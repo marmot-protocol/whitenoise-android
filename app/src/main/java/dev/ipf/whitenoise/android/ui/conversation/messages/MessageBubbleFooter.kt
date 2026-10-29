@@ -13,19 +13,31 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.layout.Placeable
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import kotlin.math.ceil
 
 // Gap between a bubble's text and its trailing inline footer.
 private val BubbleFooterGap = 8.dp
 
+/** Occupied extent from the body's logical start; physical right edges are unsafe in RTL. */
+internal fun TextLayoutResult.bubbleFooterLastLineWidth(layoutDirection: LayoutDirection): Int? {
+    if (lineCount == 0) return null
+    val lastLine = lineCount - 1
+    val occupied =
+        if (layoutDirection == LayoutDirection.Rtl) size.width - getLineLeft(lastLine) else getLineRight(lastLine)
+    return ceil(occupied).toInt().coerceIn(0, size.width)
+}
+
 /**
  * Lays [content] with [footer] pinned bottom-end. The footer joins the last
- * line when it leaves room ([lastLineWidth], the real last-line right edge when
+ * line when it leaves room ([lastLineWidth], the occupied extent from logical start when
  * the caller can supply it; otherwise the widest line) and sits on that line's
  * [lastLineBaseline]; else it drops to its own line below. Either way it stays
- * right of the text and never overlaps.
+ * on the text's logical trailing side and never overlaps.
  */
 @Composable
 internal fun BubbleFooterLayout(
@@ -33,6 +45,7 @@ internal fun BubbleFooterLayout(
     modifier: Modifier = Modifier,
     lastLineWidth: Int? = null,
     lastLineBaseline: Int? = null,
+    allowInline: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     Layout(
@@ -42,7 +55,7 @@ internal fun BubbleFooterLayout(
             Box { footer() }
         },
     ) { measurables, constraints ->
-        val footerPlaceable = measurables[1].measure(Constraints())
+        val footerPlaceable = measurables[1].measure(constraints.copy(minWidth = 0, minHeight = 0))
         val contentPlaceable = measurables[0].measure(constraints.copy(minWidth = 0))
         layoutMeasuredBubbleFooter(
             constraints = constraints,
@@ -51,6 +64,7 @@ internal fun BubbleFooterLayout(
             lastLineWidth = lastLineWidth,
             lastLineBaseline = lastLineBaseline,
             gap = BubbleFooterGap.roundToPx(),
+            allowInline = allowInline,
         )
     }
 }
@@ -81,9 +95,10 @@ internal fun bubbleInlineFooterGeometry(
     maxWidth: Int,
     minWidth: Int,
     gap: Int,
+    allowInline: Boolean = true,
 ): BubbleInlineFooterGeometry {
     val required = lastLineRight + gap + footerWidth
-    val inline = required <= maxWidth && lastBaseline >= footerBaseline
+    val inline = allowInline && required <= maxWidth && lastBaseline >= footerBaseline
     val width = maxOf(textWidth, footerWidth, minWidth, if (inline) required else 0).coerceAtMost(maxWidth)
     val y = if (inline) lastBaseline - footerBaseline else textHeight + gap / 2
     return BubbleInlineFooterGeometry(width, maxOf(textHeight, y + footerHeight), width - footerWidth, y)
@@ -96,10 +111,16 @@ private fun MeasureScope.layoutMeasuredBubbleFooter(
     lastLineWidth: Int?,
     lastLineBaseline: Int?,
     gap: Int,
+    allowInline: Boolean,
 ): MeasureResult {
     val effectiveGap = if (footer.width == 0 && footer.height == 0) 0 else gap
     val lastRight = (lastLineWidth ?: content.width).coerceIn(0, content.width)
-    val footerBaseline = footer[FirstBaseline].takeIf { it != AlignmentLine.Unspecified } ?: footer.height
+    val firstFooterBaseline = footer[FirstBaseline]
+    val lastFooterBaseline = footer[LastBaseline]
+    val footerBaseline =
+        lastFooterBaseline.takeIf { it != AlignmentLine.Unspecified }
+            ?: firstFooterBaseline.takeIf { it != AlignmentLine.Unspecified }
+            ?: footer.height
     // A reported text baseline is local to the text block that measured it, so a body built from
     // several blocks placed the footer against the wrong one. The body's own last baseline is
     // already expressed in the coordinates the footer is placed in, so prefer it and keep the
@@ -122,12 +143,19 @@ private fun MeasureScope.layoutMeasuredBubbleFooter(
             maxWidth = constraints.maxWidth,
             minWidth = constraints.minWidth,
             gap = effectiveGap,
+            allowInline = allowInline && footer.hasSingleFooterBaseline(),
         )
     return layout(geometry.width, geometry.height.coerceIn(constraints.minHeight, constraints.maxHeight)) {
-        content.place(0, 0)
-        footer.place(geometry.x, geometry.y)
+        content.placeRelative(0, 0)
+        footer.placeRelative(geometry.x, geometry.y)
     }
 }
+
+/** A wrapped metadata footer must never rise into earlier lines of a multi-block body. */
+private fun Placeable.hasSingleFooterBaseline(): Boolean =
+    this[FirstBaseline] == AlignmentLine.Unspecified ||
+        this[LastBaseline] == AlignmentLine.Unspecified ||
+        this[FirstBaseline] == this[LastBaseline]
 
 internal fun bubbleFooterInlineWidth(
     contentWidth: Int,
@@ -149,6 +177,7 @@ internal fun BubbleCollapsibleFooterLayout(
     modifier: Modifier = Modifier,
     lastLineWidth: Int? = null,
     lastLineBaseline: Int? = null,
+    allowInline: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     Layout(
@@ -184,7 +213,7 @@ internal fun BubbleCollapsibleFooterLayout(
                 ),
             )
         val footerPlaceable =
-            measurables[2].measure(Constraints())
+            measurables[2].measure(constraints.copy(minWidth = 0, minHeight = 0))
         val gap = BubbleFooterGap.roundToPx()
         if (contentPlaceable.height <= maxBodyHeightPx) {
             layoutMeasuredBubbleFooter(
@@ -194,10 +223,11 @@ internal fun BubbleCollapsibleFooterLayout(
                 lastLineWidth = lastLineWidth,
                 lastLineBaseline = lastLineBaseline,
                 gap = gap,
+                allowInline = allowInline,
             )
         } else {
             val readMorePlaceable =
-                measurables[1].measure(Constraints())
+                measurables[1].measure(constraints.copy(minWidth = 0, minHeight = 0))
             layoutCollapsedBubbleFooter(
                 constraints = constraints,
                 content = contentPlaceable,
@@ -205,6 +235,7 @@ internal fun BubbleCollapsibleFooterLayout(
                 footer = footerPlaceable,
                 visibleContentHeight = maxBodyHeightPx,
                 gap = gap,
+                allowInline = allowInline,
             )
         }
     }
@@ -217,8 +248,10 @@ private fun MeasureScope.layoutCollapsedBubbleFooter(
     footer: Placeable,
     visibleContentHeight: Int,
     gap: Int,
+    allowInline: Boolean,
 ): MeasureResult {
     val effectiveGap = if (footer.width == 0 && footer.height == 0) 0 else gap
+    val canShareRow = allowInline && footer.hasSingleFooterBaseline()
     val width =
         bubbleCollapsedFooterWidth(
             contentWidth = content.width,
@@ -227,14 +260,16 @@ private fun MeasureScope.layoutCollapsedBubbleFooter(
             minWidth = constraints.minWidth,
             maxWidth = constraints.maxWidth,
             gap = effectiveGap,
+            allowInline = canShareRow,
         )
     val rowFits =
-        collapsedFooterFitsOnOneRow(
-            containerWidth = width,
-            readMoreWidth = readMore.width,
-            footerWidth = footer.width,
-            gap = effectiveGap,
-        )
+        canShareRow &&
+            collapsedFooterFitsOnOneRow(
+                containerWidth = width,
+                readMoreWidth = readMore.width,
+                footerWidth = footer.width,
+                gap = effectiveGap,
+            )
     if (rowFits) {
         val rowMetrics =
             collapsedFooterRowMetrics(
@@ -269,8 +304,9 @@ internal fun bubbleCollapsedFooterWidth(
     minWidth: Int,
     maxWidth: Int,
     gap: Int,
+    allowInline: Boolean = true,
 ): Int =
-    maxOf(contentWidth, readMoreWidth + gap + footerWidth, minWidth)
+    maxOf(contentWidth, if (allowInline) readMoreWidth + gap + footerWidth else maxOf(readMoreWidth, footerWidth), minWidth)
         .coerceAtMost(maxWidth)
 
 internal fun collapsedFooterFitsOnOneRow(

@@ -21,10 +21,12 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextDecoration
@@ -44,7 +46,6 @@ import dev.ipf.whitenoise.android.ui.markdownDocumentToPreviewAnnotatedString
 import dev.ipf.whitenoise.android.ui.markdownInlinesToAnnotatedString
 import dev.ipf.whitenoise.android.ui.previewTake
 import dev.ipf.whitenoise.android.ui.rememberTimestampRevision
-import kotlin.math.ceil
 
 /** Display-only excerpt keeps native inline styling but removes all actionable link annotations. */
 internal fun focusedMessagePreviewText(
@@ -152,8 +153,13 @@ internal fun FocusedTextMessagePreview(
         remember(text, document, mentionDisplayName, timestampRevision) {
             focusedMessagePreviewText(text, document, mentionDisplayName)
         }
-    var lastLineWidth by remember(excerpt) { mutableStateOf<Int?>(null) }
-    var lastLineBaseline by remember(excerpt) { mutableStateOf<Int?>(null) }
+    var lastLineLayout by remember(excerpt) { mutableStateOf<TextLayoutResult?>(null) }
+    val layoutDirection = LocalLayoutDirection.current
+    val lastLineWidth = lastLineLayout?.bubbleFooterLastLineWidth(layoutDirection)
+    val lastLineBaseline =
+        lastLineLayout?.let { layout ->
+            if (layout.lineCount > 0) layout.getLineBaseline(layout.lineCount - 1).toInt() else null
+        }
     val footer: @Composable () -> Unit =
         footerContent ?: {
             MessageInlineFooter(
@@ -181,11 +187,7 @@ internal fun FocusedTextMessagePreview(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.testTag("message-actions-excerpt"),
                     onTextLayout = { layout ->
-                        val lastLine = layout.lineCount - 1
-                        lastLineWidth =
-                            if (layout.lineCount > 0) ceil(layout.getLineRight(lastLine)).toInt() else null
-                        lastLineBaseline =
-                            if (layout.lineCount > 0) layout.getLineBaseline(lastLine).toInt() else null
+                        lastLineLayout = layout
                     },
                 )
                 warning?.let {

@@ -2,19 +2,33 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -73,6 +87,135 @@ class MessageBubbleFooterPlacementTest {
         composeRule.onNodeWithTag(ROOT_TAG).captureRoboImage(
             "src/test/snapshots/message_footer_multi_block_placement.png",
         )
+    }
+
+    /** A wrapped edited label cannot rise into earlier body lines even with a short final line. */
+    @Test
+    fun wrappedMetadataRemainsBelowTheWholeMultiBlockBody() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                BubbleFooterLayout(
+                    modifier = Modifier.width(130.dp).testTag(ROOT_TAG),
+                    lastLineWidth = 8,
+                    lastLineBaseline = 100,
+                    footer = {
+                        MessageInlineFooter(
+                            timeText = "12:45",
+                            color = Color.Black,
+                            showStatus = true,
+                            status = MessageStatus.Sent,
+                            editedLabel = "A long translated edited label",
+                            onEditedClick = {},
+                        )
+                    },
+                ) {
+                    Column {
+                        Text("Several earlier lines of message text fill this bubble.")
+                        Text("Hi", modifier = Modifier.testTag(LAST_BLOCK_TAG))
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val last = composeRule.onNodeWithTag(LAST_BLOCK_TAG).fetchSemanticsNode().boundsInRoot
+        val edited =
+            composeRule
+                .onNodeWithText("A long translated edited label", useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val time = composeRule.onNodeWithText("12:45", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue("wrapped metadata must be below the body", edited.top >= last.bottom)
+        assertTrue("the timestamp must follow the wrapped label", time.top >= edited.bottom)
+    }
+
+    /** Read More and recovery content stay before the terminal warning/time region. */
+    @Test
+    fun collapsedBodyKeepsWarningAndTimeAfterReadMore() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                BubbleCollapsibleFooterLayout(
+                    modifier = Modifier.width(180.dp),
+                    maxBodyHeight = 48.dp,
+                    readMore = { Text("Read More") },
+                    allowInline = false,
+                    footer = {
+                        MessageBubbleMetadataFooter(warning = "Delivery not confirmed", color = Color.Black) {
+                            Text("12:45", style = MaterialTheme.typography.labelSmall)
+                        }
+                    },
+                ) {
+                    Box(Modifier.height(200.dp)) { Text("A long body") }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val readMore = composeRule.onNodeWithText("Read More").fetchSemanticsNode().boundsInRoot
+        val warning = composeRule.onNodeWithText("Delivery not confirmed").fetchSemanticsNode().boundsInRoot
+        val time = composeRule.onNodeWithText("12:45").fetchSemanticsNode().boundsInRoot
+        assertTrue("warning must follow Read More", warning.top >= readMore.bottom)
+        assertTrue("warning cannot extend below time", warning.bottom <= time.bottom + 1f)
+    }
+
+    /** An explicitly left-aligned final line exposes physical-right/logical-end confusion in RTL. */
+    @Test
+    fun leftAlignedLatinInRtlReservesItsActualLogicalExtent() {
+        composeRule.setContent {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                WhiteNoiseTheme(darkTheme = false) {
+                    var textLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
+                    BubbleFooterLayout(
+                        modifier = Modifier.width(220.dp),
+                        lastLineWidth = textLayout?.bubbleFooterLastLineWidth(LayoutDirection.Rtl),
+                        lastLineBaseline = textLayout?.let { it.getLineBaseline(it.lineCount - 1).toInt() },
+                        footer = { Text("12:45", style = MaterialTheme.typography.labelSmall) },
+                    ) {
+                        Text(
+                            "Several wrapped lines of left-aligned Latin text.\nHi",
+                            modifier = Modifier.width(220.dp).testTag(LAST_BLOCK_TAG),
+                            textAlign = TextAlign.Left,
+                            onTextLayout = { textLayout = it },
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val text = composeRule.onNodeWithTag(LAST_BLOCK_TAG).fetchSemanticsNode().boundsInRoot
+        val time = composeRule.onNodeWithText("12:45").fetchSemanticsNode().boundsInRoot
+        println("RTL explicitly left-aligned footer: text=$text, time=$time")
+        assertTrue("the footer must follow a final line occupying its physical left edge", time.top >= text.bottom)
+    }
+
+    /** Default inline placement must recognize the wrapper's true first and terminal baselines. */
+    @Test
+    fun multilineWarningCannotRiseIntoBodyWithDefaultInlinePolicy() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                BubbleFooterLayout(
+                    modifier = Modifier.width(220.dp),
+                    lastLineWidth = 8,
+                    footer = {
+                        Box(Modifier.width(120.dp)) {
+                            MessageBubbleMetadataFooter(warning = "Delivery not confirmed", color = Color.Black) {
+                                Text("12:45", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    },
+                ) {
+                    Column {
+                        Text("Earlier paragraph lines use the full bubble width before the final short word.")
+                        Text("Hi", modifier = Modifier.testTag(LAST_BLOCK_TAG))
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val body = composeRule.onNodeWithTag(LAST_BLOCK_TAG).fetchSemanticsNode().boundsInRoot
+        val warning = composeRule.onNodeWithText("Delivery not confirmed").fetchSemanticsNode().boundsInRoot
+        val time = composeRule.onNodeWithText("12:45").fetchSemanticsNode().boundsInRoot
+        assertTrue("the warning must actually wrap", warning.height > time.height)
+        assertTrue("a multiline footer must remain below the whole body", warning.top >= body.bottom)
+        assertTrue("timestamp remains on the terminal warning line", kotlin.math.abs(warning.bottom - time.bottom) <= 1f)
     }
 
     /** A paragraph and a link stacked as separate blocks, with the footer beside them. */
