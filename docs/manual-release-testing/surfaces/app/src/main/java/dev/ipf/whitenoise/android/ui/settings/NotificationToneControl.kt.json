@@ -1,0 +1,124 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationToneControl.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "NotificationToneControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationToneControl.kt",
+        "anchor": "fun NotificationToneControl(",
+        "test_ids": [
+          "NTF-045"
+        ]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "NotificationToneControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationToneControl.kt",
+        "anchor": "fun NotificationToneControl(",
+        "test_ids": [
+          "NTF-045"
+        ]
+      },
+      {
+        "surface": "rememberNotificationSoundLabels",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationToneControl.kt",
+        "anchor": "fun rememberNotificationSoundLabels(",
+        "test_ids": [
+          "NTF-045"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:notification_tone_add",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationToneControl.kt",
+        "anchor": "R.string.notification_tone_add",
+        "test_ids": [
+          "NTF-045"
+        ]
+      },
+      {
+        "surface": "string:notification_tone_add_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationToneControl.kt",
+        "anchor": "R.string.notification_tone_add_detail",
+        "test_ids": [
+          "NTF-045"
+        ]
+      },
+      {
+        "surface": "string:notification_tone_add_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationToneControl.kt",
+        "anchor": "R.string.notification_tone_add_failed",
+        "test_ids": [
+          "NTF-045"
+        ]
+      },
+      {
+        "surface": "string:notification_tone_added",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationToneControl.kt",
+        "anchor": "R.string.notification_tone_added",
+        "test_ids": [
+          "NTF-045"
+        ]
+      },
+      {
+        "surface": "string:notification_tone_android",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationToneControl.kt",
+        "anchor": "R.string.notification_tone_android",
+        "test_ids": [
+          "NTF-045"
+        ]
+      },
+      {
+        "surface": "string:notification_tone_default",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationToneControl.kt",
+        "anchor": "R.string.notification_tone_default",
+        "test_ids": [
+          "NTF-045"
+        ]
+      },
+      {
+        "surface": "string:notification_tone_off",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationToneControl.kt",
+        "anchor": "R.string.notification_tone_off",
+        "test_ids": [
+          "NTF-045"
+        ]
+      },
+      {
+        "surface": "string:notification_tone_preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationToneControl.kt",
+        "anchor": "R.string.notification_tone_preview",
+        "test_ids": [
+          "NTF-045"
+        ]
+      },
+      {
+        "surface": "string:notification_tone_preview_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationToneControl.kt",
+        "anchor": "R.string.notification_tone_preview_failed",
+        "test_ids": [
+          "NTF-045"
+        ]
+      },
+      {
+        "surface": "string:notification_tone_silent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationToneControl.kt",
+        "anchor": "R.string.notification_tone_silent",
+        "test_ids": [
+          "NTF-045"
+        ]
+      },
+      {
+        "surface": "string:notification_tone_stop",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationToneControl.kt",
+        "anchor": "R.string.notification_tone_stop",
+        "test_ids": [
+          "NTF-045"
+        ]
+      }
+    ]
+  }
+}

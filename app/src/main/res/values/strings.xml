@@ -2670,4 +2670,19 @@
     <string name="chat_batch_order_unchanged">No selected pinned chats can move further. Selected runs move one position while keeping their order.</string>
     <string name="chat_batch_check_results">Check results</string>
     <string name="chat_batch_order_unconfirmed">Could not confirm the pinned order. Check the chat list before moving chats again.</string>
+    <string name="notification_tones">White Noise sounds</string>
+    <string name="notification_tone_ding">White Noise Ding</string>
+    <string name="notification_tone_pulse">White Noise Pulse</string>
+    <string name="notification_tone_preview">Tap to preview</string>
+    <string name="notification_tone_stop">Tap to stop preview</string>
+    <string name="notification_tone_preview_failed">Could not play the preview. Try again.</string>
+    <string name="notification_tone_add">Add to Android sounds</string>
+    <string name="notification_tone_add_detail">Make these tones available in Android’s sound picker.</string>
+    <string name="notification_tone_added">Added. Open a category below, then Sound to choose a tone. Some devices list these under My Sounds.</string>
+    <string name="notification_tone_add_failed">Could not add the sounds. Try again or keep your current Android sound.</string>
+    <string name="notification_tone_scope">Previewing or adding sounds does not change your alerts. Choose a sound in Android for each category, conversation or person. Existing conversations and personal overrides keep their own sounds. New message categories use Ding; silent and customized categories stay unchanged. Previews use notification volume and respect Silent mode and Do Not Disturb.</string>
+    <string name="notification_tone_android">Android sound</string>
+    <string name="notification_tone_silent">Silent</string>
+    <string name="notification_tone_off">Off</string>
+    <string name="notification_tone_default">Default</string>
 </resources>
