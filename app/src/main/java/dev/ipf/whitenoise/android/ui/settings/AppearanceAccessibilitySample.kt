@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /** Synthetic sample; the screen retains simulation state without writing app or system preferences. */
 @Composable
@@ -33,12 +34,18 @@ internal fun AppearanceAccessibilitySample(
     val density = LocalDensity.current
     val direction = LocalLayoutDirection.current
     val motion = rememberSystemAnimationsEnabled()
+    // SettingsGroup supplies its own screen margin, so only the free-standing children add one.
+    val margin = Modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
     Column(
-        Modifier.fillMaxWidth().padding(16.dp).testTag("appearance.accessibility.preview"),
+        Modifier.fillMaxWidth().padding(vertical = 16.dp).testTag("appearance.accessibility.preview"),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(stringResource(R.string.appearance_accessibility_preview), style = MaterialTheme.typography.titleMedium)
-        Text(stringResource(R.string.appearance_preview_limits), style = MaterialTheme.typography.bodySmall)
+        Text(
+            stringResource(R.string.appearance_accessibility_preview),
+            margin,
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(stringResource(R.string.appearance_preview_limits), margin, style = MaterialTheme.typography.bodySmall)
         SettingsGroup {
             row("preview_rtl") { context ->
                 SettingsSwitch(
@@ -61,16 +68,18 @@ internal fun AppearanceAccessibilitySample(
             LocalLayoutDirection provides if (state.rtl) LayoutDirection.Rtl else direction,
             LocalDensity provides Density(density.density, density.fontScale * if (state.largeText) 2f else 1f),
         ) {
-            FontAppearanceSample(theme, mineArgb, otherArgb, Modifier.testTag("appearance.accessibility.sample"))
+            FontAppearanceSample(theme, mineArgb, otherArgb, margin.testTag("appearance.accessibility.sample"))
         }
         Text(
             stringResource(
                 if (motion) R.string.appearance_preview_motion_on else R.string.appearance_preview_motion_off,
             ),
+            margin,
             style = MaterialTheme.typography.bodySmall,
         )
         TextButton(
             onClick = state::reset,
+            modifier = margin,
         ) {
             Text(stringResource(R.string.appearance_preview_reset))
         }

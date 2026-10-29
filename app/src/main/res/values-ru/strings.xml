@@ -2573,10 +2573,10 @@
     <string name="appearance_accessibility_preview">Предпросмотр читаемости</string>
     <string name="appearance_preview_rtl">Предпросмотр макета справа налево</string>
     <string name="appearance_preview_large_text">Предпросмотр увеличенного текста</string>
-    <string name="appearance_preview_reset">Сбросить пример</string>
-    <string name="appearance_preview_limits">Искусственный пример с текущей темой и шрифтом. Эти переключатели влияют только на этот пример. Порядок чтения программой экранного доступа, увеличение, управление переключателями и области касания нужно проверять отдельно с реальной службой специальных возможностей.</string>
-    <string name="appearance_preview_motion_on">Системные анимации включены. Этот статичный пример не проверяет движение.</string>
-    <string name="appearance_preview_motion_off">Системные анимации отключены. Этот пример учитывает эту настройку.</string>
+    <string name="appearance_preview_reset">Сбросить предпросмотр</string>
+    <string name="appearance_preview_limits">Показывает, как выглядят сообщения с текущими темой, шрифтом и размером текста. Эти переключатели меняют только этот предпросмотр. Программы чтения с экрана и увеличение здесь не показываются — проверьте их в настройках специальных возможностей устройства.</string>
+    <string name="appearance_preview_motion_on">Анимации на устройстве включены.</string>
+    <string name="appearance_preview_motion_off">Анимации на устройстве отключены, поэтому изменения отображаются без движения.</string>
 
     <string name="voice_recording_save_failed">Запись остановлена, но не удалось сохранить аудио. Запишите ещё раз.</string>
     <string name="voice_recording_stops_in">Остановка через %1$s</string>

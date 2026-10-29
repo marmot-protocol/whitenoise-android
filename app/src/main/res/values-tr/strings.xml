@@ -2497,10 +2497,10 @@
     <string name="appearance_accessibility_preview">Okunabilirlik önizlemesi</string>
     <string name="appearance_preview_rtl">Sağdan sola düzeni önizle</string>
     <string name="appearance_preview_large_text">Daha büyük metni önizle</string>
-    <string name="appearance_preview_reset">Örneği sıfırla</string>
-    <string name="appearance_preview_limits">Geçerli tema ve yazı tipini kullanan yapay bir örnek. Bu anahtarlar yalnızca bu örneği etkiler. Ekran okuyucu sırası, büyütme, anahtarla erişim ve dokunma alanları gerçek erişilebilirlik hizmetiyle ayrıca test edilmelidir.</string>
-    <string name="appearance_preview_motion_on">Sistem animasyonları etkin. Bu statik örnek hareketi test etmez.</string>
-    <string name="appearance_preview_motion_off">Sistem animasyonları devre dışı. Bu örnek bu ayara uyar.</string>
+    <string name="appearance_preview_reset">Önizlemeyi sıfırla</string>
+    <string name="appearance_preview_limits">Mesajların geçerli tema, yazı tipi ve metin boyutuyla nasıl göründüğünü gösterir. Bu anahtarlar yalnızca bu önizlemeyi değiştirir. Ekran okuyucular ve büyütme burada önizlenemez; bunları cihazınızın Erişilebilirlik ayarlarında deneyin.</string>
+    <string name="appearance_preview_motion_on">Cihaz animasyonları açık.</string>
+    <string name="appearance_preview_motion_off">Cihaz animasyonları kapalı, bu nedenle değişiklikler hareketsiz görünür.</string>
 
     <string name="voice_recording_save_failed">Kayıt durduruldu, ancak ses kaydedilemedi. Yeniden kaydedin.</string>
     <string name="voice_recording_stops_in">%1$s sonra duracak</string>

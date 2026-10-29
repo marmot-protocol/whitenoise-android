@@ -2499,10 +2499,10 @@
     <string name="appearance_accessibility_preview">Vista previa de legibilidad</string>
     <string name="appearance_preview_rtl">Vista previa del diseño de derecha a izquierda</string>
     <string name="appearance_preview_large_text">Vista previa con texto más grande</string>
-    <string name="appearance_preview_reset">Restablecer ejemplo</string>
-    <string name="appearance_preview_limits">Ejemplo ficticio con el tema y la fuente actuales. Estos interruptores solo afectan a este ejemplo. El orden del lector de pantalla, la ampliación, el acceso con interruptores y las áreas táctiles deben probarse por separado con el servicio de accesibilidad real.</string>
-    <string name="appearance_preview_motion_on">Las animaciones del sistema están activadas. Este ejemplo estático no prueba el movimiento.</string>
-    <string name="appearance_preview_motion_off">Las animaciones del sistema están desactivadas. Este ejemplo respeta ese ajuste.</string>
+    <string name="appearance_preview_reset">Restablecer vista previa</string>
+    <string name="appearance_preview_limits">Muestra cómo se ven los mensajes con tu tema, fuente y tamaño de texto actuales. Estos interruptores solo cambian esta vista previa. Los lectores de pantalla y la ampliación no se pueden previsualizar aquí; pruébalos en los ajustes de Accesibilidad de tu dispositivo.</string>
+    <string name="appearance_preview_motion_on">Las animaciones del dispositivo están activadas.</string>
+    <string name="appearance_preview_motion_off">Las animaciones del dispositivo están desactivadas, así que los cambios aparecen sin movimiento.</string>
 
     <string name="voice_recording_save_failed">La grabación se detuvo, pero no se pudo guardar el audio. Graba de nuevo.</string>
     <string name="voice_recording_stops_in">Se detiene en %1$s</string>

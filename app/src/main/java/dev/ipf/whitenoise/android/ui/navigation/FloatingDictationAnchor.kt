@@ -34,7 +34,6 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInWindow
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
@@ -125,6 +124,30 @@ private data class DictationFooterSpace(
 private val LocalDictationFooterSpace = compositionLocalOf<DictationFooterSpace?> { null }
 
 /**
+ * Reuses one shell-content lambda per footer space. Subcomposition recomposes only for a new lambda, so
+ * remeasuring without dictation, or with unchanged space, leaves the shell's composition untouched.
+ */
+private class DictationContentSlots(
+    private val content: @Composable () -> Unit,
+) {
+    private var space: DictationFooterSpace? = null
+    private var slot: @Composable () -> Unit = provide(null)
+
+    /** Returns the cached lambda while [next] equals the previous footer space. */
+    fun forSpace(next: DictationFooterSpace?): @Composable () -> Unit {
+        if (next != space) {
+            space = next
+            slot = provide(next)
+        }
+        return slot
+    }
+
+    /** Shell content sees [footerSpace] through [LocalDictationFooterSpace]. */
+    private fun provide(footerSpace: DictationFooterSpace?): @Composable () -> Unit =
+        { CompositionLocalProvider(LocalDictationFooterSpace provides footerSpace, content = content) }
+}
+
+/**
  * Registers the complete footer. Ordinary windows scroll only overflowing actions. Short windows
  * scroll a measured empty capsule slot and the actions together, retaining every full-size target.
  * The one real capsule remains in the shell and is clipped to this viewport as the slot scrolls.
@@ -177,16 +200,14 @@ internal fun FloatingDictationLayout(
     content: @Composable () -> Unit,
     control: @Composable () -> Unit,
 ) {
-    val density = LocalDensity.current
-    val statusBarTop = WindowInsets.statusBars.getTop(density)
-    val fallbackInset = maxOf(WindowInsets.ime.getBottom(density), WindowInsets.navigationBars.getBottom(density))
+    val statusBars = WindowInsets.statusBars
+    val ime = WindowInsets.ime
+    val navigationBars = WindowInsets.navigationBars
     var rootTop by remember { mutableStateOf(0f) }
     val idleScroll = rememberScrollState()
-    SubcomposeLayout(
-        modifier = Modifier.fillMaxSize().onPlaced { rootTop = it.positionInWindow().y },
-    ) { constraints ->
-        val bubble =
-            subcompose("control") {
+    val controlSlot: @Composable () -> Unit =
+        remember(anchor, control) {
+            {
                 Box(
                     Modifier.scrollable(
                         state = anchor.scrollingState ?: idleScroll,
@@ -197,7 +218,18 @@ internal fun FloatingDictationLayout(
                 ) {
                     control()
                 }
-            }.single()
+            }
+        }
+    val contentSlots = remember(content) { DictationContentSlots(content) }
+    SubcomposeLayout(
+        modifier = Modifier.fillMaxSize().onPlaced { rootTop = it.positionInWindow().y },
+    ) { constraints ->
+        // Insets are read while measuring, so a keyboard frame remeasures the shell without recomposing it.
+        val statusBarTop = statusBars.getTop(this)
+        val fallbackInset = maxOf(ime.getBottom(this), navigationBars.getBottom(this))
+        val bubble =
+            subcompose("control", controlSlot)
+                .single()
                 .measure(constraints.copy(minWidth = 0, minHeight = 0))
                 .takeIf { it.width > 0 && it.height > 0 }
         val safeTop = (statusBarTop - rootTop).roundToInt().coerceAtLeast(0)
@@ -211,11 +243,7 @@ internal fun FloatingDictationLayout(
                     DictationFooterSpace((available - slot).toDp(), 0.dp)
                 }
             }
-        val body =
-            subcompose("content") {
-                CompositionLocalProvider(LocalDictationFooterSpace provides footerSpace, content = content)
-            }.single()
-                .measure(constraints)
+        val body = subcompose("content", contentSlots.forSpace(footerSpace)).single().measure(constraints)
         layout(constraints.maxWidth, constraints.maxHeight) {
             body.place(0, 0)
             if (bubble != null) {

@@ -2516,10 +2516,10 @@
     <string name="appearance_accessibility_preview">Lesbarkeitsvorschau</string>
     <string name="appearance_preview_rtl">Layout von rechts nach links anzeigen</string>
     <string name="appearance_preview_large_text">Größeren Text anzeigen</string>
-    <string name="appearance_preview_reset">Beispiel zurücksetzen</string>
-    <string name="appearance_preview_limits">Künstliches Beispiel mit deinem aktuellen Design und deiner Schriftart. Diese Schalter wirken sich nur auf dieses Beispiel aus. Die Lesereihenfolge des Screenreaders, Vergrößerung, Schalterzugriff und Berührungsflächen müssen separat mit dem tatsächlichen Bedienungshilfedienst getestet werden.</string>
-    <string name="appearance_preview_motion_on">Systemanimationen sind aktiviert. Dieses statische Beispiel testet keine Bewegungen.</string>
-    <string name="appearance_preview_motion_off">Systemanimationen sind deaktiviert. Dieses Beispiel berücksichtigt diese Einstellung.</string>
+    <string name="appearance_preview_reset">Vorschau zurücksetzen</string>
+    <string name="appearance_preview_limits">Zeigt, wie Nachrichten mit deinem aktuellen Design, deiner Schriftart und Textgröße aussehen. Diese Schalter ändern nur diese Vorschau. Screenreader und Vergrößerung sind hier nicht in der Vorschau verfügbar; probiere sie in den Bedienungshilfen deines Geräts aus.</string>
+    <string name="appearance_preview_motion_on">Geräteanimationen sind an.</string>
+    <string name="appearance_preview_motion_off">Geräteanimationen sind aus, daher erscheinen Änderungen ohne Bewegung.</string>
 
     <string name="voice_recording_save_failed">Aufnahme wurde beendet, aber die Audiodatei konnte nicht gespeichert werden. Nimm erneut auf.</string>
     <string name="voice_recording_stops_in">Endet in %1$s</string>

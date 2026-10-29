@@ -2499,10 +2499,10 @@
     <string name="appearance_accessibility_preview">Aperçu de la lisibilité</string>
     <string name="appearance_preview_rtl">Aperçu de la disposition de droite à gauche</string>
     <string name="appearance_preview_large_text">Aperçu avec un texte plus grand</string>
-    <string name="appearance_preview_reset">Réinitialiser l’exemple</string>
-    <string name="appearance_preview_limits">Exemple fictif utilisant le thème et la police actuels. Ces interrupteurs ne modifient que cet exemple. L’ordre du lecteur d’écran, l’agrandissement, l’accès par contacteurs et les zones tactiles doivent être testés séparément avec le service d’accessibilité réel.</string>
-    <string name="appearance_preview_motion_on">Les animations du système sont activées. Cet exemple statique ne teste pas les mouvements.</string>
-    <string name="appearance_preview_motion_off">Les animations du système sont désactivées. Cet exemple respecte ce réglage.</string>
+    <string name="appearance_preview_reset">Réinitialiser l’aperçu</string>
+    <string name="appearance_preview_limits">Montre l’apparence des messages avec votre thème, votre police et votre taille de texte actuels. Ces interrupteurs ne modifient que cet aperçu. Les lecteurs d’écran et l’agrandissement ne peuvent pas être prévisualisés ici ; essayez-les dans les réglages d’accessibilité de votre appareil.</string>
+    <string name="appearance_preview_motion_on">Les animations de l’appareil sont activées.</string>
+    <string name="appearance_preview_motion_off">Les animations de l’appareil sont désactivées : les changements s’affichent sans mouvement.</string>
 
     <string name="voice_recording_save_failed">L’enregistrement s’est arrêté, mais l’audio n’a pas pu être sauvegardé. Réenregistrez.</string>
     <string name="voice_recording_stops_in">Arrêt dans %1$s</string>

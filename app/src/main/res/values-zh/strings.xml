@@ -2464,10 +2464,10 @@
     <string name="appearance_accessibility_preview">可读性预览</string>
     <string name="appearance_preview_rtl">预览从右到左的布局</string>
     <string name="appearance_preview_large_text">预览更大文字</string>
-    <string name="appearance_preview_reset">重置示例</string>
-    <string name="appearance_preview_limits">使用当前主题和字体的模拟示例。这些开关仅影响此示例。屏幕阅读器的朗读顺序、放大功能、开关控制和触摸区域需要使用实际的无障碍服务单独测试。</string>
-    <string name="appearance_preview_motion_on">系统动画已启用。此静态示例不测试动态效果。</string>
-    <string name="appearance_preview_motion_off">系统动画已停用。此示例遵循该设置。</string>
+    <string name="appearance_preview_reset">重置预览</string>
+    <string name="appearance_preview_limits">显示消息在当前主题、字体和文字大小下的样子。这些开关只会更改此预览。屏幕阅读器和放大功能无法在此预览，请在设备的无障碍设置中试用。</string>
+    <string name="appearance_preview_motion_on">设备动画已开启。</string>
+    <string name="appearance_preview_motion_off">设备动画已关闭，因此更改会直接显示，没有动画。</string>
 
     <string name="voice_recording_save_failed">录音已停止，但无法保存音频。请重新录制。</string>
     <string name="voice_recording_stops_in">将在 %1$s 后停止</string>

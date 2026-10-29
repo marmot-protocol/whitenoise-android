@@ -2667,10 +2667,10 @@
     <string name="appearance_accessibility_preview">Readability preview</string>
     <string name="appearance_preview_rtl">Preview right-to-left layout</string>
     <string name="appearance_preview_large_text">Preview larger text</string>
-    <string name="appearance_preview_reset">Reset sample</string>
-    <string name="appearance_preview_limits">Synthetic sample using your current theme and font. These switches affect only this sample. Screen-reader order, magnification, switch access and touch targets need separate testing with the real accessibility service.</string>
-    <string name="appearance_preview_motion_on">System animations are enabled. This static sample does not test motion.</string>
-    <string name="appearance_preview_motion_off">System animations are disabled. This sample respects that setting.</string>
+    <string name="appearance_preview_reset">Reset preview</string>
+    <string name="appearance_preview_limits">Shows how messages look with your current theme, font and text size. These switches change only this preview. Screen readers and magnification can’t be previewed here; try them in your device’s Accessibility settings.</string>
+    <string name="appearance_preview_motion_on">Device animations are on.</string>
+    <string name="appearance_preview_motion_off">Device animations are off, so changes appear without motion.</string>
     <string name="chat_batch_progress">Processed %1$d of %2$d chats</string>
     <string name="chat_batch_result">Changed: %1$d\nAlready satisfied: %2$d\nSkipped (unavailable): %3$d\nFailed: %4$d\nNot started: %5$d\nUnconfirmed: %6$d</string>
     <string name="chat_batch_order_failed">Pinned order is unavailable or changed. Review the current chat list before another move.</string>

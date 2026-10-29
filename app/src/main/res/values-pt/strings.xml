@@ -2499,10 +2499,10 @@
     <string name="appearance_accessibility_preview">Pré-visualização da legibilidade</string>
     <string name="appearance_preview_rtl">Pré-visualizar disposição da direita para a esquerda</string>
     <string name="appearance_preview_large_text">Pré-visualizar texto maior</string>
-    <string name="appearance_preview_reset">Repor exemplo</string>
-    <string name="appearance_preview_limits">Exemplo fictício com o tema e o tipo de letra atuais. Estes interruptores afetam apenas este exemplo. A ordem do leitor de ecrã, a ampliação, o acesso por interruptores e as áreas de toque precisam de testes separados com o serviço de acessibilidade real.</string>
-    <string name="appearance_preview_motion_on">As animações do sistema estão ativadas. Este exemplo estático não testa movimentos.</string>
-    <string name="appearance_preview_motion_off">As animações do sistema estão desativadas. Este exemplo respeita essa definição.</string>
+    <string name="appearance_preview_reset">Repor pré-visualização</string>
+    <string name="appearance_preview_limits">Mostra o aspeto das mensagens com o tema, o tipo de letra e o tamanho do texto atuais. Estes interruptores alteram apenas esta pré-visualização. Os leitores de ecrã e a ampliação não podem ser pré-visualizados aqui; experimente-os nas definições de Acessibilidade do dispositivo.</string>
+    <string name="appearance_preview_motion_on">As animações do dispositivo estão ativadas.</string>
+    <string name="appearance_preview_motion_off">As animações do dispositivo estão desativadas, por isso as alterações aparecem sem movimento.</string>
 
     <string name="voice_recording_save_failed">A gravação parou, mas não foi possível salvar o áudio. Grave novamente.</string>
     <string name="voice_recording_stops_in">Termina em %1$s</string>
