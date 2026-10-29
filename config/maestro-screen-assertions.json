@@ -162,6 +162,46 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListBatchDialog.kt",
+      "symbol": "ChatListBatchDialog",
+      "bindings": [
+        {
+          "case": "chatstate-folder-exclude",
+          "selector": {
+            "text": "Changed: 1\nAlready satisfied: 0\nSkipped \\(unavailable\\): 0\nFailed: 0\nNot started: 0\nUnconfirmed: 0"
+          },
+          "scope": "Production captured-selection folder exclusion after creating a folder with the selected generated group. Exact successful counts and Close are directly asserted; removing that row from the folder does not dismiss the result. Native postcondition separately verifies the saved folder preference; UI absence verifies exclusion. Planned assertions, not an execution receipt.",
+          "entry_assertion": {
+            "text": "Changed: 1\nAlready satisfied: 0\nSkipped \\(unavailable\\): 0\nFailed: 0\nNot started: 0\nUnconfirmed: 0"
+          },
+          "opened_by": {
+            "text": "Exclude from this folder"
+          }
+        }
+      ],
+      "remaining": "Running progress, multiple or mixed-state targets, satisfied/unavailable/failed/not-started/unconfirmed outcomes, Check results, failed-only Retry, account/runtime retirement, source-filter replacement, translated/narrow/RTL large-text layout and physical-device interactions require separate execution evidence. This binding does not qualify those paths or full release proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListBatchDialog.kt",
+      "symbol": "ChatListBatchStatusDialog",
+      "bindings": [
+        {
+          "case": "chatstate-folder-exclude",
+          "selector": {
+            "text": "Changed: 1\nAlready satisfied: 0\nSkipped \\(unavailable\\): 0\nFailed: 0\nNot started: 0\nUnconfirmed: 0"
+          },
+          "scope": "Production captured-selection folder exclusion after creating a folder with the selected generated group. Exact successful counts and Close are directly asserted; removing that row from the folder does not dismiss the result. Native postcondition separately verifies the saved folder preference; UI absence verifies exclusion. Planned assertions, not an execution receipt.",
+          "entry_assertion": {
+            "text": "Changed: 1\nAlready satisfied: 0\nSkipped \\(unavailable\\): 0\nFailed: 0\nNot started: 0\nUnconfirmed: 0"
+          },
+          "opened_by": {
+            "text": "Exclude from this folder"
+          }
+        }
+      ],
+      "remaining": "Running progress, multiple or mixed-state targets, satisfied/unavailable/failed/not-started/unconfirmed outcomes, Check results, failed-only Retry, account/runtime retirement, source-filter replacement, translated/narrow/RTL large-text layout and physical-device interactions require separate execution evidence. This binding does not qualify those paths or full release proof."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPickerSheet.kt",
       "symbol": "ChatFolderPickerSheet",
       "bindings": [
@@ -1073,10 +1113,16 @@
       "bindings": [
         {
           "case": "presentation-extra-composer-sending-identity",
-          "selector": {"text": "Sending as"},
+          "selector": {
+            "text": "Sending as"
+          },
           "scope": "Actual composer opens the nonactive native draft owner popover; Back retains its draft and active account. Does not certify keyboard or account-switch lifecycle execution.",
-          "entry_assertion": {"id": "composer-sending-identity-popup"},
-          "opened_by": {"id": "composer-sending-identity"}
+          "entry_assertion": {
+            "id": "composer-sending-identity-popup"
+          },
+          "opened_by": {
+            "id": "composer-sending-identity"
+          }
         }
       ],
       "remaining": "Exact-source campaign execution, keyboard continuity and owner-switch lifecycle remain separate qualification."

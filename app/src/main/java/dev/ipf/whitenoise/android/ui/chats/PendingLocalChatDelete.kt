@@ -8,6 +8,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 internal class PendingLocalChatDelete private constructor(
     val groupIds: List<String>,
     val reviewItems: List<ChatListItem>,
+    val requireNativeEligibility: Boolean,
     private val controller: ChatsController,
     private val ownerState: WhiteNoiseAppState,
     private val account: String?,
@@ -38,6 +39,7 @@ internal class PendingLocalChatDelete private constructor(
         PendingLocalChatDelete(
             groupIds.drop(deleted),
             reviewItems.filter { it.group.groupIdHex in groupIds.drop(deleted) },
+            requireNativeEligibility,
             controller,
             ownerState,
             account,
@@ -50,14 +52,22 @@ internal class PendingLocalChatDelete private constructor(
             items: List<ChatListItem>,
             controller: ChatsController,
             appState: WhiteNoiseAppState,
-        ) = PendingLocalChatDelete(
-            items.map { it.group.groupIdHex }.distinctBy { it.lowercase() },
-            items.distinctBy { it.group.groupIdHex.lowercase() }.toList(),
-            controller,
-            appState,
-            controller.accountRef,
-            appState.runtimeGeneration,
-            controller.bindEpoch,
-        )
+            requireNativeEligibility: Boolean = false,
+        ): PendingLocalChatDelete {
+            val targets =
+                items
+                    .filter { !requireNativeEligibility || it.actions?.canDeleteLocal == true }
+                    .distinctBy { it.group.groupIdHex.lowercase() }
+            return PendingLocalChatDelete(
+                targets.map { it.group.groupIdHex },
+                targets.toList(),
+                requireNativeEligibility,
+                controller,
+                appState,
+                controller.accountRef,
+                appState.runtimeGeneration,
+                controller.bindEpoch,
+            )
+        }
     }
 }

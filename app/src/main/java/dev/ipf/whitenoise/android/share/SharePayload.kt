@@ -16,6 +16,9 @@ data class SharePayload(
     val importReady: Boolean = false,
     val importErrors: List<ShareImportError> = emptyList(),
     val importRejectedCount: Int = 0,
+    val importImageLimitBytes: Long? = null,
+    val importDocumentLimitBytes: Long? = null,
+    val importBatchLimitBytes: Long? = null,
 ) {
     /** A nonblank caption, stream, or typed recovery error makes the request actionable without sending it. */
     fun isSupported(): Boolean = !text.isNullOrBlank() || streamUris.isNotEmpty() || importErrors.isNotEmpty()

@@ -220,6 +220,14 @@
         "test_ids": [
           "GRP-034"
         ]
+      },
+      {
+        "surface": "R.string.toast_couldnt_update_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.toast_couldnt_update_chat",
+        "test_ids": [
+          "CHL-012"
+        ]
       }
     ],
     "source_coverage": [
@@ -285,6 +293,39 @@
         "anchor": "R.string.pull_unread_load_failed",
         "test_ids": [
           "CHL-031"
+        ]
+      },
+      {
+        "surface": "R.string.chat_batch_order_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.chat_batch_order_failed",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.chat_batch_order_unchanged",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.chat_batch_order_unchanged",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.chat_batch_order_unconfirmed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.chat_batch_order_unconfirmed",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "Selection directions and silent skipped-only completion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "chatListSelectionActions(",
+        "test_ids": [
+          "CHL-011",
+          "CHL-012"
         ]
       }
     ]

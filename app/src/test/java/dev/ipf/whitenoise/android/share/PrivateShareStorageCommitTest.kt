@@ -43,4 +43,31 @@ class PrivateShareStorageCommitTest {
             root.deleteRecursively()
         }
     }
+
+    /** Sparse originals exercise the exact native-compatible plaintext boundary without copying a huge body. */
+    @Test
+    fun restoredDocumentValidatesActualLengthAgainstTheSameNativePolicy() {
+        val root = Files.createTempDirectory("large-share-recovery").toFile()
+        val maximum = dev.ipf.whitenoise.android.ui.conversation.media.FILE_BACKED_ATTACHMENT_MAX_BYTES
+        val limits =
+            shareImportLimits(
+                dev.ipf.whitenoise.android.ui.conversation.media
+                    .FileBackedSendLimits(maximum, 900L * 1024L * 1024L),
+            )
+        val files = PrivateShareFiles(root, "test.private-share", limits)
+        try {
+            val (uri, file) = files.newFile()
+            java.io.RandomAccessFile(file, "rw").use { it.setLength(maximum) }
+            files.finish(uri, "large.zip", "application/zip", maximum)
+            assertEquals(maximum, PrivateShareFiles(root, "test.private-share", limits).metadata(uri)!!.getLong("size"))
+            java.io.RandomAccessFile(file, "rw").use { it.setLength(maximum + 1L) }
+            writePrivateShareJson(
+                File(root, "${file.nameWithoutExtension}.json"),
+                JSONObject().put("name", "large.zip").put("mime", "application/zip").put("size", maximum + 1L),
+            )
+            org.junit.Assert.assertNull(files.metadata(uri))
+        } finally {
+            root.deleteRecursively()
+        }
+    }
 }

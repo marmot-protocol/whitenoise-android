@@ -76,7 +76,7 @@ verified. Unset and unknown values retain the prior PR lanes described below.
 Merge admission requires separate live proof of queue enforcement and authorization.
 
 In activated mode, ordinary code PRs run tooling, dependency/security contracts,
-the offline signer, ktlint/detekt and Kotlin/Java compilation of Zapstore and
+the loopback ZSP v2 publisher, ktlint/detekt and Kotlin/Java compilation of Zapstore and
 Play main, unit-test and Android-test sources. Separate per-flavor runners use
 one active Gradle worker and the existing configured heaps. Tooling owns benchmark
 source compilation in prechecks and benchmark assembly in full runs.
@@ -91,7 +91,7 @@ the distinct draft aggregate context and require readiness before queue admissio
 
 Every merge group, master push, nightly and manual run uses the full core matrix:
 both complete unit/golden suites and comparison evidence, current coverage gates,
-both lint variants, compile/style/security/offline contracts and baseline
+both lint variants, compile/style/security/ZSP contracts and baseline
 packaging. Compose reports remain risk-selected supplemental work. Merge groups do not use the PR documentation shortcut. Master remains
 full in this first rollout; removing duplicate master work requires separately
 reviewed accepted-integration provenance and a full fallback.
@@ -144,7 +144,7 @@ rejects missing or unexpected outcomes, code-path skips, failures and cancellati
 on a code PR does not turn that PR into a docs-only candidate.
 
 With queue prechecks disabled, ready code candidates run every core check for the Zapstore distribution,
-including coverage, screenshots, baseline packaging and the offline signer
+including coverage, screenshots, baseline packaging and the loopback ZSP v2 publisher
 contract. Zapstore is the PR primary because its own source set carries the
 self-updater, downloader and installer; Play's adds only a store-listing redirect.
 Play is checked on PRs by compiling its main, unit-test and androidTest sources
@@ -162,8 +162,8 @@ required check. A `master` failure in any of them is fixed through an owned PR.
 
 ## Supplemental campaigns and draft PRs
 
-With queue prechecks disabled, draft PRs run the fast lane: classification, tooling contracts, the offline
-signer contract, Zapstore lint and unit/screenshot tests, compilation, ktlint and
+With queue prechecks disabled, draft PRs run the fast lane: classification, tooling contracts, the ZSP v2
+publishing contract, Zapstore lint and unit/screenshot tests, compilation, ktlint and
 detekt. They defer coverage, baseline packaging, Compose reports, the Play check,
 emulator workflows and release verification. `ready_for_review` starts a new run
 with every applicable lane, so the required aggregate is recomputed for the ready

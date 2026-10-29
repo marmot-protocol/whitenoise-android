@@ -2453,6 +2453,18 @@
     <string name="setup_finding_outcome_failure">檢查失敗</string>
     <string name="public_jpeg_previews_title">聊天內圖片預覽</string>
     <string name="public_jpeg_previews_privacy">預設關閉。直接的 Blossom JPEG 連結可能會向圖片伺服器透露你的 IP 位址。預覽僅使用不按流量計費的 Wi-Fi，並遵循你的相片下載規則。關閉後仍可開啟一般連結。</string>
+    <string name="chat_batch_progress">已處理 %1$d 個聊天，共 %2$d 個</string>
+    <string name="chat_batch_result">已變更：%1$d\n已處於目標狀態：%2$d\n已略過（無法使用）：%3$d\n失敗：%4$d\n未開始：%5$d\n未確認：%6$d</string>
+    <string name="chat_batch_order_failed">置頂聊天的順序無法使用或已變更。再次移動前，請檢查目前的聊天清單。</string>
+    <string name="chat_batch_order_unchanged">所選置頂聊天無法繼續移動。每組連續選取的聊天會移動一個位置，並保持組內順序。</string>
+    <string name="chat_batch_check_results">檢查結果</string>
+    <string name="chat_batch_order_unconfirmed">無法確認置頂聊天的順序。再次移動聊天前，請檢查聊天清單。</string>
     <string name="public_jpeg_preview_image">連結的 JPEG 預覽</string>
     <string name="public_jpeg_preview_save_failed">無法儲存圖片預覽設定，請重試。</string>
+
+    <string name="voice_recording_save_failed">錄音已停止，但無法儲存音訊。請重新錄製。</string>
+    <string name="voice_recording_stops_in">將在 %1$s 後停止</string>
+    <string name="voice_recording_limit_warning">錄音將在 30 秒後達到五分鐘上限並停止。</string>
+    <string name="voice_recording_limit_reached">已達到五分鐘錄音上限。傳送前請檢查語音訊息。</string>
+    <string name="voice_recording_interrupted">錄音已中斷。傳送前請檢查已錄製的音訊。</string>
 </resources>
