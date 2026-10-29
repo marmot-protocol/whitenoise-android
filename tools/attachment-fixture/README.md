@@ -61,12 +61,6 @@ scenario emits `background-receipt-process-stop` metrics for its `ReceiptProcess
 stages. These are the last observed inputs, not a diagnosis of why they failed to settle. Deadlines and assertions
 are unchanged; the original timeout is rethrown, and the host retains the metric even without source frames.
 
-On the hosted `ci-api34-x86_64` profile the runner first roots the disposable emulator, enables Wi-Fi and asks it
-once to join the open `AndroidWifi` access point, then restores shell privileges before any port is reversed. The
-emulator keeps that saved network until it is discarded. Android waits only 500 ms for the request's callback, so
-the report's `wifi_setup.association` is `initiated`, `none` (no reply in time) or `failed`, and only `failed` stops
-the run. None of these is network proof; the scenario's own 30-second waits still decide.
-
 The optional `controller` sender mode configures only the generated group's loopback blob endpoint, then uses the shipping `ConversationController.sendAttachments` path without uploader, publisher or accepted-result fakes. Its reference comes from actual native history. The runner requires exact outgoing native lease bytes before and after native runtime reopen with acquisition unavailable; missing controller evidence fails even when transport and budgets pass. This remains a native-runtime lifecycle check, not full Android process restart or manual viewer/installer qualification.
 
 The `controller-restart` mode force-stops only the isolated emulator fixture package between two instrumentation runs. Generated identities remain in a private fixture directory, then the second process verifies the restored native history and reads exact sent/received bytes ten times each while acquisition is unavailable. It asserts a different process id, keeps the HTTP ledger across both processes, and removes only its generated session after readback. The received reopen timing covers one read; the nine additional received and ten outgoing reads are correctness/bandwidth checks, not additional latency samples. No personal-device app or user data is stopped or cleared.
