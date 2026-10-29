@@ -130,6 +130,16 @@ class InstrumentedDispatchTest(unittest.TestCase):
         self.assertNotIn("MediaContainmentAcceptance", smoke)
         self.assertNotIn(case, smoke)
 
+    def test_domain_canary_runs_on_pull_requests_and_in_containment(self):
+        """The cross- versus same-domain canary is quick enough for every PR and stays in the focused lane."""
+        directory = ROOT / "app/src/androidTest/java/dev/ipf/whitenoise/android/media/sandbox"
+        source = (directory / "MediaWorkerDomainDeviceTest.kt").read_text()
+        self.assertIn("@PullRequestDeviceSmoke", source)
+        self.assertIn("@MediaContainmentAcceptance", source)
+        case = ("dev.ipf.whitenoise.android.media.sandbox.MediaWorkerDomainDeviceTest#"
+                "retainedStateReachesTheSameDomainOnlyNeverAnotherDomain")
+        self.assertIn(case, (ROOT / "config/instrumented-required-cases.txt").read_text())
+
     def test_healthy_timing_fixture_is_excluded_from_all_existing_suites(self):
         directory=ROOT/'app/src/androidTest/java/dev/ipf/whitenoise/android/media/sandbox'
         source=(directory/'MediaWorkerHealthyBaselineDeviceTest.kt').read_text()

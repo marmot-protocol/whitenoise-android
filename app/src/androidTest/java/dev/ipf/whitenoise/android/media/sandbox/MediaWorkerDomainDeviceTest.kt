@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -13,9 +14,11 @@ import java.io.ByteArrayOutputStream
 
 /**
  * Domain-bound worker generations on a real isolated service. The debug canary makes each worker report the
- * state and descriptor its previous input left behind, so a test can see which inputs shared a process.
+ * state and descriptor its previous input left behind, so a test can see which inputs shared a process. The canary
+ * takes well under a second, so every pull request runs it as well as the focused containment lane.
  */
 @RunWith(AndroidJUnit4::class)
+@PullRequestDeviceSmoke
 @MediaContainmentAcceptance
 class MediaWorkerDomainDeviceTest {
     /**
