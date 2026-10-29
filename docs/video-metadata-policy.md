@@ -142,3 +142,14 @@ reads the exact bytes and files handed to MDK, and drives every reader path
 above. `VideoMetadataScrubberDeviceTest` scrubs a video written by Android's own
 `MediaMuxer` with a location, and plays each scrubbed fixture through Android's
 retriever and extractor, comparing every sample with the original.
+
+The `controller-video-metadata` attachment-fixture mode links preparation to
+the recipient on a hosted emulator. `VideoMetadataFixtureDeviceTest` hands
+tagged videos to `sendStagedAttachments` through its content-URI preparation
+entry points (visual and Files picks in memory and above the in-memory limit,
+a `ShareFileImporter` import and prepared draft injection), sends them through
+MDK to the loopback fixture and downloads each as the receiver. The received
+bytes must equal the scrubbed source and keep every sample, and an AVI or a
+trailing-byte MP4 must be refused with no upload. It drives no system picker or
+share sheet UI, its drafts are injected rather than saved, force-stopped and
+restored, and it records no phone, so MED-043 remains the receipt for those.
