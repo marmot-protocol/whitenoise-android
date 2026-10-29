@@ -130,6 +130,8 @@ class MediaWorkerDomainTest {
             assertTrue("The least recently used domain is evicted", victim.remote.retired.await(2, TimeUnit.SECONDS))
             Thread.sleep(FENCE_OBSERVATION_MS)
             assertEquals("No new worker before the victim's death", 2, context.bindings.size)
+            val survivor = context.bindings[1].remote
+            assertEquals("Only the least recently used domain is evicted", 1L, survivor.retired.count)
             assertTrue(third.thread.isAlive)
             victim.remote.die()
             finish(third)
@@ -139,11 +141,6 @@ class MediaWorkerDomainTest {
                 context.bindings[2]
                     .remote.inputs
                     .toList(),
-            )
-            assertEquals(
-                1L,
-                context.bindings[1]
-                    .remote.retired.count,
             )
         } finally {
             third?.interruptAndJoin()
