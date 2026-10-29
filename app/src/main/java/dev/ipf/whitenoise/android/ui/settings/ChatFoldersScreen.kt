@@ -272,7 +272,7 @@ internal fun ChatFoldersContent(
             }
             state.folders.forEach { folder ->
                 item(key = folder.id) {
-                    SettingsGroup(modifier = folderDragRowModifier(folder.id, drag, drag.targetId)) {
+                    SettingsGroup(modifier = folderDragRowModifier(folder.id, drag)) {
                         row(folder.id) { context ->
                             FolderManageRow(
                                 context = context,

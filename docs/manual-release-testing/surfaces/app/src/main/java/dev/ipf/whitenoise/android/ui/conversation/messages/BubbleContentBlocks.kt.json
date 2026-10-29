@@ -12,7 +12,8 @@
           "MED-003",
           "MED-007",
           "MSG-019",
-          "MSG-040"
+          "MSG-040",
+          "MSG-015"
         ]
       },
       {
@@ -42,6 +43,26 @@
         "anchor": "val movableMessageTextBody =",
         "test_ids": [
           "RDR-006"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "Text-bubble recovery action: retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/BubbleContentBlocks.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "MSG-015",
+          "CON-006"
+        ]
+      },
+      {
+        "surface": "Text-bubble recovery action: discard_failed_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/BubbleContentBlocks.kt",
+        "anchor": "R.string.discard_failed_message",
+        "test_ids": [
+          "MSG-015",
+          "CON-006"
         ]
       }
     ]

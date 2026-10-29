@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,13 +13,18 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.github.takahirom.roborazzi.captureRoboImage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -39,6 +45,7 @@ class ChatListEdgeFadeScreenshotTest {
     @get:Rule val rule = createComposeRule()
     private lateinit var list: LazyListState
     private lateinit var scope: CoroutineScope
+    private lateinit var view: View
 
     /** A list parked in its middle dissolves at both visible edges while keeping its body opaque. */
     @Test
@@ -65,21 +72,60 @@ class ChatListEdgeFadeScreenshotTest {
         assertEquals(ROW, pixels[COLUMN, 159])
     }
 
-    /** Mounts a normal, non-reversed list over a known background. */
-    private fun render(rowCount: Int) {
+    /** The keyboard suspends the mask in place: the clipped production list keeps its start edge. */
+    @Test
+    fun keyboardSuspendsMaskWithoutClippingStartEdge() {
+        render(rowCount = 40, clipped = true)
+        rule.runOnIdle { scope.launch { list.scrollToItem(10) } }
+        rule.waitForIdle()
+        dispatchIme(bottom = 300)
+        val keyboard = rule.onNodeWithTag(FRAME).captureToImage().toPixelMap()
+
+        assertEquals("start edge under the keyboard", ROW, keyboard[START_COLUMN, 240])
+        assertEquals("keyboard viewport stays unmasked", ROW, keyboard[COLUMN, 1])
+        dispatchIme(bottom = 0)
+        val restored = rule.onNodeWithTag(FRAME).captureToImage().toPixelMap()
+        assertEquals("start edge after the keyboard", ROW, restored[START_COLUMN, 240])
+        assertTrue(restored[COLUMN, 14].isPartlyFaded())
+    }
+
+    /** Mounts a normal, non-reversed list over a known background, optionally clipped like the chat list. */
+    private fun render(
+        rowCount: Int,
+        clipped: Boolean = false,
+    ) {
         rule.setContent {
             list = rememberLazyListState()
             scope = rememberCoroutineScope()
+            view = LocalView.current
             Box(Modifier.size(320.dp, 480.dp).background(BACKGROUND).testTag(FRAME)) {
                 LazyColumn(
                     state = list,
-                    modifier = Modifier.fillMaxSize().chatListEdgeFade(list),
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .then(if (clipped) Modifier.clipToBounds() else Modifier)
+                            .chatListEdgeFade(list),
                 ) {
                     items((0 until rowCount).toList(), key = { it }) {
                         Box(Modifier.fillMaxWidth().height(40.dp).background(ROW))
                     }
                 }
             }
+        }
+        rule.waitForIdle()
+    }
+
+    /** Dispatches window insets so Compose sees the IME settle as visible or hidden. */
+    private fun dispatchIme(bottom: Int) {
+        rule.runOnIdle {
+            val insets =
+                WindowInsetsCompat
+                    .Builder()
+                    .setInsets(WindowInsetsCompat.Type.ime(), Insets.of(0, 0, 0, bottom))
+                    .setVisible(WindowInsetsCompat.Type.ime(), bottom > 0)
+                    .build()
+            ViewCompat.dispatchApplyWindowInsets(view.rootView, insets)
         }
         rule.waitForIdle()
     }
@@ -91,6 +137,9 @@ class ChatListEdgeFadeScreenshotTest {
         const val FRAME = "chat-list-edge-fade-frame"
         const val SNAPSHOT = "src/test/snapshots/chat_list_edge_fade.png"
         const val COLUMN = 160
+
+        // Inside the 30 dp lateral outset that a removed mask layer used to leave clipped.
+        const val START_COLUMN = 4
         val ROW = Color.Cyan
         val BACKGROUND = Color.White
     }

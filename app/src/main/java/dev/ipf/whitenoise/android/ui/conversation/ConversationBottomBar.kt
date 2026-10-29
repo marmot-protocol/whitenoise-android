@@ -36,6 +36,8 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposer
 import dev.ipf.whitenoise.android.ui.conversation.composer.VoiceRecordingReview
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberReplyReceivedEmoji
+import dev.ipf.whitenoise.android.ui.navigation.ComposerFabEndpoint
+import dev.ipf.whitenoise.android.ui.navigation.composerFabEndpoint
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 
 private val ConversationTopInteractionClearance = 64.dp
@@ -211,6 +213,7 @@ internal fun ConversationBottomBar(
                                 controller.timeline.firstOrNull { it.record.messageIdHex == id }?.record
                             }
                         ComposerBar(
+                            modifier = Modifier.composerFabEndpoint(ComposerFabEndpoint.Composer),
                             replyingToEmoji =
                                 rememberReplyReceivedEmoji(
                                     controller.replyingTo?.messageIdHex,

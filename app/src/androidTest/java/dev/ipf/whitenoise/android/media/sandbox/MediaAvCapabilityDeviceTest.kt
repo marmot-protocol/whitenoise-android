@@ -187,14 +187,15 @@ private class ProbeCase(
     val bytes: ByteArray,
 )
 
-/** Bounded fixed-tag read, scoped to a fresh random token and this exact request and kernel reply UID. */
+/** Bounded worker-PID read; unrelated processes cannot displace the correlated request's log tail. */
 internal object AvCapabilityLogs {
+    /** Read only the kernel-verified worker, then enforce the exact request, UID and terminal contract. */
     fun read(
         tuple: AvProbeTuple,
         uid: Int,
         pid: Int,
         replyDeadline: Boolean,
-    ): JSONArray = admit(bytes().toString(Charsets.UTF_8), tuple, uid, pid, replyDeadline)
+    ): JSONArray = admit(bytes(pid).toString(Charsets.UTF_8), tuple, uid, pid, replyDeadline)
 
     fun admit(
         text: String,
@@ -220,8 +221,10 @@ internal object AvCapabilityLogs {
         return JSONArray(rows)
     }
 
-    private fun bytes(): ByteArray {
-        val command = "logcat -d -t 256 -v raw -s MediaAvCapability:I '*:S'"
+    /** Filter at the log reader before its tail limit, retaining the existing byte and time bounds. */
+    private fun bytes(pid: Int): ByteArray {
+        check(pid > 0) { "Kernel worker PID required" }
+        val command = "logcat --pid=$pid -d -t 256 -v raw -s MediaAvCapability:I '*:S'"
         val shell = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
         val deadline = android.os.SystemClock.elapsedRealtime() + 3000
         return ParcelFileDescriptor.AutoCloseInputStream(shell).use { input ->

@@ -2570,6 +2570,13 @@
     <string name="chat_batch_order_unconfirmed">Не удалось подтвердить порядок закреплённых чатов. Проверьте список чатов перед повторным перемещением.</string>
     <string name="public_jpeg_preview_image">Предпросмотр JPEG по ссылке</string>
     <string name="public_jpeg_preview_save_failed">Не удалось сохранить настройку предпросмотра изображений. Попробуйте ещё раз.</string>
+    <string name="appearance_accessibility_preview">Предпросмотр читаемости</string>
+    <string name="appearance_preview_rtl">Предпросмотр макета справа налево</string>
+    <string name="appearance_preview_large_text">Предпросмотр увеличенного текста</string>
+    <string name="appearance_preview_reset">Сбросить предпросмотр</string>
+    <string name="appearance_preview_limits">Показывает, как выглядят сообщения с текущими темой, шрифтом и размером текста. Эти переключатели меняют только этот предпросмотр. Программы чтения с экрана и увеличение здесь не показываются — проверьте их в настройках специальных возможностей устройства.</string>
+    <string name="appearance_preview_motion_on">Анимации на устройстве включены.</string>
+    <string name="appearance_preview_motion_off">Анимации на устройстве отключены, поэтому изменения отображаются без движения.</string>
 
     <string name="voice_recording_save_failed">Запись остановлена, но не удалось сохранить аудио. Запишите ещё раз.</string>
     <string name="voice_recording_stops_in">Остановка через %1$s</string>

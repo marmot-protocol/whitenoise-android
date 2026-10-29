@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -26,6 +27,7 @@ import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.BubbleSide
@@ -289,13 +291,20 @@ internal fun PreviewBubble(
             ),
         shape = MaterialTheme.shapes.large,
     ) {
+        // Like real message bodies, sample text takes its direction from its content, so an RTL layout
+        // mirrors the bubble without reordering an English sentence's punctuation or clock time.
         if (quote == null && time == null) {
-            Text(text, Modifier.padding(horizontal = 16.dp, vertical = 10.dp))
+            Text(
+                text,
+                Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                style = LocalTextStyle.current.copy(textDirection = TextDirection.Content),
+            )
         } else {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
-                if (quote != null) Text(quote, style = MaterialTheme.typography.bodySmall)
-                Text(text, style = MaterialTheme.typography.bodyLarge)
-                if (time != null) Text(time, style = MaterialTheme.typography.labelSmall)
+                val typography = MaterialTheme.typography
+                if (quote != null) Text(quote, style = typography.bodySmall.copy(textDirection = TextDirection.Content))
+                Text(text, style = typography.bodyLarge.copy(textDirection = TextDirection.Content))
+                if (time != null) Text(time, style = typography.labelSmall.copy(textDirection = TextDirection.Content))
             }
         }
     }

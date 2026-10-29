@@ -14,10 +14,11 @@ internal enum class BackgroundReceiptPolicyCase {
     ProcessStop,
 }
 
-/** The two independently bounded waits in the fixture's policy setup. */
+/** Independently bounded policy and network waits in the generated receipt fixture. */
 internal enum class BackgroundReceiptPolicyStage {
     HostPolicy,
     NativeApproval,
+    WifiSnapshot,
 }
 
 /**

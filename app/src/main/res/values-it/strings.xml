@@ -2496,6 +2496,13 @@
     <string name="chat_batch_order_unconfirmed">Impossibile confermare l’ordine delle conversazioni fissate. Controlla l’elenco prima di spostare nuovamente le conversazioni.</string>
     <string name="public_jpeg_preview_image">Anteprima del JPEG collegato</string>
     <string name="public_jpeg_preview_save_failed">Impossibile salvare la preferenza delle anteprime. Riprova.</string>
+    <string name="appearance_accessibility_preview">Anteprima della leggibilità</string>
+    <string name="appearance_preview_rtl">Anteprima del layout da destra a sinistra</string>
+    <string name="appearance_preview_large_text">Anteprima con testo più grande</string>
+    <string name="appearance_preview_reset">Reimposta anteprima</string>
+    <string name="appearance_preview_limits">Mostra l’aspetto dei messaggi con il tema, il carattere e la dimensione del testo attuali. Questi interruttori modificano solo questa anteprima. Lettori di schermo e ingrandimento non sono visualizzabili qui; provali nelle impostazioni di Accessibilità del dispositivo.</string>
+    <string name="appearance_preview_motion_on">Le animazioni del dispositivo sono attive.</string>
+    <string name="appearance_preview_motion_off">Le animazioni del dispositivo sono disattivate, quindi le modifiche appaiono senza movimento.</string>
 
     <string name="voice_recording_save_failed">La registrazione si è interrotta, ma non è stato possibile salvare l’audio. Registra di nuovo.</string>
     <string name="voice_recording_stops_in">Termina tra %1$s</string>

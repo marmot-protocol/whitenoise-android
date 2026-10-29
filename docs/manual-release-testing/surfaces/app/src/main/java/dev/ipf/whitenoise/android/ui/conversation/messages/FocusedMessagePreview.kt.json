@@ -26,7 +26,8 @@
         "anchor": "fun FocusedTextMessagePreview(",
         "test_ids": [
           "MSG-004",
-          "MSG-009"
+          "MSG-009",
+          "MSG-015"
         ]
       }
     ],

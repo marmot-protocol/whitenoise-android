@@ -135,6 +135,7 @@ import dev.ipf.whitenoise.android.ui.common.dragSelectionEndpoint
 import dev.ipf.whitenoise.android.ui.common.loadFailurePlacement
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
+import dev.ipf.whitenoise.android.ui.common.rememberScrollEdgeFadeMotion
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar
 import dev.ipf.whitenoise.android.ui.group.groupAbandonmentBatchLabel
@@ -791,6 +792,10 @@ internal fun ChatsScreen(
             showArchived = showArchived,
         )
     val chatListState = searchViewport?.listState(showArchived) ?: key(viewportOwner) { rememberLazyListState() }
+    // Active/archived viewports keep separate scrolling; only decorative fades share the account lifetime.
+    val edgeFadeMotion = rememberScrollEdgeFadeMotion(appState.activeAccountRef to appState.runtimeGeneration)
+    val folderArrival =
+        rememberChatFolderArrival(appState.activeAccountRef to appState.runtimeGeneration, selectedFolderId)
     val userGestureGeneration = rememberChatListUserGestureGeneration(chatListState)
     LaunchedEffect(chatListState, actionSheetChatId, actionMenuOwner.token, actionMenuOwner.pointerHeld) {
         val anchorId = actionSheetChatId ?: return@LaunchedEffect
@@ -1647,7 +1652,9 @@ internal fun ChatsScreen(
                     }
                 }
 
-                /** True while the row menu still belongs to the account and runtime that opened it. */
+                /**
+                 * Admits navigation and menu commands only while the measured row and account scope remain current.
+                 */
                 fun menuActionsCurrent(): Boolean {
                     val ownsAccount =
                         menuAccount != null &&
@@ -1742,12 +1749,18 @@ internal fun ChatsScreen(
                         },
                         bodyMatch = bodyMatch,
                         onOpen = {
-                            searchViewport?.selection?.selected =
-                                bodyMatch?.let { GlobalSearchSelectedResult(item.group.groupIdHex, it.messageIdHex) }
-                                    ?: GlobalSearchSelectedResult()
-                            openGroupFromVisibleList(item, bodyMatch?.messageIdHex, false)
+                            if (menuActionsCurrent()) {
+                                searchViewport?.selection?.selected =
+                                    bodyMatch?.let {
+                                        GlobalSearchSelectedResult(item.group.groupIdHex, it.messageIdHex)
+                                    }
+                                        ?: GlobalSearchSelectedResult()
+                                openGroupFromVisibleList(item, bodyMatch?.messageIdHex, false)
+                            }
                         },
-                        onOpenProfile = { npub -> presentProfileFromVisibleList(npub) },
+                        onOpenProfile = { npub ->
+                            if (menuActionsCurrent()) presentProfileFromVisibleList(npub)
+                        },
                         onOpenActions = {
                             if (menuActionsCurrent()) {
                                 val continuingHold =
@@ -1789,9 +1802,11 @@ internal fun ChatsScreen(
                         },
                         rangeDragActive = dragAnchorChatId == rowId,
                         onToggleSelection = {
-                            val updated = toggleChatListSelection(selectedChatIds, rowId)
-                            selectedChatIds.clear()
-                            selectedChatIds.addAll(updated)
+                            if (menuActionsCurrent()) {
+                                val updated = toggleChatListSelection(selectedChatIds, rowId)
+                                selectedChatIds.clear()
+                                selectedChatIds.addAll(updated)
+                            }
                         },
                     )
                 }
@@ -2310,7 +2325,8 @@ internal fun ChatsScreen(
                                             .testTag("chats.list")
                                             .trackWhiteNoiseHeader(chatListState)
                                             .clipToBounds()
-                                            .chatListEdgeFade(chatListState)
+                                            .chatListEdgeFade(chatListState, motion = edgeFadeMotion)
+                                            .then(folderArrival)
                                             .cancelPointersAcrossChatListMotion(chatListInteractionsEnabled)
                                             .onGloballyPositioned { coordinates ->
                                                 chatListWindowTop = coordinates.positionInWindow().y

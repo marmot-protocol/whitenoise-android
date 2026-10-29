@@ -403,6 +403,7 @@ private fun RowScope.GiphyMetadataRow(
             onEditedClick = null,
             modifier = Modifier.alignByBaseline(),
             statusContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            allowWrap = false,
         )
     }
 }

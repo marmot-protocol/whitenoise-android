@@ -53,15 +53,26 @@ internal fun Modifier.scrollEdgeFade(
     return scrollEdgeFade(source, reverseScrolling, fadeEnabled, SCROLL_EDGE_FADE_HEIGHT, stableRenderTarget)
 }
 
+/** Decorative bands can outlive a keyed folder subtree without owning its scroll or input state. */
+internal class ScrollEdgeFadeMotion {
+    val top = Animatable(0.dp, Dp.VectorConverter)
+    val bottom = Animatable(0.dp, Dp.VectorConverter)
+}
+
+/** Retire decorative state with the viewport owner, rather than with its selected folder. */
+@Composable
+internal fun rememberScrollEdgeFadeMotion(owner: Any): ScrollEdgeFadeMotion = remember(owner) { ScrollEdgeFadeMotion() }
+
 /** List callers keep their own state, restoration, keys and gestures. */
 @Composable
 internal fun Modifier.scrollEdgeFade(
     state: LazyListState,
     reverseLayout: Boolean = false,
     fadeHeight: Dp = SCROLL_EDGE_FADE_HEIGHT,
+    motion: ScrollEdgeFadeMotion = rememberScrollEdgeFadeMotion(state),
 ): Modifier {
     val source = remember(state) { ScrollEdgeSource(state, { state.canScrollBackward }, { state.canScrollForward }) }
-    return scrollEdgeFade(source, reverseLayout, true, fadeHeight)
+    return scrollEdgeFade(source, reverseLayout, true, fadeHeight, motion = motion)
 }
 
 /** Grid callers keep their own state and layout; only viewport painting changes. */
@@ -80,6 +91,10 @@ private class ScrollEdgeSource(
     val forward: () -> Boolean,
 )
 
+/**
+ * Masks only edges with off-screen content, suspending the mask in place while disabled or under the IME.
+ * The retained bands keep tracking eligibility there, so hiding the IME restores cues without replaying them.
+ */
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
 private fun Modifier.scrollEdgeFade(
@@ -88,13 +103,16 @@ private fun Modifier.scrollEdgeFade(
     fadeEnabled: Boolean,
     fadeHeight: Dp,
     stableRenderTarget: Boolean = false,
+    motion: ScrollEdgeFadeMotion = rememberScrollEdgeFadeMotion(source.owner),
 ): Modifier {
     // Keyboard forms keep ordinary painting and their caller-owned scroll state.
-    // Remove the added layer immediately; hiding the IME restores the same viewport's cues.
-    if (!fadeEnabled || WindowInsets.isImeVisible) return this
-    val top = remember(source.owner, reverseScrolling, fadeEnabled) { Animatable(0.dp, Dp.VectorConverter) }
-    val bottom = remember(source.owner, reverseScrolling, fadeEnabled) { Animatable(0.dp, Dp.VectorConverter) }
-    LaunchedEffect(source.owner, reverseScrolling, fadeEnabled, fadeHeight) {
+    // Clear the mask immediately, and hiding the IME restores the same viewport's cues.
+    // The layer itself stays mounted — removing its outsets from under a clipping parent leaves that parent
+    // clipping the outset width off the left edge, which cut every chat-list avatar under the search keyboard.
+    val masking = fadeEnabled && !WindowInsets.isImeVisible
+    val top = motion.top
+    val bottom = motion.bottom
+    LaunchedEffect(motion, source.owner, reverseScrolling, fadeEnabled, fadeHeight) {
         snapshotFlow { scrollEdgeFadeState(source.backward(), source.forward(), reverseScrolling) }
             .collectLatest { edges ->
                 coroutineScope {
@@ -106,14 +124,14 @@ private fun Modifier.scrollEdgeFade(
     return verticalEdgeFade(
         // Reaching an edge must reveal the resting content immediately, even before the coroutine runs.
         topFade = {
-            if (fadeEnabled && scrollEdgeFadeState(source.backward(), source.forward(), reverseScrolling).top) {
+            if (masking && scrollEdgeFadeState(source.backward(), source.forward(), reverseScrolling).top) {
                 top.value
             } else {
                 0.dp
             }
         },
         bottomFade = {
-            if (fadeEnabled && scrollEdgeFadeState(source.backward(), source.forward(), reverseScrolling).bottom) {
+            if (masking && scrollEdgeFadeState(source.backward(), source.forward(), reverseScrolling).bottom) {
                 bottom.value
             } else {
                 0.dp
