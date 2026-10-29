@@ -20,6 +20,9 @@ internal object MediaWorkerThroughput {
     private const val THUMB_EDGE = 128
     private const val VIEWER_EDGE = 1920
     private const val COLD_REPETITIONS = 8
+    private const val COLD_LAUNCH_REPETITIONS = 5
+    private const val QUIESCE_TIMEOUT_MS = 20_000L
+    private const val QUIESCE_POLL_MS = 250L
     private const val IDLE_THUMBNAILS = 24
     private const val IDLE_THUMBNAIL_GAP_MS = 400L
     private const val IDLE_VIEWERS = 10
@@ -49,7 +52,8 @@ internal object MediaWorkerThroughput {
         MediaWorkerThroughputReport().use { report ->
             report.emit(header(corpus, variants, SystemClock.elapsedRealtimeNanos() - prepared))
             variants.forEachIndexed { pass, variant ->
-                coldFirst(report, context, corpus, pass, variant)
+                coldFirst(report, context, corpus, pass, variant, coldLaunch = true)
+                coldFirst(report, context, corpus, pass, variant, coldLaunch = false)
                 scenarios().forEach { scenario -> measured(report, context, corpus, pass, variant, scenario) }
             }
             report.emit(
@@ -90,19 +94,27 @@ internal object MediaWorkerThroughput {
                 concurrent(lane, corpus, rows, SCROLL_TILES, SCROLL_ROUNDS, SCROLL_ROUND_MS)
             }
 
-    /** Cold first-thumbnail latency: a new lane per repetition, so every sample includes worker startup. */
+    /**
+     * First-thumbnail latency on a new lane per repetition. With [coldLaunch], each repetition first waits
+     * until no image worker or application zygote of this app is alive, as after a fresh launch; otherwise
+     * lanes follow each other, so an application zygote started earlier may still be warm.
+     */
+    @Suppress("LongParameterList") // Report, context, corpus, identity and the launch condition of one scenario.
     private fun coldFirst(
         report: MediaWorkerThroughputReport,
         context: Context,
         corpus: ThroughputCorpus,
         pass: Int,
         variant: String,
+        coldLaunch: Boolean,
     ) {
+        val scenario = if (coldLaunch) "cold_launch" else "cold_first"
         val rows = mutableListOf<JSONObject>()
         val sampler = MediaWorkerThroughputSampler()
         var starts = 0
         try {
-            repeat(COLD_REPETITIONS) { index ->
+            repeat(if (coldLaunch) COLD_LAUNCH_REPETITIONS else COLD_REPETITIONS) { index ->
+                if (coldLaunch) awaitNoWorkerProcesses()
                 ThroughputVariants.create(variant, context, observer).use { lane ->
                     rows += call(lane, "thumbnail", index) { thumbnail(lane, corpus, index) }
                     starts += lane.binding.snapshot().getInt("binding_attempts")
@@ -111,8 +123,22 @@ internal object MediaWorkerThroughput {
         } finally {
             sampler.close()
         }
-        rows.forEach { report.emit(it.put("pass", pass).put("scenario", "cold_first")) }
-        report.emit(summary(variant, pass, "cold_first", rows, 0L, starts, JSONArray(), sampler.snapshot()))
+        rows.forEach { report.emit(it.put("pass", pass).put("scenario", scenario)) }
+        report.emit(summary(variant, pass, scenario, rows, 0L, starts, JSONArray(), sampler.snapshot()))
+    }
+
+    /** Waits until `ps` lists no image worker and no application zygote of this app; fails after a bound. */
+    private fun awaitNoWorkerProcesses() {
+        val deadline = SystemClock.elapsedRealtime() + QUIESCE_TIMEOUT_MS
+        while (true) {
+            val listing = MediaWorkerThroughputSampler.shell("ps -A -o RSS,NAME")
+            val quiet =
+                MediaWorkerThroughputSampler.decoderProcesses(listing).isEmpty() &&
+                    MediaWorkerThroughputSampler.appZygoteCount(listing) == 0
+            if (quiet) return
+            check(SystemClock.elapsedRealtime() < deadline) { "Image workers or the app zygote stayed alive" }
+            SystemClock.sleep(QUIESCE_POLL_MS)
+        }
     }
 
     /** Warms one lane, settles so a pre-started generation can connect, then measures one scenario. */

@@ -131,8 +131,10 @@ adb -s <your-emulator> shell am instrument -w -r \
   dev.ipf.whitenoise.android.dev.test/androidx.test.runner.AndroidJUnitRunner
 ```
 
-Scenarios: eight cold first thumbnails, each on a new lane; 24 idle
-thumbnails 400 ms apart; ten 1920×1440 viewer decodes 600 ms apart; the
+Scenarios: five first thumbnails after launch, each on a new lane once no
+image worker or application zygote of the app is alive (`cold_launch`); eight
+first thumbnails on new lanes started back to back, so an application zygote may
+still be warm (`cold_first`); 24 idle thumbnails 400 ms apart; ten 1920×1440 viewer decodes 600 ms apart; the
 six-operation mix back to back; 24-, 48- and 96-request bursts released
 together; and eight overlapping scroll rounds of eight tiles every 400 ms.
 Every input has distinct bytes. Rows go to instrumentation status key
@@ -145,3 +147,16 @@ and FD maxima and the lowest system MemAvailable. RSS counts pages shared with
 the zygote once per process; measure PSS separately with `dumpsys meminfo`.
 Results are performance observations, never a security qualification. Compare
 only matching corpus digests on the same device, API and build configuration.
+
+## UI-level checks
+
+`MediaWorkerUiDeviceTest` runs in the focused containment campaign against the
+installed lane: a real three-column Compose grid of 120 distinct JPEG tiles,
+each decoded through the production bubble decode and scrolled to its end by
+touch; notification avatar artwork within the presenter's 2.5-second bound and
+emoji artwork within its 250 ms bound, idle and behind a 24-image burst; and
+viewer and photo-editor decodes cancelled once their input reached a worker,
+followed by another image. `MediaWorkerUiThroughputDeviceTest` is the opt-in
+`ManualDeviceFixture` that repeats the same scenarios for a named lane
+(`-e ui_lane reuse|prewarm2|default`, one grid pass per run) and emits rows under
+`media_worker_ui_json`. Both use synthetic images only.

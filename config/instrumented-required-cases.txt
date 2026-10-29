@@ -140,6 +140,13 @@ dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoderDeviceTest#eachStil
 dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoderDeviceTest#retainedStateAndDescriptorOfOneSourceNeverReachTheNextSourcesWorker
 dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoderDeviceTest#noncooperativeRetiringWorkerBlocksTheNextInputUntilAndroidStopsIt
 dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoderDeviceTest#abandonedNoncooperativeWorkerStillHoldsTheNextInputUntilItsDeath
+dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoderDeviceTest#abandonedNoncooperativeWorkerIsStoppedWithoutAnotherRequest
+
+# #3373: the installed still-image lane keeps a real media grid, notification artwork deadlines and
+# viewer/editor cancellation working at the UI level.
+dev.ipf.whitenoise.android.media.sandbox.MediaWorkerUiDeviceTest#mediaGridScrollRendersEveryVisibleTileWithoutDecodeFailures
+dev.ipf.whitenoise.android.media.sandbox.MediaWorkerUiDeviceTest#notificationArtworkMeetsItsDeadlines
+dev.ipf.whitenoise.android.media.sandbox.MediaWorkerUiDeviceTest#viewerAndEditorCancellationMidDecodeLeaveTheLaneUsable
 
 # Debug-only selected-descriptor A/V capability capture; focused containment and full suites.
 dev.ipf.whitenoise.android.media.sandbox.MediaAvCapabilityDeviceTest#characterizeSelectedDescriptorPlatformMediaFromAnIsolatedUid
