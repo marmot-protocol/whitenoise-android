@@ -245,7 +245,7 @@ internal object MediaWorkerUiScenarios {
                 val avatars =
                     wave.map { index ->
                         async(Dispatchers.IO) {
-                            timed(AVATAR_NOTIFICATION_DEADLINE_MS) {
+                            timed(AVATAR_NOTIFICATION_DEADLINE_MS, cached = true) {
                                 AvatarImageLoader.loadBitmap("https://fixture.invalid/notify/$attempt/$index")
                             }
                         }
@@ -344,15 +344,20 @@ internal object MediaWorkerUiScenarios {
                 .put("follow_up_ns", followNs)
         }
 
-    /** Runs [block] under [deadlineMs]; returns its elapsed nanoseconds, or null when it missed or failed. */
+    /**
+     * Runs [block] under [deadlineMs]; returns its elapsed nanoseconds, or null when it missed or failed. A
+     * [cached] bitmap belongs to the avatar loader's cache and is left alone — recycling it would corrupt the
+     * cache's size accounting and crash its next trim.
+     */
     private suspend fun timed(
         deadlineMs: Long,
+        cached: Boolean = false,
         block: suspend () -> Bitmap?,
     ): Long? {
         val start = SystemClock.elapsedRealtimeNanos()
         val bitmap = withTimeoutOrNull(deadlineMs) { block() }
         val elapsed = SystemClock.elapsedRealtimeNanos() - start
-        bitmap?.recycle()
+        if (!cached) bitmap?.recycle()
         return elapsed.takeIf { bitmap != null }
     }
 
