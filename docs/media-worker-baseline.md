@@ -144,8 +144,12 @@ warm lane, 400 ms apart (`new_domain`); 24 idle thumbnails 400 ms apart; ten
 48- and 96-request bursts released together within one conversation; a
 48-request burst across six conversations (`mixed_burst`); a cold chat list of
 24 profile pictures and 8 groups' own images released together (`chat_list`);
-and eight overlapping scroll rounds of eight tiles every 400 ms. Unless named
-otherwise, every request belongs to one conversation.
+eight overlapping scroll rounds of eight tiles every 400 ms; and, last, the same
+cold chat list with every group showing a URL picture that decodes single-use
+(`chat_list_url`). Unless named otherwise, every request belongs to one
+conversation. The sampler and the cold-launch wait count only the measured
+package's workers and application zygote, so another installed build on a
+physical device does not disturb them.
 Every input has distinct bytes. Rows go to instrumentation status key
 `media_worker_throughput_json` and, when available, a
 `media-worker-throughput-*.jsonl` file. Each request records latency, admission
@@ -169,7 +173,9 @@ viewer and photo-editor decodes cancelled once their input reached a worker,
 followed by another image. `MediaWorkerUiThroughputDeviceTest` is the opt-in
 `ManualDeviceFixture` that repeats the same scenarios for a named lane
 (`-e ui_lane reuse|single_use|domain|default`, one grid pass per run) and emits
-rows under `media_worker_ui_json`. Each grid row also records the setup time,
+rows under `media_worker_ui_json`. Its `measureGroupNotificationArtwork` method
+repeats the notification rows with a group's URL picture as the avatar, which
+decodes single-use (scenario names end in `_group_url`). Each grid row also records the setup time,
 the slowest loaded tile with its start, and the settle window a visible tile
 has once scrolling stops, so an outlier can be placed in its run and the margin
 read off.

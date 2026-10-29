@@ -4,7 +4,7 @@
 
 Still-image decode and inspection, EXIF inspection and SVG preparation use a nonexported `android:isolatedProcess` service. The worker has a separate UID and no application permissions. Application startup skips account state, diagnostics, locale preferences, playback, transfers and background scheduling in that process.
 
-The app decodes still images in domain-bound worker generations: each isolated worker serves one conversation, the account's public profile pictures or the account's local picks, and an undeclared input gets a single-use worker; see [Domain-bound worker generations](#domain-bound-worker-generations). Video poster/duration probes and voice waveform extraction use a separate, process-wide serialized platform-service adapter. Android denies `media.player` and `media.extractor` discovery to isolated UIDs on API 30; attempting those operations in the image worker is unsupported. This is an explicit route, with no isolated-attempt/privileged-fallback sequence. A slow waveform must not occupy the notification-avatar lane. Production calls on the main looper or without a configured transport fail closed. JVM tests explicitly inject their codec fixture; those tests do not prove process isolation.
+The app decodes still images in domain-bound worker generations: each isolated worker serves one conversation's member-pinned media, the account's public profile pictures, one conversation's outgoing picks or the account's display-only local files, and any other input gets a single-use worker; see [Domain-bound worker generations](#domain-bound-worker-generations). Video poster/duration probes and voice waveform extraction use a separate, process-wide serialized platform-service adapter. Android denies `media.player` and `media.extractor` discovery to isolated UIDs on API 30; attempting those operations in the image worker is unsupported. This is an explicit route, with no isolated-attempt/privileged-fallback sequence. A slow waveform must not occupy the notification-avatar lane. Production calls on the main looper or without a configured transport fail closed. JVM tests explicitly inject their codec fixture; those tests do not prove process isolation.
 
 Input bytes are written only after their temporary file is unlinked, then passed by read-only descriptor. Picked images and media use a process-wide staging gate, with provider cancellation and bounded reads. Whole-file seekable videos pass their descriptor without a full-video array copy. Provider subranges are copied into their own unlinked inode, so a decoder cannot read bytes outside the selected asset. No URLs, account objects, keys or general file-access callback enter the worker.
 
@@ -119,28 +119,53 @@ retains the separate manual acceptance.
 ## Domain-bound worker generations
 
 A still-image worker generation serves one data-access domain for its whole
-life (#3373). A domain is a set of inputs whose principal can already read all
-of them, so a decoder compromised by one input reaches only content that its
-domain's principal could already read. Callers name the domain of each request
-through `MediaTrustDomain`; the facade and the transport interface carry it
-unchanged.
+life (#3373). Callers name the domain of each request through
+`MediaTrustDomain`; the facade and the transport interface carry it unchanged.
+
+Every domain keeps one rule: each input's bytes are fixed by a principal who
+can already read the whole domain, and whatever the worker returns stays where
+that principal can already see it. A decoder compromised by one input then
+reaches only content its own author could already read, and its output reaches
+no one who could not already see that domain. Bytes that a URL's host chooses,
+with no digest a member pinned, never enter a conversation's worker. Anything a
+caller cannot place under the rule decodes single-use.
 
 | Domain | Key | Inputs |
 | --- | --- | --- |
-| Conversation | account, conversation | Message media, thumbnails, bubbles and the viewer; received custom emoji; link-preview and event-card images shown in the conversation; the group's own image wherever it is drawn, in the chat list, durable chat rows and notifications included. |
-| Public profiles | account | Kind-0 profile pictures and banners. They are published to relays, so anyone can already fetch all of them, and sharing one worker exposes nothing new. A group's image is never one of these. |
-| Local | account | Images the user picks from the device before sending or publishing them: composer picks and previews, the photo editor, pending and just-sent thumbnails, private contact pictures, and the device's own custom-emoji files, notification emoji included. |
-| Unique | none | Anything a caller does not attribute. Each input gets its own single-use generation, as in the per-input lane. Today: web image search results and typed image URLs, picks during sign-up before an account exists, identity-picture cropping, profile and group picture picks, preparing a new private contact picture, the avatar viewer, and picker rows that may show either a group or a person. |
+| Conversation | account, conversation | Bytes a member fixed: encrypted, hash-verified message media, thumbnails, bubbles and the viewer; custom emoji received as the message's own attachments; link-preview JPEGs whose digest the message pins, checked before decode; and the group's encrypted, hash-pinned image wherever it is drawn, in the chat list, durable chat rows and the notification loader included. |
+| Public profiles | account | Kind-0 profile pictures and banners, of people in every conversation and of the user's own accounts. They are published to relays, so anyone can fetch all of them and anyone may choose their bytes; sharing one worker exposes nothing new. A group's image is never one of these. Every caller names this domain explicitly. |
+| Outgoing | account, conversation | Images the user picked from the device to send into one conversation: composer picks and previews, the photo editor, staged drafts, Original-quality preparation, thumbhashes and just-sent thumbnails. The worker's output is sent there, so it never sees another conversation's picks. |
+| Local | account | Display-only files of this device: the user's custom-emoji files, notification emoji included, and stored private contact pictures. Their decoded pixels are only drawn on this device; an emoji is sent as its stored file, never re-encoded from a decode. |
+| Unique | none | Anything else. Each input gets its own single-use generation, as in the per-input lane. Today: GIPHY first frames, Nostr event and linked-note images, a group's URL picture (in a header, the chat list, a durable row whose group has a URL, or a notification), web image search results and typed image URLs, picks during sign-up, identity-picture cropping, profile and group picture picks, preparing a new private contact picture, the avatar viewer, and picker rows that may show either a group or a person. The avatar loader and the generic picture rows fall back to this when a caller names nothing. |
 
-When a picture may belong either to a group or to a person, it decodes in the
-group's conversation: a person's public picture in a conversation's worker
-exposes nothing, while a group's image in the public-profile worker would.
+A group's picture decodes in its conversation only when it is the encrypted
+image with no URL beside it (`GroupProjector.pictureIsMemberPinned`). A group
+whose picture is a URL, or that has both a URL and an image hash, decodes it
+single-use. A direct chat's peer picture is a published one.
+
+Audit of the conversation rows against the rule, after round 3's review:
+
+| Input | Who fixes the bytes | Domain |
+| --- | --- | --- |
+| Message media and its viewer | The sending member; the attachment's hash is verified before decode | Conversation |
+| Received custom emoji | The sending member, as one of the message's attachments | Conversation |
+| Link-preview JPEG | The linking member, through the digest in the URL, checked before decode | Conversation |
+| Group's encrypted image | The member who set it, through the image hash and the group's key | Conversation |
+| Group's URL picture | The URL's host | Unique (was Conversation) |
+| GIPHY first frame | GIPHY, an allow-listed host, with no digest | Unique (was Conversation) |
+| Nostr event and linked-note images | The note's author and its host | Unique (was Conversation) |
+| Direct chat peer's picture in a header or notification | Its host; it is published | Public profiles (was Conversation) |
+| Picks to send | The user, who chose each file for this conversation | Outgoing (was account-wide Local) |
 
 Within its domain a compromised worker can still read every later input the
 generation serves, including descriptors it retained; alter the pixels it
 returns, which the parent validates for shape but not content; and use CPU and
-memory up to its watchdog. Escapes through the kernel or system services are
-not contained by domains.
+memory up to its watchdog. In the outgoing domain that means a hostile gallery
+file can carry another pick of the same conversation, including one the user
+then removed from the draft, into an image sent to that conversation. In the
+local domain it means a hostile emoji file can draw a private contact picture
+in an emoji slot on this device. Escapes through the kernel or system services
+are not contained by domains.
 
 Lifetime:
 
@@ -260,10 +285,13 @@ domain lane with *Reusable + zygote*, which shares its launch path, and the
 two no-zygote columns with each other.
 
 The proposed budget below was written before the domain lane existed and is
-judged unchanged. Three earlier campaign runs were stopped because they exposed
-defects, each since fixed: requests waiting for a worker held descriptors; a
-cross-domain admission bound made domains evict each other; and eviction raced a
-domain's own request. Only the final run's data is shown.
+judged unchanged. Runs 1 and 2 were stopped because they exposed defects:
+requests waiting for a worker held descriptors, and a cross-domain admission
+bound made domains evict each other. Run 3 completed and missed U3 on API 36,
+2 of 60 idle avatars, which exposed a race between eviction and a domain's own
+request; with that fixed, run 4 confirmed the budget. Run 4's data is shown
+first, then the round-4 re-measure after the review's fixes. T11 is judged as
+the budget states it: a lane's maximum caller FDs never above master's.
 
 #### API 30
 
@@ -357,7 +385,7 @@ the burst's own conversation; the avatar is always a published profile picture.
 | T8 Cold chat list: all within 2.5 s, p95 within 1.2 s | Met, max 201, p95 196 | **Not met**, max 2521, p95 2206 | Met, max 278, p95 221 | **Not met**, max 2003, p95 1666 |
 | T9 Scroll rounds p95 within 250 ms | Met, 23 | Met, 22 | Met, 21 | Met, 24 |
 | T10 At most three live workers plus the zygote | Met, 3 | Met, 3 | Met, 3 | Met, 3 |
-| T11 No caller FD growth (at most two above master) | Met, 64 vs 64 | Met, 64 vs 64 | Met, 104 vs 104 | Met, 102 vs 104 |
+| T11 No caller FD growth | Met, 64 vs 64 | Met, 64 vs 64 | Met, 104 vs 104 | Met, 102 vs 104 |
 | T12 Idle PSS growth within 40 MiB | Met, +25.1 | **Not met**, +43.0 | Met, +22.6 | **Not met**, +45.4 |
 | U1 Grid: no failed tile, no blank tile | Met, 0/0 | Met, 0/0 | Met, 0/0 | Met, 0/0 |
 | U2 Grid frame p95 within one 60 Hz frame of master | Met, +3 | Met, +3 | Met, -7 | Met, -6 |
@@ -383,6 +411,157 @@ to be at least as large; that remains unmeasured. The options are to accept
 them, to raise the live limit and spare count where workers are exec-spawned
 (more parallel starts for more memory), to keep the reusable lane there, or to
 measure on a GrapheneOS device first.
+
+#### Round 4 re-measure
+
+Round 3's review led to four fixes:
+- the session's refusal ledger is locked across domain lanes;
+- a conversation's worker sees only member-pinned bytes;
+- picks to send are keyed by conversation;
+- undeclared avatar decodes are single-use.
+
+The rows these can move were measured again on the same emulators, against the
+same budget, unchanged. Columns: master (the reusable worker without the
+application zygote), domain + zygote and domain without the zygote, each in
+ABBA order; host load 3 to 10.
+
+Two scenarios are new. *Cold chat list, 8 groups' URL pictures single-use* is
+the cold chat list with every group showing a URL picture. *Group URL picture*
+repeats the notification artwork with a group's URL picture as the avatar. Both
+decode single-use under the new rule. Existing scenario code is unchanged, so
+their rows stay comparable with run 4.
+
+##### API 30
+
+| Throughput, p50/p95 ms | Master | Domain + zygote | Domain, no zygote |
+| --- | ---: | ---: | ---: |
+| First image after launch | 335/438 | 454/874 | 331/416 |
+| First image, new lane | 323/345 | 32/71 | 339/376 |
+| First image, new domain on a warm lane | 2/7 | 37/50 | 341/386 |
+| Idle thumbnail | 2/4 | 3/7 | 2/3 |
+| Idle 1920×1440 viewer | 15/19 | 25/37 | 14/27 |
+| Six-operation mix | 1/28 | 1/27 | 1/28 |
+| Burst of 24, one conversation (queue) | 16/28 (27) | 23/38 (36) | 27/44 (43) |
+| Burst of 48, one conversation (queue) | 34/86 (84) | 42/68 (67) | 48/87 (86) |
+| Burst of 96, one conversation (queue) | 56/105 (103) | 63/125 (124) | 67/135 (133) |
+| Burst of 48 across 6 conversations (queue) | 37/73 (71) | 85/169 (168) | 690/1667 (1665) |
+| Cold chat list, 24 profiles + 8 groups (max) | 27/57, max 61 | 42/234, max 321 | 1350/3076, max 3080 |
+| Scroll, 8 tiles every 400 ms | 7/12 | 11/20 | 9/19 |
+| Cold chat list, 8 groups' URL pictures single-use (max) | 24/57, max 63 | 51/203, max 263 | 973/2270, max 2636 |
+| No result or admission timeout | 0 | 0 | 0 |
+| Live image workers, at most | 1 | 3 | 3 |
+| Caller FDs, at most | 66 | 64 | 66 |
+| Idle PSS, workers and zygote (MiB) | 47.7 | 71.4 | 90.6 |
+
+| UI level | Master | Domain + zygote | Domain, no zygote |
+| --- | ---: | ---: | ---: |
+| Grid passes | 4 | 4 | 4 |
+| Tiles loaded while on screen, median per pass | 21 | 99 | 108 |
+| Tiles failed / visible tiles left blank | 22 / 0 | 0 / 0 | 0 / 0 |
+| Tile p50/p95, median of passes | 999/1063 | 22/465 | 22/378 |
+| Slowest tile (settle window 10 000) | 1089 | 671 | 393 |
+| Frame p95, median of passes | 23 | 44 | 20 |
+| Avatar within 2.5 s, idle (p50) | 60 of 60 (5) | 60 of 60 (9) | 60 of 60 (5) |
+| Emoji within 250 ms, idle (p50) | 60 of 60 (2) | 60 of 60 (5) | 45 of 60 (3) |
+| Avatar within 2.5 s, behind a burst in another conversation (p50) | 60 of 60 (35) | 60 of 60 (14) | 60 of 60 (14) |
+| Emoji within 250 ms, behind a burst in another conversation (p50) | 60 of 60 (25) | 60 of 60 (6) | 60 of 60 (6) |
+| Avatar within 2.5 s, behind a burst in the same conversation (p50) | 60 of 60 (41) | 60 of 60 (12) | 60 of 60 (10) |
+| Emoji within 250 ms, behind a burst in the same conversation (p50) | 60 of 60 (31) | 60 of 60 (33) | 60 of 60 (26) |
+| Group URL picture within 2.5 s, single-use, idle (p50) | 60 of 60 (6) | 60 of 60 (71) | 59 of 60 (685) |
+| Group URL picture within 2.5 s, single-use, behind a burst in another conversation (p50) | 60 of 60 (40) | 60 of 60 (168) | 31 of 60 (1037) |
+| Group URL picture within 2.5 s, single-use, behind a burst in the same conversation (p50) | 60 of 60 (38) | 60 of 60 (192) | 22 of 60 (1471) |
+| Viewer cancelled mid-decode: pixels delivered; next image p50/max (first try) | 0; 456/701 (0 of 10) | 0; 74/91 (10 of 10) | 0; 397/494 (10 of 10) |
+| Editor cancelled mid-decode: pixels delivered; next image p50/max (first try) | 0; 21/30 (10 of 10) | 0; 18/20 (10 of 10) | 0; 20/33 (10 of 10) |
+
+##### API 36
+
+| Throughput, p50/p95 ms | Master | Domain + zygote | Domain, no zygote |
+| --- | ---: | ---: | ---: |
+| First image after launch | 238/346 | 274/358 | 258/297 |
+| First image, new lane | 248/315 | 37/55 | 251/293 |
+| First image, new domain on a warm lane | 3/8 | 44/67 | 271/292 |
+| Idle thumbnail | 3/7 | 3/7 | 3/6 |
+| Idle 1920×1440 viewer | 21/30 | 21/37 | 16/25 |
+| Six-operation mix | 1/25 | 1/28 | 1/26 |
+| Burst of 24, one conversation (queue) | 28/47 (46) | 34/52 (50) | 23/41 (40) |
+| Burst of 48, one conversation (queue) | 42/74 (73) | 45/76 (75) | 40/64 (63) |
+| Burst of 96, one conversation (queue) | 66/129 (128) | 81/146 (145) | 71/149 (148) |
+| Burst of 48 across 6 conversations (queue) | 42/70 (69) | 107/248 (245) | 588/1331 (1328) |
+| Cold chat list, 24 profiles + 8 groups (max) | 27/50, max 53 | 117/263, max 341 | 291/1767, max 2019 |
+| Scroll, 8 tiles every 400 ms | 9/17 | 11/21 | 11/22 |
+| Cold chat list, 8 groups' URL pictures single-use (max) | 32/74, max 79 | 44/286, max 362 | 534/1820, max 2128 |
+| No result or admission timeout | 0 | 0 | 0 |
+| Live image workers, at most | 1 | 3 | 3 |
+| Caller FDs, at most | 104 | 102 | 104 |
+| Idle PSS, workers and zygote (MiB) | 60.0 | 82.1 | 105.6 |
+
+| UI level | Master | Domain + zygote | Domain, no zygote |
+| --- | ---: | ---: | ---: |
+| Grid passes | 4 | 4 | 4 |
+| Tiles loaded while on screen, median per pass | 79 | 112 | 111 |
+| Tiles failed / visible tiles left blank | 48 / 0 | 0 / 0 | 0 / 0 |
+| Tile p50/p95, median of passes | 8/290 | 10/285 | 10/314 |
+| Slowest tile (settle window 10 000) | 1051 | 364 | 403 |
+| Frame p95, median of passes | 50 | 52 | 47 |
+| Avatar within 2.5 s, idle (p50) | 60 of 60 (9) | 60 of 60 (8) | 60 of 60 (7) |
+| Emoji within 250 ms, idle (p50) | 60 of 60 (4) | 60 of 60 (5) | 43 of 60 (4) |
+| Avatar within 2.5 s, behind a burst in another conversation (p50) | 60 of 60 (46) | 60 of 60 (16) | 60 of 60 (15) |
+| Emoji within 250 ms, behind a burst in another conversation (p50) | 60 of 60 (34) | 60 of 60 (7) | 60 of 60 (8) |
+| Avatar within 2.5 s, behind a burst in the same conversation (p50) | 60 of 60 (38) | 60 of 60 (15) | 60 of 60 (12) |
+| Emoji within 250 ms, behind a burst in the same conversation (p50) | 60 of 60 (29) | 60 of 60 (44) | 60 of 60 (35) |
+| Group URL picture within 2.5 s, single-use, idle (p50) | 60 of 60 (12) | 60 of 60 (88) | 60 of 60 (551) |
+| Group URL picture within 2.5 s, single-use, behind a burst in another conversation (p50) | 60 of 60 (48) | 60 of 60 (249) | 38 of 60 (1308) |
+| Group URL picture within 2.5 s, single-use, behind a burst in the same conversation (p50) | 60 of 60 (44) | 60 of 60 (222) | 35 of 60 (1054) |
+| Viewer cancelled mid-decode: pixels delivered; next image p50/max (first try) | 0; 331/420 (0 of 10) | 0; 89/120 (10 of 10) | 0; 313/778 (10 of 10) |
+| Editor cancelled mid-decode: pixels delivered; next image p50/max (first try) | 0; 18/20 (10 of 10) | 0; 20/21 (10 of 10) | 0; 18/56 (10 of 10) |
+
+| Proposed budget item | API 30 domain + zygote | API 30 repeat | API 30 domain, no zygote | API 36 domain + zygote | API 36 domain, no zygote |
+| --- | --- | --- | --- | --- | --- |
+| T1 No failed request or admission timeout | Met, 0 | Met, 0 | Met, 0 | Met, 0 | Met, 0 |
+| T2 Idle thumbnail p95 within 50 ms of master | Met, +3 | Met, +1 | Met, -1 | Met, +0 | Met, -1 |
+| T3 Idle viewer p95 within 100 ms of master | Met, +18 | Met, +9 | Met, +8 | Met, +7 | Met, -5 |
+| T4 First image after launch p95 within 150 ms of master | **Not met**, +436 | **Not met**, +255 | Met, -22 | Met, +12 | Met, -49 |
+| T5 First image in a new domain p95 within 150 ms of master's new lane | Met, 50 vs 345 | Met, 54 vs 345 | Met, 386 vs 345 | Met, 67 vs 315 | Met, 292 vs 315 |
+| T6 Bursts in one conversation p95 within 0.6, 1.2, 2.5 s | Met, 38/68/125 | Met, 38/71/124 | Met, 44/87/135 | Met, 52/76/146 | Met, 41/64/149 |
+| T7 Burst across conversations p95 within 1.2 s | Met, 169 | Met, 143 | **Not met**, 1667 | Met, 248 | **Not met**, 1331 |
+| T8 Cold chat list: all within 2.5 s, p95 within 1.2 s | Met, max 321, p95 234 | Met, max 214, p95 194 | **Not met**, max 3080, p95 3076 | Met, max 341, p95 263 | **Not met**, max 2019, p95 1767 |
+| T8 The same with group URL pictures single-use | Met, max 263, p95 203 | Met, max 256, p95 201 | **Not met**, max 2636, p95 2270 | Met, max 362, p95 286 | **Not met**, max 2128, p95 1820 |
+| T9 Scroll rounds p95 within 250 ms | Met, 20 | Met, 20 | Met, 19 | Met, 21 | Met, 22 |
+| T10 At most three live workers plus the zygote | Met, 3 | Met, 3 | Met, 3 | Met, 3 | Met, 3 |
+| T11 No caller FD growth | Met, 64 vs 66 | Met, 64 vs 66 | Met, 66 vs 66 | Met, 102 vs 104 | Met, 104 vs 104 |
+| T12 Idle PSS growth within 40 MiB | Met, +23.7 | not re-run | **Not met**, +42.9 | Met, +22.1 | **Not met**, +45.6 |
+| U1 Grid: no failed tile, no blank tile | Met, 0/0 | Met, 0/0 | Met, 0/0 | Met, 0/0 | Met, 0/0 |
+| U2 Grid frame p95 within one 60 Hz frame of master | **Not met**, +21 | Met, -3 | Met, -3 | Met, +2 | Met, -3 |
+| U3 Notification avatar within 2.5 s: idle, other, same | Met, 60/60/60 | Met, 60/60/60 | Met, 60/60/60 | Met, 60/60/60 | Met, 60/60/60 |
+| U3 The same with a group URL picture single-use | Met, 60/60/60 | Met, 60/60/60 | **Not met**, 59/31/22 | Met, 60/60/60 | **Not met**, 60/38/35 |
+| U4 Emoji within 250 ms: idle, other, same | Met, 60/60/60 | Met, 60/60/60 | **Not met**, 45/60/60 | Met, 60/60/60 | **Not met**, 43/60/60 |
+| U5 Cancel delivers nothing; next image within 2 s | Met, max 91 | Met, max 221 | Met, max 494 | Met, max 120 | Met, max 778 |
+
+The first API 30 run on the candidate began at host load 10.6, straight after a
+local build. Domain + zygote then missed T4 (cold launch p95 874 ms, samples 407
+to 874) and U2 (frame p95 44 ms). A repeat of that phase was decided before it
+ran and is shown beside it, not instead of it: U2 met, T4 missed again at p95
+693 ms. A diagnostic A/B on the same emulator ran the round-3 candidate APK
+against this one in ABBA order, domain lane only. It gave the same cold launch,
+p50 400 to 410 ms and p95 412 to 462 ms. So the T4 misses come from the
+environment, not from this round's code, but they are recorded as measured.
+
+What changed from run 4:
+- On stock Android the domain lane still meets every other item on both APIs.
+  A chat list whose eight groups show URL pictures single-use stays within
+  T8: p95 203 ms (API 30), 286 ms (API 36).
+- A notification with a group's URL picture meets U3 on stock Android at p50
+  71 to 249 ms.
+- Without the application zygote it now misses U3 as well, besides T7, T8,
+  T12 and U4. Behind a burst, only 31 and 22 of 60 group pictures arrived
+  within 2.5 s on API 30, and 38 and 35 on API 36.
+- The cause is that single-use inputs are admitted one at a time: each
+  waits for the previous single-use worker's death. Ten such pictures cost ten
+  process starts in series, about 0.35 s each without a zygote.
+- On GrapheneOS that path is at least as slow. The options there are to admit
+  several fresh single-use workers at once, within the live limit, or to
+  accept that a group URL picture can miss its notification when ten arrive
+  at once.
 
 Against keeping the reusable default, which ships the same launch path
 (*Reusable + zygote*), the domain lane costs a first image in a new
@@ -436,9 +615,19 @@ animation type checks.
 
 - A compromised worker keeps whatever it can read of its own domain until the
   generation is replaced: up to 64 inputs or 30 seconds idle.
-- Callers name domains. A caller that names the wrong one, or a future caller
-  that names none, decides what a worker can see; the fail-safe default is
-  Unique, never a shared domain.
+- Callers name domains. A caller that names the wrong one decides what a worker
+  can see. A caller that names none gets Unique, never a shared domain: the
+  avatar loader and the generic picture rows fall back to it too, and
+  `PictureDomainCoverageTest` fails when a production loader call or a picture
+  row with a URL names no domain. Whether a named domain is the right one rests
+  on review and on the audit above.
+- The avatar cache and its in-flight requests are keyed by URL, not domain. If
+  one URL were both a person's published picture and a group's URL picture, the
+  first request's domain would decode it for both.
+- In the outgoing domain a hostile gallery file can carry another pick of the
+  same conversation, including one removed from the draft before sending, into
+  an image sent there. In the local domain a hostile emoji file can draw a
+  private contact picture in an emoji slot on this device.
 - A cooperative self-exit ends the worker process only. Android's escalation
   kill covers the process group. A forked descendant of a compromised worker is
   outside the Binder witness.
@@ -451,6 +640,10 @@ animation type checks.
 - On GrapheneOS, every new domain and every Unique input pays an exec-spawned
   process start; see the [proposed budget](#measurements-and-proposed-budget)
   for the lower bound measured without the application zygote.
+- Unique inputs are admitted one at a time, each after the previous single-use
+  worker's death. Without the application zygote, ten notifications with group
+  URL pictures behind a burst missed the 2.5 s artwork bound for a third to
+  two thirds of them; see the [round 4 re-measure](#round-4-re-measure).
 - There is no visible-first priority within a domain. Callers cancelled through
   interruption, such as the image bubble decode, leave the queue; other callers
   wait within the eight-second admission bound.

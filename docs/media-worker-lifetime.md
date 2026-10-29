@@ -4,7 +4,8 @@ Production installation uses domain-bound worker generations (#3373), switched
 pending approval of their proposed budget. The facade keeps one process-owned
 `IsolatedMediaTransport` across clear, install and account reset, so a held
 generation survives facade replacement.
-Each session has its own source access, refusal cache and epoch. No in-process
+Each session has its own source access, refusal ledger and epoch; the ledger
+holds its own lock, as every domain lane checks and records refusals at once. No in-process
 decoding fallback exists. [Media containment](media-containment.md#domain-bound-worker-generations)
 states the contract; this page records the owner, deadline and test boundaries.
 
@@ -78,8 +79,13 @@ cross-domain admission while another domain's request is in flight, with only
 requests that hold a worker holding descriptors however many domains wait;
 eviction
 only through the victim's death; failure retirement and quarantine per domain;
-the input cap and idle timeout; account reset; and Unique staying single-use.
-Those JVM fixtures exercise owner ordering only.
+the input cap and idle timeout; account reset; Unique staying single-use; and
+failing requests in four domains at once keeping every quarantine entry, its
+bound and no exception. `MediaRefusalLedgerTest` hammers the session's refusal
+ledger from eight threads; without its lock it throws. `PictureDomainCoverageTest`
+and `PictureDomainMappingTest` check that every production picture names its
+domain and that only member-pinned bytes reach a conversation's worker. Those
+JVM fixtures exercise owner ordering only.
 
 `IsolatedMediaDecoderDeviceTest` supplies the operating-system evidence on a
 real device. A debug worker-state canary shows source A's retained digest and

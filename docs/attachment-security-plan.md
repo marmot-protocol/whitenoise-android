@@ -3,8 +3,9 @@
 PR #3382 began with test-only still-image worker characterization and a
 retained still-worker lifetime owner. #3373 implements domain-bound worker
 generations: a worker process serves one data-access domain for its whole life
-(one conversation, one account's published profile pictures or one account's
-local picks), with an exact Binder-death barrier before a domain's next worker
+(one conversation's member-pinned media, one account's published profile
+pictures, one conversation's outgoing picks or one account's display-only local
+files), with an exact Binder-death barrier before a domain's next worker
 and before the next single-use input, and a pre-warmed clean spare. Production
 installation uses it, switched in this PR pending approval of its measured
 regression budget; see
