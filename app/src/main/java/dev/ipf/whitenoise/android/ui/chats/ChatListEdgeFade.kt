@@ -5,6 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.common.ScrollEdgeFadeMotion
+import dev.ipf.whitenoise.android.ui.common.rememberScrollEdgeFadeMotion
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 
 /** How far a chat-list row dissolves before it reaches the surrounding chrome. */
@@ -31,4 +33,5 @@ internal fun chatListEdgeFadeState(
 internal fun Modifier.chatListEdgeFade(
     listState: LazyListState,
     fadeHeight: Dp = CHAT_LIST_EDGE_FADE_HEIGHT,
-): Modifier = scrollEdgeFade(listState, fadeHeight = fadeHeight)
+    motion: ScrollEdgeFadeMotion = rememberScrollEdgeFadeMotion(listState),
+): Modifier = scrollEdgeFade(listState, fadeHeight = fadeHeight, motion = motion)

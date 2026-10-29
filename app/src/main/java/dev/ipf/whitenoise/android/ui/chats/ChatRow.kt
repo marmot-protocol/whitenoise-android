@@ -289,7 +289,6 @@ internal fun ChatRow(
         }
     val pinned = item.pinned()
     val deliveryIndicator = item.projectedDeliveryIndicator()
-    val hasSupportingMetadata = item.group.pendingConfirmation || rowHasUnread || deliveryIndicator != null
     val actionColors = accountActionColors(appState, accountRef)
     ChatRowLayout(
         modifier =
@@ -498,23 +497,18 @@ internal fun ChatRow(
                 )
             }
         },
-        supportingMetadata =
-            if (hasSupportingMetadata) {
-                {
-                    ChatRowSupportingMetadata(
-                        pendingConfirmation = item.group.pendingConfirmation,
-                        rowHasUnread = rowHasUnread,
-                        rowUnreadCount = rowUnreadCount,
-                        unreadMention = item.unreadMention,
-                        actionColors = actionColors,
-                        pinned = false,
-                        evicted = false,
-                        deliveryIndicator = deliveryIndicator,
-                    )
-                }
-            } else {
-                null
-            },
+        supportingMetadata = {
+            ChatRowSupportingMetadata(
+                pendingConfirmation = item.group.pendingConfirmation,
+                rowHasUnread = rowHasUnread,
+                rowUnreadCount = rowUnreadCount,
+                unreadMention = item.unreadMention,
+                actionColors = actionColors,
+                pinned = false,
+                evicted = false,
+                deliveryIndicator = deliveryIndicator,
+            )
+        },
     )
 }
 

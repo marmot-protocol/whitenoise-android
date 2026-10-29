@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalCursorBlinkEnabled
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
@@ -110,7 +111,11 @@ class DestinationPickerImeScreenshotTest {
         val folder = requireNotNull(store.createFolder(ACCOUNT_REF, "Friends"))
         store.setChatInFolder(ACCOUNT_REF, folder.id, GROUP_A, true)
         composeRule.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
+            // Keep the focused cursor visible throughout capture; its blink phase is not an IME layout input.
+            CompositionLocalProvider(
+                LocalDensity provides Density(1f, fontScale),
+                LocalCursorBlinkEnabled provides false,
+            ) {
                 WhiteNoiseTheme(darkTheme = true) {
                     if (share) {
                         ShareChatPickerFullScreenContent(

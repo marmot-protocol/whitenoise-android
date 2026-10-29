@@ -24,6 +24,8 @@ import dev.ipf.whitenoise.android.state.WCAG_AA_NORMAL_TEXT_CONTRAST
 import dev.ipf.whitenoise.android.state.contrastRatio
 import dev.ipf.whitenoise.android.state.readableTextArgb
 import dev.ipf.whitenoise.android.state.resolveActionColorArgb
+import dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled
+import dev.ipf.whitenoise.android.ui.common.observeSystemAnimationsEnabled
 
 private const val OPAQUE_ARGB_MASK = 0xFFFFFFFFL
 private const val ACCENT_BLEND_STEPS = 16
@@ -327,6 +329,8 @@ fun WhiteNoiseTheme(
     CompositionLocalProvider(
         LocalAmoledSurfaceTheme provides amoledActive,
         LocalMessageBubbleBaseColorScheme provides baseColorScheme.withAmoledPalette(amoledActive),
+        // One settings observer for the whole theme; chat rows and pills read it instead of registering their own.
+        LocalSystemAnimationsEnabled provides observeSystemAnimationsEnabled(),
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
