@@ -92,8 +92,8 @@ private class ScrollEdgeSource(
 )
 
 /**
- * Retains only decorative edge motion. Live eligibility hides fitting edges immediately; the IME
- * removes the paint layer without replacing caller-owned scrolling or its retained animation state.
+ * Masks only edges with off-screen content, suspending the mask in place while disabled or under the IME.
+ * The retained bands keep tracking eligibility there, so hiding the IME restores cues without replaying them.
  */
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
@@ -106,7 +106,10 @@ private fun Modifier.scrollEdgeFade(
     motion: ScrollEdgeFadeMotion = rememberScrollEdgeFadeMotion(source.owner),
 ): Modifier {
     // Keyboard forms keep ordinary painting and their caller-owned scroll state.
-    // Remove the added layer immediately; hiding the IME restores the same viewport's cues.
+    // Clear the mask immediately, and hiding the IME restores the same viewport's cues.
+    // The layer itself stays mounted — removing its outsets from under a clipping parent leaves that parent
+    // clipping the outset width off the left edge, which cut every chat-list avatar under the search keyboard.
+    val masking = fadeEnabled && !WindowInsets.isImeVisible
     val top = motion.top
     val bottom = motion.bottom
     LaunchedEffect(motion, source.owner, reverseScrolling, fadeEnabled, fadeHeight) {
@@ -118,18 +121,17 @@ private fun Modifier.scrollEdgeFade(
                 }
             }
     }
-    if (!fadeEnabled || WindowInsets.isImeVisible) return this
     return verticalEdgeFade(
         // Reaching an edge must reveal the resting content immediately, even before the coroutine runs.
         topFade = {
-            if (fadeEnabled && scrollEdgeFadeState(source.backward(), source.forward(), reverseScrolling).top) {
+            if (masking && scrollEdgeFadeState(source.backward(), source.forward(), reverseScrolling).top) {
                 top.value
             } else {
                 0.dp
             }
         },
         bottomFade = {
-            if (fadeEnabled && scrollEdgeFadeState(source.backward(), source.forward(), reverseScrolling).bottom) {
+            if (masking && scrollEdgeFadeState(source.backward(), source.forward(), reverseScrolling).bottom) {
                 bottom.value
             } else {
                 0.dp
