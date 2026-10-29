@@ -40,20 +40,24 @@ class MediaWorkerUiDeviceTest {
         assertEquals(result.toString(), 0, result.getInt("visible_unloaded"))
     }
 
-    /** Idle artwork meets both deadlines, and avatar artwork still meets its deadline behind an image burst. */
+    /**
+     * Idle artwork meets both deadlines. Behind an image burst in another conversation, avatar and emoji
+     * artwork still meet theirs, as that burst never shares their admission.
+     */
     @Test
     fun notificationArtworkMeetsItsDeadlines() {
         AvatarImageLoader.clear()
         val avatar = MediaWorkerUiScenarios.png(AVATAR_EDGE, AVATAR_SEED)
         AvatarImageLoader.attachProfileImageFetcher { _, _ -> avatar }
         UiLane.install("default").use { lane ->
-            val idle = MediaWorkerUiScenarios.notificationArtwork(lane, contended = false, attempt = 0)
-            val busy = MediaWorkerUiScenarios.notificationArtwork(lane, contended = true, attempt = 1)
+            val idle = MediaWorkerUiScenarios.notificationArtwork(lane, BurstPlacement.NONE, attempt = 0)
+            val busy = MediaWorkerUiScenarios.notificationArtwork(lane, BurstPlacement.OTHER, attempt = 1)
             MediaWorkerUiReport.emit(idle)
             MediaWorkerUiReport.emit(busy)
             assertEquals(idle.toString(), idle.getInt("requests"), idle.getInt("avatar_hits"))
             assertEquals(idle.toString(), idle.getInt("requests"), idle.getInt("emoji_hits"))
             assertEquals(busy.toString(), busy.getInt("requests"), busy.getInt("avatar_hits"))
+            assertEquals(busy.toString(), busy.getInt("requests"), busy.getInt("emoji_hits"))
         }
     }
 

@@ -141,6 +141,8 @@ dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoderDeviceTest#retained
 dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoderDeviceTest#noncooperativeRetiringWorkerBlocksTheNextInputUntilAndroidStopsIt
 dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoderDeviceTest#abandonedNoncooperativeWorkerStillHoldsTheNextInputUntilItsDeath
 dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoderDeviceTest#abandonedNoncooperativeWorkerIsStoppedWithoutAnotherRequest
+# #3373: a domain's worker keeps its own earlier input's state for that domain only, never for another.
+dev.ipf.whitenoise.android.media.sandbox.MediaWorkerDomainDeviceTest#retainedStateReachesTheSameDomainOnlyNeverAnotherDomain
 
 # #3373: the installed still-image lane keeps a real media grid, notification artwork deadlines and
 # viewer/editor cancellation working at the UI level.

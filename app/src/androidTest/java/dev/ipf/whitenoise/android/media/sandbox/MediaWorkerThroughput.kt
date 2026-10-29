@@ -33,7 +33,21 @@ internal object MediaWorkerThroughput {
     private const val SCROLL_ROUND_MS = 400L
     private const val WARM_SETTLE_MS = 1_000L
     private const val SCENARIO_DEADLINE_S = 120L
+    private const val NEW_DOMAINS = 8
+    private const val NEW_DOMAIN_GAP_MS = 400L
+    private const val MIXED_BURST = 48
+    private const val MIXED_CONVERSATIONS = 6
+    private const val CHAT_LIST_ROWS = 32
+    private const val CHAT_LIST_GROUP_EVERY = 4
     private val BURSTS = listOf(24, 48, 96)
+
+    /** The conversation every single-conversation scenario decodes in. */
+    private val HOME = conversation(0)
+
+    /** One account's published profile pictures. */
+    private val PROFILES =
+        dev.ipf.whitenoise.android.media.MediaTrustDomain
+            .PublicProfiles("throughput")
     private val waitSlot = ThreadLocal<LongArray?>()
     private val observer =
         MediaAdmissionObserver { wait, admitted ->
@@ -64,12 +78,39 @@ internal object MediaWorkerThroughput {
         }
     }
 
-    /** Scenario bodies after warm-up, each records one row per request. */
+    /** Synthetic conversation [index] of the throughput account. */
+    private fun conversation(index: Int): dev.ipf.whitenoise.android.media.MediaTrustDomain =
+        dev.ipf.whitenoise.android.media.MediaTrustDomain
+            .Conversation("throughput", "conversation-$index")
+
+    /**
+     * Scenario bodies after warm-up, each records one row per request. Unless a scenario says otherwise, every
+     * request belongs to one conversation, so bursts and scroll rounds stay within it.
+     */
     private fun scenarios(): List<ThroughputScenario> =
         listOf(
+            ThroughputScenario("new_domain") { lane, corpus, rows ->
+                // A running lane meets conversations it has not served yet, one at a time.
+                repeat(NEW_DOMAINS) { index ->
+                    rows += call(lane, "thumbnail", index) { thumbnail(lane, corpus, index, conversation(100 + index)) }
+                    SystemClock.sleep(NEW_DOMAIN_GAP_MS)
+                }
+            },
+            ThroughputScenario("mixed_burst") { lane, corpus, rows ->
+                concurrent(lane, corpus, rows, MIXED_BURST, rounds = 1, roundMs = 0L) { index ->
+                    conversation(1 + index % MIXED_CONVERSATIONS)
+                }
+            },
+            ThroughputScenario("chat_list") { lane, corpus, rows ->
+                // A cold chat list: many people's profile pictures and several groups' own images at once.
+                concurrent(lane, corpus, rows, CHAT_LIST_ROWS, rounds = 1, roundMs = 0L) { index ->
+                    val groupRow = index % CHAT_LIST_GROUP_EVERY == CHAT_LIST_GROUP_EVERY - 1
+                    if (groupRow) conversation(200 + index) else PROFILES
+                }
+            },
             ThroughputScenario("idle_thumbnail") { lane, corpus, rows ->
                 repeat(IDLE_THUMBNAILS) { index ->
-                    rows += call(lane, "thumbnail", index) { thumbnail(lane, corpus, index) }
+                    rows += call(lane, "thumbnail", index) { thumbnail(lane, corpus, index, HOME) }
                     SystemClock.sleep(IDLE_THUMBNAIL_GAP_MS)
                 }
             },
@@ -116,7 +157,7 @@ internal object MediaWorkerThroughput {
             repeat(if (coldLaunch) COLD_LAUNCH_REPETITIONS else COLD_REPETITIONS) { index ->
                 if (coldLaunch) awaitNoWorkerProcesses()
                 ThroughputVariants.create(variant, context, observer).use { lane ->
-                    rows += call(lane, "thumbnail", index) { thumbnail(lane, corpus, index) }
+                    rows += call(lane, "thumbnail", index) { thumbnail(lane, corpus, index, HOME) }
                     starts += lane.binding.snapshot().getInt("binding_attempts")
                 }
             }
@@ -159,7 +200,9 @@ internal object MediaWorkerThroughput {
         val elapsed: Long
         try {
             val warm =
-                call(lane, "warmup", -1) { valid(lane.transport.decode(corpus.mix[0], THUMB_EDGE, false, DECODE)) }
+                call(lane, "warmup", -1) {
+                    lane.inDomain(HOME) { valid(lane.transport.decode(corpus.mix[0], THUMB_EDGE, false, DECODE)) }
+                }
             report.emit(warm.put("scenario", scenario.name).put("pass", pass))
             SystemClock.sleep(WARM_SETTLE_MS)
             startsBefore = lane.binding.snapshot().getInt("binding_attempts")
@@ -181,7 +224,11 @@ internal object MediaWorkerThroughput {
         report.emit(summary(variant, pass, scenario.name, rows, elapsed, starts, endpoints, sampler.snapshot()))
     }
 
-    /** Submits [tiles] concurrent thumbnails per round, rounds [roundMs] apart, and waits for all of them. */
+    /**
+     * Submits [tiles] concurrent thumbnails per round, rounds [roundMs] apart, and waits for all of them. Each
+     * request belongs to [domainOf] its index, the home conversation by default.
+     */
+    @Suppress("LongParameterList") // Lane, corpus, sink and the shape of one concurrent load.
     private fun concurrent(
         lane: ThroughputLane,
         corpus: ThroughputCorpus,
@@ -189,6 +236,7 @@ internal object MediaWorkerThroughput {
         tiles: Int,
         rounds: Int,
         roundMs: Long,
+        domainOf: (Int) -> dev.ipf.whitenoise.android.media.MediaTrustDomain = { HOME },
     ) {
         val pool = Executors.newFixedThreadPool(tiles * rounds)
         try {
@@ -201,7 +249,7 @@ internal object MediaWorkerThroughput {
                             val index = round * tiles + tile
                             pool.submit<JSONObject> {
                                 gate.await()
-                                call(lane, "thumbnail", index) { thumbnail(lane, corpus, index) }
+                                call(lane, "thumbnail", index) { thumbnail(lane, corpus, index, domainOf(index)) }
                             }
                         }
                     gate.countDown()
@@ -244,29 +292,41 @@ internal object MediaWorkerThroughput {
             .put("outcome", if (success) "success" else "no_result")
     }
 
+    /** One distinct thumbnail decode, as a request of [domain]. */
     private fun thumbnail(
         lane: ThroughputLane,
         corpus: ThroughputCorpus,
         index: Int,
+        domain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
     ): Boolean {
         val source = corpus.thumbnails[index % corpus.thumbnails.size]
-        return valid(lane.transport.decode(source, THUMB_EDGE, false, DECODE))
+        return lane.inDomain(domain) { valid(lane.transport.decode(source, THUMB_EDGE, false, DECODE)) }
     }
 
+    /** One 1920×1440 viewer decode in the home conversation. */
     private fun viewer(
         lane: ThroughputLane,
         corpus: ThroughputCorpus,
         index: Int,
-    ): Boolean = valid(lane.transport.decode(corpus.viewers[index % corpus.viewers.size], VIEWER_EDGE, true, DECODE))
+    ): Boolean =
+        lane.inDomain(HOME) {
+            valid(lane.transport.decode(corpus.viewers[index % corpus.viewers.size], VIEWER_EDGE, true, DECODE))
+        }
 
     /** The existing baseline's six-operation mix: thumbnail, viewer, inspect, EXIF, region and SVG. */
     private fun mix(
         lane: ThroughputLane,
         corpus: ThroughputCorpus,
         index: Int,
-    ): Boolean {
-        val transport = lane.transport
-        return when (index % MIX.size) {
+    ): Boolean = lane.inDomain(HOME) { mixInScope(lane.transport, corpus, index) }
+
+    /** One operation of the mix on the calling thread's request domain. */
+    private fun mixInScope(
+        transport: MediaDecodeTransport,
+        corpus: ThroughputCorpus,
+        index: Int,
+    ): Boolean =
+        when (index % MIX.size) {
             0 -> valid(transport.decode(corpus.mix[0], THUMB_EDGE, true, DECODE))
             1 -> valid(transport.decode(corpus.mix[1], 512, true, DECODE))
             2 -> transport.inspect(corpus.mix[0])?.let { it.width == 256 && it.height == 256 } == true
@@ -274,7 +334,6 @@ internal object MediaWorkerThroughput {
             4 -> valid(transport.region(corpus.mix[0], MediaImageRegion(0, 0, 128, 128), 64))
             else -> valid(transport.decode(corpus.mix[2], MediaDecodePolicy.SVG_EDGE, false, MediaDecodePolicy.SVG))
         }
-    }
 
     private fun valid(bitmap: Bitmap?): Boolean =
         try {
@@ -292,7 +351,7 @@ internal object MediaWorkerThroughput {
         return JSONObject()
             .put("kind", "header")
             .put("schema", 1)
-            .put("corpus", "synthetic-gradient-throughput-v1")
+            .put("corpus", "synthetic-gradient-throughput-v2-domains")
             .put("thumbnail_sha256", digest(corpus.thumbnails.fold(ByteArray(0)) { all, next -> all + next }))
             .put("viewer_sha256", digest(corpus.viewers.fold(ByteArray(0)) { all, next -> all + next }))
             .put("mix_sha256", JSONArray(corpus.mix.map(::digest)))

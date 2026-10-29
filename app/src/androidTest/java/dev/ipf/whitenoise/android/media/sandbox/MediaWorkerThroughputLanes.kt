@@ -6,13 +6,27 @@ import android.graphics.Color
 import android.os.SystemClock
 import java.io.ByteArrayOutputStream
 
-/** One still-image transport under matched characterization, created fresh for each scenario. */
+/**
+ * One still-image transport under matched characterization, created fresh for each scenario. Only a lane that
+ * [honorsDomains] receives each request's domain; the others see every request as single-use, as before domains.
+ */
 internal class ThroughputLane(
     val variant: String,
     val binding: MediaWorkerBaselineBinding,
     val transport: MediaDecodeTransport,
     private val closer: java.io.Closeable,
+    private val honorsDomains: Boolean = false,
 ) : java.io.Closeable {
+    /** Runs one request as [domain]'s on a domain lane, as an undeclared single-use request otherwise. */
+    fun <T> inDomain(
+        domain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
+        block: () -> T,
+    ): T =
+        MediaTrustScope.within(
+            if (honorsDomains) domain else dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
+            block,
+        )
+
     /** Closes the transport, then waits a bounded time for every observed endpoint's Binder death. */
     override fun close() {
         closer.close()
@@ -43,33 +57,37 @@ internal object ThroughputVariants {
     ): ThroughputLane {
         val binding = MediaWorkerBaselineBinding(context)
         return when (variant) {
-            // The production lane: one reusable worker across inputs.
+            // The pre-#3373 lane: one reusable worker across inputs, whatever their domain.
             "reuse" ->
                 ReusableMediaTransport(binding, "tp_reuse").let {
                     it.admissionObserver = observer
                     ThroughputLane(variant, binding, it, it)
                 }
-            // One cold binding generation per input, with no pre-warmed spare.
-            "per_input" -> fresh(variant, binding, observer, spares = 0)
-            // One clean spare warmed while the current input is served.
-            "prewarm1" -> fresh(variant, binding, observer, spares = 1)
-            // Two clean spares, the per-input lane's default depth and the pool's upper bound.
-            "prewarm2" -> fresh(variant, binding, observer, spares = 2)
+            // The per-input lane with two spares: every request single-use, as before domains.
+            "single_use" -> fresh(variant, binding, observer, MediaWorkerPool.DEFAULT_SPARES, domains = false)
+            // Domain-bound generations with the production spare depth and live limit.
+            "domain" -> fresh(variant, binding, observer, MediaWorkerPool.DOMAIN_SPARES, domains = true)
             else -> error("Unknown throughput variant $variant")
         }
     }
 }
 
-/** A per-input lane with [spares] clean spares, observed through the shared admission observer. */
+/** An isolated lane with [spares] clean spares within the live limit, observed through the shared observer. */
 private fun fresh(
     variant: String,
     binding: MediaWorkerBaselineBinding,
     observer: MediaAdmissionObserver,
     spares: Int,
+    domains: Boolean,
 ): ThroughputLane =
-    IsolatedMediaTransport(binding, "tp_$variant", spares).let {
+    IsolatedMediaTransport(
+        binding,
+        "tp_$variant",
+        spares,
+        liveLimit = MediaWorkerPool.MAX_LIVE_GENERATIONS,
+    ).let {
         it.admissionObserver = observer
-        ThroughputLane(variant, binding, it, it)
+        ThroughputLane(variant, binding, it, it, honorsDomains = domains)
     }
 
 /** Synthetic, account-free inputs, distinct bytes per request so no cache can answer. */

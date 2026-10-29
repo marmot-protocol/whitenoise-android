@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorRenderer
 import dev.ipf.whitenoise.android.notifications.NOTIFICATION_EMOJI_PREPARE_TIMEOUT_MS
 import dev.ipf.whitenoise.android.notifications.decodeNotificationEmojiInterruptibly
@@ -54,12 +55,17 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * One still-image lane installed into the real facade for a UI-level scenario, observed through a
- * read-only Binder witness. Closing it reinstalls the production default.
+ * read-only Binder witness. Closing it reinstalls the production default. Only a domain lane receives
+ * each request's real domain; the others see every request as single-use, as before domains.
  */
 internal class UiLane private constructor(
     val name: String,
     val binding: MediaWorkerBaselineBinding,
+    private val honorsDomains: Boolean,
 ) : java.io.Closeable {
+    /** The domain a production call on this lane passes for content of [domain]. */
+    fun domain(domain: MediaTrustDomain): MediaTrustDomain = if (honorsDomains) domain else MediaTrustDomain.Unique
+
     /** DECODE messages sent to every worker of this lane so far. */
     fun decodesSent(): Int {
         val endpoints = binding.snapshot().getJSONArray("endpoints")
@@ -74,29 +80,53 @@ internal class UiLane private constructor(
 
     companion object {
         /**
-         * Installs `reuse`, `prewarm2` or `default` (the transport kind the production facade installs,
-         * with the same configuration) behind the facade every UI caller uses.
+         * Installs `reuse`, `single_use` (per-input generations with two spares), `domain` (domain-bound
+         * generations as production configures them) or `default` (the kind the production facade installs)
+         * behind the facade every UI caller uses.
          */
         fun install(name: String): UiLane {
             val target = InstrumentationRegistry.getInstrumentation().targetContext
             val binding = MediaWorkerBaselineBinding(target)
+            val kind = if (name == "default") defaultKind(target) else name
             val transport: MediaDecodeTransport =
-                when (if (name == "default") defaultKind(target) else name) {
+                when (kind) {
                     "reuse" -> ReusableMediaTransport(binding, "ui_reuse")
-                    "prewarm2" -> IsolatedMediaTransport(binding, "ui_prewarm2", spares = 2)
+                    "single_use" ->
+                        IsolatedMediaTransport(
+                            binding,
+                            "ui_single",
+                            MediaWorkerPool.DEFAULT_SPARES,
+                            liveLimit = MediaWorkerPool.MAX_LIVE_GENERATIONS,
+                        )
+                    "domain" ->
+                        IsolatedMediaTransport(
+                            binding,
+                            "ui_domain",
+                            MediaWorkerPool.DOMAIN_SPARES,
+                            liveLimit = MediaWorkerPool.MAX_LIVE_GENERATIONS,
+                        )
                     else -> error("Unknown UI lane $name")
                 }
             IsolatedMediaDecoder.installTestTransport(transport)
-            return UiLane(name, binding)
+            return UiLane(name, binding, honorsDomains = kind == "domain")
         }
 
         /** The kind of transport the production facade installs, read from its private field. */
         private fun defaultKind(target: android.content.Context): String {
             IsolatedMediaDecoder.install(target)
             val field = IsolatedMediaDecoder::class.java.getDeclaredField("transport").apply { isAccessible = true }
-            return if (field.get(IsolatedMediaDecoder) is IsolatedMediaTransport) "prewarm2" else "reuse"
+            return if (field.get(IsolatedMediaDecoder) is IsolatedMediaTransport) "domain" else "reuse"
         }
     }
+}
+
+/** Where a notification's burst runs relative to its emoji artwork, and the scenario name it reports. */
+internal enum class BurstPlacement(
+    val scenario: String,
+) {
+    NONE("notification_idle"),
+    OTHER("notification_other_burst"),
+    SAME("notification_same_burst"),
 }
 
 /** Per-tile timing from a real Compose grid: composition start, pixels, failure or cancellation. */
@@ -153,9 +183,18 @@ internal object MediaWorkerUiScenarios {
     /** Same bound as the notification presenter's avatar fetch (AVATAR_NOTIFICATION_FETCH_TIMEOUT_MS). */
     const val AVATAR_NOTIFICATION_DEADLINE_MS = 2_500L
 
+    /** The conversation on screen: its grid, its viewer and, in [BurstPlacement.OTHER], its burst. */
+    private val OPEN_CONVERSATION = MediaTrustDomain.Conversation("ui-account", "open")
+
+    /** Another conversation whose notification arrives while the open one decodes. */
+    private val OTHER_CONVERSATION = MediaTrustDomain.Conversation("ui-account", "other")
+    private val PROFILES = MediaTrustDomain.PublicProfiles("ui-account")
+    private val LOCAL_PICKS = MediaTrustDomain.Local("ui-account")
+
     /**
      * Scrolls a real three-column Compose grid of distinct JPEG tiles to its end with touch swipes, each
-     * tile decoding through the production bubble decode, then waits for every visible tile's pixels.
+     * tile decoding through the production bubble decode in the open conversation, then waits for every
+     * visible tile's pixels.
      */
     fun gridScroll(
         rule: AndroidComposeTestRule<*, ComponentActivity>,
@@ -167,7 +206,7 @@ internal object MediaWorkerUiScenarios {
         val content = SystemClock.elapsedRealtimeNanos()
         rule.setContent {
             state = rememberLazyGridState()
-            MaterialTheme { MediaGrid(state, sources, log) }
+            MaterialTheme { MediaGrid(state, sources, log, lane.domain(OPEN_CONVERSATION)) }
         }
         rule.waitForIdle()
         val frames = FrameSampler(rule.activity.window)
@@ -204,6 +243,8 @@ internal object MediaWorkerUiScenarios {
             .put("visible_at_end", visible.size)
             .put("visible_unloaded", visible.count { !log.loadedNanos.containsKey(it) })
             .put("settle_after_last_swipe_ns", settled?.let { (it - scrolled).coerceAtLeast(0L) } ?: JSONObject.NULL)
+            // The window a visible tile has to load once scrolling stops, so every row records its margin.
+            .put("settle_window_ns", SETTLE_TIMEOUT_MS * NANOS)
             .put("setup_ns", started - content)
             .put("scroll_ns", scrolled - started)
             .put("slowest_tile", log.slowest(content) ?: JSONObject.NULL)
@@ -212,27 +253,36 @@ internal object MediaWorkerUiScenarios {
     }
 
     /**
-     * Notification artwork against its real deadlines: avatar pixels through the notification fetch lane
-     * within 2.5 s, and emoji artwork within the 250 ms emoji preparation bound. The lane is warmed and
-     * left idle first, as a running app's lane is; the first image after launch is measured separately.
-     * Idle, notifications arrive one at a time, 300 ms apart, each with one avatar and one emoji. With
-     * [contended], a burst of grid-sized decodes is queued first, as when a media-heavy chat is open, and
-     * all notifications arrive at once behind it.
+     * Notification artwork against its real deadlines: the sender's published avatar through the notification
+     * fetch lane within 2.5 s, and emoji artwork within the 250 ms emoji preparation bound. The lane is warmed
+     * in the open conversation and left idle first, as a running app's lane is; the first image after launch is
+     * measured separately. With [BurstPlacement.NONE], notifications arrive one at a time, 300 ms apart, each
+     * with one avatar and one emoji. Otherwise a burst of grid-sized decodes in the open conversation is queued
+     * first, as when a media-heavy chat is open, and all notifications arrive at once behind it, with their
+     * emoji in another conversation ([BurstPlacement.OTHER]) or in the open one ([BurstPlacement.SAME]).
      */
     fun notificationArtwork(
         lane: UiLane,
-        contended: Boolean,
+        placement: BurstPlacement,
         attempt: Int,
     ): JSONObject =
         runBlocking {
             val tiles = (0 until BURST).map { jpeg(TILE_SOURCE_EDGE, TILE_SOURCE_EDGE, 1_000 + attempt * BURST + it) }
             val emoji = (0 until NOTIFICATIONS).map { png(EMOJI_EDGE, 2_000 + attempt * NOTIFICATIONS + it) }
-            MediaPipeline.decodeSampledBitmap(png(EMOJI_EDGE, WARM_UP_SEED - attempt), TILE_EDGE)?.recycle()
+            val open = lane.domain(OPEN_CONVERSATION)
+            val emojiConversation = if (placement == BurstPlacement.SAME) OPEN_CONVERSATION else OTHER_CONVERSATION
+            val emojiDomain = lane.domain(emojiConversation)
+            val avatarDomain = lane.domain(PROFILES)
+            val warmUp = png(EMOJI_EDGE, WARM_UP_SEED - attempt)
+            MediaPipeline.decodeSampledBitmap(warmUp, TILE_EDGE, domain = open)?.recycle()
             delay(IDLE_SETTLE_MS)
+            val contended = placement != BurstPlacement.NONE
             val burst =
                 if (contended) {
                     tiles.map { bytes ->
-                        async(Dispatchers.IO) { MediaPipeline.decodeSampledBitmap(bytes, TILE_EDGE)?.recycle() }
+                        async(Dispatchers.IO) {
+                            MediaPipeline.decodeSampledBitmap(bytes, TILE_EDGE, domain = open)?.recycle()
+                        }
                     }
                 } else {
                     emptyList()
@@ -246,7 +296,8 @@ internal object MediaWorkerUiScenarios {
                     wave.map { index ->
                         async(Dispatchers.IO) {
                             timed(AVATAR_NOTIFICATION_DEADLINE_MS, cached = true) {
-                                AvatarImageLoader.loadBitmap("https://fixture.invalid/notify/$attempt/$index")
+                                val url = "https://fixture.invalid/notify/$attempt/$index"
+                                AvatarImageLoader.loadBitmap(url, avatarDomain)
                             }
                         }
                     }
@@ -254,7 +305,7 @@ internal object MediaWorkerUiScenarios {
                     wave.map { index ->
                         async(Dispatchers.IO) {
                             timed(NOTIFICATION_EMOJI_PREPARE_TIMEOUT_MS) {
-                                decodeNotificationEmojiInterruptibly(emoji[index])
+                                decodeNotificationEmojiInterruptibly(emoji[index], emojiDomain)
                             }
                         }
                     }
@@ -264,7 +315,7 @@ internal object MediaWorkerUiScenarios {
             }
             burst.awaitAll()
             JSONObject()
-                .put("scenario", if (contended) "notification_contended" else "notification_idle")
+                .put("scenario", placement.scenario)
                 .put("lane", lane.name)
                 .put("avatar_deadline_ms", AVATAR_NOTIFICATION_DEADLINE_MS)
                 .put("avatar_hits", avatarTimes.count { it != null })
@@ -282,15 +333,17 @@ internal object MediaWorkerUiScenarios {
      */
     fun viewerCancellation(lane: UiLane): JSONObject =
         cancellation(lane, "viewer_cancel", sentPerRequest = 1) { bytes ->
+            val domain = lane.domain(OPEN_CONVERSATION)
             (
-                decodeMessageAttachmentImage(bytes, "image/jpeg", MediaPipeline.VIEWER_MAX_EDGE_PX) as?
+                decodeMessageAttachmentImage(bytes, "image/jpeg", MediaPipeline.VIEWER_MAX_EDGE_PX, domain = domain) as?
                     DecodedAttachmentPresentation.Static
             )?.bitmap
         }
 
-    /** The same cancellation check through the photo editor's preview decode (inspection, then decode). */
+    /** The same cancellation check through the photo editor's preview decode of a local pick. */
     fun editorCancellation(lane: UiLane): JSONObject {
-        val renderer = PhotoEditorRenderer()
+        val domain = lane.domain(LOCAL_PICKS)
+        val renderer = PhotoEditorRenderer(domain = { domain })
         return cancellation(lane, "editor_cancel", sentPerRequest = 2) { bytes ->
             renderer.decodePreview(bytes)
         }
@@ -404,33 +457,35 @@ internal object MediaWorkerUiScenarios {
         }
     }
 
-    /** A grid laid out like the media library, three square tiles per row. */
+    /** A grid laid out like the media library, three square tiles per row, decoding in [domain]. */
     @Composable
     private fun MediaGrid(
         state: LazyGridState,
         sources: List<ByteArray>,
         log: TileLog,
+        domain: MediaTrustDomain,
     ) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(GRID_COLUMNS),
             state = state,
             modifier = Modifier.fillMaxSize().testTag(GRID_TAG),
         ) {
-            items(sources.size, key = { it }) { index -> MediaTile(index, sources[index], log) }
+            items(sources.size, key = { it }) { index -> MediaTile(index, sources[index], log, domain) }
         }
     }
 
-    /** One tile decoding through the production bubble decode; leaving composition cancels it. */
+    /** One tile decoding through the production bubble decode in [domain]; leaving composition cancels it. */
     @Composable
     private fun MediaTile(
         index: Int,
         bytes: ByteArray,
         log: TileLog,
+        domain: MediaTrustDomain,
     ) {
         val image by produceState<ImageBitmap?>(null, index) {
             log.start(index)
             try {
-                val decoded = decodeMessageAttachmentImage(bytes, "image/jpeg", TILE_EDGE)
+                val decoded = decodeMessageAttachmentImage(bytes, "image/jpeg", TILE_EDGE, domain = domain)
                 val bitmap = (decoded as? DecodedAttachmentPresentation.Static)?.bitmap
                 if (bitmap == null) {
                     log.failed.incrementAndGet()

@@ -12,8 +12,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Opt-in UI-level measurements for one named lane per run (`-e ui_lane reuse|prewarm2|default`, repeat
- * runs in ABBA order). Rows go to instrumentation status key `media_worker_ui_json`.
+ * Opt-in UI-level measurements for one named lane per run (`-e ui_lane reuse|single_use|domain|default`,
+ * repeat runs in ABBA order). Rows go to instrumentation status key `media_worker_ui_json`.
  */
 @RunWith(AndroidJUnit4::class)
 @ManualDeviceFixture
@@ -37,7 +37,7 @@ class MediaWorkerUiThroughputDeviceTest {
         UiLane.install(lane).use { MediaWorkerUiReport.emit(MediaWorkerUiScenarios.gridScroll(rule, it)) }
     }
 
-    /** Repeated notification artwork, idle and behind a burst, then viewer and editor cancellation. */
+    /** Repeated notification artwork, idle and behind bursts in other and same domains, then cancellation. */
     @Test
     fun measureNotificationArtworkAndCancellation() {
         AvatarImageLoader.clear()
@@ -45,8 +45,10 @@ class MediaWorkerUiThroughputDeviceTest {
         AvatarImageLoader.attachProfileImageFetcher { _, _ -> avatar }
         UiLane.install(lane).use { installed ->
             repeat(repeats) { attempt ->
-                MediaWorkerUiReport.emit(MediaWorkerUiScenarios.notificationArtwork(installed, false, attempt * 2))
-                MediaWorkerUiReport.emit(MediaWorkerUiScenarios.notificationArtwork(installed, true, attempt * 2 + 1))
+                BurstPlacement.entries.forEachIndexed { offset, placement ->
+                    val seed = attempt * BurstPlacement.entries.size + offset
+                    MediaWorkerUiReport.emit(MediaWorkerUiScenarios.notificationArtwork(installed, placement, seed))
+                }
                 MediaWorkerUiReport.emit(MediaWorkerUiScenarios.viewerCancellation(installed))
                 MediaWorkerUiReport.emit(MediaWorkerUiScenarios.editorCancellation(installed))
             }
