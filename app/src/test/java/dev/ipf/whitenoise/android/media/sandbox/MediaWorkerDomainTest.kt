@@ -5,6 +5,7 @@ import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -21,6 +22,23 @@ import java.util.concurrent.TimeUnit
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = android.app.Application::class)
 class MediaWorkerDomainTest {
+    /**
+     * Runs one complete decode on the test thread first, so Robolectric's native runtime loads there. Loading
+     * it first on several decode threads at once aborted the test JVM (`JniConstants: Class not found`).
+     */
+    @Before
+    fun loadNativeRuntimeOnTheTestThread() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), validReplyAt = { true })
+        val transport = domainLane(context)
+        try {
+            val bytes = byteArrayOf(1)
+            MediaTrustScope.within(A) { transport.decode(bytes, 1, false, MediaDecodePolicy.DECODE) }?.recycle()
+        } finally {
+            context.dieAll()
+            transport.close()
+        }
+    }
+
     /** A domain's later inputs reuse its generation, and no input of another domain ever reaches it. */
     @Test
     fun domainGenerationServesOnlyItsOwnDomain() {
@@ -114,6 +132,68 @@ class MediaWorkerDomainTest {
             context.dieAll()
             transport.close()
         }
+    }
+
+    /**
+     * However many domains wait, no more requests are admitted than generations may live, so waiting requests
+     * hold no descriptors; held requests finishing let the rest in.
+     */
+    @Test
+    fun admittedRequestsAcrossDomainsNeverExceedTheLiveLimit() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
+        val transport = domainLane(context)
+        val admitted =
+            java.util.concurrent.atomic
+                .AtomicInteger()
+        transport.admissionObserver = MediaAdmissionObserver { _, entered -> if (entered) admitted.incrementAndGet() }
+        val domains = listOf(A, B, C, D, MediaTrustDomain.Local("account"))
+        val calls = domains.mapIndexed { index, domain -> decodeIn(transport, index + 1, domain) }
+        try {
+            repeat(MediaWorkerPool.MAX_LIVE_GENERATIONS) {
+                assertTrue(
+                    context
+                        .next()
+                        .remote.decoded
+                        .await(2, TimeUnit.SECONDS),
+                )
+            }
+            Thread.sleep(FENCE_OBSERVATION_MS)
+            assertEquals(MediaWorkerPool.MAX_LIVE_GENERATIONS, admitted.get())
+            assertTrue(calls.count { it.thread.isAlive } == domains.size)
+            context.bindings.take(MediaWorkerPool.MAX_LIVE_GENERATIONS).forEach { bound ->
+                assertTrue(withWorkerIdentity { bound.remote.deliverHeldReply(successfulPixelReply()) })
+            }
+            serveUntilDone(context, calls, heldFrom = MediaWorkerPool.MAX_LIVE_GENERATIONS)
+            assertEquals(domains.size, admitted.get())
+        } finally {
+            calls.forEach(DecodeCall::interruptAndJoin)
+            context.dieAll()
+            transport.close()
+        }
+    }
+
+    /**
+     * Lets [calls] finish without interrupting them: every evicted worker dies as a cooperative one would, and
+     * each binding from index [heldFrom] on answers its held request once it arrives.
+     */
+    private fun serveUntilDone(
+        context: BindingFixture,
+        calls: List<DecodeCall>,
+        heldFrom: Int,
+    ) {
+        val died = mutableSetOf<Int>()
+        val answered = mutableSetOf<Int>()
+        val until = System.nanoTime() + TimeUnit.SECONDS.toNanos(SERVE_SECONDS)
+        while (calls.any { it.thread.isAlive } && System.nanoTime() < until) {
+            synchronized(context.bindings) { context.bindings.toList() }.forEachIndexed { index, bound ->
+                if (bound.remote.retired.count == 0L && died.add(index)) bound.remote.die()
+                if (index >= heldFrom && bound.remote.decoded.count == 0L && answered.add(index)) {
+                    withWorkerIdentity { bound.remote.deliverHeldReply(successfulPixelReply()) }
+                }
+            }
+            Thread.sleep(POLL_MS)
+        }
+        calls.forEach(::finish)
     }
 
     /** Evicting the least recently used idle domain frees its slot only once that worker has died. */
@@ -299,6 +379,8 @@ class MediaWorkerDomainTest {
         val D = MediaTrustDomain.PublicProfiles("account")
         const val INPUTS_PER_DOMAIN = 6
         const val FENCE_OBSERVATION_MS = 300L
+        const val SERVE_SECONDS = 5L
+        const val POLL_MS = 5L
         const val RECOVERY_DEADLINE_MS = 3_000L
     }
 }

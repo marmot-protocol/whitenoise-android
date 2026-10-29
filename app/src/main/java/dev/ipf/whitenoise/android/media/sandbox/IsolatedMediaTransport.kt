@@ -89,6 +89,12 @@ internal class IsolatedMediaTransport(
 
     /** Admission per reusable domain, held only while a request of that domain is queued or running. */
     private val lanes = HashMap<MediaTrustDomain, Lane>()
+
+    /**
+     * Requests admitted across all lanes, one per possible live generation. An admitted request holds its
+     * input and output descriptors while it waits for a worker, so this bounds them whatever the domain count.
+     */
+    private val inFlight = Semaphore(liveLimit.coerceIn(1, MediaWorkerPool.MAX_LIVE_GENERATIONS), true)
     private val bindingLock = Any()
     private var epoch = 0L
 
@@ -272,7 +278,8 @@ internal class IsolatedMediaTransport(
 
     /**
      * Admits one request of [domain]: single-use requests share one serialized lane, each reusable domain
-     * has its own, so a queue in one conversation never delays another domain's admission.
+     * has its own, so a queue in one conversation never delays another domain's admission. Across lanes, no
+     * more requests are admitted than generations may live; both waits share the admission bound.
      */
     @Suppress("ReturnCount") // Closed, unadmitted, stale and completed requests leave separately.
     private fun <T> serialized(
@@ -287,23 +294,42 @@ internal class IsolatedMediaTransport(
             // Queue admission has its own bound; it never spends the admitted exchange's budget.
             val queued = System.nanoTime()
             val admitted = admission.tryAcquire(deadlineMs, TimeUnit.MILLISECONDS)
-            admissionObserver?.admission(System.nanoTime() - queued, admitted)
-            if (!admitted) return null
-            val ticket = Operation(selected, domain, android.os.SystemClock.elapsedRealtime() + deadlineMs)
+            if (!admitted) {
+                admissionObserver?.admission(System.nanoTime() - queued, false)
+                return null
+            }
             try {
-                if (!current(ticket)) return null
-                val result = block(ticket)
-                return if (current(ticket)) {
-                    result
-                } else {
-                    (result as? Bitmap)?.recycle()
-                    null
+                val left = deadlineMs - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - queued)
+                val slot = inFlight.tryAcquire(left.coerceAtLeast(0L), TimeUnit.MILLISECONDS)
+                admissionObserver?.admission(System.nanoTime() - queued, slot)
+                if (!slot) return null
+                try {
+                    return admittedRequest(selected, domain, block)
+                } finally {
+                    inFlight.release()
                 }
             } finally {
                 admission.release()
             }
         } finally {
             lane?.let { synchronized(lanes) { leaveLane(domain, it) } }
+        }
+    }
+
+    /** Runs one admitted request under its own exchange deadline, discarding a result from a replaced session. */
+    private fun <T> admittedRequest(
+        selected: Session,
+        domain: MediaTrustDomain,
+        block: (Operation) -> T?,
+    ): T? {
+        val ticket = Operation(selected, domain, android.os.SystemClock.elapsedRealtime() + deadlineMs)
+        if (!current(ticket)) return null
+        val result = block(ticket)
+        return if (current(ticket)) {
+            result
+        } else {
+            (result as? Bitmap)?.recycle()
+            null
         }
     }
 
