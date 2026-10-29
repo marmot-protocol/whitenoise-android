@@ -1,12 +1,14 @@
 # Attachment security plan
 
 PR #3382 began with test-only still-image worker characterization and a
-retained still-worker lifetime owner. #3373 implements per-input worker
-generations: one worker process per untrusted still input, an exact
-Binder-death barrier before the parent-owned pixel copy and before the next
-input, and pre-warmed clean spares. Production installation keeps the reusable
-worker until a measured regression budget is agreed; see
-[Media containment](media-containment.md#per-input-worker-generations). Upload
+retained still-worker lifetime owner. #3373 implements domain-bound worker
+generations: a worker process serves one data-access domain for its whole life
+(one conversation, one account's published profile pictures or one account's
+local picks), with an exact Binder-death barrier before a domain's next worker
+and before the next single-use input, and a pre-warmed clean spare. Production
+installation keeps the reusable worker until a measured regression budget is
+agreed; see
+[Media containment](media-containment.md#domain-bound-worker-generations). Upload
 preparation, download policy, animation and platform audio/video remain
 unchanged. Release-build, physical-device and GrapheneOS qualification of the
 still lifetime and production-payload inspection remain pending.
@@ -27,7 +29,7 @@ descriptor, output, admission and storage bounds documented in
 
 | Issue | Owning source boundary | Confirmed gap and evidence limit | Next stage and acceptance | Dependency |
 | --- | --- | --- | --- | --- |
-| [#3373](https://github.com/marmot-protocol/whitenoise-android/issues/3373), still-worker lifetime | `IsolatedMediaDecoder`, `IsolatedMediaTransport`, `MediaWorkerPool` and `MediaDecodeService` | The production transport reuses one worker across distinct inputs. The per-input lane uses one generation per input, waits for its exact Binder-host death before the copy and the next input, and escalates an uncooperative worker to an Android stop. Persistence and sandbox escape remain threat scenarios with explicit descendant limits. | Agree on the measured regression budget and review the UI-level evidence before switching the default; then qualify it on release builds, physical hardware and GrapheneOS. Review the application-zygote launch path: shared layout on stock Android, exec-spawned workers on GrapheneOS. | Emulator API 30/API 36 device tests and matched throughput measurements. Complete descendant termination remains a separate proof obligation. |
+| [#3373](https://github.com/marmot-protocol/whitenoise-android/issues/3373), still-worker lifetime | `IsolatedMediaDecoder`, `IsolatedMediaTransport`, `MediaWorkerPool` and `MediaDecodeService` | The production transport reuses one worker across distinct inputs. The domain lane binds each generation to one data-access domain for life, waits for a retired generation's exact Binder-host death before its domain's next input, keeps Unique inputs single-use with the death before the copy, and escalates an uncooperative worker to an Android stop. Persistence and sandbox escape remain threat scenarios with explicit descendant limits. | Agree on the measured regression budget and review the UI-level evidence before switching the default; then qualify it on release builds, physical hardware and GrapheneOS, where exec spawning skips the application zygote and every new domain pays a full process start. Review the application-zygote launch path: shared layout on stock Android, exec-spawned workers on GrapheneOS. | Emulator API 30/API 36 device tests and matched throughput measurements. Complete descendant termination remains a separate proof obligation. |
 | [#3374](https://github.com/marmot-protocol/whitenoise-android/issues/3374), audio/video containment | `PlatformMediaTransport`, `BoundedMediaExecutor`, waveform extraction and Media3 playback | Automatic media work has app-process clients; Media3 extraction runs in the player process. Existing platform services provide some isolation. Exploitability remains unproven. | Publish an API/format/process capability matrix and a minimal automatic-probe prototype on API 30 and API 36. Record denied services, selected-FD/output behavior, cancellation and hung-call limits; decide playback separately. | Actual platform feasibility. A same-UID service can contain some crashes while retaining app-private-data and permission access. |
 | [#3375](https://github.com/marmot-protocol/whitenoise-android/issues/3375), trusted automatic downloads | MDK acquisition policy and Android `MediaAutoDownloadMatrix`, `AppState`, Data usage and identity selection | Existing controls cover network/type permission. Trusted-sender policy requires shared enforcement across background/retry acquisition. | Adopt the published shared contract, then add account-scoped explicit pubkey selection, restricted-empty behavior, truthful save/error states and a separate Download once action. Prove enforcement before remote reads across every attachment type. | [MDK #2512](https://github.com/marmot-protocol/mdk/issues/2512), including storage, admission, retry/revocation and per-item manual permission. An effective toggle requires publication and adoption of the MarmotKit contract. |
 | [#3376](https://github.com/marmot-protocol/whitenoise-android/issues/3376), outgoing video privacy | `MediaPipeline.readVideoForUpload`, `ConversationMediaSender` staging and accepted draft/share payloads | This candidate scrubs ISO BMFF and Matroska container metadata in place, at the same size, before acceptance on every local selection path. Visual picks reported as video, and Files picks whose content is a video, are refused when they cannot be cleaned; other Files picks stay byte-for-byte. Which private fields occur in production camera payloads remains unmeasured. | Follow the [video metadata policy](video-metadata-policy.md). Real-camera corpus inspection of the exact final bytes passed to MDK, and device playback of scrubbed output on API 30 and a current API, remain to be recorded. | The policy's field table, the generated fixtures, the device test and the `controller-video-metadata` emulator send-and-receive lane. The in-app parser runs in the app process; app-process parser exposure remains tracked by #3374. |
@@ -50,10 +52,11 @@ and [Data usage](../app/src/main/java/dev/ipf/whitenoise/android/ui/settings/Dat
 
 ## Still-worker retirement and output handling
 
-The per-input transport keeps one serialized lane and binding monitor. Its
-pool reserves a generation before binding, registers death on the
+The domain transport serializes each domain's requests under one binding
+monitor. Its pool reserves a generation before binding, registers death on the
 framework-delivered remote Binder before sending descriptors and dispatches one
-request to that generation. Each terminal result revokes its reply capability. A
+request at a time to a domain's generation. Each terminal result revokes that
+request's reply capability. A
 successful response remains provisional while retirement is unresolved. The
 [still-image worker lifetime](media-worker-lifetime.md) records the owner,
 deadline and test boundaries; physical-device qualification remains pending.
