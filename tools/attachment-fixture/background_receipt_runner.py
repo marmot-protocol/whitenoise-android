@@ -30,11 +30,13 @@ def prepare_ci_wifi(adb, serial, report):
     """Associate once with AndroidWifi on the hosted API 34 emulator before reverse ports exist.
 
     Android 14 separates radio enable from root-only association. Verify privilege transitions, restore
-    shell in finally before any reverse port or instrumentation. Acceptance of this request is not
-    network proof: the unchanged Android scenario must still observe actual validated default Wi-Fi
-    within its own 30-second waits, with cellular fallback and every policy assertion preserved.
+    shell in finally before any reverse port or instrumentation. `connect-network` waits only 500 ms
+    for its callback and exits zero either way, so a silent reply is recorded as "none" rather than
+    failing the campaign; only an explicit "Connection failed" stops here. No reply is network proof:
+    the unchanged Android scenario must still observe actual validated default Wi-Fi within its own
+    30-second waits, with cellular fallback and every policy assertion preserved.
     """
-    setup = {"phase": "guard", "association_initiated": False, "shell_restored": False}
+    setup = {"phase": "guard", "association": "none", "shell_restored": False}
     report["wifi_setup"] = setup
     if os.environ.get("GITHUB_ACTIONS") != "true" or re.fullmatch(r'emulator-[0-9]+', serial) is None:
         raise ValueError("Wi-Fi setup requires the hosted disposable emulator")
@@ -51,10 +53,12 @@ def prepare_ci_wifi(adb, serial, report):
             raise ValueError("hosted image did not admit root for Wi-Fi association")
         adb_command(adb, serial, "shell", "cmd", "wifi", "set-wifi-enabled", "enabled", timeout=10)
         result = adb_command(adb, serial, "shell", "cmd", "wifi", "connect-network", "AndroidWifi", "open", timeout=10)
-        setup["association_initiated"] = ("Connection initiated" in {line.strip() for line in result.splitlines()}
-                                          and "Connection failed" not in result)
-        if not setup["association_initiated"]:
-            raise ValueError("fixed virtual AP association was not accepted")
+        lines = {line.strip() for line in result.splitlines()}
+        if "Connection failed" in lines:
+            setup["association"] = "failed"
+            raise ValueError("fixed virtual AP association was refused")
+        if "Connection initiated" in lines:
+            setup["association"] = "initiated"
     finally:
         adb_command(adb, serial, "unroot", timeout=10)
         adb_command(adb, serial, "wait-for-device", timeout=10)

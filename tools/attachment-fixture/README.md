@@ -50,12 +50,22 @@ never copied into redacted reports.
 
 Subprocess failures retain their operation, exit status and fixed diagnostic category. Failed emulator instrumentation also reads at most 100 recent crash records with a ten-second bound; reports retain only a matching package crash marker and a fixed exception category. Raw messages and command arguments stay out of artifacts. Recent-buffer diagnostics do not prove attribution to the current invocation and never qualify missing measurements. Physical fixtures retain the failure fields without collecting crash logs.
 
-The `controller-background-receipt` policy waits emit a `background-receipt-policy-timeout` metric before cleanup.
-Its closed `case` and `stage` distinguish host-policy settling from native approval. The snapshot contains only
-allowed/expected/Wi-Fi-only type names, network categories, account state, pause/validation booleans and whether an
-approval revision is applied. An applied revision does not prove approval for the requested type. These are the
-last observed inputs, not a diagnosis of why they failed to settle. Both 15-second deadlines and all assertions
-remain unchanged; the original timeout is rethrown, and the host retains the metric even without source frames.
+The `controller-background-receipt` policy and network waits emit a `background-receipt-policy-timeout` metric before
+cleanup. Its closed `case` (`Initial`, `DisabledType`, `NetworkHeld`, `ProcessStop`) and `stage` (`HostPolicy`,
+`NativeApproval`, `WifiSnapshot`) name the wait that expired. Policy snapshots contain only allowed/expected/Wi-Fi-only
+type names, network categories, account state, pause/validation booleans and whether an approval revision is applied;
+an applied revision does not prove approval for the requested type. A `WifiSnapshot` timeout instead records closed
+transport facts: the app's network mirror beside a fresh platform default-network read (present, Wi-Fi, cellular,
+VPN, internet, validated, unmetered, and whether the default stayed stable during the read). The process-stop
+scenario emits `background-receipt-process-stop` metrics for its `ReceiptProcessing`, `RunningWork` and `HeldLedger`
+stages. These are the last observed inputs, not a diagnosis of why they failed to settle. Deadlines and assertions
+are unchanged; the original timeout is rethrown, and the host retains the metric even without source frames.
+
+On the hosted `ci-api34-x86_64` profile the runner first roots the disposable emulator, enables Wi-Fi and asks it
+once to join the open `AndroidWifi` access point, then restores shell privileges before any port is reversed. The
+emulator keeps that saved network until it is discarded. Android waits only 500 ms for the request's callback, so
+the report's `wifi_setup.association` is `initiated`, `none` (no reply in time) or `failed`, and only `failed` stops
+the run. None of these is network proof; the scenario's own 30-second waits still decide.
 
 The optional `controller` sender mode configures only the generated group's loopback blob endpoint, then uses the shipping `ConversationController.sendAttachments` path without uploader, publisher or accepted-result fakes. Its reference comes from actual native history. The runner requires exact outgoing native lease bytes before and after native runtime reopen with acquisition unavailable; missing controller evidence fails even when transport and budgets pass. This remains a native-runtime lifecycle check, not full Android process restart or manual viewer/installer qualification.
 

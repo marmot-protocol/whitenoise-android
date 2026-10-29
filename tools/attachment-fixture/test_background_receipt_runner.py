@@ -62,44 +62,93 @@ class HostedWifiSetupTest(unittest.TestCase):
                 mock.patch.object(runner, "adb_command", side_effect=adb):
             runner.prepare_ci_wifi("adb", "emulator-5554", report)
         self.assertEqual("association-requested", report["wifi_setup"]["phase"])
+        self.assertEqual("initiated", report["wifi_setup"]["association"])
         self.assertNotIn("qualified", report["wifi_setup"])
         self.assertTrue(report["wifi_setup"]["shell_restored"])
         self.assertEqual(1, calls.count(("shell", "cmd", "wifi", "connect-network", "AndroidWifi", "open")))
         self.assertFalse(any("data" in call or "airplane-mode" in call or "reverse" in call for call in calls))
 
-    def test_zero_exit_failure_and_command_timeout_restore_shell_and_fail(self):
-        """The Android command may exit zero after a failed callback; transport failures must also restore shell."""
-        for response in ("Connection failed\n", "", subprocess.TimeoutExpired("adb", 10)):
+    @staticmethod
+    def hosted_adb(calls, reply):
+        """Model the hosted emulator's guards and privilege transitions, answering connect-network with [reply]."""
+        uid = "2000"
+
+        def adb(_adb, _serial, *args, **_kwargs):
+            """Record each command and return the fixed platform output for it."""
+            nonlocal uid
+            calls.append(args)
+            if args[:2] == ("shell", "getprop"):
+                return {"ro.kernel.qemu": "1", "ro.build.version.sdk": "34",
+                        "ro.product.cpu.abi": "x86_64", "ro.debuggable": "1"}[args[2]]
+            if args == ("root",):
+                uid = "0"
+            if args == ("unroot",):
+                uid = "2000"
+            if args == ("shell", "id", "-u"):
+                return uid
+            if "connect-network" in args:
+                if isinstance(reply, Exception):
+                    raise reply
+                return reply
+            return ""
+
+        return adb
+
+    def test_refused_association_and_command_timeout_restore_shell_and_fail(self):
+        """An explicit refusal or a transport failure stops setup, and shell privileges are still restored."""
+        for reply in ("Connection failed\n", subprocess.TimeoutExpired("adb", 10)):
             report, calls = {}, []
-            uid = "2000"
-
-            def adb(_adb, _serial, *args, **_kwargs):
-                """Accept guards, then fail the association while tracking mandatory cleanup."""
-                nonlocal uid
-                calls.append(args)
-                if args[:2] == ("shell", "getprop"):
-                    return {"ro.kernel.qemu": "1", "ro.build.version.sdk": "34",
-                            "ro.product.cpu.abi": "x86_64", "ro.debuggable": "1"}[args[2]]
-                if args == ("root",):
-                    uid = "0"
-                if args == ("unroot",):
-                    uid = "2000"
-                if args == ("shell", "id", "-u"):
-                    return uid
-                if "connect-network" in args:
-                    if isinstance(response, Exception):
-                        raise response
-                    return response
-                return ""
-
             with mock.patch.dict(runner.os.environ, GITHUB_ACTIONS="true"), \
-                    mock.patch.object(runner, "adb_command", side_effect=adb), \
+                    mock.patch.object(runner, "adb_command", side_effect=self.hosted_adb(calls, reply)), \
                     self.assertRaises((ValueError, subprocess.TimeoutExpired)):
                 runner.prepare_ci_wifi("adb", "emulator-5554", report)
             self.assertEqual(1, calls.count(("unroot",)))
             self.assertTrue(report["wifi_setup"]["shell_restored"])
             self.assertNotIn("qualified", report["wifi_setup"])
-            self.assertNotIn(("shell", "dumpsys", "connectivity"), calls)
+            if isinstance(reply, str):
+                self.assertEqual("failed", report["wifi_setup"]["association"])
+
+    def test_a_late_callback_leaves_judgement_to_the_scenario(self):
+        """connect-network exits zero with no output when its callback misses the 500 ms wait; setup continues."""
+        report, calls = {}, []
+        with mock.patch.dict(runner.os.environ, GITHUB_ACTIONS="true"), \
+                mock.patch.object(runner, "adb_command", side_effect=self.hosted_adb(calls, "")):
+            runner.prepare_ci_wifi("adb", "emulator-5554", report)
+        self.assertEqual("none", report["wifi_setup"]["association"])
+        self.assertEqual("association-requested", report["wifi_setup"]["phase"])
+        self.assertTrue(report["wifi_setup"]["shell_restored"])
+        self.assertEqual(1, calls.count(("unroot",)))
+
+    def test_hosted_profile_associates_before_any_reverse_port(self):
+        """The run requests association first on the hosted profile only, before any port is reversed."""
+        for profile, expected in (("ci-api34-x86_64", True), ("reference-api30-arm64", False)):
+            order = []
+            server = mock.Mock(server_port=4001, ledger=mock.Mock(snapshot=mock.Mock(return_value=[])))
+            relay = mock.Mock(port=4002)
+
+            def adb(_adb, _serial, *args, **_kwargs):
+                """Answer the run's emulator and package probes and record each reverse port."""
+                if args and args[0] == "reverse":
+                    order.append("reverse")
+                if "ro.kernel.qemu" in args:
+                    return "1\n"
+                if "list" in args:
+                    return f"package:{runner.APP}\n"
+                return ""
+
+            with self.subTest(profile=profile), tempfile.TemporaryDirectory() as directory, \
+                    mock.patch.object(runner, "adb_command", side_effect=adb), \
+                    mock.patch.object(runner, "prepare_ci_wifi", side_effect=lambda *_: order.append("wifi")), \
+                    mock.patch.object(runner, "FixtureServer", return_value=server), \
+                    mock.patch.object(runner, "FixtureRelay", return_value=relay), \
+                    mock.patch.object(runner, "instrument", side_effect=ValueError("stop after setup")), \
+                    mock.patch.object(runner.time, "sleep"):
+                with self.assertRaises(RuntimeError):
+                    runner.run("adb", "emulator-5554", Path(directory), Path(directory) / "out.json", profile)
+            self.assertIn("reverse", order)
+            self.assertEqual(expected, "wifi" in order)
+            if expected:
+                self.assertEqual("wifi", order[0])
 
 
 class BackgroundReceiptRunnerTest(unittest.TestCase):
