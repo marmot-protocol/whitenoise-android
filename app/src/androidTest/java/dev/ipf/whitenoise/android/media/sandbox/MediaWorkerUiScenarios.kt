@@ -118,6 +118,18 @@ internal class TileLog {
         loadedNanos[index] = now
         started[index]?.let { latencies += now - it }
     }
+
+    /** The slowest loaded tile, with its start relative to [origin], so an outlier can be placed in the run. */
+    fun slowest(origin: Long): JSONObject? =
+        loadedNanos.entries
+            .mapNotNull { (index, loaded) -> started[index]?.let { Triple(index, it, loaded - it) } }
+            .maxByOrNull { it.third }
+            ?.let { (index, start, latency) ->
+                JSONObject()
+                    .put("index", index)
+                    .put("started_after_content_ns", start - origin)
+                    .put("latency_ns", latency)
+            }
 }
 
 /** UI-level scenarios shared by the containment assertions and the manual measurement fixture. */
@@ -152,6 +164,7 @@ internal object MediaWorkerUiScenarios {
         val sources = (0 until GRID_TILES).map { jpeg(TILE_SOURCE_EDGE, TILE_SOURCE_EDGE, it) }
         val log = TileLog()
         lateinit var state: LazyGridState
+        val content = SystemClock.elapsedRealtimeNanos()
         rule.setContent {
             state = rememberLazyGridState()
             MaterialTheme { MediaGrid(state, sources, log) }
@@ -191,7 +204,9 @@ internal object MediaWorkerUiScenarios {
             .put("visible_at_end", visible.size)
             .put("visible_unloaded", visible.count { !log.loadedNanos.containsKey(it) })
             .put("settle_after_last_swipe_ns", settled?.let { (it - scrolled).coerceAtLeast(0L) } ?: JSONObject.NULL)
+            .put("setup_ns", started - content)
             .put("scroll_ns", scrolled - started)
+            .put("slowest_tile", log.slowest(content) ?: JSONObject.NULL)
             .put("frames", frames.summary())
             .put("worker_starts", lane.binding.snapshot().getInt("binding_attempts"))
     }

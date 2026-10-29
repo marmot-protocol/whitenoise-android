@@ -159,4 +159,6 @@ viewer and photo-editor decodes cancelled once their input reached a worker,
 followed by another image. `MediaWorkerUiThroughputDeviceTest` is the opt-in
 `ManualDeviceFixture` that repeats the same scenarios for a named lane
 (`-e ui_lane reuse|prewarm2|default`, one grid pass per run) and emits rows under
-`media_worker_ui_json`. Both use synthetic images only.
+`media_worker_ui_json`. Each grid row also records the setup time and the
+slowest loaded tile with its start, so an outlier can be placed in its run.
+Both use synthetic images only.
