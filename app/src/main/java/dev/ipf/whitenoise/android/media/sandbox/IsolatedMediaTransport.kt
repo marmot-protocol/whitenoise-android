@@ -96,6 +96,9 @@ internal class IsolatedMediaTransport(
     private val handler by lazy { Handler(callbacks.looper) }
     private val callbackExecutor = java.util.concurrent.Executor { command -> handler.post(command) }
 
+    /** Measurement-only queue observer, used by matched lane characterization. */
+    @Volatile internal var admissionObserver: MediaAdmissionObserver? = null
+
     /** Account invalidation never discards the process-death witness. */
     internal fun activateSession() = replaceSession(true)
 
@@ -316,7 +319,10 @@ internal class IsolatedMediaTransport(
     ): T? {
         if (selected == null || closed) return null
         // Queue admission has its own bound; it never spends the admitted exchange's budget.
-        return if (!gate.tryAcquire(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)) {
+        val queued = System.nanoTime()
+        val admitted = gate.tryAcquire(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)
+        admissionObserver?.admission(System.nanoTime() - queued, admitted)
+        return if (!admitted) {
             null
         } else {
             val ticket = Operation(selected, android.os.SystemClock.elapsedRealtime() + MediaDecodePolicy.DEADLINE_MS)
