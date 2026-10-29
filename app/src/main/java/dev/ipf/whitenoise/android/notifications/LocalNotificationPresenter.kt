@@ -1233,6 +1233,7 @@ class LocalNotificationPresenter(
                                                 notificationContent.senderKey,
                                             )
                                         },
+                                    redacted = redactContent || !previewToken.allowed,
                                 )
                             // #3311: every rich card carries its conversation identity picture in the first
                             // payload, for a direct chat as well as a group, so the native conversation picture
@@ -2284,7 +2285,7 @@ class LocalNotificationPresenter(
                 ) {
                     val payload = previewPayload(withCurrentContactPictures(notification), tag, id, hiddenShortcut)
                     // Rewrites of a card posted by the earlier expanded-choice build return to the standard template.
-                    val standard = withoutLegacyReactionRail(context, payload)
+                    val standard = withoutGroupSenderPictures(context, withoutLegacyReactionRail(context, payload))
                     val revision = ConversationCardPostedRegistry.newPayloadRevision()
                     // A recovery builder can discard custom views and group alert behavior. Stamp a copy of
                     // the final platform payload so the revision describes exactly the card Android receives.
@@ -2998,17 +2999,28 @@ class LocalNotificationPresenter(
                         stampContactPictureShortcut(built, update.sender.accountIdHex, update.isDm)
                         if (!shortcutPreviewAllowed(context, built)) {
                             genericNotificationShortcut(context, built)
-                        } else if (currentChoice) {
-                            withContactPictureIcon(
-                                context,
-                                built,
-                                update.sender.accountIdHex,
-                                pixels,
-                                initialConversationIcon =
-                                    notificationConversationIcon(title, shortcutId, ownedConversationAvatar),
-                            )
                         } else {
-                            built
+                            val pictured =
+                                if (currentChoice) {
+                                    withContactPictureIcon(
+                                        context,
+                                        built,
+                                        update.sender.accountIdHex,
+                                        pixels,
+                                        initialConversationIcon =
+                                            notificationConversationIcon(title, shortcutId, ownedConversationAvatar),
+                                    )
+                                } else {
+                                    built
+                                }
+                            if (content.isGroupConversation) {
+                                ShortcutInfoCompat
+                                    .Builder(pictured)
+                                    .setPerson(groupNotificationPerson(ownedSender))
+                                    .build()
+                            } else {
+                                pictured
+                            }
                         }
                     }
                     val currentShortcut = finish(shortcut)
@@ -3358,13 +3370,22 @@ private fun String.firstMonogramCodePoint(): Int? {
 internal fun notificationSenderPerson(
     content: LocalNotificationContent,
     avatarBitmap: Bitmap?,
+    redacted: Boolean = false,
 ): Person =
     Person
         .Builder()
         .setName(content.senderName)
         .setKey(content.senderKey)
         .apply {
-            avatarBitmap?.let { setIcon(IconCompat.createWithBitmap(it)) }
+            if (!redacted) {
+                val icon =
+                    if (content.isGroupConversation && content.senderKey.isNotBlank()) {
+                        groupSenderIcon()
+                    } else {
+                        avatarBitmap?.let(IconCompat::createWithBitmap)
+                    }
+                icon?.let(::setIcon)
+            }
         }.build()
 
 private const val NOTIFICATION_MONOGRAM_SIZE_PX = 128

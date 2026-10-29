@@ -147,16 +147,7 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
                         chats = attachReadyGroup(fixture)
                     }
                 }
-            if (!isDm) assertTrue("Group image must be in the first payload", notification.getLargeIcon() != null)
-            val body = notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
-            assertEquals(preview.replace("**", ""), body)
-            assertFalse(body.contains("**"))
-
-            val card = renderPlatformTemplate(notification)
-            val visibleText = card.descendantText()
-            assertTrue(visibleText.any { "Alice" in it })
-            assertTrue(visibleText.any { "Resolved first draw" in it })
-            assertFalse(visibleText.any(YEAR_OFFSET::containsMatchIn))
+            val card = assertFirstPostTemplate(notification, preview, isDm)
             card.captureRoboImage(
                 when {
                     longBody && !isDm -> LONG_GROUP_SNAPSHOT_PATH
@@ -171,6 +162,25 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
             chats?.onCleared()
             fixture.close()
         }
+    }
+
+    /** Checks the resolved payload and visible sender/body before capturing the platform template. */
+    private fun assertFirstPostTemplate(
+        notification: Notification,
+        preview: String,
+        isDm: Boolean,
+    ): View {
+        if (!isDm) assertTrue("Group image must be in the first payload", notification.getLargeIcon() != null)
+        val body = notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
+        assertEquals(preview.replace("**", ""), body)
+        assertFalse(body.contains("**"))
+
+        val card = renderPlatformTemplate(notification)
+        val visibleText = card.descendantText()
+        assertTrue(visibleText.any { "Alice" in it })
+        assertTrue(visibleText.any { "Resolved first draw" in it })
+        assertFalse(visibleText.any(YEAR_OFFSET::containsMatchIn))
+        return card
     }
 
     /** Supplies a real owner-bound group projection with its decoded avatar already cached. */

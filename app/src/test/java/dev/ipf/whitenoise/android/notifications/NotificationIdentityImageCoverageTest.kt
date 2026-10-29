@@ -191,6 +191,21 @@ class NotificationIdentityImageCoverageTest {
         assertTrue("the use report re-reads the snapshot inside the lock", lock in 0 until reRead)
     }
 
+    /** Every rich-group rewrite normalizes sender pixels after private overrides while retaining native style. */
+    @Test
+    fun groupSenderPicturesAreSuppressedAtTheFinalWriteBoundary() {
+        val write = source("LocalNotificationPresenter.kt").functionBody("postNotificationSafely")
+        val normalize = write.indexOf("withoutGroupSenderPictures(")
+        assertTrue("normalization is in the final write", normalize >= 0)
+        assertTrue("after private picture reconciliation", write.indexOf("withCurrentContactPictures(") < normalize)
+        val policy = source("NotificationGroupSenderImages.kt")
+        assertTrue("real group conversation style retained", "setGroupConversation(true)" in policy)
+        assertTrue("all historic senders normalized", "existing.historicMessages.forEach" in policy)
+        assertTrue("self normalized too", "groupNotificationPerson(existing.user)" in policy)
+        assertTrue("native action objects retained", "actions = notification.actions" in policy)
+        assertFalse("no replacement custom card", "RemoteViews" in policy)
+    }
+
     /** Body of an extension function such as `fun Receiver.name(...)`, which [functionBody] does not match. */
     private fun String.extensionBody(name: String): String {
         val start =

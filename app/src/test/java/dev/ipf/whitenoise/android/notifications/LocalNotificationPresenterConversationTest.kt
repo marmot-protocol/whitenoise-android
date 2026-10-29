@@ -194,7 +194,7 @@ class LocalNotificationPresenterConversationTest {
             assertEquals(Color.BLUE, senderPixels())
         }
 
-    /** A member's private face changes its Person only; the group's shortcut retains the group's own image. */
+    /** A private member picture never replaces the group's own shortcut image. */
     @Test
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun privateContactDoesNotReplaceTheGroupShortcutImage() =
@@ -1100,10 +1100,10 @@ class LocalNotificationPresenterConversationTest {
     }
 
     @Test
-    fun senderPersonUsesTheResolvedAvatarBitmap() {
+    fun directSenderPersonUsesTheResolvedAvatarBitmap() {
         val content =
             LocalNotificationFormatter.content(
-                update = update(isMention = false),
+                update = update(isMention = false).copy(isDm = true),
                 context = context,
                 shortNpub = { "npub1test" },
             )!!
@@ -1756,9 +1756,9 @@ class LocalNotificationPresenterConversationTest {
         assertEquals("nostr:$DEFAULT_NOTIFICATION_SENDER_ID", messages.first().person?.uri)
     }
 
-    /** Nickname refresh updates the expanded single-message bridge before it gains history. */
+    /** Nickname refresh updates a long first message before the same card accumulates history. */
     @Test
-    fun nicknameRefreshUpdatesExpandedSingleMessageBeforeItBecomesHistory() {
+    fun nicknameRefreshUpdatesLongFirstMessageBeforeItBecomesHistory() {
         presenter.ensureChannels()
         val longBody = "A detailed notification message. ".repeat(20)
         runBlocking {
@@ -1772,12 +1772,27 @@ class LocalNotificationPresenterConversationTest {
                 1,
                 presenter.refreshContactSenderName("account-a", DEFAULT_NOTIFICATION_SENDER_ID, "Ally"),
             )
+            val renamed =
+                checkNotNull(
+                    NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(
+                        manager.activeNotifications.single().notification,
+                    ),
+                )
+            assertEquals("General", renamed.conversationTitle.toString())
             assertEquals(
-                context.getString(R.string.notification_sender_in_group, "Ally", "General"),
-                manager.activeNotifications
+                "Ally",
+                renamed.messages
                     .single()
-                    .notification.extras
-                    .getCharSequence(Notification.EXTRA_TITLE),
+                    .person
+                    ?.name
+                    .toString(),
+            )
+            assertEquals(
+                longBody.trim(),
+                renamed.messages
+                    .single()
+                    .text
+                    .toString(),
             )
             presenter.show(
                 update(isMention = false, messageIdHex = "next-message"),

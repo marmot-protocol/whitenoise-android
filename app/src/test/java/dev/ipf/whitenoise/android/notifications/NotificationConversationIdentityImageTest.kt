@@ -63,15 +63,16 @@ class NotificationConversationIdentityImageTest {
         assertEquals(DEFAULT_SENDER, identityExtras(posts.single())?.getString("contact"))
     }
 
-    /** A group card shows the group picture while the message keeps the sender's own face. */
+    /** A group card shows its own picture and the sender name without sender photo or initial pixels. */
     @Test
-    fun groupCardShowsTheGroupPictureAndKeepsTheSenderInTheMessage() {
+    fun groupCardShowsOnlyTheGroupPictureAndKeepsTheSenderName() {
         val presenter = presenter()
         show(presenter, group(), conversation = solid(Color.BLUE), sender = solid(Color.GREEN))
 
         val card = liveCard()
         assertEquals(Color.BLUE, identityPixel(card))
-        assertEquals(Color.GREEN, pixel(lastMessagePerson(card)))
+        assertEquals(0, Color.alpha(pixel(lastMessagePerson(card))))
+        assertEquals(DEFAULT_SENDER, lastMessagePerson(card).key)
         assertNull("a group identity is never a member's private contact", identityExtras(card)?.getString("contact"))
     }
 
@@ -265,7 +266,8 @@ class NotificationConversationIdentityImageTest {
 
             val card = liveCard()
             assertEquals(Color.BLUE, identityPixel(card))
-            assertEquals(Color.RED, pixel(lastMessagePerson(card)))
+            assertEquals(0, Color.alpha(pixel(lastMessagePerson(card))))
+            assertEquals("Maya", lastMessagePerson(card).name.toString())
         }
 
     /** App-lock redaction never carries an identity picture or its contact key. */
@@ -307,6 +309,28 @@ class NotificationConversationIdentityImageTest {
             assertEquals(Color.MAGENTA, identityPixel(card))
             assertEquals(Color.MAGENTA, pixel(lastMessagePerson(card)))
             assertEquals("Maya", lastMessagePerson(card).name.toString())
+            assertTrue(card.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+        }
+
+    /** A late member picture cannot undo a newer sender nickname or replace the group's own picture. */
+    @Test
+    fun lateGroupSenderPictureKeepsTheCurrentNameAndNoSenderPixels() =
+        runBlocking {
+            val posts = mutableListOf<Notification>()
+            val presenter = presenter(posts, resolver = ::latePicture)
+            val picture = solid(Color.BLUE)
+            show(presenter, group(), conversation = picture)
+            presenter.refreshContactSenderName(ACCOUNT, DEFAULT_SENDER, "Maya")
+            val before = posts.size
+            val sources = NotificationIdentityPictureSources(picture, null, null, PICTURE_URL)
+
+            assertTrue(refreshLateIdentity(presenter, group(), sources))
+
+            assertEquals(before + 1, posts.size)
+            val card = liveCard()
+            assertEquals(Color.BLUE, identityPixel(card))
+            assertEquals("Maya", lastMessagePerson(card).name.toString())
+            assertEquals(0, Color.alpha(pixel(lastMessagePerson(card))))
             assertTrue(card.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
         }
 
@@ -360,9 +384,9 @@ class NotificationConversationIdentityImageTest {
             assertEquals(Color.BLUE, identityPixel(liveCard()))
         }
 
-    /** A group picture loader that fails yields no group picture, but the sender picture that arrived still lands. */
+    /** A failed group-picture load cannot turn a late sender picture into visible member pixels. */
     @Test
-    fun lateIdentityRefreshKeepsTheSenderPictureWhenTheGroupLoaderFails() =
+    fun lateIdentityRefreshKeepsSenderPixelsHiddenWhenTheGroupLoaderFails() =
         runBlocking {
             val posts = mutableListOf<Notification>()
             val presenter = presenter(posts, resolver = ::latePicture)
@@ -379,7 +403,8 @@ class NotificationConversationIdentityImageTest {
 
             assertTrue(refreshLateIdentity(presenter, group(), sources))
 
-            assertEquals("the sender picture is still written once", before + 1, posts.size)
+            assertEquals("the late rewrite is still bounded to once", before + 1, posts.size)
+            assertEquals(0, Color.alpha(pixel(lastMessagePerson(liveCard()))))
         }
 
     /** A redacted group card never asks the loader for its encrypted picture, and nothing is written. */
