@@ -95,7 +95,10 @@ internal fun ChatUnreadBadgeMotion(
     }
 }
 
-/** Visibility and count emphasis share cancellation, so a replacement count reverses from the current frame. */
+/**
+ * Visibility and count emphasis share cancellation, so a replacement count reverses from the current frame.
+ * A newly composed or unchanged row is already at rest and requests no animation frames.
+ */
 private suspend fun animateUnreadBadge(
     visible: Boolean,
     changed: Boolean,
@@ -104,6 +107,7 @@ private suspend fun animateUnreadBadge(
     emphasis: Animatable<Float, AnimationVector1D>,
 ) {
     val target = if (visible) 1f else 0f
+    if (!changed && visibility.value == target && emphasis.value == 1f) return
     if (!enabled) {
         visibility.snapTo(target)
         emphasis.snapTo(1f)

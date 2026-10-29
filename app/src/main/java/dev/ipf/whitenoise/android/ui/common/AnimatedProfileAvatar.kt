@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -61,9 +62,19 @@ internal fun systemAnimationsEnabled(resolver: ContentResolver): Boolean {
     return scale != 0f
 }
 
+/**
+ * One live [systemAnimationsEnabled] value for the theme's subtree, so dense lists read it instead of
+ * registering a settings observer per row. Unset outside the theme, where callers observe it themselves.
+ */
+internal val LocalSystemAnimationsEnabled = compositionLocalOf<Boolean?> { null }
+
 /** Tracks [systemAnimationsEnabled] live, so a mounted avatar stops the moment motion is turned off. */
 @Composable
-internal fun rememberSystemAnimationsEnabled(): Boolean {
+internal fun rememberSystemAnimationsEnabled(): Boolean = LocalSystemAnimationsEnabled.current ?: observeSystemAnimationsEnabled()
+
+/** Registers one settings observer for this call site; the theme provides its result to every descendant. */
+@Composable
+internal fun observeSystemAnimationsEnabled(): Boolean {
     val resolver = LocalContext.current.contentResolver
     var enabled by remember(resolver) { mutableStateOf(systemAnimationsEnabled(resolver)) }
     DisposableEffect(resolver) {
