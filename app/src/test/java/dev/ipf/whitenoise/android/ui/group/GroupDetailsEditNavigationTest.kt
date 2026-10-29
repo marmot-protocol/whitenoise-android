@@ -5,6 +5,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assert
@@ -186,11 +187,11 @@ class GroupDetailsEditNavigationTest {
             assertFalse(autoOpen.value)
 
             // A real role update retires the automatic picker without disposing this details owner.
-            composeRule.runOnIdle { fixture.controller.applyGroupStateForTest(group(admin = false)) }
+            applyGroupStateWhilePaused(fixture.controller, group(admin = false))
             composeRule.mainClock.advanceTimeBy(240)
             composeRule.onNodeWithText(context.getString(R.string.add_member)).assertDoesNotExist()
             composeRule.onNodeWithTag("chat_info.add_people").assertDoesNotExist()
-            composeRule.runOnIdle { fixture.controller.applyGroupStateForTest(group()) }
+            applyGroupStateWhilePaused(fixture.controller, group())
             composeRule.mainClock.advanceTimeBy(240)
 
             repeat(2) { assertManualAddMembersEntryMovesAndBackReturnsToDetails() }
@@ -201,6 +202,20 @@ class GroupDetailsEditNavigationTest {
         }
     }
 
+    /**
+     * Applies a canonical group update and publishes it to the recomposer. With the main clock paused, a write made
+     * inside `runOnIdle` is otherwise never announced, so the screen would keep composing the previous role.
+     */
+    private fun applyGroupStateWhilePaused(
+        controller: ConversationController,
+        update: AppGroupRecordFfi,
+    ) {
+        composeRule.runOnIdle {
+            controller.applyGroupStateForTest(update)
+            Snapshot.sendApplyNotifications()
+        }
+    }
+
     /** Returns the left edge of the add-member title in root coordinates, to detect horizontal picker movement. */
     private fun addMembersTitleLeft(): Float =
         composeRule
@@ -208,9 +223,16 @@ class GroupDetailsEditNavigationTest {
             .fetchSemanticsNode()
             .boundsInRoot.left
 
-    /** Reads the real picker layer rather than a separate direction or suppression calculation. */
+    /**
+     * Reads the real picker layer rather than a separate direction or suppression calculation. The scroll runs with
+     * the clock advancing, because Compose refuses scroll actions on a paused clock, and the clock is paused again
+     * before the click so the entry frames stay observable.
+     */
     private fun assertManualAddMembersEntryMovesAndBackReturnsToDetails() {
-        composeRule.onNodeWithTag("chat_info.add_people").performScrollTo().performClick()
+        composeRule.mainClock.autoAdvance = true
+        composeRule.onNodeWithTag("chat_info.add_people").performScrollTo()
+        composeRule.mainClock.autoAdvance = false
+        composeRule.onNodeWithTag("chat_info.add_people").performClick()
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.mainClock.advanceTimeByFrame()
         val first = addMembersTitleLeft()
