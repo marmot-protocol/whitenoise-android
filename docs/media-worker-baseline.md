@@ -3,7 +3,8 @@
 This characterization was introduced before worker-per-input retirement, when
 the production transport reused its worker after successful requests. Preserve
 those measurements separately from later lifetime measurements. The baseline
-drives the domain-bound transport (#3373), which production does not install yet.
+drives the domain-bound transport (#3373), which production installs pending
+approval of its budget.
 The audio/video containment, sender-trust, video-metadata and document-privacy
 work in #3374–#3377 remains pending.
 
@@ -82,8 +83,9 @@ execution supplies the platform evidence.
 Review raw healthy and negative samples before choosing a regression budget.
 Historical baseline measurements remain separate from the candidate's
 domain-bound lifetime behavior. Matched performance-budget approval, worker-resource evidence
-and platform qualification for the lifetime candidate remain pending. Default
-adoption stays held until those gates are reviewed.
+and platform qualification for the lifetime candidate remain pending. The
+default is switched pending that review; restore the reusable default if the
+budget is rejected.
 
 The original `non-production` invariant exemption applies to the historical
 test-only baseline slice. The lifetime implementation has separate behavioral
@@ -93,9 +95,9 @@ manual IDs and unchecked results are retained.
 The [still-image worker lifetime](media-worker-lifetime.md) documents the
 production owner and its qualification boundaries.
 
-Production installation still uses the reusable worker. Adopting the
-domain-bound transport rests on the matched throughput comparison and UI-level
-checks below and a reviewed budget, not on this sequential corpus.
+Production installation uses the domain-bound transport, pending approval of
+its budget. That approval rests on the matched throughput comparison and
+UI-level checks below, not on this sequential corpus.
 
 ## Healthy startup timing
 

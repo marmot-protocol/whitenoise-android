@@ -1,10 +1,9 @@
 # Still-image worker lifetime
 
-Production installation keeps the reusable worker. The debug
-`installForLifetimeQualification` seam selects domain-bound worker generations
-(#3373) until their proposed budget is reviewed. The facade keeps that one
-process-owned `IsolatedMediaTransport` across clear, install and account reset,
-so a held generation survives facade replacement.
+Production installation uses domain-bound worker generations (#3373), switched
+pending approval of their proposed budget. The facade keeps one process-owned
+`IsolatedMediaTransport` across clear, install and account reset, so a held
+generation survives facade replacement.
 Each session has its own source access, refusal cache and epoch. No in-process
 decoding fallback exists. [Media containment](media-containment.md#domain-bound-worker-generations)
 states the contract; this page records the owner, deadline and test boundaries.

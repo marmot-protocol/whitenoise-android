@@ -114,35 +114,28 @@ class MediaBindingRecoveryTest {
         }
     }
 
-    /** Production install keeps the reusable worker; only the qualification seam selects per-input generations. */
+    /**
+     * Production install runs domain-bound generations, an undeclared input in its own named generation, and
+     * account reset keeps that one owner.
+     */
     @Test
-    fun defaultFacadeReusesItsWorkerAndAccountResetKeepsTheDefault() =
+    fun defaultFacadeUsesDomainGenerationsAndAccountResetKeepsTheOwner() =
         withFacadeFields { context ->
             IsolatedMediaDecoder.install(context)
-            val owner = privateField(IsolatedMediaDecoder, "transport") as ReusableMediaTransport
-            val imageOwner = IsolatedMediaDecoder::class.java.getDeclaredField("imageOwner")
-            assertNull(imageOwner.apply { isAccessible = true }.get(IsolatedMediaDecoder))
-            startDecode(owner, 1).join()
-            context.next()
-            startDecode(owner, 2).join()
-            assertEquals(1, context.bindings.size)
-            val reused = context.bindings.single().remote
-            assertEquals(2, reused.requests)
-            assertEquals(1L, reused.retired.count)
-            IsolatedMediaDecoder.resetForAccount()
-            val replacement = privateField(IsolatedMediaDecoder, "transport")
-            assertTrue(replacement is ReusableMediaTransport)
-            assertFalse(owner === replacement)
-            IsolatedMediaDecoder.installForLifetimeQualification(context)
-            val candidate = privateField(IsolatedMediaDecoder, "transport") as IsolatedMediaTransport
-            val call = startDecode(candidate, 4)
+            val owner = privateField(IsolatedMediaDecoder, "transport") as IsolatedMediaTransport
+            assertSame(owner, privateField(IsolatedMediaDecoder, "imageOwner"))
+            val call = startDecode(owner, 1)
             try {
-                val qualification = context.next()
-                assertTrue(qualification.remote.retired.await(2, TimeUnit.SECONDS))
-                assertTrue(context.instanceNames[1].startsWith("lifetime_images_"))
-                assertFalse(context.instanceNames[0] == context.instanceNames[1])
-                qualification.remote.die()
+                val first = context.next()
+                assertTrue(first.remote.retired.await(2, TimeUnit.SECONDS))
+                assertEquals(1, first.remote.requests)
+                assertTrue(context.instanceNames.first().startsWith("images_"))
+                first.remote.die()
                 call.join()
+                IsolatedMediaDecoder.resetForAccount()
+                assertSame(owner, privateField(IsolatedMediaDecoder, "transport"))
+                assertSame(owner, privateField(IsolatedMediaDecoder, "imageOwner"))
+                assertTrue(context.instanceNames.none { it == "images" })
             } finally {
                 call.interruptAndJoin()
             }
@@ -157,13 +150,13 @@ class MediaBindingRecoveryTest {
                 .getDeclaredField("imageOwner")
                 .apply { isAccessible = true }
                 .set(IsolatedMediaDecoder, owner)
-            IsolatedMediaDecoder.installForLifetimeQualification(context)
+            IsolatedMediaDecoder.install(context)
             val call = startDecode(owner, 1)
             try {
                 val first = context.next()
                 assertTrue(first.remote.retired.await(2, TimeUnit.SECONDS))
                 IsolatedMediaDecoder.clear()
-                IsolatedMediaDecoder.installForLifetimeQualification(context)
+                IsolatedMediaDecoder.install(context)
                 IsolatedMediaDecoder.resetForAccount()
                 assertSame(owner, privateField(IsolatedMediaDecoder, "imageOwner"))
                 call.interruptAndJoin()

@@ -4,7 +4,7 @@
 
 Still-image decode and inspection, EXIF inspection and SVG preparation use a nonexported `android:isolatedProcess` service. The worker has a separate UID and no application permissions. Application startup skips account state, diagnostics, locale preferences, playback, transfers and background scheduling in that process.
 
-The app lazily binds one serialized image worker. Domain-bound worker generations are implemented but not installed by default; see [Domain-bound worker generations](#domain-bound-worker-generations). Video poster/duration probes and voice waveform extraction use a separate, process-wide serialized platform-service adapter. Android denies `media.player` and `media.extractor` discovery to isolated UIDs on API 30; attempting those operations in the image worker is unsupported. This is an explicit route, with no isolated-attempt/privileged-fallback sequence. A slow waveform must not occupy the notification-avatar lane. Production calls on the main looper or without a configured transport fail closed. JVM tests explicitly inject their codec fixture; those tests do not prove process isolation.
+The app decodes still images in domain-bound worker generations: each isolated worker serves one conversation, the account's public profile pictures or the account's local picks, and an undeclared input gets a single-use worker; see [Domain-bound worker generations](#domain-bound-worker-generations). Video poster/duration probes and voice waveform extraction use a separate, process-wide serialized platform-service adapter. Android denies `media.player` and `media.extractor` discovery to isolated UIDs on API 30; attempting those operations in the image worker is unsupported. This is an explicit route, with no isolated-attempt/privileged-fallback sequence. A slow waveform must not occupy the notification-avatar lane. Production calls on the main looper or without a configured transport fail closed. JVM tests explicitly inject their codec fixture; those tests do not prove process isolation.
 
 Input bytes are written only after their temporary file is unlinked, then passed by read-only descriptor. Picked images and media use a process-wide staging gate, with provider cancellation and bounded reads. Whole-file seekable videos pass their descriptor without a full-video array copy. Provider subranges are copied into their own unlinked inode, so a decoder cannot read bytes outside the selected asset. No URLs, account objects, keys or general file-access callback enter the worker.
 
@@ -425,12 +425,12 @@ Rejected alternatives, on the same emulators:
 
 ### Default
 
-Production installation keeps the reusable worker until the
-[proposed budget](#measurements-and-proposed-budget) is reviewed. The debug
-`installForLifetimeQualification` seam installs the isolated transport for
-device qualification. `ReusableMediaTransport` therefore stays in production
-code. Removing it waits for that decision and for #3439, which edits the
-facade's animation type checks.
+Production installation uses domain-bound generations, switched in #3516
+pending approval of the [proposed budget](#measurements-and-proposed-budget).
+`ReusableMediaTransport` is no longer installed. It stays in production code as
+the lane to restore if the budget is rejected and as the measurement baseline.
+Removing it waits for that decision and for #3439, which edits the facade's
+animation type checks.
 
 ### Residual risks
 
@@ -442,8 +442,8 @@ facade's animation type checks.
 - A cooperative self-exit ends the worker process only. Android's escalation
   kill covers the process group. A forked descendant of a compromised worker is
   outside the Binder witness.
-- One idle spare stays resident while the lane is installed, plus the
-  application zygote on stock Android.
+- One idle spare stays resident while a slot is free, plus the application
+  zygote on stock Android.
 - On stock Android, forks share the application zygote's layout for preloaded
   code, so one generation's address-space disclosure applies to later ones.
 - Heap tagging through the application-zygote launch path is unqualified on
