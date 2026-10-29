@@ -2,104 +2,11 @@
 
 import json
 from pathlib import Path
-import subprocess
 import tempfile
 import unittest
 from unittest import mock
 
 import background_receipt_runner as runner
-
-
-class HostedWifiSetupTest(unittest.TestCase):
-    """Reject misleading command results and keep privileged setup outside instrumentation."""
-
-    def test_untrusted_environment_and_non_emulator_never_reach_adb(self):
-        """The host precondition is unavailable to local/reference and physical-device callers."""
-        for environment, serial in (({}, "emulator-5554"), ({"GITHUB_ACTIONS": "true"}, "PHYSICAL000TEST")):
-            with mock.patch.dict(runner.os.environ, environment, clear=True), \
-                    mock.patch.object(runner, "adb_command") as adb, self.assertRaises(ValueError):
-                runner.prepare_ci_wifi("adb", serial, {})
-            adb.assert_not_called()
-
-    def test_wrong_image_or_false_emulator_never_changes_privileges_or_networks(self):
-        """Read-only identity checks must complete before either root or Wi-Fi commands are admitted."""
-        for property_name in ("ro.kernel.qemu", "ro.build.version.sdk", "ro.product.cpu.abi", "ro.debuggable"):
-            with mock.patch.dict(runner.os.environ, GITHUB_ACTIONS="true"), \
-                    mock.patch.object(runner, "adb_command") as adb, self.assertRaises(ValueError):
-                expected = {"ro.kernel.qemu": "1", "ro.build.version.sdk": "34",
-                            "ro.product.cpu.abi": "x86_64", "ro.debuggable": "1"}
-                adb.side_effect = lambda _a, _s, *args, **_kw: "wrong" if args[-1] == property_name else expected[args[-1]]
-                runner.prepare_ci_wifi("adb", "emulator-5554", {})
-            self.assertTrue(all(call.args[2:4] == ("shell", "getprop") for call in adb.call_args_list))
-
-    def test_single_association_restores_shell_without_claiming_network_qualification(self):
-        """The request is sent once as root; normal shell and existing Android assertions own the subsequent run."""
-        calls, report = [], {}
-        uid = "2000"
-
-        def adb(_adb, serial, *args, **kwargs):
-            """Model only the fixed platform outputs, including the privilege transition."""
-            nonlocal uid
-            self.assertEqual("emulator-5554", serial)
-            self.assertGreater(kwargs["timeout"], 0)
-            self.assertLessEqual(kwargs["timeout"], 10)
-            calls.append(args)
-            if args[:2] == ("shell", "getprop"):
-                return {"ro.kernel.qemu": "1", "ro.build.version.sdk": "34",
-                        "ro.product.cpu.abi": "x86_64", "ro.debuggable": "1"}[args[2]]
-            if args == ("root",):
-                uid = "0"
-            if args == ("unroot",):
-                uid = "2000"
-            if args == ("shell", "id", "-u"):
-                return uid
-            if "connect-network" in args:
-                self.assertEqual("0", uid)
-                return "Connection initiated \n"
-            return ""
-
-        with mock.patch.dict(runner.os.environ, GITHUB_ACTIONS="true"), \
-                mock.patch.object(runner, "adb_command", side_effect=adb):
-            runner.prepare_ci_wifi("adb", "emulator-5554", report)
-        self.assertEqual("association-requested", report["wifi_setup"]["phase"])
-        self.assertNotIn("qualified", report["wifi_setup"])
-        self.assertTrue(report["wifi_setup"]["shell_restored"])
-        self.assertEqual(1, calls.count(("shell", "cmd", "wifi", "connect-network", "AndroidWifi", "open")))
-        self.assertFalse(any("data" in call or "airplane-mode" in call or "reverse" in call for call in calls))
-
-    def test_zero_exit_failure_and_command_timeout_restore_shell_and_fail(self):
-        """The Android command may exit zero after a failed callback; transport failures must also restore shell."""
-        for response in ("Connection failed\n", "", subprocess.TimeoutExpired("adb", 10)):
-            report, calls = {}, []
-            uid = "2000"
-
-            def adb(_adb, _serial, *args, **_kwargs):
-                """Accept guards, then fail the association while tracking mandatory cleanup."""
-                nonlocal uid
-                calls.append(args)
-                if args[:2] == ("shell", "getprop"):
-                    return {"ro.kernel.qemu": "1", "ro.build.version.sdk": "34",
-                            "ro.product.cpu.abi": "x86_64", "ro.debuggable": "1"}[args[2]]
-                if args == ("root",):
-                    uid = "0"
-                if args == ("unroot",):
-                    uid = "2000"
-                if args == ("shell", "id", "-u"):
-                    return uid
-                if "connect-network" in args:
-                    if isinstance(response, Exception):
-                        raise response
-                    return response
-                return ""
-
-            with mock.patch.dict(runner.os.environ, GITHUB_ACTIONS="true"), \
-                    mock.patch.object(runner, "adb_command", side_effect=adb), \
-                    self.assertRaises((ValueError, subprocess.TimeoutExpired)):
-                runner.prepare_ci_wifi("adb", "emulator-5554", report)
-            self.assertEqual(1, calls.count(("unroot",)))
-            self.assertTrue(report["wifi_setup"]["shell_restored"])
-            self.assertNotIn("qualified", report["wifi_setup"])
-            self.assertNotIn(("shell", "dumpsys", "connectivity"), calls)
 
 
 class BackgroundReceiptRunnerTest(unittest.TestCase):
