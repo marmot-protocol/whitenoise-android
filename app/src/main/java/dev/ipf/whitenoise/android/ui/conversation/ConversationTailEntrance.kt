@@ -184,7 +184,8 @@ internal fun rememberConversationTailEntrance(
 
 /**
  * Claims the entering row for its send flight during composition, from this small scope of its own, so a flight
- * starting or retiring recomposes only this claim and not the transcript that owns the entrance.
+ * starting or retiring recomposes only this claim and not the transcript that owns the entrance. The scope also
+ * observes the entering row, because a flight accepted before its row publishes must claim it when it arrives.
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -193,7 +194,8 @@ internal fun TailEntranceSendClaim(
     claimedPresentationId: () -> String?,
 ) {
     val claimed = claimedPresentationId()
-    SideEffect { entrance.claimPresentation(claimed) }
+    val entering = entrance.enteringItemId
+    SideEffect { if (entering == entrance.enteringItemId) entrance.claimPresentation(claimed) }
 }
 
 /** Plain bookkeeping, so holding and releasing an entrance never invalidates the composition that owns it. */
@@ -227,13 +229,8 @@ private data class ConversationTailEntranceElement(
     /** Attaches one row's entrance layer. */
     override fun create() = ConversationTailEntranceNode(entrance, itemId, claimedPresentationId)
 
-    /** Retargets a reused row and remeasures it, so a newly entering row still starts its entrance. */
-    override fun update(node: ConversationTailEntranceNode) {
-        node.entrance = entrance
-        node.itemId = itemId
-        node.claimedPresentationId = claimedPresentationId
-        node.invalidateMeasurement()
-    }
+    /** Retargets a reused row's measure and layer, so it starts and follows the current entrance. */
+    override fun update(node: ConversationTailEntranceNode) = node.retarget(entrance, itemId, claimedPresentationId)
 
     /** Names the row and entrance when inspecting the transcript. */
     override fun InspectorInfo.inspectableProperties() {
@@ -244,24 +241,27 @@ private data class ConversationTailEntranceElement(
 
 /** Starts the entrance from the entering row's measure and draws every row at the shared shift. */
 private class ConversationTailEntranceNode(
-    var entrance: ConversationTailEntrance,
-    var itemId: String,
-    var claimedPresentationId: () -> String?,
+    private var entrance: ConversationTailEntrance,
+    private var itemId: String,
+    private var claimedPresentationId: () -> String?,
 ) : Modifier.Node(),
     LayoutModifierNode {
-    private val shiftLayer: GraphicsLayerScope.() -> Unit = {
-        val currentClaim = claimedPresentationId()
-        val entering = entrance.enteringItemId
-        // Once visible accepted ink retires, its neighbours must share its final slots too.
-        val claimedEntrance = entering != null && entrance.claimedEnteringItemId == entering
-        val retiredClaim = claimedEntrance && currentClaim != entering
-        val activeEnteringClaim = itemId == entering && claimedEntrance && currentClaim == entering
-        translationY =
-            if (retiredClaim || activeEnteringClaim) {
-                0f
-            } else {
-                entrance.shiftPx
-            }
+    private var shiftLayer = shiftLayer(entrance, itemId, claimedPresentationId)
+
+    /**
+     * Points this node at new inputs. The layer block is rebuilt because a layer re-runs only for a new block
+     * instance, and the old one would keep observing the previous entrance's shift.
+     */
+    fun retarget(
+        entrance: ConversationTailEntrance,
+        itemId: String,
+        claimedPresentationId: () -> String?,
+    ) {
+        this.entrance = entrance
+        this.itemId = itemId
+        this.claimedPresentationId = claimedPresentationId
+        shiftLayer = shiftLayer(entrance, itemId, claimedPresentationId)
+        invalidateMeasurement()
     }
 
     /**
@@ -279,3 +279,24 @@ private class ConversationTailEntranceNode(
         }
     }
 }
+
+/** Draws one row at the entrance shift, or in its own slot while its send flight claims or has just released it. */
+private fun shiftLayer(
+    entrance: ConversationTailEntrance,
+    itemId: String,
+    claimedPresentationId: () -> String?,
+): GraphicsLayerScope.() -> Unit =
+    {
+        val currentClaim = claimedPresentationId()
+        val entering = entrance.enteringItemId
+        // Once visible accepted ink retires, its neighbours must share its final slots too.
+        val claimedEntrance = entering != null && entrance.claimedEnteringItemId == entering
+        val retiredClaim = claimedEntrance && currentClaim != entering
+        val activeEnteringClaim = itemId == entering && claimedEntrance && currentClaim == entering
+        translationY =
+            if (retiredClaim || activeEnteringClaim) {
+                0f
+            } else {
+                entrance.shiftPx
+            }
+    }
