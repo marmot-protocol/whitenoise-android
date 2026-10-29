@@ -300,6 +300,14 @@
         "test_ids": [
           "MED-044"
         ]
+      },
+      {
+        "surface": "Batch-selection forward eligibility follows attachment downloads while messages are selected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "val selectionMediaCacheRevision",
+        "test_ids": [
+          "MSG-012"
+        ]
       }
     ]
   },
