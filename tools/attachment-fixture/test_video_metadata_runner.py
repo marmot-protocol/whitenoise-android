@@ -3,6 +3,7 @@ report states what the lane does not drive."""
 
 import json
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -19,15 +20,22 @@ def device_replies(qemu="1", packages=(runner.APP, runner.APP + ".test"), sdk="3
             ("shell", "pm", "list", "packages", runner.APP): listed}
 
 
-def run_scripted(passed=True, sdk="34"):
-    """Runs the runner against a scripted emulator and fixture, returning the written report and every adb command."""
+def run_scripted(passed=True, sdk="34", instrument_error=None, cleanup_error=None):
+    """Runs the runner against a scripted emulator and fixture, optionally failing the instrumentation or the reverse
+    cleanup, and returns the written report, every adb command and whether the run raised."""
     replies = device_replies(sdk=sdk)
     commands = []
 
     def adb(_adb, _serial, *args):
-        """Answers each adb call from the script and records it."""
+        """Answers each adb call from the script and records it, failing a reverse removal when asked to."""
         commands.append(args)
+        if args[:2] == ("reverse", "--remove") and cleanup_error is not None:
+            raise cleanup_error
         return "" if args[0] == "reverse" else replies[args]
+
+    instrumented = (mock.patch.object(runner, "instrument", side_effect=instrument_error)
+                    if instrument_error is not None
+                    else mock.patch.object(runner, "instrument", return_value="OK (1 test)"))
 
     server = mock.MagicMock(server_port=4001)
     server.ledger.snapshot.return_value = []
@@ -36,15 +44,16 @@ def run_scripted(passed=True, sdk="34"):
             mock.patch("apk_physical_runner.adb_command", side_effect=adb), \
             mock.patch.object(runner, "FixtureServer", return_value=server), \
             mock.patch.object(runner, "FixtureRelay", return_value=mock.MagicMock(port=4002)), \
-            mock.patch.object(runner, "instrument", return_value="OK (1 test)"), \
+            instrumented, \
             mock.patch.object(runner, "check_video_metadata", return_value={"passed": passed}), \
             mock.patch.object(runner.time, "sleep"):
         output = Path(directory) / "out.json"
+        raised = False
         try:
             runner.run("adb", "emulator-5554", Path(directory), output, "ci-api34-x86_64")
         except RuntimeError:
-            pass  # An unqualified run raises after writing its report, which the caller judges.
-        return json.loads(output.read_text()), commands
+            raised = True  # An unqualified run raises after writing its report, which the caller judges.
+        return json.loads(output.read_text()), commands, raised
 
 
 class VideoMetadataRunnerTest(unittest.TestCase):
@@ -87,8 +96,9 @@ class VideoMetadataRunnerTest(unittest.TestCase):
 
     def test_a_qualified_run_still_defers_every_entry_point_it_does_not_drive(self):
         """Even a passing run defers the system UI, a restored draft, a physical device and a camera recording."""
-        report, commands = run_scripted()
+        report, commands, raised = run_scripted()
         self.assertTrue(report["qualified"])
+        self.assertFalse(raised)
         self.assertEqual(list(runner.DEFERRED), report["deferred"])
         self.assertIn("force-stop-restored-draft", report["deferred"])
         self.assertIn("system-photo-picker-ui", report["deferred"])
@@ -99,8 +109,31 @@ class VideoMetadataRunnerTest(unittest.TestCase):
         """A checker violation, or a platform other than the declared profile, leaves the run unqualified."""
         for passed, sdk in ((False, "34"), (True, "33")):
             with self.subTest(passed=passed, sdk=sdk):
-                report, _ = run_scripted(passed=passed, sdk=sdk)
+                report, _, raised = run_scripted(passed=passed, sdk=sdk)
                 self.assertFalse(report["qualified"])
+                self.assertTrue(raised)
+
+    def test_an_instrumentation_error_is_reported_cleaned_up_and_never_qualifies(self):
+        """A missing adb, a failed or a timed-out instrumentation writes its failure class, still removes both
+        reverses and raises, without qualifying the run."""
+        errors = (FileNotFoundError("adb"),
+                  subprocess.CalledProcessError(1, ["adb"]),
+                  subprocess.TimeoutExpired(["adb"], runner.INSTRUMENT_TIMEOUT_SECONDS))
+        for error in errors:
+            with self.subTest(error=type(error).__name__):
+                report, commands, raised = run_scripted(instrument_error=error)
+                self.assertFalse(report["qualified"])
+                self.assertEqual(type(error).__name__, report["failure_class"])
+                self.assertTrue(raised)
+                self.assertIn(("reverse", "--remove", "tcp:4001"), commands)
+                self.assertIn(("reverse", "--remove", "tcp:4002"), commands)
+
+    def test_a_failed_reverse_cleanup_is_recorded_and_never_qualifies(self):
+        """A reverse that cannot be removed is recorded and leaves an otherwise passing run unqualified."""
+        report, _, raised = run_scripted(cleanup_error=subprocess.CalledProcessError(1, ["adb"]))
+        self.assertTrue(report["reverse_cleanup_failed"])
+        self.assertFalse(report["qualified"])
+        self.assertTrue(raised)
 
 
 if __name__ == "__main__":
