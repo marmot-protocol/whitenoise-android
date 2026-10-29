@@ -3,6 +3,7 @@ stay in the report."""
 
 import argparse
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -23,6 +24,44 @@ TEST = ("dev.ipf.whitenoise.android.media.IncomingAttachmentBackgroundDownloadAn
 INSTRUMENT_TIMEOUT_SECONDS = 900
 DISCONNECT_WAIT_SECONDS = 15
 STAGES = ("main", "resume")
+
+
+def prepare_ci_wifi(adb, serial, report):
+    """Associate once with AndroidWifi on the hosted API 34 emulator before reverse ports exist.
+
+    Android 14 separates radio enable from root-only association. Verify privilege transitions, restore
+    shell in finally before any reverse port or instrumentation. Acceptance of this request is not
+    network proof: the unchanged Android scenario must still observe actual validated default Wi-Fi
+    within its own 30-second waits, with cellular fallback and every policy assertion preserved.
+    """
+    setup = {"phase": "guard", "association_initiated": False, "shell_restored": False}
+    report["wifi_setup"] = setup
+    if os.environ.get("GITHUB_ACTIONS") != "true" or re.fullmatch(r'emulator-[0-9]+', serial) is None:
+        raise ValueError("Wi-Fi setup requires the hosted disposable emulator")
+    expected = {"ro.kernel.qemu": "1", "ro.build.version.sdk": "34", "ro.product.cpu.abi": "x86_64",
+                "ro.debuggable": "1"}
+    for prop, value in expected.items():
+        if adb_command(adb, serial, "shell", "getprop", prop, timeout=5).strip() != value:
+            raise ValueError("unsupported hosted Wi-Fi setup image")
+    setup["phase"] = "associate"
+    try:
+        adb_command(adb, serial, "root", timeout=10)
+        adb_command(adb, serial, "wait-for-device", timeout=10)
+        if adb_command(adb, serial, "shell", "id", "-u", timeout=5).strip() != "0":
+            raise ValueError("hosted image did not admit root for Wi-Fi association")
+        adb_command(adb, serial, "shell", "cmd", "wifi", "set-wifi-enabled", "enabled", timeout=10)
+        result = adb_command(adb, serial, "shell", "cmd", "wifi", "connect-network", "AndroidWifi", "open", timeout=10)
+        setup["association_initiated"] = ("Connection initiated" in {line.strip() for line in result.splitlines()}
+                                          and "Connection failed" not in result)
+        if not setup["association_initiated"]:
+            raise ValueError("fixed virtual AP association was not accepted")
+    finally:
+        adb_command(adb, serial, "unroot", timeout=10)
+        adb_command(adb, serial, "wait-for-device", timeout=10)
+        setup["shell_restored"] = adb_command(adb, serial, "shell", "id", "-u", timeout=5).strip() == "2000"
+        if not setup["shell_restored"]:
+            raise ValueError("hosted Wi-Fi setup did not restore shell privileges")
+    setup["phase"] = "association-requested"
 
 
 def instrument(adb, serial, ports, stage, session):
@@ -109,6 +148,8 @@ def run(adb, serial, root, output, budget_profile="reference-api30-arm64"):
     start = len(server.ledger.snapshot())
     forwards, threads, started, failure = [], [], [], None
     try:
+        if budget_profile == "ci-api34-x86_64":
+            prepare_ci_wifi(adb, serial, report)
         for service in (server, relay):
             thread = threading.Thread(target=service.serve_forever, daemon=True)
             thread.start()
