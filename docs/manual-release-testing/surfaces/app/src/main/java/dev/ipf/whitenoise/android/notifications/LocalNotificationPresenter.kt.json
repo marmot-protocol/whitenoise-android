@@ -73,12 +73,13 @@
         ]
       },
       {
-        "surface": "expanded single-message text yields to the conversation template while previews are hidden",
+        "surface": "one native conversation template for short, long and redacted messages",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
-        "anchor": "redactContent || !previewToken.allowed",
+        "anchor": "Keep the native conversation template for every message length.",
         "test_ids": [
           "NTF-030",
-          "NTF-036"
+          "NTF-036",
+          "NTF-042"
         ]
       },
       {

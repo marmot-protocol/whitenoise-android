@@ -7,6 +7,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
+import android.os.Bundle
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.content.pm.ShortcutInfoCompat
@@ -1179,7 +1180,7 @@ class LocalNotificationPresenterConversationTest {
     }
 
     @Test
-    fun longFirstMessageUsesExpandedTextWithoutLosingConversationActions() {
+    fun longFirstMessageKeepsConversationStyleTextAndActions() {
         presenter.ensureChannels()
         val body = "A long message sentence. ".repeat(12).trim()
 
@@ -1194,8 +1195,9 @@ class LocalNotificationPresenterConversationTest {
         )
 
         val notification = manager.activeNotifications.single().notification
-        assertEquals(body, notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString())
-        assertNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification))
+        assertNull(notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT))
+        val style = checkNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification))
+        assertEquals(listOf(body), style.messages.map { it.text.toString() })
         assertEquals(2, notification.actions.size)
         assertEquals(
             context.getString(R.string.reply),
@@ -1208,7 +1210,7 @@ class LocalNotificationPresenterConversationTest {
     }
 
     @Test
-    fun secondMessageTransitionsExpandedFirstMessageBackToMessagingHistory() {
+    fun secondMessageKeepsLongFirstMessageInMessagingHistory() {
         presenter.ensureChannels()
         val first = "A long message sentence. ".repeat(12).trim()
 
@@ -1235,11 +1237,64 @@ class LocalNotificationPresenterConversationTest {
         )
     }
 
+    /** A pre-upgrade expandable-text card contributes its message when the next native conversation arrives. */
+    @Test
+    fun legacyExpandedFirstMessageIsRetainedAfterUpgrade() {
+        presenter.ensureChannels()
+        val first = "Legacy long message. ".repeat(20).trim()
+        runBlocking {
+            presenter.show(
+                update(isMention = false, messageIdHex = "first"),
+                previewTextOverride = first,
+                shortNpub = { "npub1test" },
+            )
+        }
+        val active = manager.activeNotifications.single()
+        val sender =
+            checkNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(active.notification))
+                .messages
+                .single()
+                .person
+        // Preserve the posted card's routing, payload revision and preview stamp, replacing only its old style.
+        val extras =
+            Bundle(active.notification.extras).apply {
+                remove(Notification.EXTRA_MESSAGES)
+                remove(Notification.EXTRA_MESSAGING_PERSON)
+                putCharSequence("dev.ipf.whitenoise.extra.EXPANDED_SINGLE_MESSAGE_BODY", first)
+                putLong("dev.ipf.whitenoise.extra.EXPANDED_SINGLE_MESSAGE_TIMESTAMP", active.notification.`when`)
+                putBundle("dev.ipf.whitenoise.extra.EXPANDED_SINGLE_MESSAGE_SENDER", checkNotNull(sender).toBundle())
+            }
+        val legacy =
+            NotificationCompat
+                .Builder(context, active.notification)
+                .setExtras(extras)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(first))
+                .build()
+        assertNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(legacy))
+        manager.notify(active.tag, active.id, legacy)
+
+        runBlocking {
+            presenter.show(
+                update(isMention = false, messageIdHex = "second"),
+                previewTextOverride = "second",
+                shortNpub = { "npub1test" },
+            )
+        }
+
+        val style =
+            checkNotNull(
+                NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(
+                    manager.activeNotifications.single().notification,
+                ),
+            )
+        assertEquals(listOf(first, "second"), style.messages.map { it.text.toString() })
+    }
+
     /** A long newest message behind history keeps the conversation template, every earlier line and its actions. */
     @Test
     fun longNewestMessageAfterHistoryKeepsConversationStyleHistoryActionsAndPublicVersion() {
         presenter.ensureChannels()
-        val newest = LongBodies.plain(MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS * 3)
+        val newest = LongBodies.plain(160 * 3)
 
         runBlocking {
             presenter.show(
@@ -1301,17 +1356,19 @@ class LocalNotificationPresenterConversationTest {
         assertEquals(MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS, LongBodies.codePoints(messageTexts.last()))
     }
 
-    /** Bodies just below, at and above the threshold pick the conversation template, then the text block. */
+    /** Short and long first messages keep one native conversation template across the former threshold. */
     @Test
     @Config(sdk = [30, 36])
-    fun bodiesAroundTheThresholdChooseTheConversationTemplateThenTheTextBlock() {
-        val threshold = MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS
+    fun shortAndLongFirstMessagesKeepTheConversationTemplate() {
+        val threshold = 160
 
         val cases =
             listOf(
                 threshold - 1 to PostedStyle.MESSAGING,
-                threshold to PostedStyle.BIG_TEXT,
-                threshold + 1 to PostedStyle.BIG_TEXT,
+                threshold to PostedStyle.MESSAGING,
+                threshold + 1 to PostedStyle.MESSAGING,
+                600 to PostedStyle.MESSAGING,
+                MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS to PostedStyle.MESSAGING,
             )
         cases.forEach { (codePoints, expectedStyle) ->
             manager.cancelAll()
@@ -1326,21 +1383,27 @@ class LocalNotificationPresenterConversationTest {
 
             assertEquals("style for $codePoints code points", expectedStyle, probe.posts.single().style)
             val notification = manager.activeNotifications.single().notification
+            assertNull(notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT))
             assertEquals(
-                if (expectedStyle == PostedStyle.BIG_TEXT) body else null,
-                notification.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString(),
+                body,
+                NotificationCompat.MessagingStyle
+                    .extractMessagingStyleFromNotification(notification)
+                    ?.messages
+                    ?.single()
+                    ?.text
+                    .toString(),
             )
             assertEquals(2, notification.actions.size)
             assertEquals(conversationShortcutId("account-a", "group-a"), notification.shortcutId)
         }
     }
 
-    /** Right-to-left and zero-width-joiner bodies of threshold length take the text block with their text intact. */
+    /** RTL and joined emoji retain their exact text in the same conversation template. */
     @Test
-    fun rtlAndZwjBodiesAtTheThresholdTakeTheTextBlockWithTheirTextIntact() {
+    fun rtlAndZwjBodiesKeepConversationStyleAndTheirTextIntact() {
         listOf(LongBodies::rtl, LongBodies::zwj).forEach { body ->
             manager.cancelAll()
-            val text = body(MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS)
+            val text = body(160)
             val probe = PostProbe()
             val probed = probedPresenter(probe)
             probed.ensureChannels()
@@ -1349,13 +1412,14 @@ class LocalNotificationPresenterConversationTest {
                 probed.show(update(isMention = false), previewTextOverride = text, shortNpub = { "npub1test" })
             }
 
-            assertEquals(PostedStyle.BIG_TEXT, probe.posts.single().style)
+            assertEquals(PostedStyle.MESSAGING, probe.posts.single().style)
             assertEquals(
                 text,
-                manager.activeNotifications
-                    .single()
-                    .notification.extras
-                    .getCharSequence(Notification.EXTRA_BIG_TEXT)
+                NotificationCompat.MessagingStyle
+                    .extractMessagingStyleFromNotification(manager.activeNotifications.single().notification)
+                    ?.messages
+                    ?.single()
+                    ?.text
                     ?.toString(),
             )
         }
@@ -1370,7 +1434,7 @@ class LocalNotificationPresenterConversationTest {
             .putBoolean(NotificationPreviewPreferences.KEY, false)
             .commit()
         presenter.ensureChannels()
-        val body = LongBodies.plain(MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS * 2)
+        val body = LongBodies.plain(160 * 2)
 
         assertTrue(
             runBlocking {
@@ -1386,7 +1450,7 @@ class LocalNotificationPresenterConversationTest {
     @Test
     fun longFirstMessageUnderAppLockStaysAGenericConversationNotATextBlock() {
         presenter.ensureChannels()
-        val body = LongBodies.plain(MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS * 2)
+        val body = LongBodies.plain(160 * 2)
 
         assertTrue(
             runBlocking {

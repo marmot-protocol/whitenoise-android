@@ -507,8 +507,8 @@ class LocalNotificationPresenter(
 
     /**
      * The card's retained entries as logical messages, newest last. A conversation card keeps its history in
-     * MessagingStyle; a long first message, a plain card or a redacted card is one entry identified by the card's
-     * stamped newest message id.
+     * MessagingStyle; a legacy expandable-text card, a plain card or a redacted card is one entry identified by
+     * the card's stamped newest message id.
      */
     private fun retainedEntryGroups(notification: Notification): List<List<NotificationCompat.MessagingStyle.Message>> {
         val redacted = notification.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true
@@ -1235,8 +1235,8 @@ class LocalNotificationPresenter(
                                         },
                                 )
                             // #3311: every rich card carries its conversation identity picture in the first
-                            // payload, for a direct chat as well as a group, and the long-message text block carries
-                            // it as its large right-hand picture, so the picture never depends on the shortcut alone.
+                            // payload, for a direct chat as well as a group, so the native conversation picture
+                            // never depends on a later shortcut enrichment.
                             // Redacted cards get none.
                             if (!redactContent) {
                                 builder.setConversationIdentityImage(
@@ -1383,62 +1383,21 @@ class LocalNotificationPresenter(
                                         )
                                         val presentationTimestampMs = nowMillis()
                                         stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
-                                        // Hidden previews rewrite the card as a generic conversation, and only the
-                                        // conversation template keeps Android's conversation classification.
-                                        // A long first message keeps the expandable text block by design, so its
-                                        // whole body stays readable (#1901), and that block carries the identity
-                                        // picture (#3311) as its explicit large picture on the right while app
-                                        // attribution keeps its small system-owned place. The next message turns the
-                                        // card back into the conversation template, which draws the picture in the
-                                        // conversation circle.
-                                        if (
-                                            shouldUseExpandedSingleMessageStyle(
-                                                body = notificationContent.body,
-                                                carriedMessageCount = carried.orEmpty().size,
-                                                redactContent = redactContent || !previewToken.allowed,
-                                            ) &&
-                                            emojiArtifact == null
-                                        ) {
-                                            builder
-                                                .setContentTitle(notificationContent.title)
-                                                .setContentText(notificationContent.body)
-                                                .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
-                                                .addExtras(
-                                                    Bundle().apply {
-                                                        putCharSequence(
-                                                            EXTRA_EXPANDED_SINGLE_MESSAGE_BODY,
-                                                            notificationContent.body,
-                                                        )
-                                                        putLong(
-                                                            EXTRA_EXPANDED_SINGLE_MESSAGE_TIMESTAMP,
-                                                            presentationTimestampMs,
-                                                        )
-                                                        putBundle(
-                                                            EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER,
-                                                            messaging.sender.toBundle(),
-                                                        )
-                                                        notificationContent.conversationTitle?.let { groupTitle ->
-                                                            putCharSequence(
-                                                                EXTRA_EXPANDED_SINGLE_MESSAGE_GROUP_TITLE,
-                                                                groupTitle,
-                                                            )
-                                                        }
-                                                    },
-                                                )
-                                        } else {
-                                            builder.setStyle(
-                                                messagingStyle(
-                                                    notificationContent,
-                                                    messaging.conversationTitleOverride,
-                                                    decision.historyCap,
-                                                    carried,
-                                                    messaging.sender,
-                                                    presentationTimestampMs,
-                                                    emojiArtifact?.uri,
-                                                    update.messageIdHex,
-                                                ),
-                                            )
-                                        }
+                                        // Keep the native conversation template for every message length. Switching
+                                        // a long first message to expandable text moves the identity to a trailing
+                                        // picture and loses Android's conversation presentation (#3505).
+                                        builder.setStyle(
+                                            messagingStyle(
+                                                notificationContent,
+                                                messaging.conversationTitleOverride,
+                                                decision.historyCap,
+                                                carried,
+                                                messaging.sender,
+                                                presentationTimestampMs,
+                                                emojiArtifact?.uri,
+                                                update.messageIdHex,
+                                            ),
+                                        )
                                         val notification = buildSettled(false)
                                         ConversationCardPostSynchronizer.awaitTestBarrier(
                                             ConversationCardOp.SHOW_NOTIFY,
@@ -2077,7 +2036,7 @@ class LocalNotificationPresenter(
         } == true
     }
 
-    /** The live card's own Person for [senderKey], from the conversation template or the long-message text block. */
+    /** The live card's own Person for [senderKey], from the conversation template or a pre-upgrade text block. */
     private fun liveSenderPerson(
         card: Notification,
         senderKey: String,
@@ -2093,8 +2052,8 @@ class LocalNotificationPresenter(
 
     /**
      * Rewrites the live card with the enriched sender and identity picture, for the conversation template and the
-     * long-message text block alike. It keeps the card's grouping eligible for heads-up while suppressing a repeat
-     * alert, and leaves any other card shape untouched.
+     * pre-upgrade long-message text block alike. It keeps the card's grouping eligible for heads-up while
+     * suppressing a repeat alert, and leaves any other card shape untouched.
      */
     private fun enrichedIdentityNotification(
         active: Notification,
@@ -2917,6 +2876,7 @@ class LocalNotificationPresenter(
         }
     }
 
+    // Read posted pre-upgrade BigTextStyle cards until their next message replaces them with MessagingStyle.
     private fun expandedSingleMessage(extras: Bundle?): List<NotificationCompat.MessagingStyle.Message>? =
         extras?.let { bundle ->
             val body = bundle.getCharSequence(EXTRA_EXPANDED_SINGLE_MESSAGE_BODY)

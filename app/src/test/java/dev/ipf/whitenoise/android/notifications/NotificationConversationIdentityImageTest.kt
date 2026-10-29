@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.os.Bundle
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.content.pm.ShortcutManagerCompat
@@ -87,16 +88,25 @@ class NotificationConversationIdentityImageTest {
         assertEquals(notificationMonogramBackgroundColor(seed), identityPixel(liveCard()))
     }
 
-    /** The first long message's text block keeps the picture, and the next message keeps it in history. */
+    /** A long first message and its later history share the same conversation template and picture. */
     @Test
     fun longFirstMessageAndTheFollowingHistoryKeepTheIdentityImage() {
         val presenter = presenter()
-        val long = LongBodies.plain(MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS * 2)
+        val long = LongBodies.plain(160 * 2)
         val red = solid(Color.RED)
         show(presenter, dm(messageId = "first"), conversation = red, sender = red, body = long)
-        val textBlock = liveCard()
-        assertNotNull(textBlock.extras.getCharSequence(Notification.EXTRA_BIG_TEXT))
-        assertEquals(Color.RED, identityPixel(textBlock))
+        val firstCard = liveCard()
+        assertNull(firstCard.extras.getCharSequence(Notification.EXTRA_BIG_TEXT))
+        assertEquals(
+            long,
+            NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(firstCard)
+                ?.messages
+                ?.single()
+                ?.text
+                .toString(),
+        )
+        assertEquals(Color.RED, identityPixel(firstCard))
 
         show(presenter, dm(messageId = "second"), conversation = red, sender = red)
         val history = liveCard()
@@ -104,9 +114,9 @@ class NotificationConversationIdentityImageTest {
         assertEquals(Color.RED, identityPixel(history))
     }
 
-    /** A cold picture starts as the monogram and replaces it silently on the long-message text block too. */
+    /** A late picture silently updates a long message without changing its conversation template or text. */
     @Test
-    fun latePictureReplacesTheMonogramSilentlyOnTheTextBlock() {
+    fun latePictureReplacesTheMonogramSilentlyOnTheLongConversationCard() {
         val posts = mutableListOf<Notification>()
         var enrichment: (suspend () -> Unit)? = null
         val presenter =
@@ -115,7 +125,7 @@ class NotificationConversationIdentityImageTest {
                 resolver = ::latePicture,
                 launcher = { enrichment = it },
             )
-        val long = LongBodies.plain(MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS * 2)
+        val long = LongBodies.plain(160 * 2)
         show(presenter, dm(), senderUrl = "https://example.com/alice.png", body = long)
         val seed = checkNotNull(conversationShortcutId(ACCOUNT, GROUP))
         assertEquals(notificationMonogramBackgroundColor(seed), identityPixel(posts.single()))
@@ -126,17 +136,25 @@ class NotificationConversationIdentityImageTest {
         val enriched = posts.last()
         assertEquals(Color.MAGENTA, identityPixel(enriched))
         assertTrue(enriched.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
-        val bigText = enriched.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
-        assertNotNull("the text block survives enrichment", bigText)
+        assertNull(enriched.extras.getCharSequence(Notification.EXTRA_BIG_TEXT))
+        assertEquals(
+            long,
+            NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(enriched)
+                ?.messages
+                ?.single()
+                ?.text
+                .toString(),
+        )
     }
 
     /** A dismissal while the picture loads keeps the long-message card dismissed. */
     @Test
-    fun dismissedTextBlockIsNotResurrectedByALatePicture() {
+    fun dismissedLongConversationCardIsNotResurrectedByALatePicture() {
         val posts = mutableListOf<Notification>()
         var enrichment: (suspend () -> Unit)? = null
         val presenter = presenter(posts, resolver = ::latePicture, launcher = { enrichment = it })
-        val long = LongBodies.plain(MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS * 2)
+        val long = LongBodies.plain(160 * 2)
         show(presenter, dm(), senderUrl = "https://example.com/alice.png", body = long)
         runBlocking {
             presenter.dismissConversationMessages(ACCOUNT, GROUP)
@@ -145,6 +163,73 @@ class NotificationConversationIdentityImageTest {
 
         assertEquals(1, posts.size)
         assertTrue(manager.activeNotifications.isEmpty())
+    }
+
+    /** A pre-upgrade long-text card retains its body and legacy sender metadata through late image enrichment. */
+    @Test
+    fun legacyTextCardKeepsBodyAndSenderWhenItsPictureArrives() =
+        runBlocking {
+            val posts = mutableListOf<Notification>()
+            val presenter = presenter(posts, resolver = ::latePicture)
+            val body = "A retained pre-upgrade message. ".repeat(12).trim()
+            show(presenter, dm(), body = body)
+            val legacy = postLegacyTextCard(body)
+            val before = posts.size
+
+            assertTrue(refreshLateIdentity(presenter, dm()))
+
+            val enriched = liveCard()
+            assertEquals(before + 1, posts.size)
+            assertEquals(Color.MAGENTA, identityPixel(enriched))
+            assertTrue(enriched.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+            assertNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(enriched))
+            assertEquals(body, enriched.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString())
+            assertEquals(legacy.`when`, enriched.`when`)
+            val sender = Person.fromBundle(checkNotNull(enriched.extras.getBundle(LEGACY_SENDER)))
+            assertEquals(DEFAULT_SENDER, sender.key)
+            assertEquals(Color.MAGENTA, pixel(sender))
+            assertEquals(body, enriched.extras.getCharSequence(LEGACY_BODY)?.toString())
+        }
+
+    /** A picture loader cannot bring back a dismissed pre-upgrade long-text card. */
+    @Test
+    fun dismissedLegacyTextCardIsNotResurrectedByALatePicture() =
+        runBlocking {
+            val posts = mutableListOf<Notification>()
+            val presenter = presenter(posts, resolver = ::latePicture)
+            val body = "A dismissed pre-upgrade message. ".repeat(12).trim()
+            show(presenter, dm(), body = body)
+            postLegacyTextCard(body)
+            val before = posts.size
+            presenter.dismissConversationMessages(ACCOUNT, GROUP)
+
+            assertFalse(refreshLateIdentity(presenter, dm()))
+
+            assertEquals(before, posts.size)
+            assertTrue(manager.activeNotifications.isEmpty())
+        }
+
+    /** Recreates the posted pre-upgrade payload without losing its generation, privacy or identity stamps. */
+    private fun postLegacyTextCard(body: String): Notification {
+        val active = manager.activeNotifications.single()
+        val sender = lastMessagePerson(active.notification)
+        val extras =
+            Bundle(active.notification.extras).apply {
+                remove(Notification.EXTRA_MESSAGES)
+                remove(Notification.EXTRA_MESSAGING_PERSON)
+                putCharSequence(LEGACY_BODY, body)
+                putLong("dev.ipf.whitenoise.extra.EXPANDED_SINGLE_MESSAGE_TIMESTAMP", active.notification.`when`)
+                putBundle(LEGACY_SENDER, sender.toBundle())
+            }
+        val legacy =
+            NotificationCompat
+                .Builder(context, active.notification)
+                .setExtras(extras)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                .build()
+        assertNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(legacy))
+        manager.notify(active.tag, active.id, legacy)
+        return legacy
     }
 
     /** The account-scoped private picture wins at the final write, and Clear falls back to the monogram. */
@@ -522,6 +607,8 @@ class NotificationConversationIdentityImageTest {
     private fun scope(account: String): String = checkNotNull(conversationShortcutAccountScope(account))
 
     private companion object {
+        const val LEGACY_BODY = "dev.ipf.whitenoise.extra.EXPANDED_SINGLE_MESSAGE_BODY"
+        const val LEGACY_SENDER = "dev.ipf.whitenoise.extra.EXPANDED_SINGLE_MESSAGE_SENDER"
         const val ACCOUNT = NotificationFixtureDefaults.ACCOUNT_REF
         const val GROUP = NotificationFixtureDefaults.GROUP_ID_HEX
         const val DEFAULT_SENDER = NotificationFixtureDefaults.SENDER_ACCOUNT_ID_HEX
