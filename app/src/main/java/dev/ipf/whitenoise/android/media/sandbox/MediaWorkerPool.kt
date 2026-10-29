@@ -122,7 +122,9 @@ internal class MediaWorkerPool(
             ?.let { return ClaimStep.Evict(it) }
         if (generations.any { it.busy }) return ClaimStep.Await(signal)
         // Every slot is held by a generation whose lifetime is unresolved, never exceed the bound.
-        return generations.firstOrNull { it.dead.count != 0L }?.let { ClaimStep.AwaitDeath(it) } ?: ClaimStep.Refused
+        generations.firstOrNull { it.dead.count != 0L }?.let { return ClaimStep.AwaitDeath(it) }
+        // Only generations already dead and not yet released hold the slots: their release signals.
+        return if (generations.isEmpty()) ClaimStep.Refused else ClaimStep.Await(signal)
     }
 
     /**
@@ -142,6 +144,22 @@ internal class MediaWorkerPool(
             retire(worker)
         } else {
             handler.postDelayed({ retireIfIdle(worker, stamp) }, DOMAIN_IDLE_MS)
+        }
+    }
+
+    /**
+     * Returns a claimed generation its request never sent input to. One claimed fresh for this request becomes a
+     * clean spare again; a domain's earlier generation simply waits for that domain's next input.
+     */
+    fun unclaim(worker: MediaWorker) {
+        synchronized(lock) {
+            worker.busy = false
+            if (!worker.served) {
+                worker.domain = null
+                worker.reusable = false
+                if (singleUseFence === worker) singleUseFence = null
+            }
+            signalLocked()
         }
     }
 
@@ -497,6 +515,9 @@ internal class MediaWorker(
 
     /** Claimed for an input now in flight. */
     var busy = false
+
+    /** Sent at least one input; a generation that never was can return to being a clean spare. */
+    var served = false
     var inputs = 0
     var useStamp = 0
     var lastUsedNanos = 0L

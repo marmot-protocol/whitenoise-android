@@ -135,11 +135,11 @@ class MediaWorkerDomainTest {
     }
 
     /**
-     * However many domains wait, no more requests are admitted than generations may live, so waiting requests
-     * hold no descriptors; held requests finishing let the rest in.
+     * However many domains wait, only requests holding a worker hold descriptors: the rest wait for a worker
+     * holding none, and get one as the held requests finish.
      */
     @Test
-    fun admittedRequestsAcrossDomainsNeverExceedTheLiveLimit() {
+    fun requestsWaitingForAWorkerHoldNoDescriptors() {
         val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
         val transport = domainLane(context)
         val admitted =
@@ -158,13 +158,14 @@ class MediaWorkerDomainTest {
                 )
             }
             Thread.sleep(FENCE_OBSERVATION_MS)
-            assertEquals(MediaWorkerPool.MAX_LIVE_GENERATIONS, admitted.get())
+            assertEquals(domains.size, admitted.get())
+            assertEquals(MediaWorkerPool.MAX_LIVE_GENERATIONS, transport.descriptorHoldersForTest())
             assertTrue(calls.count { it.thread.isAlive } == domains.size)
             context.bindings.take(MediaWorkerPool.MAX_LIVE_GENERATIONS).forEach { bound ->
                 assertTrue(withWorkerIdentity { bound.remote.deliverHeldReply(successfulPixelReply()) })
             }
             serveUntilDone(context, calls, heldFrom = MediaWorkerPool.MAX_LIVE_GENERATIONS)
-            assertEquals(domains.size, admitted.get())
+            assertEquals(0, transport.descriptorHoldersForTest())
         } finally {
             calls.forEach(DecodeCall::interruptAndJoin)
             context.dieAll()
