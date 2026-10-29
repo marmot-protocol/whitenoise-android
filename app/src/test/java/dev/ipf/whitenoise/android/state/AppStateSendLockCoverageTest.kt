@@ -401,22 +401,21 @@ class AppStateSendLockCoverageTest {
     /** Keeps read-watermark math tied to the edit-filtered timeline and every structural prefix row. */
     @Test
     fun conversationReadAnchorUsesHoistedRenderedTimelineAndCandidateIdentity() {
-        val source = conversationScreenSource().readText()
+        val screen = conversationScreenSource()
+        val source = screen.readText()
+        val tracking = screen.parentFile.resolve("ConversationUnreadTracking.kt").readText()
         val renderedTimelineIndex = source.indexOf("val renderedTimeline =")
-        val readAnchorHelperIndex = source.indexOf("private fun rememberConversationReadAnchor(")
-        val readAnchorHelper =
-            source.substring(
-                readAnchorHelperIndex,
-                source.indexOf("@OptIn(ExperimentalMaterial3Api::class)", readAnchorHelperIndex),
-            )
-        val readAnchorCallIndex = source.indexOf("rememberConversationReadAnchor(", renderedTimelineIndex)
+        val readAnchorHelper = tracking.substring(tracking.indexOf("private fun ConversationReadAnchorEffect("))
+        val readAnchorCallIndex = source.indexOf("ConversationUnreadTracking(", renderedTimelineIndex)
         val readAnchorCall = source.substring(readAnchorCallIndex, source.indexOf(")", readAnchorCallIndex) + 1)
+        val trackingCall = tracking.substring(tracking.indexOf("    ConversationReadAnchorEffect("))
 
         assertTrue(
             "read-anchor effect must preserve the durable watermark and reuse the hoisted edit-filtered timeline",
             renderedTimelineIndex >= 0 &&
                 renderedTimelineIndex < readAnchorCallIndex &&
                 "renderedTimeline = renderedTimeline" in readAnchorCall &&
+                "renderedTimeline = renderedTimeline" in trackingCall.substringBefore(")") &&
                 "remember(timelineViewport, renderedSize, trailingRowCount)" in readAnchorHelper &&
                 "currentHighestVisibleMessageId," in readAnchorHelper &&
                 "advanceConversationReadAnchor(" in readAnchorHelper &&

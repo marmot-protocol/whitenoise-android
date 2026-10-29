@@ -47,6 +47,11 @@ internal interface ScopedCacheRegistration {
 /**
  * Thread-safe access-order LRU that registers its account-boundary clear path at
  * construction.
+ *
+ * An [observable] cache lets Compose readers re-read when their answer can change. Its revision advances only when
+ * an entry a reader may hold is replaced, removed, evicted or cleared, or when a reader has seen a key missing (or
+ * read the size) since the last advance. Filling a missing key that nobody saw missing is not a change, so the first
+ * reader of a key never recomposes every other reader of the cache.
  */
 internal class ScopedCache<K : Any, V : Any>(
     registry: ScopedCacheRegistry,
@@ -58,23 +63,37 @@ internal class ScopedCache<K : Any, V : Any>(
     private val entries = BoundedEntryCache<K, V>(maxEntries)
     private val observableRevision: MutableIntState? = if (observable) mutableIntStateOf(0) else null
 
+    // A reader that saw a key missing, or read the size, may fall back to a source outside this cache, so any later
+    // mutation must reach it. Cleared each time the revision advances.
+    private var absenceObserved = false
+
     init {
         registry.register(this)
     }
 
+    /** Returns the cached value, or null after noting that a reader saw [key] missing. */
     operator fun get(key: K): V? =
         synchronized(lock) {
-            entries[key].also { observeRevisionLocked() }
+            entries[key].also { value -> observeRevisionLocked(missing = value == null) }
         }
 
+    /** Stores [value], advancing the revision only when a held entry changes or a reader saw a key missing. */
     fun put(
         key: K,
         value: V,
     ): V? =
         synchronized(lock) {
-            entries.put(key, value).also { advanceRevisionLocked() }
+            val sizeBefore = entries.size()
+            entries.put(key, value).also { previous ->
+                when {
+                    // A new key that evicted another drops an entry some reader may hold.
+                    previous == null -> changedLocked(entriesChanged = entries.size() <= sizeBefore)
+                    previous != value -> advanceRevisionLocked()
+                }
+            }
         }
 
+    /** Returns the cached value, filling a missing key without disturbing readers of other keys. */
     fun getOrPut(
         key: K,
         defaultValue: () -> V,
@@ -83,48 +102,67 @@ internal class ScopedCache<K : Any, V : Any>(
             entries[key]?.also {
                 observeRevisionLocked()
             } ?: defaultValue().also { value ->
+                val sizeBefore = entries.size()
                 entries.put(key, value)
-                advanceRevisionLocked()
+                // An eviction drops an entry some reader may hold, while a plain fill changes nothing anyone read.
+                changedLocked(entriesChanged = entries.size() <= sizeBefore)
                 observeRevisionLocked()
             }
         }
 
+    /** Removes [key], advancing the revision when it held an entry or a reader saw a key missing. */
     fun remove(key: K): V? =
         synchronized(lock) {
-            entries.remove(key).also { advanceRevisionLocked() }
+            entries.remove(key).also { removed -> changedLocked(removed != null) }
         }
 
+    /** Removes matching keys, advancing the revision when any matched or a reader saw a key missing. */
     fun removeAll(predicate: (K) -> Boolean): Boolean =
         synchronized(lock) {
-            entries.removeAll(predicate).also { advanceRevisionLocked() }
+            entries.removeAll(predicate).also(::changedLocked)
         }
 
+    /** Whether [key] is cached, noting a miss so a later fill reaches this reader. */
     fun containsKey(key: K): Boolean =
         synchronized(lock) {
-            entries.containsKey(key).also { observeRevisionLocked() }
+            entries.containsKey(key).also { present -> observeRevisionLocked(missing = !present) }
         }
 
     val size: Int
         get() =
             synchronized(lock) {
-                entries.size().also { observeRevisionLocked() }
+                // Any insertion changes the size, so a size reader is treated like one that saw a key missing.
+                entries.size().also { observeRevisionLocked(missing = true) }
             }
 
     fun clear() {
         synchronized(lock) { clearLocked() }
     }
 
+    /** Drops every entry, invalidating readers only when one was held or a key was seen missing. */
     override fun clearLocked() {
+        val hadEntries = entries.size() > 0
         entries.clear()
-        advanceRevisionLocked()
+        changedLocked(hadEntries)
     }
 
-    private fun observeRevisionLocked() {
-        observableRevision?.intValue
+    /** Advances when held entries changed, or when a reader saw a key missing and may depend on what changed. */
+    private fun changedLocked(entriesChanged: Boolean) {
+        if (entriesChanged || absenceObserved) advanceRevisionLocked()
     }
 
+    /** Subscribes the current reader to the revision, noting when it saw a key [missing]. */
+    private fun observeRevisionLocked(missing: Boolean = false) {
+        val revision = observableRevision ?: return
+        if (missing) absenceObserved = true
+        revision.intValue
+    }
+
+    /** Invalidates every reader of the revision and forgets which keys were seen missing. */
     private fun advanceRevisionLocked() {
-        observableRevision?.let { it.intValue += 1 }
+        val revision = observableRevision ?: return
+        absenceObserved = false
+        revision.intValue += 1
     }
 }
 

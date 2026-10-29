@@ -42,7 +42,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -124,7 +123,6 @@ import dev.ipf.whitenoise.android.state.StagedAttachmentSendClaim
 import dev.ipf.whitenoise.android.state.StagedAttachmentSender
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.advanceConversationReadAnchor
 import dev.ipf.whitenoise.android.state.attachmentsFor
 import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
 import dev.ipf.whitenoise.android.state.conversationWindowCanReportVisible
@@ -137,7 +135,6 @@ import dev.ipf.whitenoise.android.state.isLoadingPage
 import dev.ipf.whitenoise.android.state.isUserBlocked
 import dev.ipf.whitenoise.android.state.loadMessageAvailability
 import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
-import dev.ipf.whitenoise.android.state.logUnreadBadgeTransition
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.markComposerReadyForPresentationTiming
 import dev.ipf.whitenoise.android.state.markInboundMessageVisibleForHostPerformance
@@ -145,7 +142,7 @@ import dev.ipf.whitenoise.android.state.markPagingEvent
 import dev.ipf.whitenoise.android.state.markWindowVisibleForPresentationTiming
 import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.state.presentFailure
-import dev.ipf.whitenoise.android.state.reconcileConversationUnreadJump
+import dev.ipf.whitenoise.android.state.reconcile
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
@@ -245,7 +242,7 @@ import dev.ipf.whitenoise.android.ui.group.isCurrentGroupMutationOwner
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
-import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTiles
+import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTilesState
 import dev.ipf.whitenoise.android.ui.medialibrary.toConversationViewerPages
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.ui.settings.blockOutcomeMessage
@@ -277,7 +274,12 @@ private class ConversationNavigationState(
     initialSeedTailAwaitingAuthoritative: Boolean,
     surfaceState: ConversationSurfaceState,
 ) {
-    var lastFollowedLatestId by mutableStateOf(initialFollowedLatestId)
+    /**
+     * Id of the newest row the tail follow has reacted to. Plain bookkeeping on purpose: composition reads it only
+     * to arm the tail entrance in the frame that inserts a row, which a timeline change always recomposes, so the
+     * follow advancing it afterwards must not recompose the whole conversation again.
+     */
+    var lastFollowedLatestId: String? = initialFollowedLatestId
     var seedTailAwaitingAuthoritative by mutableStateOf(initialSeedTailAwaitingAuthoritative)
     var initialTimelineLoadStarted by mutableStateOf(false)
     var initialTimelineBackfillNoProgress by surfaceState.initialTimelineBackfillNoProgress
@@ -505,82 +507,6 @@ private fun rememberConversationBatchSelectionUiState(
     }
 }
 
-/**
- * Read anchor stored as the message id of the deepest row the user has
- * settled on. The candidate id is a key so an optimistic UUID being replaced
- * in the same list slot still advances the anchor to the confirmed message.
- * A missing durable watermark rebases only at the fully loaded tail; while a
- * newer page exists it may be off-window and must remain monotonic.
- *
- * A row only counts once it clears the composer outright. The transcript rests with the next
- * message showing a sliver above the composer, and taking that sliver as read deducted a message
- * from the unread badge that nobody had seen.
- */
-@Composable
-private fun rememberConversationReadAnchor(
-    controller: ConversationController,
-    entrySessionIdentity: Any,
-    renderedTimeline: List<TimelineMessage>,
-    timelineViewport: ConversationTimelineViewport,
-    trailingRowCount: Int,
-    initialTimelineAnchored: Boolean,
-): MutableState<String?> {
-    val readAnchor = remember(entrySessionIdentity) { mutableStateOf(controller.lastReadMessageId) }
-    val renderedSize = renderedTimeline.size
-    val currentHighestVisibleTimelineIndex by
-        remember(timelineViewport, renderedSize, trailingRowCount) {
-            derivedStateOf {
-                // The reading viewport rather than the raw layout, and within it only a row that
-                // clears the composer outright. Counting a row the composer covers, or one left
-                // showing a sliver above it, clears an unread badge for a message nobody has read.
-                val newest =
-                    timelineViewport.readingLayoutInfo().newestReadRow(
-                        timelineListIndices = trailingRowCount until trailingRowCount + renderedSize,
-                    )
-                if (newest == null || renderedSize == 0) return@derivedStateOf -1
-                // Reversed layout, bottom to top: [maybe bottom error]
-                // [timeline items, newest first][maybe older-loading]
-                // [maybe top error][maybe group recovery][top spacer].
-                // The lowest fully clear index is therefore the newest row actually read.
-                conversationTimelineIndexForListIndex(
-                    listIndex = newest.index,
-                    timelineSize = renderedSize,
-                    trailingRowCount = trailingRowCount,
-                ).coerceIn(0, renderedSize - 1)
-            }
-        }
-    val currentHighestVisibleMessageId =
-        renderedTimeline
-            .getOrNull(currentHighestVisibleTimelineIndex)
-            ?.record
-            ?.messageIdHex
-    LaunchedEffect(
-        controller,
-        initialTimelineAnchored,
-        currentHighestVisibleTimelineIndex,
-        currentHighestVisibleMessageId,
-        controller.lastReadMessageId,
-    ) {
-        val idx =
-            conversationReadAnchorCandidateIndex(
-                initialTimelineAnchored = initialTimelineAnchored,
-                highestVisibleTimelineIndex = currentHighestVisibleTimelineIndex,
-            )
-        if (idx < 0) return@LaunchedEffect
-        readAnchor.value =
-            advanceConversationReadAnchor(
-                timeline = renderedTimeline,
-                currentUiAnchorId = readAnchor.value,
-                durableAnchorId = controller.lastReadMessageId,
-                candidateIndex = idx,
-                canRebaseMissingAnchor =
-                    idx == renderedTimeline.lastIndex &&
-                        !controller.hasMoreAfterTimeline,
-            )
-    }
-    return readAnchor
-}
-
 /** Renders one account-owned conversation and coordinates its route-stable presentation. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -758,10 +684,12 @@ internal fun ConversationScreen(
     val timelineViewport = remember(listState) { ConversationTimelineViewport(listState) }
     val scrollEvidenceSink = LocalConversationScrollEvidenceSink.current
     val ttsQuickTransportViewportLock = rememberTtsQuickTransportViewportLock(listState)
-    var unreadJumpState by
+    // Written from callbacks and reconciled by ConversationUnreadTracking, never read while composing this screen.
+    val unreadJump =
         remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration) {
             mutableStateOf(ConversationUnreadJumpState())
         }
+    var unreadJumpState by unreadJump
     val scrollCoordinator =
         remember(
             controller,
@@ -1077,14 +1005,14 @@ internal fun ConversationScreen(
     val indicatorItemCount =
         renderedTimeline.size + trailingRowCount + olderHeaderCount +
             inlineTopErrorCount + groupRecoveryCount + (if (hasRetentionHistoryBoundary) 1 else 0) + 1
+    // Held, not read: the tiles rebuild off the main thread after every timeline change, and only an open media
+    // viewer needs them, so their arrival recomposes the viewer rather than the whole conversation.
     val conversationMedia =
-        rememberSharedMediaTiles(
+        rememberSharedMediaTilesState(
             controller = controller,
             appState = appState,
             myAccountId = conversationSelfAccountIdHex,
         )
-    val conversationVisualPages =
-        remember(conversationMedia.visuals) { conversationMedia.visuals.toConversationViewerPages() }
     val renderedTimelineAnchorKeys =
         remember(renderedTimeline) {
             renderedTimeline.map { it.presentationId to it.record.messageIdHex }
@@ -1576,15 +1504,11 @@ internal fun ConversationScreen(
         }
     }
     dragInteractionEffect()
-    var readAnchorMessageId by
-        rememberConversationReadAnchor(
-            controller = controller,
-            entrySessionIdentity = entryUnreadSessionIdentity,
-            renderedTimeline = renderedTimeline,
-            timelineViewport = timelineViewport,
-            trailingRowCount = trailingRowCount,
-            initialTimelineAnchored = initialTimelineAnchored,
-        )
+    // The read anchor, badge and unread jump target are written from callbacks and reconciled by
+    // ConversationUnreadTracking, never read while composing this screen: a send moves all three in turn, and
+    // each read here recomposed the whole conversation once more.
+    val readAnchor = remember(entryUnreadSessionIdentity) { mutableStateOf(controller.lastReadMessageId) }
+    var readAnchorMessageId by readAnchor
 
     /** Saves the reading position when the conversation leaves composition or its controller changes. */
     @Composable
@@ -1623,48 +1547,37 @@ internal fun ConversationScreen(
     // One owner for the badge's number (#2726): it follows the loaded rows while the read anchor is
     // among them and holds while paging moves the anchor off screen, so a history page can never
     // switch the count between the rows and the projection or count the loaded window itself.
-    val unreadBadgeUi =
-        rememberConversationUnreadBadgeCount(
+    val projectionUnread = projectedUnreadCount.takeIf { entryProjectionAvailable }
+    val unreadBadge =
+        rememberConversationUnreadBadge(
             identity = Triple(controller, chat.id, entryUnreadSessionIdentity),
             anchored = initialTimelineAnchored,
-            timeline = controller.timeline,
-            readAnchorMessageId = readAnchorMessageId,
-            projectionUnread = projectedUnreadCount.takeIf { entryProjectionAvailable },
-            windowReachesTail = !controller.hasMoreAfterTimeline,
-            onTransition = { before, after ->
-                logUnreadBadgeTransition("DMConversation", before, after, controller.timeline.size)
-            },
-        )
-    // The first composition after anchoring has not reconciled yet; exposing 0 there would retire the
-    // two-stage jump target, so the count and its consumers wait for the first reconciliation.
-    val badgeReconciled = unreadBadgeUi.reconciled
-    val unreadIncomingCount = unreadBadgeUi.count
-
-    /** Reconciles the two-stage unread jump target with the current rows and unread count. */
-    @Composable
-    fun unreadJumpReconcileEffect() {
-        LaunchedEffect(
-            controller,
-            initialTimelineAnchored,
-            renderedTimeline,
-            readAnchorMessageId,
-            badgeReconciled,
-            unreadIncomingCount,
-            nearBottom,
-            unreadJumpState,
-        ) {
-            if (!badgeReconciled) return@LaunchedEffect
-            unreadJumpState =
-                reconcileConversationUnreadJump(
-                    current = unreadJumpState,
-                    timeline = renderedTimeline,
-                    readAnchorMessageId = readAnchorMessageId,
-                    unreadCount = unreadIncomingCount,
-                    nearBottom = nearBottom,
-                )
+        ) { unseeded ->
+            unseeded.reconcile(
+                timeline = controller.timeline,
+                readAnchorMessageId = readAnchor.value,
+                projectionUnread = projectionUnread,
+                windowReachesTail = !controller.hasMoreAfterTimeline,
+            )
         }
-    }
-    unreadJumpReconcileEffect()
+    ConversationUnreadTracking(
+        controller = controller,
+        renderedTimeline = renderedTimeline,
+        timelineViewport = timelineViewport,
+        trailingRowCount = trailingRowCount,
+        initialTimelineAnchored = initialTimelineAnchored,
+        nearBottom = nearBottom,
+        projectionUnread = projectionUnread,
+        readAnchor = readAnchor,
+        badge = unreadBadge,
+        unreadJump = unreadJump,
+    )
+    // Read only by the jump control, which recomposes when the number shown changes rather than whenever the badge
+    // follows a moved read anchor.
+    val unreadIncomingCount by
+        remember(unreadBadge, initialTimelineAnchored) {
+            derivedStateOf { unreadBadge.value.uiState(initialTimelineAnchored).count }
+        }
     // Unread messages (after the read anchor) that mention the active account,
     // oldest first — drives the in-conversation jump-to-mention chip. Mirrors
     // countUnreadIncoming's anchor logic; kind-9 only, matching the engine's
@@ -5179,6 +5092,9 @@ internal fun ConversationScreen(
         if (mediaOwnerCurrent) {
             ConversationMediaViewerSessionHost(mediaViewerSessionState) { active ->
                 val request = active.request
+                val conversationVisuals = conversationMedia.value.visuals
+                val conversationVisualPages =
+                    remember(conversationVisuals) { conversationVisuals.toConversationViewerPages() }
                 ConversationMediaViewer(
                     controller = controller,
                     appState = appState,

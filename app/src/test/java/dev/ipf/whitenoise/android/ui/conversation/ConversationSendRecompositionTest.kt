@@ -52,8 +52,9 @@ import org.robolectric.annotation.GraphicsMode
 import java.util.TimeZone
 
 /**
- * Recomposition budget for a warm send through the live conversation route. Unchanged rows must skip: a send that
- * re-ran every visible row and bubble in several frames was the main-thread cost behind send jank on device.
+ * Recomposition budget for a warm send through the live conversation route. The screen body may run once, for the
+ * timeline change itself, and unchanged rows must skip: a send that re-ran the whole conversation in several frames,
+ * and every visible row and bubble with it, was the main-thread cost behind send jank on device.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -75,18 +76,14 @@ class ConversationSendRecompositionTest {
         TimeZone.setDefault(originalTimeZone)
     }
 
-    /** A warm send re-runs only the new row and its neighbour, and no settled row's swipe glyph recomposes. */
+    /**
+     * A warm send recomposes the screen body and the composer once, re-runs only the new row and its neighbour, and
+     * recomposes no settled row's swipe glyph. The read anchor, unread badge, jump target, followed tail id, shared
+     * media tiles and tail entrance all move after the row lands, and none of them may recompose the screen again.
+     */
     @Test
-    fun warmSendRecomposesOnlyTheNewRowAndItsNeighbour() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        Settings.Global.putFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
-        val conversation = createConversation()
-        val evidence = TailEvidence()
-        mount(conversation, evidence)
-        composeRule.waitForIdle()
-        composeRule.waitUntil(5_000) { evidence.viewport?.mode is ConversationScrollMode.FollowingTail }
-        composeRule.mainClock.autoAdvance = false
-        settle(20)
+    fun warmSendRecomposesTheScreenOnceAndOnlyTheNewRowAndItsNeighbour() {
+        val context = mountAtLiveTail()
         send(context, expectedPublishes = 1)
         settle(60)
         composeRule.onNode(hasSetTextAction()).performTextInput("Second send")
@@ -96,9 +93,27 @@ class ConversationSendRecompositionTest {
                 send(context, expectedPublishes = 2)
                 settle(40)
             }
+        assertTrue("screen re-run: $counts", counts.exactly(CONVERSATION_SCREEN) <= 1)
+        assertTrue("composer re-run: $counts", counts.of("composer.ComposerBar") <= 1)
         assertTrue("rows re-run: $counts", counts.of("TimelineRow") <= 2)
         assertTrue("bubbles re-run: $counts", counts.of("messages.MessageBubble") <= 2)
         assertTrue("swipe glyphs re-run: $counts", counts.of("MessageReplySwipeGlyph") <= 2)
+    }
+
+    /**
+     * The first outgoing bubble in a chat of received messages fills the outgoing colour slots. That fill must not
+     * recompose the received bubbles that already read their own slots.
+     */
+    @Test
+    fun firstOutgoingBubbleDoesNotRecomposeTheReceivedBubbles() {
+        val context = mountAtLiveTail()
+        val counts =
+            countCompositions {
+                send(context, expectedPublishes = 1)
+                settle(40)
+            }
+        assertTrue("rows re-run: $counts", counts.of("TimelineRow") <= 2)
+        assertTrue("bubbles re-run: $counts", counts.of("messages.MessageBubble") <= 2)
     }
 
     /** The entrance modifier compares equal for the same entrance, row and claim source, so unchanged rows skip. */
@@ -118,6 +133,20 @@ class ConversationSendRecompositionTest {
             Modifier.conversationTailEntranceMotion(entrance, "m1", claim),
             Modifier.conversationTailEntranceMotion(entrance, "m2", claim),
         )
+    }
+
+    /** Mounts the live route with motion on, waits for it to follow the tail and settles it frame by frame. */
+    private fun mountAtLiveTail(): Context {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        Settings.Global.putFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
+        val conversation = createConversation()
+        val evidence = TailEvidence()
+        mount(conversation, evidence)
+        composeRule.waitForIdle()
+        composeRule.waitUntil(5_000) { evidence.viewport?.mode is ConversationScrollMode.FollowingTail }
+        composeRule.mainClock.autoAdvance = false
+        settle(20)
+        return context
     }
 
     /** Presses the production Send button and waits for the scripted publisher to accept it. */
@@ -248,6 +277,9 @@ class ConversationSendRecompositionTest {
     }
 }
 
+/** The compiler's name for the conversation screen body itself. */
+private const val CONVERSATION_SCREEN = "dev.ipf.whitenoise.android.ui.conversation.ConversationScreen"
+
 /** Parses text into one plain paragraph with soft breaks, like the engine's renderer for unformatted sends. */
 private fun plainParagraph(text: String): MarkdownDocumentFfi =
     MarkdownDocumentFfi(
@@ -277,6 +309,9 @@ private class CompositionCounts {
 
     /** Total runs of functions whose qualified name ends with [suffix]. */
     fun of(suffix: String): Int = counts.entries.filter { it.key.endsWith(suffix) }.sumOf { it.value }
+
+    /** Runs of the one function named [qualifiedName], excluding the local functions and lambdas nested in it. */
+    fun exactly(qualifiedName: String): Int = counts[qualifiedName] ?: 0
 
     /** Lists the conversation functions that ran, most frequent first, for assertion messages. */
     override fun toString(): String =
