@@ -1004,10 +1004,11 @@ The assumptions behind each budget:
   before the emulator but continues on error, so ART verification still runs;
   the lane's last step then fails. These lanes run on release-input pull
   requests, `master` pushes, the merge queue, tags and nightly, and they are not
-  required checks. Both budgets were reviewed against `stagingZapstoreRelease`
-  at `8342b52`. Production enables fewer debug-only code paths
-  (`ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS` is false), so its R8 output differs
-  slightly; its own sizes are in its lane report. Play builds are not budgeted.
+  required checks. Each variant's budget was reviewed against its own build.
+  Production enables fewer debug-only code paths
+  (`ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS` is false), so its largest method was
+  `ConversationScreen` at 11,130 code units, while staging's `MessageBubble`
+  reached 11,671. Play builds are not budgeted.
 - **`benchmarkRelease` is plain D8 output.** The build type is created without
   release minification, so it keeps source names, has no mapping, and its large
   composables are 30–40% larger than the shipping ones. Its sizes never
