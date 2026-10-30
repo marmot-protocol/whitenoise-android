@@ -2934,13 +2934,13 @@ class LocalNotificationPresenter(
         senderAvatarBitmap: Bitmap?,
         sender: Person,
     ): Triple<Bitmap?, Bitmap?, Person> {
-        val (override, currentAvatar) = directContactAvatar(update)
-        val senderAvatar = currentAvatar ?: senderAvatarBitmap
-        val conversationAvatar = currentAvatar ?: conversationAvatarBitmap
-        return when {
-            !update.isDm -> Triple(conversationAvatarBitmap, null, sender)
-            !override -> Triple(conversationAvatarBitmap, senderAvatarBitmap, sender)
-            else -> Triple(conversationAvatar, senderAvatar, contactAvatarPerson(sender, senderAvatar))
+        if (!update.isDm) return Triple(conversationAvatarBitmap, null, sender)
+        val (override, currentAvatar) = currentContactAvatar(update.accountRef, update.sender.accountIdHex)
+        return if (!override) {
+            Triple(conversationAvatarBitmap, senderAvatarBitmap, sender)
+        } else {
+            val senderAvatar = currentAvatar ?: senderAvatarBitmap
+            Triple(currentAvatar ?: conversationAvatarBitmap, senderAvatar, contactAvatarPerson(sender, senderAvatar))
         }
     }
 
@@ -3027,20 +3027,7 @@ class LocalNotificationPresenter(
                         if (!shortcutPreviewAllowed(context, built)) {
                             genericNotificationShortcut(context, built)
                         } else if (currentChoice) {
-                            withContactPictureIcon(
-                                context,
-                                built,
-                                update.sender.accountIdHex,
-                                pixels,
-                                initialGroupPresentation =
-                                    initialGroupShortcutPresentation(
-                                        content,
-                                        title,
-                                        shortcutId,
-                                        ownedConversationAvatar,
-                                        ownedSender,
-                                    ),
-                            )
+                            withContactPictureIcon(context, built, update.sender.accountIdHex, pixels)
                         } else {
                             built
                         }

@@ -15,7 +15,7 @@
       {
         "surface": "public initial group shortcut identity after private picture overrides",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationGroupSenderImages.kt",
-        "anchor": "internal fun initialGroupShortcutPresentation(",
+        "anchor": "internal fun notificationShortcutSender(",
         "test_ids": [
           "NTF-042",
           "PRO-008"

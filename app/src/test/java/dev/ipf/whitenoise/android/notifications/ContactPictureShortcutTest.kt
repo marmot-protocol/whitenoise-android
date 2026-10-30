@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.notifications
 import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.core.app.Person
-import androidx.core.graphics.drawable.IconCompat
 import androidx.core.graphics.drawable.toBitmap
 import dev.ipf.whitenoise.android.share.ShareShortcutTarget
 import dev.ipf.whitenoise.android.share.buildShareShortcut
@@ -121,60 +120,8 @@ class ContactPictureShortcutTest {
         }
     }
 
-    /** Initial groups keep their group image and namable sender through a private override without copy APIs. */
-    @Test fun initialGroupPictureRefreshKeepsItsSenderAndPublicShortcutMetadata() {
-        val context = RuntimeEnvironment.getApplication()
-        val preview = NotificationPreviewPreferences.capture(context)
-        val group =
-            checkNotNull(
-                buildShareShortcut(
-                    context,
-                    ShareShortcutTarget("a", "group", "Hikers"),
-                    previewToken = preview,
-                ),
-            )
-        stampContactPictureShortcut(group, "contact", conversationIcon = false)
-        val red = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
-        val blue = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.BLUE) }
-        val sender =
-            Person
-                .Builder()
-                .setName("Alice")
-                .setKey("member")
-                .setUri("nostr:member")
-                .setImportant(true)
-                .setIcon(IconCompat.createWithBitmap(red))
-                .build()
-        val initial = InitialGroupShortcutPresentation(IconCompat.createWithBitmap(blue), sender)
-        val refreshed = withContactPictureIcon(context, group, "contact", red, initialGroupPresentation = initial)
-        val person = checkNotNull(refreshed.persons()).single()
-        assertEquals("Alice", person.name.toString())
-        assertEquals("member", person.key)
-        assertEquals("nostr:member", person.uri)
-        assertTrue(person.isImportant)
-        assertEquals(0, Color.alpha(checkNotNull(person.icon?.loadDrawable(context)).toBitmap().getPixel(0, 0)))
-        assertEquals(Color.BLUE, checkNotNull(refreshed.icon?.loadDrawable(context)).toBitmap().getPixel(0, 0))
-        assertEquals(group.rank, refreshed.rank)
-        assertEquals(group.categories, refreshed.categories)
-        assertEquals(group.locusId, refreshed.locusId)
-        assertEquals(group.excludedFromSurfaces, refreshed.excludedFromSurfaces)
-        assertEquals(group.intents.map { it.toUri(0) }, refreshed.intents.map { it.toUri(0) })
-        val dm =
-            checkNotNull(
-                buildShareShortcut(
-                    context,
-                    ShareShortcutTarget("a", "dm", "Maya"),
-                    previewToken = preview,
-                ),
-            )
-        stampContactPictureShortcut(dm, "contact", conversationIcon = true)
-        val refreshedDm = withContactPictureIcon(context, dm, "contact", red, initialGroupPresentation = initial)
-        assertEquals("Maya", checkNotNull(refreshedDm.persons()).single().name.toString())
-        assertEquals("contact", checkNotNull(refreshedDm.persons()).single().key)
-    }
-
-    /** A missing sender key cannot drop an otherwise rich group's image or restore its sender picture. */
-    @Test fun initialGroupShortcutKeepsPresentationWithoutASenderKey() {
+    /** A group shortcut sender keeps its name but no picture without a sender key; a direct sender is unchanged. */
+    @Test fun groupShortcutSenderHidesItsPictureWithoutASenderKey() {
         val context = RuntimeEnvironment.getApplication()
         val content =
             LocalNotificationContent(
@@ -193,11 +140,8 @@ class ContactPictureShortcutTest {
         val normalized = notificationShortcutSender(content, sender)
         assertEquals("Alice", normalized.name.toString())
         assertEquals(0, Color.alpha(checkNotNull(normalized.icon?.loadDrawable(context)).toBitmap().getPixel(0, 0)))
-        val initial = initialGroupShortcutPresentation(content, "Group", "group", null, normalized)
-        assertEquals(normalized, checkNotNull(initial).sender)
         val direct = content.copy(isGroupConversation = false)
         assertEquals(sender, notificationShortcutSender(direct, sender))
-        assertNull(initialGroupShortcutPresentation(direct, "Alice", "dm", null, sender))
     }
 
     /** Runs the production icon-refresh path against a controlled preview epoch and captured launcher writes. */

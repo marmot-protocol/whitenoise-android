@@ -26,12 +26,6 @@ internal fun groupNotificationPerson(person: Person): Person = person.toBuilder(
 /** A fresh icon wrapper shares immutable pixels, so one Person cannot retint another Person's icon. */
 internal fun groupSenderIcon(): IconCompat = IconCompat.createWithBitmap(transparentGroupSenderBitmap)
 
-/** Initial group publication supplies both fields that an ordinary icon-only refresh intentionally omits. */
-internal data class InitialGroupShortcutPresentation(
-    val icon: IconCompat,
-    val sender: Person,
-)
-
 /** Private overrides are resolved before this final sender policy enters the public shortcut factory. */
 internal fun notificationShortcutSender(
     content: LocalNotificationContent,
@@ -41,20 +35,6 @@ internal fun notificationShortcutSender(
         groupNotificationPerson(sender)
     } else {
         sender
-    }
-
-/** Only an initial rich group publication may add a group identity and sender to an icon-only update. */
-internal fun initialGroupShortcutPresentation(
-    content: LocalNotificationContent,
-    title: String,
-    shortcutId: String,
-    groupPicture: Bitmap?,
-    sender: Person,
-): InitialGroupShortcutPresentation? =
-    if (content.isGroupConversation) {
-        InitialGroupShortcutPresentation(notificationConversationIcon(title, shortcutId, groupPicture), sender)
-    } else {
-        null
     }
 
 /**
