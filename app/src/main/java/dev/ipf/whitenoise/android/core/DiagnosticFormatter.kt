@@ -328,7 +328,7 @@ object DiagnosticFormatter {
 }
 
 /** MDK refused a media reference: unusable, or encrypted at an epoch the group has left or not yet settled. */
-private fun MarmotKitException?.isMediaReferenceRefusal(): Boolean =
+internal fun Throwable?.isMediaReferenceRefusal(): Boolean =
     this is MarmotKitException.InvalidMediaReference ||
         this is MarmotKitException.MediaReferenceStaleEpoch ||
         this is MarmotKitException.MediaReferenceEpochUnsettled

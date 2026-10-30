@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.whitenoise.android.core.isMediaReferenceRefusal
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
@@ -319,16 +320,14 @@ internal fun isTransientAttachmentDownloadFailure(throwable: Throwable): Boolean
 
 /** Typed contract failures and native terminal states cannot be repaired by a host transport retry. */
 private fun isTerminalAttachmentDownloadFailure(failure: Throwable): Boolean =
-    when (failure) {
-        is CancellationException,
-        is MarmotKitException.InvalidMediaReference,
-        is MarmotKitException.MediaReferenceStaleEpoch,
-        is MarmotKitException.MediaReferenceEpochUnsettled,
-        is MarmotKitException.MediaAttachmentRejected,
-        is MarmotKitException.MediaUnfetchable,
-        is MarmotKitException.AttachmentModeRequired,
-        is MarmotKitException.AttachmentAccountSignedOut,
-        is NativeAttachmentTerminalException,
-        -> true
-        else -> false
-    }
+    failure.isMediaReferenceRefusal() ||
+        when (failure) {
+            is CancellationException,
+            is MarmotKitException.MediaAttachmentRejected,
+            is MarmotKitException.MediaUnfetchable,
+            is MarmotKitException.AttachmentModeRequired,
+            is MarmotKitException.AttachmentAccountSignedOut,
+            is NativeAttachmentTerminalException,
+            -> true
+            else -> false
+        }

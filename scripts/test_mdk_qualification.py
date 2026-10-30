@@ -681,9 +681,9 @@ class EmulatorProcessEvidenceTest(unittest.TestCase):
 
 
 class BaselineStagingTest(unittest.TestCase):
-    """Fixture overlays admit only the explicitly reviewed published nightly, never an arbitrary runtime."""
+    """Fixture overlays admit only the explicitly reviewed baseline release, never an arbitrary runtime."""
 
-    def test_reviewed_nightly_copies_only_shared_fixture(self):
+    def test_reviewed_baseline_release_copies_only_shared_fixture(self):
         """The overlay is test-only and preserves the baseline production implementation and native lock."""
         from scripts import stage_mdk_baseline_fixture as staging
         with tempfile.TemporaryDirectory() as directory:

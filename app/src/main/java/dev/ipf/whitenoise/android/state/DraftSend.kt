@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.SelectedMessageDraftContentFfi
 import dev.ipf.marmotkit.SelectedMessageDraftFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
+import dev.ipf.whitenoise.android.core.isMediaReferenceRefusal
 
 /**
  * Publishes the composer's text with one engine call, the way the app sent before 0.10.0.
@@ -170,10 +171,7 @@ private suspend fun MarmotInterface.sendDraftOrNull(
         null
     } catch (invalid: MarmotKitException.InvalidMessageDraft) {
         null
-    } catch (invalid: MarmotKitException.InvalidMediaReference) {
-        null
-    } catch (stale: MarmotKitException.MediaReferenceStaleEpoch) {
-        null
-    } catch (unsettled: MarmotKitException.MediaReferenceEpochUnsettled) {
+    } catch (refused: MarmotKitException) {
+        if (!refused.isMediaReferenceRefusal()) throw refused
         null
     }

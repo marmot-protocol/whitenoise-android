@@ -121,6 +121,49 @@ class NativeAttachmentFeedTest {
             assertTrue(feed.closed.get())
         }
 
+    /** A pause that ends inside the grace lets observation follow the transfer to READY. */
+    @Test
+    fun `a pause that ends within the grace continues to ready`() =
+        runBlocking {
+            val feed = ScriptedFeed().apply { deliver(AttachmentTransferStateFfi.NOT_REQUESTED) }
+            launch {
+                delay(30)
+                feed.deliver(AttachmentTransferStateFfi.DOWNLOADING)
+                feed.deliver(AttachmentTransferStateFfi.READY)
+            }
+            val states = mutableListOf<AttachmentTransferStateFfi>()
+
+            withTimeout(WAIT_MILLIS) {
+                awaitNativeAttachment(
+                    open = { feed },
+                    onState = { states += it },
+                    pausedGraceMillis = PAUSE_GRACE_MILLIS,
+                ) { AttachmentTransferStateFfi.PAUSED }
+            }
+
+            assertEquals(AttachmentTransferStateFfi.READY, states.last())
+            assertTrue(feed.closed.get())
+        }
+
+    /** A pause that outlasts the grace ends observation with the paused exception and releases the feed. */
+    @Test
+    fun `a pause that outlasts the grace ends observation`() =
+        runBlocking {
+            val feed = ScriptedFeed().apply { deliver(AttachmentTransferStateFfi.NOT_REQUESTED) }
+
+            assertThrows(NativeAttachmentPausedException::class.java) {
+                runBlocking {
+                    withTimeout(WAIT_MILLIS) {
+                        awaitNativeAttachment(open = { feed }, pausedGraceMillis = PAUSE_GRACE_MILLIS) {
+                            AttachmentTransferStateFfi.PAUSED
+                        }
+                    }
+                }
+            }
+
+            assertTrue(feed.closed.get())
+        }
+
     /** Acquisition reads the snapshot once, before demand, and never polls it beside the feed. */
     @Test
     fun `acquisition does not poll the snapshot while it waits`() {
@@ -150,5 +193,6 @@ class NativeAttachmentFeedTest {
             )
 
         const val WAIT_MILLIS = 5_000L
+        const val PAUSE_GRACE_MILLIS = 200L
     }
 }
