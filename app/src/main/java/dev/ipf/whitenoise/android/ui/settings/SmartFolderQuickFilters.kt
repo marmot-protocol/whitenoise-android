@@ -42,16 +42,20 @@ internal fun SmartFolderFilter.Group.quickMode(field: FolderField): FolderMode? 
 internal fun sameQuickFilterPayload(
     first: String?,
     second: String?,
-): Boolean =
-    first == second ||
-        listOf(first, second)
-            .map { payload ->
-                payload
-                    ?.let(SmartFolderCodec::decode)
-                    ?.takeIf { it.supportsQuickFilters() }
-                    ?.children
-                    ?.toSet()
-            }.let { (left, right) -> left != null && left == right }
+): Boolean {
+    if (first == second) return true
+    val left = quickConditions(first)
+    val right = quickConditions(second)
+    return left != null && left == right
+}
+
+/** The conditions of a payload the quick controls can edit, or null for any other payload. */
+private fun quickConditions(payload: String?): Set<SmartFolderFilter>? =
+    payload
+        ?.let(SmartFolderCodec::decode)
+        ?.takeIf { it.supportsQuickFilters() }
+        ?.children
+        ?.toSet()
 
 /** Replace in place, append a new restriction, or clear just this predicate; untouched order is retained. */
 internal fun SmartFolderFilter.Group.toggleQuickFilter(

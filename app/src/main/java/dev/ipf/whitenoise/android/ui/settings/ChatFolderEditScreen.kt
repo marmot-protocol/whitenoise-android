@@ -178,11 +178,14 @@ private fun ChatFolderEditSession(
             smartPayload == initialSmart ||
             smartRoot?.let(SmartFolderCodec::valid) == true
     val missing = folderId != null && existing == null
+    // Comparing quick payloads decodes both rules, so name and description keystrokes must not repeat it.
+    val smartRuleUnchanged =
+        remember(smartPayload, initialSmart) { sameQuickFilterPayload(smartPayload, initialSmart) }
     val dirty =
         name.text.toString() != prefillName ||
             description.text.toString() != existing?.description.orEmpty() ||
             rule.copy(smartFilter = initialSmart) != initialRule ||
-            !sameQuickFilterPayload(smartPayload, initialSmart) ||
+            !smartRuleUnchanged ||
             manualChatIds != initialManual ||
             showWhenEmpty != initialShowWhenEmpty ||
             sort != initialSort
