@@ -4,7 +4,7 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "Stable public audio URIs",
+        "surface": "Canonical named and legacy public audio URIs",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationToneProvider.kt",
         "anchor": "class NotificationToneProvider",
         "test_ids": [

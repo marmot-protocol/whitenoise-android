@@ -4,7 +4,7 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "Original tone catalog",
+        "surface": "Permanent named and legacy tone URIs",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationTone.kt",
         "anchor": "enum class NotificationTone(",
         "test_ids": [

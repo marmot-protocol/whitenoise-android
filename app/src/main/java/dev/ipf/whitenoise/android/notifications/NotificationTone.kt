@@ -17,7 +17,9 @@ internal enum class NotificationTone(
     PULSE("pulse-v1", R.raw.notification_pulse_v1, R.string.notification_tone_pulse),
     ;
 
-    fun uri(context: Context): Uri = Uri.parse("content://${context.packageName}.notification-tones/$token")
+    fun uri(context: Context): Uri = legacyUri(context).buildUpon().appendPath(filename.removeSuffix(".wav")).build()
+
+    fun legacyUri(context: Context): Uri = Uri.parse("content://${context.packageName}.notification-tones/$token")
 
     val filename: String get() =
         when (this) {
@@ -41,6 +43,6 @@ internal enum class NotificationTone(
         fun resolve(
             context: Context,
             uri: Uri,
-        ): NotificationTone? = entries.firstOrNull { it.uri(context) == uri }
+        ): NotificationTone? = entries.firstOrNull { it.uri(context) == uri || it.legacyUri(context) == uri }
     }
 }

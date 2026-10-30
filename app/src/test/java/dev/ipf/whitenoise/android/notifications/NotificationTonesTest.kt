@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.notifications
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.media.RingtoneManager
 import android.net.Uri
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -22,6 +23,47 @@ class NotificationTonesTest {
     private val context: Context get() = RuntimeEnvironment.getApplication()
 
     @Test
+    fun namedUrisStayPermanentAndExistingLegacyChannelIsNotRewritten() {
+        assertEquals(
+            "content://${context.packageName}.notification-tones/ding-v1/White%20Noise%20Ding",
+            NotificationTone.DING.uri(context).toString(),
+        )
+        assertEquals(
+            "content://${context.packageName}.notification-tones/pulse-v1/White%20Noise%20Pulse",
+            NotificationTone.PULSE.uri(context).toString(),
+        )
+        val legacy = Uri.parse("content://${context.packageName}.notification-tones/ding-v1")
+        val manager = context.getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(
+            NotificationChannel(
+                NotificationChannelSpec.DIRECT_MESSAGES.id,
+                "Existing direct messages",
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ).apply { setSound(legacy, NotificationTone.audioAttributes) },
+        )
+        NotificationChannels.ensureChannels(context)
+        assertEquals(legacy, manager.getNotificationChannel(NotificationChannelSpec.DIRECT_MESSAGES.id).sound)
+        assertEquals(
+            NotificationTone.DING.uri(context),
+            manager.getNotificationChannel(NotificationChannelSpec.MENTIONS.id).sound,
+        )
+    }
+
+    @Test
+    fun preferredProviderUrisExposeFriendlyRingtoneTitlesAndKeepLegacyAliases() {
+        Robolectric.setupContentProvider(
+            NotificationToneProvider::class.java,
+            "${context.packageName}.notification-tones",
+        )
+        NotificationTone.entries.forEach { tone ->
+            val expected = tone.filename.removeSuffix(".wav")
+            assertEquals(expected, tone.uri(context).lastPathSegment)
+            assertEquals(tone.token, tone.legacyUri(context).lastPathSegment)
+            assertEquals(expected, RingtoneManager.getRingtone(context, tone.uri(context)).getTitle(context))
+        }
+    }
+
+    @Test
     fun stableProviderUrisCanonicalizeForBackupWithoutChangingTokens() {
         val provider =
             Robolectric.setupContentProvider(
@@ -29,13 +71,27 @@ class NotificationTonesTest {
                 "${context.packageName}.notification-tones",
             )
         NotificationTone.entries.forEach { tone ->
-            val uri = tone.uri(context)
-            assertEquals(uri, provider.canonicalize(uri))
-            assertEquals(uri, provider.uncanonicalize(uri))
+            listOf(tone.legacyUri(context), tone.uri(context)).forEach { uri ->
+                assertEquals(uri, provider.canonicalize(uri))
+                assertEquals(uri, provider.uncanonicalize(uri))
+                assertEquals(NotificationTone.mimeType, provider.getType(uri))
+                provider.openAssetFile(uri, "r").use { assertTrue(it.length > 0) }
+            }
         }
         listOf(
             Uri.parse("content://${context.packageName}.notification-tones/unknown"),
             Uri.parse("content://other.notification-tones/ding-v1"),
+            Uri.parse("content://${context.packageName}.notification-tones/ding-v1/Other"),
+            NotificationTone.DING
+                .uri(context)
+                .buildUpon()
+                .appendPath("extra")
+                .build(),
+            NotificationTone.DING
+                .uri(context)
+                .buildUpon()
+                .appendQueryParameter("extra", "1")
+                .build(),
         ).forEach { uri ->
             assertNull(provider.canonicalize(uri))
             assertNull(provider.uncanonicalize(uri))

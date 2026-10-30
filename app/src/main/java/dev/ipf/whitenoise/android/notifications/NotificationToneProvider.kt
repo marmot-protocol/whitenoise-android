@@ -13,7 +13,7 @@ import java.io.FileNotFoundException
 class NotificationToneProvider : ContentProvider() {
     override fun onCreate(): Boolean = true
 
-    override fun canonicalize(uri: Uri): Uri? = tone(uri)?.uri(requireNotNull(context))
+    override fun canonicalize(uri: Uri): Uri? = tone(uri)?.let { uri }
 
     override fun uncanonicalize(uri: Uri): Uri? = canonicalize(uri)
 
