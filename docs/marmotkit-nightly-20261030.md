@@ -28,6 +28,18 @@ workflow builder `f7178f0e997e3d6d450fb0af45a32e4780ed862c`.
   build jobs, and the exact-source
   [`kotlin-bindings.sh`](https://github.com/marmot-protocol/mdk/blob/f7178f0e997e3d6d450fb0af45a32e4780ed862c/crates/marmot-uniffi/kotlin-bindings.sh)
   maps them to the unchanged `otlp-export,product-analytics-export` Cargo features.
+  Retained excerpts from that run's four "Build Android input" jobs:
+
+  ```text
+  Build Android input (arm64-v8a)    2026-10-30T05:51:44.6126846Z  OTLP_EXPORT: 1
+  Build Android input (arm64-v8a)    2026-10-30T05:51:44.6127705Z  PRODUCT_ANALYTICS_EXPORT: 1
+  Build Android input (armeabi-v7a)  2026-10-30T05:51:44.3466146Z  OTLP_EXPORT: 1
+  Build Android input (armeabi-v7a)  2026-10-30T05:51:44.3466965Z  PRODUCT_ANALYTICS_EXPORT: 1
+  Build Android input (x86)          2026-10-30T05:51:45.4353626Z  OTLP_EXPORT: 1
+  Build Android input (x86)          2026-10-30T05:51:45.4354076Z  PRODUCT_ANALYTICS_EXPORT: 1
+  Build Android input (x86_64)       2026-10-30T05:51:45.4014044Z  OTLP_EXPORT: 1
+  Build Android input (x86_64)       2026-10-30T05:51:45.4014294Z  PRODUCT_ANALYTICS_EXPORT: 1
+  ```
 - The baseline is master's official MarmotKit 0.14.0 pin, MDK
   `3fb4b4759ac676b0c21c4c3527074866c9fa4c89` ([0.14.0 record](marmotkit-0.14.0.md)).
   The nightly is 106 MDK commits ahead of it.
