@@ -7,7 +7,7 @@
       "max_registers": 13106,
       "basis": {
         "source_sha": "8342b521687aa1454e4a0e4beba97656b8f43d89",
-        "artifact": "stagingZapstoreRelease arm64-v8a, R8 9.4.24; production shares its code and differs only in flavor resources and BuildConfig values",
+        "artifact": "stagingZapstoreRelease arm64-v8a at the same source, R8 9.4.24; production's own sizes are in its release-runtime lane report",
         "largest_insns_code_units": 11671,
         "largest_registers": 270
       }

@@ -392,10 +392,13 @@ jobs:
           bash scripts/verify-baseline-profile.sh "$app_apk"
           printf 'apk=%s\n' "$app_apk" >> "$GITHUB_OUTPUT"
 
-      # benchmarkRelease is unminified D8 output, so this budget keeps benchmarked
-      # methods compilable; it never stands in for the shipping R8 budgets.
-      - name: Enforce benchmark DEX method budget
+      # benchmarkRelease is unminified D8 output. Its budget warns when a benchmarked
+      # method reaches ART's compile limit but never blocks merges; the shipping R8
+      # budgets fail in the release-runtime lanes.
+      - name: Check benchmark DEX method budget
+        id: dex_budget_benchmark
         if: matrix.phase == 'baseline'
+        continue-on-error: true
         env:
           DEX_BUDGET_APK_PATH: ${{ steps.baseline_apk.outputs.apk }}
           DEX_BUDGET_SOURCE_SHA: ${{ github.sha }}
@@ -405,6 +408,22 @@ jobs:
           --variant devZapstoreBenchmarkRelease
           --source-sha "$DEX_BUDGET_SOURCE_SHA"
           --report-dir app/build/reports/dex-method-budget
+
+      - name: Warn on benchmark DEX method budget
+        if: ${{ always() && matrix.phase == 'baseline' && steps.dex_budget_benchmark.outcome == 'failure' }}
+        run: >-
+          echo "::warning title=Benchmark DEX method budget::devZapstoreBenchmarkRelease failed its DEX method
+          budget check. A method at ART's compile limit makes macrobenchmarks measure the interpreter. See the
+          step summary and the dex-method-budget-benchmark artifact."
+
+      - name: Upload benchmark DEX method report
+        if: ${{ always() && matrix.phase == 'baseline' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: dex-method-budget-benchmark
+          path: app/build/reports/dex-method-budget/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Stage the existing APK for optional Maestro testing
         id: maestro_stage

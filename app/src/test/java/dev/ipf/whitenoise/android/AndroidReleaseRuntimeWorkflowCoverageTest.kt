@@ -23,7 +23,7 @@ class AndroidReleaseRuntimeWorkflowCoverageTest {
         assertRuntimeVerifierResilience(verifierSource())
     }
 
-    /** Both shipping lanes budget post-R8 method sizes of the APK they verify, before the emulator installs it. */
+    /** Both shipping lanes budget the APK they verify, and a budget failure never skips ART verification. */
     @Test
     fun shippingRuntimeLanesEnforcePostR8DexMethodBudgets() {
         val workflow = workflowSource()
@@ -186,7 +186,10 @@ class AndroidReleaseRuntimeWorkflowCoverageTest {
         )
     }
 
-    /** Asserts one lane budgets its located APK with the same build's mapping and fails before ART verification. */
+    /**
+     * Asserts one lane budgets its located APK with the same build's mapping before the emulator starts,
+     * still runs ART verification after a budget failure, and fails the job at the end.
+     */
     private fun assertDexMethodBudget(
         job: String,
         apkOutput: String,
@@ -195,7 +198,7 @@ class AndroidReleaseRuntimeWorkflowCoverageTest {
     ) {
         val budgetStart = job.indexOf("- name: Enforce post-R8 DEX method budgets")
         assertTrue("$variant must enforce post-R8 DEX method budgets", budgetStart >= 0)
-        val budgetStep = job.substring(budgetStart).substringBefore("\n      - name:")
+        val budgetStep = job.stepAt(budgetStart)
         assertTrue("$variant must measure the located APK", "\${{ $apkOutput }}" in budgetStep)
         assertTrue(
             "$variant must name methods with the mapping from the same build",
@@ -204,10 +207,32 @@ class AndroidReleaseRuntimeWorkflowCoverageTest {
         )
         assertTrue("$variant must record the exact source commit", "\${{ github.sha }}" in budgetStep)
         assertTrue(
-            "$variant must fail before the emulator installs the APK",
+            "$variant must measure before the emulator installs the APK",
             budgetStart < job.indexOf("- name: $emulatorStep"),
         )
+        assertTrue(
+            "a $variant budget failure must not skip ART verification",
+            "\n        id: dex_budget\n" in budgetStep && "continue-on-error: true" in budgetStep,
+        )
+        assertTrue(
+            "ART verification of $variant must run whatever the budget found",
+            "\n        if:" !in job.stepAt(job.indexOf("- name: $emulatorStep")),
+        )
+        assertTrue(
+            "the $variant budget step must not be disabled",
+            "\n        if:" !in budgetStep && "|| true" !in budgetStep,
+        )
+        val failStart = job.indexOf("- name: Fail on post-R8 DEX method budget")
+        assertTrue(
+            "$variant must fail the job after ART verification when its budget failed",
+            failStart > job.indexOf("- name: $emulatorStep") &&
+                "steps.dex_budget.outcome == 'failure'" in job.stepAt(failStart) &&
+                "exit 1" in job.stepAt(failStart),
+        )
     }
+
+    /** Returns the workflow step that starts at [start], up to the next step in the same job. */
+    private fun String.stepAt(start: Int): String = substring(start).substringBefore("\n      - name:")
 
     private fun assertRequiredCheckAggregation(aggregateJob: String) {
         assertTrue(

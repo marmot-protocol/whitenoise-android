@@ -12,7 +12,7 @@ import zipfile
 import zlib
 
 from scripts.dex_method_budget import (ART_PATHOLOGICAL_LIMIT, BudgetInputError, DexFile, load_config, main,
-                                       original_identity, read_mapping, read_uleb128)
+                                       markdown_summary, original_identity, read_mapping, read_uleb128)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MAP_ID = 'a' * 64
@@ -34,8 +34,9 @@ def uleb128(value):
 def build_dex(classes, strings_extra=(), version=b'039'):
     """Assemble a minimal valid DEX file.
 
-    Each class is (descriptor, methods) and each method is (name, params, returns,
-    insns, registers, virtual). insns None declares an abstract method without code.
+    Each class is (descriptor, methods) or (descriptor, methods, (static, instance)) field
+    counts, and each method is (name, params, returns, insns, registers, virtual). insns None
+    declares an abstract method without code.
     """
     strings, types, protos, method_ids = [], [], [], []
 
@@ -63,13 +64,13 @@ def build_dex(classes, strings_extra=(), version=b'039'):
         return protos.index(key)
 
     plan = []
-    for descriptor, methods in classes:
+    for descriptor, methods, *fields in classes:
         type_index(descriptor)
         entries = []
         for name, params, returns, insns, registers, virtual in methods:
             method_ids.append((type_index(descriptor), proto_index(params, returns), string(name)))
             entries.append((len(method_ids) - 1, insns, registers, virtual))
-        plan.append((descriptor, entries))
+        plan.append((descriptor, entries, fields[0] if fields else (0, 0)))
     for value in strings_extra:
         string(value)
 
@@ -99,13 +100,16 @@ def build_dex(classes, strings_extra=(), version=b'039'):
         proto_rows.append(struct.pack('<III', strings.index('V' + 'L' * len(params)), types.index(returns),
                                       parameters))
     class_rows = []
-    for descriptor, entries in plan:
+    for descriptor, entries, (statics, instances) in plan:
         code = {index: (place(struct.pack('<HHHHII', registers, 0, 0, 0, 0, insns) + bytes(2 * insns), 4)
                         if insns is not None else 0)
                 for index, insns, registers, _virtual in entries}
-        blob = bytearray(uleb128(0) + uleb128(0))
+        blob = bytearray(uleb128(statics) + uleb128(instances))
         groups = [[entry for entry in entries if not entry[3]], [entry for entry in entries if entry[3]]]
         blob += uleb128(len(groups[0])) + uleb128(len(groups[1]))
+        # Each field is a field_idx_diff and multi-byte access flags, which the parser must skip.
+        for field in range(statics + instances):
+            blob += uleb128(0 if field in (0, statics) else 1) + uleb128(0x4019)
         for group in groups:
             previous = 0
             for index, _insns, _registers, _virtual in sorted(group):
@@ -158,6 +162,7 @@ dev.example.ui.ScreenKt -> a:
       # {{"id":"com.android.tools.r8.residualsignature","signature":"(Lb;I)V"}}
     5:9:void dev.example.ui.ContentKt.Screen(dev.example.State,int):41:45 -> a
     5:9:void ScreenKt.Screen(State,int):0 -> a
+    10:12:void ScreenKt.Screen(State,int):0 -> a
     void abstractHook() -> b
 dev.example.State -> b:
     1:3:void apply(int):10:12 -> c
@@ -187,14 +192,14 @@ class DexFixture:
         """Replace the budget config with the given variant entries."""
         self.config.write_text(json.dumps({'schema': 1, 'variants': variants}), encoding='utf-8')
 
-    def run(self, variant='productionZapstoreRelease', environment=None, with_mapping=True):
+    def run(self, variant='productionZapstoreRelease', environment=None, with_mapping=True, top=3):
         """Run the CLI and return (exit code, stdout, stderr)."""
         stdout, stderr = io.StringIO(), io.StringIO()
         mapping = ['--mapping', str(self.mapping)] if with_mapping else []
         with patch.dict('os.environ', environment or {}, clear=True), \
                 contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             code = main(['--apk', str(self.apk), *mapping, '--variant', variant, '--source-sha', SOURCE_SHA,
-                         '--config', str(self.config), '--report-dir', str(self.reports), '--top', '3'])
+                         '--config', str(self.config), '--report-dir', str(self.reports), '--top', str(top)])
         return code, stdout.getvalue(), stderr.getvalue()
 
     def report(self, variant='productionZapstoreRelease'):
@@ -233,6 +238,13 @@ class DexParsingTest(unittest.TestCase):
                    for item in dex.methods()}
         self.assertEqual({('La;', 'a', '(Lb;I)V'): (900, 40), ('Lb;', 'c', '(I)V'): (120, 5),
                           ('Lb;', 'c', '(J)V'): (300, 7)}, methods)
+
+    def test_methods_after_static_and_instance_fields_keep_their_sizes(self):
+        """Encoded fields are skipped two LEB128 values at a time before methods are read."""
+        classes = [('La;', [('a', [], 'V', 70, 3, False), ('b', [], 'V', 90, 4, True)], (2, 3))]
+        dex = DexFile(build_dex(classes), 'classes.dex')
+        self.assertEqual({'a': (70, 3), 'b': (90, 4)},
+                         {item['name']: (item['insns_code_units'], item['registers']) for item in dex.methods()})
 
     def test_method_index_diffs_accumulate_across_many_methods(self):
         """Multi-byte method_idx_diff values decode against the right method_id."""
@@ -386,6 +398,64 @@ class BudgetCommandTest(unittest.TestCase):
         self.assertEqual(2, code)
         self.assertIn('classes2.dex: no R8 marker', stderr)
 
+    def test_method_exactly_at_its_budget_passes(self):
+        """A budget is the largest allowed size, so a method of exactly that size passes."""
+        fixture = DexFixture(self.root, variants={'productionZapstoreRelease': budget('shipping', 900, 40)})
+        self.assertEqual(0, fixture.run()[0])
+
+    def test_tied_sizes_keep_every_reported_row_named(self):
+        """Naming and reporting share one ordering, so a tie at the top-N cut never drops a name."""
+        classes = [('Lz;', [('a', [], 'V', 50, 1, False)]), ('La;', [('b', [], 'V', 50, 1, False)])]
+        variants = {'devZapstoreBenchmarkRelease': budget('benchmark', 1000, 100)}
+        fixture = DexFixture(self.root, classes=classes, marker=D8_MARKER, variants=variants)
+        self.assertEqual(0, fixture.run('devZapstoreBenchmarkRelease', with_mapping=False, top=1)[0])
+        report = fixture.report('devZapstoreBenchmarkRelease')
+        for row in report['largest_by_insns'] + report['largest_by_registers']:
+            self.assertTrue(row['original'], row)
+
+    def test_failure_text_offers_a_budget_review_only_below_arts_limit(self):
+        """At ART's limit the only remedy is a split; below it, a reviewed budget change is possible."""
+        fixture = DexFixture(self.root, variants={'productionZapstoreRelease': budget('shipping', 899, 100)})
+        self.assertIn('Split the method or review a new budget', fixture.run()[2])
+        classes = [('La;', [('a', [], 'V', ART_PATHOLOGICAL_LIMIT, 1, False)])]
+        variants = {'devZapstoreBenchmarkRelease': budget('benchmark', ART_PATHOLOGICAL_LIMIT - 1, 100)}
+        fixture = DexFixture(self.root, classes=classes, marker=D8_MARKER, variants=variants)
+        code, _stdout, stderr = fixture.run('devZapstoreBenchmarkRelease', with_mapping=False)
+        self.assertEqual(1, code)
+        self.assertIn('Split the method (docs/performance.md', stderr)
+        self.assertNotIn('review a new budget', stderr)
+
+    def test_variant_flag_is_checked_against_output_metadata(self):
+        """AGP's output-metadata.json beside the APK must name the budgeted variant and list the APK."""
+        fixture = DexFixture(self.root)
+        metadata = self.root / 'output-metadata.json'
+        metadata.write_text(json.dumps({'variantName': 'stagingZapstoreRelease',
+                                        'elements': [{'outputFile': 'app.apk'}]}), encoding='utf-8')
+        self.assertEqual(2, fixture.run()[0])
+        metadata.write_text(json.dumps({'variantName': 'productionZapstoreRelease',
+                                        'elements': [{'outputFile': 'app.apk'}]}), encoding='utf-8')
+        self.assertEqual(0, fixture.run()[0])
+        self.assertEqual('output-metadata.json', fixture.report()['provenance']['variant_check'])
+        metadata.write_text(json.dumps({'variantName': 'productionZapstoreRelease',
+                                        'elements': [{'outputFile': 'other.apk'}]}), encoding='utf-8')
+        self.assertEqual(2, fixture.run()[0])
+        for malformed in ('{not json', json.dumps({'variantName': 'productionZapstoreRelease'})):
+            metadata.write_text(malformed, encoding='utf-8')
+            self.assertEqual(2, fixture.run()[0])
+        metadata.unlink()
+        self.assertEqual(0, fixture.run()[0])
+        self.assertTrue(fixture.report()['provenance']['variant_check'].startswith('unchecked'))
+
+    def test_step_summary_escapes_merged_method_names(self):
+        """Merged R8 sources joined by " | " stay inside one Markdown table cell."""
+        fixture = DexFixture(self.root)
+        fixture.run()
+        report = fixture.report()
+        report['largest_by_insns'][0]['original'] = 'a.B.c() -> void | a.B.d() -> void'
+        row = [line for line in markdown_summary(report).splitlines() if 'a.B.c()' in line][0]
+        self.assertIn('`a.B.c() -> void \\| a.B.d() -> void`', row)
+        self.assertEqual(6, len(re.findall(r'(?<!\\)\|', row)))
+
     def test_missing_or_malformed_inputs_fail(self):
         """Missing APK, mapping or DEX, and DEX without an R8 marker, all fail rather than pass."""
         fixture = DexFixture(self.root)
@@ -404,6 +474,18 @@ class BudgetCommandTest(unittest.TestCase):
         code, _stdout, stderr = fixture.run()
         self.assertEqual(2, code)
         self.assertIn('no R8 marker', stderr)
+        abstract_only = [('La;', [('a', [], 'V', None, 0, False)])]
+        self.assertEqual(2, DexFixture(self.root, classes=abstract_only).run()[0])
+        variants = {'devZapstoreBenchmarkRelease': budget('benchmark', 1000, 100)}
+        unmarked = DexFixture(self.root, variants=variants, marker='plain string')
+        self.assertEqual(2, unmarked.run('devZapstoreBenchmarkRelease', with_mapping=False)[0])
+
+    def test_mapping_with_another_min_api_fails(self):
+        """The map's min_api must equal the R8 marker's, or it describes another build."""
+        fixture = DexFixture(self.root, mapping=SAMPLE_MAPPING.replace('# min_api: 30', '# min_api: 31'))
+        code, _stdout, stderr = fixture.run()
+        self.assertEqual(2, code)
+        self.assertIn('min_api', stderr)
 
     def test_incomplete_or_unsafe_budget_configs_fail(self):
         """Unknown variants, extra keys, budgets at ART's limit and unbound bases are rejected."""
@@ -431,6 +513,20 @@ class BudgetCommandTest(unittest.TestCase):
 
 class CommittedBudgetTest(unittest.TestCase):
     """The committed config covers exactly the variants CI measures, each with a sound budget."""
+
+    def test_benchmark_budget_only_warns_and_always_keeps_its_report(self):
+        """A D8-only benchmark size never fails the required build check, and its report survives a pass."""
+        workflow = (REPO_ROOT / '.github/workflows/android-ci.yml').read_text(encoding='utf-8')
+        steps = {step.split('\n', 1)[0]: step for step in workflow.split('\n      - name: ')[1:]}
+        check = steps['Check benchmark DEX method budget']
+        self.assertIn('\n        id: dex_budget_benchmark\n', check)
+        self.assertIn('\n        continue-on-error: true\n', check)
+        self.assertIn('--variant devZapstoreBenchmarkRelease', check)
+        warn = steps['Warn on benchmark DEX method budget']
+        self.assertIn("always() && matrix.phase == 'baseline' && steps.dex_budget_benchmark.outcome == 'failure'", warn)
+        self.assertIn('::warning', warn)
+        self.assertNotIn('exit 1', warn)
+        self.assertIn("always() && matrix.phase == 'baseline'", steps['Upload benchmark DEX method report'])
 
     def test_every_measured_variant_has_a_reviewed_budget_of_the_right_kind(self):
         """Workflow --variant arguments and config entries match, and kinds follow the build type."""

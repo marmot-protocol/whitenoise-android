@@ -160,8 +160,11 @@ jobs:
           fi
           printf 'path=%s\n' "${matches[0]}" >> "$GITHUB_OUTPUT"
 
-      # Measure the exact optimized DEX that ART verifies below, before the emulator starts.
+      # Measure the exact optimized DEX before the emulator starts. A failure is
+      # reported by the job's last step, so ART verification below still runs.
       - name: Enforce post-R8 DEX method budgets
+        id: dex_budget
+        continue-on-error: true
         env:
           DEX_BUDGET_APK_PATH: ${{ steps.apk.outputs.path }}
           DEX_BUDGET_SOURCE_SHA: ${{ github.sha }}
@@ -206,6 +209,12 @@ jobs:
           path: app/build/reports/release-runtime-verify/
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Fail on post-R8 DEX method budget
+        if: ${{ always() && steps.dex_budget.outcome == 'failure' }}
+        run: |
+          echo 'The post-R8 DEX method budget failed; see "Enforce post-R8 DEX method budgets".' >&2
+          exit 1
 
   verify-staging-android17:
     name: Verify staging APK on Android 17 ART
@@ -355,7 +364,10 @@ jobs:
           done
 
       # Budget the shipping ARM64 artifact, whose DEX the step above proved identical.
+      # A failure is reported by the job's last step, so ART verification still runs.
       - name: Enforce post-R8 DEX method budgets
+        id: dex_budget
+        continue-on-error: true
         env:
           DEX_BUDGET_APK_PATH: ${{ steps.apks.outputs.arm64_v8a_path }}
           DEX_BUDGET_SOURCE_SHA: ${{ github.sha }}
@@ -452,6 +464,12 @@ jobs:
           path: app/build/reports/release-runtime-verify/
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Fail on post-R8 DEX method budget
+        if: ${{ always() && steps.dex_budget.outcome == 'failure' }}
+        run: |
+          echo 'The post-R8 DEX method budget failed; see "Enforce post-R8 DEX method budgets".' >&2
+          exit 1
 
   verify:
     name: Verify minified APK on ART

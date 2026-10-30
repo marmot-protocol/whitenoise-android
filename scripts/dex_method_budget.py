@@ -12,8 +12,8 @@ import zipfile
 import zlib
 
 # ART's optimizing compiler, both dex2oat and the JIT, refuses any method whose
-# code_item instruction or register count reaches UINT16_MAX / 4. That method
-# then runs interpreted forever, with no JIT fallback on devices that disable it.
+# code_item instruction or register count reaches UINT16_MAX / 4, so that method
+# always runs in the interpreter.
 # See Compiler::IsPathologicalCase in AOSP art/compiler/compiler.cc.
 ART_PATHOLOGICAL_LIMIT = 0xFFFF // 4
 SUPPORTED_DEX_VERSIONS = {b'035', b'037', b'038', b'039', b'040'}
@@ -465,7 +465,24 @@ def require_variant_shape(kind, classes):
                                'benchmark sizes must never stand in for shipping sizes')
     if kind == 'benchmark' and renamed:
         raise BudgetInputError('a benchmark budget was given an obfuscated artifact; '
-                               'pass the benchmarkRelease APK and mapping')
+                               'pass the benchmarkRelease APK without --mapping')
+
+
+def variant_evidence(apk, variant):
+    """Check the variant flag against AGP's output-metadata.json beside the APK, when it is there."""
+    metadata = Path(apk).parent / 'output-metadata.json'
+    if not metadata.is_file():
+        return 'unchecked: no output-metadata.json beside the APK'
+    try:
+        outputs = json.loads(metadata.read_text(encoding='utf-8'))
+        files = {element['outputFile'] for element in outputs['elements']}
+        name = outputs['variantName']
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        raise BudgetInputError(f'{metadata}: malformed output-metadata.json') from error
+    if name != variant or Path(apk).name not in files:
+        raise BudgetInputError(f'{apk}: output-metadata.json names variant {name}, not {variant}, '
+                               'or does not list this APK')
+    return 'output-metadata.json'
 
 
 def require_bound_mapping(markers, header):
@@ -493,18 +510,21 @@ def describe(method, identities, budget):
     }
 
 
+def ranked(methods, size):
+    """Order methods by one size, largest first, with a total tie-break so every caller sees the same top N."""
+    return sorted(methods, key=lambda item: (-item[size], item['dex'], item['class'], item['name'], item['proto']))
+
+
 def build_report(args, budget, measured, header, identities):
     """Assemble the artifact-bound report and the list of budget violations."""
-    methods, dex_files, markers, app_metadata, compiler = measured
-    by_insns = sorted(methods, key=lambda item: (-item['insns_code_units'], item['dex'], item['class'],
-                                                 item['name'], item['proto']))
-    by_registers = sorted(methods, key=lambda item: (-item['registers'], item['dex'], item['class'],
-                                                     item['name'], item['proto']))
+    methods, dex_files, markers, app_metadata, compiler, variant_check = measured
+    by_insns, by_registers = ranked(methods, 'insns_code_units'), ranked(methods, 'registers')
     violations = [item for item in by_insns if item['insns_code_units'] > budget['max_insns_code_units']]
     violations += [item for item in by_registers if item['registers'] > budget['max_registers']
                    and item not in violations]
     provenance = {
         'variant': args.variant,
+        'variant_check': variant_check,
         'kind': budget['kind'],
         'source_sha': args.source_sha,
         'apk': {'path': str(args.apk), 'sha256': sha256_file(args.apk), 'bytes': Path(args.apk).stat().st_size},
@@ -542,7 +562,9 @@ def markdown_summary(report):
              f'(ART skips compilation at {report["art_pathological_limit"]}).', '',
              '| Code units | Registers | Method | Residual | DEX |', '| ---: | ---: | --- | --- | --- |']
     for row in report['largest_by_insns'][:10]:
-        lines.append(f'| {row["insns_code_units"]} | {row["registers"]} | `{row["original"]}` | '
+        # A merged R8 method lists its sources joined by " | ", which would split the table cell.
+        original = row['original'].replace('|', '\\|')
+        lines.append(f'| {row["insns_code_units"]} | {row["registers"]} | `{original}` | '
                      f'`{row["residual"]}` | {row["dex"]} |')
     if report['violations']:
         lines += ['', f'**{len(report["violations"])} method(s) exceed the reviewed budget.**']
@@ -576,8 +598,9 @@ def run(args):
     if not methods:
         raise BudgetInputError(f'{args.apk}: no method has a code_item')
     compiler = artifact_compiler(budget['kind'], markers, args.mapping is not None)
-    by_insns = sorted(methods, key=lambda item: -item['insns_code_units'])[:args.top]
-    by_registers = sorted(methods, key=lambda item: -item['registers'])[:args.top]
+    variant_check = variant_evidence(args.apk, args.variant)
+    by_insns = ranked(methods, 'insns_code_units')[:args.top]
+    by_registers = ranked(methods, 'registers')[:args.top]
     flagged = [item for item in methods if item['insns_code_units'] > budget['max_insns_code_units']
                or item['registers'] > budget['max_registers']]
     named = by_insns + by_registers + flagged
@@ -597,7 +620,8 @@ def run(args):
             residual_class = item['class'][1:-1].replace('/', '.')
             identities[(item['dex'], item['class'], item['name'], item['proto'])] = original_identity(
                 item, classes, original_to_residual, runs.get((residual_class, item['name']), []))
-    report = build_report(args, budget, (methods, dex_files, markers, app_metadata, compiler), header, identities)
+    measured = (methods, dex_files, markers, app_metadata, compiler, variant_check)
+    report = build_report(args, budget, measured, header, identities)
     summary = markdown_summary(report)
     if args.report_dir:
         args.report_dir.mkdir(parents=True, exist_ok=True)
@@ -609,10 +633,15 @@ def run(args):
             stream.write(summary)
     print(summary)
     for row in report['violations']:
+        # A budget already at ART's limit cannot be raised, so splitting the method is the only remedy.
+        over = [key for key, size in (('max_insns_code_units', 'insns_code_units'), ('max_registers', 'registers'))
+                if row[size] > budget[key]]
+        raisable = any(budget[key] < ART_PATHOLOGICAL_LIMIT - 1 for key in over)
         print(f'error: {row["original"]} [{row["residual"]} in {row["dex"]}] has '
               f'{row["insns_code_units"]} code units / {row["registers"]} registers; budget '
-              f'{budget["max_insns_code_units"]} / {budget["max_registers"]}. Split the method or '
-              'review a new budget (docs/performance.md#dex-method-size-budgets).', file=sys.stderr)
+              f'{budget["max_insns_code_units"]} / {budget["max_registers"]}. Split the method'
+              f'{" or review a new budget" if raisable else ""} '
+              '(docs/performance.md#dex-method-size-budgets).', file=sys.stderr)
     return EXIT_VIOLATION if report['violations'] else 0
 
 
