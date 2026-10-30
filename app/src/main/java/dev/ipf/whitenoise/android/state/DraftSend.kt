@@ -157,6 +157,7 @@ private fun MarmotInterface.saveRevisionOrNull(
     }
 }
 
+/** Sends the stored draft, or returns null when MDK refuses it in a way the direct send can retry. */
 @Suppress("SwallowedException") // Conflicts and descriptor mismatches are handled by the direct-send fallback.
 private suspend fun MarmotInterface.sendDraftOrNull(
     accountRef: String,
@@ -170,5 +171,9 @@ private suspend fun MarmotInterface.sendDraftOrNull(
     } catch (invalid: MarmotKitException.InvalidMessageDraft) {
         null
     } catch (invalid: MarmotKitException.InvalidMediaReference) {
+        null
+    } catch (stale: MarmotKitException.MediaReferenceStaleEpoch) {
+        null
+    } catch (unsettled: MarmotKitException.MediaReferenceEpochUnsettled) {
         null
     }

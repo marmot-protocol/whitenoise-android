@@ -322,6 +322,8 @@ private fun isTerminalAttachmentDownloadFailure(failure: Throwable): Boolean =
     when (failure) {
         is CancellationException,
         is MarmotKitException.InvalidMediaReference,
+        is MarmotKitException.MediaReferenceStaleEpoch,
+        is MarmotKitException.MediaReferenceEpochUnsettled,
         is MarmotKitException.MediaAttachmentRejected,
         is MarmotKitException.MediaUnfetchable,
         is MarmotKitException.AttachmentModeRequired,

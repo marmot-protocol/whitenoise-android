@@ -91,6 +91,11 @@ object DiagnosticFormatter {
                 // Notices carry no relay, message or key identities; the list
                 // itself is re-read from the runtime, never copied here.
                 "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] history notices changed"
+            is MarmotEventFfi.LinkedDevicesChanged ->
+                // The device list is re-read from the runtime, never copied here.
+                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] linked devices changed"
+            is MarmotEventFfi.KeyPackageRefreshOverdueChanged ->
+                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] key package refresh overdue changed"
         }
 
     private const val MAX_ERROR_LEN = 80
@@ -225,7 +230,7 @@ object DiagnosticFormatter {
             marmotError is MarmotKitException.DuplicateIdentity -> "ALREADY_EXISTS"
             marmotError is MarmotKitException.InvalidChatPin ||
                 marmotError is MarmotKitException.InvalidMessageDraft ||
-                marmotError is MarmotKitException.InvalidMediaReference ||
+                marmotError.isMediaReferenceRefusal() ||
                 marmotError is MarmotKitException.MediaAttachmentRejected ||
                 marmotError is MarmotKitException.InvalidHex ||
                 marmotError is MarmotKitException.InvalidIdentity ||
@@ -321,3 +326,9 @@ object DiagnosticFormatter {
     private const val MAX_CODE_LEN = 64
     private const val MAX_CAUSE_DEPTH = 8
 }
+
+/** MDK refused a media reference: unusable, or encrypted at an epoch the group has left or not yet settled. */
+private fun MarmotKitException?.isMediaReferenceRefusal(): Boolean =
+    this is MarmotKitException.InvalidMediaReference ||
+        this is MarmotKitException.MediaReferenceStaleEpoch ||
+        this is MarmotKitException.MediaReferenceEpochUnsettled

@@ -2005,9 +2005,9 @@ class ConversationSendRetryIntegrationTest {
                 return publishLock {
                     ensureCurrent()
                     onPublish()
-                    throw MarmotKitException.InvalidMediaReference(STALE_EPOCH_DETAILS)
+                    throw staleEpochRejection()
                 }
-            } catch (rejection: MarmotKitException.InvalidMediaReference) {
+            } catch (rejection: MarmotKitException.MediaReferenceStaleEpoch) {
                 last = rejection
             }
         }
