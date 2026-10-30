@@ -925,15 +925,14 @@ The domain canary gains a per-pick case: a second pick of the same conversation
 gets a fresh process holding nothing of the first, the first pick's later input
 returns to its own worker, and after the pick is retired its next input meets a
 new process with nothing left behind. Containment acceptance, which runs it,
-passed 35 of 35 on API 30 and API 36 with the build of `4562586f8`. The final
-build only routes retirement through the transport interface; it passed 35 of 35
-on API 36, and 34 of 35 in two API 30 runs, the second on a freshly booted
-emulator. A run between them failed the same test and also refused to overwrite
-the first run's baseline report, which had not been moved aside. The failing
-test each time was `AvCapabilityLogCaptureDeviceTest`, whose parent process did
-not see its own 512th log line from logd within 3 s. That test is unchanged from
-master and outside the still-image path, and in isolation on that emulator it
-failed 3 of 6 runs on the `4562586f8` build and 2 of 6 on the final one.
+passed 35 of 35 on API 30 and API 36 with the final build. Three earlier API 30
+runs on the build of `a9443e30e`, which differed from it only in comment text,
+each failed `AvCapabilityLogCaptureDeviceTest`: the parent process did not see
+its own 512th log line from logd within 3 s. One of them also refused to
+overwrite an earlier run's baseline report, which had not been moved aside. That
+test is unchanged from master and outside the still-image path, and in isolation
+on that emulator it failed 3 of 6 runs on the `4562586f8` build too, which had
+passed 35 of 35 before.
 
 #### Rejected alternatives
 
