@@ -13,6 +13,10 @@ import java.io.FileNotFoundException
 class NotificationToneProvider : ContentProvider() {
     override fun onCreate(): Boolean = true
 
+    override fun canonicalize(uri: Uri): Uri? = tone(uri)?.uri(requireNotNull(context))
+
+    override fun uncanonicalize(uri: Uri): Uri? = canonicalize(uri)
+
     override fun getType(uri: Uri): String? = tone(uri)?.let { NotificationTone.mimeType }
 
     override fun openAssetFile(

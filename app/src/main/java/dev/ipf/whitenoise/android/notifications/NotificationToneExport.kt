@@ -77,8 +77,13 @@ internal object NotificationToneExport {
             .use { cursor ->
                 while (cursor.moveToNext()) {
                     val name = cursor.getString(1)
-                    val stem = Regex.escape(tone.filename.removeSuffix(".wav"))
-                    if (name != tone.filename && !Regex("""$stem \([0-9]+\)\.wav""").matches(name)) continue
+                    val filenames = listOf(tone.filename, "whitenoise_${tone.token}.wav")
+                    val knownName =
+                        filenames.any { filename ->
+                            val stem = Regex.escape(filename.removeSuffix(".wav"))
+                            name == filename || Regex("""$stem \([0-9]+\)\.wav""").matches(name)
+                        }
+                    if (!knownName) continue
                     val uri = ContentUris.withAppendedId(collection, cursor.getLong(0))
                     // Bounded comparison; a changed same-name file never becomes an accepted tone.
                     val matches = checkNotNull(resolver.openInputStream(uri)).use { matches(it, expected) }
@@ -110,6 +115,7 @@ internal object NotificationToneExport {
         tone: NotificationTone,
     ): ContentValues =
         ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, tone.filename)
             put(MediaStore.MediaColumns.IS_PENDING, 0)
             put(MediaStore.Audio.Media.IS_NOTIFICATION, 1)
             put(MediaStore.Audio.Media.TITLE, context.getString(tone.title))

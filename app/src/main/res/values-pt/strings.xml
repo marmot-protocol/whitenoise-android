@@ -2513,7 +2513,7 @@
     <string name="notification_tone_add_detail">Disponibilizar estes tons no seletor de sons do Android.</string>
     <string name="notification_tone_added">Adicionados. Abra uma categoria abaixo e depois Som para escolher um tom. Alguns dispositivos os mostram em Meus sons.</string>
     <string name="notification_tone_add_failed">Não foi possível adicionar os sons. Tente novamente ou mantenha o som atual do Android.</string>
-    <string name="notification_tone_scope">Ouvir ou adicionar sons não altera os seus alertas. Escolha um som no Android para cada categoria, conversa ou pessoa. As conversas existentes e as configurações pessoais mantêm os próprios sons. Novas categorias de mensagens usam Ding; categorias silenciosas e personalizadas permanecem inalteradas. As prévias usam o volume das notificações e respeitam o modo silencioso e Não perturbe.</string>
+    <string name="notification_tone_scope">Ouvir ou adicionar sons não altera os seus alertas. Escolha um som no Android para cada categoria, conversa ou pessoa. As conversas e pessoas com um som próprio atribuído explicitamente mantêm esse som. Novas categorias de mensagens usam Ding; categorias silenciosas e personalizadas permanecem inalteradas. As prévias usam o volume das notificações e respeitam o modo silencioso e Não perturbe.</string>
     <string name="notification_tone_android">Som do Android</string>
     <string name="notification_tone_silent">Silencioso</string>
     <string name="notification_tone_off">Desativado</string>

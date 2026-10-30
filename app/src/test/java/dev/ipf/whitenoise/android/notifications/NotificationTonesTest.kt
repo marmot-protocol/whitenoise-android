@@ -22,6 +22,29 @@ class NotificationTonesTest {
     private val context: Context get() = RuntimeEnvironment.getApplication()
 
     @Test
+    fun stableProviderUrisCanonicalizeForBackupWithoutChangingTokens() {
+        val provider =
+            Robolectric.setupContentProvider(
+                NotificationToneProvider::class.java,
+                "${context.packageName}.notification-tones",
+            )
+        NotificationTone.entries.forEach { tone ->
+            val uri = tone.uri(context)
+            assertEquals(uri, provider.canonicalize(uri))
+            assertEquals(uri, provider.uncanonicalize(uri))
+        }
+        listOf(
+            Uri.parse("content://${context.packageName}.notification-tones/unknown"),
+            Uri.parse("content://other.notification-tones/ding-v1"),
+        ).forEach { uri ->
+            assertNull(provider.canonicalize(uri))
+            assertNull(provider.uncanonicalize(uri))
+        }
+        assertEquals("White Noise Ding.wav", NotificationTone.DING.filename)
+        assertEquals("White Noise Pulse.wav", NotificationTone.PULSE.filename)
+    }
+
+    @Test
     fun onlyFreshMessageCategoriesUseSignatureAndExistingSilenceSurvives() {
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(

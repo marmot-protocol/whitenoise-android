@@ -19,7 +19,11 @@ internal enum class NotificationTone(
 
     fun uri(context: Context): Uri = Uri.parse("content://${context.packageName}.notification-tones/$token")
 
-    val filename: String get() = "whitenoise_$token.wav"
+    val filename: String get() =
+        when (this) {
+            DING -> "White Noise Ding.wav"
+            PULSE -> "White Noise Pulse.wav"
+        }
 
     companion object {
         val mimeType: String get() =

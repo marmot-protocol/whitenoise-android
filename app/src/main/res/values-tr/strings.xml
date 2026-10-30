@@ -2511,7 +2511,7 @@
     <string name="notification_tone_add_detail">Bu tonları Android ses seçicisinde kullanılabilir hâle getirin.</string>
     <string name="notification_tone_added">Eklendi. Bir ton seçmek için aşağıdan bir kategoriyi, ardından Ses seçeneğini açın. Bazı cihazlarda bu tonlar Seslerim altında listelenir.</string>
     <string name="notification_tone_add_failed">Sesler eklenemedi. Tekrar deneyin veya mevcut Android sesinizi koruyun.</string>
-    <string name="notification_tone_scope">Sesleri önizlemek veya eklemek uyarılarınızı değiştirmez. Android’de her kategori, sohbet veya kişi için bir ses seçin. Mevcut sohbetler ve kişisel ayarlar kendi seslerini korur. Yeni mesaj kategorileri Ding kullanır; sessiz ve özelleştirilmiş kategoriler değişmez. Önizlemeler bildirim ses düzeyini kullanır, Sessiz ve Rahatsız Etmeyin modlarına uyar.</string>
+    <string name="notification_tone_scope">Sesleri önizlemek veya eklemek uyarılarınızı değiştirmez. Android’de her kategori, sohbet veya kişi için bir ses seçin. Kendi sesi açıkça atanmış sohbetler ve kişiler bu sesi korur. Yeni mesaj kategorileri Ding kullanır; sessiz ve özelleştirilmiş kategoriler değişmez. Önizlemeler bildirim ses düzeyini kullanır, Sessiz ve Rahatsız Etmeyin modlarına uyar.</string>
     <string name="notification_tone_android">Android sesi</string>
     <string name="notification_tone_silent">Sessiz</string>
     <string name="notification_tone_off">Kapalı</string>

@@ -30,6 +30,24 @@ class NotificationToneExportTest {
     private val context: Context get() = RuntimeEnvironment.getApplication()
 
     @Test
+    fun legacyOwnedCopiesKeepTheirUrisAndReceiveFriendlyNames() {
+        val provider = Store(context)
+        ShadowContentResolver.registerProviderInternal(MediaStore.AUTHORITY, provider)
+        NotificationToneExport.addToAndroid(context)
+        val originalUris = provider.rows.keys.toList()
+        provider.rows.values.zip(NotificationTone.entries).forEach { (row, tone) ->
+            row.values.put(MediaStore.MediaColumns.DISPLAY_NAME, "whitenoise_${tone.token} (1).wav")
+        }
+        NotificationToneExport.addToAndroid(context)
+        assertEquals(originalUris, provider.rows.keys.toList())
+        assertEquals(2, provider.insertCount)
+        assertEquals(0, provider.deleteCount)
+        provider.rows.values.zip(NotificationTone.entries).forEach { (row, tone) ->
+            assertEquals(tone.filename, row.values.getAsString(MediaStore.MediaColumns.DISPLAY_NAME))
+        }
+    }
+
+    @Test
     fun repeatedImportReusesExactOwnedBytesAndRepairsPickerMetadata() {
         val provider = Store(context)
         ShadowContentResolver.registerProviderInternal(MediaStore.AUTHORITY, provider)
