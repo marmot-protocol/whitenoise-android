@@ -89,7 +89,9 @@ domain and that only member-pinned bytes reach a conversation's worker;
 check that every decode of one pick, edited or not, runs in that pick's own
 outgoing worker and never another pick's, also under concurrency, and
 `ConversationDraftRestorationPlanTest` that each restored draft attachment is its
-own pick. `MediaWorkerDomainTest` adds a ten-pick concurrency canary, parallel
+own pick. `PickWorkerRetirementTest` checks that removing a photo or a document
+retires exactly that pick's worker, and that sending retires a document's worker
+at once while a photo keeps its worker for its just-sent poster. `MediaWorkerDomainTest` adds a ten-pick concurrency canary, parallel
 eviction for an album of new picks, and the retirement of an idle or busy pick's
 domain. Those JVM fixtures exercise owner ordering only.
 
