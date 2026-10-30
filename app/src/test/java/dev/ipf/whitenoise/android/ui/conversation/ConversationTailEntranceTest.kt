@@ -143,6 +143,40 @@ class ConversationTailEntranceTest {
         assertEquals("the pinned frame starts the shift", rowHeightPx, harness.entrance.shiftPx, 1f)
     }
 
+    /** A follow that reaches the tail late still gets its whole entrance; the hold outlasts its fixed delay. */
+    @Test
+    fun aLateTailFollowKeepsTheEnteringRowUntilItsMotionSettles() {
+        val harness = TailHarness().apply { rows = rows + (1..6).map { "h$it" } }
+        setTailContent(harness, composerPadding = COMPOSER_PADDING)
+        composeRule.mainClock.autoAdvance = false
+        composeRule.waitForIdle()
+
+        composeRule.runOnUiThread {
+            harness.rows = listOf("m4") + harness.rows
+            harness.latestId = "m4"
+            Snapshot.sendApplyNotifications()
+        }
+        composeRule.mainClock.advanceTimeBy(LATE_FOLLOW_MILLIS)
+        composeRule.runOnIdle {
+            harness.followedId = "m4"
+            harness.listState.requestScrollToItem(0, 0)
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+        seenTop("m3")
+        assertEquals("the late pin still starts the shift", rowHeightPx, harness.entrance.shiftPx, 1f)
+
+        // Past the fixed 260ms hold, but inside the 180ms motion that began at the pin.
+        composeRule.mainClock.advanceTimeBy(MID_MOTION_MILLIS)
+        seenTop("m3")
+        assertEquals("the entering row stays held mid-motion", "m4", harness.entrance.enteringItemId)
+        assertTrue("the motion is still running", harness.entrance.shiftPx > 0f)
+
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.waitForIdle()
+        assertEquals("the hold ends once the motion settles", null, harness.entrance.enteringItemId)
+        assertEquals("the shift returns to zero", 0f, harness.entrance.shiftPx, 0f)
+    }
+
     /**
      * Advances through the entrance and checks both rows rise monotonically, as one, through
      * in-between positions. The fifth frame, well inside the 180ms, is recorded as the baseline.
@@ -430,5 +464,11 @@ class ConversationTailEntranceTest {
 
         /** Bottom padding under the composer, where a reversed list lays out rows it has not scrolled to yet. */
         val COMPOSER_PADDING = 100.dp
+
+        /** A tail follow that lands after the motion's own 180ms would end inside the fixed 260ms hold. */
+        const val LATE_FOLLOW_MILLIS = 150L
+
+        /** From the late pin, past the fixed hold's end but before the 180ms motion settles. */
+        const val MID_MOTION_MILLIS = 130L
     }
 }

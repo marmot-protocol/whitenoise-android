@@ -3238,7 +3238,7 @@ internal fun ConversationScreen(
             motionEnabled = conversationMotionEnabled,
             ownerKey = controller,
             // Stable-key anchoring keeps the previous newest row first until the follow scrolls to the new one.
-            tailReached = { currentTailIndex?.let { listState.firstVisibleItemIndex <= it } == true },
+            tailReached = { listState.firstVisibleItemIndex <= currentTailIndex },
         )
     TailEntranceSendClaim(tailEntrance, claimedSendPresentation)
 

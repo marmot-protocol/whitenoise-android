@@ -86,6 +86,11 @@ internal class ConversationTailEntrance internal constructor(
             }
         }
 
+    /** Suspends until the motion started for [itemId] has finished; returns at once if it never started. */
+    internal suspend fun awaitMotionFinished(itemId: String) {
+        if (startedForItemId == itemId) animation?.join()
+    }
+
     /** How far below its laid-out slot every row is drawn right now, in pixels. */
     var shiftPx: Float by mutableFloatStateOf(0f)
         private set
@@ -181,6 +186,9 @@ internal fun rememberConversationTailEntrance(
         hold.release =
             scope.launch {
                 delay(CONVERSATION_TAIL_ENTRANCE_MILLIS + CONVERSATION_TAIL_ENTRANCE_SETTLE_MILLIS)
+                // A motion that began late, or runs under a slower animator scale, keeps its row until it settles.
+                // A tail the follow never reached started nothing, so the hold still ends here.
+                entrance.awaitMotionFinished(candidate)
                 hold.itemId = null
                 // Rows read the entering id only while measuring, so releasing it here relayouts them
                 // instead of recomposing the transcript.
