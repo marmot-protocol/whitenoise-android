@@ -5,6 +5,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.ui.settings.quickFolderFields
 import dev.ipf.whitenoise.android.ui.settings.quickMode
 import dev.ipf.whitenoise.android.ui.settings.resetQuickFilters
+import dev.ipf.whitenoise.android.ui.settings.sameQuickFilterPayload
 import dev.ipf.whitenoise.android.ui.settings.supportsQuickFilters
 import dev.ipf.whitenoise.android.ui.settings.toggleQuickFilter
 import org.junit.Assert.assertEquals
@@ -89,6 +90,7 @@ class SmartFolderCodecTest {
         assertFalse(SmartFolderCodec.valid(SmartFolderFilter.Group(children = listOf(SmartFolderFilter.Group()))))
     }
 
+    /** Every paired mode round-trips through the codec, and clearing a choice leaves the other conditions in order. */
     @Test fun pairedPredicatesRoundTripEveryModeAndRetainUneditedOrder() {
         val accepted = SmartFolderFilter.Condition(FolderField.ACCEPTED)
         val archived = SmartFolderFilter.Condition(FolderField.ARCHIVED, FolderMode.NONE)
@@ -113,6 +115,7 @@ class SmartFolderCodecTest {
         assertEquals(listOf(accepted), withUnread.resetQuickFilters().children)
     }
 
+    /** Rules the paired controls cannot represent ignore quick edits and keep their exact encoding. */
     @Test fun unsupportedAndRepeatedTreesRejectQuickEditsWithoutChangingTheirEncoding() {
         val unread = SmartFolderFilter.Condition(FolderField.UNREAD)
         val roots =
@@ -149,6 +152,23 @@ class SmartFolderCodecTest {
         val empty = SmartFolderFilter.Group()
         assertEquals(empty, empty.toggleQuickFilter(FolderField.UNREAD, FolderMode.DIRECT))
         assertEquals(empty, empty.toggleQuickFilter(FolderField.ACCEPTED, FolderMode.PRESENT))
+    }
+
+    /** Quick payloads that differ only in condition order are one rule; any other difference still counts. */
+    @Test fun quickPayloadsCompareWithoutConditionOrder() {
+        val archived = SmartFolderFilter.Condition(FolderField.ARCHIVED, FolderMode.NONE)
+        val accepted = SmartFolderFilter.Condition(FolderField.ACCEPTED)
+        val saved = SmartFolderCodec.encode(SmartFolderFilter.Group(children = listOf(archived, accepted)))
+        val reordered = SmartFolderCodec.encode(SmartFolderFilter.Group(children = listOf(accepted, archived)))
+        assertTrue(sameQuickFilterPayload(saved, reordered))
+        assertTrue(sameQuickFilterPayload(null, null))
+        assertFalse(sameQuickFilterPayload(saved, null))
+        val other = archived.copy(mode = FolderMode.PRESENT)
+        val changed = SmartFolderCodec.encode(SmartFolderFilter.Group(children = listOf(accepted, other)))
+        assertFalse(sameQuickFilterPayload(saved, changed))
+        val any = SmartFolderFilter.Group(all = false, children = listOf(archived, accepted))
+        val anyReordered = any.copy(children = listOf(accepted, archived))
+        assertFalse(sameQuickFilterPayload(SmartFolderCodec.encode(any), SmartFolderCodec.encode(anyReordered)))
     }
 
     @Test fun atomicCommitReloadAccountIsolationAndUnsupportedPayloadPreservation() {

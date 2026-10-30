@@ -437,6 +437,7 @@ class SmartFolderMatchingTest {
         assertEquals(FolderTruth.UNKNOWN, matches(condition(FolderField.PENDING_SEND, FolderMode.NONE), row))
     }
 
+    /** Neither half of any paired filter can match or reject a chat whose facts are not loaded. */
     @Test fun pairedPositiveAndNegativeFiltersCannotProveMissingFacts() {
         val unknown = item("unknown").copy(projection = null, selectedPreview = null)
         quickFolderFields.forEach { field ->
@@ -450,6 +451,7 @@ class SmartFolderMatchingTest {
         }
     }
 
+    /** A rule cleared back to neutral matches nothing automatically but keeps manual inclusions and exclusions. */
     @Test fun neutralQuickFiltersRetainManualInclusionsAndExactExclusions() {
         val neutral =
             SmartFolderFilter

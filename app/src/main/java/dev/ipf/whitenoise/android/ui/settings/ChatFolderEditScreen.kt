@@ -181,7 +181,8 @@ private fun ChatFolderEditSession(
     val dirty =
         name.text.toString() != prefillName ||
             description.text.toString() != existing?.description.orEmpty() ||
-            rule != initialRule ||
+            rule.copy(smartFilter = initialSmart) != initialRule ||
+            !sameQuickFilterPayload(smartPayload, initialSmart) ||
             manualChatIds != initialManual ||
             showWhenEmpty != initialShowWhenEmpty ||
             sort != initialSort

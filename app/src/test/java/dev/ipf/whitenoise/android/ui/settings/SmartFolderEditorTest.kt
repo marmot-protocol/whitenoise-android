@@ -265,6 +265,7 @@ class SmartFolderEditorTest {
         composeRule.onNodeWithTag("folder.conditionDone").assertExists()
     }
 
+    /** Each paired row selects, swaps and clears one condition, and Reset keeps only the accepted-chat scope. */
     @Test fun pairedControlsReplaceClearAndResetOnlyTheVisiblePredicates() {
         val initial = defaultSmartFolder()
         val root = renderPanel(initial)
@@ -295,11 +296,13 @@ class SmartFolderEditorTest {
         assertEquals(listOf(SmartFolderFilter.Condition(FolderField.ACCEPTED)), root.value!!.children)
     }
 
+    /** Both halves of a row announce its whole state, and Advanced announces collapsed then expanded. */
     @Test fun pairedRowsAnnounceNeutralAndBothSelectionsAndAdvancedExpansion() {
         renderPanel(SmartFolderFilter.Group())
         val positive = composeRule.onNodeWithTag("folder.quick.UNREAD.PRESENT")
         val negative = composeRule.onNodeWithTag("folder.quick.UNREAD.NONE")
 
+        /** Asserts that both halves of the Unread row announce [choice] as the row's state. */
         fun assertRowState(choice: Int) {
             val expected =
                 context.getString(
@@ -334,6 +337,7 @@ class SmartFolderEditorTest {
         )
     }
 
+    /** Opening Advanced, cancelling a condition edit and closing Advanced leave the draft exactly as it was. */
     @Test fun switchingAdvancedPresentationAndCancellingAnEditPreservesTheExactDraft() {
         val initial = defaultSmartFolder().toggleQuickFilter(FolderField.DRAFT, FolderMode.NONE)
         val root = renderPanel(initial)
@@ -351,6 +355,7 @@ class SmartFolderEditorTest {
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
     }
 
+    /** Switching legacy rules to quick filters asks first, and cancelling leaves the draft untouched. */
     @Test fun legacyQuickReplacementCanBeCancelledBeforeAnyDraftChange() {
         val root = renderPanel(null, legacy = true)
         composeRule.onNodeWithTag("folder.quick.start").performClick()
@@ -362,6 +367,7 @@ class SmartFolderEditorTest {
         assertEquals(defaultSmartFolder(), root.value)
     }
 
+    /** A nested or negated rule shows only the tree and is never flattened to fit the quick controls. */
     @Test fun complexRulesHaveNoQuickControlsOrImplicitNormalization() {
         val nested = SmartFolderFilter.Group(children = listOf(defaultSmartFolder()), not = true)
         val root = renderPanel(nested)
@@ -370,6 +376,7 @@ class SmartFolderEditorTest {
         assertEquals(nested, root.value)
     }
 
+    /** A quick edit and the expanded Advanced section both survive saved-state restoration. */
     @Test fun quickDraftAndAdvancedDisclosureSurviveSavedStateRestoration() {
         val restoration = StateRestorationTester(composeRule)
         var current: SmartFolderFilter.Group? = null
@@ -416,6 +423,7 @@ class SmartFolderEditorTest {
         composeRule.onNodeWithTag("folder.quick.UNREAD.NONE").assertDoesNotExist()
     }
 
+    /** Switching to Match any in Advanced removes the quick controls instead of offering a lossy toggle. */
     @Test fun becomingIncompatibleInAdvancedNeverOffersAFlatteningQuickToggle() {
         val root = renderPanel(defaultSmartFolder())
         composeRule.onNodeWithTag("folder.quick.advanced").performScrollTo().performClick()
@@ -428,6 +436,7 @@ class SmartFolderEditorTest {
         assertEquals(any, root.value)
     }
 
+    /** A pending legacy replacement prompt survives rotation and can still be cancelled without a change. */
     @Test fun pendingLegacyReplacementSurvivesRotationAndCanStillBeCancelled() {
         val restoration = StateRestorationTester(composeRule)
         var changes = 0
@@ -454,6 +463,7 @@ class SmartFolderEditorTest {
         composeRule.onNodeWithTag("folder.confirmPreset").assertDoesNotExist()
     }
 
+    /** Renders the rule panel for [initial] and returns the draft root its edits write to. */
     private fun renderPanel(
         initial: SmartFolderFilter.Group?,
         legacy: Boolean = false,

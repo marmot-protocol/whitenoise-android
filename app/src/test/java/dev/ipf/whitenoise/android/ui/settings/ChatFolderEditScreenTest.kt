@@ -340,6 +340,29 @@ class ChatFolderEditScreenTest {
         assertEquals(manual, reloaded.membershipFor(ACCOUNT_REF, folder.id))
     }
 
+    /** Clearing and re-picking a saved quick choice reorders the rule but is not an edit, so Back just closes. */
+    @Test
+    fun reselectingAClearedQuickChoiceLeavesNothingToDiscard() {
+        val appState = appState()
+        val store = appState.chatFolderPreferences
+        val id = ChatFolderPreferences.SYSTEM_FOLDER_UNREAD_ID
+        store.foldersFor(ACCOUNT_REF)
+        val saved = ChatFolderRule(smartFilter = SmartFolderCodec.encode(defaultSmartFolder()))
+        store.commitFolderDraft(ACCOUNT_REF, id, null, "", emptySet(), saved)
+        var closed = false
+        renderEditor(appState, onClose = { closed = true })
+        val archived = "folder.quick.ARCHIVED.NONE"
+        repeat(2) {
+            composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag(archived))
+            composeRule.onNodeWithTag(archived).performClick()
+        }
+        composeRule.onNodeWithTag(archived).assertIsSelected()
+        composeRule.onNodeWithTag(WHITE_NOISE_TOP_BAR_BACK_TAG).performClick()
+        composeRule.onNodeWithText(app.getString(R.string.folder_discard)).assertDoesNotExist()
+        assertTrue(closed)
+    }
+
+    /** A new folder's first filter opens quick controls, and the condition tree appears only behind Advanced. */
     @Test
     fun newFolderEntersAutomaticRulesOnlyAfterExplicitChoice() {
         val appState = appState()

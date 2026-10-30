@@ -36,7 +36,10 @@ import dev.ipf.whitenoise.android.state.FolderMode
 import dev.ipf.whitenoise.android.state.SmartFolderFilter
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicHeight
 
-/** Three-state controls edit the same draft tree as Advanced; neither half selected means unrestricted. */
+/**
+ * Three-state controls edit the same draft tree as Advanced. A neutral row adds no condition for its field; a rule
+ * left with no conditions at all matches nothing automatically, which the empty-rule notice says.
+ */
 @Composable
 @Suppress("LongMethod") // One bounded paired-control list, with the same draft callback for every predicate.
 internal fun SmartFolderQuickFilterControls(
@@ -122,6 +125,7 @@ internal fun SmartFolderQuickFilterControls(
     }
 }
 
+/** The button label for [mode] in [field]'s paired row. */
 private fun quickFilterLabel(
     field: FolderField,
     mode: FolderMode,

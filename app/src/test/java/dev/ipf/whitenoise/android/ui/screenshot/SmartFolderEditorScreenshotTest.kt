@@ -27,6 +27,7 @@ import dev.ipf.whitenoise.android.ui.settings.LegacyFolderRuleControls
 import dev.ipf.whitenoise.android.ui.settings.SmartFolderPanelState
 import dev.ipf.whitenoise.android.ui.settings.SmartFolderRulePanel
 import dev.ipf.whitenoise.android.ui.settings.defaultSmartFolder
+import dev.ipf.whitenoise.android.ui.settings.resetQuickFilters
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -41,12 +42,16 @@ import org.robolectric.annotation.GraphicsMode
 class SmartFolderEditorScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Quick controls with every row neutral, as left after Reset. */
     @Test fun quickNeutral() = capture("smart_folder_quick_neutral", quick = true)
 
+    /** Quick controls with mixed selections in the light theme. */
     @Test fun quickMixedLight() = capture("smart_folder_quick_mixed_light", quick = true, mixed = true)
 
+    /** Quick controls with mixed selections in the dark theme. */
     @Test fun quickMixedDark() = capture("smart_folder_quick_mixed_dark", quick = true, mixed = true, dark = true)
 
+    /** Quick controls with mixed selections in the AMOLED theme. */
     @Test fun quickMixedAmoled() =
         capture(
             "smart_folder_quick_mixed_amoled",
@@ -56,10 +61,12 @@ class SmartFolderEditorScreenshotTest {
             amoled = true,
         )
 
+    /** Quick controls with mixed selections in right-to-left layout. */
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h1100dp-mdpi")
     fun quickRtlLarge() = capture("smart_folder_quick_rtl_large", quick = true, mixed = true, rtl = true)
 
+    /** Quick controls with mixed selections in landscape with large text. */
     @Test
     @Config(qualifiers = "en-w640dp-h360dp-mdpi")
     fun quickLandscapeLarge() =
@@ -124,6 +131,7 @@ class SmartFolderEditorScreenshotTest {
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h1100dp-mdpi")
     fun rtlRulesLarge() = capture("smart_folder_rtl_rules_large", rtl = true, rules = true, options = true)
 
+    /** Renders the editor form for one configuration and records it as the [name] baseline. */
     @Suppress("LongMethod") // Render one fixed full form consistently across visual configurations.
     private fun capture(
         name: String,
@@ -223,6 +231,7 @@ class SmartFolderEditorScreenshotTest {
         target.captureRoboImage("src/test/snapshots/$name.png")
     }
 
+    /** The rule tree each capture renders, from neutral quick rows to nested groups. */
     private fun screenshotRules(
         quick: Boolean,
         mixed: Boolean,
@@ -250,7 +259,7 @@ class SmartFolderEditorScreenshotTest {
                                 SmartFolderFilter.Condition(FolderField.TYPE, FolderMode.GROUP),
                             ),
                 )
-            quick -> SmartFolderFilter.Group()
+            quick -> defaultSmartFolder().resetQuickFilters()
             empty -> SmartFolderFilter.Group()
             nested ->
                 SmartFolderFilter.Group(

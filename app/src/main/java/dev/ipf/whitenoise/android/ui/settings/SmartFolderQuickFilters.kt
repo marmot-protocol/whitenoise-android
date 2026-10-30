@@ -31,8 +31,27 @@ internal fun SmartFolderFilter.Group.supportsQuickFilters(): Boolean {
         }
 }
 
+/** The selected mode of [field], or null when that paired control is neutral. */
 internal fun SmartFolderFilter.Group.quickMode(field: FolderField): FolderMode? =
     children.filterIsInstance<SmartFolderFilter.Condition>().firstOrNull { it.field == field }?.mode
+
+/**
+ * Re-picking a cleared choice appends it, so two quick payloads that differ only in condition order are the
+ * same rule. Anything else, including any rule quick controls cannot edit, still compares exactly.
+ */
+internal fun sameQuickFilterPayload(
+    first: String?,
+    second: String?,
+): Boolean =
+    first == second ||
+        listOf(first, second)
+            .map { payload ->
+                payload
+                    ?.let(SmartFolderCodec::decode)
+                    ?.takeIf { it.supportsQuickFilters() }
+                    ?.children
+                    ?.toSet()
+            }.let { (left, right) -> left != null && left == right }
 
 /** Replace in place, append a new restriction, or clear just this predicate; untouched order is retained. */
 internal fun SmartFolderFilter.Group.toggleQuickFilter(
