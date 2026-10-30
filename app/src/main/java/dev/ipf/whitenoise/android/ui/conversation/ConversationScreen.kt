@@ -1095,6 +1095,11 @@ internal fun ConversationScreen(
             renderedTimeline.mapNotNull { it.record.retentionExpiresAt?.takeIf { expiry -> expiry > 0uL } }
         }
     val eligibilityNowSeconds = rememberForwardEligibilityNowSeconds(forwardEligibilityExpiries)
+    // The cache revision moves on every attachment download or eviction in any chat, and only forward
+    // eligibility depends on it, which is read for selected messages alone. Reading it only while a
+    // selection exists keeps those bumps from re-running this whole-timeline pass while reading. Entering
+    // and leaving selection each re-key it once, and the reconcile effect below refreshes selected entries.
+    val selectionMediaCacheRevision = if (selectedMessages.isNotEmpty()) mediaCacheRevision else null
     val selectableMessageProjections =
         remember(
             renderedTimeline,
@@ -1105,7 +1110,7 @@ internal fun ConversationScreen(
             // so a promotion/demotion or roster verification is reflected.
             controller.isSelfAdmin,
             controller.canSendMessages,
-            mediaCacheRevision,
+            selectionMediaCacheRevision,
             eligibilityNowSeconds,
         ) {
             renderedTimeline
@@ -4983,7 +4988,8 @@ internal fun ConversationScreen(
                                 isMine = controller::isMessageMine,
                                 senderName = appState::displayName,
                                 controller = controller,
-                                thumbnailRevision = mediaCacheRevision,
+                                // Without kept cards, a cache bump must not recompose this transcript scope.
+                                thumbnailRevision = if (keptEntries.isEmpty()) 0L else mediaCacheRevision,
                             )
                         KeptMessagesOverlay(
                             state = KeptMessagesOverlayState(keptEntries, keptMessagesController, keptAccountRef),

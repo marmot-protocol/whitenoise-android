@@ -114,8 +114,20 @@ internal fun rememberMediaViewerForwardActions(
             controller.timeline.mapNotNull { it.record.retentionExpiresAt }
         }
     val nowSeconds = rememberForwardEligibilityNowSeconds(retentionExpiries)
-    val mediaCacheRevision by appState.mediaCacheRevision.collectAsState()
-    val hasCachedAttachment = remember(controller, mediaCacheRevision) { controller::hasCachedAttachment }
+    val mediaCacheRevision = appState.mediaCacheRevision.collectAsState()
+
+    /**
+     * Cache lookup for a forward payload. Its `.value` read is the subscription: it makes only the composition
+     * building a payload, an open viewer or a pending request, observe cache changes, not the screen holding these
+     * actions. Keep the read, since dropping it leaves a stale Forward action.
+     */
+    fun hasCachedAttachment(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ): Boolean {
+        mediaCacheRevision.value
+        return controller.hasCachedAttachment(messageIdHex, attachmentIndex)
+    }
 
     /** True while the viewer's account and conversation are still the active ones. */
     fun ownerIsCurrent(): Boolean =
