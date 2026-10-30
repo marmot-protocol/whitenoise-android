@@ -23,6 +23,30 @@ class AndroidReleaseRuntimeWorkflowCoverageTest {
         assertRuntimeVerifierResilience(verifierSource())
     }
 
+    /** Both shipping lanes budget post-R8 method sizes of the APK they verify, before the emulator installs it. */
+    @Test
+    fun shippingRuntimeLanesEnforcePostR8DexMethodBudgets() {
+        val workflow = workflowSource()
+
+        assertDexMethodBudget(
+            job = workflow.jobSection("verify-production"),
+            apkOutput = "steps.apk.outputs.path",
+            variant = "productionZapstoreRelease",
+            emulatorStep = "Verify release APK on ART",
+        )
+        assertDexMethodBudget(
+            job = workflow.jobSection("verify-staging-android17"),
+            apkOutput = "steps.apks.outputs.arm64_v8a_path",
+            variant = "stagingZapstoreRelease",
+            emulatorStep = "Verify staging APK on Android 17 ART",
+        )
+        assertTrue(
+            "budget inputs must trigger the runtime workflow on pull requests",
+            "- 'scripts/dex_method_budget.py'" in workflow &&
+                "- 'config/dex-method-budgets.json'" in workflow,
+        )
+    }
+
     @Test
     fun productionFirebaseExemptionCannotAuthorizePlayPublication() {
         val buildScript = appBuildScriptSource()
@@ -159,6 +183,29 @@ class AndroidReleaseRuntimeWorkflowCoverageTest {
         assertTrue(
             "the release log guard must reject a standalone raw error field",
             Regex("($appLogTags).*($dynamicValuePatterns)").containsMatchIn("DMSend: error=timeout"),
+        )
+    }
+
+    /** Asserts one lane budgets its located APK with the same build's mapping and fails before ART verification. */
+    private fun assertDexMethodBudget(
+        job: String,
+        apkOutput: String,
+        variant: String,
+        emulatorStep: String,
+    ) {
+        val budgetStart = job.indexOf("- name: Enforce post-R8 DEX method budgets")
+        assertTrue("$variant must enforce post-R8 DEX method budgets", budgetStart >= 0)
+        val budgetStep = job.substring(budgetStart).substringBefore("\n      - name:")
+        assertTrue("$variant must measure the located APK", "\${{ $apkOutput }}" in budgetStep)
+        assertTrue(
+            "$variant must name methods with the mapping from the same build",
+            "--mapping app/build/outputs/mapping/$variant/mapping.txt" in budgetStep &&
+                "--variant $variant" in budgetStep,
+        )
+        assertTrue("$variant must record the exact source commit", "\${{ github.sha }}" in budgetStep)
+        assertTrue(
+            "$variant must fail before the emulator installs the APK",
+            budgetStart < job.indexOf("- name: $emulatorStep"),
         )
     }
 

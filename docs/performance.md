@@ -963,6 +963,71 @@ Outputs land in `app/build/compose-metrics/` and
 `app/build/compose-reports/`. CI publishes them as the
 `compose-compiler-reports` artifact for 14 days.
 
+## DEX method-size budgets
+
+ART's optimizing compiler refuses any method whose `code_item` reaches 16,383
+instructions (16-bit code units) or 16,383 registers: `UINT16_MAX / 4` in
+`Compiler::IsPathologicalCase` (AOSP `art/compiler/compiler.cc`). dex2oat and
+the JIT both skip such a method, so it runs interpreted for the life of the
+install, and devices that disable the JIT, such as GrapheneOS, have no fallback.
+Large Compose screen functions approach that limit; PRs
+[#3234](https://github.com/marmot-protocol/whitenoise-android/pull/3234) and
+[#3238](https://github.com/marmot-protocol/whitenoise-android/pull/3238) split
+the ones that had crossed it.
+
+`scripts/dex_method_budget.py` reads the DEX already packaged in an APK and
+never builds anything. It reports each method's `insns_size` and
+`registers_size`, names residual methods through the R8 mapping from the same
+build (eliding inlined and synthesized frames, as retrace does), and records the
+source commit, APK and DEX SHA-256s, mapping `pg_map_id`, compiler and AGP
+versions and CI run. The mapping's `pg_map_id` must equal the one R8 wrote into
+every DEX, so a map from another build fails. Budgets live in
+`config/dex-method-budgets.json`; each entry's `basis` records the commit,
+artifact and largest sizes it was reviewed against.
+
+| Variant | Measured in | Compiler | Budget (code units / registers) |
+| --- | --- | --- | ---: |
+| `productionZapstoreRelease` | Android Release Runtime Verify, before API 36 ART verification | R8 full mode, obfuscated | 13,106 / 13,106 |
+| `stagingZapstoreRelease` | Android Release Runtime Verify, the shipping ARM64 APK before Android 17 verification | R8 full mode, obfuscated | 13,106 / 13,106 |
+| `devZapstoreBenchmarkRelease` | Android CI baseline phase, the universal APK the Baseline Profile check reads | D8 only, unminified | 16,382 / 16,382 |
+
+The assumptions behind each budget:
+
+- **Shipping budgets are 80% of ART's limit, rounded down.** At review time this
+  left about 1,400 code units of growth above the largest shipping method and
+  kept 3,277 between the budget and the limit, so a failure arrives while a
+  split is still a planned change rather than a fix for interpreted code. Only
+  obfuscated R8 output with its own mapping is accepted.
+- **`benchmarkRelease` is plain D8 output.** The build type is created without
+  release minification, so it keeps source names, has no mapping, and its large
+  composables are 30–40% larger than the shipping ones. Its sizes never
+  stand in for shipping sizes, and the script refuses to apply a shipping budget
+  to it. Its budget is the largest size ART still compiles: beyond it,
+  macrobenchmarks measure the interpreter rather than compiled code.
+- **The threshold is ART's as of AOSP main on 2026-10-30.** Re-check it when a
+  new ART release changes the compiler. The parser accepts DEX versions 035–040
+  and fails on any other, including the DEX 041 container format.
+
+When a budget fails, the log names the source method, its residual identity and
+DEX file, and its size against the budget. The JSON and Markdown reports are in
+the lane's report artifact. Prefer splitting the method, using the patterns from
+the PRs above. Raising a budget is a reviewed change to the config: record the
+new measurement in `basis` and justify the margin in the PR.
+
+Measure an APK locally (omit `--mapping` for `devZapstoreBenchmarkRelease`):
+
+```bash
+python3 scripts/dex_method_budget.py \
+  --apk app/build/outputs/apk/stagingZapstore/release/<arm64-v8a APK> \
+  --mapping app/build/outputs/mapping/stagingZapstoreRelease/mapping.txt \
+  --variant stagingZapstoreRelease \
+  --source-sha "$(git rev-parse HEAD)" \
+  --report-dir build/dex-method-budget
+```
+
+Exit status 1 is a budget violation; 2 is a missing, malformed or mismatched
+input.
+
 ## PR measurement table
 
 Use one physical device and unchanged fixture for both runs. Report medians and

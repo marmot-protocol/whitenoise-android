@@ -189,6 +189,9 @@ jobs:
       - name: Test stale-result recurrence classifier
         run: python3 -m unittest scripts/test_stale_result_recurrence.py
 
+      - name: Test DEX method budget reporting
+        run: python3 -m unittest scripts/test_dex_method_budget.py
+
       - name: Test package-replacement startup reporter
         run: bash .github/scripts/test-package-replacement-startup-report.sh
 
@@ -388,6 +391,20 @@ jobs:
           app_apk="$(dirname "$metadata")/$output_file"
           bash scripts/verify-baseline-profile.sh "$app_apk"
           printf 'apk=%s\n' "$app_apk" >> "$GITHUB_OUTPUT"
+
+      # benchmarkRelease is unminified D8 output, so this budget keeps benchmarked
+      # methods compilable; it never stands in for the shipping R8 budgets.
+      - name: Enforce benchmark DEX method budget
+        if: matrix.phase == 'baseline'
+        env:
+          DEX_BUDGET_APK_PATH: ${{ steps.baseline_apk.outputs.apk }}
+          DEX_BUDGET_SOURCE_SHA: ${{ github.sha }}
+        run: >-
+          python3 scripts/dex_method_budget.py
+          --apk "$DEX_BUDGET_APK_PATH"
+          --variant devZapstoreBenchmarkRelease
+          --source-sha "$DEX_BUDGET_SOURCE_SHA"
+          --report-dir app/build/reports/dex-method-budget
 
       - name: Stage the existing APK for optional Maestro testing
         id: maestro_stage
