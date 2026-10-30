@@ -90,12 +90,20 @@ internal class ConversationTailEntrance internal constructor(
     var shiftPx: Float by mutableFloatStateOf(0f)
         private set
 
-    /** Starts the motion from the entering row's first measure, once per row. */
+    /**
+     * Whether the list has scrolled to the entering row. A reversed list lays the inserted row out under the
+     * composer, in its bottom padding, a frame before the tail follow reaches it; starting there would draw every
+     * row above a full row-height below its slot. Read while measuring, so reaching the tail remeasures the row.
+     */
+    internal var tailReached: () -> Boolean = { true }
+
+    /** Starts the motion from the entering row's first measure at the tail, once per row. */
     fun onEnteringRowMeasured(
         itemId: String,
         heightPx: Int,
     ) {
-        if (!motionEnabled || itemId != enteringItemId || startedForItemId == itemId) return
+        val pendingStart = motionEnabled && itemId == enteringItemId && startedForItemId != itemId
+        if (!pendingStart || !tailReached()) return
         startedForItemId = itemId
         // Written during layout and read only while drawing, so the very frame
         // that lays the row out already draws everything shifted, with no jump.
@@ -149,9 +157,11 @@ internal fun rememberConversationTailEntrance(
     rowSpacingPx: Float = with(LocalDensity.current) { CONVERSATION_TIMELINE_ROW_SPACING.toPx() },
     motionEnabled: Boolean = rememberConversationMotionEnabled(),
     ownerKey: Any? = null,
+    tailReached: () -> Boolean = { true },
 ): ConversationTailEntrance {
     val scope = rememberCoroutineScope()
     val entrance = remember(scope, ownerKey) { ConversationTailEntrance(scope, rowSpacingPx) }
+    entrance.tailReached = tailReached
     DisposableEffect(entrance) { onDispose { entrance.motionEnabled = false } }
     val candidate =
         latestItemId.takeIf {
