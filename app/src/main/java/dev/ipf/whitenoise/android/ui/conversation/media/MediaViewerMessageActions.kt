@@ -117,13 +117,17 @@ internal fun rememberMediaViewerForwardActions(
     val mediaCacheRevision = appState.mediaCacheRevision.collectAsState()
 
     /**
-     * Reads the cache revision where a payload is built, not as a remember key, so only an open viewer or a
-     * pending request observes cache changes, and the screen holding these actions does not recompose on each one.
+     * Cache lookup for a forward payload. Its `.value` read is the subscription: it makes only the composition
+     * building a payload, an open viewer or a pending request, observe cache changes, not the screen holding these
+     * actions. Keep the read, since dropping it leaves a stale Forward action.
      */
     fun hasCachedAttachment(
         messageIdHex: String,
         attachmentIndex: Int,
-    ): Boolean = mediaCacheRevision.value.let { controller.hasCachedAttachment(messageIdHex, attachmentIndex) }
+    ): Boolean {
+        mediaCacheRevision.value
+        return controller.hasCachedAttachment(messageIdHex, attachmentIndex)
+    }
 
     /** True while the viewer's account and conversation are still the active ones. */
     fun ownerIsCurrent(): Boolean =

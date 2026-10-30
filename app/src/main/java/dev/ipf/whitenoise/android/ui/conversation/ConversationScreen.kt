@@ -1097,8 +1097,8 @@ internal fun ConversationScreen(
     val eligibilityNowSeconds = rememberForwardEligibilityNowSeconds(forwardEligibilityExpiries)
     // The cache revision moves on every attachment download or eviction in any chat, and only forward
     // eligibility depends on it, which is read for selected messages alone. Reading it only while a
-    // selection exists keeps those bumps from re-running this whole-timeline pass while reading. The
-    // first selection re-keys it once, and the reconcile effect below refreshes the selected entries.
+    // selection exists keeps those bumps from re-running this whole-timeline pass while reading. Entering
+    // and leaving selection each re-key it once, and the reconcile effect below refreshes selected entries.
     val selectionMediaCacheRevision = if (selectedMessages.isNotEmpty()) mediaCacheRevision else null
     val selectableMessageProjections =
         remember(
