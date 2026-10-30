@@ -228,7 +228,7 @@ class LocalNotificationHeadsUpFlagsTest {
             presenter.show(
                 notificationUpdate(),
                 previewTextOverride = "hi",
-                senderAvatarUrl = "https://example.com/alice.png",
+                conversationAvatarUrl = "https://example.com/general.png",
                 shortNpub = { "npub1test" },
             )
             assertEquals(1, probe.enrichment.releaseAll())

@@ -87,13 +87,17 @@ class NotificationConversationIdentityImageTest {
         val presenter =
             presenter(
                 posts,
-                resolver = { url -> resolverCalls.incrementAndGet(); url?.let { fetched += it; solid(Color.GREEN) } },
-                contactAvatar = { _, _ -> privateReads.incrementAndGet(); true to solid(Color.RED) },
+                resolver = { url ->
+                    resolverCalls.incrementAndGet()
+                    url?.also { fetched += it }?.let { solid(Color.GREEN) }
+                },
+                contactAvatar = { _, _ -> (true to solid(Color.RED)).also { privateReads.incrementAndGet() } },
                 shortcutPublications = publications,
             )
         val picture = solid(Color.BLUE)
         show(presenter, group(), conversation = picture, senderUrl = PICTURE_URL)
-        show(presenter, group().copy(messageIdHex = "next"), conversation = picture, senderUrl = "https://example.com/changed.png")
+        val next = group().copy(messageIdHex = "next")
+        show(presenter, next, conversation = picture, senderUrl = "https://example.com/changed.png")
 
         assertTrue(fetched.isEmpty())
         assertEquals(0, privateReads.get())
@@ -115,7 +119,7 @@ class NotificationConversationIdentityImageTest {
         val presenter =
             presenter(
                 posts,
-                resolver = { url -> fetched += checkNotNull(url); solid(Color.BLUE) },
+                resolver = { url -> solid(Color.BLUE).also { fetched += checkNotNull(url) } },
                 launcher = { enrichment = it },
             )
         show(presenter, group(), senderUrl = PICTURE_URL, conversationUrl = groupUrl)
@@ -370,7 +374,8 @@ class NotificationConversationIdentityImageTest {
         runBlocking {
             val posts = mutableListOf<Notification>()
             val fetched = mutableListOf<String>()
-            val presenter = presenter(posts, resolver = { url -> url?.let { fetched += it; solid(Color.MAGENTA) } })
+            val presenter =
+                presenter(posts, resolver = { url -> url?.also { fetched += it }?.let { solid(Color.MAGENTA) } })
             val picture = solid(Color.BLUE)
             show(presenter, group(), conversation = picture)
             presenter.refreshContactSenderName(ACCOUNT, DEFAULT_SENDER, "Maya")
@@ -444,7 +449,8 @@ class NotificationConversationIdentityImageTest {
         runBlocking {
             val posts = mutableListOf<Notification>()
             val fetched = mutableListOf<String>()
-            val presenter = presenter(posts, resolver = { url -> url?.let { fetched += it; solid(Color.MAGENTA) } })
+            val presenter =
+                presenter(posts, resolver = { url -> url?.also { fetched += it }?.let { solid(Color.MAGENTA) } })
             show(presenter, group())
             val before = posts.size
             val sources =

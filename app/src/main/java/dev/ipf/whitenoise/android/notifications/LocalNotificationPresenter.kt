@@ -1299,7 +1299,8 @@ class LocalNotificationPresenter(
                                     shortcutId = messagingShortcutId,
                                     conversationAvatarUrl = conversationAvatarUrl,
                                     conversationAvatarBitmap = resolvedConversationAvatarBitmap,
-                                    senderAvatarUrl = senderAvatarUrl.takeUnless { notificationContent.isGroupConversation },
+                                    senderAvatarUrl =
+                                        senderAvatarUrl.takeUnless { notificationContent.isGroupConversation },
                                     senderAvatarBitmap = resolvedSenderAvatarBitmap,
                                 )
                         }
@@ -1741,7 +1742,12 @@ class LocalNotificationPresenter(
         val enrichedSender =
             notificationSenderPerson(
                 content,
-                senderAvatarBitmap ?: if (content.isGroupConversation) null else notificationMonogramBitmap(content.senderName, content.senderKey),
+                senderAvatarBitmap
+                    ?: if (content.isGroupConversation) {
+                        null
+                    } else {
+                        notificationMonogramBitmap(content.senderName, content.senderKey)
+                    },
             )
         postEnrichedMessagingNotification(
             update = update,
@@ -2223,7 +2229,13 @@ class LocalNotificationPresenter(
         var style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
         if (style != null) {
             var changedAny = false
-            val people = (style.messages + style.historicMessages).mapNotNull { it.person }.distinctBy { it.key }
+            // Group cards draw no member's picture (withoutGroupSenderPictures), so their senders' choices go unread.
+            val people =
+                if (style.isGroupConversation) {
+                    emptyList()
+                } else {
+                    (style.messages + style.historicMessages).mapNotNull { it.person }.distinctBy { it.key }
+                }
             people.forEach { person ->
                 val (changed, bitmap) = person.key?.let { contactAvatarOverride(account, it) } ?: (false to null)
                 if (changed) {
@@ -2908,20 +2920,28 @@ class LocalNotificationPresenter(
             }
         }
 
-    /** Cached private pixels replace the protocol-sourced bitmaps; when none are cached, the public ones stay. */
+    /** A direct chat's current private contact choice. A group shows no member's picture, so it reads none. */
+    private fun directContactAvatar(update: NotificationUpdateFfi): Pair<Boolean, Bitmap?> =
+        if (update.isDm) currentContactAvatar(update.accountRef, update.sender.accountIdHex) else false to null
+
+    /**
+     * Cached private pixels replace a direct chat's protocol-sourced bitmaps; when none are cached, the public ones
+     * stay. A group keeps only its own picture and drops its member's.
+     */
     private fun ownedShortcutAvatars(
         update: NotificationUpdateFfi,
         conversationAvatarBitmap: Bitmap?,
         senderAvatarBitmap: Bitmap?,
         sender: Person,
     ): Triple<Bitmap?, Bitmap?, Person> {
-        if (!update.isDm) return Triple(conversationAvatarBitmap, null, sender)
-        val (override, currentAvatar) = currentContactAvatar(update.accountRef, update.sender.accountIdHex)
-        if (!override) return Triple(conversationAvatarBitmap, senderAvatarBitmap, sender)
+        val (override, currentAvatar) = directContactAvatar(update)
         val senderAvatar = currentAvatar ?: senderAvatarBitmap
-        val conversationAvatar =
-            if (update.isDm) currentAvatar ?: conversationAvatarBitmap else conversationAvatarBitmap
-        return Triple(conversationAvatar, senderAvatar, contactAvatarPerson(sender, senderAvatar))
+        val conversationAvatar = currentAvatar ?: conversationAvatarBitmap
+        return when {
+            !update.isDm -> Triple(conversationAvatarBitmap, null, sender)
+            !override -> Triple(conversationAvatarBitmap, senderAvatarBitmap, sender)
+            else -> Triple(conversationAvatar, senderAvatar, contactAvatarPerson(sender, senderAvatar))
+        }
     }
 
     /**
@@ -2999,7 +3019,7 @@ class LocalNotificationPresenter(
             synchronized(UserEventNotificationGroup.mutationLock) {
                 // A cap filled by protected shortcuts skips the publication, and the card keeps the existing fallback.
                 if (isPublishAllowed() && pruneConversationShortcutsBeforePublish(shortcutId)) {
-                    val (currentChoice, pixels) = currentContactAvatar(update.accountRef, update.sender.accountIdHex)
+                    val (currentChoice, pixels) = directContactAvatar(update)
                     val preview = NotificationPreviewPreferences.capture(context)
                     val finish = { built: ShortcutInfoCompat ->
                         built.extras?.let { stampShortcutPreview(preview, it) }

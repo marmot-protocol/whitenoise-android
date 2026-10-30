@@ -70,10 +70,17 @@ class NotificationAvatarPreWarmTriggerTest {
                     appLocked = { false },
                     shouldPost = { _, _ -> true },
                     canPost = { true },
-                    senderAvatarUrl = { senderReads += 1; "https://example.com/member.png" },
-                    groupAvatarUrl = { groupReads += 1; null },
+                    senderAvatarUrl = {
+                        senderReads += 1
+                        "https://example.com/member.png"
+                    },
+                    groupAvatarUrl = {
+                        groupReads += 1
+                        null
+                    },
                 )
-            coordinator.preWarm(update(isDm = false, pictureUrl = "https://example.com/payload.png"), engineMuted = false)
+            val groupMessage = update(isDm = false, pictureUrl = "https://example.com/payload.png")
+            coordinator.preWarm(groupMessage, engineMuted = false)
             assertEquals(0, senderReads)
             assertEquals(1, groupReads)
         }

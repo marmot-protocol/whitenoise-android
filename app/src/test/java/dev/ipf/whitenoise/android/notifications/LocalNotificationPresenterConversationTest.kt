@@ -632,6 +632,7 @@ class LocalNotificationPresenterConversationTest {
         )
     }
 
+    /** A group picture that lands for an older message cannot overwrite the card a newer message already owns. */
     @Test
     fun olderAvatarEnrichmentCannotOverwriteANewerMessageGeneration() {
         val posts = mutableListOf<Notification>()
@@ -655,13 +656,13 @@ class LocalNotificationPresenterConversationTest {
             twoStagePresenter.show(
                 update(isMention = false, messageIdHex = "first"),
                 previewTextOverride = "first",
-                senderAvatarUrl = "https://example.com/first.png",
+                conversationAvatarUrl = "https://example.com/first.png",
                 shortNpub = { "npub1test" },
             )
             twoStagePresenter.show(
                 update(isMention = false, messageIdHex = "second"),
                 previewTextOverride = "second",
-                senderAvatarUrl = "https://example.com/second.png",
+                conversationAvatarUrl = "https://example.com/second.png",
                 shortNpub = { "npub1test" },
             )
         }
@@ -687,6 +688,7 @@ class LocalNotificationPresenterConversationTest {
         )
     }
 
+    /** Dismissing a group card while its picture loads keeps the late enrichment from posting it again. */
     @Test
     fun dismissalWhileAvatarLoadsPreventsCardResurrection() {
         val posts = mutableListOf<Notification>()
@@ -708,7 +710,7 @@ class LocalNotificationPresenterConversationTest {
         runBlocking {
             twoStagePresenter.show(
                 update(isMention = false),
-                senderAvatarUrl = "https://example.com/alice.png",
+                conversationAvatarUrl = "https://example.com/general.png",
                 shortNpub = { "npub1test" },
             )
             twoStagePresenter.dismissConversationMessages("account-a", "group-a")
