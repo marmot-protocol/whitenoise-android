@@ -85,9 +85,13 @@ bound and no exception. `MediaRefusalLedgerTest` hammers the session's refusal
 ledger from eight threads; without its lock it throws. `PictureDomainCoverageTest`
 and `PictureDomainMappingTest` check that every production picture names its
 domain and that only member-pinned bytes reach a conversation's worker;
-`PhotoEditorDomainTest` checks that edited renders and the editor preview decode
-single-use while unedited picks keep their outgoing domain. Those JVM fixtures
-exercise owner ordering only.
+`PhotoEditorDomainTest`, `PhotoDraftStagerTest` and `PhotoEditorCommitterTest`
+check that every decode of one pick, edited or not, runs in that pick's own
+outgoing worker and never another pick's, also under concurrency, and
+`ConversationDraftRestorationPlanTest` that each restored draft attachment is its
+own pick. `MediaWorkerDomainTest` adds a ten-pick concurrency canary, parallel
+eviction for an album of new picks, and the retirement of an idle or busy pick's
+domain. Those JVM fixtures exercise owner ordering only.
 
 `IsolatedMediaDecoderDeviceTest` supplies the operating-system evidence on a
 real device. A debug worker-state canary shows source A's retained digest and
@@ -101,6 +105,8 @@ not as a self-exit.
 `MediaWorkerDomainDeviceTest` uses the same canary across domains: a
 conversation's later input lands in the worker holding its earlier input's
 state, and another conversation's input lands in a different process holding
-none of it. These cases ran on API 30 and API 36 emulators and run in the hosted
+none of it. Its per-pick case does the same for two picks of one conversation,
+then retires the first pick and shows its next input in a fresh process holding
+nothing. These cases ran on API 30 and API 36 emulators and run in the hosted
 API 34 pull-request lane. MED-031 and MED-032 keep their image, account-switching and
 format checks.
