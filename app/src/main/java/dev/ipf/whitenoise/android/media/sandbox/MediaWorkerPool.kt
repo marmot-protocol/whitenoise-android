@@ -42,7 +42,7 @@ internal class MediaWorkerPool(
     private val generations = ArrayList<MediaWorker>(capacity)
     private var singleUseFence: MediaWorker? = null
 
-    /** Claims now waiting for a slot; evictions in flight never outnumber them. Guarded by [lock]. */
+    /** Claims now waiting for a slot — evictions in flight never outnumber them. Guarded by [lock]. */
     private var slotDemand = 0
     private var signal = CountDownLatch(1)
     private var closed = false
@@ -140,7 +140,7 @@ internal class MediaWorkerPool(
             return ClaimStep.Start(reserve())
         }
         // Every slot is taken, so this claim waits for one. Slots already being freed are awaited while they cover
-        // every waiting claim, never doubled by another eviction; otherwise one more eviction runs alongside them.
+        // every waiting claim, never doubled by another eviction, otherwise one more eviction runs alongside them.
         if (!demand.counted) {
             demand.counted = true
             slotDemand++
@@ -188,7 +188,7 @@ internal class MediaWorkerPool(
 
     /**
      * Returns a claimed generation its request never sent input to. One claimed fresh for this request becomes a
-     * clean spare again; a domain's earlier generation waits for that domain's next input, unless the domain was
+     * clean spare again, while a domain's earlier generation waits for that domain's next input, unless the domain was
      * retired meanwhile.
      */
     fun unclaim(worker: MediaWorker) {
@@ -586,7 +586,7 @@ internal class MediaWorker(
     /** Claimed for an input now in flight. */
     var busy = false
 
-    /** Its domain was retired while this request was in flight; it retires when the request is released. */
+    /** Its domain was retired while this request was in flight, so it retires when the request is released. */
     var retireOnRelease = false
 
     /** Sent at least one input; a generation that never was can return to being a clean spare. */

@@ -126,7 +126,7 @@ class PhotoEditorDomainTest {
             memoryBudgetBytes = { 256L * 1024L * 1024L },
         )
 
-    /** A small opaque PNG of [edge] pixels the in-process codec can inspect and decode; its size identifies it. */
+    /** A small opaque PNG of [edge] pixels the in-process codec can inspect and decode, identified by its size. */
     private fun source(edge: Int): ByteArray {
         val bitmap = Bitmap.createBitmap(edge, edge, Bitmap.Config.ARGB_8888)
         bitmap.eraseColor(Color.BLUE)

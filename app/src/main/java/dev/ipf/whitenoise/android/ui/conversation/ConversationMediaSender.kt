@@ -103,7 +103,7 @@ internal class ConversationAttachmentReader(
     private val context: Context,
     private val fileBackedLimits: () -> FileBackedSendLimits? = ::nativeFileBackedSendLimits,
     private val usableSpace: (java.io.File) -> Long = ::usableSpaceFor,
-    /** The worker domain of one pick, a slot id or a document URI, read at each image read; single-use when unset. */
+    /** The worker domain of one pick, a slot id or a document URI, read at each image read, single-use when unset. */
     private val domain: (String?) -> dev.ipf.whitenoise.android.media.MediaTrustDomain = {
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique
     },
@@ -125,7 +125,7 @@ internal class ConversationAttachmentReader(
             )
         }
 
-    /** Reads one image pick at the chosen quality; its inspection and decodes run in [pick]'s own outgoing worker. */
+    /** Reads one image pick at the chosen quality, inspecting and decoding it in [pick]'s own outgoing worker. */
     fun readImageAttachment(
         uri: android.net.Uri,
         remainingBytes: Long,
@@ -472,7 +472,7 @@ internal class ConversationAttachmentReader(
 
     /**
      * Reads one visual [pick] through the same transform and in-memory limits used at send time, decoding in that
-     * pick's own outgoing worker; a read that names no pick decodes single-use.
+     * pick's own outgoing worker, while a read that names no pick decodes single-use.
      */
     suspend fun readVisualDraft(
         uri: android.net.Uri,
