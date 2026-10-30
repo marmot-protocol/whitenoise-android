@@ -190,8 +190,9 @@ internal object MediaWorkerUiScenarios {
     private val OTHER_CONVERSATION = MediaTrustDomain.Conversation("ui-account", "other")
     private val PROFILES = MediaTrustDomain.PublicProfiles("ui-account")
 
-    /** The user's own picks to send into the open conversation, which the photo editor decodes. */
-    private val OUTGOING_PICKS = MediaTrustDomain.Outgoing("ui-account", "open")
+    /** Two of the user's picks to send into the open conversation, each decoded in its own outgoing worker. */
+    private val CANCELLED_PICK = MediaTrustDomain.Outgoing("ui-account", "open", "cancelled-pick")
+    private val NEXT_PICK = MediaTrustDomain.Outgoing("ui-account", "open", "next-pick")
 
     /**
      * Scrolls a real three-column Compose grid of distinct JPEG tiles to its end with touch swipes, each
@@ -346,12 +347,16 @@ internal object MediaWorkerUiScenarios {
             )?.bitmap
         }
 
-    /** The same cancellation check through the photo editor's preview decode of a pick to send. */
+    /**
+     * The same cancellation check through the photo editor's preview decode of a pick to send. The cancelled source
+     * and the next image are two picks, so each decodes in its own outgoing worker, as in production.
+     */
     fun editorCancellation(lane: UiLane): JSONObject {
-        val domain = lane.domain(OUTGOING_PICKS)
-        val renderer = PhotoEditorRenderer(domain = { domain })
+        val cancelledSource = largeSources.first
+        val renderer = PhotoEditorRenderer()
         return cancellation(lane, "editor_cancel", sentPerRequest = 2) { bytes ->
-            renderer.decodePreview(bytes)
+            val pick = if (bytes === cancelledSource) CANCELLED_PICK else NEXT_PICK
+            renderer.decodePreview(bytes, lane.domain(pick))
         }
     }
 
