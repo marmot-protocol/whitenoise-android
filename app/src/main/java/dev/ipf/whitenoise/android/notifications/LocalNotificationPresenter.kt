@@ -1219,13 +1219,17 @@ class LocalNotificationPresenter(
                                     null to null
                                 } else {
                                     (conversationAvatarBitmap ?: cachedAvatarBitmap(conversationAvatarUrl)) to
-                                        (senderAvatarBitmap ?: cachedAvatarBitmap(senderAvatarUrl))
+                                        if (notificationContent.isGroupConversation) {
+                                            null
+                                        } else {
+                                            senderAvatarBitmap ?: cachedAvatarBitmap(senderAvatarUrl)
+                                        }
                                 }
                             val sender =
                                 notificationSenderPerson(
                                     notificationContent,
                                     resolvedSenderAvatarBitmap
-                                        ?: if (redactContent) {
+                                        ?: if (redactContent || notificationContent.isGroupConversation) {
                                             null
                                         } else {
                                             notificationMonogramBitmap(
@@ -1295,7 +1299,7 @@ class LocalNotificationPresenter(
                                     shortcutId = messagingShortcutId,
                                     conversationAvatarUrl = conversationAvatarUrl,
                                     conversationAvatarBitmap = resolvedConversationAvatarBitmap,
-                                    senderAvatarUrl = senderAvatarUrl,
+                                    senderAvatarUrl = senderAvatarUrl.takeUnless { notificationContent.isGroupConversation },
                                     senderAvatarBitmap = resolvedSenderAvatarBitmap,
                                 )
                         }
@@ -1737,7 +1741,7 @@ class LocalNotificationPresenter(
         val enrichedSender =
             notificationSenderPerson(
                 content,
-                senderAvatarBitmap ?: notificationMonogramBitmap(content.senderName, content.senderKey),
+                senderAvatarBitmap ?: if (content.isGroupConversation) null else notificationMonogramBitmap(content.senderName, content.senderKey),
             )
         postEnrichedMessagingNotification(
             update = update,
@@ -1783,7 +1787,7 @@ class LocalNotificationPresenter(
                                 }
                             }
                     }
-                val senderAvatar = async { sources.senderBitmap ?: avatarBitmapResolver(sources.senderUrl) }
+                val senderAvatar = async { sources.senderBitmap ?: sources.senderUrl?.let { avatarBitmapResolver(it) } }
                 conversationAvatar.await() to senderAvatar.await()
             }
         }
@@ -1921,7 +1925,9 @@ class LocalNotificationPresenter(
             // Nothing is fetched or decrypted for a card that can no longer take it, and the card is checked again
             // once the pictures arrive, since it may have been dismissed, read or replaced meanwhile.
             val refreshable = { isRefreshCurrent() && refreshableIdentityCard(update, content) != null }
-            val arrived = if (refreshable()) arrivedPictures(pictures)?.takeIf { refreshable() } else null
+            val visiblePictures =
+                if (content.isGroupConversation) pictures.copy(senderBitmap = null, senderUrl = null) else pictures
+            val arrived = if (refreshable()) arrivedPictures(visiblePictures)?.takeIf { refreshable() } else null
             if (arrived == null) {
                 false
             } else {
@@ -2909,6 +2915,7 @@ class LocalNotificationPresenter(
         senderAvatarBitmap: Bitmap?,
         sender: Person,
     ): Triple<Bitmap?, Bitmap?, Person> {
+        if (!update.isDm) return Triple(conversationAvatarBitmap, null, sender)
         val (override, currentAvatar) = currentContactAvatar(update.accountRef, update.sender.accountIdHex)
         if (!override) return Triple(conversationAvatarBitmap, senderAvatarBitmap, sender)
         val senderAvatar = currentAvatar ?: senderAvatarBitmap
@@ -2965,7 +2972,7 @@ class LocalNotificationPresenter(
                     senderKey = content.senderKey,
                     avatarUrl = conversationAvatarUrl,
                     avatarGenerationId = ownedConversationAvatar?.generationId,
-                    senderAvatarUrl = senderAvatarUrl,
+                    senderAvatarUrl = senderAvatarUrl.takeIf { update.isDm },
                     senderAvatarGenerationId = ownedSenderAvatar?.generationId,
                     directShareEligible = directShareEligible,
                     previewRevision = NotificationPreviewPreferences.capture(context).revision,

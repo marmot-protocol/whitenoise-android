@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -45,17 +46,53 @@ class NotificationAvatarPreWarmTriggerTest {
     }
 
     @Test
-    fun groupPreWarmDelegatesPayloadUrlClassificationToMdkAndRequestsTheGroupAvatar() {
+    fun groupPreWarmSkipsMemberPayloadAndProfilePicturesButRequestsTheGroupAvatar() {
         val target =
             notificationAvatarPreWarmTarget(
                 update = update(isDm = false, pictureUrl = "http://127.0.0.1/alice.png"),
                 appLockScreenVisible = true,
             )
 
-        assertEquals("alice", target.senderAccountIdHex)
-        assertEquals("http://127.0.0.1/alice.png", target.senderAvatarUrl)
+        assertNull(target.senderAccountIdHex)
+        assertNull(target.senderAvatarUrl)
         assertEquals(true, target.resolveGroupAvatar)
         assertEquals(false, target.preWarmRemoteImages)
+    }
+
+    /** Group post-write warmup calls only the group owner, never the sender profile callback. */
+    @Test
+    fun groupCoordinatorNeverResolvesTheHiddenSenderProfile() =
+        runBlocking {
+            var senderReads = 0
+            var groupReads = 0
+            val coordinator =
+                NotificationAvatarCoordinator(
+                    appLocked = { false },
+                    shouldPost = { _, _ -> true },
+                    canPost = { true },
+                    senderAvatarUrl = { senderReads += 1; "https://example.com/member.png" },
+                    groupAvatarUrl = { groupReads += 1; null },
+                )
+            coordinator.preWarm(update(isDm = false, pictureUrl = "https://example.com/payload.png"), engineMuted = false)
+            assertEquals(0, senderReads)
+            assertEquals(1, groupReads)
+        }
+
+    /** Even callers carrying a ready member bitmap cannot feed it into a group's late picture work. */
+    @Test
+    fun lateSourcesKeepSenderPicturesOnlyForDirectMessages() {
+        val picture = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        val ready = PreWarmedNotificationAvatars(null, null, senderAvatarBitmap = picture)
+        val warmed = PreWarmedNotificationAvatars("https://example.com/member.png", "https://example.com/group.png")
+        val group = ready.lateIdentitySources(warmed, isDm = false)
+        assertNull(group.senderBitmap)
+        assertNull(group.senderUrl)
+        assertEquals(warmed.groupAvatarUrl, group.conversationUrl)
+        val dm = ready.lateIdentitySources(warmed, isDm = true)
+        assertSame(picture, dm.senderBitmap)
+        assertSame(picture, dm.conversationBitmap)
+        assertEquals(warmed.senderAvatarUrl, dm.senderUrl)
+        assertEquals(warmed.senderAvatarUrl, dm.conversationUrl)
     }
 
     @Test

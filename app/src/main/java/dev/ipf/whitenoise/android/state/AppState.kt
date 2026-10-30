@@ -13843,7 +13843,9 @@ class WhiteNoiseAppState private constructor(
         val result =
             if (shouldPost && !appLockScreenVisible) {
                 notificationFirstPostContentCoordinator.resolve(stage) {
-                    warmPrivateContactAvatar(update.accountRef, update.sender.accountIdHex)
+                    if (update.isDm || update.trigger != NotificationTriggerFfi.NEW_MESSAGE) {
+                        warmPrivateContactAvatar(update.accountRef, update.sender.accountIdHex)
+                    }
                     notificationContentResolution.firstPost.resolve(update, localOnly = true)
                 }
             } else {
@@ -13877,9 +13879,13 @@ class WhiteNoiseAppState private constructor(
     internal fun readyNotificationAvatars(update: NotificationUpdateFfi): PreWarmedNotificationAvatars {
         if (appLockScreenVisible) return PreWarmedNotificationAvatars(null, null)
         val senderUrl =
-            synchronized(profilePresentationLock) {
-                profilePresentations[update.sender.accountIdHex]?.avatarUrl
-            } ?: update.sender.pictureUrl
+            if (update.isDm || update.trigger != NotificationTriggerFfi.NEW_MESSAGE) {
+                synchronized(profilePresentationLock) {
+                    profilePresentations[update.sender.accountIdHex]?.avatarUrl
+                } ?: update.sender.pictureUrl
+            } else {
+                null
+            }
         val group =
             chatsController
                 ?.takeIf { it.boundAccountRef == update.accountRef && update.accountRef == activeAccountRef }

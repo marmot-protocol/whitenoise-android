@@ -76,6 +76,58 @@ class NotificationConversationIdentityImageTest {
         assertNull("a group identity is never a member's private contact", identityExtras(card)?.getString("contact"))
     }
 
+    /** Hidden member pictures do not schedule enrichment, consult private overrides or churn a group shortcut. */
+    @Test
+    fun readyGroupPictureIgnoresColdAndChangedSenderPictures() {
+        val posts = mutableListOf<Notification>()
+        val publications = AtomicInteger()
+        val privateReads = AtomicInteger()
+        val resolverCalls = AtomicInteger()
+        val fetched = mutableListOf<String>()
+        val presenter =
+            presenter(
+                posts,
+                resolver = { url -> resolverCalls.incrementAndGet(); url?.let { fetched += it; solid(Color.GREEN) } },
+                contactAvatar = { _, _ -> privateReads.incrementAndGet(); true to solid(Color.RED) },
+                shortcutPublications = publications,
+            )
+        val picture = solid(Color.BLUE)
+        show(presenter, group(), conversation = picture, senderUrl = PICTURE_URL)
+        show(presenter, group().copy(messageIdHex = "next"), conversation = picture, senderUrl = "https://example.com/changed.png")
+
+        assertTrue(fetched.isEmpty())
+        assertEquals(0, privateReads.get())
+        assertEquals(0, resolverCalls.get())
+        assertEquals(1, publications.get())
+        assertEquals(2, posts.size)
+        assertEquals(Color.BLUE, identityPixel(liveCard()))
+        assertEquals(DEFAULT_SENDER, lastMessagePerson(liveCard()).key)
+        assertEquals(0, Color.alpha(pixel(lastMessagePerson(liveCard()))))
+    }
+
+    /** A missing group URL picture still enriches the same card without fetching its member's image. */
+    @Test
+    fun groupPictureUrlStillLoadsWithoutTheHiddenSenderUrl() {
+        val posts = mutableListOf<Notification>()
+        val fetched = mutableListOf<String>()
+        var enrichment: (suspend () -> Unit)? = null
+        val groupUrl = "https://example.com/group.png"
+        val presenter =
+            presenter(
+                posts,
+                resolver = { url -> fetched += checkNotNull(url); solid(Color.BLUE) },
+                launcher = { enrichment = it },
+            )
+        show(presenter, group(), senderUrl = PICTURE_URL, conversationUrl = groupUrl)
+        runBlocking { checkNotNull(enrichment).invoke() }
+
+        assertEquals(listOf(groupUrl), fetched)
+        assertEquals(2, posts.size)
+        assertEquals(Color.BLUE, identityPixel(liveCard()))
+        assertTrue(liveCard().flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+        assertEquals(0, Color.alpha(pixel(lastMessagePerson(liveCard()))))
+    }
+
     /** Missing pictures fall back to the conversation shortcut's monogram, never the app icon or a member's face. */
     @Test
     fun missingPicturesFallBackToTheConversationMonogram() {
@@ -312,21 +364,23 @@ class NotificationConversationIdentityImageTest {
             assertTrue(card.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
         }
 
-    /** A late member picture cannot undo a newer sender nickname or replace the group's own picture. */
+    /** An unused late member picture causes no fetch or rewrite and keeps the current sender name. */
     @Test
     fun lateGroupSenderPictureKeepsTheCurrentNameAndNoSenderPixels() =
         runBlocking {
             val posts = mutableListOf<Notification>()
-            val presenter = presenter(posts, resolver = ::latePicture)
+            val fetched = mutableListOf<String>()
+            val presenter = presenter(posts, resolver = { url -> url?.let { fetched += it; solid(Color.MAGENTA) } })
             val picture = solid(Color.BLUE)
             show(presenter, group(), conversation = picture)
             presenter.refreshContactSenderName(ACCOUNT, DEFAULT_SENDER, "Maya")
             val before = posts.size
             val sources = NotificationIdentityPictureSources(picture, null, null, PICTURE_URL)
 
-            assertTrue(refreshLateIdentity(presenter, group(), sources))
+            assertFalse(refreshLateIdentity(presenter, group(), sources))
 
-            assertEquals(before + 1, posts.size)
+            assertTrue(fetched.isEmpty())
+            assertEquals(before, posts.size)
             val card = liveCard()
             assertEquals(Color.BLUE, identityPixel(card))
             assertEquals("Maya", lastMessagePerson(card).name.toString())
@@ -384,12 +438,13 @@ class NotificationConversationIdentityImageTest {
             assertEquals(Color.BLUE, identityPixel(liveCard()))
         }
 
-    /** A failed group-picture load cannot turn a late sender picture into visible member pixels. */
+    /** A failed group-picture load never fetches an unused sender image or rewrites the card. */
     @Test
     fun lateIdentityRefreshKeepsSenderPixelsHiddenWhenTheGroupLoaderFails() =
         runBlocking {
             val posts = mutableListOf<Notification>()
-            val presenter = presenter(posts, resolver = ::latePicture)
+            val fetched = mutableListOf<String>()
+            val presenter = presenter(posts, resolver = { url -> url?.let { fetched += it; solid(Color.MAGENTA) } })
             show(presenter, group())
             val before = posts.size
             val sources =
@@ -401,9 +456,10 @@ class NotificationConversationIdentityImageTest {
                     conversationLoader = { error("the group picture download failed") },
                 )
 
-            assertTrue(refreshLateIdentity(presenter, group(), sources))
+            assertFalse(refreshLateIdentity(presenter, group(), sources))
 
-            assertEquals("the late rewrite is still bounded to once", before + 1, posts.size)
+            assertTrue(fetched.isEmpty())
+            assertEquals("no visible picture arrived, so no rewrite is needed", before, posts.size)
             assertEquals(0, Color.alpha(pixel(lastMessagePerson(liveCard()))))
         }
 
@@ -534,11 +590,15 @@ class NotificationConversationIdentityImageTest {
         launcher: (suspend () -> Unit) -> Unit = { error("ready pictures must not launch enrichment") },
         contactAvatar: (String, String) -> Pair<Boolean, Bitmap?> = { _, _ -> false to null },
         pacer: NotificationPostPacer = NotificationPostPacer(),
+        shortcutPublications: AtomicInteger? = null,
     ): LocalNotificationPresenter =
         LocalNotificationPresenter(
             context = context,
             groupReconciliation = {},
-            shortcutPublisher = { ShortcutManagerCompat.pushDynamicShortcut(context, it) },
+            shortcutPublisher = {
+                shortcutPublications?.incrementAndGet()
+                ShortcutManagerCompat.pushDynamicShortcut(context, it)
+            },
             notificationPoster = { notificationManager, tag, id, notification ->
                 posts += notification
                 notificationManager.notify(tag, id, notification)
@@ -567,6 +627,7 @@ class NotificationConversationIdentityImageTest {
         conversation: Bitmap? = null,
         sender: Bitmap? = null,
         senderUrl: String? = null,
+        conversationUrl: String? = null,
         body: String = "hi",
     ) {
         assertTrue(
@@ -575,6 +636,7 @@ class NotificationConversationIdentityImageTest {
                     update,
                     previewTextOverride = body,
                     conversationAvatarBitmap = conversation,
+                    conversationAvatarUrl = conversationUrl,
                     senderAvatarBitmap = sender,
                     senderAvatarUrl = senderUrl,
                     shortNpub = { "npub1test" },
