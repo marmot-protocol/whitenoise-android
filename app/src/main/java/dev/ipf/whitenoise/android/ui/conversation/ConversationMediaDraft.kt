@@ -413,9 +413,10 @@ internal class ConversationMediaDraftState(
         mediaSlotIds: Set<String>,
         documentUris: Set<Uri>,
     ) {
-        // Sent picks leave the draft: their workers retire, and a just-sent thumbnail starts its pick's own anew.
-        (mediaSlotIds + documentUris.map(Uri::toString)).forEach { pick ->
-            IsolatedMediaDecoder.retireDomain(controller.outgoingMediaTrustDomain(pick))
+        // A sent document gets no just-sent poster, so its worker retires now. A sent photo's worker still decodes its
+        // pending preview and just-sent poster, and retires after that poster, or after its idle timeout without one.
+        documentUris.forEach { uri ->
+            IsolatedMediaDecoder.retireDomain(controller.outgoingMediaTrustDomain(uri.toString()))
         }
         backedPhotos = backedPhotos.filterKeys { it !in mediaSlotIds }
         preparedPhotos = preparedPhotos.filterKeys { it !in mediaSlotIds }
