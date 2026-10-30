@@ -66,7 +66,7 @@ execute: no ignored recovery case can satisfy adoption.
 
 The populated campaign builds current master and the candidate with one disposable
 signer and isolated `.mdkqualification` package. It fails closed if master no
-longer pins the reviewed October 23 source `d274dd22`. Dispatch once on the
+longer pins the reviewed 0.14.0 source `3fb4b475`. Dispatch once on the
 candidate branch and reuse a matching active run:
 
 ```bash

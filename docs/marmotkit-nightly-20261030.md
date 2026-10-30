@@ -58,6 +58,15 @@ Android changes needed to keep current behavior:
   `MarmotKitError.AccountDevicesActivationRefused` need no exhaustive handling in
   Android today.
 
+## Attachment transfer feed
+
+`AttachmentTransferSubscription.next()` now delivers a state change, `READY`
+included, as soon as the engine reports it; only progress-only replacements stay
+at four per second (mdk#2157, mdk#2311, mdk#2610). Android therefore no longer
+reads `attachmentTransferSnapshot` beside the feed to see `READY` sooner, the
+workaround added in #3031. Acquisition reads the snapshot once before demand and
+then follows the feed alone.
+
 ## Behavior that changes without Android code
 
 - Errors are classified by what they are (mdk#2602). A busy, closed or full store
@@ -65,10 +74,6 @@ Android changes needed to keep current behavior:
   `StorageFull` instead of `Runtime`. An external-signer rejection is now
   `ExternalSignerRejected` on every path, including identity proofs for KeyPackages
   and group changes, so diagnostics report it as `CANCELLED`.
-- `AttachmentTransferSubscription.next()` delivers state changes as soon as the
-  engine reports them; progress-only replacements stay at four per second.
-  Android's snapshot peek beside the feed still works and can be removed in a
-  follow-up.
 - Sign-out deletes only this device's KeyPackage slot (mdk#2654).
 - Group member rows are accounts, not devices, with a `deviceCount`. Creating a
   group or inviting adds every recent device of each recipient account, up to 20.

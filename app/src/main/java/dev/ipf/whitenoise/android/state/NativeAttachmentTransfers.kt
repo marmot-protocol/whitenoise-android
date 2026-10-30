@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.state
 
-import dev.ipf.marmotkit.AttachmentLocalTargetFfi
 import dev.ipf.marmotkit.AttachmentTransferSnapshotFfi
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.AttachmentTransferStatusFfi
@@ -97,18 +96,6 @@ internal suspend fun WhiteNoiseAppState.openNativeAttachmentFeed(
         marmotIo { subscribeAttachmentTransfers(request.accountRef, request.groupIdHex, listOf(target.toFfi())) },
     )
 
-/** Reads the authoritative state of one target without demanding, retrying or cancelling anything. */
-private suspend fun WhiteNoiseAppState.peekNativeTransferState(
-    request: AttachmentTransferRequest,
-    ffiTarget: AttachmentLocalTargetFfi,
-): AttachmentTransferStateFfi? =
-    marmotIo {
-        attachmentTransferSnapshot(request.accountRef, request.groupIdHex, listOf(ffiTarget))
-            .items
-            .singleOrNull()
-            ?.state
-    }
-
 /**
  * Observes native-owned acquisition. Interactive demand joins live work;
  * only the explicit Retry intent permits terminal recovery.
@@ -162,7 +149,6 @@ internal suspend fun WhiteNoiseAppState.acquireNativeAttachment(
             )
         },
         onState = { state -> diagnostics?.transferUpdate(state) },
-        peek = { peekNativeTransferState(request, ffiTarget) },
         pausedGraceMillis = automaticPauseGrace(priority, demandIntent),
     ) {
         marmotIo {
@@ -194,19 +180,17 @@ private fun automaticPauseGrace(
  * Installs native subscription ownership before caller cancellation can resume, then always releases it. A
  * non-null [pausedGraceMillis] ends observation of a transfer that stays paused that long.
  */
-@Suppress("LongParameterList") // Each observation hook is optional and named at its call site.
 internal suspend fun awaitNativeAttachment(
     open: suspend () -> NativeTransferFeed,
     onDemand: () -> Unit = {},
     onState: (AttachmentTransferStateFfi) -> Unit = {},
-    peek: NativeStatePeek? = null,
     pausedGraceMillis: Long? = null,
     demand: suspend () -> AttachmentTransferStateFfi?,
 ) {
     var owned: NativeTransferFeed? = null
     try {
         withContext(NonCancellable) { owned = open() }
-        observeNativeAttachment(checkNotNull(owned), demand, onDemand, onState, peek, pausedGraceMillis)
+        observeNativeAttachment(checkNotNull(owned), demand, onDemand, onState, pausedGraceMillis)
     } finally {
         withContext(NonCancellable + Dispatchers.IO) { owned?.close() }
     }
@@ -217,56 +201,46 @@ internal suspend fun awaitNativeAttachment(
     feed: NativeTransferFeed,
     onDemand: () -> Unit = {},
     onState: (AttachmentTransferStateFfi) -> Unit = {},
-    peek: NativeStatePeek? = null,
     demand: suspend () -> AttachmentTransferStateFfi?,
 ) {
-    feed.use { observeNativeAttachment(it, demand, onDemand, onState, peek, pausedGraceMillis = null) }
+    feed.use { observeNativeAttachment(it, demand, onDemand, onState, pausedGraceMillis = null) }
 }
 
 /** Waits for one demanded acquisition after ownership has already been made cancellation-safe. */
-@Suppress("LongParameterList") // The observation hooks are threaded through unchanged from the public entry points.
 private suspend fun observeNativeAttachment(
     updates: NativeTransferFeed,
     demand: suspend () -> AttachmentTransferStateFfi?,
     onDemand: () -> Unit,
     onState: (AttachmentTransferStateFfi) -> Unit,
-    peek: NativeStatePeek?,
     pausedGraceMillis: Long?,
 ) {
     // The subscription starts with a pre-demand snapshot; it must not be
     // mistaken for the terminal outcome of the acquisition we are starting.
     updates.nextState().also(onState)
     onDemand()
+    // MDK delivers a state change, READY included, as soon as it happens; only byte progress is spaced 250 ms apart.
     var state = demand()?.also(onState)
-    // The engine coalesces feed updates to one per 250 ms, so a fast transfer's READY would otherwise wait for it.
-    val pending = PendingFeedWait(updates)
-    try {
-        while (state != AttachmentTransferStateFfi.READY) {
-            if (state in NATIVE_TRANSFER_TERMINAL_FAILURES) {
-                throw NativeAttachmentTerminalException(requireNotNull(state))
-            }
-            state =
-                if (state == AttachmentTransferStateFfi.PAUSED && pausedGraceMillis != null) {
-                    awaitPauseEnd(pending, peek, onState, pausedGraceMillis)
-                } else {
-                    pending.next(state, peek).also(onState)
-                }
+    while (state != AttachmentTransferStateFfi.READY) {
+        if (state in NATIVE_TRANSFER_TERMINAL_FAILURES) {
+            throw NativeAttachmentTerminalException(requireNotNull(state))
         }
-    } finally {
-        pending.cancel()
+        state =
+            if (state == AttachmentTransferStateFfi.PAUSED && pausedGraceMillis != null) {
+                updates.awaitPauseEnd(onState, pausedGraceMillis)
+            } else {
+                updates.nextState().also(onState)
+            }
     }
 }
 
 /** Returns the first state after a pause, or ends observation once the pause has lasted [graceMillis]. */
-private suspend fun awaitPauseEnd(
-    pending: PendingFeedWait,
-    peek: NativeStatePeek?,
+private suspend fun NativeTransferFeed.awaitPauseEnd(
     onState: (AttachmentTransferStateFfi) -> Unit,
     graceMillis: Long,
 ): AttachmentTransferStateFfi =
     withTimeoutOrNull(graceMillis) {
         var next = AttachmentTransferStateFfi.PAUSED
-        while (next == AttachmentTransferStateFfi.PAUSED) next = pending.next(next, peek).also(onState)
+        while (next == AttachmentTransferStateFfi.PAUSED) next = nextState().also(onState)
         next
     } ?: throw NativeAttachmentPausedException()
 
