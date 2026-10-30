@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.notifications
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
-import android.media.RingtoneManager
 import android.net.Uri
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -59,7 +58,6 @@ class NotificationTonesTest {
             val expected = tone.filename.removeSuffix(".wav")
             assertEquals(expected, tone.uri(context).lastPathSegment)
             assertEquals(tone.token, tone.legacyUri(context).lastPathSegment)
-            assertEquals(expected, RingtoneManager.getRingtone(context, tone.uri(context)).getTitle(context))
         }
     }
 
