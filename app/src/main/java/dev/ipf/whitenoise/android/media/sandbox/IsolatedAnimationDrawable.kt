@@ -78,6 +78,17 @@ internal class IsolatedAnimationDrawable(
         session.preempted?.first { it } ?: awaitCancellation()
     }
 
+    /** A worker loss wakes the same mounted owner, without claiming its cause is known. */
+    override suspend fun awaitTermination(): dev.ipf.whitenoise.android.media.AnimationTermination {
+        val reasons = session.termination
+        return if (reasons != null) {
+            checkNotNull(reasons.first { it != null })
+        } else {
+            awaitPreemption()
+            dev.ipf.whitenoise.android.media.AnimationTermination.Preempted
+        }
+    }
+
     /** Takes ownership of one validated frame and recycles late, mismatched or superseded pixels. */
     fun accept(next: Bitmap) {
         // The worker may finish its one outstanding frame after PAUSE. ACK still happens in

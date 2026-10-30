@@ -119,9 +119,9 @@ class ComposerPrototypeGeometryTest {
         composeRule.runOnIdle { assertEquals("", state.valueState.value.text) }
     }
 
-    /** An accepted multi-line send takes its one-line geometry on the next frame, never a height in between. */
+    /** Accepted text clears immediately while its presentation height eases down to the empty composer. */
     @Test
-    fun acceptedSendCollapsesThePillInTheFrameTheTextLeaves() {
+    fun acceptedSendWithoutAnAdmittedFlightClearsAndSnapsThePill() {
         val draft =
             TextFieldValue("Ready to send a draft long enough to wrap onto a second line here", TextRange(10))
         val state = ComposerTextState(draft)
@@ -134,16 +134,15 @@ class ComposerPrototypeGeometryTest {
 
         composeRule.onNodeWithContentDescription(app.getString(R.string.send)).performClick()
         composeRule.runOnIdle { assertNotNull(accepted) }
-        // Hold the clock so the geometry is read a few frames after the clear,
-        // where a tween would still show most of the two-line height.
+        // This fixture has no flight owner. Drive only the acceptance composition and zero-duration layout.
         composeRule.mainClock.autoAdvance = false
         composeRule.runOnUiThread {
             accepted?.invoke()
             Snapshot.sendApplyNotifications()
         }
-        repeat(4) { composeRule.mainClock.advanceTimeByFrame() }
+        repeat(2) { composeRule.mainClock.advanceTimeByFrame() }
         composeRule.runOnIdle { assertEquals("", state.valueState.value.text) }
-        val afterFourFrames =
+        val afterAcceptance =
             composeRule
                 .onNodeWithTag(COMPOSER_PILL_SURFACE_TAG)
                 .fetchSemanticsNode()
@@ -158,8 +157,9 @@ class ComposerPrototypeGeometryTest {
                 .fetchSemanticsNode()
                 .boundsInRoot.height
         assertTrue("the empty pill must be shorter than it was with the two-line draft", settled < withDraft - 1f)
-        assertEquals("the collapse lands in one step, with no in-between height", settled, afterFourFrames, 1f)
-        composeRule.runOnIdle { assertFalse("the one-shot collapse is released once applied", state.collapsedBySend) }
+        assertTrue("the accepted collapse must move below the draft height", afterAcceptance < withDraft)
+        assertEquals("a non-flight acceptance must already have its final geometry", settled, afterAcceptance, 1f)
+        composeRule.runOnIdle { assertFalse("the accepted collapse releases once settled", state.collapsedBySend) }
     }
 
     /** Two-line drafts keep the persistent grip and fit their measured text above the tools. */

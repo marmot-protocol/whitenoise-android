@@ -77,26 +77,52 @@ class MediaAnimationService : Service() {
             val bytes = input.use { requireNotNull(readDecoderInput(it)) }
             val canary = canaryErrno(data)
             animation =
-                WorkerAnimation(bytes, data.getInt("edge"), output, codec, { sequence, width, height ->
-                    writeAnimationFrame(
-                        callback.binder,
-                        AnimationFrameInfo(
-                            session,
-                            sequence,
-                            width,
-                            height,
-                            Process.isIsolated(),
-                            checkSelfPermission(android.Manifest.permission.INTERNET) ==
-                                android.content.pm.PackageManager.PERMISSION_GRANTED,
-                            (application as dev.ipf.whitenoise.android.WhiteNoiseApplication)
-                                .initializedAppState() != null,
-                            canary,
-                        ),
-                    )
-                    armIdle()
-                }, ::nativeWork)
+                try {
+                    WorkerAnimation(bytes, data.getInt("edge"), output, codec, { sequence, width, height ->
+                        writeAnimationFrame(
+                            callback.binder,
+                            AnimationFrameInfo(
+                                session,
+                                sequence,
+                                width,
+                                height,
+                                Process.isIsolated(),
+                                checkSelfPermission(android.Manifest.permission.INTERNET) ==
+                                    android.content.pm.PackageManager.PERMISSION_GRANTED,
+                                (application as dev.ipf.whitenoise.android.WhiteNoiseApplication)
+                                    .initializedAppState() != null,
+                                canary,
+                            ),
+                        )
+                        armIdle()
+                    }, ::nativeWork)
+                } catch (rejected: java.io.IOException) {
+                    reportCodecRejection(callback)
+                    throw rejected
+                } catch (rejected: IllegalArgumentException) {
+                    reportCodecRejection(callback)
+                    throw rejected
+                }
         }
         animation?.firstFrame()
+    }
+
+    /** Only known decoder or source-geometry rejection has a permanent codec status. */
+    private fun reportCodecRejection(callback: Messenger) {
+        runCatching {
+            writeAnimationStatus(
+                callback.binder,
+                AnimationStatusInfo(
+                    session,
+                    AnimationFrameProtocol.CODEC_REJECTED,
+                    Process.isIsolated(),
+                    checkSelfPermission(android.Manifest.permission.INTERNET) ==
+                        android.content.pm.PackageManager.PERMISSION_GRANTED,
+                    (application as dev.ipf.whitenoise.android.WhiteNoiseApplication)
+                        .initializedAppState() != null,
+                ),
+            )
+        }
     }
 
     private fun nativeWork(block: () -> Unit) {

@@ -46,6 +46,15 @@
         "test_ids": [
           "CON-001"
         ]
+      },
+      {
+        "surface": "Compact toolbar target spacing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "val primaryTrailingActionWidth =",
+        "test_ids": [
+          "CON-030",
+          "CON-035"
+        ]
       }
     ],
     "settings_controls": [
@@ -128,11 +137,29 @@
         ]
       },
       {
+        "surface": "Only an admitted current text flight animates accepted composer collapse",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "fun animateAcceptedCollapse(",
+        "test_ids": [
+          "CON-036"
+        ]
+      },
+      {
         "surface": "Suggestion viewport preserves composer input and actions",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
         "anchor": "ComposerContentLayout(",
         "test_ids": [
           "CON-005"
+        ]
+      }
+    ],
+    "string_resources": [
+      {
+        "surface": "Locked voice recording cancel control",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "R.string.voice_message_cancel",
+        "test_ids": [
+          "CON-030"
         ]
       }
     ]

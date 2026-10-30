@@ -14,7 +14,7 @@
       {
         "surface": "Jump-to-newest badge count owner",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "anchor": "rememberConversationUnreadBadgeCount(",
+        "anchor": "rememberConversationUnreadBadge(",
         "test_ids": [
           "CON-003"
         ]
@@ -54,6 +54,14 @@
         "anchor": "attachmentSendClaim.send(",
         "test_ids": [
           "DIC-008"
+        ]
+      },
+      {
+        "surface": "Logical destination navigation motion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "val detailsRouteMotion =",
+        "test_ids": [
+          "CON-037"
         ]
       },
       {
@@ -283,6 +291,22 @@
         "anchor": "composerAutoFocusConsumed.value = true",
         "test_ids": [
           "CON-013"
+        ]
+      },
+      {
+        "surface": "Media source uses the current clear reading viewport",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "readingViewport = { timelineViewport.readingBoundsInWindow }",
+        "test_ids": [
+          "MED-044"
+        ]
+      },
+      {
+        "surface": "Batch-selection forward eligibility follows attachment downloads while messages are selected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "val selectionMediaCacheRevision",
+        "test_ids": [
+          "MSG-012"
         ]
       }
     ]

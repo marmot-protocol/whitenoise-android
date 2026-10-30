@@ -12,6 +12,24 @@
           "MSG-001",
           "MSG-040"
         ]
+      },
+      {
+        "surface": "rememberTimelineReactionMotion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TimelineRow.kt",
+        "anchor": "fun rememberTimelineReactionMotion(",
+        "test_ids": [
+          "MSG-041"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Reaction motion follows actual action read-only admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TimelineRow.kt",
+        "anchor": "controller.group.pendingConfirmation",
+        "test_ids": [
+          "MSG-041"
+        ]
       }
     ]
   },

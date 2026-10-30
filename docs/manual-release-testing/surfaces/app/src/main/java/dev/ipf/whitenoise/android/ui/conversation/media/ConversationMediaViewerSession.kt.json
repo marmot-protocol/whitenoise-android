@@ -1,0 +1,46 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationMediaViewerSession.kt",
+  "legacy_sha256": "985a63dc136bb61e0d0050d29ea133ac015eaa15e5febeede687060d231febe7",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ConversationMediaViewerSessionHost",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationMediaViewerSession.kt",
+        "anchor": "fun ConversationMediaViewerSessionHost(",
+        "test_ids": [
+          "MED-007",
+          "MED-015"
+        ]
+      },
+      {
+        "surface": "ComposerSendMotionMediaGate",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationMediaViewerSession.kt",
+        "anchor": "fun ComposerSendMotionMediaGate(",
+        "test_ids": [
+          "MED-044",
+          "CON-036"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Visible thumbnail expansion and selected attachment return continuity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationMediaViewerSession.kt",
+        "anchor": "class ConversationMediaViewerSessionState(",
+        "test_ids": [
+          "MED-044"
+        ]
+      },
+      {
+        "surface": "Media modal suppresses send ink without recomposing its transcript owner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationMediaViewerSession.kt",
+        "anchor": "fun ComposerSendMotionMediaGate(",
+        "test_ids": [
+          "MED-044",
+          "CON-036"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

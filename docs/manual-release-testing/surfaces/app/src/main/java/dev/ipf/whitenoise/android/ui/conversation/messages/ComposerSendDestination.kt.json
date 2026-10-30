@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ComposerSendDestination.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Accepted composer text presentation continuity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ComposerSendDestination.kt",
+        "anchor": "fun Modifier.composerSendDestination(",
+        "test_ids": [
+          "MSG-042"
+        ]
+      },
+      {
+        "surface": "Destination callbacks validate the exact active send owner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ComposerSendDestination.kt",
+        "anchor": "if (motion.activePresentationId != presentationId)",
+        "test_ids": [
+          "CON-036"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -881,19 +881,16 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                 hasReplyPreview = replyPreviewPresent,
                 hasMedia = hasMedia,
             )
-        val lastLineWidth = lastLineLayout?.bubbleFooterLastLineWidth(layoutDirection)
+        // Read after the body measures: its first onTextLayout already owns the
+        // last-line metrics in this pass, before a recomposition can capture them.
+        val readLastLineWidth: () -> Int? = { lastLineLayout?.bubbleFooterLastLineWidth(layoutDirection) }
         // The inline footer sits on this baseline, so the timestamp and its delivery glyph share the
         // last line's baseline instead of hanging below the text block.
-        val lastLineBaseline =
+        val readLastLineBaseline: () -> Int? = {
             lastLineLayout?.let { layout ->
-                if (layout.lineCount > 0) {
-                    layout.getLineBaseline(layout.lineCount - 1).toInt()
-                } else {
-                    null
-                }
+                if (layout.lineCount > 0) layout.getLineBaseline(layout.lineCount - 1).toInt() else null
             }
-        val footerLastLineWidth = lastLineWidth.takeIf { eventReferences.isEmpty() }
-        val footerLastLineBaseline = lastLineBaseline.takeIf { eventReferences.isEmpty() }
+        }
         if (collapsible && eventReferences.isNotEmpty() && showMessageTextBody) {
             Column(
                 modifier = bodyModifier,
@@ -904,7 +901,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                     readMore = readMoreFooter,
                     footer = {},
                     modifier = Modifier.fillMaxWidth(),
-                    lastLineWidth = lastLineWidth,
+                    lastLineWidth = readLastLineWidth,
                 ) {
                     selectionWrapper(movableMessageTextBody)
                 }
@@ -922,8 +919,8 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                 readMore = readMoreFooter,
                 footer = { if (hasInlineFooter) inlineFooter() },
                 modifier = bodyModifier,
-                lastLineWidth = footerLastLineWidth,
-                lastLineBaseline = footerLastLineBaseline,
+                lastLineWidth = { readLastLineWidth().takeIf { eventReferences.isEmpty() } },
+                lastLineBaseline = { readLastLineBaseline().takeIf { eventReferences.isEmpty() } },
                 allowInline = allowInlineFooter,
             ) {
                 selectableMessageBody()
@@ -932,8 +929,8 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             BubbleFooterLayout(
                 footer = inlineFooter,
                 modifier = bodyModifier,
-                lastLineWidth = footerLastLineWidth,
-                lastLineBaseline = footerLastLineBaseline,
+                lastLineWidth = { readLastLineWidth().takeIf { eventReferences.isEmpty() } },
+                lastLineBaseline = { readLastLineBaseline().takeIf { eventReferences.isEmpty() } },
                 allowInline = allowInlineFooter,
             ) {
                 selectableMessageBody()

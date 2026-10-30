@@ -481,7 +481,13 @@ internal fun MediaVideoGridTile(
                     bitmap = poster,
                     contentDescription = stringResource(R.string.reply_media_video),
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier =
+                        Modifier.fillMaxSize().mediaViewerThumbnail(
+                            messageIdHex,
+                            attachmentIndex,
+                            reference.sourceEpoch,
+                            gridTile = true,
+                        ),
                 )
             thumbhashImage != null ->
                 Image(
@@ -983,7 +989,12 @@ internal fun MediaVideoBubble(
                         bitmap = poster,
                         contentDescription = stringResource(R.string.reply_media_video),
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier =
+                            Modifier.fillMaxSize().mediaViewerThumbnail(
+                                messageIdHex,
+                                attachmentIndex,
+                                reference.sourceEpoch,
+                            ),
                     )
                 thumbhashImage != null ->
                     Image(

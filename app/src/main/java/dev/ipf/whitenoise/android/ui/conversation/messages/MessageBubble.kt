@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -132,6 +133,7 @@ import dev.ipf.whitenoise.android.ui.conversation.ConversationTtsSentenceLayoutS
 import dev.ipf.whitenoise.android.ui.conversation.ConversationUiTrace
 import dev.ipf.whitenoise.android.ui.conversation.InvitationActions
 import dev.ipf.whitenoise.android.ui.conversation.InviteAcceptanceResolutionStatus
+import dev.ipf.whitenoise.android.ui.conversation.LocalComposerSendMotion
 import dev.ipf.whitenoise.android.ui.conversation.LocalPollVotesHost
 import dev.ipf.whitenoise.android.ui.conversation.PollCard
 import dev.ipf.whitenoise.android.ui.conversation.PollMessageActionOwner
@@ -158,6 +160,9 @@ import dev.ipf.whitenoise.android.ui.conversation.media.shouldExpandCaptionedPor
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
 import dev.ipf.whitenoise.android.ui.conversation.reactions.CompleteReactionDetailsSheet
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ConfigureReactionsSheet
+import dev.ipf.whitenoise.android.ui.conversation.reactions.localReactionOverlay
+import dev.ipf.whitenoise.android.ui.conversation.reactions.rememberLocalReactionMotion
+import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.replies.isOwnReplySender
 import dev.ipf.whitenoise.android.ui.conversation.replies.senderTitleForReply
@@ -170,6 +175,7 @@ import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedUserFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.rememberLocalVCardContact
 import dev.ipf.whitenoise.android.ui.conversation.traceConversationUiSection
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
+import dev.ipf.whitenoise.android.ui.group.isCurrentGroupMutationOwner
 import dev.ipf.whitenoise.android.ui.markdownHasLinkAnnotationAt
 import dev.ipf.whitenoise.android.ui.markdownLinkDestinationAt
 import dev.ipf.whitenoise.android.ui.theme.LocalMessageBubbleBaseColorScheme
@@ -430,6 +436,20 @@ internal fun MessageBubble(
     // add a warning; only unknown reasons still take the error-styled
     // tombstone. Explicit deletion always wins.
     val invalidated = !deleted && item.projected?.invalidationStatus != null
+    val rowReactionMotion = dev.ipf.whitenoise.android.ui.conversation.reactions.LocalRowReactionMotion.current
+    val localReactionMotion =
+        rowReactionMotion ?: run {
+            val runtime = remember(controller) { appState.runtimeGeneration }
+            val currentOwner =
+                !appState.appLockScreenVisible &&
+                    controller.isCurrentGroupMutationOwner(appState, runtime) &&
+                    controller.acceptsConversationActionOwner(controller.boundAccountRef, controller.group.groupIdHex)
+            val available = currentOwner && !deleted && !invalidated && !actionsReadOnly
+            rememberLocalReactionMotion(
+                controller to item.presentationId,
+                enabled = rememberConversationMotionEnabled() && available,
+            )
+        }
     val invalidationPresentation =
         if (deleted) {
             TimelineInvalidationPresentation.None
@@ -595,8 +615,10 @@ internal fun MessageBubble(
         textLayouts.selectableTextLayouts.update(textLayouts.plainTextLayoutKey, layoutResult, coordinates)
     }
 
+    val composerSendMotion = dev.ipf.whitenoise.android.ui.conversation.LocalComposerSendMotion.current
     val plainTextSelectionModifier =
         Modifier.onGloballyPositioned { coordinates ->
+            composerSendMotion?.destinationText(item.presentationId, coordinates)
             textLayouts.plainTextLayoutTracker.coordinates = coordinates
             reportPlainTextLayoutIfReady()
         }
@@ -1044,6 +1066,7 @@ internal fun MessageBubble(
         // the delete landed.
         if (deleted || actionsReadOnly) return
         // Route via launchMutation: same survives-navigation rationale as delete/send.
+        val reactionOrigin = localReactionMotion.takeOrigin(emoji)
         appState.launchMutation {
             val target =
                 if (isPollRecord) {
@@ -1051,7 +1074,9 @@ internal fun MessageBubble(
                 } else {
                     record
                 }
-            controller.toggleReaction(emoji, target) {
+            controller.toggleReaction(emoji, target, onLocalIntent = { added ->
+                localReactionMotion.accept(emoji, added, reactionOrigin)
+            }) {
                 !isPollRecord || currentPollActionTarget(controller, pollOwner) != null
             }
         }
@@ -1520,6 +1545,7 @@ internal fun MessageBubble(
     BoxWithConstraints(
         Modifier
             .fillMaxWidth()
+            .then(if (rowReactionMotion == null) Modifier.localReactionOverlay(localReactionMotion) else Modifier)
             .onGloballyPositioned {
                 if (replySwipe.atRest) replySwipe.rowBoundsInRoot = it.boundsInRoot()
             },
@@ -2158,6 +2184,30 @@ internal fun MessageBubble(
                             parseMarkdown = parseMarkdown,
                         )
                     }
+                SideEffect {
+                    val document = displayedMarkdownDocument
+                    if (document != null && document.blocks.isNotEmpty() && !isSinglePlainSendParagraph(document)) {
+                        composerSendMotion
+                            ?.takeIf { it.activePresentationId == item.presentationId }
+                            ?.clear("destination-markdown-transformed")
+                    }
+                }
+                val currentSendDocument by rememberUpdatedState(displayedMarkdownDocument)
+                val sendSelectableTextLayoutReporter: dev.ipf.whitenoise.android.ui.SelectableTextLayoutReporter =
+                    remember(textLayouts, composerSendMotion, item.presentationId) {
+                        { key, layout, coordinates ->
+                            textLayouts.selectableTextLayoutReporter(key, layout, coordinates)
+                            if (composerSendMotion?.activePresentationId == item.presentationId &&
+                                layout != null &&
+                                coordinates != null
+                            ) {
+                                if (currentSendDocument?.let(::isSinglePlainSendParagraph) == true) {
+                                    composerSendMotion.destinationLayout(item.presentationId, layout)
+                                    composerSendMotion.destinationText(item.presentationId, coordinates)
+                                }
+                            }
+                        }
+                    }
                 val bodyOrWarningInsideBubble =
                     shouldFrameMessageBubbleSupplement(bodyTextToRender, outerInvalidationWarning)
                 val soleCaptionedVisual =
@@ -2319,6 +2369,7 @@ internal fun MessageBubble(
 
                 /** Records the plain-text leaf's layout and registers it for selection once positioned. */
                 val onPlainTextLayout: (TextLayoutResult) -> Unit = {
+                    composerSendMotion?.destinationLayout(item.presentationId, it)
                     textLayouts.plainTextLayoutTracker.layoutResult = it
                     reportPlainTextLayoutIfReady()
                 }
@@ -2484,7 +2535,7 @@ internal fun MessageBubble(
                                     persistedFailure = persistedFailure,
                                     textSelectionMode = textSelectionMode,
                                     customBubbleColorActive = customBubbleColorActive,
-                                    selectableTextLayoutReporter = textLayouts.selectableTextLayoutReporter,
+                                    selectableTextLayoutReporter = sendSelectableTextLayoutReporter,
                                     markdownLinkLayoutReporter = textLayouts.markdownLinkLayoutReporter,
                                     onCopyMarkdownLink = ::copyMarkdownLink,
                                     deferMarkdownLinkActivation = deferMarkdownLinkActivation,
@@ -2575,7 +2626,7 @@ internal fun MessageBubble(
                                     persistedFailure = persistedFailure,
                                     textSelectionMode = textSelectionMode,
                                     customBubbleColorActive = customBubbleColorActive,
-                                    selectableTextLayoutReporter = textLayouts.selectableTextLayoutReporter,
+                                    selectableTextLayoutReporter = sendSelectableTextLayoutReporter,
                                     markdownLinkLayoutReporter = textLayouts.markdownLinkLayoutReporter,
                                     onCopyMarkdownLink = ::copyMarkdownLink,
                                     deferMarkdownLinkActivation = deferMarkdownLinkActivation,
@@ -2618,7 +2669,13 @@ internal fun MessageBubble(
                         modifier =
                             Modifier
                                 .then(textSelectionBoundsModifier)
-                                .then(actionAnchorBoundsModifier),
+                                .then(actionAnchorBoundsModifier)
+                                .composerSendDestination(
+                                    item.presentationId,
+                                    composerSendMotion,
+                                    bubblePresentation,
+                                    mine,
+                                ),
                         presentation = bubblePresentation,
                         highlighted = highlighted,
                         mine = mine,
@@ -2651,7 +2708,7 @@ internal fun MessageBubble(
                             persistedFailure = persistedFailure,
                             textSelectionMode = textSelectionMode,
                             customBubbleColorActive = customBubbleColorActive,
-                            selectableTextLayoutReporter = textLayouts.selectableTextLayoutReporter,
+                            selectableTextLayoutReporter = sendSelectableTextLayoutReporter,
                             markdownLinkLayoutReporter = textLayouts.markdownLinkLayoutReporter,
                             onCopyMarkdownLink = ::copyMarkdownLink,
                             deferMarkdownLinkActivation = deferMarkdownLinkActivation,
@@ -2749,6 +2806,7 @@ internal fun MessageBubble(
                         ),
                     quickReactionEmojis = quickReactionEmojis,
                     onDismissRequest = { onActionMenuOpenChange(false) },
+                    onReactionOrigin = localReactionMotion::choose,
                     onReact = { emoji ->
                         if (!deleted && !actionsReadOnly) {
                             onActionMenuOpenChange(false)
@@ -3083,51 +3141,61 @@ internal fun MessageBubble(
                                     )
                                 ComposerGate.COMPOSER ->
                                     if (!actionsReadOnly) {
-                                        ComposerBar(
-                                            replyingToEmoji =
-                                                rememberReplyReceivedEmoji(
-                                                    controller.replyingTo?.messageIdHex,
-                                                    controller,
-                                                    appState,
-                                                ),
-                                            replyingTo = controller.replyingTo,
-                                            replyingToMedia =
-                                                controller.replyingTo
-                                                    ?.let(controller::mediaReferencesFor)
-                                                    .orEmpty(),
-                                            replyingToDisplay =
-                                                controller.replyingTo
-                                                    ?.let { controller.replyTargetPreview(it, messageTextCopy) },
-                                            messageTextCopy = messageTextCopy,
-                                            onCancelReply = { controller.replyingTo = null },
-                                            onSend = { text, onAccepted ->
-                                                appState.launchMutation {
-                                                    appState.sendConversationText(controller, text, onAccepted)
-                                                }
-                                            },
-                                            initialDraft =
-                                                appState
-                                                    .draftSnapshotFor(controller.boundAccountRef, groupIdHex)
-                                                    ?.textFieldValue
-                                                    ?: TextFieldValue(""),
-                                            onDraftChange = {
-                                                appState.setDraft(controller.boundAccountRef, groupIdHex, it)
-                                            },
-                                            draftKey = composerDraftOwnerKey(controller.boundAccountRef, groupIdHex),
-                                            draftAccountRef = controller.boundAccountRef,
-                                            draftGroupIdHex = groupIdHex,
-                                            textState = composerTextState,
-                                            editingMessageId = controller.editingMessageId,
-                                            editingInitialText = editingRecord?.let { controller.displayedText(it) },
-                                            onCancelEdit = controller::cancelMessageEdit,
-                                            appState = appState,
-                                            mentionCandidates = mentionCandidates,
-                                            mentionPickerEnabled = mentionPickerEnabled,
-                                            enterKeyBehavior = appState.enterKeyBehavior,
-                                            recentEmojis = recentEmojis,
-                                            onEmojiUsed = onEmojiUsed,
-                                            onAfterSend = { surfaces.finishExpandedReaderSend(readerSession) },
-                                        )
+                                        CompositionLocalProvider(
+                                            LocalComposerSendMotion provides null,
+                                        ) {
+                                            ComposerBar(
+                                                replyingToEmoji =
+                                                    rememberReplyReceivedEmoji(
+                                                        controller.replyingTo?.messageIdHex,
+                                                        controller,
+                                                        appState,
+                                                    ),
+                                                replyingTo = controller.replyingTo,
+                                                replyingToMedia =
+                                                    controller.replyingTo
+                                                        ?.let(controller::mediaReferencesFor)
+                                                        .orEmpty(),
+                                                replyingToDisplay =
+                                                    controller.replyingTo
+                                                        ?.let { controller.replyTargetPreview(it, messageTextCopy) },
+                                                messageTextCopy = messageTextCopy,
+                                                onCancelReply = { controller.replyingTo = null },
+                                                onSend = { text, onAccepted ->
+                                                    appState.launchMutation {
+                                                        appState.sendConversationText(
+                                                            controller,
+                                                            text,
+                                                            onAccepted = onAccepted,
+                                                        )
+                                                    }
+                                                },
+                                                initialDraft =
+                                                    appState
+                                                        .draftSnapshotFor(controller.boundAccountRef, groupIdHex)
+                                                        ?.textFieldValue
+                                                        ?: TextFieldValue(""),
+                                                onDraftChange = {
+                                                    appState.setDraft(controller.boundAccountRef, groupIdHex, it)
+                                                },
+                                                draftKey =
+                                                    composerDraftOwnerKey(controller.boundAccountRef, groupIdHex),
+                                                draftAccountRef = controller.boundAccountRef,
+                                                draftGroupIdHex = groupIdHex,
+                                                textState = composerTextState,
+                                                editingMessageId = controller.editingMessageId,
+                                                editingInitialText =
+                                                    editingRecord?.let { controller.displayedText(it) },
+                                                onCancelEdit = controller::cancelMessageEdit,
+                                                appState = appState,
+                                                mentionCandidates = mentionCandidates,
+                                                mentionPickerEnabled = mentionPickerEnabled,
+                                                enterKeyBehavior = appState.enterKeyBehavior,
+                                                recentEmojis = recentEmojis,
+                                                onEmojiUsed = onEmojiUsed,
+                                                onAfterSend = { surfaces.finishExpandedReaderSend(readerSession) },
+                                            )
+                                        }
                                     }
                             }
                         },
@@ -3283,6 +3351,7 @@ internal fun MessageBubble(
                     tallies = reactionTallies,
                     mine = mine,
                     visibilityState = reactionVisibilityState,
+                    localMotion = localReactionMotion,
                     enabled = !deleted,
                     onClick = {
                         if (!deleted) {

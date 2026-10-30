@@ -23,7 +23,10 @@ class AppStateSendLockCoverageTest {
         assertTrue(
             "Mounted dictation must dispatch through the ordinary controller path",
             "sendDictationThroughMountedController(liveReply.controller, request)" in body &&
-                "sendConversationText(controller, request.payload, request.onPendingShown)" in mountedControllerBody,
+                Regex(
+                    """sendConversationText\(\s*controller,\s*request.payload,\s*""" +
+                        """onAccepted\s*=\s*request.onPendingShown,?\s*\)""",
+                ).containsMatchIn(mountedControllerBody),
         )
         assertTrue(
             "The ordinary text publisher must record its marmotIo timing section",
@@ -308,23 +311,34 @@ class AppStateSendLockCoverageTest {
         )
     }
 
+    /**
+     * DM classification prefers the engine's projected kind, read through a derived kind so classification readers
+     * do not recompose on every chat-list row update.
+     */
     @Test
     fun conversationClassificationPrefersProjectedKind() {
         val source = controllersSource().readText()
+        val derivedKind =
+            Regex(
+                """val\s+latestConversationKind:\s*ChatConversationKindFfi\?\s*by\s*derivedStateOf\s*\{\s*""" +
+                    """latestChatListRow\?\.conversationKind\s*}""",
+            )
         val projectedIsDm =
             Regex(
                 """val\s+isDm:\s*Boolean\s*\n\s*get\(\)\s*=\s*""" +
-                    """GroupProjector\.isDm\(latestChatListRow\?\.conversationKind,\s*memberCount,\s*group\.name\)""",
+                    """GroupProjector\.isDm\(latestConversationKind,\s*memberCount,\s*group\.name\)""",
             )
         val projectedIsDirect =
             Regex(
                 """val\s+isDirectConversation:\s*Boolean\s*\n\s*get\(\)\s*=\s*""" +
-                    """GroupProjector\.isDm\(latestChatListRow\?\.conversationKind,\s*memberCount,\s*group\.name\)""",
+                    """GroupProjector\.isDm\(latestConversationKind,\s*memberCount,\s*group\.name\)""",
             )
 
         assertTrue(
             "conversation-screen DM classification must prefer the engine's projected kind, heuristic only as fallback",
-            projectedIsDm.containsMatchIn(source) && projectedIsDirect.containsMatchIn(source),
+            derivedKind.containsMatchIn(source) &&
+                projectedIsDm.containsMatchIn(source) &&
+                projectedIsDirect.containsMatchIn(source),
         )
     }
 
@@ -398,22 +412,21 @@ class AppStateSendLockCoverageTest {
     /** Keeps read-watermark math tied to the edit-filtered timeline and every structural prefix row. */
     @Test
     fun conversationReadAnchorUsesHoistedRenderedTimelineAndCandidateIdentity() {
-        val source = conversationScreenSource().readText()
+        val screen = conversationScreenSource()
+        val source = screen.readText()
+        val tracking = screen.parentFile.resolve("ConversationUnreadTracking.kt").readText()
         val renderedTimelineIndex = source.indexOf("val renderedTimeline =")
-        val readAnchorHelperIndex = source.indexOf("private fun rememberConversationReadAnchor(")
-        val readAnchorHelper =
-            source.substring(
-                readAnchorHelperIndex,
-                source.indexOf("@OptIn(ExperimentalMaterial3Api::class)", readAnchorHelperIndex),
-            )
-        val readAnchorCallIndex = source.indexOf("rememberConversationReadAnchor(", renderedTimelineIndex)
+        val readAnchorHelper = tracking.substring(tracking.indexOf("private fun ConversationReadAnchorEffect("))
+        val readAnchorCallIndex = source.indexOf("ConversationUnreadTracking(", renderedTimelineIndex)
         val readAnchorCall = source.substring(readAnchorCallIndex, source.indexOf(")", readAnchorCallIndex) + 1)
+        val trackingCall = tracking.substring(tracking.indexOf("    ConversationReadAnchorEffect("))
 
         assertTrue(
             "read-anchor effect must preserve the durable watermark and reuse the hoisted edit-filtered timeline",
             renderedTimelineIndex >= 0 &&
                 renderedTimelineIndex < readAnchorCallIndex &&
                 "renderedTimeline = renderedTimeline" in readAnchorCall &&
+                "renderedTimeline = renderedTimeline" in trackingCall.substringBefore(")") &&
                 "remember(timelineViewport, renderedSize, trailingRowCount)" in readAnchorHelper &&
                 "currentHighestVisibleMessageId," in readAnchorHelper &&
                 "advanceConversationReadAnchor(" in readAnchorHelper &&

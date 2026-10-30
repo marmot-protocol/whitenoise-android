@@ -1,0 +1,24 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotionGeometry.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Centered actual-fit destination geometry for thumbnail continuity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotionGeometry.kt",
+        "anchor": "fun mediaViewerMotionBounds(",
+        "test_ids": [
+          "MED-044"
+        ]
+      },
+      {
+        "surface": "Recorded thumbnail covers morphing rounded bounds for portrait and wide photos",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotionGeometry.kt",
+        "anchor": "internal fun mediaViewerThumbnailScale(",
+        "test_ids": [
+          "MED-044"
+        ]
+      }
+    ]
+  }
+}

@@ -21,6 +21,17 @@ internal data class PreparedGroupAvatarPixels(
         if (asset != null && image != null) recordLoaded?.invoke(asset, image)
     }
 
+    /** Classification is reusable only for the exact selected revision, never fallback pixels. */
+    fun animationClassificationFor(asset: AvatarAssetFfi?): Boolean? =
+        asset?.takeIf { it.isRenderable() }?.let { current ->
+            retained
+                .firstOrNull {
+                    it.asset.target == current.target &&
+                        it.asset.reference == current.reference &&
+                        it.asset.contentRevision == current.contentRevision
+                }?.animationClassification
+        }
+
     /** A revision refresh may reuse known pixels, but a removed or different selection never can. */
     fun retainedFor(asset: AvatarAssetFfi?): ImageBitmap? =
         asset?.takeIf { it.isRenderable() }?.let { current ->
@@ -32,4 +43,5 @@ internal data class PreparedGroupAvatarPixels(
 internal data class PreparedAvatarImage(
     val asset: AvatarAssetFfi,
     val image: ImageBitmap,
+    val animationClassification: Boolean? = null,
 )

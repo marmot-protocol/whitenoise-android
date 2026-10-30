@@ -6,6 +6,7 @@ import android.view.Choreographer
 import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -6592,6 +6593,15 @@ class ConversationController(
         private set
 
     /**
+     * The engine's conversation kind alone. The row above changes with every last message, unread count and read
+     * marker, so the DM classification and title read this instead: their readers, every visible bubble among
+     * them, recompose only when the kind itself changes.
+     */
+    private val latestConversationKind: ChatConversationKindFfi? by derivedStateOf {
+        latestChatListRow?.conversationKind
+    }
+
+    /**
      * An encrypted image upload may succeed before clearing a legacy URL
      * avatar fails. MDK gives URL avatars precedence, so retain this transient
      * retry latch and avoid uploading the same bytes again on the next tap.
@@ -7133,6 +7143,11 @@ class ConversationController(
     val title: String
         get() = title()
 
+    /**
+     * The conversation's display title from its group, roster and engine conversation kind, with [copy] supplying
+     * the generated wording. Reads the derived kind, so its readers recompose on a chat-list row update only when
+     * that update changes the kind.
+     */
     fun title(copy: dev.ipf.whitenoise.android.core.GroupTitleCopy = dev.ipf.whitenoise.android.core.GroupTitleCopy.Default): String {
         val identity =
             conversationIdentityProjection(
@@ -7146,7 +7161,7 @@ class ConversationController(
             memberCount = identity.memberCount,
             memberTitle = { appState.chatMemberTitle(it) },
             copy = copy,
-            conversationKind = latestChatListRow?.conversationKind,
+            conversationKind = latestConversationKind,
             soleSelfMember = GroupProjector.isSelfSoleMember(members, conversationAccountIdHex),
         )
     }
@@ -7197,11 +7212,11 @@ class ConversationController(
     val memberCount: Int get() = GroupProjector.uniqueMemberCount(members)
     val isDm: Boolean
         get() =
-            GroupProjector.isDm(latestChatListRow?.conversationKind, memberCount, group.name) ||
+            GroupProjector.isDm(latestConversationKind, memberCount, group.name) ||
                 (
                     initialIsDm &&
                         !membersVerified &&
-                        latestChatListRow?.conversationKind != ChatConversationKindFfi.GROUP
+                        latestConversationKind != ChatConversationKindFfi.GROUP
                 )
 
     val subtitle: String
@@ -7233,7 +7248,7 @@ class ConversationController(
      * moderation capability is granted from an unverified roster.
      */
     val isDirectConversation: Boolean
-        get() = GroupProjector.isDm(latestChatListRow?.conversationKind, memberCount, group.name)
+        get() = GroupProjector.isDm(latestConversationKind, memberCount, group.name)
 
     /**
      * The authoritative deletion capability for [message], shared by the
@@ -8304,6 +8319,7 @@ class ConversationController(
         text: String,
         onAccepted: () -> Unit = {},
         onTerminalFailure: () -> Unit = {},
+        onPresentationAccepted: (String) -> Unit = {},
         onDurablyAccepted: () -> Unit = {},
     ) {
         val trimmed = text.trim()
@@ -8451,6 +8467,7 @@ class ConversationController(
         // draft (issue #264): clearing earlier, synchronously in the UI on the
         // mere act of dispatching this coroutine, lost the text whenever a
         // guard above bailed before this point.
+        onPresentationAccepted(optimisticKey)
         onAccepted()
         // The optimistic bubble is now published: the pending clock is on
         // screen. The chat-list order is reserved, but its preview waits for
@@ -9953,6 +9970,7 @@ class ConversationController(
     suspend fun toggleReaction(
         emoji: String,
         message: AppMessageRecordFfi,
+        onLocalIntent: (Boolean) -> Unit = {},
         stillAvailable: () -> Boolean = { true },
     ) {
         val account = reactionAccountIfAccepted() ?: return
@@ -9968,6 +9986,8 @@ class ConversationController(
         optimisticReactionChanges[optimisticId] = OptimisticReactionChange(target, emoji, add = desiredMine)
         recomputeReactions(setOf(target))
         val submission = reactionIntentConflator.submit(key, desiredMine)
+        // Local presentation acceptance is distinct from native/remote completion.
+        onLocalIntent(desiredMine)
         if (!submission.shouldDrain) return
 
         val outcome =

@@ -36,10 +36,15 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.MAX_ANIMATED_PROFILE_AVATAR_EDGE
 import dev.ipf.whitenoise.android.core.PROFILE_AVATAR_MAX_DIMENSION
+import dev.ipf.whitenoise.android.media.AnimationStartupException
+import dev.ipf.whitenoise.android.media.AnimationTermination
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.PreemptibleAnimation
+import dev.ipf.whitenoise.android.media.sandbox.AnimationAdmission
+import dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlin.math.roundToInt
 
@@ -110,19 +115,24 @@ internal suspend fun decodeAnimatedProfileAvatar(
         discard = { (it as? java.io.Closeable)?.close() },
     )
 
-/** Bounded group thumbnails wait for confirmed retirement and yield the worker to explicit media use. */
+/** Group owners retain one explicit demand ticket across their finite decode waits. */
 internal suspend fun decodeAnimatedGroupThumbnail(
     source: ByteArray,
     maxEdgePx: Int,
+): Drawable? = decodeAnimatedGroupThumbnail(source, maxEdgePx, null)
+
+/**
+ * Decodes a group thumbnail on IO against [demand]'s FIFO position, surfacing typed startup and admission-busy faults
+ * to the recovery loop, and closes a drawable that lands after the caller was cancelled.
+ */
+internal suspend fun decodeAnimatedGroupThumbnail(
+    source: ByteArray,
+    maxEdgePx: Int,
+    demand: AnimationAdmission.GroupDemand?,
 ): Drawable? =
     dev.ipf.whitenoise.android.media.decodeOwnedMedia(
         decode = {
-            MediaPipeline.decodeAnimatedDrawable(
-                source,
-                maxEdgePx,
-                decorative = true,
-                waitForDecorativeAdmission = true,
-            )
+            MediaPipeline.decodeGroupThumbnailAnimation(source, maxEdgePx, demand)
         },
         discard = { (it as? java.io.Closeable)?.close() },
     )
@@ -172,6 +182,7 @@ internal fun AnimatedProfileAvatarLayer(
     groupThumbnail: Boolean = false,
     onDecodeUnavailable: () -> Unit = {},
     decode: suspend (ByteArray, Int) -> Drawable? = ::decodeAnimatedProfileAvatar,
+    groupDecode: (suspend (ByteArray, Int, AnimationAdmission.GroupDemand?) -> Drawable?)? = null,
 ) {
     // Not keyed on the source: the visibility node only reports changes, so a reset here would leave a
     // replacement picture in the same slot believing it is off-screen until the next scroll.
@@ -182,20 +193,48 @@ internal fun AnimatedProfileAvatarLayer(
     val foreground = lifecycleState.isAtLeast(Lifecycle.State.STARTED)
     val animate =
         (explicitViewer || groupThumbnail) && shouldAnimateProfileAvatar(animationsEnabled, visible, foreground)
+    // Geometry changes may restart a decoder, but do not grant this same eligible source more faults.
+    val faultBudget = remember(source, animate) { AvatarFaultBudget() }
     val drawable by produceState<Drawable?>(null, source, maxEdgePx, animate) {
         value = null
         if (animate) {
-            playAvatarAnimation(
-                resumeAfterPreemption = groupThumbnail,
-                decode = { decode(source, maxEdgePx.coerceAtMost(MAX_ANIMATED_PROFILE_AVATAR_EDGE)) },
-                publish = { value = it },
-                onDecodeUnavailable = onDecodeUnavailable,
-            )
+            val demand = if (groupThumbnail) IsolatedMediaDecoder.groupDemand() else null
+            try {
+                faultBudget.playAvatarAnimation(
+                    resumeAfterPreemption = groupThumbnail,
+                    decode = {
+                        val edge = maxEdgePx.coerceAtMost(MAX_ANIMATED_PROFILE_AVATAR_EDGE)
+                        if (groupThumbnail && groupDecode != null) {
+                            groupDecode(source, edge, demand)
+                        } else {
+                            decode(source, edge)
+                        }
+                    },
+                    publish = { value = it },
+                    onDecodeUnavailable = onDecodeUnavailable,
+                    demand = demand,
+                )
+            } finally {
+                demand?.close()
+            }
         }
     }
-    Box(
+    AnimatedAvatarPixels(
+        drawable,
+        contentScale,
         modifier.onVisibilityChanged(minFractionVisible = VISIBLE_FRACTION) { visible = it },
-    ) {
+    )
+}
+
+/** Renders and disposes the existing raw-pixel drawable without owning retry or source state. */
+@Composable
+@Suppress("FunctionNaming")
+private fun AnimatedAvatarPixels(
+    drawable: Drawable?,
+    contentScale: ContentScale,
+    modifier: Modifier,
+) {
+    Box(modifier) {
         val current = drawable ?: return@Box
         val painter = remember(current) { AnimatedDrawablePainter(current) }
         DisposableEffect(current, painter) {
@@ -217,34 +256,64 @@ internal fun AnimatedProfileAvatarLayer(
     }
 }
 
-/** Reopens only viewer-preempted group sessions; cancellation and failed codecs never become retry loops. */
-private suspend fun playAvatarAnimation(
+/** Retained by the eligible source owner, independently of decoder geometry or first-frame success. */
+internal class AvatarFaultBudget {
+    private var replacements = 0
+
+    /** 250 ms before the first fault replacement, 1 s before the second, then null once the budget is spent. */
+    fun nextBackoff(): Long? =
+        when (replacements) {
+            0 -> 250L.also { replacements++ }
+            1 -> 1000L.also { replacements++ }
+            else -> null
+        }
+}
+
+/** Two fault replacements per continuous owner; successful first frames do not replenish the budget. */
+internal suspend fun AvatarFaultBudget.playAvatarAnimation(
     resumeAfterPreemption: Boolean,
     decode: suspend () -> Drawable?,
     publish: (Drawable?) -> Unit,
     onDecodeUnavailable: () -> Unit,
+    demand: AnimationAdmission.GroupDemand? = null,
 ) {
     while (true) {
-        val produced =
-            dev.ipf.whitenoise.android.state
-                .runCatchingCancellable { decode() }
-                .getOrNull()
-        try {
-            currentCoroutineContext().ensureActive()
-            publish(produced)
-            if (produced == null) {
-                onDecodeUnavailable()
-                return
+        currentCoroutineContext().ensureActive()
+        var produced: Drawable? = null
+        val reason =
+            try {
+                produced = decodeAvatarWhenAvailable(decode)
+                currentCoroutineContext().ensureActive()
+                publish(produced)
+                if (produced == null) {
+                    onDecodeUnavailable()
+                    return
+                }
+                if (resumeAfterPreemption && produced is PreemptibleAnimation) {
+                    produced.awaitTermination()
+                } else {
+                    awaitCancellation()
+                }
+            } catch (startup: AnimationStartupException) {
+                startup.reason
+            } finally {
+                publish(null)
+                (produced as? java.io.Closeable)?.close()
             }
-            if (resumeAfterPreemption && produced is PreemptibleAnimation) {
-                produced.awaitPreemption()
-            } else {
-                awaitCancellation()
-            }
-        } finally {
-            publish(null)
-            (produced as? java.io.Closeable)?.close()
+        currentCoroutineContext().ensureActive()
+        if (resumeAfterPreemption && reason == AnimationTermination.Preempted) continue
+        val fault =
+            reason == AnimationTermination.TransportUnavailable ||
+                reason == AnimationTermination.WorkerLostUnknown
+        val backoff = if (resumeAfterPreemption && fault) nextBackoff() else null
+        if (backoff == null) {
+            onDecodeUnavailable()
+            return
         }
+        demand?.beginBackoff()
+        delay(backoff)
+        currentCoroutineContext().ensureActive()
+        demand?.endBackoff()
     }
 }
 

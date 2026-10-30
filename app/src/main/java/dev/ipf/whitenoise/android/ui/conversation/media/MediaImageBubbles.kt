@@ -46,6 +46,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -425,11 +426,13 @@ internal fun MediaImageBubble(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .reportMediaApplyAfterDraw(mediaApplyHostAttempt)
                                 .combinedClickable(
+                                    interactionSource = null,
+                                    indication = rememberMediaViewerPressIndication(),
                                     onLongClick = onLongPress,
                                     onClick = ::dispatchViewerOpen,
-                                ),
+                                ).mediaViewerThumbnail(key, attachmentIndex, reference.sourceEpoch)
+                                .reportMediaApplyAfterDraw(mediaApplyHostAttempt),
                     )
                 is DecodedAttachmentPresentation.Animated ->
                     AnimatedDrawableAttachmentImage(
@@ -439,11 +442,13 @@ internal fun MediaImageBubble(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .reportMediaApplyAfterDraw(mediaApplyHostAttempt)
                                 .combinedClickable(
+                                    interactionSource = null,
+                                    indication = rememberMediaViewerPressIndication(),
                                     onLongClick = onLongPress,
                                     onClick = ::dispatchViewerOpen,
-                                ),
+                                ).mediaViewerThumbnail(key, attachmentIndex, reference.sourceEpoch)
+                                .reportMediaApplyAfterDraw(mediaApplyHostAttempt),
                     )
                 null ->
                     when {
@@ -561,58 +566,76 @@ internal fun MasonryImageLayout(
     tile: @Composable (index: Int, tileModifier: Modifier) -> Unit,
 ) {
     val gap = ConversationMessageMetrics.GallerySpacing
-    when (visibleCount) {
-        2 ->
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(gap),
-                modifier = Modifier.fillMaxWidth().height(GALLERY_TWO_HEIGHT),
-            ) {
-                tile(0, Modifier.weight(1f).fillMaxHeight())
-                tile(1, Modifier.weight(1f).fillMaxHeight())
-            }
-        3 ->
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(gap),
-                modifier = Modifier.fillMaxWidth().height(GALLERY_THREE_HEIGHT),
-            ) {
-                tile(0, Modifier.width(GALLERY_THREE_HEIGHT).fillMaxHeight())
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(gap),
-                    modifier = Modifier.weight(1f).fillMaxHeight(),
+    MediaThumbnailCanvas {
+        when (visibleCount) {
+            2 ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(gap),
+                    modifier = Modifier.fillMaxWidth().height(GALLERY_TWO_HEIGHT),
                 ) {
-                    tile(1, Modifier.weight(1f).fillMaxWidth())
-                    tile(2, Modifier.weight(1f).fillMaxWidth())
-                }
-            }
-        4 ->
-            Column(
-                verticalArrangement = Arrangement.spacedBy(gap),
-                modifier = Modifier.fillMaxWidth().height(GALLERY_FOUR_HEIGHT),
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.fillMaxWidth().weight(1f)) {
                     tile(0, Modifier.weight(1f).fillMaxHeight())
                     tile(1, Modifier.weight(1f).fillMaxHeight())
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.fillMaxWidth().weight(1f)) {
-                    tile(2, Modifier.weight(1f).fillMaxHeight())
-                    tile(3, Modifier.weight(1f).fillMaxHeight())
-                }
-            }
-        else ->
-            Column(
-                verticalArrangement = Arrangement.spacedBy(gap),
-                modifier = Modifier.fillMaxWidth().height(GALLERY_FIVE_HEIGHT),
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.fillMaxWidth()) {
-                    tile(0, Modifier.weight(1f).height(GALLERY_TWO_HEIGHT))
-                    tile(1, Modifier.weight(1f).height(GALLERY_TWO_HEIGHT))
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.fillMaxWidth()) {
-                    for (index in 2 until visibleCount.coerceAtMost(MAX_VISIBLE_GALLERY_FRAMES)) {
-                        tile(index, Modifier.weight(1f).height(GALLERY_FIVE_SECOND_ROW_HEIGHT))
+            3 ->
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(gap),
+                    modifier = Modifier.fillMaxWidth().height(GALLERY_THREE_HEIGHT),
+                ) {
+                    tile(0, Modifier.width(GALLERY_THREE_HEIGHT).fillMaxHeight())
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(gap),
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                    ) {
+                        tile(1, Modifier.weight(1f).fillMaxWidth())
+                        tile(2, Modifier.weight(1f).fillMaxWidth())
                     }
                 }
-            }
+            4 -> masonryFourImageLayout(gap, tile)
+            else ->
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(gap),
+                    modifier = Modifier.fillMaxWidth().height(GALLERY_FIVE_HEIGHT),
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.fillMaxWidth()) {
+                        tile(0, Modifier.weight(1f).height(GALLERY_TWO_HEIGHT))
+                        tile(1, Modifier.weight(1f).height(GALLERY_TWO_HEIGHT))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(gap), modifier = Modifier.fillMaxWidth()) {
+                        for (index in 2 until visibleCount.coerceAtMost(MAX_VISIBLE_GALLERY_FRAMES)) {
+                            tile(index, Modifier.weight(1f).height(GALLERY_FIVE_SECOND_ROW_HEIGHT))
+                        }
+                    }
+                }
+        }
+    }
+}
+
+/** Keeps the four-tile grid's native row and weight structure unchanged. */
+@Composable
+private fun masonryFourImageLayout(
+    gap: Dp,
+    tile: @Composable (index: Int, tileModifier: Modifier) -> Unit,
+) {
+    val bottomRight = 3
+    Column(
+        verticalArrangement = Arrangement.spacedBy(gap),
+        modifier = Modifier.fillMaxWidth().height(GALLERY_FOUR_HEIGHT),
+    ) {
+        Row(
+            horizontalArrangement =
+                Arrangement.spacedBy(gap),
+            modifier = Modifier.fillMaxWidth().weight(1f),
+        ) {
+            tile(0, Modifier.weight(1f).fillMaxHeight())
+            tile(1, Modifier.weight(1f).fillMaxHeight())
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(gap),
+            modifier = Modifier.fillMaxWidth().weight(1f),
+        ) {
+            tile(2, Modifier.weight(1f).fillMaxHeight())
+            tile(bottomRight, Modifier.weight(1f).fillMaxHeight())
+        }
     }
 }
 
@@ -930,6 +953,11 @@ internal fun MediaImageGridTile(
     Box(
         modifier =
             modifier.onSizeChanged(decodeRequest::onSizeChanged).combinedClickable(
+                interactionSource = null,
+                indication =
+                    rememberMediaViewerPressIndication(
+                        ready = presentation != null && !failed && !transfer.cancelling,
+                    ),
                 onLongClick = onLongPress,
                 // Two modes:
                 //   - Bytes ready (`bitmap != null`): tap opens the viewer.
@@ -974,14 +1002,22 @@ internal fun MediaImageGridTile(
                     source = animationSource,
                     contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().reportMediaApplyAfterDraw(mediaApplyHostAttempt),
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .mediaViewerThumbnail(messageIdHex, attachmentIndex, reference.sourceEpoch, gridTile = true)
+                            .reportMediaApplyAfterDraw(mediaApplyHostAttempt),
                 )
             is DecodedAttachmentPresentation.Animated ->
                 AnimatedDrawableAttachmentImage(
                     drawable = current.drawable,
                     contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().reportMediaApplyAfterDraw(mediaApplyHostAttempt),
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .mediaViewerThumbnail(messageIdHex, attachmentIndex, reference.sourceEpoch, gridTile = true)
+                            .reportMediaApplyAfterDraw(mediaApplyHostAttempt),
                 )
             null ->
                 when {

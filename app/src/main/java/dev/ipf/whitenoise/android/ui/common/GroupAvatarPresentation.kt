@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui.common
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.ImageBitmap
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
@@ -32,13 +34,18 @@ internal data class GroupAvatarPresentation(
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
 )
 
+/** Maximum local read for an evicted animated source, matching the existing encoded avatar budget. */
+private const val GROUP_ANIMATION_LOCAL_READ_MAX_BYTES: ULong = 2_097_152uL
+
 /** A durable group selection keeps viewer bytes and thumbnail admission under the same pinned owner. */
+@Suppress("LongParameterList") // Keeps exact pixel metadata attached to the existing selected-avatar presentation.
 internal fun WhiteNoiseAppState.durableGroupAvatarPresentation(
     group: AppGroupRecordFfi,
     asset: AvatarAssetFfi,
     accountRef: String?,
     image: ImageBitmap?,
     personPicture: Boolean,
+    animationClassification: Boolean? = null,
 ): GroupAvatarPresentation {
     val durableKey = accountRef?.let { asset.takeIf { it.isRenderable() }?.cacheKey(it) }
     val ownsGroupPicture = GroupProjector.ownsGroupPicture(group, asset, personPicture)
@@ -50,13 +57,23 @@ internal fun WhiteNoiseAppState.durableGroupAvatarPresentation(
         val sameAccount = activeAccountRef == accountRef && runtimeGeneration == runtime
         sameAccount && sameRuntime && AvatarImageLoader.currentCacheLifetime() == lifetime
     }
-    // The first-frame loader already retains bounded GIF bytes. A thumbnail must never re-read
-    // a warm static asset merely to discover its format; evicted sources retain the static frame.
+    // Encoded sources have a smaller cache than first-frame pixels. Recover an evicted durable
+    // source only from MDK's existing local store, inside the visible thumbnail's source budget.
+    // Known static first frames never reread bytes; classification shares their existing bitmap LRU entry.
     val animation =
         if (ownsGroupPicture && durableKey != null && owner != null) {
+            val readLocal = retainedAvatarBytesReader(asset, accountRef, GROUP_ANIMATION_LOCAL_READ_MAX_BYTES)
             GroupAvatarAnimation("$runtime|$lifetime|${group.groupIdHex}|$durableKey") {
                 if (ownsSource()) {
-                    AvatarImageLoader.peekAnimatedSource(durableKey)?.takeIf { ownsSource() }
+                    val classification =
+                        AvatarImageLoader.cachedAnimationClassification(durableKey)
+                            ?: animationClassification
+                    val bytes =
+                        AvatarImageLoader.peekAnimatedSource(durableKey)
+                            ?: readLocal
+                                ?.takeIf { classification != false }
+                                ?.invoke()
+                    bytes?.takeIf { ownsSource() }
                 } else {
                     null
                 }
@@ -145,3 +162,47 @@ internal fun groupAvatarDecodeDomain(
             dev.ipf.whitenoise.android.media.MediaTrustDomain
                 .publicProfiles(accountRef)
     }
+
+/** Classification travels with the exact displayed pixels through decoded-cache capacity eviction. */
+@Composable
+internal fun rememberGroupAvatarClassification(
+    appState: WhiteNoiseAppState,
+    asset: AvatarAssetFfi,
+    accountRef: String?,
+    image: ImageBitmap?,
+    seed: ChatListAvatarSeed?,
+): Boolean? {
+    val lifetime = AvatarImageLoader.currentCacheLifetime()
+    val key = accountRef?.let { asset.takeIf { it.isRenderable() }?.cacheKey(it) }
+    val pins =
+        LocalPreparedGroupAvatarPixels.current?.takeIf {
+            it.accountRef == accountRef && it.runtimeGeneration == appState.runtimeGeneration && it.lifetime == lifetime
+        }
+    return remember(appState, appState.runtimeGeneration, accountRef, lifetime, key, image) {
+        key?.let(AvatarImageLoader::cachedAnimationClassification)
+            ?: pins?.animationClassificationFor(asset)
+            ?: seed?.takeIf { image != null && it.image === image }?.animationClassification
+    }
+}
+
+/**
+ * Keeps selected native pixels and their exact retained classification under the same presentation owner. The
+ * pixels decode in [domain], the selection's [durableGroupPictureDomain].
+ */
+@Composable
+@Suppress("LongParameterList") // Mirrors the existing selected durable-avatar inputs.
+internal fun rememberSelectedDurableGroupAvatar(
+    appState: WhiteNoiseAppState,
+    group: AppGroupRecordFfi,
+    asset: AvatarAssetFfi,
+    accountRef: String?,
+    seed: ChatListAvatarSeed?,
+    personPicture: Boolean,
+    domain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
+): GroupAvatarPresentation {
+    val key = accountRef?.let { asset.takeIf { it.isRenderable() }?.cacheKey(it) }
+    val ownedSeed = seed?.takeIf { it.source == ChatListAvatarSource.DURABLE && it.key == key }
+    val image = rememberDurableAvatar(appState, asset, accountRef, domain) ?: ownedSeed?.image
+    val classification = rememberGroupAvatarClassification(appState, asset, accountRef, image, ownedSeed)
+    return appState.durableGroupAvatarPresentation(group, asset, accountRef, image, personPicture, classification)
+}

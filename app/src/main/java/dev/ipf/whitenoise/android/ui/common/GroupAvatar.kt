@@ -16,7 +16,6 @@ import dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
 import dev.ipf.whitenoise.android.state.ChatListAvatarSeed
-import dev.ipf.whitenoise.android.state.ChatListAvatarSource
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -24,7 +23,6 @@ import dev.ipf.whitenoise.android.state.adoptableSelectedAvatarAsset
 import dev.ipf.whitenoise.android.state.cacheKey
 import dev.ipf.whitenoise.android.state.currentGroupAvatarItem
 import dev.ipf.whitenoise.android.state.isPeerSourced
-import dev.ipf.whitenoise.android.state.isRenderable
 import dev.ipf.whitenoise.android.state.privateContactAvatarSource
 import dev.ipf.whitenoise.android.state.retainedAvatarBytesReader
 
@@ -67,17 +65,15 @@ internal fun rememberGroupAvatarPresentation(
     // A missing/corrupt local image may still use this account's native public-avatar selection.
     if (privateSource != null && privateImage != null) return GroupAvatarPresentation(privateImage, privateSource)
     val ownedSeed = firstFrameAvatar?.takeIf { it.matchesAvatarPresentationOwner(accountRef) }
-    val durableDomain = durableGroupPictureDomain(group, groupOwnsPicture, accountRef)
-    val durableImage = rememberDurableAvatar(appState, durableAvatar, accountRef, durableDomain)
     if (durableAvatar != null) {
-        val durableKey = accountRef?.let { durableAvatar.takeIf { it.isRenderable() }?.cacheKey(it) }
-        // Missing/invalidated assets must not revive a legacy bitmap or launch a second acquisition.
-        return appState.durableGroupAvatarPresentation(
+        return rememberSelectedDurableGroupAvatar(
+            appState,
             group,
             durableAvatar,
             accountRef,
-            durableImage ?: ownedSeed?.durableImageFor(durableKey),
+            ownedSeed,
             durableAvatarIsPersonPicture,
+            durableGroupPictureDomain(group, groupOwnsPicture, accountRef),
         )
     }
     val legacyUrl = ProfileSanitizer.protocolImageUrl(group.avatarUrl)
@@ -182,12 +178,6 @@ private fun ChatListAvatarSeed.matchesAvatarPresentationOwner(accountRef: String
     val currentOwner = this.accountRef == null || this.accountRef == accountRef
     val currentLifetime = cacheLifetime == null || cacheLifetime == AvatarImageLoader.currentCacheLifetime()
     return currentOwner && currentLifetime
-}
-
-/** A selected native identity may only reuse the exact durable presentation seed. */
-private fun ChatListAvatarSeed.durableImageFor(assetKey: String?): ImageBitmap? {
-    val selected = source == ChatListAvatarSource.DURABLE && key == assetKey
-    return image.takeIf { selected }
 }
 
 /** The row's selected asset already includes MDK's group/peer selection and membership checks. */

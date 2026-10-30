@@ -6,11 +6,15 @@ import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -32,7 +36,7 @@ import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 internal val composerSendingIdentityTargetSize = 48.dp
-private val sendingIdentityAvatarSize = 28.dp
+private val sendingIdentityAvatarSize = 24.dp
 
 /** Never substitutes the globally active account for the actual composer owner. */
 internal fun composerSendingAccount(
@@ -62,16 +66,22 @@ internal fun ComposerSendingIdentity(
         val sendingAs = stringResource(R.string.share_sending_as)
         val popupOffset = with(LocalDensity.current) { composerSendingIdentityTargetSize.roundToPx() }
         Box {
-            AccountAvatarButton(
-                title = title,
-                seed = account.accountIdHex,
-                pictureUrl = picture,
-                size = sendingIdentityAvatarSize,
-                touchTargetSize = composerSendingIdentityTargetSize,
-                actionDescription = sendingAs,
-                onClick = { showing = !showing },
-                modifier = Modifier.testTag("composer-sending-identity"),
-            )
+            ComposerToolbarTargets {
+                AccountAvatarButton(
+                    title = title,
+                    seed = account.accountIdHex,
+                    pictureUrl = picture,
+                    size = sendingIdentityAvatarSize,
+                    touchTargetSize = composerSendingIdentityTargetSize,
+                    actionDescription = sendingAs,
+                    onClick = { showing = !showing },
+                    modifier =
+                        Modifier
+                            .width(ComposerToolbarSlotWidth)
+                            .height(ComposerActionRowHeight)
+                            .testTag("composer-sending-identity"),
+                )
+            }
             if (showing) {
                 Popup(
                     alignment = Alignment.BottomStart,
@@ -97,4 +107,13 @@ internal fun ComposerSendingIdentity(
             }
         }
     }
+}
+
+/** Preserve compact visual slots while retaining platform minimum touch-target expansion. */
+@Composable
+internal fun ComposerToolbarTargets(content: @Composable () -> Unit) {
+    CompositionLocalProvider(
+        LocalMinimumInteractiveComponentSize provides ComposerToolbarSlotWidth,
+        content = content,
+    )
 }
