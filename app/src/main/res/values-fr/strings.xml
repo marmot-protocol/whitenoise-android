@@ -2509,4 +2509,20 @@
     <string name="voice_recording_limit_warning">L’enregistrement s’arrêtera dans 30 secondes à la limite de cinq minutes.</string>
     <string name="voice_recording_limit_reached">Limite de cinq minutes atteinte. Vérifiez votre message vocal avant de l’envoyer.</string>
     <string name="voice_recording_interrupted">Enregistrement interrompu. Vérifiez l’audio enregistré avant de l’envoyer.</string>
+
+    <string name="notification_tones">Sons White Noise</string>
+    <string name="notification_tone_ding">White Noise Ding</string>
+    <string name="notification_tone_pulse">White Noise Pulse</string>
+    <string name="notification_tone_preview">Appuyer pour écouter</string>
+    <string name="notification_tone_stop">Appuyer pour arrêter l’aperçu</string>
+    <string name="notification_tone_preview_failed">Impossible de lire l’aperçu. Réessayez.</string>
+    <string name="notification_tone_add">Ajouter aux sons Android</string>
+    <string name="notification_tone_add_detail">Rendre ces sons disponibles dans le sélecteur de sons Android.</string>
+    <string name="notification_tone_added">Ajoutés. Ouvrez une catégorie ci-dessous, puis Son pour choisir un son. Certains appareils les affichent sous Mes sons.</string>
+    <string name="notification_tone_add_failed">Impossible d’ajouter les sons. Réessayez ou conservez votre son Android actuel.</string>
+    <string name="notification_tone_scope">Écouter ou ajouter des sons ne modifie pas vos alertes. Choisissez un son dans Android pour chaque catégorie, conversation ou personne. Les conversations et les personnes auxquelles un son propre a été explicitement attribué conservent ce son. Les nouvelles catégories de messages utilisent Ding ; les catégories silencieuses ou personnalisées restent inchangées. Les aperçus utilisent le volume des notifications et respectent le mode silencieux et Ne pas déranger.</string>
+    <string name="notification_tone_android">Son Android</string>
+    <string name="notification_tone_silent">Silencieux</string>
+    <string name="notification_tone_off">Désactivé</string>
+    <string name="notification_tone_default">Par défaut</string>
 </resources>

@@ -1134,6 +1134,9 @@ class LocalizationResourceTest {
                 // In-app brand wordmark; the product name "White Noise" is kept
                 // identical across every locale.
                 "white_noise",
+                // Bundled sound names are stable product labels in Android's sound picker.
+                "notification_tone_ding",
+                "notification_tone_pulse",
                 "app_preferences",
                 "actions",
                 "bytes_count",

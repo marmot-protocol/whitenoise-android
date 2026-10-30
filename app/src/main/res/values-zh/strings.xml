@@ -2474,4 +2474,20 @@
     <string name="voice_recording_limit_warning">录音将在 30 秒后达到五分钟上限并停止。</string>
     <string name="voice_recording_limit_reached">已达到五分钟录音上限。发送前请检查语音消息。</string>
     <string name="voice_recording_interrupted">录音已中断。发送前请检查已录制的音频。</string>
+
+    <string name="notification_tones">White Noise 提示音</string>
+    <string name="notification_tone_ding">White Noise Ding</string>
+    <string name="notification_tone_pulse">White Noise Pulse</string>
+    <string name="notification_tone_preview">点按试听</string>
+    <string name="notification_tone_stop">点按停止试听</string>
+    <string name="notification_tone_preview_failed">无法播放试听音。请重试。</string>
+    <string name="notification_tone_add">添加到 Android 提示音</string>
+    <string name="notification_tone_add_detail">将这些提示音添加到 Android 声音选择器。</string>
+    <string name="notification_tone_added">已添加。打开下方的类别，然后选择“声音”来选取提示音。部分设备会将其列在“我的声音”中。</string>
+    <string name="notification_tone_add_failed">无法添加提示音。请重试或保留当前的 Android 提示音。</string>
+    <string name="notification_tone_scope">试听或添加提示音不会更改通知提醒。请在 Android 中为每个类别、对话或联系人选择声音。已明确指定专属声音的对话和联系人会保留该声音。新的消息类别使用 Ding；静音和自定义类别保持不变。试听使用通知音量，并遵循静音模式和勿扰模式。</string>
+    <string name="notification_tone_android">Android 提示音</string>
+    <string name="notification_tone_silent">静音</string>
+    <string name="notification_tone_off">关闭</string>
+    <string name="notification_tone_default">默认</string>
 </resources>

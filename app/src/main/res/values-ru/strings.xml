@@ -2583,4 +2583,20 @@
     <string name="voice_recording_limit_warning">Запись остановится через 30 секунд по достижении лимита в пять минут.</string>
     <string name="voice_recording_limit_reached">Достигнут лимит записи в пять минут. Проверьте голосовое сообщение перед отправкой.</string>
     <string name="voice_recording_interrupted">Запись прервана. Проверьте записанное аудио перед отправкой.</string>
+
+    <string name="notification_tones">Звуки White Noise</string>
+    <string name="notification_tone_ding">White Noise Ding</string>
+    <string name="notification_tone_pulse">White Noise Pulse</string>
+    <string name="notification_tone_preview">Нажмите, чтобы прослушать</string>
+    <string name="notification_tone_stop">Нажмите, чтобы остановить прослушивание</string>
+    <string name="notification_tone_preview_failed">Не удалось воспроизвести звук. Попробуйте ещё раз.</string>
+    <string name="notification_tone_add">Добавить в звуки Android</string>
+    <string name="notification_tone_add_detail">Сделать эти звуки доступными в системном выборе звука Android.</string>
+    <string name="notification_tone_added">Добавлено. Откройте категорию ниже, затем «Звук», чтобы выбрать мелодию. На некоторых устройствах они находятся в разделе «Мои звуки».</string>
+    <string name="notification_tone_add_failed">Не удалось добавить звуки. Попробуйте ещё раз или сохраните текущий звук Android.</string>
+    <string name="notification_tone_scope">Прослушивание и добавление звуков не меняет ваши оповещения. Выберите звук в Android для каждой категории, беседы или человека. Беседы и люди с явно назначенным собственным звуком сохраняют этот звук. Новые категории сообщений используют Ding; беззвучные и настроенные категории не изменяются. При прослушивании используется громкость уведомлений с учётом беззвучного режима и режима «Не беспокоить».</string>
+    <string name="notification_tone_android">Звук Android</string>
+    <string name="notification_tone_silent">Без звука</string>
+    <string name="notification_tone_off">Выключено</string>
+    <string name="notification_tone_default">По умолчанию</string>
 </resources>

@@ -86,6 +86,7 @@ internal fun NotificationsScreen(
     val hasAccount = appState.activeAccountRef != null
     val capability = appState.nativePushCapability()
     val selectedMode = appState.notificationDeliveryMode()
+    val soundLabels = rememberNotificationSoundLabels()
 
     SettingsScaffold(title = stringResource(R.string.notifications), onBack = onBack) {
         SettingsList {
@@ -144,8 +145,16 @@ internal fun NotificationsScreen(
                 )
             }
             item { SettingsExplainer(stringResource(R.string.notification_device_policy_detail)) }
+            item { SettingsSection(stringResource(R.string.notification_tones)) }
+            item { NotificationToneControl() }
+            item { SettingsExplainer(stringResource(R.string.notification_tone_scope)) }
             item { SettingsSection(stringResource(R.string.notification_categories)) }
-            item { GlobalNotificationCategories(onOpenChannel = { openNotificationChannelSettings(context, it) }) }
+            item {
+                GlobalNotificationCategories(
+                    onOpenChannel = { openNotificationChannelSettings(context, it) },
+                    soundLabels = soundLabels,
+                )
+            }
             item { SettingsExplainer(stringResource(R.string.notification_categories_detail)) }
         }
     }
@@ -300,13 +309,17 @@ internal fun NativePushCapability.subtitleResource(): Int =
 /** One link per Android notification channel; each opens that channel's system settings. */
 @Suppress("FunctionNaming")
 @Composable
-internal fun GlobalNotificationCategories(onOpenChannel: (NotificationChannelSpec) -> Unit) {
+internal fun GlobalNotificationCategories(
+    onOpenChannel: (NotificationChannelSpec) -> Unit,
+    soundLabels: Map<NotificationChannelSpec, String> = emptyMap(),
+) {
     SettingsGroup {
         NotificationChannelSpec.entries.filter { it != NotificationChannelSpec.USER_EVENT_SUMMARY }.forEach { channel ->
             row(channel.id) { context ->
                 SettingsLink(
                     context = context,
                     title = notificationChannelTitle(channel),
+                    value = soundLabels[channel],
                     onClick = { onOpenChannel(channel) },
                     modifier = Modifier.testTag("global-notification-category-${channel.id}"),
                 )
