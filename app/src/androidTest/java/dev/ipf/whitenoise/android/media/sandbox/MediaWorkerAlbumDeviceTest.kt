@@ -219,7 +219,7 @@ internal object AlbumScenarios {
     /**
      * Send tap -> attachments encoded for upload, then just-sent posters: the picks in slot order, as an unprepared
      * slot is read at send time, then each sent attachment's poster. With [retire], as on the pick lane, each pick's
-     * worker is retired at acceptance and again after its poster, as sending a pick does.
+     * worker is retired after its poster, as sending a photo does.
      */
     fun send(
         context: Context,
@@ -243,7 +243,6 @@ internal object AlbumScenarios {
                 results += (SystemClock.elapsedRealtimeNanos() - begin) to (jpeg != null)
                 jpeg?.bytes
             }
-        if (retire) picks.forEach { IsolatedMediaDecoder.retireDomain(it.domain) }
         picks.zip(encoded).forEachIndexed { index, (pick, bytes) ->
             val begin = SystemClock.elapsedRealtimeNanos()
             val poster =

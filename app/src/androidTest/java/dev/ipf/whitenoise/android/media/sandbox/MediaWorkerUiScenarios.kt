@@ -62,6 +62,7 @@ internal class UiLane private constructor(
     val name: String,
     val binding: MediaWorkerBaselineBinding,
     private val honorsDomains: Boolean,
+    private val transport: MediaDecodeTransport,
 ) : java.io.Closeable {
     /** The domain a production call on this lane passes for content of [domain]. */
     fun domain(domain: MediaTrustDomain): MediaTrustDomain = if (honorsDomains) domain else MediaTrustDomain.Unique
@@ -72,8 +73,13 @@ internal class UiLane private constructor(
         return (0 until endpoints.length()).sumOf { endpoints.getJSONObject(it).getInt("decodes") }
     }
 
-    /** Reinstalls the production default; that clears the facade and closes this lane's transport. */
+    /**
+     * Closes this lane's transport once and reinstalls the production default. The facade holds a test transport as
+     * both its image and its media transport, so clearing it in place would close a reusable lane twice.
+     */
     override fun close() {
+        IsolatedMediaDecoder.installTestTransport(null)
+        (transport as? java.io.Closeable)?.takeUnless { it is ReusableMediaTransport }?.close()
         IsolatedMediaDecoder.install(InstrumentationRegistry.getInstrumentation().targetContext)
         binding.closeObservers()
     }
@@ -108,7 +114,7 @@ internal class UiLane private constructor(
                     else -> error("Unknown UI lane $name")
                 }
             IsolatedMediaDecoder.installTestTransport(transport)
-            return UiLane(name, binding, honorsDomains = kind == "domain")
+            return UiLane(name, binding, honorsDomains = kind == "domain", transport = transport)
         }
 
         /** The kind of transport the production facade installs, read from its private field. */
