@@ -12,6 +12,8 @@ import android.graphics.Rect
 import android.graphics.RectF
 import dev.ipf.whitenoise.android.media.ImageAnimationStatus
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
+import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
 import dev.ipf.whitenoise.android.state.MediaQuality
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -84,20 +86,24 @@ internal class PhotoEditorRenderer(
     private val renderDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val memoryBudgetBytes: () -> Long = ::defaultEditorMemoryBudgetBytes,
     private val onEncode: () -> Unit = {},
-    /** The worker domain of the edited source, read at each call; single-use when unset. */
-    private val domain: () -> dev.ipf.whitenoise.android.media.MediaTrustDomain = {
-        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique
-    },
+    /**
+     * The worker domain of the unedited pick, read at each call, such as its conversation's outgoing domain;
+     * single-use when unset. Only inspection and unedited renders use it, see [photoEditRenderDomain].
+     */
+    private val domain: () -> MediaTrustDomain = { MediaTrustDomain.Unique },
 ) {
-    /** Validates [sourceBytes] as an editable still, inspected in the source's domain. */
+    /** Validates [sourceBytes] as an editable still, inspected in the unedited pick's domain. */
     suspend fun inspect(sourceBytes: ByteArray): PhotoEditorInspectResult =
-        withContext(renderContext()) {
+        withContext(renderContext(domain())) {
             inspectNow(sourceBytes)
         }
 
-    /** A bounded, upright preview of [sourceBytes], decoded in the source's domain, or null. */
+    /**
+     * A bounded, upright preview of [sourceBytes] for the editor, or null. It decodes single-use: the editor shows
+     * what the user is about to crop, blur or mark, so no worker that served an earlier pick may see it.
+     */
     suspend fun decodePreview(sourceBytes: ByteArray): Bitmap? =
-        withContext(renderContext()) {
+        withContext(renderContext(MediaTrustDomain.Unique)) {
             when (inspectNow(sourceBytes)) {
                 is PhotoEditorInspectResult.Failure -> null
                 is PhotoEditorInspectResult.Success -> {
@@ -117,13 +123,13 @@ internal class PhotoEditorRenderer(
             }
         }
 
-    /** Renders [recipe] over [sourceBytes] at [quality]; every inspection and decode runs in the source's domain. */
+    /** Renders [recipe] over [sourceBytes] at [quality], inspecting and decoding in [photoEditRenderDomain]. */
     suspend fun render(
         sourceBytes: ByteArray,
         recipe: PhotoEditRecipe,
         quality: MediaQuality,
     ): PhotoEditorRenderResult =
-        withContext(renderContext()) {
+        withContext(renderContext(photoEditRenderDomain(recipe, domain()))) {
             processRenderMutex.withLock {
                 currentCoroutineContext().ensureActive()
                 val inspected = inspectNow(sourceBytes)
@@ -206,11 +212,8 @@ internal class PhotoEditorRenderer(
         )
     }
 
-    /** The render dispatcher, declaring the source's worker domain on whichever thread decodes. */
-    private fun renderContext(): kotlin.coroutines.CoroutineContext =
-        renderDispatcher +
-            dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
-                .element(domain())
+    /** The render dispatcher, declaring [domain] as the worker domain on whichever thread decodes. */
+    private fun renderContext(domain: MediaTrustDomain) = renderDispatcher + MediaTrustScope.element(domain)
 
     @Suppress("CyclomaticComplexMethod") // Fail-closed source validation is intentionally centralized.
     private fun inspectNow(sourceBytes: ByteArray): PhotoEditorInspectResult {
@@ -498,6 +501,17 @@ internal class PhotoEditorRenderer(
         private val processRenderMutex = Mutex()
     }
 }
+
+/**
+ * The worker domain a render of [recipe] decodes in: the [unedited] pick's domain for [PhotoEditRecipe.Original],
+ * single-use for any edit. A worker that an earlier hostile pick of the same conversation compromised has seen that
+ * conversation's picks whole, so it must never produce a crop, blur or mark's pixels, which could restore what the
+ * user removed.
+ */
+internal fun photoEditRenderDomain(
+    recipe: PhotoEditRecipe,
+    unedited: MediaTrustDomain,
+): MediaTrustDomain = if (recipe == PhotoEditRecipe.Original) unedited else MediaTrustDomain.Unique
 
 private fun recipeMeetsMinimumCrop(
     orientedSize: EditorPixelSize,

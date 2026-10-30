@@ -84,8 +84,10 @@ failing requests in four domains at once keeping every quarantine entry, its
 bound and no exception. `MediaRefusalLedgerTest` hammers the session's refusal
 ledger from eight threads; without its lock it throws. `PictureDomainCoverageTest`
 and `PictureDomainMappingTest` check that every production picture names its
-domain and that only member-pinned bytes reach a conversation's worker. Those
-JVM fixtures exercise owner ordering only.
+domain and that only member-pinned bytes reach a conversation's worker;
+`PhotoEditorDomainTest` checks that edited renders and the editor preview decode
+single-use while unedited picks keep their outgoing domain. Those JVM fixtures
+exercise owner ordering only.
 
 `IsolatedMediaDecoderDeviceTest` supplies the operating-system evidence on a
 real device. A debug worker-state canary shows source A's retained digest and

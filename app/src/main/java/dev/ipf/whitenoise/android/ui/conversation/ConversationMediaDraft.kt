@@ -108,6 +108,7 @@ internal class ConversationMediaDraftState(
     private val messages: PhotoEditorMessages,
     private val pendingCameraFiles: PendingCameraCaptureFiles? = null,
 ) {
+    // Unedited picks inspect and render in the outgoing domain; the renderer makes edits and its preview single-use.
     private val renderer = PhotoEditorRenderer(domain = { controller.outgoingMediaTrustDomain })
 
     /** The outgoing domain this conversation's own picks decode in, for previews that hold no controller. */

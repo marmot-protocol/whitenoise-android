@@ -102,7 +102,12 @@ object AvatarImageLoader {
      */
     fun publicProfiles(): MediaTrustDomain = MediaTrustDomain.publicProfiles(activeAccount())
 
-    /** The domain an enclosing scope declared for this request, otherwise a single-use worker: the fail-safe. */
+    /**
+     * The domain an enclosing [dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope] declared for this request,
+     * otherwise a single-use worker: the fail-safe. An undeclared call inside a declared scope therefore inherits
+     * that scope's domain. `PictureDomainCoverageTest` does not see scopes; it requires every production call to
+     * name its domain instead, so this inherited default is reachable only from test and harness code.
+     */
     private fun declaredOrUnique(): MediaTrustDomain =
         dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
             .declared() ?: MediaTrustDomain.Unique

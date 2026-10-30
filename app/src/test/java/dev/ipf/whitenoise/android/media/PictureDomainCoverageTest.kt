@@ -29,6 +29,19 @@ class PictureDomainCoverageTest {
         assertEquals("loader calls without a domain", emptyList<String>(), undeclared.map { it.first.location })
     }
 
+    /** No production code passes a decoding avatar-loader function by reference, which could only use the default. */
+    @Test
+    fun avatarLoaderIsNeverPassedByReference() {
+        val reference =
+            Regex("""(?<![A-Za-z0-9_])AvatarImageLoader\s*::\s*(load|loadBanner|retryBanner|preWarm|loadBitmap)\b""")
+        val references =
+            mainSources().flatMap { file ->
+                val text = file.readText()
+                reference.findAll(text).map { match -> "${file.name}:${lineOf(text, match.range.first)}" }
+            }
+        assertEquals("loader references that rely on the default domain", emptyList<String>(), references)
+    }
+
     /** Each generic Avatar, ContactRow or group header given a picture URL names that picture's domain. */
     @Test
     fun genericPictureRowsNameTheirDomain() {
@@ -146,6 +159,12 @@ class PictureDomainCoverageTest {
         while (at < text.length && text[at] != '"') at += if (text[at] == '\\') 2 else 1
         return minOf(at + 1, text.length)
     }
+
+    /** The one-based line of [offset] in [text]. */
+    private fun lineOf(
+        text: String,
+        offset: Int,
+    ): Int = text.substring(0, offset).count { it == '\n' } + 1
 
     /** The app's main sources, from either the module or the repository root. */
     private fun mainSources(): List<File> {

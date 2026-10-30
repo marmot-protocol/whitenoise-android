@@ -36,9 +36,11 @@ sealed interface MediaTrustDomain {
     }
 
     /**
-     * Images the account's user picked from the device to send into one conversation: composer picks and previews,
-     * the photo editor, staged drafts, thumbhashes and just-sent thumbnails. The worker's output is sent there, so
-     * it may see only that conversation's picks, never another conversation's.
+     * Images the account's user picked from the device to send into one conversation, while unedited: composer
+     * picks and previews, the editor's source inspection, staged drafts, thumbhashes and just-sent thumbnails. The
+     * worker's output is sent there, so it may see only that conversation's picks, never another conversation's.
+     * An edited render and the editor's own preview decode [Unique] instead, so a worker an earlier pick compromised
+     * cannot restore what a crop, blur or mark removed.
      */
     data class Outgoing(
         val account: String,
@@ -50,8 +52,9 @@ sealed interface MediaTrustDomain {
 
     /**
      * Display-only images from this device for one account: the user's own custom-emoji files and stored private
-     * contact pictures. Their decoded pixels are only drawn on this device, never re-encoded or sent; an emoji is
-     * sent as its stored file.
+     * contact pictures. Their decoded pixels are drawn on this device, or exported only to this user's own
+     * notification surfaces: notification emoji are re-encoded as PNG and shared with the system through the app's
+     * FileProvider. They are never sent; an emoji is sent as its stored file.
      */
     data class Local(
         val account: String,

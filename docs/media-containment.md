@@ -134,8 +134,8 @@ caller cannot place under the rule decodes single-use.
 | --- | --- | --- |
 | Conversation | account, conversation | Bytes a member fixed: encrypted, hash-verified message media, thumbnails, bubbles and the viewer; custom emoji received as the message's own attachments; link-preview JPEGs whose digest the message pins, checked before decode; and the group's encrypted, hash-pinned image wherever it is drawn, in the chat list, durable chat rows and the notification loader included. |
 | Public profiles | account | Kind-0 profile pictures and banners, of people in every conversation and of the user's own accounts. They are published to relays, so anyone can fetch all of them and anyone may choose their bytes; sharing one worker exposes nothing new. A group's image is never one of these. Every caller names this domain explicitly. |
-| Outgoing | account, conversation | Images the user picked from the device to send into one conversation: composer picks and previews, the photo editor, staged drafts, Original-quality preparation, thumbhashes and just-sent thumbnails. The worker's output is sent there, so it never sees another conversation's picks. |
-| Local | account | Display-only files of this device: the user's custom-emoji files, notification emoji included, and stored private contact pictures. Their decoded pixels are only drawn on this device; an emoji is sent as its stored file, never re-encoded from a decode. |
+| Outgoing | account, conversation | Images the user picked from the device to send into one conversation, while unedited: composer picks and previews, the editor's source inspection, staged drafts, Original-quality preparation, thumbhashes and just-sent thumbnails. The worker's output is sent there, so it never sees another conversation's picks. An edited render (crop, turn, blur or marks) and the editor's own preview decode single-use instead. |
+| Local | account | Display-only files of this device: the user's custom-emoji files, notification emoji included, and stored private contact pictures. Their decoded pixels are drawn on this device or exported only to this user's own notification surfaces (notification emoji are re-encoded as PNG and shared with the system through the app's FileProvider); they are never sent, and an emoji is sent as its stored file. |
 | Unique | none | Anything else. Each input gets its own single-use generation, as in the per-input lane. Today: GIPHY first frames, Nostr event and linked-note images, a group's URL picture (in a header, the chat list, a durable row whose group has a URL, or a notification), web image search results and typed image URLs, picks during sign-up, identity-picture cropping, profile and group picture picks, preparing a new private contact picture, the avatar viewer, and picker rows that may show either a group or a person. The avatar loader and the generic picture rows fall back to this when a caller names nothing. |
 
 A group's picture decodes in its conversation only when it is the encrypted
@@ -156,16 +156,18 @@ Audit of the conversation rows against the rule, after round 3's review:
 | Nostr event and linked-note images | The note's author and its host | Unique (was Conversation) |
 | Direct chat peer's picture in a header or notification | Its host; it is published | Public profiles (was Conversation) |
 | Picks to send | The user, who chose each file for this conversation | Outgoing (was account-wide Local) |
+| Edited renders and the editor preview | The user's pick, after a crop, turn, blur or marks | Unique (was Outgoing) |
 
 Within its domain a compromised worker can still read every later input the
 generation serves, including descriptors it retained; alter the pixels it
 returns, which the parent validates for shape but not content; and use CPU and
-memory up to its watchdog. In the outgoing domain that means a hostile gallery
-file can carry another pick of the same conversation, including one the user
-then removed from the draft, into an image sent to that conversation. In the
-local domain it means a hostile emoji file can draw a private contact picture
-in an emoji slot on this device. Escapes through the kernel or system services
-are not contained by domains.
+memory up to its watchdog. Within the outgoing domain a hostile earlier pick
+can carry another pick of the same conversation, including one removed from
+the draft, into a sent image. Edited (cropped, blurred or marked) renders are
+decoded single-use, so an earlier pick cannot undo a redaction. In the local
+domain a hostile emoji file can draw a private contact picture in an emoji slot
+on this device or in this user's own notification. Escapes through the kernel or
+system services are not contained by domains.
 
 Lifetime:
 
@@ -543,8 +545,12 @@ to 874) and U2 (frame p95 44 ms). A repeat of that phase was decided before it
 ran and is shown beside it, not instead of it: U2 met, T4 missed again at p95
 693 ms. A diagnostic A/B on the same emulator ran the round-3 candidate APK
 against this one in ABBA order, domain lane only. It gave the same cold launch,
-p50 400 to 410 ms and p95 412 to 462 ms. So the T4 misses come from the
-environment, not from this round's code, but they are recorded as measured.
+p50 400 to 410 ms; cold-launch p95 was 432 (round 3), 462 (round 4), 429
+(round 4) and 412 ms (round 3). So the T4 misses are not caused by this round's
+code; the campaign tails (693 to 874 ms) are unexplained, and they are recorded
+as measured. T4's "p95" over ten samples is effectively the maximum, which
+decides T4 both ways: master's 438 ms is one sample, and its other nine were
+320 to 356 ms.
 
 What changed from run 4:
 - On stock Android the domain lane still meets every other item on both APIs.
@@ -562,6 +568,22 @@ What changed from run 4:
   several fresh single-use workers at once, within the live limit, or to
   accept that a group URL picture can miss its notification when ten arrive
   at once.
+
+#### Round 5: editor renders single-use
+
+Round 4's review moved every edited render and the editor's own preview to
+single-use workers, so a worker an earlier pick compromised cannot restore what
+a crop, blur or mark removed. The one measured row this moves is U5's editor
+half, whose harness decodes through the editor preview. It was measured again on
+the domain lane, recorded beforehand, against the same budget:
+
+| Editor cancelled mid-decode: pixels delivered; next image p50/max (first try) | Domain + zygote | Domain, no zygote |
+| --- | ---: | ---: |
+| API 30 | 0; 67/79 (10 of 10) | 0; 69/772 (10 of 10) |
+| API 36 | 0; 79/93 (10 of 10) | 0; 527/738 (10 of 10) |
+
+U5 stays met on both builds and both APIs. Containment acceptance passed 34 of
+34 on both APIs with the same build.
 
 Against keeping the reusable default, which ships the same launch path
 (*Reusable + zygote*), the domain lane costs a first image in a new
@@ -619,15 +641,22 @@ animation type checks.
   can see. A caller that names none gets Unique, never a shared domain: the
   avatar loader and the generic picture rows fall back to it too, and
   `PictureDomainCoverageTest` fails when a production loader call or a picture
-  row with a URL names no domain. Whether a named domain is the right one rests
-  on review and on the audit above.
+  row with a URL names no domain, or when production code passes a decoding
+  loader function by reference. The loader's fallback returns a domain an
+  enclosing `MediaTrustScope` declared before Unique, so an undeclared call
+  inside a declared scope inherits it; the guard reads call sites, not scopes,
+  and instead requires every production call to name its domain, which leaves
+  that inheritance to test and harness code. Whether a named domain is the right
+  one rests on review and on the audit above.
 - The avatar cache and its in-flight requests are keyed by URL, not domain. If
   one URL were both a person's published picture and a group's URL picture, the
   first request's domain would decode it for both.
-- In the outgoing domain a hostile gallery file can carry another pick of the
-  same conversation, including one removed from the draft before sending, into
-  an image sent there. In the local domain a hostile emoji file can draw a
-  private contact picture in an emoji slot on this device.
+- Within the outgoing domain a hostile earlier pick can carry another pick of
+  the same conversation, including one removed from the draft, into a sent
+  image. Edited (cropped, blurred or marked) renders are decoded single-use, so
+  redactions cannot be undone by an earlier pick. In the local domain a hostile
+  emoji file can draw a private contact picture in an emoji slot on this device
+  or in this user's own notification; nothing from the local domain is sent.
 - A cooperative self-exit ends the worker process only. Android's escalation
   kill covers the process group. A forked descendant of a compromised worker is
   outside the Binder witness.

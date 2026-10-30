@@ -1191,7 +1191,10 @@ internal fun rememberProfileBannerLoadState(
     bannerUrl: String,
     targetWidthPx: Int,
     peek: (String, Int) -> ImageBitmap? = AvatarImageLoader::peekBanner,
-    load: suspend (String, Int) -> ImageBitmap? = AvatarImageLoader::loadBanner,
+    load: suspend (String, Int) -> ImageBitmap? = { url, width ->
+        // A kind-0 banner is published, so it decodes in the public profiles.
+        AvatarImageLoader.loadBanner(url, width, AvatarImageLoader.publicProfiles())
+    },
 ): ProfileBannerLoadState {
     var image by remember(bannerUrl, targetWidthPx) { mutableStateOf(peek(bannerUrl, targetWidthPx)) }
     var settled by remember(bannerUrl, targetWidthPx) { mutableStateOf(image != null) }
@@ -1209,7 +1212,10 @@ internal fun rememberProfileBannerLoadState(
 internal fun ProfileBannerImage(
     bannerUrl: String,
     peek: (String, Int) -> ImageBitmap? = AvatarImageLoader::peekBanner,
-    load: suspend (String, Int) -> ImageBitmap? = AvatarImageLoader::loadBanner,
+    load: suspend (String, Int) -> ImageBitmap? = { url, width ->
+        // A kind-0 banner is published, so it decodes in the public profiles.
+        AvatarImageLoader.loadBanner(url, width, AvatarImageLoader.publicProfiles())
+    },
 ) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val targetWidthPx = profileBannerTargetWidthPx(maxWidth)

@@ -200,7 +200,10 @@ internal fun ProfileBannerControl(
     isUploading: Boolean,
     isProfileLoaded: Boolean = true,
     showValidationError: Boolean = true,
-    imageLoader: suspend (String, Int) -> ImageBitmap? = AvatarImageLoader::loadBanner,
+    imageLoader: suspend (String, Int) -> ImageBitmap? = { url, width ->
+        // The user's own kind-0 banner is published, so it decodes in the public profiles.
+        AvatarImageLoader.loadBanner(url, width, AvatarImageLoader.publicProfiles())
+    },
     onClick: () -> Unit,
 ) {
     // A 2:1 banner fills the screen's width, so it is decoded for that box
