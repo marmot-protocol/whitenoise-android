@@ -6880,7 +6880,7 @@ class WhiteNoiseAppState private constructor(
         /** Hides platform share targets before publishing a different active account. */
         override suspend fun hidePreviousAccountShortcuts() {
             hideConversationShortcutsFromDirectShare()
-            recordAccountSwitchMark("previous-shortcuts-hidden")
+            recordAccountSwitchMark("previous-shortcuts-hide-finished")
         }
 
         /** Commits the prepared projection and active label together without a suspension. */
@@ -6899,7 +6899,7 @@ class WhiteNoiseAppState private constructor(
             currentStartupProfiles.forEach(::applyAccountSwitchProfileSeed)
             activeAccountRef = label
             preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
-            recordAccountSwitchMark("published")
+            recordAccountSwitchMark("published", label)
             reloadMediaAutoDownloadMatrix()
         }
 
@@ -6993,9 +6993,16 @@ class WhiteNoiseAppState private constructor(
         recordPendingAccountSwitchStage(accountRef, "member-derived-local-ready", rowCount)
     }
 
-    /** Logs an elapsed-time mark for the account switch in flight, whichever account it targets. Debug builds only. */
-    internal fun recordAccountSwitchMark(stage: String) {
+    /**
+     * Logs an elapsed-time mark for the account switch in flight. Debug builds only. A mark naming [accountRef]
+     * is dropped unless that account is the switch's target, so the outgoing account's rebind cannot pose as it.
+     */
+    internal fun recordAccountSwitchMark(
+        stage: String,
+        accountRef: String? = null,
+    ) {
         val trace = pendingAccountSwitchTrace ?: return
+        if (accountRef != null && trace.accountRef != accountRef) return
         val elapsedMs = (SystemClock.elapsedRealtime() - trace.startedAtMs).coerceAtLeast(0L)
         appStateDebug { "account-switch $stage +${elapsedMs}ms" }
     }
