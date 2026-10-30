@@ -38,6 +38,14 @@
         "test_ids": [
           "CON-036"
         ]
+      },
+      {
+        "surface": "Entrance waits until the list reaches the new tail row",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTailEntrance.kt",
+        "anchor": "internal var tailReached:",
+        "test_ids": [
+          "CON-036"
+        ]
       }
     ]
   },
