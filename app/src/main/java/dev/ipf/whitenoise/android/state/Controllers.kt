@@ -6475,13 +6475,15 @@ class ConversationController(
         }
     },
     private val mediaPublisher: MediaPublisher? = null,
-    // The user's own sent pick decodes in this conversation's outgoing domain.
+    // A just-sent pick decodes in its own outgoing domain, which then retires: the pick has left the draft.
     private val mediaThumbnailDecoder: suspend (PendingAttachment) -> android.graphics.Bitmap? = { attachment ->
-        decodeMediaThumbnailOffMain(
-            attachment,
+        val domain =
             dev.ipf.whitenoise.android.media.MediaTrustDomain
-                .outgoing(accountRefOverride ?: appState.activeAccountRef, initialGroup.groupIdHex),
-        )
+                .outgoing(accountRefOverride ?: appState.activeAccountRef, initialGroup.groupIdHex, attachment.pick)
+        decodeMediaThumbnailOffMain(attachment, domain).also {
+            dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                .retireDomain(domain)
+        }
     },
     private val markdownParser: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
     private val groupArchivedUpdater: suspend (String, String, Boolean) -> AppGroupRecordFfi =
@@ -6882,13 +6884,12 @@ class ConversationController(
                 .conversation(conversationAccountRef, group.groupIdHex)
 
     /**
-     * The domain for images this conversation's user picks from the device to send here. Its worker's output is
-     * sent into this conversation, so it never sees another conversation's picks.
+     * The domain of one file this conversation's user picked to send here: [pick] is its composer slot id, which a
+     * restored draft attachment keeps as its own, or a document's URI. Its worker never sees another pick.
      */
-    internal val outgoingMediaTrustDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain
-        get() =
-            dev.ipf.whitenoise.android.media.MediaTrustDomain
-                .outgoing(conversationAccountRef, group.groupIdHex)
+    internal fun outgoingMediaTrustDomain(pick: String?): dev.ipf.whitenoise.android.media.MediaTrustDomain =
+        dev.ipf.whitenoise.android.media.MediaTrustDomain
+            .outgoing(conversationAccountRef, group.groupIdHex, pick)
 
     /** Current retained owner eligibility; the shell's privacy and route admission remain independent. */
     internal val ownsRetainedForegroundPresentation: Boolean

@@ -86,6 +86,11 @@ internal object IsolatedMediaDecoder {
         mediaTransport = null
     }
 
+    /** Retires [domain]'s still-image worker, such as a pick removed from a draft or sent; fakes ignore it. */
+    fun retireDomain(domain: dev.ipf.whitenoise.android.media.MediaTrustDomain) {
+        (transport as? IsolatedMediaTransport)?.retireDomain(domain)
+    }
+
     fun decode(
         bytes: ByteArray,
         edge: Int,

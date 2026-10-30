@@ -232,6 +232,122 @@ class MediaWorkerDomainTest {
     }
 
     /**
+     * An album of new picks, with every slot held by an idle domain, evicts as many idle domains at once as picks
+     * wait instead of one at a time, and still uses no victim's slot before that victim's death.
+     */
+    @Test
+    fun albumOfNewPicksEvictsIdleDomainsInParallel() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), validReplyAt = { true })
+        val transport = domainLane(context)
+        val waiting = mutableListOf<DecodeCall>()
+        try {
+            (1..3).forEach { finish(decodeIn(transport, it, pick(it))) }
+            val victims = context.bindings.toList()
+            (4..6).forEach { waiting += decodeIn(transport, it, pick(it)) }
+            assertTrue(
+                "Every idle domain is evicted at once",
+                victims.all { it.remote.retired.await(2, TimeUnit.SECONDS) },
+            )
+            Thread.sleep(FENCE_OBSERVATION_MS)
+            assertEquals("No new worker before a victim's death", 3, context.bindings.size)
+            victims.forEach { it.remote.die() }
+            waiting.forEach(::finish)
+            assertEquals(6, context.bindings.size)
+            assertEquals(
+                listOf(setOf(4), setOf(5), setOf(6)),
+                context.bindings
+                    .drop(3)
+                    .map { it.remote.inputs.toSet() }
+                    .sortedBy { it.first() },
+            )
+        } finally {
+            waiting.forEach { it.interruptAndJoin() }
+            context.dieAll()
+            transport.close()
+        }
+    }
+
+    /** Under concurrent picks of one conversation, from more picks than slots, every worker sees one pick only. */
+    @Test
+    fun concurrentPicksOfOneConversationNeverShareAWorker() {
+        val context =
+            BindingFixture(ApplicationProvider.getApplicationContext(), validReplyAt = { true }, dieOnRetire = true)
+        val transport = domainLane(context)
+        val picks = (1..PICKS).map(::pick)
+        val callers =
+            picks.mapIndexed { index, domain ->
+                Thread {
+                    repeat(INPUTS_PER_DOMAIN) { input -> finish(decodeIn(transport, index * 16 + input + 1, domain)) }
+                }.apply { start() }
+            }
+        try {
+            callers.forEach { it.join(TimeUnit.SECONDS.toMillis(SERVE_SECONDS * 2)) }
+            assertTrue("A caller is stuck", callers.none(Thread::isAlive))
+            val served =
+                context.bindings.map { bound ->
+                    bound.remote.inputs
+                        .map { (it - 1) / 16 }
+                        .toSet()
+                }
+            assertTrue("A worker saw two picks: $served", served.all { it.size <= 1 })
+            assertEquals(picks.size * INPUTS_PER_DOMAIN, context.bindings.sumOf { it.remote.requests })
+        } finally {
+            context.dieAll()
+            transport.close()
+        }
+    }
+
+    /** Retiring an idle pick's domain, as removing or sending it does, stops its worker before its next input. */
+    @Test
+    fun retiringAnIdleDomainStopsItsWorkerBeforeItsNextInput() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), validReplyAt = { true })
+        val transport = domainLane(context)
+        var next: DecodeCall? = null
+        try {
+            finish(decodeIn(transport, 1, pick(1)))
+            val first = context.bindings.single()
+            transport.retireDomain(pick(1))
+            assertTrue("The retired pick's worker is told to retire", first.remote.retired.await(2, TimeUnit.SECONDS))
+            next = decodeIn(transport, 2, pick(1))
+            Thread.sleep(FENCE_OBSERVATION_MS)
+            assertEquals("The pick's next input waits for its retired worker's death", 1, context.bindings.size)
+            first.remote.die()
+            finish(next)
+            assertEquals(
+                listOf(2),
+                context.bindings[1]
+                    .remote.inputs
+                    .toList(),
+            )
+        } finally {
+            next?.interruptAndJoin()
+            context.dieAll()
+            transport.close()
+        }
+    }
+
+    /** Retiring a pick's domain while its request is in flight lets the request finish, then retires that worker. */
+    @Test
+    fun retiringABusyDomainRetiresItsWorkerOnceItsRequestEnds() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
+        val transport = domainLane(context)
+        val call = decodeIn(transport, 1, pick(1))
+        try {
+            val worker = context.next()
+            assertTrue(worker.remote.decoded.await(2, TimeUnit.SECONDS))
+            transport.retireDomain(pick(1))
+            assertEquals("A busy worker is not retired under its request", 1L, worker.remote.retired.count)
+            assertTrue(withWorkerIdentity { worker.remote.deliverHeldReply(successfulPixelReply()) })
+            finish(call)
+            assertTrue("The worker retires once its request ends", worker.remote.retired.await(2, TimeUnit.SECONDS))
+        } finally {
+            call.interruptAndJoin()
+            context.dieAll()
+            transport.close()
+        }
+    }
+
+    /**
      * A domain's own request racing an eviction never lands on the worker being evicted: the victim is marked
      * retiring under the same lock that chose it, so the domain waits for a fresh worker instead of failing.
      */
@@ -479,6 +595,11 @@ class MediaWorkerDomainTest {
         val B = MediaTrustDomain.Conversation("account", "b")
         val C = MediaTrustDomain.Conversation("account", "c")
         val D = MediaTrustDomain.PublicProfiles("account")
+
+        /** Pick [n] of one album sent into one conversation, its own outgoing domain. */
+        fun pick(n: Int): MediaTrustDomain = MediaTrustDomain.Outgoing("account", "album", "pick-$n")
+
+        const val PICKS = 10
         const val INPUTS_PER_DOMAIN = 6
         const val FENCE_OBSERVATION_MS = 300L
         const val SERVE_SECONDS = 5L

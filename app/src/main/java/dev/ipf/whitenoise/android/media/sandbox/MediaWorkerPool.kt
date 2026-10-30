@@ -25,7 +25,8 @@ import java.util.concurrent.atomic.AtomicInteger
  * death. Clean spares, which never receive input before they are claimed, are started while inputs are
  * served. Live generations, including retired ones whose death is still unconfirmed, never exceed the live
  * limit: a new domain takes a spare or a free slot, or evicts the least recently used idle domain through the
- * same death fence.
+ * same death fence. As many evictions run at once as claims wait for a slot, so an album of new domains is not
+ * served one eviction at a time, and none beyond that.
  */
 @Suppress("TooManyFunctions") // One cohesive owner for generation binding, admission, retirement and disposal.
 internal class MediaWorkerPool(
@@ -40,6 +41,9 @@ internal class MediaWorkerPool(
     private val spareLimit = spares.coerceIn(0, minOf(MAX_SPARES, capacity - 1))
     private val generations = ArrayList<MediaWorker>(capacity)
     private var singleUseFence: MediaWorker? = null
+
+    /** Claims now waiting for a slot; evictions in flight never outnumber them. Guarded by [lock]. */
+    private var slotDemand = 0
     private var signal = CountDownLatch(1)
     private var closed = false
     private val callbackThread = lazy { HandlerThread("media-decoder-ipc").apply { start() } }
@@ -61,17 +65,35 @@ internal class MediaWorkerPool(
         current: () -> Boolean,
     ): MediaWorker? {
         val until = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(budgetMs)
-        while (true) {
-            val left = TimeUnit.NANOSECONDS.toMillis(until - System.nanoTime())
-            if (left <= 0L) return null
-            when (val step = synchronized(lock) { nextStep(domain, reusable, current) }) {
-                is ClaimStep.Claimed -> return step.worker
-                is ClaimStep.Await -> step.latch.await(minOf(left, WAIT_SLICE_MS), TimeUnit.MILLISECONDS)
-                is ClaimStep.AwaitDeath -> awaitDeath(step.worker, minOf(left, WAIT_SLICE_MS))
-                is ClaimStep.Evict -> retire(step.worker)
-                is ClaimStep.Start -> if (!start(step.worker)) return null
-                ClaimStep.Refused -> return null
+        val demand = SlotDemand()
+        try {
+            while (true) {
+                val left = TimeUnit.NANOSECONDS.toMillis(until - System.nanoTime())
+                if (left <= 0L) return null
+                when (val step = synchronized(lock) { nextStep(domain, reusable, current, demand) }) {
+                    is ClaimStep.Claimed -> return step.worker
+                    is ClaimStep.Await -> step.latch.await(minOf(left, WAIT_SLICE_MS), TimeUnit.MILLISECONDS)
+                    is ClaimStep.AwaitDeath -> awaitDeath(step.worker, minOf(left, WAIT_SLICE_MS))
+                    is ClaimStep.Evict -> retire(step.worker)
+                    is ClaimStep.Start -> if (!start(step.worker)) return null
+                    ClaimStep.Refused -> return null
+                }
             }
+        } finally {
+            synchronized(lock) { satisfy(demand) }
+        }
+    }
+
+    /** Whether one claim is counted in [slotDemand]. Guarded by [lock]. */
+    private class SlotDemand {
+        var counted = false
+    }
+
+    /** Stops counting [demand] as waiting for a slot. Called under the lock. */
+    private fun satisfy(demand: SlotDemand) {
+        if (demand.counted) {
+            demand.counted = false
+            slotDemand--
         }
     }
 
@@ -81,6 +103,7 @@ internal class MediaWorkerPool(
         domain: Any,
         reusable: Boolean,
         current: () -> Boolean,
+        demand: SlotDemand,
     ): ClaimStep {
         if (closed || !current()) return ClaimStep.Refused
         // The single-use fence: no single-use input while the previous single-use generation may live.
@@ -112,10 +135,19 @@ internal class MediaWorkerPool(
                 val young = waited < TimeUnit.MILLISECONDS.toNanos(STARTING_GRACE_MS)
                 if (young || generations.size >= capacity) return ClaimStep.Await(youngest.connected)
             }
-        if (generations.size < capacity) return ClaimStep.Start(reserve())
-        // A slot already being freed is awaited, never doubled by a second eviction.
-        generations.firstOrNull { it.retiring && it.dead.count != 0L }?.let { return ClaimStep.AwaitDeath(it) }
-        // Every slot is taken: the least recently used idle domain leaves through the death fence.
+        if (generations.size < capacity) {
+            satisfy(demand)
+            return ClaimStep.Start(reserve())
+        }
+        // Every slot is taken, so this claim waits for one. Slots already being freed are awaited while they cover
+        // every waiting claim, never doubled by another eviction; otherwise one more eviction runs alongside them.
+        if (!demand.counted) {
+            demand.counted = true
+            slotDemand++
+        }
+        val freeing = generations.filter { it.retiring && it.dead.count != 0L }
+        if (freeing.size >= slotDemand) return ClaimStep.AwaitDeath(freeing.first())
+        // The least recently used idle domain leaves through the death fence.
         generations
             .filter { it.reusable && !it.busy && !it.retiring && it.dead.count != 0L }
             .minByOrNull { it.lastUsedNanos }
@@ -141,7 +173,7 @@ internal class MediaWorkerPool(
                 worker.busy = false
                 worker.inputs++
                 worker.lastUsedNanos = System.nanoTime()
-                val spent = worker.inputs >= DOMAIN_INPUT_CAP
+                val spent = worker.inputs >= DOMAIN_INPUT_CAP || worker.retireOnRelease
                 // Retiring under the same lock, so no claim can take a spent generation before RETIRE is sent.
                 if (spent) worker.retiring = true
                 signalLocked()
@@ -156,18 +188,46 @@ internal class MediaWorkerPool(
 
     /**
      * Returns a claimed generation its request never sent input to. One claimed fresh for this request becomes a
-     * clean spare again; a domain's earlier generation simply waits for that domain's next input.
+     * clean spare again; a domain's earlier generation waits for that domain's next input, unless the domain was
+     * retired meanwhile.
      */
     fun unclaim(worker: MediaWorker) {
-        synchronized(lock) {
-            worker.busy = false
-            if (!worker.served) {
-                worker.domain = null
-                worker.reusable = false
-                if (singleUseFence === worker) singleUseFence = null
+        val retireNow =
+            synchronized(lock) {
+                worker.busy = false
+                if (!worker.served) {
+                    worker.domain = null
+                    worker.reusable = false
+                    worker.retireOnRelease = false
+                    if (singleUseFence === worker) singleUseFence = null
+                }
+                // A served generation whose domain was retired meanwhile retires now instead of waiting idle.
+                val retireNow = worker.served && worker.retireOnRelease && !worker.retiring
+                if (retireNow) worker.retiring = true
+                signalLocked()
+                retireNow
             }
-            signalLocked()
-        }
+        if (retireNow) retire(worker)
+    }
+
+    /**
+     * Retires [domain]'s live generation, such as a pick removed from a draft or sent: at once when it is idle,
+     * after its request in flight otherwise. Its next input, if any, waits for its death as usual.
+     */
+    fun retireDomain(domain: Any) {
+        val idle =
+            synchronized(lock) {
+                val owner =
+                    generations.firstOrNull { it.domain == domain && !it.retiring && it.dead.count != 0L }
+                        ?: return
+                if (owner.busy) {
+                    owner.retireOnRelease = true
+                    null
+                } else {
+                    owner.also { it.retiring = true }
+                }
+            }
+        idle?.let(::retire)
     }
 
     private fun retireIfIdle(
@@ -525,6 +585,9 @@ internal class MediaWorker(
 
     /** Claimed for an input now in flight. */
     var busy = false
+
+    /** Its domain was retired while this request was in flight; it retires when the request is released. */
+    var retireOnRelease = false
 
     /** Sent at least one input; a generation that never was can return to being a clean spare. */
     var served = false

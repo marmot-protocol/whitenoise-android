@@ -13,6 +13,11 @@ data class PendingAttachment(
     val dim: String? = null,
     val thumbhash: String? = null,
     val sourceFile: StagedUploadSource? = null,
+    /**
+     * The pick this attachment came from, a composer slot id or a document URI, whose own outgoing worker decodes
+     * its thumbnails; null when it came from no pick, which decodes single-use.
+     */
+    val pick: String? = null,
 ) {
     init {
         require(sourceFile == null || plaintextBytes.isEmpty()) { "attachment must have one input representation" }

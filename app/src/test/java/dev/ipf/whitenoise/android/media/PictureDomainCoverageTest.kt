@@ -29,6 +29,28 @@ class PictureDomainCoverageTest {
         assertEquals("loader calls without a domain", emptyList<String>(), undeclared.map { it.first.location })
     }
 
+    /**
+     * Each production photo-editor inspection, preview and render names its worker domain: its pick's own outgoing
+     * domain, or single-use for an identity or contact picture. The renderer's single-use default is never relied on.
+     */
+    @Test
+    fun editorRendererCallsNameTheirDomain() {
+        val required = mapOf("inspect" to 2, "decodePreview" to 2, "render" to 4)
+        val calls =
+            mainSources().flatMap { file ->
+                required.flatMap { (name, count) ->
+                    val receiver = """(?<![A-Za-z0-9_])(renderer|PhotoEditorRenderer\(\))"""
+                    calls(file, """$receiver\s*\.\s*$name\(""").map { it to count }
+                }
+            }
+        assertTrue("the scan found the renderer's callers", calls.size >= MIN_RENDERER_CALLS)
+        val undeclared =
+            calls.filter { (call, count) ->
+                call.arguments.size < count && call.arguments.none { it.name == "domain" }
+            }
+        assertEquals("renderer calls without a domain", emptyList<String>(), undeclared.map { it.first.location })
+    }
+
     /** No production code passes a decoding avatar-loader function by reference, which could only use the default. */
     @Test
     fun avatarLoaderIsNeverPassedByReference() {
@@ -174,5 +196,9 @@ class PictureDomainCoverageTest {
                 File("app/src/main/java/dev/ipf/whitenoise/android"),
             ).first(File::isDirectory)
         return root.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
+    }
+
+    private companion object {
+        const val MIN_RENDERER_CALLS = 8
     }
 }

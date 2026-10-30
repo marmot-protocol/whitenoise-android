@@ -53,6 +53,8 @@ internal class PhotoEditorCommitter(
         sourceLeaseId: String,
         recipe: PhotoEditRecipe,
         quality: MediaQuality,
+        domain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
+            dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
     ): PhotoEditorCommitResult {
         val sourceBytes =
             try {
@@ -63,7 +65,8 @@ internal class PhotoEditorCommitter(
                 null
             } ?: return PhotoEditorCommitResult.SourceUnavailable
         currentCoroutineContext().ensureActive()
-        val rendered = renderer.render(sourceBytes, recipe, quality)
+        // The render runs in the pick's own outgoing worker, which has never seen another pick.
+        val rendered = renderer.render(sourceBytes, recipe, quality, domain)
         if (rendered !is PhotoEditorRenderResult.Success) {
             return PhotoEditorCommitResult.RenderFailed(rendered)
         }

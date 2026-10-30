@@ -7,6 +7,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
 import dev.ipf.marmotkit.MessageDraftSummaryFfi
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.restoredPhotosMissingFrom
@@ -281,6 +282,35 @@ class PhotoDraftStagerTest {
                 setOf(slot.id),
                 restoredPhotosMissingFrom(listOf(slot), mapOf(slot.id to photo), emptyMap(), emptySet()),
             )
+        }
+
+    /**
+     * Two picks staged through their content URIs, one at standard and one at Original quality, each run every
+     * inspection, render and Original preparation in their own outgoing worker and never in the other's (#3373).
+     */
+    @Test
+    fun eachStagedPickDecodesOnlyInItsOwnWorker() =
+        runTest {
+            EditorDomainRecorder().use { recorder ->
+                val fixture = fixture()
+                val bytes = pngBytes()
+                ShadowContentResolver.reset()
+                val uris = listOf("slot-a", "slot-b").map { Uri.parse("content://photo-editor/$it") }
+                uris.forEach { uri ->
+                    shadowOf(app.contentResolver).registerInputStreamSupplier(uri) { ByteArrayInputStream(bytes) }
+                }
+                val cases = listOf("slot-a" to MediaQuality.Standard, "slot-b" to MediaQuality.Original)
+                cases.forEachIndexed { index, case ->
+                    val (slot, quality) = case
+                    recorder.clear()
+                    val staged = fixture.stager.stage(uris[index], slot, ACCOUNT, GROUP, quality)
+                    assertTrue(staged is PhotoDraftStageResult.Success)
+                    assertEquals(
+                        setOf(MediaTrustDomain.Outgoing(ACCOUNT, GROUP, slot)),
+                        recorder.domains(),
+                    )
+                }
+            }
         }
 
     private fun fixture(onEncode: () -> Unit = {}): Fixture {

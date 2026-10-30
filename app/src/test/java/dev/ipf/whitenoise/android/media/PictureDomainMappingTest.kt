@@ -30,15 +30,19 @@ class PictureDomainMappingTest {
         assertEquals(MediaTrustDomain.PublicProfiles(ACCOUNT), notificationSenderDomain(update(isDm = false)))
     }
 
-    /** Send-bound picks are keyed by account and conversation, apart from display-only local files. */
+    /** Each pick is its own outgoing domain, keyed by account, conversation and pick, apart from local files. */
     @Test
-    fun outgoingPicksAreKeyedByConversation() {
-        assertNotEquals(MediaTrustDomain.outgoing(ACCOUNT, GROUP), MediaTrustDomain.outgoing(ACCOUNT, "other"))
-        assertNotEquals(MediaTrustDomain.outgoing(ACCOUNT, GROUP), MediaTrustDomain.local(ACCOUNT))
-        assertNotEquals(MediaTrustDomain.outgoing(ACCOUNT, GROUP), MediaTrustDomain.conversation(ACCOUNT, GROUP))
-        assertEquals(MediaTrustDomain.Unique, MediaTrustDomain.outgoing(ACCOUNT, null))
-        assertEquals(MediaTrustDomain.Unique, MediaTrustDomain.outgoing(null, GROUP))
-        assertEquals("Outgoing", MediaTrustDomain.outgoing(ACCOUNT, GROUP).toString())
+    fun outgoingPicksAreKeyedByPick() {
+        val pick = MediaTrustDomain.outgoing(ACCOUNT, GROUP, "slot-a")
+        assertNotEquals(pick, MediaTrustDomain.outgoing(ACCOUNT, GROUP, "slot-b"))
+        assertNotEquals(pick, MediaTrustDomain.outgoing(ACCOUNT, "other", "slot-a"))
+        assertNotEquals(pick, MediaTrustDomain.local(ACCOUNT))
+        assertNotEquals(pick, MediaTrustDomain.conversation(ACCOUNT, GROUP))
+        assertEquals(pick, MediaTrustDomain.outgoing(ACCOUNT, GROUP, "slot-a"))
+        assertEquals(MediaTrustDomain.Unique, MediaTrustDomain.outgoing(ACCOUNT, GROUP, null))
+        assertEquals(MediaTrustDomain.Unique, MediaTrustDomain.outgoing(ACCOUNT, null, "slot-a"))
+        assertEquals(MediaTrustDomain.Unique, MediaTrustDomain.outgoing(null, GROUP, "slot-a"))
+        assertEquals("Outgoing", pick.toString())
     }
 
     /** A notification update for [isDm] in the fixture account and group. */

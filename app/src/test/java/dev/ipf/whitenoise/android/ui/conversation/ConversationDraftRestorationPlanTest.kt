@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import android.net.Uri
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.media.editor.DraftBackedPhoto
 import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
 import dev.ipf.whitenoise.android.media.editor.EditorPixelSize
@@ -75,6 +76,21 @@ class ConversationDraftRestorationPlanTest {
         val projected = restore(inputs, stale)
         assertEquals(listOf(freshUri), projected.documents)
         assertEquals(mapOf(freshUri to inputs.preparedDocuments.getValue(freshUri)), projected.inputs.preparedDocuments)
+    }
+
+    /** Each restored native attachment becomes its own pick, so each decodes in its own outgoing worker (#3373). */
+    @Test
+    fun restoredNativeAttachmentsEachBecomeTheirOwnPick() {
+        val first = attachment("restored-a")
+        val second = attachment("restored-b")
+        val plan = planDraftRestoration(emptyInputs(), "account", "group", listOf(first, second), emptySet())
+        val materialized =
+            listOf(first to Uri.parse("content://draft/restored-a"), second to Uri.parse("content://draft/restored-b"))
+        val projected = projectDraftRestoration(emptyInputs(), plan, materialized, emptySet(), "source unavailable")
+        assertEquals(listOf(first.id, second.id), projected.media.map { it.id })
+        val domains = projected.media.map { MediaTrustDomain.outgoing("account", "group", it.id) }
+        assertEquals(2, domains.toSet().size)
+        assertTrue(domains.none { it == MediaTrustDomain.Unique })
     }
 
     /** Plans and projects a restoration where [stale] was removed natively, asserting nothing is reconciled. */

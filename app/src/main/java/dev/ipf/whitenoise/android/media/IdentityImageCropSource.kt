@@ -58,8 +58,10 @@ internal suspend fun loadIdentityImageCropSource(
     prepareGroupImage: Boolean = false,
 ): IdentityImageCropSource? {
     val bytes = readSourceOrNull(contentResolver, uri, prepareGroupImage) ?: return null
-    val oriented = (renderer.inspect(bytes) as? PhotoEditorInspectResult.Success)?.source?.orientedSize
-    val preview = oriented?.let { renderer.decodePreview(bytes) }
+    // An identity picture is no outgoing pick: its crop source decodes single-use.
+    val inspected = renderer.inspect(bytes, MediaTrustDomain.Unique) as? PhotoEditorInspectResult.Success
+    val oriented = inspected?.source?.orientedSize
+    val preview = oriented?.let { renderer.decodePreview(bytes, MediaTrustDomain.Unique) }
     return if (oriented != null && preview != null) {
         IdentityImageCropSource(bytes = bytes, preview = preview, orientedSize = oriented)
     } else {
@@ -75,8 +77,9 @@ internal suspend fun loadGroupAttachmentCropSource(
     if (bytes.size > IDENTITY_IMAGE_SOURCE_MAX_BYTES) throw ImageUploadPreparationException.PreparedImageTooLarge
     val source = prepareGroupIdentityImageSource(bytes, mediaType)
     val renderer = PhotoEditorRenderer()
-    val oriented = (renderer.inspect(source) as? PhotoEditorInspectResult.Success)?.source?.orientedSize
-    val preview = oriented?.let { renderer.decodePreview(source) }
+    val inspected = renderer.inspect(source, MediaTrustDomain.Unique) as? PhotoEditorInspectResult.Success
+    val oriented = inspected?.source?.orientedSize
+    val preview = oriented?.let { renderer.decodePreview(source, MediaTrustDomain.Unique) }
     return if (oriented != null && preview != null) {
         IdentityImageCropSource(source, preview, oriented)
     } else {

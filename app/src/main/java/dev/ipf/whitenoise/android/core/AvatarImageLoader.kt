@@ -104,9 +104,13 @@ object AvatarImageLoader {
 
     /**
      * The domain an enclosing [dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope] declared for this request,
-     * otherwise a single-use worker: the fail-safe. An undeclared call inside a declared scope therefore inherits
-     * that scope's domain. `PictureDomainCoverageTest` does not see scopes; it requires every production call to
-     * name its domain instead, so this inherited default is reachable only from test and harness code.
+     * otherwise a single-use worker: the fail-safe. An undeclared avatar-loader call inside a declared scope
+     * therefore inherits that scope's domain. `PictureDomainCoverageTest` does not see scopes; it requires every
+     * production avatar-loader call to name its domain instead, so for this loader the inherited default is reachable
+     * only from test and harness code. Other production paths do rely on scope inheritance by design:
+     * `MediaPipeline`'s decode functions default to the enclosing scope, the photo editor declares its pick's domain
+     * through its render context, and the notification presenter declares each picture slot's domain around its
+     * resolver.
      */
     private fun declaredOrUnique(): MediaTrustDomain =
         dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope

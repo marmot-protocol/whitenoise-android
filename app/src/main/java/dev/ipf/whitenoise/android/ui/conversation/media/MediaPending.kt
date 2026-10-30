@@ -361,7 +361,8 @@ private fun PendingGridTile(
 private fun rememberPendingVisualPreview(attachment: PendingAttachment?): ImageBitmap? {
     val bytes = attachment?.inMemoryBytes
     val isVideo = attachment != null && attachment.isPendingVideo
-    val domain = LocalPickedMediaDomain.current
+    // A queued pick decodes in its own outgoing worker; an attachment from no pick decodes single-use.
+    val domain = LocalPickMediaDomains.current(attachment?.pick)
     var bitmap by remember(bytes, isVideo) { mutableStateOf<android.graphics.Bitmap?>(null) }
     LaunchedEffect(bytes, isVideo) {
         bitmap =
