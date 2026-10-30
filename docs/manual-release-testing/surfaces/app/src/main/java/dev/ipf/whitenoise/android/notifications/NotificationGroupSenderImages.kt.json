@@ -13,7 +13,7 @@
         ]
       },
       {
-        "surface": "public initial group shortcut identity after private picture overrides",
+        "surface": "public group shortcut sender without member pictures",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationGroupSenderImages.kt",
         "anchor": "internal fun notificationShortcutSender(",
         "test_ids": [
