@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -194,7 +195,18 @@ internal fun rememberSharedMediaTiles(
     controller: ConversationController,
     appState: WhiteNoiseAppState,
     myAccountId: String? = appState.activeAccount?.accountIdHex,
-): SharedMediaTiles {
+): SharedMediaTiles = rememberSharedMediaTilesState(controller, appState, myAccountId).value
+
+/**
+ * Remembers the shared media tiles as state, so a caller that only needs them in a nested scope can read them there
+ * and leave its own scope untouched when a rebuild lands.
+ */
+@Composable
+internal fun rememberSharedMediaTilesState(
+    controller: ConversationController,
+    appState: WhiteNoiseAppState,
+    myAccountId: String? = appState.activeAccount?.accountIdHex,
+): State<SharedMediaTiles> {
     val timeline = controller.timeline
     val deletedMessageIds = controller.deletedMessageIds
     val pendingTimelineRemovedMessageIds = controller.pendingTimelineRemovedMessageIds
@@ -215,7 +227,7 @@ internal fun rememberSharedMediaTiles(
         // thread. Re-keying on every visibility input also clears a stale result
         // synchronously, so deleted or expired media cannot remain swipeable while
         // the replacement projection is still being built.
-        val tiles by produceState(
+        produceState(
             initialValue = emptySharedMediaTiles().copy(isLoading = true),
             timeline,
             deletedMessageIds,
@@ -235,7 +247,6 @@ internal fun rememberSharedMediaTiles(
                     )
                 }
         }
-        tiles
     }
 }
 

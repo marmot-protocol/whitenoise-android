@@ -984,7 +984,7 @@ internal fun MainShell(
         owner = chatsController,
         accountRef = appState.activeAccountRef,
         ready = chatsController.boundAccountRef == appState.activeAccountRef && !chatsController.isLoading,
-        targetRevision = chatsController.forwardTargetsRevision,
+        targetRevision = { chatsController.forwardTargetsRevision },
         profileRevision = appState.profileRevisionForCompose,
         publish = {
             if (chatsController.boundAccountRef == appState.activeAccountRef && !chatsController.isLoading) {
