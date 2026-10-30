@@ -3,7 +3,8 @@
 This toolkit measures the optimized app rather than a debuggable Compose build.
 The Baseline Profile plugin derives two release-like variants from `release`:
 
-- `devZapstoreBenchmarkRelease`: minified, non-debuggable, profileable; used for Macrobenchmark.
+- `devZapstoreBenchmarkRelease`: non-debuggable, profileable, and not minified (plain D8 output; see
+  [DEX method-size budgets](#dex-method-size-budgets)); used for Macrobenchmark.
 - `devZapstoreNonMinifiedRelease`: non-minified, non-debuggable, profileable; used to collect profiles.
 
 Both use the Android debug key and the existing dev application ID

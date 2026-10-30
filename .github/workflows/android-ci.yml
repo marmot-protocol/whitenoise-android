@@ -413,8 +413,9 @@ jobs:
         if: ${{ always() && matrix.phase == 'baseline' && steps.dex_budget_benchmark.outcome == 'failure' }}
         run: >-
           echo "::warning title=Benchmark DEX method budget::devZapstoreBenchmarkRelease failed its DEX method
-          budget check. A method at ART's compile limit makes macrobenchmarks measure the interpreter. See the
-          step summary and the dex-method-budget-benchmark artifact."
+          budget check. See the Check benchmark DEX method budget step log. A budget violation also leaves a
+          step summary and the dex-method-budget-benchmark artifact; an input error leaves only the log. A
+          method at ART's compile limit makes macrobenchmarks measure the interpreter."
 
       - name: Upload benchmark DEX method report
         if: ${{ always() && matrix.phase == 'baseline' }}
