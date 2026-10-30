@@ -7107,6 +7107,11 @@ class ConversationController(
     val title: String
         get() = title()
 
+    /**
+     * The conversation's display title from its group, roster and engine conversation kind, with [copy] supplying
+     * the generated wording. Reads the derived kind, so its readers recompose on a chat-list row update only when
+     * that update changes the kind.
+     */
     fun title(copy: dev.ipf.whitenoise.android.core.GroupTitleCopy = dev.ipf.whitenoise.android.core.GroupTitleCopy.Default): String {
         val identity =
             conversationIdentityProjection(
