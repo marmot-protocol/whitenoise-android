@@ -9,7 +9,16 @@
         "anchor": "package dev.ipf.whitenoise.android",
         "test_ids": [
           "FIND-001",
-          "NCH-001"
+          "NCH-001",
+          "NCH-008"
+        ]
+      },
+      {
+        "surface": "Measured control morph ownership and presentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/MeasuredControlHandoff.kt",
+        "anchor": "package dev.ipf.whitenoise.android",
+        "test_ids": [
+          "NCH-008"
         ]
       }
     ],
@@ -20,7 +29,8 @@
         "anchor": "fun MeasuredControlHandoffHost(",
         "test_ids": [
           "FIND-001",
-          "NCH-001"
+          "NCH-001",
+          "NCH-008"
         ]
       },
       {
@@ -29,7 +39,16 @@
         "anchor": "fun Modifier.controlHandoffEndpoint(",
         "test_ids": [
           "FIND-001",
-          "NCH-001"
+          "NCH-001",
+          "NCH-008"
+        ]
+      },
+      {
+        "surface": "Modifier.controlMorphSurface",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/MeasuredControlHandoff.kt",
+        "anchor": "fun Modifier.controlMorphSurface(",
+        "test_ids": [
+          "NCH-008"
         ]
       }
     ]
