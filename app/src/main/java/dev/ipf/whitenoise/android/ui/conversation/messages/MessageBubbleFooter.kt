@@ -135,6 +135,10 @@ internal fun bubbleInlineFooterGeometry(
     return BubbleInlineFooterGeometry(width, maxOf(textHeight, y + footerHeight), width - footerWidth, y)
 }
 
+/**
+ * Places a measured body and footer: inline beside the last line when it fits, else on its own row,
+ * reporting a height clamped to [constraints] and never placing the footer below that height.
+ */
 private fun MeasureScope.layoutMeasuredBubbleFooter(
     constraints: Constraints,
     content: Placeable,
