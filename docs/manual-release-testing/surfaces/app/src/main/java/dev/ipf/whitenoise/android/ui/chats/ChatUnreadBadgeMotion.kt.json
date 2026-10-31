@@ -9,7 +9,7 @@
         "anchor": "package dev.ipf.whitenoise.android",
         "test_ids": [
           "CHL-002",
-          "CHL-032"
+          "CHL-033"
         ]
       }
     ],
@@ -20,7 +20,7 @@
         "anchor": "fun ChatUnreadBadgeMotion(",
         "test_ids": [
           "CHL-002",
-          "CHL-032"
+          "CHL-033"
         ]
       }
     ],
@@ -31,7 +31,7 @@
         "anchor": "R.string.chat_row_marked_unread",
         "test_ids": [
           "CHL-002",
-          "CHL-032"
+          "CHL-033"
         ]
       }
     ]
