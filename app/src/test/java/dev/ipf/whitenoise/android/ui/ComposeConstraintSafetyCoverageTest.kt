@@ -28,6 +28,7 @@ class ComposeConstraintSafetyCoverageTest {
                 "conversation/composer/VoiceReviewComposer.kt" to "boundedIntrinsicWidth",
                 "conversation/replies/ReplyPreviewCard.kt" to "boundedIntrinsicHeight",
                 "MarkdownRenderer.kt" to "boundedIntrinsicHeight",
+                "settings/SmartFolderQuickFilterControls.kt" to "boundedIntrinsicHeight",
             )
         owners.forEach { (path, modifier) ->
             assertTrue(

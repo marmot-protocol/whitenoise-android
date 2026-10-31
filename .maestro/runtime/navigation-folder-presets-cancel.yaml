@@ -6,7 +6,7 @@ name: navigation-folder-presets-cancel
 - scrollUntilVisible:
     element:
       id: folder.presets
-    direction: DOWN
+    direction: UP
 - tapOn:
     id: folder.presets
 - assertVisible:

@@ -64,4 +64,17 @@
     <string name="smart_folder_always_include">Sohbetleri her zaman dahil et</string>
     <string name="smart_folder_read_help">Tümü okundu, ajanın işini bitirdiği anlamına gelmez.</string>
   <string name="folder_show_when_empty">Boşken göster</string>
+  <string name="smart_folder_quick_start">Hızlı filtreleri kullan</string>
+  <string name="smart_folder_quick_hint">Sohbetleri sınırlamak için iki seçenekten birini seçin. Bu kısıtlamayı kaldırmak için aynı seçeneğe tekrar dokunun. Kaydet, değişikliklerinizi uygular.</string>
+  <string name="smart_folder_quick_accepted">Yalnızca kabul edilen sohbetler. Sıfırlama bu kapsamı korur; Gelişmiş bölümünde düzenleyebilirsiniz.</string>
+  <string name="smart_folder_quick_not_accepted">Kabul edilen sohbetler: Hayır. Sıfırlama bu kapsamı korur; Gelişmiş bölümünde düzenleyebilirsiniz.</string>
+  <string name="smart_folder_quick_reset">Hızlı filtreleri sıfırla</string>
+  <string name="smart_folder_quick_unread">Okunmamış</string>
+  <string name="smart_folder_quick_not_muted">Sessize alınmamış</string>
+  <string name="smart_folder_quick_not_pinned">Sabitlenmemiş</string>
+  <string name="smart_folder_quick_not_archived">Arşivlenmemiş</string>
+  <string name="smart_folder_quick_neutral">Hiçbiri seçili değil</string>
+  <string name="smart_folder_quick_state">%1$s: %2$s</string>
+  <string name="smart_folder_quick_expanded">Genişletilmiş</string>
+  <string name="smart_folder_quick_collapsed">Daraltılmış</string>
 </resources>
