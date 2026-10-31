@@ -199,6 +199,7 @@ internal class RawAvRenderSession(
         var lastVideoPts = -1L
         var lastVideoDelta = 33_333L
         var audioEndUs = targetUs
+        var prerollAudioUs = Long.MIN_VALUE
         var video: AvStreamFrame.Video? = null
         var audio: PendingPcm? = null
     }
@@ -226,13 +227,18 @@ internal class RawAvRenderSession(
                     progress.audioEnded = !wantAudio || !info.hasAudio
                     progress.lastVideoPts = -1
                     progress.audioEndUs = progress.targetUs
+                    progress.prerollAudioUs = Long.MIN_VALUE
                 }
+                if (!valid(activation, appliedSeek)) continue
                 operationSeek = appliedSeek
                 if (progress.video == null && !progress.videoEnded) {
                     when (val frame = read(AvStreamProtocol.VIDEO_TRACK)) {
                         is AvStreamFrame.Video -> {
-                            if (!valid(activation, appliedSeek) || frame.timestampUs < progress.targetUs) {
+                            if (!valid(activation, appliedSeek)) {
                                 frame.bitmap.recycle()
+                            } else if (frame.timestampUs < progress.targetUs) {
+                                frame.bitmap.recycle()
+                                drainPrerollAudio(progress, frame.timestampUs, activation, read)
                             } else {
                                 progress.video = frame
                             }
@@ -277,6 +283,39 @@ internal class RawAvRenderSession(
             progress.video?.bitmap?.recycle()
             progress.video = null
             progress.audio = null
+        }
+    }
+
+    /** Discard only pre-target PCM; retain one crossing-target suffix through the existing clip/adoption owner. */
+    private fun drainPrerollAudio(
+        progress: Progress,
+        discardedVideoUs: Long,
+        activation: Long,
+        read: (Int) -> AvStreamFrame,
+    ) {
+        while (sourceHasAudio &&
+            valid(activation, appliedSeek) &&
+            !progress.audioEnded &&
+            progress.audio == null &&
+            progress.prerollAudioUs < discardedVideoUs
+        ) {
+            val frame = read(AvStreamProtocol.AUDIO_TRACK)
+            if (!valid(activation, appliedSeek)) {
+                if (frame is AvStreamFrame.Video) frame.bitmap.recycle()
+                return
+            }
+            when (frame) {
+                is AvStreamFrame.Audio -> {
+                    progress.prerollAudioUs = maxOf(progress.prerollAudioUs, frame.timestampUs)
+                    adoptPcm(frame, progress, activation)
+                }
+                AvStreamFrame.AudioEnd -> progress.audioEnded = true
+                is AvStreamFrame.Video -> {
+                    frame.bitmap.recycle()
+                    throw IOException("Unexpected video from preroll audio read")
+                }
+                else -> throw IOException("Unexpected output from preroll audio read")
+            }
         }
     }
 

@@ -211,3 +211,6 @@ dev.ipf.whitenoise.android.media.sandbox.MediaAvNativeCorpusDeviceTest#commonAud
 # Explicit raw Sonic EOS and unity AudioTrack refill qualification on focused API30/API36.
 dev.ipf.whitenoise.android.media.sandbox.IsolatedAttachmentPlayerDeviceTest#tinyRawSonicEosProducesNonzeroPcmAndDrainsTheUnityDeviceAtQuarterSpeed
 dev.ipf.whitenoise.android.media.sandbox.IsolatedAttachmentPlayerDeviceTest#quarterSpeedRawPcmRefillsAfterAnInteriorUnderrunWithoutResettingTheMediaClock
+
+# Unchanged-corpus production startup, unpaced throughput and separate memory observations.
+dev.ipf.whitenoise.android.media.sandbox.MediaAvPerformanceDeviceTest#measureProductionCostsOnUnchangedCorpus

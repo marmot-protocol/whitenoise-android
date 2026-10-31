@@ -20,10 +20,11 @@ def main():
                                   ('KEY_ALIAS', alias), ('KEY_PASSWORD', 'fixture')):
                 env[f'WHITENOISE_{prefix}_{suffix}'] = value
         init = temporary / 'assert-signing.gradle'
-        init.write_text('''gradle.projectsEvaluated {
+        init.write_text('''gradle.taskGraph.whenReady {
     // Init scripts also run for buildSrc/included builds; only the main build owns :app.
     if (gradle.parent != null) return
     def app = gradle.rootProject.project(':app')
+    // Graph-ready listeners run under Gradle project-state locks; resolve producer dependencies here.
     // Both JNI folder consumption and native packaging must wait for verified decoder outputs.
     def decoderProducer = app.tasks.named('prepareNativeMediaDecoder').get()
     ['Zapstore', 'Play'].each { flavor ->
@@ -39,6 +40,7 @@ def main():
     def expectedAlias = bundleMode ? 'upload-fixture' : 'direct-fixture'
     assert android.productFlavors.getByName('production').signingConfig.keyAlias == expectedAlias :
         'Unexpected signing key: run in a checkout without local signing overrides'
+    println('Verified decoder producer dependencies and release signing assertions.')
 }
 ''')
         cases = [
@@ -59,7 +61,8 @@ def main():
             if expected_error:
                 assert result.returncode != 0 and expected_error in output, output
             else:
-                assert result.returncode == 0, output
+                assertions_ran = 'Verified decoder producer dependencies and release signing assertions.' in output
+                assert result.returncode == 0 and assertions_ran, output
             print('PASS:', ' '.join(arguments), flush=True)
 
 

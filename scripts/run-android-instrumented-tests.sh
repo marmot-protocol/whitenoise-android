@@ -73,7 +73,7 @@ if [[ "$event_name" == "workflow_dispatch" && "$media_sandbox_only" == "true" ]]
     --no-daemon --stacktrace
   required_file="$(mktemp)"
   trap 'rm -f "$required_file"' EXIT
-  grep -E '\.(IsolatedMediaDecoderDeviceTest|AnimationSourceAdmissionDeviceTest|MediaCodecCorpusDeviceTest|MediaWorkerBaselineDeviceTest|MediaAvCapabilityDeviceTest|AvCapabilityLogCaptureDeviceTest|NativeMediaSandboxDeviceTest|IsolatedAttachmentPlayerDeviceTest|MediaAvNativeCorpusDeviceTest)#' config/instrumented-required-cases.txt > "$required_file"
+  grep -E '\.(IsolatedMediaDecoderDeviceTest|AnimationSourceAdmissionDeviceTest|MediaCodecCorpusDeviceTest|MediaWorkerBaselineDeviceTest|MediaAvCapabilityDeviceTest|AvCapabilityLogCaptureDeviceTest|NativeMediaSandboxDeviceTest|IsolatedAttachmentPlayerDeviceTest|MediaAvNativeCorpusDeviceTest|MediaAvPerformanceDeviceTest)#' config/instrumented-required-cases.txt > "$required_file"
   python3 scripts/check_instrumented_required_cases.py app/build/outputs/androidTest-results/connected --required "$required_file"
   exit 0
 fi

@@ -7,6 +7,7 @@ import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -18,6 +19,107 @@ import java.io.IOException
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [30, 36])
 class RawAvPreferredRenderTest {
+    @Test fun longGopPrerollDrainsTheActualBoundedReaderAndRetainsCrossingPcmOnce() =
+        runBlocking {
+            val legacy = PrerollPackets()
+            val exhausted =
+                assertThrows(IOException::class.java) {
+                    repeat(350) { (legacy.read(AvStreamProtocol.VIDEO_TRACK) as AvStreamFrame.Video).bitmap.recycle() }
+                }
+            assertEquals("compressed_lookahead_budget_refused", exhausted.message)
+
+            val owner = Owner().apply { targetUs = 14_010_000L }
+            val device = RawPcmOutputSonicTest.Device()
+            val renderer =
+                RawAvRenderSession(
+                    ApplicationProvider.getApplicationContext(),
+                    Uri.EMPTY,
+                    true,
+                    true,
+                    owner,
+                ) { rate, channels, _ -> RawPcmOutput(rate, channels, device) }
+            renderer.speed(.25f)
+            val packets = PrerollPackets()
+            renderer.consumeFrames(AvStreamInfo(2, 2, 14_400_000, 0, 8000, 1), 7, packets::read, {
+                assertEquals(owner.targetUs, it)
+            })
+            assertTrue(owner.ended)
+            assertEquals((351..359).map { it * 40_000L }, owner.displayed)
+            assertTrue("Interleaved audio must be consumed during preroll", packets.audioReads > 512)
+            assertTrue(packets.maximumQueued <= 512)
+            assertEquals(1, packets.crossingReads)
+            // The real quarter-speed processor receives the clipped390ms exactly once, including its10ms suffix.
+            assertEquals(24_960, device.audio.size())
+            assertEquals(14_400_000L, renderer.positionUs())
+            renderer.pause()
+        }
+
+    @Test fun revokedVideoPrerollNeverStartsAnotherAudioRead() =
+        runBlocking {
+            for (replaceGeneration in listOf(false, true)) {
+                val owner = Owner().apply { targetUs = 100_000 }
+                val renderer = session(owner, Sink())
+                val frame = video(0)
+                var reads = 0
+                renderer.consumeFrames(info(), 7, { track ->
+                    assertEquals(AvStreamProtocol.VIDEO_TRACK, track)
+                    assertEquals(1, ++reads)
+                    if (replaceGeneration) owner.activation = 8 else owner.alive = false
+                    frame
+                }, {})
+                assertTrue(frame.bitmap.isRecycled)
+                assertEquals(1, reads)
+                assertTrue(owner.displayed.isEmpty())
+                assertFalse(owner.ended)
+            }
+        }
+
+    @Test fun revokedPrerollAudioReplyCannotAdoptItsCrossingSuffixOrReadAgain() =
+        runBlocking {
+            val owner = Owner().apply { targetUs = 100_000 }
+            var deviceCreations = 0
+            val renderer =
+                RawAvRenderSession(
+                    ApplicationProvider.getApplicationContext(),
+                    Uri.EMPTY,
+                    true,
+                    true,
+                    owner,
+                ) { _, _, _ ->
+                    deviceCreations++
+                    Sink()
+                }
+            var reads = 0
+            val frame = video(0)
+            renderer.consumeFrames(info(), 7, { track ->
+                when (++reads) {
+                    1 -> {
+                        assertEquals(AvStreamProtocol.VIDEO_TRACK, track)
+                        frame
+                    }
+                    2 -> {
+                        assertEquals(AvStreamProtocol.AUDIO_TRACK, track)
+                        owner.alive = false
+                        AvStreamFrame.Audio(ByteArray(320), 8000, 1, 90_000)
+                    }
+                    else -> error("A revoked generation must not issue another read")
+                }
+            }, {})
+            assertEquals(2, reads)
+            assertTrue(frame.bitmap.isRecycled)
+            assertEquals(0, deviceCreations)
+            assertTrue(owner.displayed.isEmpty())
+        }
+
+    @Test fun revokedSeekAcknowledgmentCannotStartPrerollReads() =
+        runBlocking {
+            val owner = Owner().apply { targetUs = 100_000 }
+            session(owner, Sink()).consumeFrames(info(), 7, { error("No read after seek revocation") }, {
+                owner.alive = false
+            })
+            assertFalse(owner.ended)
+        }
+
     @Test fun audioOnlyInitialTimestampGapAndSeekGapRetainTheSelectedSourceAnchor() =
         runBlocking {
             for (target in listOf(0L, 20_000L)) {
@@ -189,11 +291,13 @@ class RawAvPreferredRenderTest {
         val displayed = mutableListOf<Long>()
         var ended = false
         var targetUs = 0L
+        var alive = true
+        var activation = 7L
         var throwAfterAdoption = false
 
         override fun intent(): RawAvPlaybackIntent {
             val attributes = AudioAttributes.Builder().build()
-            return RawAvPlaybackIntent(true, true, 7, 1, targetUs, 1f, 1f, attributes)
+            return RawAvPlaybackIntent(alive, true, activation, 1, targetUs, 1f, 1f, attributes)
         }
 
         override fun awaitPrepared() = Unit
@@ -233,6 +337,52 @@ class RawAvPreferredRenderTest {
             seek: Long?,
             failure: IOException,
         ) = Unit
+    }
+
+    /** Same finite demux/selected-track queue shape and aggregate packet cap as the native preferred reader. */
+    private class PrerollPackets {
+        private data class Packet(
+            val audio: Boolean,
+            val timeUs: Long,
+        )
+
+        private val packets =
+            buildList {
+                repeat(360) { index ->
+                    add(Packet(true, index * 40_000L))
+                    add(Packet(false, index * 40_000L))
+                    add(Packet(true, index * 40_000L + 20_000))
+                }
+            }
+        private var cursor = 0
+        private val audio = ArrayDeque<Long>()
+        private val video = ArrayDeque<Long>()
+        var audioReads = 0
+        var crossingReads = 0
+        var maximumQueued = 0
+
+        fun read(track: Int): AvStreamFrame {
+            val selected = if (track == AvStreamProtocol.AUDIO_TRACK) audio else video
+            while (selected.isEmpty() && cursor < packets.size) {
+                if (audio.size + video.size >= 512) throw IOException("compressed_lookahead_budget_refused")
+                val packet = packets[cursor++]
+                (if (packet.audio) audio else video).addLast(packet.timeUs)
+                maximumQueued = maxOf(maximumQueued, audio.size + video.size)
+            }
+            val time = selected.removeFirstOrNull()
+            if (time == null) {
+                return if (track == AvStreamProtocol.AUDIO_TRACK) AvStreamFrame.AudioEnd else AvStreamFrame.VideoEnd
+            }
+            return if (track == AvStreamProtocol.AUDIO_TRACK) {
+                audioReads++
+                if (time == 14_000_000L) crossingReads++
+                AvStreamFrame.Audio(ByteArray(320) { if (it % 2 == 1) 32 else 0 }, 8000, 1, time)
+            } else {
+                val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+                bitmap.eraseColor(0xff000000.toInt() or time.toInt())
+                AvStreamFrame.Video(bitmap, time)
+            }
+        }
     }
 
     private class Sink : RawPcmSink {

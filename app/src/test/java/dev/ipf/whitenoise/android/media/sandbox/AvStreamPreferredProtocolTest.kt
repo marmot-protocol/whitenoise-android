@@ -22,6 +22,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 /** Real parent IPC/validator over a local Binder fake; no decoding or OS-worker lifetime evidence. */
 @RunWith(RobolectricTestRunner::class)
@@ -218,7 +219,16 @@ class AvStreamPreferredProtocolTest {
             val callbacks = field(stream, "callbacks") as HandlerThread
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
             while (released.count != 0L && System.nanoTime() < deadline) {
-                shadowOf(callbacks.looper).idleFor(Duration.ofMillis(50))
+                try {
+                    shadowOf(callbacks.looper).idleFor(Duration.ofMillis(50))
+                } catch (failure: IllegalStateException) {
+                    // Cleanup quits this Looper before its final released latch acknowledgment.
+                    val cleaned = field(stream, "cleaned") as AtomicBoolean
+                    val remaining = deadline - System.nanoTime()
+                    if (!cleaned.get() || remaining <= 0 || !released.await(remaining, TimeUnit.NANOSECONDS)) {
+                        throw failure
+                    }
+                }
                 released.await(5, TimeUnit.MILLISECONDS)
             }
             assertEquals("Only fixture-owned resources may remain", 0L, released.count)

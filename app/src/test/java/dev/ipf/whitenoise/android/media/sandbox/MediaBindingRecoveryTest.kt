@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.media.sandbox
 
 import android.content.ComponentName
 import android.content.ContentProvider
+import android.content.ContentResolver
 import android.content.ContentValues
 import android.content.Context
 import android.content.ContextWrapper
@@ -12,6 +13,7 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.Binder
 import android.os.Bundle
+import android.os.CancellationSignal
 import android.os.HandlerThread
 import android.os.IBinder
 import android.os.Message
@@ -28,6 +30,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.annotation.Implementation
+import org.robolectric.annotation.Implements
 import org.robolectric.shadows.ShadowContentResolver
 import java.time.Duration
 import java.util.concurrent.CountDownLatch
@@ -880,6 +884,7 @@ class MediaBindingRecoveryTest {
     }
 
     @Test
+    @Config(shadows = [BorrowedDescriptorStatShadow::class, SelectedAssetCloseResolverShadow::class])
     fun selectedUriCloseMustFinishBeforeAnotherAutomaticSourceCanBind() {
         val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
         val transport =
@@ -930,6 +935,7 @@ class MediaBindingRecoveryTest {
     }
 
     @Test
+    @Config(shadows = [BorrowedDescriptorStatShadow::class, SelectedAssetCloseResolverShadow::class])
     @Suppress("LongMethod") // Failure, account replacement and exact synthetic capability teardown are one fixture.
     fun selectedUriCloseFailureHoldsAcrossAccountResetWithoutAnotherSourceOpen() {
         val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
@@ -1129,7 +1135,7 @@ class MediaBindingRecoveryTest {
             worker.remote.dieBinderOnly()
             first.join()
             assertNull(first.result.get())
-            assertTrue(worker.remote.retired.await(2, TimeUnit.SECONDS))
+            assertEquals("An already-dead endpoint receives no RETIRE RPC", 1L, worker.remote.retired.count)
             assertAutomaticCleanupAcknowledged(transport)
             assertEquals(1, context.unbound.size)
             assertFalse(transport.isRequestDispatchedForTest())
@@ -1421,6 +1427,25 @@ class MediaBindingRecoveryTest {
         fun interruptAndJoin() {
             thread.interrupt()
             join()
+        }
+    }
+
+    /**
+     * Injects a close-controlled parent resource for two synthetic authorities. Framework ContentResolver
+     * rebuilds provider AFDs, so a provider subclass close override is not a client close hook.
+     */
+    @Implements(ContentResolver::class)
+    class SelectedAssetCloseResolverShadow : ShadowContentResolver() {
+        @Implementation
+        protected fun openAssetFileDescriptor(
+            uri: Uri,
+            mode: String,
+            cancellationSignal: CancellationSignal?,
+        ): AssetFileDescriptor? {
+            require(uri.scheme == "content" && uri.authority in setOf("held.automatic.close", "failed.automatic.close"))
+            cancellationSignal?.throwIfCanceled()
+            val provider = checkNotNull(ShadowContentResolver.getProvider(uri))
+            return provider.openAssetFile(uri, mode, cancellationSignal)
         }
     }
 

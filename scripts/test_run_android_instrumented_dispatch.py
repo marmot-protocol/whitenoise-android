@@ -120,6 +120,7 @@ class InstrumentedDispatchTest(unittest.TestCase):
             "MediaAvNativeCorpusDeviceTest": (
                 "commonVideoFormatsReturnRedPixelsFromFreshRestrictedWorkers",
                 "commonAudioFormatsReturnFiniteWaveformsAndDurations"),
+            "MediaAvPerformanceDeviceTest": ("measureProductionCostsOnUnchangedCorpus",),
         }
         focused = self.run_dispatch("workflow_dispatch", "false", "false", "false", "true")
         for name, names in methods.items():
@@ -140,10 +141,12 @@ class InstrumentedDispatchTest(unittest.TestCase):
             focused = self.run_dispatch("workflow_dispatch", "false", "false", "false", "true", "false", "false", "false", api)
             cases = [line for line in focused.splitlines() if line.startswith("dev.ipf.") and "#" in line]
             native = [line for line in cases if any("." + name + "#" in line for name in (
-                "NativeMediaSandboxDeviceTest", "IsolatedAttachmentPlayerDeviceTest", "MediaAvNativeCorpusDeviceTest"))]
-            self.assertEqual(9, len(native))
+                "NativeMediaSandboxDeviceTest", "IsolatedAttachmentPlayerDeviceTest", "MediaAvNativeCorpusDeviceTest",
+                "MediaAvPerformanceDeviceTest"))]
+            self.assertEqual(10, len(native))
             for method in ("tinyRawSonicEosProducesNonzeroPcmAndDrainsTheUnityDeviceAtQuarterSpeed",
-                           "quarterSpeedRawPcmRefillsAfterAnInteriorUnderrunWithoutResettingTheMediaClock"):
+                           "quarterSpeedRawPcmRefillsAfterAnInteriorUnderrunWithoutResettingTheMediaClock",
+                           "measureProductionCostsOnUnchangedCorpus"):
                 self.assertTrue(any(case.endswith("#" + method) for case in native))
             with tempfile.TemporaryDirectory() as temporary:
                 root = pathlib.Path(temporary)
