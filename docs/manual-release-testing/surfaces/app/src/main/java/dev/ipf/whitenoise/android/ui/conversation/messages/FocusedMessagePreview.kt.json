@@ -27,7 +27,16 @@
         "test_ids": [
           "MSG-004",
           "MSG-009",
-          "MSG-015"
+          "MSG-015",
+          "MSG-043"
+        ]
+      },
+      {
+        "surface": "QuoteAboveContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessagePreview.kt",
+        "anchor": "fun QuoteAboveContent(",
+        "test_ids": [
+          "MSG-043"
         ]
       }
     ],

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
@@ -20,6 +21,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -32,6 +34,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MarkdownBlockFfi
@@ -180,12 +183,14 @@ internal fun FocusedTextMessagePreview(
             lastLineBaseline = { lastLineBaseline.takeIf { warning == null } },
         ) {
             Column {
+                // Weighted, so the warning is measured first and a short frame shortens the excerpt
+                // rather than squeezing the warning out of view.
                 MarkdownTimestampText(
                     text = excerpt,
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = if (compact) 1 else FOCUSED_PREVIEW_TEXT_LINES,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.testTag("message-actions-excerpt"),
+                    modifier = Modifier.weight(1f, fill = false).testTag("message-actions-excerpt"),
                     onTextLayout = { layout ->
                         lastLineLayout = layout
                     },
@@ -208,8 +213,11 @@ internal fun FocusedTextMessagePreview(
                 mentionedSelf = mentionedSelf,
                 mentionedYouLabel = mentionedYouLabel,
             ) {
-                if (!compact) reply?.invoke()
-                content(compact)
+                if (compact || reply == null) {
+                    content(compact)
+                } else {
+                    QuoteAboveContent(reply) { content(compact) }
+                }
             }
         }
     } else {
@@ -248,6 +256,43 @@ internal fun FocusedTextMessagePreview(
         }
     }
 }
+
+/**
+ * Places a quoted reply above the message content, measuring the content first. Under a height bound a
+ * quote that no longer fits whole above the content is left out rather than cut, so the decorative quote
+ * yields before the excerpt, warning or timestamp, and no spacing is left behind for it.
+ */
+@Composable
+private fun QuoteAboveContent(
+    quote: @Composable () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Layout(
+        contents = listOf(quote, { Column(verticalArrangement = Arrangement.spacedBy(QuoteGap), content = content) }),
+    ) { (quoteMeasurables, contentMeasurables), constraints ->
+        val gap = QuoteGap.roundToPx()
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val body = contentMeasurables.single().measure(loose)
+        val room =
+            if (constraints.hasBoundedHeight) constraints.maxHeight - body.height - gap else Constraints.Infinity
+        val natural = loose.copy(maxHeight = Constraints.Infinity)
+        val quotes = quoteMeasurables.map { it.measure(natural) }
+        val quoteHeight = quotes.maxOfOrNull { it.height } ?: 0
+        val shown = quotes.isNotEmpty() && quoteHeight <= room
+        val top = if (shown) quoteHeight + gap else 0
+        val width = maxOf(body.width, if (shown) quotes.maxOf { it.width } else 0)
+        layout(
+            width.coerceIn(constraints.minWidth, constraints.maxWidth),
+            (top + body.height).coerceIn(constraints.minHeight, constraints.maxHeight),
+        ) {
+            if (shown) quotes.forEach { it.placeRelative(0, 0) }
+            body.placeRelative(0, top)
+        }
+    }
+}
+
+// Matches the bubble frame's spacing between its content blocks.
+private val QuoteGap = 6.dp
 
 /** Replays a natively remeasured display layer at one pixel per pixel; metadata is never GPU-scaled. */
 @Composable
