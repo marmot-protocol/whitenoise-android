@@ -2642,6 +2642,7 @@ class ChatsController private constructor(
         preserveLoadedContent: Boolean = false,
     ) {
         if (isCleared) return
+        accountRef?.let { appState.recordAccountSwitchMark("bind-start", it) }
         val currentBindJob = coroutineContext[Job]
         synchronized(liveSubscriptionLock) { subscriptionOwner.bindJob = currentBindJob }
         chatsDebug { "bind account=${accountRef?.take(8)}" }
@@ -2694,6 +2695,7 @@ class ChatsController private constructor(
             var initialSubscriptionProjection = true
             if (seededLocalSnapshot != null) {
                 // Render the preinstalled one-shot seed before live or background enrichment.
+                appState.recordAccountSwitchMark("seed-bound", accountRef)
                 awaitRenderedChatListFrame()
                 if (isActiveBindEpoch(epoch) && shouldRetryLiveSubscriptionForAccount(accountRef, boundAccountRef)) {
                     appState.recordAccountSwitchLocalSnapshotRendered(accountRef, chatRows.size)
