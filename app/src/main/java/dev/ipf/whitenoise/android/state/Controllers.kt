@@ -1177,7 +1177,7 @@ internal fun sameRenderableSendTags(
 /**
  * Find a projected timeline row that matches [optimistic] and is committed locally
  * but not yet published (`sourceMessageIdHex == null`). Used when retrying a failed
- * optimistic send so we drive `retryGroupConvergence` instead of minting a duplicate.
+ * optimistic send so we wait for native publication instead of minting a duplicate.
  */
 internal fun committedButUnpublishedProjectionForOptimistic(
     timelineRecords: Map<String, TimelineMessageRecordFfi>,
@@ -10698,9 +10698,6 @@ class ConversationController(
             if (committedProjection != null) {
                 optimisticSendPhases[key] = OptimisticSendPhase.ACCEPTED_PENDING
                 preserveOptimisticDisplayPosition(committedProjection.messageIdHex, tempId)
-                appState.withGroupCommitLock(account, group.groupIdHex) {
-                    appState.marmotIo { retryGroupConvergence(account, group.groupIdHex) }
-                }
                 completeDurableAcceptance(key)
                 transferRetentionAtSend(tempId, committedProjection.messageIdHex)
                 appState.commitOptimisticSentPreview(
@@ -10711,12 +10708,7 @@ class ConversationController(
                 )
                 optimisticMessages.remove(key)
                 messageById.remove(tempId)
-                val projectedAction = TimelineProjector.toAppMessageRecord(committedProjection)
-                val projectedRecord =
-                    projectedAction.withRecordedAtOverride(
-                        localTimelineTimestampOverrides[committedProjection.messageIdHex],
-                    )
-                messageById[committedProjection.messageIdHex] = projectedRecord
+                val projectedRecord = upsertProjectedRecord(committedProjection)
                 handoffPendingMessageEdit(tempId, committedProjection.messageIdHex, ready = true)
                 invalidatedProjectionIdsMatchingMessage(timelineRecords, projectedRecord)
                     .forEach(::removeProjectedRecord)

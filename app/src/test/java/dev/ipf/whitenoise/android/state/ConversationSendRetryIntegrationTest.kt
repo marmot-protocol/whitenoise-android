@@ -2572,18 +2572,20 @@ class ConversationSendRetryIntegrationTest {
             assertFalse(capability.canDeleteForMe)
         }
 
-    /** Native maintenance cannot delay a later durable send, including after a failed send is readmitted. */
+    /** Native maintenance cannot delay a later send after fresh admission, readmission or committed retry. */
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
-    @Suppress("LongMethod") // Both admission histories share the held native boundary and exact projection assertions.
+    @Suppress("LongMethod") // Admission histories share the held native boundary and exact projection assertions.
     fun durableSendsSkipRecoveryWait() =
         runBlocking {
             Dispatchers.setMain(UnconfinedTestDispatcher())
             try {
-                for (initialFailure in listOf(null, MarmotKitException.Publish("signer refused"))) {
+                for (history in AdmissionHistory.entries) {
                     val releaseRecovery = CompletableDeferred<Unit>()
                     val admitted = linkedMapOf<String, Pair<String, String>>()
-                    var failure = initialFailure
+                    val attempts = mutableListOf<String>()
+                    var failure =
+                        if (history == AdmissionHistory.FRESH) null else MarmotKitException.Publish("signer refused")
                     val nativeType = MarmotInterface::class.java
                     val metadata =
                         Proxy.newProxyInstance(nativeType.classLoader, arrayOf(nativeType)) { proxy, method, args ->
@@ -2594,11 +2596,12 @@ class ConversationSendRetryIntegrationTest {
                                 "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
                                 "localSendStatus" -> null
                                 "sendTextWithClientToken" -> {
+                                    attempts += args!![2] as String
                                     failure?.let {
                                         failure = null
                                         throw it
                                     }
-                                    val token = args!![3] as String
+                                    val token = args[3] as String
                                     val id = (if (admitted.isEmpty()) "c3" else "c5").repeat(32)
                                     admitted[token] = id to (args[2] as String)
                                     LocalSendAcceptanceFfi(token, id)
@@ -2630,13 +2633,29 @@ class ConversationSendRetryIntegrationTest {
                     try {
                         withTimeout(5_000) {
                             controller.send("first")
-                            if (initialFailure != null) {
+                            if (history != AdmissionHistory.FRESH) {
                                 assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+                                if (history == AdmissionHistory.COMMITTED_UNPUBLISHED) {
+                                    val failed = controller.timeline.single().record
+                                    val committed =
+                                        projectedMessage(failed.recordedAt, null, null, sourceMessageIdHex = null)
+                                            .copy(plaintext = "first")
+                                    applyProjection(controller, committed)
+                                    admitted[failed.messageIdHex] = committed.messageIdHex to "first"
+                                    assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+                                }
                                 controller.retryFailedSend(controller.timeline.single())
                             }
                             controller.send("second")
                         }
                         assertFalse(releaseRecovery.isCompleted)
+                        val expectedAttempts =
+                            if (history == AdmissionHistory.READMITTED) {
+                                listOf("first", "first", "second")
+                            } else {
+                                listOf("first", "second")
+                            }
+                        assertEquals(expectedAttempts, attempts)
                         assertEquals(listOf("first", "second"), admitted.values.map { it.second })
                         assertEquals(2, admitted.keys.toSet().size)
                         val pendingStatuses = controller.timeline.map { it.status }
@@ -3559,6 +3578,12 @@ class ConversationSendRetryIntegrationTest {
         pendingEditStatusReader = statusReader,
         messageEditPublisher = { _, _, _, _ -> error("pending revision must not use a wire edit") },
     )
+
+    private enum class AdmissionHistory {
+        FRESH,
+        READMITTED,
+        COMMITTED_UNPUBLISHED,
+    }
 
     private fun appState(
         additionalAccounts: List<AccountSummaryFfi> = emptyList(),
