@@ -229,11 +229,13 @@ Admission:
   at once as requests wait for a slot, so an album of new picks is not served
   one eviction at a time, and none beyond that: slots already being freed are
   awaited while they cover every waiting request.
-- A refused bind fails that input. A binding Android reports dead or null
-  before it ever connects never received input: it is unbound and its slot
-  freed. A throwing bind, a startup that reports nothing, a death link that
-  cannot be registered or a worker that never dies keeps its slot; when every
-  slot is held, new input fails closed rather than starting another process.
+- A refused bind fails that input. A binding Android reports dead or null before
+  it ever connects never received input: it is unbound and its slot freed. A
+  death link that fails because the Binder is already dead records that death
+  and frees the slot the same way. A throwing bind, a startup that reports
+  nothing, a worker that never dies, or a death link that fails while the Binder
+  is alive or its state unknown keeps its slot; when every slot is held, new
+  input fails closed rather than starting another process.
 - A claim waits at most one second for a spare that is still starting while a
   slot is free, then starts a fresh generation. Nothing falls back to an
   earlier worker, another domain's worker or app-process decoding.
@@ -250,8 +252,15 @@ worker classes with constant static state; it starts no threads. What that
 means for each worker differs by OS:
 
 - Stock Android, including the emulators measured here: Android starts one
-  application zygote for the app, with its own isolated UID, and forks every
-  worker from it. Each fork gets its own isolated UID but shares the zygote's
+  application zygote for the app and forks every worker from it. The application
+  zygote runs under the app's own UID, the defining package's
+  ([`ProcessList`](https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-15.0.0_r1/services/core/java/com/android/server/am/ProcessList.java#2334)),
+  in the `app_zygote` SELinux domain
+  ([`AppZygote`](https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-15.0.0_r1/core/java/android/os/AppZygote.java#114)),
+  and may only move its forks into the isolated UID range Android reserves for
+  the app's isolated services; the same holds from Android 10 through 15. It is
+  not itself isolated, and the preload receives no input. Each fork
+  gets its own isolated UID from that range but shares the zygote's
   address-space layout for everything loaded before the fork, including the
   preloaded worker classes. The platform zygote's preloaded libraries, the
   codecs among them, were already shared this way across all app processes.
