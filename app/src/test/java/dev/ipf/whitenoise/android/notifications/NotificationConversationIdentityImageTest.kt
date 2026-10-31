@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.os.Bundle
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.content.pm.ShortcutManagerCompat
@@ -62,16 +63,73 @@ class NotificationConversationIdentityImageTest {
         assertEquals(DEFAULT_SENDER, identityExtras(posts.single())?.getString("contact"))
     }
 
-    /** A group card shows the group picture while the message keeps the sender's own face. */
+    /** A group card shows its own picture and the sender name without sender photo or initial pixels. */
     @Test
-    fun groupCardShowsTheGroupPictureAndKeepsTheSenderInTheMessage() {
+    fun groupCardShowsOnlyTheGroupPictureAndKeepsTheSenderName() {
         val presenter = presenter()
         show(presenter, group(), conversation = solid(Color.BLUE), sender = solid(Color.GREEN))
 
         val card = liveCard()
         assertEquals(Color.BLUE, identityPixel(card))
-        assertEquals(Color.GREEN, pixel(lastMessagePerson(card)))
+        assertEquals(0, Color.alpha(pixel(lastMessagePerson(card))))
+        assertEquals(DEFAULT_SENDER, lastMessagePerson(card).key)
         assertNull("a group identity is never a member's private contact", identityExtras(card)?.getString("contact"))
+    }
+
+    /** Hidden member pictures do not schedule enrichment, consult private overrides or churn a group shortcut. */
+    @Test
+    fun readyGroupPictureIgnoresColdAndChangedSenderPictures() {
+        val posts = mutableListOf<Notification>()
+        val publications = AtomicInteger()
+        val privateReads = AtomicInteger()
+        val resolverCalls = AtomicInteger()
+        val fetched = mutableListOf<String>()
+        val presenter =
+            presenter(
+                posts,
+                resolver = { url ->
+                    resolverCalls.incrementAndGet()
+                    url?.also { fetched += it }?.let { solid(Color.GREEN) }
+                },
+                contactAvatar = { _, _ -> (true to solid(Color.RED)).also { privateReads.incrementAndGet() } },
+                shortcutPublications = publications,
+            )
+        val picture = solid(Color.BLUE)
+        show(presenter, group(), conversation = picture, senderUrl = PICTURE_URL)
+        val next = group().copy(messageIdHex = "next")
+        show(presenter, next, conversation = picture, senderUrl = "https://example.com/changed.png")
+
+        assertTrue(fetched.isEmpty())
+        assertEquals(0, privateReads.get())
+        assertEquals(0, resolverCalls.get())
+        assertEquals(1, publications.get())
+        assertEquals(2, posts.size)
+        assertEquals(Color.BLUE, identityPixel(liveCard()))
+        assertEquals(DEFAULT_SENDER, lastMessagePerson(liveCard()).key)
+        assertEquals(0, Color.alpha(pixel(lastMessagePerson(liveCard()))))
+    }
+
+    /** A missing group URL picture still enriches the same card without fetching its member's image. */
+    @Test
+    fun groupPictureUrlStillLoadsWithoutTheHiddenSenderUrl() {
+        val posts = mutableListOf<Notification>()
+        val fetched = mutableListOf<String>()
+        var enrichment: (suspend () -> Unit)? = null
+        val groupUrl = "https://example.com/group.png"
+        val presenter =
+            presenter(
+                posts,
+                resolver = { url -> solid(Color.BLUE).also { fetched += checkNotNull(url) } },
+                launcher = { enrichment = it },
+            )
+        show(presenter, group(), senderUrl = PICTURE_URL, conversationUrl = groupUrl)
+        runBlocking { checkNotNull(enrichment).invoke() }
+
+        assertEquals(listOf(groupUrl), fetched)
+        assertEquals(2, posts.size)
+        assertEquals(Color.BLUE, identityPixel(liveCard()))
+        assertTrue(liveCard().flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+        assertEquals(0, Color.alpha(pixel(lastMessagePerson(liveCard()))))
     }
 
     /** Missing pictures fall back to the conversation shortcut's monogram, never the app icon or a member's face. */
@@ -87,16 +145,25 @@ class NotificationConversationIdentityImageTest {
         assertEquals(notificationMonogramBackgroundColor(seed), identityPixel(liveCard()))
     }
 
-    /** The first long message's text block keeps the picture, and the next message keeps it in history. */
+    /** A long first message and its later history share the same conversation template and picture. */
     @Test
     fun longFirstMessageAndTheFollowingHistoryKeepTheIdentityImage() {
         val presenter = presenter()
-        val long = LongBodies.plain(MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS * 2)
+        val long = LongBodies.plain(160 * 2)
         val red = solid(Color.RED)
         show(presenter, dm(messageId = "first"), conversation = red, sender = red, body = long)
-        val textBlock = liveCard()
-        assertNotNull(textBlock.extras.getCharSequence(Notification.EXTRA_BIG_TEXT))
-        assertEquals(Color.RED, identityPixel(textBlock))
+        val firstCard = liveCard()
+        assertNull(firstCard.extras.getCharSequence(Notification.EXTRA_BIG_TEXT))
+        assertEquals(
+            long,
+            NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(firstCard)
+                ?.messages
+                ?.single()
+                ?.text
+                .toString(),
+        )
+        assertEquals(Color.RED, identityPixel(firstCard))
 
         show(presenter, dm(messageId = "second"), conversation = red, sender = red)
         val history = liveCard()
@@ -104,9 +171,9 @@ class NotificationConversationIdentityImageTest {
         assertEquals(Color.RED, identityPixel(history))
     }
 
-    /** A cold picture starts as the monogram and replaces it silently on the long-message text block too. */
+    /** A late picture silently updates a long message without changing its conversation template or text. */
     @Test
-    fun latePictureReplacesTheMonogramSilentlyOnTheTextBlock() {
+    fun latePictureReplacesTheMonogramSilentlyOnTheLongConversationCard() {
         val posts = mutableListOf<Notification>()
         var enrichment: (suspend () -> Unit)? = null
         val presenter =
@@ -115,7 +182,7 @@ class NotificationConversationIdentityImageTest {
                 resolver = ::latePicture,
                 launcher = { enrichment = it },
             )
-        val long = LongBodies.plain(MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS * 2)
+        val long = LongBodies.plain(160 * 2)
         show(presenter, dm(), senderUrl = "https://example.com/alice.png", body = long)
         val seed = checkNotNull(conversationShortcutId(ACCOUNT, GROUP))
         assertEquals(notificationMonogramBackgroundColor(seed), identityPixel(posts.single()))
@@ -126,17 +193,25 @@ class NotificationConversationIdentityImageTest {
         val enriched = posts.last()
         assertEquals(Color.MAGENTA, identityPixel(enriched))
         assertTrue(enriched.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
-        val bigText = enriched.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
-        assertNotNull("the text block survives enrichment", bigText)
+        assertNull(enriched.extras.getCharSequence(Notification.EXTRA_BIG_TEXT))
+        assertEquals(
+            long,
+            NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(enriched)
+                ?.messages
+                ?.single()
+                ?.text
+                .toString(),
+        )
     }
 
     /** A dismissal while the picture loads keeps the long-message card dismissed. */
     @Test
-    fun dismissedTextBlockIsNotResurrectedByALatePicture() {
+    fun dismissedLongConversationCardIsNotResurrectedByALatePicture() {
         val posts = mutableListOf<Notification>()
         var enrichment: (suspend () -> Unit)? = null
         val presenter = presenter(posts, resolver = ::latePicture, launcher = { enrichment = it })
-        val long = LongBodies.plain(MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS * 2)
+        val long = LongBodies.plain(160 * 2)
         show(presenter, dm(), senderUrl = "https://example.com/alice.png", body = long)
         runBlocking {
             presenter.dismissConversationMessages(ACCOUNT, GROUP)
@@ -145,6 +220,73 @@ class NotificationConversationIdentityImageTest {
 
         assertEquals(1, posts.size)
         assertTrue(manager.activeNotifications.isEmpty())
+    }
+
+    /** A pre-upgrade long-text card retains its body and legacy sender metadata through late image enrichment. */
+    @Test
+    fun legacyTextCardKeepsBodyAndSenderWhenItsPictureArrives() =
+        runBlocking {
+            val posts = mutableListOf<Notification>()
+            val presenter = presenter(posts, resolver = ::latePicture)
+            val body = "A retained pre-upgrade message. ".repeat(12).trim()
+            show(presenter, dm(), body = body)
+            val legacy = postLegacyTextCard(body)
+            val before = posts.size
+
+            assertTrue(refreshLateIdentity(presenter, dm()))
+
+            val enriched = liveCard()
+            assertEquals(before + 1, posts.size)
+            assertEquals(Color.MAGENTA, identityPixel(enriched))
+            assertTrue(enriched.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+            assertNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(enriched))
+            assertEquals(body, enriched.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString())
+            assertEquals(legacy.`when`, enriched.`when`)
+            val sender = Person.fromBundle(checkNotNull(enriched.extras.getBundle(LEGACY_SENDER)))
+            assertEquals(DEFAULT_SENDER, sender.key)
+            assertEquals(Color.MAGENTA, pixel(sender))
+            assertEquals(body, enriched.extras.getCharSequence(LEGACY_BODY)?.toString())
+        }
+
+    /** A picture loader cannot bring back a dismissed pre-upgrade long-text card. */
+    @Test
+    fun dismissedLegacyTextCardIsNotResurrectedByALatePicture() =
+        runBlocking {
+            val posts = mutableListOf<Notification>()
+            val presenter = presenter(posts, resolver = ::latePicture)
+            val body = "A dismissed pre-upgrade message. ".repeat(12).trim()
+            show(presenter, dm(), body = body)
+            postLegacyTextCard(body)
+            val before = posts.size
+            presenter.dismissConversationMessages(ACCOUNT, GROUP)
+
+            assertFalse(refreshLateIdentity(presenter, dm()))
+
+            assertEquals(before, posts.size)
+            assertTrue(manager.activeNotifications.isEmpty())
+        }
+
+    /** Recreates the posted pre-upgrade payload without losing its generation, privacy or identity stamps. */
+    private fun postLegacyTextCard(body: String): Notification {
+        val active = manager.activeNotifications.single()
+        val sender = lastMessagePerson(active.notification)
+        val extras =
+            Bundle(active.notification.extras).apply {
+                remove(Notification.EXTRA_MESSAGES)
+                remove(Notification.EXTRA_MESSAGING_PERSON)
+                putCharSequence(LEGACY_BODY, body)
+                putLong("dev.ipf.whitenoise.extra.EXPANDED_SINGLE_MESSAGE_TIMESTAMP", active.notification.`when`)
+                putBundle(LEGACY_SENDER, sender.toBundle())
+            }
+        val legacy =
+            NotificationCompat
+                .Builder(context, active.notification)
+                .setExtras(extras)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                .build()
+        assertNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(legacy))
+        manager.notify(active.tag, active.id, legacy)
+        return legacy
     }
 
     /** The account-scoped private picture wins at the final write, and Clear falls back to the monogram. */
@@ -180,7 +322,8 @@ class NotificationConversationIdentityImageTest {
 
             val card = liveCard()
             assertEquals(Color.BLUE, identityPixel(card))
-            assertEquals(Color.RED, pixel(lastMessagePerson(card)))
+            assertEquals(0, Color.alpha(pixel(lastMessagePerson(card))))
+            assertEquals("Maya", lastMessagePerson(card).name.toString())
         }
 
     /** App-lock redaction never carries an identity picture or its contact key. */
@@ -222,6 +365,31 @@ class NotificationConversationIdentityImageTest {
             assertEquals(Color.MAGENTA, identityPixel(card))
             assertEquals(Color.MAGENTA, pixel(lastMessagePerson(card)))
             assertEquals("Maya", lastMessagePerson(card).name.toString())
+            assertTrue(card.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+        }
+
+    /** An unused late member picture causes no fetch or rewrite and keeps the current sender name. */
+    @Test
+    fun lateGroupSenderPictureKeepsTheCurrentNameAndNoSenderPixels() =
+        runBlocking {
+            val posts = mutableListOf<Notification>()
+            val fetched = mutableListOf<String>()
+            val presenter =
+                presenter(posts, resolver = { url -> url?.also { fetched += it }?.let { solid(Color.MAGENTA) } })
+            val picture = solid(Color.BLUE)
+            show(presenter, group(), conversation = picture)
+            presenter.refreshContactSenderName(ACCOUNT, DEFAULT_SENDER, "Maya")
+            val before = posts.size
+            val sources = NotificationIdentityPictureSources(picture, null, null, PICTURE_URL)
+
+            assertFalse(refreshLateIdentity(presenter, group(), sources))
+
+            assertTrue(fetched.isEmpty())
+            assertEquals(before, posts.size)
+            val card = liveCard()
+            assertEquals(Color.BLUE, identityPixel(card))
+            assertEquals("Maya", lastMessagePerson(card).name.toString())
+            assertEquals(0, Color.alpha(pixel(lastMessagePerson(card))))
             assertTrue(card.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
         }
 
@@ -275,12 +443,14 @@ class NotificationConversationIdentityImageTest {
             assertEquals(Color.BLUE, identityPixel(liveCard()))
         }
 
-    /** A group picture loader that fails yields no group picture, but the sender picture that arrived still lands. */
+    /** A failed group-picture load never fetches an unused sender image or rewrites the card. */
     @Test
-    fun lateIdentityRefreshKeepsTheSenderPictureWhenTheGroupLoaderFails() =
+    fun lateIdentityRefreshKeepsSenderPixelsHiddenWhenTheGroupLoaderFails() =
         runBlocking {
             val posts = mutableListOf<Notification>()
-            val presenter = presenter(posts, resolver = ::latePicture)
+            val fetched = mutableListOf<String>()
+            val presenter =
+                presenter(posts, resolver = { url -> url?.also { fetched += it }?.let { solid(Color.MAGENTA) } })
             show(presenter, group())
             val before = posts.size
             val sources =
@@ -292,9 +462,11 @@ class NotificationConversationIdentityImageTest {
                     conversationLoader = { error("the group picture download failed") },
                 )
 
-            assertTrue(refreshLateIdentity(presenter, group(), sources))
+            assertFalse(refreshLateIdentity(presenter, group(), sources))
 
-            assertEquals("the sender picture is still written once", before + 1, posts.size)
+            assertTrue(fetched.isEmpty())
+            assertEquals("no visible picture arrived, so no rewrite is needed", before, posts.size)
+            assertEquals(0, Color.alpha(pixel(lastMessagePerson(liveCard()))))
         }
 
     /** A redacted group card never asks the loader for its encrypted picture, and nothing is written. */
@@ -424,11 +596,15 @@ class NotificationConversationIdentityImageTest {
         launcher: (suspend () -> Unit) -> Unit = { error("ready pictures must not launch enrichment") },
         contactAvatar: (String, String) -> Pair<Boolean, Bitmap?> = { _, _ -> false to null },
         pacer: NotificationPostPacer = NotificationPostPacer(),
+        shortcutPublications: AtomicInteger? = null,
     ): LocalNotificationPresenter =
         LocalNotificationPresenter(
             context = context,
             groupReconciliation = {},
-            shortcutPublisher = { ShortcutManagerCompat.pushDynamicShortcut(context, it) },
+            shortcutPublisher = {
+                shortcutPublications?.incrementAndGet()
+                ShortcutManagerCompat.pushDynamicShortcut(context, it)
+            },
             notificationPoster = { notificationManager, tag, id, notification ->
                 posts += notification
                 notificationManager.notify(tag, id, notification)
@@ -457,6 +633,7 @@ class NotificationConversationIdentityImageTest {
         conversation: Bitmap? = null,
         sender: Bitmap? = null,
         senderUrl: String? = null,
+        conversationUrl: String? = null,
         body: String = "hi",
     ) {
         assertTrue(
@@ -465,6 +642,7 @@ class NotificationConversationIdentityImageTest {
                     update,
                     previewTextOverride = body,
                     conversationAvatarBitmap = conversation,
+                    conversationAvatarUrl = conversationUrl,
                     senderAvatarBitmap = sender,
                     senderAvatarUrl = senderUrl,
                     shortNpub = { "npub1test" },
@@ -522,6 +700,8 @@ class NotificationConversationIdentityImageTest {
     private fun scope(account: String): String = checkNotNull(conversationShortcutAccountScope(account))
 
     private companion object {
+        const val LEGACY_BODY = "dev.ipf.whitenoise.extra.EXPANDED_SINGLE_MESSAGE_BODY"
+        const val LEGACY_SENDER = "dev.ipf.whitenoise.extra.EXPANDED_SINGLE_MESSAGE_SENDER"
         const val ACCOUNT = NotificationFixtureDefaults.ACCOUNT_REF
         const val GROUP = NotificationFixtureDefaults.GROUP_ID_HEX
         const val DEFAULT_SENDER = NotificationFixtureDefaults.SENDER_ACCOUNT_ID_HEX

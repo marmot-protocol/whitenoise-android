@@ -1815,12 +1815,6 @@
         "test_ids": ["MED-019", "MED-020", "MED-025"]
       },
       {
-        "surface": "Prompt native READY observation beside the engine feed",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentFastReady.kt",
-        "anchor": "internal class PendingFeedWait(",
-        "test_ids": ["MED-025"]
-      },
-      {
         "surface": "Interactive attachment demand and post-admission native state",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentDemand.kt",
         "anchor": "internal suspend fun MarmotInterface.requestNativeInteractiveAttachment(",

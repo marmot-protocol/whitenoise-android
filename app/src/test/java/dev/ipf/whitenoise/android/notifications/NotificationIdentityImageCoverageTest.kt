@@ -8,7 +8,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * Invariant gate for #3311: every rich message card, in the conversation template and the long-message text block,
+ * Invariant gate for #3311 and #3505: every rich message card uses the native conversation template and
  * carries one shared conversation identity snapshot through first post, enrichment, private contact pictures and
  * every rewrite of a live card. Its identity shortcut is published before the single first post, so even a
  * brand-new conversation's first card is a conversation, while redacted and hidden-preview cards stay generic.
@@ -31,6 +31,19 @@ class NotificationIdentityImageCoverageTest {
         assertTrue("the shortcut monogram seed keeps card and shortcut alike", "seed = messagingShortcutId" in guarded)
         val image = source("NotificationIdentityImage.kt").extensionBody("identityImage")
         assertTrue("a group never borrows a member's face", "senderAvatar.takeIf { directChat }" in image)
+    }
+
+    /** Long first messages never switch the image into BigTextStyle's trailing picture slot. */
+    @Test
+    fun everyNewMessageUsesTheSameNativeConversationTemplate() {
+        val show = source("LocalNotificationPresenter.kt").functionBody("show")
+        val richWrite =
+            show
+                .substringAfter("val presentationTimestampMs = nowMillis()")
+                .substringBefore("val notification = buildSettled(false)")
+        assertTrue("the message branch builds a conversation", "messagingStyle(" in richWrite)
+        assertFalse("no body-length switch", "shouldUseExpandedSingleMessageStyle" in show)
+        assertFalse("no trailing big-text picture for messages", "BigTextStyle" in richWrite)
     }
 
     /**
@@ -71,12 +84,12 @@ class NotificationIdentityImageCoverageTest {
         )
     }
 
-    /** Late pictures rewrite both card templates with the same snapshot instead of only the conversation style. */
+    /** Late pictures also support a pre-upgrade text card until its next message replaces the old template. */
     @Test
-    fun enrichmentRewritesBothTemplatesWithTheSnapshot() {
+    fun enrichmentRetainsCompatibilityWithPreUpgradeTextCards() {
         val body = source("LocalNotificationPresenter.kt").functionBody("enrichedIdentityNotification")
         assertTrue("conversation template", "enrichedMessagingStyle(active, sender)" in body)
-        assertTrue("long-message text block", "EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER" in body)
+        assertTrue("pre-upgrade long-message text block", "EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER" in body)
         assertTrue("the same snapshot", "setConversationIdentityImage(identity)" in body)
         assertTrue("one silent rewrite", "setOnlyAlertOnce(true)" in body)
     }
@@ -176,6 +189,21 @@ class NotificationIdentityImageCoverageTest {
         val lock = reuse.lastIndexOf("synchronized(UserEventNotificationGroup.mutationLock)", report)
         val reRead = reuse.lastIndexOf("shortcutSnapshots[shortcutId] == snapshot", report)
         assertTrue("the use report re-reads the snapshot inside the lock", lock in 0 until reRead)
+    }
+
+    /** Every rich-group rewrite normalizes sender pixels after private overrides while retaining native style. */
+    @Test
+    fun groupSenderPicturesAreSuppressedAtTheFinalWriteBoundary() {
+        val write = source("LocalNotificationPresenter.kt").functionBody("postNotificationSafely")
+        val normalize = write.indexOf("withoutGroupSenderPictures(")
+        assertTrue("normalization is in the final write", normalize >= 0)
+        assertTrue("after private picture reconciliation", write.indexOf("withCurrentContactPictures(") < normalize)
+        val policy = source("NotificationGroupSenderImages.kt")
+        assertTrue("real group conversation style retained", "setGroupConversation(true)" in policy)
+        assertTrue("all historic senders normalized", "existing.historicMessages.forEach" in policy)
+        assertTrue("self normalized too", "groupNotificationPerson(existing.user)" in policy)
+        assertTrue("native action objects retained", "actions = notification.actions" in policy)
+        assertFalse("no replacement custom card", "RemoteViews" in policy)
     }
 
     /** Body of an extension function such as `fun Receiver.name(...)`, which [functionBody] does not match. */

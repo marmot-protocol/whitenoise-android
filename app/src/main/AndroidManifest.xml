@@ -123,6 +123,12 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
+        <!-- Public immutable sound assets, including system playback after restore. -->
+        <provider
+            android:name=".notifications.NotificationToneProvider"
+            android:authorities="${applicationId}.notification-tones"
+            android:exported="true"
+            android:grantUriPermissions="false" />
         <provider
             android:name=".share.PrivateShareProvider"
             android:authorities="${applicationId}.private-share"

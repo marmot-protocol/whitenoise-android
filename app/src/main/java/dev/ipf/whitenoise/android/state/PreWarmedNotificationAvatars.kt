@@ -33,8 +33,8 @@ internal fun PreWarmedNotificationAvatars.lateIdentitySources(
     NotificationIdentityPictureSources(
         conversationBitmap = conversationBitmap(isDm),
         conversationUrl = if (isDm) warmed.senderAvatarUrl else warmed.groupAvatarUrl,
-        senderBitmap = senderAvatarBitmap,
-        senderUrl = warmed.senderAvatarUrl,
+        senderBitmap = senderAvatarBitmap.takeIf { isDm },
+        senderUrl = warmed.senderAvatarUrl.takeIf { isDm },
         conversationDomain = conversationDomain,
         senderDomain = senderDomain,
     )

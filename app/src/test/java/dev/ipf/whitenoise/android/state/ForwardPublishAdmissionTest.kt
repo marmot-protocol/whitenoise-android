@@ -245,8 +245,7 @@ class ForwardPublishAdmissionTest {
     fun aStaleEpochRefusalIsReportedAsRejected() =
         runTest {
             val ledger = FakeTokenLedger()
-            val stale =
-                MarmotKitException.InvalidMediaReference(STALE_EPOCH_DETAILS)
+            val stale = MarmotKitException.MediaReferenceStaleEpoch(sourceEpoch = 3uL, currentEpoch = 4uL)
 
             val failure = runCatching { publish(ledger, admitFailure = stale) }.exceptionOrNull()
 
@@ -259,6 +258,5 @@ class ForwardPublishAdmissionTest {
         const val DEADLINE_MILLIS = 5_000L
         const val POLL_MILLIS = 100L
         const val HANDOFF_MILLIS = 1_000L
-        const val STALE_EPOCH_DETAILS = "media reference was encrypted at epoch 3 but the group is at 4"
     }
 }

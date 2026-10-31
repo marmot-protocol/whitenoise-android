@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.notifications
 
 import android.graphics.Bitmap
 import android.graphics.Color
+import androidx.core.app.Person
 import androidx.core.graphics.drawable.toBitmap
 import dev.ipf.whitenoise.android.share.ShareShortcutTarget
 import dev.ipf.whitenoise.android.share.buildShareShortcut
@@ -117,6 +118,30 @@ class ContactPictureShortcutTest {
         listOf(dm, group, refreshedDm, refreshedGroup).forEach { shortcut ->
             assertTrue(checkNotNull(shortcut.extras).keySet().none { it.endsWith(".name") || it.endsWith(".uri") })
         }
+    }
+
+    /** A group shortcut sender keeps its name but no picture without a sender key; a direct sender is unchanged. */
+    @Test fun groupShortcutSenderHidesItsPictureWithoutASenderKey() {
+        val context = RuntimeEnvironment.getApplication()
+        val content =
+            LocalNotificationContent(
+                notificationTag = "group",
+                notificationId = 1,
+                title = "Group",
+                body = "message",
+                senderName = "Alice",
+                senderKey = "",
+                selfName = "Me",
+                selfKey = "self",
+                isGroupConversation = true,
+                conversationTitle = "Group",
+            )
+        val sender = Person.Builder().setName("Alice").build()
+        val normalized = notificationShortcutSender(content, sender)
+        assertEquals("Alice", normalized.name.toString())
+        assertEquals(0, Color.alpha(checkNotNull(normalized.icon?.loadDrawable(context)).toBitmap().getPixel(0, 0)))
+        val direct = content.copy(isGroupConversation = false)
+        assertEquals(sender, notificationShortcutSender(direct, sender))
     }
 
     /** Runs the production icon-refresh path against a controlled preview epoch and captured launcher writes. */

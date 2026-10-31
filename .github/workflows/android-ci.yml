@@ -189,6 +189,9 @@ jobs:
       - name: Test stale-result recurrence classifier
         run: python3 -m unittest scripts/test_stale_result_recurrence.py
 
+      - name: Test DEX method budget reporting
+        run: python3 -m unittest scripts/test_dex_method_budget.py
+
       - name: Test package-replacement startup reporter
         run: bash .github/scripts/test-package-replacement-startup-report.sh
 
@@ -388,6 +391,40 @@ jobs:
           app_apk="$(dirname "$metadata")/$output_file"
           bash scripts/verify-baseline-profile.sh "$app_apk"
           printf 'apk=%s\n' "$app_apk" >> "$GITHUB_OUTPUT"
+
+      # benchmarkRelease is unminified D8 output. Its budget warns when a benchmarked
+      # method reaches ART's compile limit but never blocks merges; the shipping R8
+      # budgets fail in the release-runtime lanes.
+      - name: Check benchmark DEX method budget
+        id: dex_budget_benchmark
+        if: matrix.phase == 'baseline'
+        continue-on-error: true
+        env:
+          DEX_BUDGET_APK_PATH: ${{ steps.baseline_apk.outputs.apk }}
+          DEX_BUDGET_SOURCE_SHA: ${{ github.sha }}
+        run: >-
+          python3 scripts/dex_method_budget.py
+          --apk "$DEX_BUDGET_APK_PATH"
+          --variant devZapstoreBenchmarkRelease
+          --source-sha "$DEX_BUDGET_SOURCE_SHA"
+          --report-dir app/build/reports/dex-method-budget
+
+      - name: Warn on benchmark DEX method budget
+        if: ${{ always() && matrix.phase == 'baseline' && steps.dex_budget_benchmark.outcome == 'failure' }}
+        run: >-
+          echo "::warning title=Benchmark DEX method budget::devZapstoreBenchmarkRelease failed its DEX method
+          budget check. See the Check benchmark DEX method budget step log. A budget violation also leaves a
+          step summary and the dex-method-budget-benchmark artifact; an input error leaves only the log. A
+          method at ART's compile limit makes macrobenchmarks measure the interpreter."
+
+      - name: Upload benchmark DEX method report
+        if: ${{ always() && matrix.phase == 'baseline' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: dex-method-budget-benchmark
+          path: app/build/reports/dex-method-budget/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Stage the existing APK for optional Maestro testing
         id: maestro_stage

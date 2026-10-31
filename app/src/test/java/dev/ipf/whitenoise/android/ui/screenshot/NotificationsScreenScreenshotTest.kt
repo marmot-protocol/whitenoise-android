@@ -4,12 +4,16 @@ import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -63,6 +67,18 @@ class NotificationsScreenScreenshotTest {
         )
     }
 
+    /** The changed explanation remains readable in a large-font RTL scrolled viewport. */
+    @Test
+    fun notificationToneScopeRtlLargeFont() {
+        capture(
+            "notification_tone_scope_rtl_large_font",
+            darkTheme = false,
+            fontScale = 2f,
+            layoutDirection = LayoutDirection.Rtl,
+            scrollToToneScope = true,
+        )
+    }
+
     /** Opted-out previews remain a clear independent choice without an account. */
     @Test
     fun notificationsPreviewsHidden() {
@@ -98,6 +114,7 @@ class NotificationsScreenScreenshotTest {
         amoled: Boolean = false,
         fontScale: Float = 1f,
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
+        scrollToToneScope: Boolean = false,
     ) {
         app
             .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
@@ -122,6 +139,11 @@ class NotificationsScreenScreenshotTest {
                     NotificationsScreen(appState = appState, onBack = {})
                 }
             }
+        }
+        if (scrollToToneScope) {
+            composeRule
+                .onNode(hasScrollToNodeAction())
+                .performScrollToNode(hasText(app.getString(R.string.notification_tone_scope)))
         }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }

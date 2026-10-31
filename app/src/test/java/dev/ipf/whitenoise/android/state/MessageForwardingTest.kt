@@ -1795,7 +1795,4 @@ class MessageForwardingTest {
 }
 
 /** MDK's synchronous refusal of a media reference encrypted at an epoch the destination has left. */
-private fun staleEpochRefusal() =
-    MarmotKitException.InvalidMediaReference(
-        "media reference was encrypted at epoch 3 but the group is at epoch 4",
-    )
+private fun staleEpochRefusal() = MarmotKitException.MediaReferenceStaleEpoch(sourceEpoch = 3uL, currentEpoch = 4uL)

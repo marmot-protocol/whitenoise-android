@@ -26,6 +26,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.FolderField
@@ -83,6 +85,10 @@ internal fun SmartFolderRulePanel(
             }
         }
         if (!state.advanced) {
+            TextButton(
+                onClick = { requestRules(defaultSmartFolder()) },
+                modifier = Modifier.testTag("folder.quick.start"),
+            ) { Text(stringResource(R.string.smart_folder_quick_start)) }
             if (!editSimpleRules) {
                 TextButton(onClick = { applyPreset(true) }, modifier = Modifier.testTag("folder.presetRead")) {
                     Text(stringResource(R.string.smart_folder_preset_read))
@@ -106,15 +112,7 @@ internal fun SmartFolderRulePanel(
                 if (legacyExpanded) legacyControls()
             }
         } else {
-            val root = state.root
-            if (root == null) {
-                Text(stringResource(R.string.smart_folder_invalid), color = MaterialTheme.colorScheme.error)
-                TextButton(onClick = { requestRules(defaultSmartFolder()) }) {
-                    Text(stringResource(R.string.smart_folder_start))
-                }
-            } else {
-                SmartFolderEditor(root, people, resolveKey, onChange)
-            }
+            SmartFolderAutomaticRules(state.root, people, resolveKey, onChange, requestRules)
         }
     }
     if (adding) {
@@ -154,6 +152,51 @@ internal fun SmartFolderRulePanel(
                 TextButton(onClick = { pendingPayload = null }) { Text(stringResource(R.string.cancel)) }
             },
         )
+    }
+}
+
+/** Automatic rule presentation owns only its saveable disclosure; draft edits still use the screen owner. */
+@Composable
+private fun SmartFolderAutomaticRules(
+    root: SmartFolderFilter.Group?,
+    people: List<WhiteNoisePickerItem>,
+    resolveKey: suspend (String) -> String?,
+    onChange: (SmartFolderFilter.Group) -> Unit,
+    requestRules: (SmartFolderFilter.Group) -> Unit,
+) {
+    var advancedExpanded by rememberSaveable { mutableStateOf(false) }
+    if (root == null) {
+        Text(stringResource(R.string.smart_folder_invalid), color = MaterialTheme.colorScheme.error)
+        TextButton(onClick = { requestRules(defaultSmartFolder()) }) {
+            Text(stringResource(R.string.smart_folder_start))
+        }
+    } else {
+        val quickCompatible = root.supportsQuickFilters()
+        if (quickCompatible) {
+            if (!advancedExpanded) SmartFolderQuickFilterControls(root, onChange)
+            val advancedState =
+                stringResource(
+                    if (advancedExpanded) {
+                        R.string.smart_folder_quick_expanded
+                    } else {
+                        R.string.smart_folder_quick_collapsed
+                    },
+                )
+            TextButton(
+                onClick = { advancedExpanded = !advancedExpanded },
+                modifier =
+                    Modifier.testTag("folder.quick.advanced").semantics {
+                        stateDescription = advancedState
+                    },
+            ) {
+                FolderButtonLabel(
+                    stringResource(R.string.advanced),
+                    R.drawable.ic_expand_more,
+                    advancedExpanded,
+                )
+            }
+        }
+        if (!quickCompatible || advancedExpanded) SmartFolderEditor(root, people, resolveKey, onChange)
     }
 }
 

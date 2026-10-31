@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.SelectedMessageDraftContentFfi
 import dev.ipf.marmotkit.SelectedMessageDraftFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
+import dev.ipf.whitenoise.android.core.isMediaReferenceRefusal
 
 /**
  * Publishes the composer's text with one engine call, the way the app sent before 0.10.0.
@@ -157,6 +158,7 @@ private fun MarmotInterface.saveRevisionOrNull(
     }
 }
 
+/** Sends the stored draft, or returns null when MDK refuses it in a way the direct send can retry. */
 @Suppress("SwallowedException") // Conflicts and descriptor mismatches are handled by the direct-send fallback.
 private suspend fun MarmotInterface.sendDraftOrNull(
     accountRef: String,
@@ -169,6 +171,7 @@ private suspend fun MarmotInterface.sendDraftOrNull(
         null
     } catch (invalid: MarmotKitException.InvalidMessageDraft) {
         null
-    } catch (invalid: MarmotKitException.InvalidMediaReference) {
+    } catch (refused: MarmotKitException) {
+        if (!refused.isMediaReferenceRefusal()) throw refused
         null
     }
