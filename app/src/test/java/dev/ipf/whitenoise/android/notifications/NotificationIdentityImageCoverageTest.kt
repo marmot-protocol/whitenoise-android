@@ -19,6 +19,10 @@ class NotificationIdentityImageCoverageTest {
     fun richCardsShareOneIdentitySnapshotAndRedactedCardsGetNone() {
         val presenter = source("LocalNotificationPresenter.kt")
         assertFalse("identity pictures go through setConversationIdentityImage", ".setLargeIcon(" in presenter)
+        assertFalse(
+            "content rewrites use the same identity snapshot",
+            ".setLargeIcon(" in source("NotificationCardContent.kt"),
+        )
         val firstPost =
             presenter
                 .substringAfter("NotificationStyleChoice.Messaging -> {")
@@ -91,7 +95,7 @@ class NotificationIdentityImageCoverageTest {
     /** Late pictures also support a pre-upgrade text card until its next message replaces the old template. */
     @Test
     fun enrichmentRetainsCompatibilityWithPreUpgradeTextCards() {
-        val body = source("LocalNotificationPresenter.kt").functionBody("enrichedIdentityNotification")
+        val body = source("NotificationCardContent.kt").functionBody("enrichedIdentityNotification")
         assertTrue("conversation template", "enrichedMessagingStyle(active, sender)" in body)
         assertTrue("pre-upgrade long-message text block", "EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER" in body)
         assertTrue("the same snapshot", "setConversationIdentityImage(identity)" in body)
@@ -104,7 +108,7 @@ class NotificationIdentityImageCoverageTest {
         val presenter = source("LocalNotificationPresenter.kt")
         val post = presenter.functionBody("postNotificationSafely")
         assertTrue("the final write uses the combined refresh", "withCurrentContactPictures(notification)" in post)
-        val refresh = presenter.functionBody("withCurrentContactPictures")
+        val refresh = source("NotificationCardContent.kt").functionBody("withCurrentContactPictures")
         assertTrue("the identity picture follows the contact choice", "withCurrentIdentityContact(" in refresh)
         assertTrue("redacted cards are never refreshed", "EXTRA_CONTENT_REDACTED" in refresh)
     }
@@ -114,6 +118,10 @@ class NotificationIdentityImageCoverageTest {
     fun liveCardRewritesNeverDropTheIdentityPicture() {
         val presenter = source("LocalNotificationPresenter.kt")
         assertFalse("no path clears the picture", "setLargeIcon(null" in presenter)
+        assertFalse(
+            "no content rewrite clears the picture",
+            "setLargeIcon(null" in source("NotificationCardContent.kt"),
+        )
         val refresh = source("NotificationIdentityImage.kt").functionBody("withCurrentIdentityContact")
         assertTrue("only a direct chat's own contact changes its picture", "IDENTITY_CONTACT" in refresh)
         assertTrue("a cleared choice falls back to the monogram", "notificationMonogramBitmap(title, seed)" in refresh)

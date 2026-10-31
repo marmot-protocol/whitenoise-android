@@ -738,9 +738,7 @@
     <ID>MaxLineLength:LocalNotificationFormatter.kt:LocalNotificationFormatter$text(context, R.string.notification_sender_invited_you_to_group, "%1\$s invited you to %2\$s", sender, group)</ID>
     <ID>MaxLineLength:LocalNotificationFormatterTest.kt:LocalNotificationFormatterTest$val redacted = LocalNotificationFormatter.redactedContent(content, appName = "White Noise", body = "New notification")</ID>
     <ID>MaxLineLength:LocalNotificationPolicy.kt:LocalNotificationPolicy$conversationNotifyMode: (accountRef: String, groupIdHex: String) -&gt; ChatNotifyMode = { _, _ -&gt; ChatNotifyMode.ALL }</ID>
-    <ID>MaxLineLength:LocalNotificationPresenter.kt:LocalNotificationPresenter$(conversationTitleOverride?.takeIf { it.isNotBlank() } ?: content.conversationTitle)?.let { style.conversationTitle = it }</ID>
     <ID>MaxLineLength:LocalNotificationPresenter.kt:LocalNotificationPresenter$.</ID>
-    <ID>MaxLineLength:LocalNotificationPresenter.kt:LocalNotificationPresenter$// Cap carried-forward history; the extracted style is otherwise re-serialized unbounded across Binder on every post.</ID>
     <ID>MaxLineLength:LocalNotificationPresenter.kt:LocalNotificationPresenter$NotificationActionKind.MARK_READ -&gt; builder.addAction(markReadNotificationAction(actionTarget))</ID>
     <ID>MaxLineLength:NotificationInteractionFactory.kt:NotificationInteractionFactory$NotificationNavigation.applyToIntent(this, target, content.notificationTag, tapTokens.tokenFor(content.notificationTag))</ID>
     <ID>MaxLineLength:LocalNotificationPresenter.kt:LocalNotificationPresenter$stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)</ID>

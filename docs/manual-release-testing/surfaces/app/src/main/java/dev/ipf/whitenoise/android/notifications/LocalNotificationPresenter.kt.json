@@ -2,37 +2,12 @@
   "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
   "legacy_sha256": "7cf6a306d4adaf51847d4f16cb1f4b6dede00e25f57d1579d924043f8b2ade61",
   "categories": {
-    "composable_surfaces": [
-      {
-        "surface": "private_contact_notification",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
-        "anchor": "fun withCurrentContactAvatars(",
-        "test_ids": [
-          "PRO-008"
-        ]
-      }
-    ],
+    "composable_surfaces": [],
     "notification_content_contracts": [
-      {
-        "surface": "localized notification emoji fallback label",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
-        "anchor": "R.string.custom_emoji",
-        "test_ids": [
-          "NTF-034"
-        ]
-      },
       {
         "surface": "silent active-card contact nickname reconciliation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
         "anchor": "suspend fun refreshContactSenderName(",
-        "test_ids": [
-          "NTF-025"
-        ]
-      },
-      {
-        "surface": "group notification sender title refresh",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
-        "anchor": "R.string.notification_sender_in_group",
         "test_ids": [
           "NTF-025"
         ]
@@ -43,16 +18,6 @@
         "anchor": "suspend fun dismissConversationMessages(",
         "test_ids": [
           "NTF-025"
-        ]
-      },
-      {
-        "surface": "same-card avatar enrichment preserves heads-up eligibility without repeat alerts",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
-        "anchor": "private fun enrichedIdentityNotification(",
-        "test_ids": [
-          "NTF-006",
-          "NTF-010",
-          "NTF-042"
         ]
       },
       {
@@ -102,15 +67,6 @@
         ]
       },
       {
-        "surface": "private contact picture on a direct message's identity",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
-        "anchor": "private fun withCurrentContactPictures(",
-        "test_ids": [
-          "NTF-042",
-          "NTF-025"
-        ]
-      },
-      {
         "surface": "identity shortcut published before the first post",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
         "anchor": "private suspend fun publishShortcutBeforePost(",
@@ -153,6 +109,15 @@
         "test_ids": [
           "NTF-042",
           "NTF-011"
+        ]
+      },
+      {
+        "surface": "live-card eligibility remains before content rewriting and serialized publication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "cardContent.withCurrentContactPictures(notification)",
+        "test_ids": [
+          "NTF-025",
+          "NTF-042"
         ]
       }
     ],

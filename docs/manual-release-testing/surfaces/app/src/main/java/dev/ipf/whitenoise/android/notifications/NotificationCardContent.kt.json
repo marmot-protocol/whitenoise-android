@@ -1,0 +1,79 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationCardContent.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "private_contact_notification",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationCardContent.kt",
+        "anchor": "fun withCurrentContactAvatars(",
+        "test_ids": [
+          "PRO-008"
+        ]
+      }
+    ],
+    "notification_content_contracts": [
+      {
+        "surface": "localized notification emoji fallback label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationCardContent.kt",
+        "anchor": "R.string.custom_emoji",
+        "test_ids": [
+          "NTF-034"
+        ]
+      },
+      {
+        "surface": "group notification sender title refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationCardContent.kt",
+        "anchor": "R.string.notification_sender_in_group",
+        "test_ids": [
+          "NTF-025"
+        ]
+      },
+      {
+        "surface": "same-card avatar enrichment preserves heads-up eligibility without repeat alerts",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationCardContent.kt",
+        "anchor": "fun enrichedIdentityNotification(",
+        "test_ids": [
+          "NTF-006",
+          "NTF-010",
+          "NTF-042"
+        ]
+      },
+      {
+        "surface": "private contact picture on a direct message's identity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationCardContent.kt",
+        "anchor": "fun withCurrentContactPictures(",
+        "test_ids": [
+          "NTF-042",
+          "NTF-025"
+        ]
+      },
+      {
+        "surface": "bounded messaging history retains attachment metadata and stamped entry identities",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationCardContent.kt",
+        "anchor": "fun messagingStyle(",
+        "test_ids": [
+          "NTF-042",
+          "NTF-043"
+        ]
+      },
+      {
+        "surface": "pre-upgrade single-message history remains readable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationCardContent.kt",
+        "anchor": "fun expandedSingleMessage(",
+        "test_ids": [
+          "NTF-042",
+          "NTF-036"
+        ]
+      },
+      {
+        "surface": "nickname rewrite preserves sender identity and conversation history",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationCardContent.kt",
+        "anchor": "fun renamedSenderNotification(",
+        "test_ids": [
+          "NTF-025"
+        ]
+      }
+    ]
+  }
+}
