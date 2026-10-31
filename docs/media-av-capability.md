@@ -4,8 +4,9 @@ This debug-only experiment measures Android media API access from the app's
 permissionless isolated UID. Attachment decoding, playback,
 voice playback and fallback retain their existing production routes. Earlier API30
 and API34 campaigns failed their A/V reply-deadline observations; these failures
-remain part of the evidence. New-source qualification remains pending.
-Issue3374 remains open.
+remain part of the evidence. Current-source API 30 and API 36 qualification remains pending.
+Issue #3374 remains open. The [feasibility decision](media-av-feasibility.md)
+records the path inventory, retained results and remaining implementation gates.
 
 ## Fixed inputs and phases
 
@@ -98,3 +99,26 @@ Individual phases may report success, an exception or untyped `no_result`.
 Review exact-head source, runtime API, JUnit, raw output and same-run APK evidence
 before interpreting those outcomes. Production adoption and attachment-security closure require their separate
 review and validation gates.
+
+## Machine-readable matrix
+
+Capture schema 3 records the app UID, selected fixture SHA-256, byte length and
+format. Timely replies retain the isolation, network-permission, runtime-startup
+and private-canary checks that the binding validated. Deadline rows retain their
+missing terminal evidence as an explicit qualification gap. Schema 2 captures
+remain historical evidence and lack the fields needed for independent matrix
+validation.
+
+After downloading the additional-output JSONL from the exact instrumented run:
+
+```sh
+python3 scripts/summarize_media_av_capability.py media-av-capability-TOKEN.jsonl
+```
+
+The analyzer rejects incomplete inventories, mixed identities and missing cleanup.
+Its report separates a complete capture, a completed characterization and parser
+support. A soft timeout can finish a negative characterization while its parser
+support remains unqualified. A reply deadline fails characterization. APK/run
+provenance and platform qualification require separate review even when the file
+passes structural validation. Retain the raw JSONL with the exact APK and JUnit
+results; the analyzer does not authenticate a locally supplied file.

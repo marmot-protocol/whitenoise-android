@@ -35,7 +35,8 @@ class MediaAvCapabilityDeviceTest {
             report.writeText(
                 JSONObject()
                     .put("type", "header")
-                    .put("capture_schema", 2)
+                    .put("capture_schema", 3)
+                    .put("app_uid", android.os.Process.myUid())
                     .put("run_token", token)
                     .put("api", Build.VERSION.SDK_INT)
                     .put("fingerprint", Build.FINGERPRINT)
@@ -99,6 +100,14 @@ private class AvCapabilityCampaign(
                 .put("run_token", token)
                 .put("request", index + 1)
                 .put("stage", case.stage)
+                .put(
+                    "input_sha256",
+                    java.security.MessageDigest
+                        .getInstance("SHA-256")
+                        .digest(case.bytes)
+                        .joinToString("") { "%02x".format(it) },
+                ).put("input_bytes", case.bytes.size)
+                .put("format", case.format)
         var failed = false
         var emitted = false
         try {
@@ -185,7 +194,15 @@ private class ProbeCase(
     val id: String,
     val stage: String,
     val bytes: ByteArray,
-)
+) {
+    val format: String
+        get() =
+            when {
+                id == "empty_range" -> "empty"
+                id.startsWith("audio_") || id == "overflow_range" -> "audio/wav"
+                else -> "video/mp4"
+            }
+}
 
 /** Bounded worker-PID read; unrelated processes cannot displace the correlated request's log tail. */
 internal object AvCapabilityLogs {

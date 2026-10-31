@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicLong
 /** Controlled state-machine assertions, never kernel identity/death or platform qualification. */
 internal fun checkAvBindingWiring(context: Context) {
     checkAvDiagnosticAdmission()
+    checkAvBoundaryReport()
     val fixture = File.createTempFile("av-wiring-", ".bin", context.cacheDir)
     try {
         fixture.writeBytes(byteArrayOf(1))
@@ -318,4 +319,25 @@ private class AvWiringEndpoint(
             check(!it.isAlive)
         }
     }
+}
+
+/** Reports retain boundary facts so offline consumers can reject incomplete or contradictory captures. */
+private fun checkAvBoundaryReport() {
+    val result =
+        Bundle().apply {
+            putInt("uid", 99_001)
+            putBoolean("isolated", true)
+            putBoolean("internetGranted", false)
+            putBoolean("runtimeInitialized", false)
+            putBoolean("privateCanaryDenied", true)
+            putInt("privateCanaryErrno", android.system.OsConstants.EACCES)
+            putInt("inputWriteErrno", android.system.OsConstants.EBADF)
+        }
+    val row = AvCapabilityEvidence.row(1, result, 7, 5, 2)
+    check(row.getInt("kernel_reply_uid") == 99_001)
+    check(row.getBoolean("isolated") && row.getBoolean("private_canary_denied"))
+    check(!row.getBoolean("internet_granted") && !row.getBoolean("runtime_initialized"))
+    check(row.getInt("private_canary_errno") == android.system.OsConstants.EACCES)
+    check(row.getInt("input_write_errno") == android.system.OsConstants.EBADF)
+    check(!row.getBoolean("success") && !row.getBoolean("output_read"))
 }
