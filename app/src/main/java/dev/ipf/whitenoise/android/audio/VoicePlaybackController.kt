@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.audio
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioManager
-import android.media.MediaPlayer
 import android.os.SystemClock
 import android.util.Log
 import android.util.LruCache
@@ -34,7 +33,7 @@ internal class VoicePlaybackRequestSerializer {
 }
 
 /**
- * Process-wide voice playback singleton. Only one MediaPlayer is active at
+ * Process-wide voice playback singleton. One isolated PCM player is active at
  * a time — starting playback on a new key implicitly stops any prior clip.
  *
  * Bubbles subscribe to [state] and decide their visual from [PlaybackState.key]
@@ -113,20 +112,22 @@ object VoicePlaybackController {
     // of process-lifetime leak.
     private val durationCache = LruCache<String, Int>(DURATION_CACHE_MAX_ENTRIES)
 
-    private var player: MediaPlayer? = null
+    private var player: VoicePlaybackPlayer? = null
+    private var applicationContext: Context? = null
+    private var playerFactory: VoicePlaybackPlayer.Factory = RawVoicePlaybackPlayer.Factory
     private var currentKey: String? = null
     private var nextSessionId = 0L
     private var currentOwnerKey: String? = null
     private var tickerJob: Job? = null
     private var currentSpeed: Float = 1f
 
-    // MediaPlayer seeks complete asynchronously, so currentPosition can still
+    // Voice seeks complete asynchronously, so currentPosition can still
     // report the old playhead. Relative banner seeks build on the last
     // requested target until this player confirms it.
     private var pendingSeek: PendingSeek? = null
     private val playbackRequests = StalenessGuard()
 
-    // play() suspends while MediaPlayer prepares on IO; serialize callers so
+    // play() suspends while isolated voice playback prepares on IO; serialize callers so
     // only one prepared player can ever reach start()/assignment.
     private val playSerializer = VoicePlaybackRequestSerializer()
 
@@ -141,6 +142,7 @@ object VoicePlaybackController {
 
     /** Call once from Application.onCreate so playback can request audio focus. */
     fun attach(context: Context) {
+        applicationContext = context.applicationContext
         AudioFocusOwner.attach(context)
     }
 
@@ -158,7 +160,7 @@ object VoicePlaybackController {
     private var completionCallback: CompletionCallback? = null
 
     /**
-     * Fires once when MediaPlayer reports completion, scoped to the owner that
+     * Fires once when voice playback reports completion, scoped to the owner that
      * started playback. Conversation screens use this to chain into the next
      * voice attachment without letting a completion from a previous screen drive
      * the currently visible screen.
@@ -179,8 +181,7 @@ object VoicePlaybackController {
     /**
      * Cycle to the next speed in [speedOptions] and apply it to the active
      * player if one is running. Returns the new speed so callers can
-     * persist it in their UI. MediaPlayer.PlaybackParams is supported from
-     * API 23 onward.
+     * persist it in their UI. The raw PCM renderer keeps pitch fixed while changing speed.
      */
     fun cycleSpeed(): Float {
         nextPlaybackGeneration()
@@ -201,9 +202,8 @@ object VoicePlaybackController {
         val mp = player ?: return
         runCatching {
             val wasPlaying = mp.isPlaying
-            mp.playbackParams = mp.playbackParams.setSpeed(currentSpeed)
-            // setPlaybackParams can flip the player into playing state on
-            // some devices; force the caller's intent.
+            mp.setSpeed(currentSpeed)
+            // Preserve paused intent across speed changes at the player boundary.
             if (!wasPlaying && mp.isPlaying) mp.pause()
         }.onFailure { Log.w(TAG, "voice_playback_speed_update_failed") }
     }
@@ -291,17 +291,8 @@ object VoicePlaybackController {
         val mp =
             withContext(Dispatchers.IO) {
                 runCatching {
-                    MediaPlayer().apply {
-                        setAudioAttributes(
-                            AudioAttributes
-                                .Builder()
-                                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                                .setUsage(AudioAttributes.USAGE_MEDIA)
-                                .build(),
-                        )
-                        setDataSource(file.absolutePath)
-                        prepare()
-                    }
+                    val context = checkNotNull(applicationContext) { "Voice playback is not attached" }
+                    playerFactory.prepare(context, file)
                 }.onFailure { Log.w(TAG, "voice_playback_prepare_failed") }
                     .getOrNull()
                     ?.also {
@@ -321,14 +312,11 @@ object VoicePlaybackController {
             mp.runCatching { release() }
             return PlaybackStartResult.Superseded
         }
-        // MediaPlayer instantiated on Dispatchers.IO has no Looper → its
-        // callbacks fire on an internal MediaPlayer thread. State that we
-        // also touch from Main (player, currentKey, _state) must only be
-        // mutated on Main; hop through scope.launch.
+        // Serialize adapter callbacks with Main-owned controller state; the exact
+        // player guard also rejects events queued before a source replacement.
         mp.setOnCompletionListener { p ->
             scope.launch {
-                // Bind to this player instance. These callbacks fire on the
-                // MediaPlayer thread and hop to Main, so a completion for a clip
+                // Bind to this player instance. A queued completion for a clip
                 // whose player was already torn down by a newer play() can land
                 // mid-transition. Without this guard it would reset state or
                 // auto-advance the wrong clip (onCompletion of the old key). See #470.
@@ -346,7 +334,7 @@ object VoicePlaybackController {
         mp.setOnSeekCompleteListener { p -> scope.launch { settlePendingSeek(p) } }
         mp.setOnErrorListener { p, what, extra ->
             scope.launch {
-                Log.w(TAG, "MediaPlayer error what=$what extra=$extra")
+                Log.w(TAG, "Voice playback error what=$what extra=$extra")
                 // Same stale-callback guard as completion (#470): only the active
                 // player's error tears playback down; a superseded player has
                 // already been released by the play() that replaced it.
@@ -355,7 +343,8 @@ object VoicePlaybackController {
                     releasePlayerInternal()
                     _state.value = PlaybackState()
                     if (failedKey != null) {
-                        _failures.emit(PlaybackFailure(failedKey, invalidatesCache = true))
+                        val invalidatesCache = voicePlaybackErrorInvalidatesCache(what)
+                        _failures.emit(PlaybackFailure(failedKey, invalidatesCache = invalidatesCache))
                     }
                 }
             }
@@ -392,21 +381,21 @@ object VoicePlaybackController {
         return PlaybackStartResult.Started
     }
 
-    private fun startCurrentPlayer(mp: MediaPlayer): Boolean =
-        startPlayer(mp, "MediaPlayer resume failed") {
+    private fun startCurrentPlayer(mp: VoicePlaybackPlayer): Boolean =
+        startPlayer(mp, "Voice playback resume failed") {
             releasePlayerInternal()
             _state.value = PlaybackState()
         }
 
-    private fun startPreparedNewPlayer(mp: MediaPlayer): Boolean =
-        startPlayer(mp, "MediaPlayer start failed") {
+    private fun startPreparedNewPlayer(mp: VoicePlaybackPlayer): Boolean =
+        startPlayer(mp, "Voice playback start failed") {
             abandonFocus()
             mp.runCatching { release() }
             _state.value = PlaybackState()
         }
 
     private fun startPlayer(
-        mp: MediaPlayer,
+        mp: VoicePlaybackPlayer,
         failureMessage: String,
         onFailure: () -> Unit,
     ): Boolean =
@@ -442,13 +431,13 @@ object VoicePlaybackController {
         val mp = player ?: return
         val wasPlaying =
             runCatching { mp.isPlaying }.getOrElse {
-                releaseAfterPlayerControlFailure("MediaPlayer state query failed during transient focus loss")
+                releaseAfterPlayerControlFailure("Voice playback state query failed during transient focus loss")
                 return
             }
         if (!wasPlaying) return
         val pauseFailure = runCatching { mp.pause() }.exceptionOrNull()
         if (pauseFailure != null) {
-            releaseAfterPlayerControlFailure("MediaPlayer transient pause failed")
+            releaseAfterPlayerControlFailure("Voice playback transient pause failed")
             return
         }
         resumeOnAudioFocusGain = true
@@ -464,7 +453,7 @@ object VoicePlaybackController {
         val mp = player ?: return
         val wasPlaying =
             runCatching { mp.isPlaying }.getOrElse {
-                releaseAfterPlayerControlFailure("MediaPlayer state query failed while ducking")
+                releaseAfterPlayerControlFailure("Voice playback state query failed while ducking")
                 return
             }
         if (!wasPlaying) return
@@ -480,7 +469,7 @@ object VoicePlaybackController {
         if (duckedForAudioFocusLoss) {
             val restoreFailure = mp?.runCatching { setVolume(1f, 1f) }?.exceptionOrNull()
             if (restoreFailure != null) {
-                releaseAfterPlayerControlFailure("MediaPlayer volume restore failed")
+                releaseAfterPlayerControlFailure("Voice playback volume restore failed")
                 return
             }
             duckedForAudioFocusLoss = false
@@ -500,7 +489,7 @@ object VoicePlaybackController {
         if (restoreVolume && duckedForAudioFocusLoss) {
             val restoreFailure = player?.runCatching { setVolume(1f, 1f) }?.exceptionOrNull()
             if (restoreFailure != null) {
-                releaseAfterPlayerControlFailure("MediaPlayer volume restore failed")
+                releaseAfterPlayerControlFailure("Voice playback volume restore failed")
                 return
             }
         }
@@ -531,7 +520,7 @@ object VoicePlaybackController {
     }
 
     /** Resumes the retained player only after recovering audio focus. */
-    private fun resumeCurrentSession(active: MediaPlayer): Boolean {
+    private fun resumeCurrentSession(active: VoicePlaybackPlayer): Boolean {
         nextPlaybackGeneration()
         if (resumeOnAudioFocusGain) abandonFocus()
         clearAudioFocusInterruption(restoreVolume = true)
@@ -598,13 +587,13 @@ object VoicePlaybackController {
             }
         val wasPlaying =
             runCatching { mp.isPlaying }.getOrElse {
-                releaseAfterPlayerControlFailure("MediaPlayer state query failed while pausing")
+                releaseAfterPlayerControlFailure("Voice playback state query failed while pausing")
                 return
             }
         if (wasPlaying) {
             val pauseFailure = runCatching { mp.pause() }.exceptionOrNull()
             if (pauseFailure != null) {
-                releaseAfterPlayerControlFailure("MediaPlayer pause failed")
+                releaseAfterPlayerControlFailure("Voice playback pause failed")
                 return
             }
         }
@@ -738,7 +727,7 @@ object VoicePlaybackController {
      * Clears the pending relative-seek target once [completed] has actually reached it. Seek completions do not say
      * which request finished, so an earlier queued seek completing must not discard a later target still in flight.
      */
-    private fun settlePendingSeek(completed: MediaPlayer) {
+    private fun settlePendingSeek(completed: VoicePlaybackPlayer) {
         val pending = pendingSeek?.takeIf { it.player === completed } ?: return
         val position = runCatching { completed.currentPosition }.getOrNull()
         if (position == null || abs(position - pending.targetMs) <= SEEK_SETTLE_TOLERANCE_MS) pendingSeek = null
@@ -746,7 +735,7 @@ object VoicePlaybackController {
 
     /** The target of a seek [player] accepted at [requestedAtMs] but has not yet reported complete. */
     private class PendingSeek(
-        val player: MediaPlayer,
+        val player: VoicePlaybackPlayer,
         val targetMs: Int,
         val requestedAtMs: Long,
     )

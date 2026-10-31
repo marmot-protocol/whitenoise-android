@@ -1,7 +1,7 @@
 package dev.ipf.whitenoise.android.audio
 
 import android.media.AudioManager
-import android.media.MediaPlayer
+import android.os.Looper
 import dev.ipf.whitenoise.android.state.StalenessGuard
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
@@ -20,7 +20,10 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowSystemClock
 import java.io.File
+import java.io.IOException
 import java.time.Duration
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicBoolean
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -41,7 +44,7 @@ class VoicePlaybackControllerFocusTest {
     fun laterUserPlaybackActionsInvalidateTheSavedDictationInterruption() {
         val context = RuntimeEnvironment.getApplication()
         VoicePlaybackController.attach(context)
-        val mediaPlayer = TrackingMediaPlayer()
+        val mediaPlayer = TrackingVoicePlayer()
         primeActivePlayer(mediaPlayer)
         val interruption = VoicePlaybackController.pauseForInterruption()
         assertNotNull(interruption)
@@ -60,7 +63,7 @@ class VoicePlaybackControllerFocusTest {
     /** Persistent controls resume the retained player and keep exact source ownership across pause. */
     @Test fun shellPauseResumeRetainsPlayerAndSource() {
         VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
-        val player = TrackingMediaPlayer()
+        val player = TrackingVoicePlayer()
         primeActivePlayer(player)
         val source = VoicePlaybackSource("personal", "chat", "message", "Maya")
         setPlaybackState(VoicePlaybackController.state.value.copy(source = source, sessionId = 42, ready = true))
@@ -75,7 +78,7 @@ class VoicePlaybackControllerFocusTest {
     /** A retained player can discover duration after preparation; shell resume refreshes that display metadata. */
     @Test fun shellResumeRefreshesLateDurationAndPreservesItAcrossUnavailableReports() {
         VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
-        val player = TrackingMediaPlayer()
+        val player = TrackingVoicePlayer()
         primeActivePlayer(player)
         setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 42, ready = true, durationMs = 0))
         VoicePlaybackController.pause()
@@ -96,7 +99,7 @@ class VoicePlaybackControllerFocusTest {
     /** A stale rendered strip cannot pause, resume or stop its successor. */
     @Test fun replacedShellSessionRejectsEveryOldControl() {
         VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
-        val player = TrackingMediaPlayer()
+        val player = TrackingVoicePlayer()
         primeActivePlayer(player)
         setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 43, ready = true))
         assertFalse(VoicePlaybackController.setSessionPlaying(42, false))
@@ -112,7 +115,7 @@ class VoicePlaybackControllerFocusTest {
     /** Banner seeks move the retained player by the requested step, clamp to the clip and keep a pause paused. */
     @Test fun shellSeekClampsToTheClipAndPreservesPause() {
         VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
-        val player = TrackingMediaPlayer()
+        val player = TrackingVoicePlayer()
         primeActivePlayer(player)
         setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 42, ready = true))
         assertTrue(VoicePlaybackController.setSessionPlaying(42, false))
@@ -131,7 +134,7 @@ class VoicePlaybackControllerFocusTest {
     /** A codec reporting no duration falls back to the known clip length, and with none known the seek is skipped. */
     @Test fun shellSeekUsesTheKnownLengthWhenTheCodecReportsNone() {
         VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
-        val player = TrackingMediaPlayer()
+        val player = TrackingVoicePlayer()
         primeActivePlayer(player)
         player.durationMs = 0
         setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 42, ready = true, durationMs = 900))
@@ -150,7 +153,7 @@ class VoicePlaybackControllerFocusTest {
     /** Quick repeated taps build on the seek still in flight instead of re-reading the stale playhead. */
     @Test fun shellSeeksAccumulateWhileTheCodecIsStillSeeking() {
         VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
-        val player = TrackingMediaPlayer()
+        val player = TrackingVoicePlayer()
         primeActivePlayer(player)
         setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 42, ready = true))
 
@@ -164,7 +167,7 @@ class VoicePlaybackControllerFocusTest {
     /** An earlier queued seek completing keeps the later target, so a third quick tap still advances once more. */
     @Test fun earlierSeekCompletionKeepsTheLaterPendingTarget() {
         VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
-        val player = TrackingMediaPlayer()
+        val player = TrackingVoicePlayer()
         primeActivePlayer(player)
         setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 42, ready = true, durationMs = 5_000))
         player.durationMs = 5_000
@@ -186,7 +189,7 @@ class VoicePlaybackControllerFocusTest {
     /** An off-target completion cannot pin a stale target: after the tap window the player's position wins again. */
     @Test fun missedSettleExpiresSoLaterSeeksStartFromThePlayhead() {
         VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
-        val player = TrackingMediaPlayer()
+        val player = TrackingVoicePlayer()
         primeActivePlayer(player)
         player.durationMs = 120_000
         setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 42, ready = true, durationMs = 120_000))
@@ -204,7 +207,7 @@ class VoicePlaybackControllerFocusTest {
     /** A seek the codec rejects reports failure and leaves the published playhead where it was. */
     @Test fun rejectedShellSeekReportsFailureAndKeepsThePlayhead() {
         VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
-        val player = TrackingMediaPlayer(failSeek = true)
+        val player = TrackingVoicePlayer(failSeek = true)
         primeActivePlayer(player)
         setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 42, ready = true))
 
@@ -215,7 +218,7 @@ class VoicePlaybackControllerFocusTest {
     /** A stale banner cannot seek or change the speed of the session that replaced it. */
     @Test fun replacedShellSessionRejectsSeekAndSpeed() {
         VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
-        val player = TrackingMediaPlayer()
+        val player = TrackingVoicePlayer()
         primeActivePlayer(player)
         setControllerField("currentSpeed", 1f)
         setPlaybackState(VoicePlaybackController.state.value.copy(sessionId = 43, ready = true, speed = 1f))
@@ -232,19 +235,33 @@ class VoicePlaybackControllerFocusTest {
     /** Equal attachment keys under another account must prepare new bytes instead of resuming the old player. */
     @Test fun sameKeyDifferentAccountDoesNotResumeCapturedAudio() {
         VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
-        val player = TrackingMediaPlayer()
+        val player = TrackingVoicePlayer()
         primeActivePlayer(player)
         val source = VoicePlaybackSource("personal", "chat", "message", "Maya")
         setPlaybackState(VoicePlaybackController.state.value.copy(source = source, sessionId = 42, ready = true))
+        val freshFile = File("missing-voice-note.amr")
+        val preparations = CopyOnWriteArrayList<File>()
+        val retiredBeforePrepare = AtomicBoolean()
+        setControllerField(
+            "playerFactory",
+            VoicePlaybackPlayer.Factory { _, file ->
+                preparations += file
+                retiredBeforePrepare.set(player.released)
+                throw IOException("Synthetic new-account preparation refusal")
+            },
+        )
         val result =
             runBlocking {
                 VoicePlaybackController.play(
                     "voice-key",
-                    File("missing-voice-note.amr"),
+                    freshFile,
                     source = source.copy(accountRef = "work"),
                 )
             }
         assertEquals(VoicePlaybackController.PlaybackStartResult.PrepareFailed, result)
+        assertEquals(listOf(freshFile), preparations)
+        assertTrue(retiredBeforePrepare.get())
+        assertNull(controllerField("player"))
         assertEquals(0, player.startCount)
         assertTrue(player.released)
         assertNull(VoicePlaybackController.state.value.source)
@@ -253,7 +270,7 @@ class VoicePlaybackControllerFocusTest {
     /** Display-name refreshes cannot replace the same account/message player or reset its playback position. */
     @Test fun renamedSourceResumesSamePlayerAndRefreshesTitle() {
         VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
-        val player = TrackingMediaPlayer()
+        val player = TrackingVoicePlayer()
         primeActivePlayer(player)
         val source = VoicePlaybackSource("personal", "chat", "message", "Before")
         setPlaybackState(VoicePlaybackController.state.value.copy(source = source, sessionId = 42, ready = true))
@@ -273,10 +290,71 @@ class VoicePlaybackControllerFocusTest {
         assertEquals(1, player.startCount)
     }
 
+    /** New sources prepare on IO through the parser-free seam and retain the adopted source owner. */
+    @Test
+    fun newVoiceSourceUsesOffMainFactoryAndRetainsItsPlayer() {
+        val context = RuntimeEnvironment.getApplication()
+        VoicePlaybackController.attach(context)
+        shadowOf(context.getSystemService(AudioManager::class.java))
+            .setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+        val player = TrackingVoicePlayer()
+        var preparedOffMain = false
+        var preparedFile: File? = null
+        val file = File("isolated-voice.amr")
+        setControllerField(
+            "playerFactory",
+            VoicePlaybackPlayer.Factory { _, selected ->
+                preparedOffMain = Looper.myLooper() != Looper.getMainLooper()
+                preparedFile = selected
+                player
+            },
+        )
+
+        val result = runBlocking { VoicePlaybackController.play("new-source", file, ownerKey = "owner") }
+
+        assertEquals(VoicePlaybackController.PlaybackStartResult.Started, result)
+        assertTrue(preparedOffMain)
+        assertSame(file, preparedFile)
+        assertSame(player, controllerField("player"))
+        assertEquals(1, player.startCount)
+        assertEquals(player.durationMs, VoicePlaybackController.state.value.durationMs)
+    }
+
+    /** Changing speed preserves paused intent and exact retained source identity. */
+    @Test
+    fun pausedVoiceSpeedChangeDoesNotResumeOrReplaceItsPlayer() {
+        VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+        val player = TrackingVoicePlayer()
+        primeActivePlayer(player)
+        VoicePlaybackController.pause()
+
+        assertEquals(1.5f, VoicePlaybackController.cycleSpeed())
+
+        assertEquals(1.5f, player.appliedSpeed)
+        assertFalse(player.playing)
+        assertEquals(0, player.startCount)
+        assertSame(player, controllerField("player"))
+    }
+
+    /** The controller applies speed without treating active buffering intent as a pause. */
+    @Test
+    fun playingVoiceSpeedChangePreservesPlaybackIntent() {
+        VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+        val player = TrackingVoicePlayer()
+        primeActivePlayer(player)
+
+        assertEquals(1.5f, VoicePlaybackController.cycleSpeed())
+
+        assertEquals(1.5f, player.appliedSpeed)
+        assertTrue(player.playing)
+        assertEquals(0, player.startCount)
+    }
+
     /** Stops playback and clears reflected focus ownership so later fixtures cannot inherit a held request. */
     @After
     fun tearDown() {
         VoicePlaybackController.stop()
+        setControllerField("playerFactory", RawVoicePlaybackPlayer.Factory)
         setControllerField("currentSpeed", 1f)
         setAudioFocusOwnerField("audioManager", null)
         setAudioFocusOwnerField("focusRequest", null)
@@ -342,7 +420,7 @@ class VoicePlaybackControllerFocusTest {
                 durationMs = 456,
             ),
         )
-        val mediaPlayer = ThrowingStartMediaPlayer()
+        val mediaPlayer = ThrowingStartVoicePlayer()
 
         assertFalse(startPreparedNewPlayer(mediaPlayer))
 
@@ -363,7 +441,7 @@ class VoicePlaybackControllerFocusTest {
         assertTrue(requestFocus())
         val focusRequest = shadowAudioManager.lastAudioFocusRequest
         assertNotNull(focusRequest)
-        val mediaPlayer = ThrowingStartMediaPlayer()
+        val mediaPlayer = ThrowingStartVoicePlayer()
         setControllerField("player", mediaPlayer)
         setControllerField("currentKey", "voice-key")
         setControllerField("currentOwnerKey", "old-owner")
@@ -399,7 +477,7 @@ class VoicePlaybackControllerFocusTest {
         assertTrue(requestFocus())
         val heldFocusRequest = audioFocusOwnerField("focusRequest")
         assertNotNull(heldFocusRequest)
-        val mediaPlayer = TrackingMediaPlayer()
+        val mediaPlayer = TrackingVoicePlayer()
         primeActivePlayer(mediaPlayer)
 
         audioFocusListener().onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
@@ -426,7 +504,7 @@ class VoicePlaybackControllerFocusTest {
         VoicePlaybackController.attach(context)
         assertTrue(requestFocus())
         val retainedRequest = shadowAudioManager.lastAudioFocusRequest
-        val mediaPlayer = TrackingMediaPlayer()
+        val mediaPlayer = TrackingVoicePlayer()
         primeActivePlayer(mediaPlayer)
 
         handleAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
@@ -450,7 +528,7 @@ class VoicePlaybackControllerFocusTest {
         val shadowAudioManager = shadowOf(audioManager)
         VoicePlaybackController.attach(context)
         assertTrue(requestFocus())
-        val mediaPlayer = TrackingMediaPlayer()
+        val mediaPlayer = TrackingVoicePlayer()
         primeActivePlayer(mediaPlayer)
 
         handleAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
@@ -470,7 +548,7 @@ class VoicePlaybackControllerFocusTest {
     /** Ducking changes volume without restarting playback; gain restores the original level. */
     @Test
     fun duckableLossLowersVolumeAndGainRestoresItWithoutRestarting() {
-        val mediaPlayer = TrackingMediaPlayer()
+        val mediaPlayer = TrackingVoicePlayer()
         primeActivePlayer(mediaPlayer)
 
         handleAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK)
@@ -490,7 +568,7 @@ class VoicePlaybackControllerFocusTest {
     /** A volume-control failure pauses the clip while retaining its legitimate gain-resume intent. */
     @Test
     fun failedDuckFallsBackToTransientPause() {
-        val mediaPlayer = TrackingMediaPlayer(failVolumeChange = true)
+        val mediaPlayer = TrackingVoicePlayer(failVolumeChange = true)
         primeActivePlayer(mediaPlayer)
 
         handleAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK)
@@ -506,7 +584,7 @@ class VoicePlaybackControllerFocusTest {
         val context = RuntimeEnvironment.getApplication()
         VoicePlaybackController.attach(context)
         assertTrue(requestFocus())
-        val mediaPlayer = TrackingMediaPlayer(failPause = true)
+        val mediaPlayer = TrackingVoicePlayer(failPause = true)
         primeActivePlayer(mediaPlayer)
 
         handleAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
@@ -522,8 +600,8 @@ class VoicePlaybackControllerFocusTest {
     fun failedUserPauseControlsReleaseBrokenPlayerAndFocus() {
         val context = RuntimeEnvironment.getApplication()
         listOf(
-            TrackingMediaPlayer(failPlayingQuery = true),
-            TrackingMediaPlayer(failPause = true),
+            TrackingVoicePlayer(failPlayingQuery = true),
+            TrackingVoicePlayer(failPause = true),
         ).forEach { mediaPlayer ->
             VoicePlaybackController.attach(context)
             assertTrue(requestFocus())
@@ -548,7 +626,7 @@ class VoicePlaybackControllerFocusTest {
         ).forEach { focusChange ->
             VoicePlaybackController.attach(context)
             assertTrue(requestFocus())
-            val mediaPlayer = TrackingMediaPlayer(failPlayingQuery = true)
+            val mediaPlayer = TrackingVoicePlayer(failPlayingQuery = true)
             primeActivePlayer(mediaPlayer)
 
             handleAudioFocusChange(focusChange)
@@ -572,7 +650,7 @@ class VoicePlaybackControllerFocusTest {
         restoreActions.forEach { restoreAction ->
             VoicePlaybackController.attach(context)
             assertTrue(requestFocus())
-            val mediaPlayer = TrackingMediaPlayer(failVolumeRestore = true)
+            val mediaPlayer = TrackingVoicePlayer(failVolumeRestore = true)
             primeActivePlayer(mediaPlayer)
 
             handleAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK)
@@ -587,7 +665,7 @@ class VoicePlaybackControllerFocusTest {
         }
     }
 
-    // Hit the private focus path directly; public playback needs MediaPlayer file
+    // Hit the private focus path directly; public playback needs isolated file
     // setup and would obscure the focus bookkeeping this regression protects.
 
     /** Invokes the production controller's private focus boundary against Robolectric's AudioManager. */
@@ -598,20 +676,20 @@ class VoicePlaybackControllerFocusTest {
     }
 
     /** Exercises production player adoption with the supplied failure-capable test player. */
-    private fun startPreparedNewPlayer(mediaPlayer: MediaPlayer): Boolean {
+    private fun startPreparedNewPlayer(mediaPlayer: VoicePlaybackPlayer): Boolean {
         val method =
             VoicePlaybackController::class.java.getDeclaredMethod(
                 "startPreparedNewPlayer",
-                MediaPlayer::class.java,
+                VoicePlaybackPlayer::class.java,
             )
         method.isAccessible = true
         return method.invoke(VoicePlaybackController, mediaPlayer) as Boolean
     }
 
     /** Delivers a seek completion through the controller's actual private settle path. */
-    private fun settlePendingSeek(mediaPlayer: MediaPlayer) {
+    private fun settlePendingSeek(mediaPlayer: VoicePlaybackPlayer) {
         val method =
-            VoicePlaybackController::class.java.getDeclaredMethod("settlePendingSeek", MediaPlayer::class.java)
+            VoicePlaybackController::class.java.getDeclaredMethod("settlePendingSeek", VoicePlaybackPlayer::class.java)
         method.isAccessible = true
         method.invoke(VoicePlaybackController, mediaPlayer)
     }
@@ -627,7 +705,7 @@ class VoicePlaybackControllerFocusTest {
      * Installs one retained codec and matching public state so controls can be tested without reopening a media
      * file.
      */
-    private fun primeActivePlayer(mediaPlayer: TrackingMediaPlayer) {
+    private fun primeActivePlayer(mediaPlayer: TrackingVoicePlayer) {
         setControllerField("player", mediaPlayer)
         setControllerField("currentKey", "voice-key")
         setControllerField("currentOwnerKey", "owner")
@@ -688,7 +766,37 @@ class VoicePlaybackControllerFocusTest {
         field.set(VoicePlaybackController, value)
     }
 
-    private class ThrowingStartMediaPlayer : MediaPlayer() {
+    /** A parser-free control seam; every failure-capable subclass preserves the production transition tests. */
+    private open class FakeVoicePlayer : VoicePlaybackPlayer {
+        override val isPlaying: Boolean get() = false
+        override val duration: Int get() = 0
+        override val currentPosition: Int get() = 0
+
+        override fun start() = Unit
+
+        override fun pause() = Unit
+
+        override fun stop() = Unit
+
+        override fun release() = Unit
+
+        override fun seekTo(positionMs: Int) = Unit
+
+        override fun setSpeed(speed: Float) = Unit
+
+        override fun setVolume(
+            left: Float,
+            right: Float,
+        ) = Unit
+
+        override fun setOnCompletionListener(listener: (VoicePlaybackPlayer) -> Unit) = Unit
+
+        override fun setOnSeekCompleteListener(listener: (VoicePlaybackPlayer) -> Unit) = Unit
+
+        override fun setOnErrorListener(listener: (VoicePlaybackPlayer, Int, Int) -> Boolean) = Unit
+    }
+
+    private class ThrowingStartVoicePlayer : FakeVoicePlayer() {
         var released = false
             private set
 
@@ -699,13 +807,13 @@ class VoicePlaybackControllerFocusTest {
         }
     }
 
-    private class TrackingMediaPlayer(
+    private class TrackingVoicePlayer(
         private val failPause: Boolean = false,
         private val failVolumeChange: Boolean = false,
         private val failVolumeRestore: Boolean = false,
         private val failPlayingQuery: Boolean = false,
         private val failSeek: Boolean = false,
-    ) : MediaPlayer() {
+    ) : FakeVoicePlayer() {
         var playing = true
         var released = false
         var leftVolume = 1f
@@ -714,11 +822,17 @@ class VoicePlaybackControllerFocusTest {
         var positionMs = 123
         var durationMs = 456
         var failDurationQuery = false
+        var appliedSpeed = 1f
 
-        override fun isPlaying(): Boolean {
-            if (failPlayingQuery) throw IllegalStateException("isPlaying failed")
-            return playing
+        override fun setSpeed(speed: Float) {
+            appliedSpeed = speed
         }
+
+        override val isPlaying: Boolean
+            get() {
+                if (failPlayingQuery) throw IllegalStateException("isPlaying failed")
+                return playing
+            }
 
         override fun pause() {
             if (failPause) throw IllegalStateException("pause failed")
@@ -734,7 +848,7 @@ class VoicePlaybackControllerFocusTest {
             playing = false
         }
 
-        override fun getCurrentPosition(): Int = positionMs
+        override val currentPosition: Int get() = positionMs
 
         var seekedToMs: Int? = null
 
@@ -745,10 +859,11 @@ class VoicePlaybackControllerFocusTest {
         }
 
         /** Models codecs that discover duration late or reject a metadata query without losing the player. */
-        override fun getDuration(): Int {
-            if (failDurationQuery) throw IllegalStateException("duration unavailable")
-            return durationMs
-        }
+        override val duration: Int
+            get() {
+                if (failDurationQuery) throw IllegalStateException("duration unavailable")
+                return durationMs
+            }
 
         override fun setVolume(
             leftVolume: Float,

@@ -14,6 +14,12 @@
             android:turnScreenOn="true" />
 
         <service
+                    android:name=".media.sandbox.NativeMediaSandboxProbeService"
+                    android:exported="false"
+                    android:isolatedProcess="true"
+                    android:process=":native_sandbox_probe" />
+
+        <service
             android:name=".media.sandbox.MediaAvCapabilityService"
             android:exported="false"
             android:isolatedProcess="true" />

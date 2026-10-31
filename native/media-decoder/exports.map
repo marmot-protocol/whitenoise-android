@@ -1,0 +1,13 @@
+{
+  global:
+    JNI_OnLoad;
+    Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeSandboxClone3Errno;
+    Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeSandboxDiagnostics;
+    Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeOpen;
+    Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeClose;
+    Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeInfo;
+    Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeRead;
+    Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeReadPreferred;
+    Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeSeek;
+  local: *;
+};

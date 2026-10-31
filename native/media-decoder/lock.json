@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "ndk": "29.0.14206865",
+  "api": 30,
+  "source_date_epoch": 1789687190,
+  "ffmpeg": {
+    "version": "9.0.2",
+    "commit": "946fcce07b6dcd0331c8cc609192aeff5e1924f8",
+    "filename": "ffmpeg-9.0.2.tar.xz",
+    "url": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
+    "bytes": 12040788,
+    "sha256": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e",
+    "license": "LGPL-2.1-or-later; GPL, version3 and nonfree components disabled"
+  },
+  "dav1d": {
+    "version": "1.5.4",
+    "commit": "54706fc6bc0cdecab7e9593974a4039cc038fca7",
+    "filename": "dav1d-1.5.4.tar.xz",
+    "url": "https://download.videolan.org/pub/videolan/dav1d/1.5.4/dav1d-1.5.4.tar.xz",
+    "bytes": 1038852,
+    "sha256": "686616b7c69eb88d44459391ab25cac13b6647a3b288835c5784e71c1514a5c5",
+    "license": "BSD-2-Clause"
+  },
+  "meson": {
+    "version": "1.12.1",
+    "filename": "meson-1.12.1-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/57/99/36cd25f9598eef70db97577440a70a360af505f6f01c2338a18d1556079c/meson-1.12.1-py3-none-any.whl",
+    "bytes": 1108668,
+    "sha256": "930bc7542cbd9f57009e182fd014eba48cf1a0180a7b9006d2d32d8f168d8b02",
+    "license": "Apache-2.0"
+  },
+  "ninja": {
+    "version": "1.13.2",
+    "filename": "ninja-1.13.2-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+    "url": "https://files.pythonhosted.org/packages/6e/53/ebfed7b689c338dd8ebeec9c0730c8d56821292f14e2536e5f3ef1a05744/ninja-1.13.2-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+    "bytes": 183365,
+    "sha256": "65a24341b5ac09fcadcc37082660be40a94174e51a937fabf6e2cae26225fa2c",
+    "license": "Apache-2.0"
+  }
+}

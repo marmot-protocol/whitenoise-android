@@ -27,7 +27,6 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.espresso.Espresso
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -77,8 +76,8 @@ class ConversationVideoRotationAndroidTest {
     private lateinit var controller: ConversationController
     private lateinit var timelineState: LazyListState
     private lateinit var viewerSessionState: ConversationMediaViewerSessionState
-    private var activePlayer: ExoPlayer? = null
-    private var firstPlayer: ExoPlayer? = null
+    private var activePlayer: Player? = null
+    private var firstPlayer: Player? = null
     private var activeSessionId: Long? = null
     private var selectedAttachment: ConversationMediaViewerAttachmentId? = null
     private var releaseCallbacks = 0
@@ -398,7 +397,7 @@ class ConversationVideoRotationAndroidTest {
     }
 
     /** Verifies an exact paused seek remains paused and positioned across portrait rotation. */
-    private fun assertPausedStateSurvivesRotation(original: ExoPlayer): PlayerSnapshot {
+    private fun assertPausedStateSurvivesRotation(original: Player): PlayerSnapshot {
         composeRule.runOnIdle {
             original.pause()
             original.seekTo(PAUSED_SEEK_MS)
@@ -422,7 +421,7 @@ class ConversationVideoRotationAndroidTest {
 
     /** Verifies end-of-stream and its terminal position survive landscape rotation. */
     private fun assertEndedStateSurvivesRotation(
-        original: ExoPlayer,
+        original: Player,
         durationMs: Long,
     ) {
         composeRule.runOnIdle {
@@ -444,7 +443,7 @@ class ConversationVideoRotationAndroidTest {
     }
 
     /** Verifies the same ended player can resume without a rotation-time release. */
-    private fun assertPlaybackResumesAfterEndedRotation(original: ExoPlayer) {
+    private fun assertPlaybackResumesAfterEndedRotation(original: Player) {
         composeRule.runOnIdle {
             original.seekTo(RESUME_SEEK_MS)
             original.play()
@@ -491,7 +490,7 @@ class ConversationVideoRotationAndroidTest {
     }
 
     /** Records the player currently owned by the production viewer subtree. */
-    private fun recordPlayer(player: ExoPlayer?) {
+    private fun recordPlayer(player: Player?) {
         if (player == null) {
             releaseCallbacks++
             activePlayer = null
@@ -502,7 +501,7 @@ class ConversationVideoRotationAndroidTest {
     }
 
     /** Records one player and requests rotation from its first real buffering callback. */
-    private fun recordPlayerAndRotateDuringBuffering(player: ExoPlayer?) {
+    private fun recordPlayerAndRotateDuringBuffering(player: Player?) {
         recordPlayer(player)
         if (player == null || firstPlayer !== player) return
         player.addListener(
@@ -526,13 +525,13 @@ class ConversationVideoRotationAndroidTest {
     /** Waits for [predicate] and returns the player captured in the matching snapshot. */
     private fun awaitPlayer(
         description: String,
-        predicate: (ExoPlayer) -> Boolean,
-    ): ExoPlayer = awaitSnapshot(description, predicate).player
+        predicate: (Player) -> Boolean,
+    ): Player = awaitSnapshot(description, predicate).player
 
     /** Polls Media3 state on the instrumentation main thread until [predicate] is satisfied. */
     private fun awaitSnapshot(
         description: String,
-        predicate: (ExoPlayer) -> Boolean,
+        predicate: (Player) -> Boolean,
     ): PlayerSnapshot {
         val deadline = SystemClock.uptimeMillis() + PLAYER_TIMEOUT_MS
         var result: PlayerSnapshot? = null
@@ -554,7 +553,7 @@ class ConversationVideoRotationAndroidTest {
     }
 
     /** Converts mutable Media3 state into one assertion-safe value captured on the main thread. */
-    private fun ExoPlayer.snapshot() =
+    private fun Player.snapshot() =
         PlayerSnapshot(
             player = this,
             playbackState = playbackState,
@@ -726,7 +725,7 @@ class ConversationVideoRotationAndroidTest {
 
 /** Main-thread snapshot of the exact Media3 instance and state used by rotation assertions. */
 private data class PlayerSnapshot(
-    val player: ExoPlayer,
+    val player: Player,
     val playbackState: Int,
     val playWhenReady: Boolean,
     val positionMs: Long,
@@ -736,7 +735,7 @@ private data class PlayerSnapshot(
 /** Stable viewer generation and player captured after delayed materialization completes. */
 private data class OwnerChainOpenResult(
     val sessionId: Long,
-    val player: ExoPlayer,
+    val player: Player,
 )
 
 /** No-op draft boundary that keeps the device fixture local and independent of account storage. */

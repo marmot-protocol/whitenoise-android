@@ -24,6 +24,15 @@ def main():
     // Init scripts also run for buildSrc/included builds; only the main build owns :app.
     if (gradle.parent != null) return
     def app = gradle.rootProject.project(':app')
+    // Both JNI folder consumption and native packaging must wait for verified decoder outputs.
+    def decoderProducer = app.tasks.named('prepareNativeMediaDecoder').get()
+    ['Zapstore', 'Play'].each { flavor ->
+        ['JniLibFolders', 'NativeLibs'].each { suffix ->
+            def consumer = app.tasks.named("mergeDev${flavor}Debug${suffix}").get()
+            assert consumer.taskDependencies.getDependencies(consumer).contains(decoderProducer) :
+                "Missing decoder producer dependency for ${consumer.path}"
+        }
+    }
     def bundleMode = app.findProperty('whitenoise.playBundle') == 'true'
     def android = app.extensions.getByName('android')
     assert android.splits.abi.enable == !bundleMode : 'Wrong ABI split configuration'

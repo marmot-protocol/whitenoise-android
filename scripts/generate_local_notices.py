@@ -102,15 +102,20 @@ def read_catalog(path):
                 len(set(identifiers)) != len(identifiers)):
             raise ValueError('Missing or ambiguous artifact attribution: ' + str(key))
         artifacts[key] = item
-    return artifacts, notices
+    bundled = catalog.get('bundled_notice_ids', [])
+    if (not isinstance(bundled, list) or
+            any(not isinstance(i, str) or i not in notices for i in bundled) or
+            len(set(bundled)) != len(bundled)):
+        raise ValueError('Invalid bundled native attribution')
+    return artifacts, notices, bundled
 
 
 def generate(catalog_path, selected, output, baseline_path=None, icons_path=None):
     """Require complete artifact attribution and emit deterministic UTF-8 byte offsets."""
-    artifacts, notices = read_catalog(catalog_path)
+    artifacts, notices, bundled = read_catalog(catalog_path)
     if not isinstance(selected, list) or not selected:
         raise ValueError('Empty selected runtime artifacts')
-    identifiers = set()
+    identifiers = set(bundled)
     observed = set()
     unreviewed = []
     for item in selected:

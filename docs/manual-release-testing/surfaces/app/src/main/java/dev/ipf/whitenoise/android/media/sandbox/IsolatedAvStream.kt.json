@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/media/sandbox/IsolatedAvStream.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Playback and analysis retain admission until process and resource retirement",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/sandbox/IsolatedAvStream.kt",
+        "anchor": "internal class IsolatedAvStream",
+        "test_ids": [
+          "MED-045"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

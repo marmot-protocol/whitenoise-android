@@ -65,7 +65,7 @@ internal object TestMediaDecodeTransport : MediaDecodeTransport {
         resolver: android.content.ContentResolver,
         uri: android.net.Uri,
         edge: Int,
-    ): MediaProbe? = resolver.openFileDescriptor(uri, "r")?.use { probeMediaFromDescriptor(it, edge, true) }
+    ): MediaProbe? = resolver.openFileDescriptor(uri, "r")?.use { probePlatformMediaFixture(it, edge, true) }
 
     override fun probe(
         file: File,
@@ -73,6 +73,6 @@ internal object TestMediaDecodeTransport : MediaDecodeTransport {
         poster: Boolean,
     ): MediaProbe? =
         ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use {
-            probeMediaFromDescriptor(it, edge, poster)
+            probePlatformMediaFixture(it, edge, poster)
         }
 }
