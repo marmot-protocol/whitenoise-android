@@ -48,8 +48,6 @@ import dev.ipf.whitenoise.android.ui.icons.filled.BrokenImage
 import dev.ipf.whitenoise.android.ui.icons.filled.Image
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 /** The optimistic tile dims exactly as far as the confirmed album overflow tile does. */
 private const val PENDING_OVERFLOW_SCRIM_ALPHA = 0.58f
@@ -369,7 +367,7 @@ private fun rememberPendingVisualPreview(attachment: PendingAttachment?): ImageB
                 null
             } else {
                 if (isVideo) {
-                    withContext(Dispatchers.Default) { pendingVideoPosterFrame(bytes, extractPoster = true).bitmap }
+                    decodePendingVideoPosterBitmap(bytes)
                 } else {
                     dev.ipf.whitenoise.android.media.decodeOwnedMedia(
                         decode = { decodeChatAttachmentStill(bytes, MediaPipeline.THUMBNAIL_MAX_EDGE_PX) },

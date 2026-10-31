@@ -44,11 +44,7 @@ class ChatSvgBubbleViewerTest {
     @Test
     fun originalSvgColdBubbleTapReachesTheRealFullscreenVectorPage() {
         val fixture = MediaDownloadIntegrationFixture()
-        val controller =
-            ConversationController(
-                fixture.state,
-                conversationTimelineTestGroup().copy(groupIdHex = MediaDownloadIntegrationFixture.GROUP),
-            )
+        val controller = svgController(fixture)
         val bytes =
             (
                 """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><r""" +
@@ -150,4 +146,10 @@ class ChatSvgBubbleViewerTest {
         }
         rule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG).assertIsDisplayed()
     }
+
+    private fun svgController(fixture: MediaDownloadIntegrationFixture): ConversationController =
+        ConversationController(
+            fixture.state,
+            conversationTimelineTestGroup().copy(groupIdHex = MediaDownloadIntegrationFixture.GROUP),
+        )
 }

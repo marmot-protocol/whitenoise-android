@@ -87,7 +87,6 @@ import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropDialog
 import dev.ipf.whitenoise.android.ui.common.SwipeDismissibleSnackbar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.clampViewerPageIndex
 import dev.ipf.whitenoise.android.ui.common.resetViewerTransform
 import dev.ipf.whitenoise.android.ui.common.viewerPagerScrollEnabled
@@ -96,6 +95,8 @@ import dev.ipf.whitenoise.android.ui.group.GroupImageFailureScope
 import dev.ipf.whitenoise.android.ui.group.groupImageFailureDetail
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -440,7 +441,17 @@ internal fun FullScreenMediaViewer(
             controller.group.groupIdHex,
             appState.runtimeGeneration,
         )
-    val sourceOwnerCurrent = currentActionOwner() == actionOwner && controller.boundAccountRef == actionOwner.accountRef
+
+    fun exportOwnerIsCurrent(): Boolean {
+        val currentOwner = currentActionOwner()
+        return actionGate.ownerIsCurrent(currentOwner) && controller.boundAccountRef == actionOwner.accountRef
+    }
+
+    fun requireExportOwner() {
+        if (!exportOwnerIsCurrent()) throw CancellationException("Media viewer owner changed")
+    }
+
+    val sourceOwnerCurrent = exportOwnerIsCurrent()
     LaunchedEffect(sourceOwnerCurrent) { if (!sourceOwnerCurrent) onDismiss() }
     // Group-image failures are app toasts. The viewer's modal claims the app's banner slot, so they show in
     // this window above the viewer, once, with their Copy and dismiss actions (#3312).
@@ -649,110 +660,141 @@ internal fun FullScreenMediaViewer(
                 actionsEnabled = !closingMotion,
                 onDismiss = dismissWithMotion,
                 onSave = {
-                    val ref = currentReference
-                    val attachmentIndex = currentAttachmentIndex
-                    val msgId = currentMessageIdHex
-                    val owned = currentMine
-                    scope.launch {
-                        val outcome =
-                            runCatchingCancellable {
-                                val saved =
-                                    if (MediaReferenceSupport.isVideoMedia(ref)) {
-                                        withMaterializedVideoFile(
-                                            context,
-                                            controller,
-                                            msgId,
-                                            attachmentIndex,
-                                            ref,
-                                            owned,
-                                        ) {
-                                            withContext(Dispatchers.IO) {
-                                                saveVideoToGallery(context, it, ref.fileName, ref.mediaType)
-                                            }
-                                        }
-                                    } else {
-                                        // An explicit Save streams the whole verified image into MediaStore, so it is
-                                        // neither bounded by the preview budget nor read into one array.
-                                        attachmentSource(controller, msgId, attachmentIndex, ref, owned).use { source ->
-                                            withContext(Dispatchers.IO) {
-                                                saveImageToGallery(context, source, ref.fileName, ref.mediaType)
-                                            }
-                                        }
-                                    }
-                                check(saved) { "MediaStore save returned false" }
+                    actionGate.dispatch(currentPage, currentActionOwner()) { selected ->
+                        val ref = selected.reference
+                        val attachmentIndex = selected.attachmentIndex
+                        val msgId = selected.messageIdHex
+                        val owned = selected.mine
+                        scope.launch {
+                            val exportContext = currentCoroutineContext()
+                            val beforePublish = {
+                                exportContext.ensureActive()
+                                requireExportOwner()
                             }
-                        snackbarHostState.showSnackbar(
-                            mediaSaveSnackbarVisuals(
-                                context = context,
-                                outcome = outcome,
-                                successTitleRes = R.string.media_saved,
-                                failureTitleRes = R.string.media_save_failed,
-                                operationCode = "MEDIA_VIEWER_SAVE",
-                            ),
-                        )
+                            val outcome =
+                                runCatchingCancellable {
+                                    val saved =
+                                        if (MediaReferenceSupport.isVideoMedia(ref)) {
+                                            withMaterializedVideoFile(
+                                                context,
+                                                controller,
+                                                msgId,
+                                                attachmentIndex,
+                                                ref,
+                                                owned,
+                                            ) {
+                                                withContext(Dispatchers.IO) {
+                                                    saveVideoToGallery(
+                                                        context,
+                                                        it,
+                                                        ref.fileName,
+                                                        ref.mediaType,
+                                                        beforePublish,
+                                                    )
+                                                }
+                                            }
+                                        } else {
+                                            // Explicit Save streams the verified image into MediaStore,
+                                            // without the preview budget or a whole-image array.
+                                            attachmentSource(
+                                                controller,
+                                                msgId,
+                                                attachmentIndex,
+                                                ref,
+                                                owned,
+                                            ).use { source ->
+                                                withContext(Dispatchers.IO) {
+                                                    saveImageToGallery(
+                                                        context,
+                                                        source,
+                                                        ref.fileName,
+                                                        ref.mediaType,
+                                                        beforePublish,
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    check(saved) { "MediaStore save returned false" }
+                                }
+                            snackbarHostState.showSnackbar(
+                                mediaSaveSnackbarVisuals(
+                                    context = context,
+                                    outcome = outcome,
+                                    successTitleRes = R.string.media_saved,
+                                    failureTitleRes = R.string.media_save_failed,
+                                    operationCode = "MEDIA_VIEWER_SAVE",
+                                ),
+                            )
+                        }
                     }
                 },
                 onShare = {
-                    val request =
-                        MediaViewerShareRequest(
-                            messageIdHex = currentMessageIdHex,
-                            attachmentIndex = currentAttachmentIndex,
-                            reference = currentReference,
-                            mine = currentMine,
-                        )
-                    scope.launch {
-                        runCatchingCancellable {
-                            when {
-                                onShareRequest != null -> onShareRequest(request).getOrThrow()
-                                MediaReferenceSupport.isVideoMedia(request.reference) ->
-                                    withMaterializedVideoFile(
-                                        context,
-                                        controller,
-                                        request.messageIdHex,
-                                        request.attachmentIndex,
-                                        request.reference,
-                                        request.mine,
-                                    ) { file ->
-                                        shareVideo(
-                                            context,
-                                            file,
-                                            request.reference.fileName,
-                                            request.reference.mediaType,
-                                        ).getOrThrow()
+                    actionGate.dispatch(currentPage, currentActionOwner()) { selected ->
+                        val request =
+                            MediaViewerShareRequest(
+                                messageIdHex = selected.messageIdHex,
+                                attachmentIndex = selected.attachmentIndex,
+                                reference = selected.reference,
+                                mine = selected.mine,
+                            )
+                        scope.launch {
+                            runCatchingCancellable {
+                                when {
+                                    onShareRequest != null -> {
+                                        requireExportOwner()
+                                        onShareRequest(request).getOrThrow()
                                     }
-                                else ->
-                                    // Explicit Share stages the verified image through the message cache,
-                                    // streamed from its source, so it is never read into one array. Leaving the viewer
-                                    // cancels this scope, which stops staging and opens no share sheet.
-                                    shareAttachmentExternally(
-                                        context = context,
-                                        attachmentIndex = request.attachmentIndex,
-                                        reference = request.reference,
-                                        chooserTitle = shareChooserTitle,
-                                        isCurrent = { true },
-                                    ) {
-                                        attachmentSource(
+                                    MediaReferenceSupport.isVideoMedia(request.reference) ->
+                                        withMaterializedVideoFile(
+                                            context,
                                             controller,
                                             request.messageIdHex,
                                             request.attachmentIndex,
                                             request.reference,
                                             request.mine,
-                                        )
-                                    }
-                            }
-                        }.onFailure { error ->
-                            if (MediaReferenceSupport.isVideoMedia(request.reference)) {
-                                appState.presentMediaLaunchFailure(
-                                    R.string.media_couldnt_open,
-                                    "MEDIA_VIEWER_VIDEO_SHARE",
-                                    error,
-                                )
-                            } else {
-                                appState.presentMediaLaunchFailure(
-                                    R.string.media_couldnt_open,
-                                    "MEDIA_VIEWER_IMAGE_SHARE",
-                                    error,
-                                )
+                                        ) { file ->
+                                            shareVideo(
+                                                context,
+                                                file,
+                                                request.reference.fileName,
+                                                request.reference.mediaType,
+                                                beforeLaunch = ::requireExportOwner,
+                                            ).getOrThrow()
+                                        }
+                                    else ->
+                                        // Explicit Share stages the verified image through the message cache,
+                                        // streamed without a whole-image array. Leaving the viewer cancels
+                                        // this scope, which stops staging and opens no share sheet.
+                                        shareAttachmentExternally(
+                                            context = context,
+                                            attachmentIndex = request.attachmentIndex,
+                                            reference = request.reference,
+                                            chooserTitle = shareChooserTitle,
+                                            isCurrent = ::exportOwnerIsCurrent,
+                                        ) {
+                                            attachmentSource(
+                                                controller,
+                                                request.messageIdHex,
+                                                request.attachmentIndex,
+                                                request.reference,
+                                                request.mine,
+                                            )
+                                        }
+                                }
+                            }.onFailure { error ->
+                                if (MediaReferenceSupport.isVideoMedia(request.reference)) {
+                                    appState.presentMediaLaunchFailure(
+                                        R.string.media_couldnt_open,
+                                        "MEDIA_VIEWER_VIDEO_SHARE",
+                                        error,
+                                    )
+                                } else {
+                                    appState.presentMediaLaunchFailure(
+                                        R.string.media_couldnt_open,
+                                        "MEDIA_VIEWER_IMAGE_SHARE",
+                                        error,
+                                    )
+                                }
                             }
                         }
                     }
@@ -838,67 +880,6 @@ internal fun FullScreenMediaViewer(
         )
     }
 }
-
-@Composable
-private fun mediaViewerMenuItems(
-    onSave: (() -> Unit)?,
-    onSetGroupPicture: (() -> Unit)?,
-    onGoToMessage: (() -> Unit)?,
-    actionsEnabled: Boolean,
-    groupPictureBusy: Boolean,
-): List<WhiteNoiseMenuItem> =
-    buildList {
-        if (onSave != null) {
-            add(
-                WhiteNoiseMenuItem(
-                    label = stringResource(R.string.media_save),
-                    icon = R.drawable.ic_download,
-                    onClick = onSave,
-                    enabled = actionsEnabled,
-                ),
-            )
-        }
-        if (onSetGroupPicture != null) {
-            add(
-                WhiteNoiseMenuItem(
-                    label = stringResource(R.string.media_set_group_picture),
-                    icon = R.drawable.ic_image,
-                    onClick = onSetGroupPicture,
-                    enabled = actionsEnabled && !groupPictureBusy,
-                ),
-            )
-        }
-        if (onGoToMessage != null) {
-            add(
-                WhiteNoiseMenuItem(
-                    label = stringResource(R.string.shared_content_go_to_message),
-                    icon = R.drawable.ic_settings_chat_bubble_outline,
-                    onClick = onGoToMessage,
-                    enabled = actionsEnabled,
-                ),
-            )
-        }
-    }
-
-private fun hasViewerBottomActions(
-    onShare: (() -> Unit)?,
-    onForwardMessage: (() -> Unit)?,
-): Boolean = onShare != null || onForwardMessage != null
-
-private fun reusableViewerPresentation(
-    presentation: DecodedAttachmentPresentation?,
-    promoteAnimation: Boolean,
-    replaceTerminatedAnimation: Boolean,
-    sourcePrepared: Boolean,
-): Boolean =
-    presentation != null &&
-        sourcePrepared &&
-        !viewerReplacementNeeded(promoteAnimation, replaceTerminatedAnimation)
-
-private fun viewerReplacementNeeded(
-    promoteAnimation: Boolean,
-    replaceTerminatedAnimation: Boolean,
-): Boolean = promoteAnimation || replaceTerminatedAnimation
 
 /**
  * Draws native edge-to-edge media with prototype chrome inside the supplied cutout/system safe insets. The media
@@ -1308,7 +1289,7 @@ internal fun ViewerPage(
         onScaleChange = onScaleChange,
         onOffsetChange = onOffsetChange,
         onChromeToggle = onChromeToggle,
-        overlay = { geometry -> ViewerImageDetailOverlay(original, geometry, detailCurrent) },
+        overlay = { geometry -> ViewerImageDetailLayer(original, geometry, detailCurrent) },
     ) { imageModifier ->
         when (val current = presentation) {
             is DecodedAttachmentPresentation.Static ->
@@ -1357,9 +1338,3 @@ internal fun ViewerPage(
         }
     }
 }
-
-private fun hasViewerOverflowActions(
-    onSave: (() -> Unit)?,
-    onSetGroupPicture: (() -> Unit)?,
-    onGoToMessage: (() -> Unit)?,
-): Boolean = onSave != null || onSetGroupPicture != null || onGoToMessage != null

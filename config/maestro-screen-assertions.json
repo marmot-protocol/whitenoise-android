@@ -1425,12 +1425,6 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ViewerImageDetail.kt",
-      "symbol": "ViewerImageDetailOverlay",
-      "bindings": [],
-      "remaining": "Direct Maestro assertions remain unimplemented for original raster and fractional SVG viewport detail, source-to-viewport alignment, fit/rezoom fallback retention, and source/lifecycle cancellation with bounded bitmap disposal. Existing parent viewer flows do not prove these detail states; exact-source device execution and resource measurements remain pending."
-    },
-    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/editor/PhotoEditorCoordinatesDialog.kt",
       "symbol": "PhotoEditorCoordinatesDialog",
       "bindings": [

@@ -88,6 +88,8 @@ internal fun writeAnimationStatus(
     callback: IBinder,
     status: AnimationStatusInfo,
 ) {
+    // A one-way callback cannot return the host's rejection of an unsupported status reason.
+    require(status.reason == AnimationFrameProtocol.CODEC_REJECTED)
     val parcel = Parcel.obtain()
     try {
         parcel.writeInterfaceToken(AnimationFrameProtocol.DESCRIPTOR)

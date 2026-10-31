@@ -93,6 +93,24 @@ class MediaViewerMessageActionsTest {
         assertEquals(listOf(page), delivered)
     }
 
+    /** An admitted export follows its owner lifetime, while ordinary page selection stays independent. */
+    @Test
+    fun exportOwnerLifetimeRejectsAccountRuntimeAndDetachButAllowsPageChanges() {
+        val gate = MediaViewerActionGate(owner)
+        gate.currentPage = page
+        assertEquals(true, gate.ownerIsCurrent(owner))
+        gate.currentPage = page.copy(attachmentIndex = 0)
+        assertEquals(true, gate.ownerIsCurrent(owner))
+        assertEquals(false, gate.ownerIsCurrent(owner.copy(accountRef = "account-b")))
+        assertEquals(false, gate.ownerIsCurrent(owner.copy(runtimeGeneration = 2)))
+        assertEquals(
+            false,
+            MediaViewerActionGate(owner.copy(accountRef = null)).ownerIsCurrent(owner.copy(accountRef = null)),
+        )
+        gate.close()
+        assertEquals(false, gate.ownerIsCurrent(owner))
+    }
+
     /** Builds a list item fixture. */
     private fun item(): TimelineMessage {
         val record =

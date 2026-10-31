@@ -88,7 +88,7 @@ internal suspend fun inspectViewerSource(
 @OptIn(FlowPreview::class)
 // Compose naming; the source lifetime owns the collector, fallback child and pixel disposal together.
 @Suppress("FunctionNaming", "LongMethod")
-internal fun ViewerImageDetailOverlay(
+internal fun ViewerImageDetailLayer(
     source: ViewerOriginalImage?,
     geometry: ViewerViewportGeometry,
     active: Boolean,

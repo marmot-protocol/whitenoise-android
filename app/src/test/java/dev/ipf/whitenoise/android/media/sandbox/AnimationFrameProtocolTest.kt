@@ -130,6 +130,30 @@ class AnimationFrameProtocolTest {
         parcel.writeInt(frame.privateCanaryErrno)
     }
 
+    @Test
+    fun unknownStatusReasonsAreRejectedBeforeTheOneWayTransaction() {
+        var transactions = 0
+        val receiver =
+            object : Binder() {
+                override fun onTransact(
+                    code: Int,
+                    data: Parcel,
+                    reply: Parcel?,
+                    flags: Int,
+                ): Boolean {
+                    transactions++
+                    return true
+                }
+            }
+        val status = AnimationStatusInfo(42, AnimationFrameProtocol.CODEC_REJECTED, true, false, false)
+        for (reason in listOf(Int.MIN_VALUE, -1, 0, 2, Int.MAX_VALUE)) {
+            assertThrows(IllegalArgumentException::class.java) {
+                writeAnimationStatus(receiver, status.copy(reason = reason))
+            }
+        }
+        assertEquals(0, transactions)
+    }
+
     /** A status round-trips as fixed primitives, and unknown codes, flags, missing fields or trailing data fail. */
     @Test
     fun statusContainsOnlyTheFixedKnownPrimitiveShape() {

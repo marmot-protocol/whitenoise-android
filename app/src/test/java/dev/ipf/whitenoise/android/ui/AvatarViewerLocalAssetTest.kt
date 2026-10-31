@@ -20,13 +20,20 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.AvatarViewerImageState
+import dev.ipf.whitenoise.android.ui.profile.decodeAvatarViewerBitmap
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarViewerImageState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -36,6 +43,8 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.ByteArrayOutputStream
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -212,6 +221,63 @@ class AvatarViewerLocalAssetTest {
             )
         }
     }
+
+    /** The produced state's owner cleans Ready even when no parent bitmap effect is installed. */
+    @Test
+    fun removingTheStateOwnerRecyclesReadyWithoutAParentPixelEffect() {
+        val bytes = largePng()
+        val reader: suspend () -> ByteArray? = { bytes }
+        val visible = mutableStateOf(true)
+        var ready: Bitmap? = null
+        composeRule.setContent {
+            if (visible.value) {
+                val state = rememberAvatarViewerImageState(null, null, reader)
+                SideEffect {
+                    if (state is AvatarViewerImageState.Ready) {
+                        ready = state.bitmap
+                        visible.value = false
+                    }
+                }
+            }
+        }
+        composeRule.waitUntil(5_000) { ready?.isRecycled == true }
+        assertTrue(checkNotNull(ready).isRecycled)
+    }
+
+    /** A blocking decoder cannot transfer orphan pixels into Ready after its owner is cancelled. */
+    @Test
+    fun cancelledOriginalDecodeRecyclesItsLateBitmapBeforeReady() =
+        runBlocking {
+            val bitmap = Bitmap.createBitmap(20, 10, Bitmap.Config.ARGB_8888)
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            var published: AvatarViewerImageState? = null
+            val pending =
+                launch(Dispatchers.Default) {
+                    val decoded =
+                        decodeAvatarViewerBitmap(byteArrayOf(1)) {
+                            entered.countDown()
+                            while (release.count > 0) {
+                                try {
+                                    release.await(20, TimeUnit.MILLISECONDS)
+                                } catch (_: InterruptedException) {
+                                    // Model a native decoder that returns only after its own work finishes.
+                                }
+                            }
+                            bitmap
+                        }
+                    if (decoded != null) published = AvatarViewerImageState.Ready(byteArrayOf(1), decoded)
+                }
+            try {
+                assertTrue(entered.await(5, TimeUnit.SECONDS))
+                pending.cancel()
+            } finally {
+                release.countDown()
+            }
+            pending.cancelAndJoin()
+            assertTrue(bitmap.isRecycled)
+            assertNull(published)
+        }
 
     @Test
     fun retainedSaveRechecksTheReaderAfterItsInitialRead() {

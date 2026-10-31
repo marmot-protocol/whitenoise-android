@@ -41,6 +41,7 @@ import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 private const val VIEWER_PERCENT = 100
+private const val VIEWER_ZOOM_OUT_FACTOR = 0.5f
 
 /** Shared image presentation; acquisition, decoded resources and transform lifetime stay with the source. */
 @Composable
@@ -203,7 +204,7 @@ internal fun ImageViewerViewport(
                             true
                         },
                         CustomAccessibilityAction(zoomOutLabel) {
-                            applyZoom(0.5f)
+                            applyZoom(VIEWER_ZOOM_OUT_FACTOR)
                             true
                         },
                         CustomAccessibilityAction(oneToOneLabel) {

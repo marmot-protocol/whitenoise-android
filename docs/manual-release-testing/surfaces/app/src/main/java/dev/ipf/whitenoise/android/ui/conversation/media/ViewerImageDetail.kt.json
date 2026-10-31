@@ -4,9 +4,9 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "ViewerImageDetailOverlay",
+        "surface": "ViewerImageDetailLayer",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ViewerImageDetail.kt",
-        "anchor": "fun ViewerImageDetailOverlay(",
+        "anchor": "fun ViewerImageDetailLayer(",
         "test_ids": [
           "MED-015"
         ]

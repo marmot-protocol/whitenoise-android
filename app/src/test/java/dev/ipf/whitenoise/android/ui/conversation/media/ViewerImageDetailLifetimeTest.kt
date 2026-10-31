@@ -35,7 +35,7 @@ class ViewerImageDetailLifetimeTest {
         var completed = 0
         val source = ViewerOriginalImage(byteArrayOf(1), ImageInspection(16000, 1000, "image/bmp", 1))
         rule.setContent {
-            ViewerImageDetailOverlay(
+            ViewerImageDetailLayer(
                 source,
                 geometry,
                 active,
@@ -93,7 +93,7 @@ class ViewerImageDetailLifetimeTest {
         var fallbacks = 0
         val source = ViewerOriginalImage(byteArrayOf(1), ImageInspection(16000, 1000, "image/bmp", 1))
         rule.setContent {
-            ViewerImageDetailOverlay(
+            ViewerImageDetailLayer(
                 source,
                 geometry,
                 active,
@@ -142,7 +142,7 @@ class ViewerImageDetailLifetimeTest {
         var peak = 0
         val source = ViewerOriginalImage(byteArrayOf(1), ImageInspection(4000, 4000, "image/png", 1))
         rule.setContent {
-            ViewerImageDetailOverlay(source, geometry, active) { _, region ->
+            ViewerImageDetailLayer(source, geometry, active) { _, region ->
                 calls++
                 running++
                 peak = maxOf(peak, running)
