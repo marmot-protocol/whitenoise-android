@@ -3,7 +3,8 @@
 This toolkit measures the optimized app rather than a debuggable Compose build.
 The Baseline Profile plugin derives two release-like variants from `release`:
 
-- `devZapstoreBenchmarkRelease`: minified, non-debuggable, profileable; used for Macrobenchmark.
+- `devZapstoreBenchmarkRelease`: non-debuggable, profileable, and not minified (plain D8 output; see
+  [DEX method-size budgets](#dex-method-size-budgets)); used for Macrobenchmark.
 - `devZapstoreNonMinifiedRelease`: non-minified, non-debuggable, profileable; used to collect profiles.
 
 Both use the Android debug key and the existing dev application ID
@@ -962,6 +963,86 @@ Generate the same optimized staging report that CI uploads:
 Outputs land in `app/build/compose-metrics/` and
 `app/build/compose-reports/`. CI publishes them as the
 `compose-compiler-reports` artifact for 14 days.
+
+## DEX method-size budgets
+
+ART's optimizing compiler refuses any method whose `code_item` reaches 16,383
+instructions (16-bit code units) or 16,383 registers: `UINT16_MAX / 4` in
+`Compiler::IsPathologicalCase` (AOSP `art/compiler/compiler.cc`). dex2oat and
+the JIT both skip such a method, so it always runs in the interpreter. Large
+Compose screen functions approach that limit:
+[#3238](https://github.com/marmot-protocol/whitenoise-android/pull/3238) split
+`ConversationScreen` after it crossed it, and
+[#3234](https://github.com/marmot-protocol/whitenoise-android/pull/3234) shrank
+`MessageBubble` before it did.
+
+`scripts/dex_method_budget.py` reads the DEX already packaged in an APK and
+never builds anything. It reports each method's `insns_size` and
+`registers_size`, names residual methods through the R8 mapping from the same
+build (eliding inlined and synthesized frames, as retrace does), and records the
+source commit, APK and DEX SHA-256s, mapping `pg_map_id`, compiler and AGP
+versions and CI run. The mapping's `pg_map_id` must equal the one R8 wrote into
+every DEX, so a map from another build fails. When AGP's `output-metadata.json`
+sits beside the APK, its `variantName` must match `--variant` and it must list
+the APK; without that file the report records the variant as unchecked. Budgets live in
+`config/dex-method-budgets.json`; each entry's `basis` records the commit,
+artifact and largest sizes it was reviewed against.
+
+| Variant | Measured in | Compiler | Budget (code units / registers) | On violation |
+| --- | --- | --- | ---: | --- |
+| `productionZapstoreRelease` | Android Release Runtime Verify, API 36 lane | R8 full mode, obfuscated | 13,106 / 13,106 | Fails the lane after ART verification |
+| `stagingZapstoreRelease` | Android Release Runtime Verify, the shipping ARM64 APK in the Android 17 lane | R8 full mode, obfuscated | 13,106 / 13,106 | Fails the lane after ART verification |
+| `devZapstoreBenchmarkRelease` | Android CI baseline phase, the universal APK the Baseline Profile check reads | D8 only, unminified | 16,382 / 16,382 | Warning annotation only |
+
+The assumptions behind each budget:
+
+- **Shipping budgets are 80% of ART's limit, rounded down.** At review time this
+  left about 1,400 code units of growth above the largest shipping method and
+  kept 3,277 between the budget and the limit, so a failure arrives while a
+  split is still a planned change rather than a fix for interpreted code. Only
+  obfuscated R8 output with its own mapping is accepted. The budget step runs
+  before the emulator but continues on error, so ART verification still runs;
+  the lane's last step then fails. These lanes run on release-input pull
+  requests, `master` pushes, the merge queue, tags and nightly, and they are not
+  required checks. Each variant's budget was reviewed against its own build.
+  Production enables fewer debug-only code paths
+  (`ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS` is false), so its largest method was
+  `ConversationScreen` at 11,130 code units, while staging's `MessageBubble`
+  reached 11,671. Play builds are not budgeted.
+- **`benchmarkRelease` is plain D8 output.** The build type is created without
+  release minification, so it keeps source names, has no mapping, and its large
+  composables are 30–40% larger than the shipping ones. Its sizes never
+  stand in for shipping sizes, and the script refuses to apply a shipping budget
+  to it. Its budget is the largest size ART still compiles: beyond it,
+  macrobenchmarks measure the interpreter rather than compiled code. A
+  violation or input error only adds a warning annotation, so a D8-only size
+  never blocks a merge. At `8342b52` its largest method, `ConversationScreen`,
+  was 615 code units below its budget. The budget cannot be raised; the remedy is
+  splitting the method.
+- **The threshold is ART's as of AOSP main on 2026-10-30.** Re-check it when a
+  new ART release changes the compiler. The parser accepts DEX versions 035–040
+  and fails on any other, including the DEX 041 container format.
+
+When a budget fails, the log names the source method, its residual identity and
+DEX file, and its size against the budget. The JSON and Markdown reports are in
+the lane's report artifact (`dex-method-budget-benchmark` for the benchmark
+check). Prefer splitting the method, using the patterns from the PRs above.
+Raising a shipping budget is a reviewed change to the config: record the new
+measurement in `basis` and justify the margin in the PR.
+
+Measure an APK locally (omit `--mapping` for `devZapstoreBenchmarkRelease`):
+
+```bash
+python3 scripts/dex_method_budget.py \
+  --apk app/build/outputs/apk/stagingZapstore/release/<arm64-v8a APK> \
+  --mapping app/build/outputs/mapping/stagingZapstoreRelease/mapping.txt \
+  --variant stagingZapstoreRelease \
+  --source-sha "$(git rev-parse HEAD)" \
+  --report-dir build/dex-method-budget
+```
+
+Exit status 1 is a budget violation; 2 is a missing, malformed or mismatched
+input.
 
 ## PR measurement table
 
