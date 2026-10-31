@@ -99,7 +99,6 @@ internal fun withContactPictureIcon(
     shortcut: ShortcutInfoCompat,
     contact: String,
     bitmap: Bitmap?,
-    initialConversationIcon: androidx.core.graphics.drawable.IconCompat? = null,
 ): ShortcutInfoCompat {
     if (!shortcutPreviewAllowed(context, shortcut)) return genericNotificationShortcut(context, shortcut)
     val icon = notificationConversationIcon(shortcut.longLabel?.toString().orEmpty(), shortcut.id, bitmap)
@@ -117,10 +116,10 @@ internal fun withContactPictureIcon(
     shortcut.locusId?.let(builder::setLocusId)
     shortcut.categories?.let(builder::setCategories)
     if (shortcut.excludedFromSurfaces != 0) builder.setExcludedFromSurfaces(shortcut.excludedFromSurfaces)
+    // A group update omits the icon and Person, so Android keeps the ones it already holds.
     if (shortcut.extras?.getBoolean(CONTACT_CONVERSATION_ICON) == true) {
         builder.setIcon(icon)
-        // A direct conversation names exactly this contact, so its Person is rebuilt from the shortcut's own
-        // label; group shortcuts set no Person here and keep whatever Android already retains for them.
+        // A direct conversation names exactly this contact, so its Person is rebuilt from the shortcut's own label.
         val person =
             androidx.core.app.Person
                 .Builder()
@@ -128,9 +127,6 @@ internal fun withContactPictureIcon(
                 .setKey(contact)
                 .build()
         builder.setPerson(contactAvatarPerson(person, bitmap))
-    } else {
-        // Updates omit the icon to retain it in Android; initial publication supplies its known group icon.
-        initialConversationIcon?.let(builder::setIcon)
     }
     return builder.build()
 }
