@@ -6,10 +6,14 @@ import android.view.InputDevice
 import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -56,20 +60,22 @@ class SharedImageViewerPinchDeviceTest {
             val ownerOffset = offset
             SideEffect { compositions.incrementAndGet() }
             WhiteNoiseTheme {
-                ImageViewerViewport(
-                    "gesture-fixture",
-                    4096,
-                    4096,
-                    ownerScale,
-                    ownerOffset,
-                    {
-                        scaleTrail += it
-                        scale = it
-                    },
-                    { offset = it },
-                    {},
-                    onViewportChange = { geometry = it },
-                ) { modifier -> Canvas(modifier) { drawRect(Color.White) } }
+                Box(Modifier.fillMaxWidth().aspectRatio(1f)) {
+                    ImageViewerViewport(
+                        "gesture-fixture",
+                        4096,
+                        4096,
+                        ownerScale,
+                        ownerOffset,
+                        {
+                            scaleTrail += it
+                            scale = it
+                        },
+                        { offset = it },
+                        {},
+                        onViewportChange = { geometry = it },
+                    ) { modifier -> Canvas(modifier) { drawRect(Color.White) } }
+                }
             }
         }
         rule.waitForIdle()
@@ -103,15 +109,88 @@ class SharedImageViewerPinchDeviceTest {
         }
     }
 
+    @Test
+    fun letterboxedImageStaysCenteredThenPreservesAnUnclampedFocalPoint() {
+        var scale by mutableStateOf(1f)
+        var offset by mutableStateOf(Offset.Zero)
+        var geometry: ViewerViewportGeometry? = null
+        rule.setContent {
+            ImageViewerViewport(
+                "letterboxed-gesture",
+                4096,
+                4096,
+                scale,
+                offset,
+                { scale = it },
+                { offset = it },
+                {},
+                onViewportChange = { geometry = it },
+            ) { modifier -> Canvas(modifier) { drawRect(Color.White) } }
+        }
+        rule.waitForIdle()
+        val bounds = rule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG).fetchSemanticsNode().screenRect()
+        rule.runOnIdle {
+            assertTrue(bounds.height() > bounds.width())
+            assertEquals(1f, scale, 0f)
+            assertEquals(Offset.Zero, offset)
+        }
+        assertSmallPinchClampsLetterboxedPan(bounds, { scale }, { offset })
+        injectPinchAndAwaitIdle(bounds, Offset(bounds.width() / 2f, bounds.height() / 2f))
+        rule.runOnIdle {
+            assertEquals(4f, scale, 0.001f)
+            assertEquals(0f, offset.x, 0.01f)
+            assertEquals(0f, offset.y, 0.01f)
+        }
+        val focalDelta = bounds.width() * 0.05f
+        injectPinchAndAwaitIdle(
+            bounds,
+            Offset(bounds.width() / 2f + focalDelta, bounds.height() / 2f + focalDelta),
+        )
+        rule.runOnIdle {
+            assertEquals(16f, scale, 0.001f)
+            assertEquals(-3f * focalDelta, offset.x, 0.1f)
+            assertEquals(-3f * focalDelta, offset.y, 0.1f)
+            val fit = viewerFitGeometry(bounds.width().toFloat(), bounds.height().toFloat(), 4096, 4096)
+            val maxY = (fit.baseHeight * scale - bounds.height()) / 2f
+            assertTrue(abs(offset.y) <= maxY)
+            assertEquals(scale, requireNotNull(geometry).scale, 0.001f)
+        }
+    }
+
+    private fun assertSmallPinchClampsLetterboxedPan(
+        bounds: Rect,
+        readScale: () -> Float,
+        readOffset: () -> Offset,
+    ) {
+        val delta = bounds.width() * 0.05f
+        injectPinchAndAwaitIdle(
+            bounds,
+            Offset(bounds.width() / 2f + delta, bounds.height() / 2f + delta),
+            endHalfSpanFraction = 0.03125f,
+        )
+        rule.runOnIdle {
+            assertEquals(1.25f, readScale(), 0.001f)
+            assertTrue(bounds.width() * readScale() < bounds.height())
+            assertEquals(-0.25f * delta, readOffset().x, 0.1f)
+            assertEquals(0f, readOffset().y, 0.01f)
+        }
+        rule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG).performTouchInput { doubleClick() }
+        rule.runOnIdle {
+            assertEquals(1f, readScale(), 0f)
+            assertEquals(Offset.Zero, readOffset())
+        }
+    }
+
     private fun injectPinchAndAwaitIdle(
         bounds: Rect,
         localFocal: Offset,
+        endHalfSpanFraction: Float = 0.10f,
     ) {
         injectViewerPinch(
             bounds.left + localFocal.x,
             bounds.top + localFocal.y,
             bounds.width() * 0.025f,
-            bounds.width() * 0.10f,
+            bounds.width() * endHalfSpanFraction,
         )
         rule.waitForIdle()
     }

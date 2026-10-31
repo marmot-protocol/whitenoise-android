@@ -15,6 +15,7 @@ import androidx.compose.ui.test.performTouchInput
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -65,6 +66,46 @@ class AvatarViewerGestureTest {
         }
         rule.waitForIdle()
         assertEquals(PAN_STEP * PAN_MOVES, stripeCenter() - before, 2f)
+    }
+
+    @Test
+    fun doubleTapResetsAZoomedAvatarWithoutStationaryPanInterference() {
+        val source = Bitmap.createBitmap(SOURCE_EDGE, SOURCE_EDGE, Bitmap.Config.ARGB_8888)
+        source.eraseColor(Color.BLACK)
+        Canvas(source).drawRect(
+            SOURCE_EDGE / 2f - STRIPE_HALF_WIDTH,
+            0f,
+            SOURCE_EDGE / 2f + STRIPE_HALF_WIDTH,
+            SOURCE_EDGE.toFloat(),
+            Paint().apply { color = Color.RED },
+        )
+        rule.setContent {
+            WhiteNoiseTheme {
+                AvatarFullScreenViewer(
+                    "Gesture picture",
+                    "gesture-picture",
+                    picture = source.asImageBitmap(),
+                    onDismiss = {},
+                )
+            }
+        }
+        val dialog = rule.onNode(isDialog())
+        rule.waitForIdle()
+        val fittedWidth = stripeWidth()
+        dialog.performTouchInput { doubleClick(center) }
+        rule.waitForIdle()
+        assertTrue(stripeWidth() > fittedWidth * 2)
+        dialog.performTouchInput { doubleClick(center) }
+        rule.waitForIdle()
+        assertEquals(fittedWidth.toFloat(), stripeWidth().toFloat(), 2f)
+    }
+
+    private fun stripeWidth(): Int {
+        val pixels = rule.onNode(isDialog()).captureToImage().toPixelMap()
+        return (0 until pixels.width).count { x ->
+            val pixel = pixels[x, pixels.height / 2]
+            pixel.red > 0.8f && pixel.green < 0.2f && pixel.blue < 0.2f
+        }
     }
 
     /** A narrow source stripe provides an independent pixel position, not another copy of transform state. */

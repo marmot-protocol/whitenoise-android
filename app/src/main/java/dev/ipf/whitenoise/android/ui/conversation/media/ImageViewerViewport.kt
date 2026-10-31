@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.IntSize
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.ViewerTransform
 import dev.ipf.whitenoise.android.ui.common.applyViewerTransformGesture
+import dev.ipf.whitenoise.android.ui.common.consumeViewerTransformIfNeeded
 import dev.ipf.whitenoise.android.ui.common.resetViewerTransform
 import dev.ipf.whitenoise.android.ui.common.viewerFitGeometry
 import dev.ipf.whitenoise.android.ui.common.viewerOneToOneScale
@@ -143,11 +144,13 @@ internal fun ImageViewerViewport(
                         val currentScale = current.scale
                         val currentOffset = current.offset
                         if (event.hasViewerTransformSample(pressedCount, currentScale)) {
+                            val zoom = event.calculateZoom()
+                            val pan = event.calculatePan()
                             val next =
                                 applyViewerTransformGesture(
                                     current = current,
-                                    zoomFactor = event.calculateZoom(),
-                                    panDelta = event.calculatePan(),
+                                    zoomFactor = zoom,
+                                    panDelta = pan,
                                     viewportWidth = size.width.toFloat(),
                                     viewportHeight = size.height.toFloat(),
                                     imageWidth = latestWidth,
@@ -158,7 +161,7 @@ internal fun ImageViewerViewport(
                             accumulated = next
                             if (next.scale != currentScale) latestOnScaleChange(next.scale)
                             if (next.offset != currentOffset) latestOnOffsetChange(next.offset)
-                            event.changes.forEach { it.consume() }
+                            event.consumeViewerTransformIfNeeded(pressedCount, zoom, pan)
                         }
                     } while (true)
                 }

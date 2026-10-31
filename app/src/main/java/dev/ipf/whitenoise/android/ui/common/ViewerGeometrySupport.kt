@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.common
 
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerEvent
 
 /** Finite bounds and focal geometry shared by the existing viewer transform operations. */
 internal fun positiveFinite(value: Float): Boolean = value.isFinite() && value > 0f
@@ -52,4 +53,19 @@ internal fun fitKnownViewerImage(
     } else {
         ViewerFitGeometry((viewportHeight * imageAspect).toFloat(), viewportHeight)
     }
+}
+
+/** Stationary one-finger samples belong to tap detection; edge pan attempts still own their input. */
+internal fun shouldConsumeViewerTransform(
+    pressedCount: Int,
+    zoom: Float,
+    pan: Offset,
+): Boolean = pressedCount >= 2 || zoom != 1f || pan != Offset.Zero
+
+internal fun PointerEvent.consumeViewerTransformIfNeeded(
+    pressedCount: Int,
+    zoom: Float,
+    pan: Offset,
+) {
+    if (shouldConsumeViewerTransform(pressedCount, zoom, pan)) changes.forEach { it.consume() }
 }
