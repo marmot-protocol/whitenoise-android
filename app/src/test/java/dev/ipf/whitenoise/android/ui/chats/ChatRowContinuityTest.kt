@@ -90,14 +90,16 @@ class ChatRowContinuityTest {
         }
         assertEquals(item.value, committedItem)
         badge(1).assertIsDisplayed()
-        val oneWidth = badge(1).fetchSemanticsNode().boundsInRoot.width
+        val oneBounds = badge(1).fetchSemanticsNode().boundsInRoot
         publishChange {
             item.value = item.value.copy(projection = requireNotNull(item.value.projection).copy(unreadCount = 1_001uL))
         }
         assertEquals(item.value, committedItem)
         badge(1).assertDoesNotExist()
         badge(1_001).assertIsDisplayed()
-        assertEquals(oneWidth, badge(1_001).fetchSemanticsNode().boundsInRoot.width, 0.5f)
+        val cappedBounds = badge(1_001).fetchSemanticsNode().boundsInRoot
+        assertEquals(oneBounds.right, cappedBounds.right, 0.5f)
+        assertTrue("A capped count occupies more width than one digit", cappedBounds.width > oneBounds.width)
         publishChange {
             item.value =
                 item.value.copy(
