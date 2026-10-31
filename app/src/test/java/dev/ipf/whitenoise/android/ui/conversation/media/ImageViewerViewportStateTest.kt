@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.TouchInjectionScope
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
@@ -122,14 +123,16 @@ class ImageViewerViewportStateTest {
         var offset by mutableStateOf(Offset.Zero)
         val ownerCompositions = AtomicInteger()
         rule.setContent {
+            val ownerScale = scale
+            val ownerOffset = offset
             SideEffect { ownerCompositions.incrementAndGet() }
             Box(Modifier.size(300.dp)) {
                 ImageViewerViewport(
                     sourceKey = "batched-pinch",
                     imageWidth = 1000,
                     imageHeight = 1000,
-                    scale = scale,
-                    offset = offset,
+                    scale = ownerScale,
+                    offset = ownerOffset,
                     onScaleChange = { scale = it },
                     onOffsetChange = { offset = it },
                     onChromeToggle = {},
@@ -141,15 +144,7 @@ class ImageViewerViewportStateTest {
         rule.mainClock.autoAdvance = false
         try {
             rule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG).performTouchInput {
-                down(0, Offset(170f, 165f))
-                down(1, Offset(190f, 165f))
-                for (span in listOf(20f, 30f, 40f, 60f)) {
-                    updatePointerTo(0, Offset(180f - span, 165f))
-                    updatePointerTo(1, Offset(180f + span, 165f))
-                    move(delayMillis = 0L)
-                }
-                up(0)
-                up(1)
+                injectBatchedPinch(listOf(20f, 30f, 40f, 60f))
             }
             assertEquals(composedBeforeBatch, ownerCompositions.get())
         } finally {
@@ -164,4 +159,56 @@ class ImageViewerViewportStateTest {
             assertEquals(165f, 15f * scale + 150f + offset.y, 0.01f)
         }
     }
+
+    @Test
+    fun repeatedBatchedPinchesRetainTheOwnerTransformAcrossIdleBoundaries() {
+        var scale by mutableFloatStateOf(1f)
+        var offset by mutableStateOf(Offset.Zero)
+        var geometry: ViewerViewportGeometry? = null
+        rule.setContent {
+            Box(Modifier.size(300.dp)) {
+                ImageViewerViewport(
+                    sourceKey = "repeated-batched-pinch",
+                    imageWidth = 1000,
+                    imageHeight = 1000,
+                    scale = scale,
+                    offset = offset,
+                    onScaleChange = { scale = it },
+                    onOffsetChange = { offset = it },
+                    onChromeToggle = {},
+                    onViewportChange = { geometry = it },
+                ) { imageModifier -> Box(imageModifier) }
+            }
+        }
+        rule.waitForIdle()
+        for (expected in listOf(4f, 16f, 64f)) {
+            rule.mainClock.autoAdvance = false
+            try {
+                rule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG).performTouchInput {
+                    injectBatchedPinch(listOf(20f, 30f, 40f))
+                }
+            } finally {
+                rule.mainClock.autoAdvance = true
+            }
+            rule.waitForIdle()
+            rule.runOnIdle {
+                assertEquals(expected, scale, 0.001f)
+                assertEquals(scale, requireNotNull(geometry).scale, 0.001f)
+                assertEquals(180f, 30f * scale + 150f + offset.x, 0.01f)
+                assertEquals(165f, 15f * scale + 150f + offset.y, 0.01f)
+            }
+        }
+    }
+}
+
+private fun TouchInjectionScope.injectBatchedPinch(spans: List<Float>) {
+    down(0, Offset(170f, 165f))
+    down(1, Offset(190f, 165f))
+    for (span in spans) {
+        updatePointerTo(0, Offset(180f - span, 165f))
+        updatePointerTo(1, Offset(180f + span, 165f))
+        move(delayMillis = 0L)
+    }
+    up(0)
+    up(1)
 }

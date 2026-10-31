@@ -1,10 +1,12 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import android.graphics.Rect
 import android.os.SystemClock
 import android.view.InputDevice
 import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.Canvas
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -32,6 +34,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.abs
 
 /** Real window multitouch through the same viewport used by attachment and public event image owners. */
@@ -46,15 +49,23 @@ class SharedImageViewerPinchDeviceTest {
         var scale by mutableStateOf(1f)
         var offset by mutableStateOf(Offset.Zero)
         var geometry: ViewerViewportGeometry? = null
+        val compositions = AtomicInteger()
+        val scaleTrail = mutableListOf<Float>()
         rule.setContent {
+            val ownerScale = scale
+            val ownerOffset = offset
+            SideEffect { compositions.incrementAndGet() }
             WhiteNoiseTheme {
                 ImageViewerViewport(
                     "gesture-fixture",
                     4096,
                     4096,
-                    scale,
-                    offset,
-                    { scale = it },
+                    ownerScale,
+                    ownerOffset,
+                    {
+                        scaleTrail += it
+                        scale = it
+                    },
                     { offset = it },
                     {},
                     onViewportChange = { geometry = it },
@@ -69,13 +80,14 @@ class SharedImageViewerPinchDeviceTest {
         val sourceX = (localFocal.x - bounds.width() / 2f) / fit.baseWidth
         val sourceY = (localFocal.y - bounds.height() / 2f) / fit.baseHeight
         repeat(3) {
-            injectViewerPinch(
-                bounds.left + localFocal.x,
-                bounds.top + localFocal.y,
-                bounds.width() * 0.025f,
-                bounds.width() * 0.10f,
-            )
-            rule.waitForIdle()
+            injectPinchAndAwaitIdle(bounds, localFocal)
+            rule.runOnIdle {
+                val diagnostic =
+                    "pinch=${it + 1}, compositions=${compositions.get()}, " +
+                        "clock=${rule.mainClock.currentTime}, ownerOffset=$offset, " +
+                        "geometry=$geometry, callbacks=$scaleTrail"
+                assertPinchHandshake(it, scale, geometry, diagnostic)
+            }
         }
         rule.runOnIdle {
             assertTrue("Repeated real pinch must exceed the old 5x ceiling: $scale", scale > 5f)
@@ -89,6 +101,19 @@ class SharedImageViewerPinchDeviceTest {
             assertEquals(1f, scale)
             assertEquals(Offset.Zero, offset)
         }
+    }
+
+    private fun injectPinchAndAwaitIdle(
+        bounds: Rect,
+        localFocal: Offset,
+    ) {
+        injectViewerPinch(
+            bounds.left + localFocal.x,
+            bounds.top + localFocal.y,
+            bounds.width() * 0.025f,
+            bounds.width() * 0.10f,
+        )
+        rule.waitForIdle()
     }
 
     @Test
@@ -190,4 +215,15 @@ private fun injectViewerPinch(
     }
     send(MotionEvent.ACTION_POINTER_UP or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 2, endHalfSpan)
     send(MotionEvent.ACTION_UP, 1, endHalfSpan)
+}
+
+private fun assertPinchHandshake(
+    index: Int,
+    scale: Float,
+    geometry: ViewerViewportGeometry?,
+    diagnostic: String,
+) {
+    val expected = listOf(4f, 16f, 64f)[index]
+    assertEquals(diagnostic, expected, scale, 0.001f)
+    assertEquals(diagnostic, scale, requireNotNull(geometry).scale, 0.001f)
 }
