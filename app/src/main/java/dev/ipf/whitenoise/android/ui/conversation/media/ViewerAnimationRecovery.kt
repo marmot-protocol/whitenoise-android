@@ -9,7 +9,7 @@ import dev.ipf.whitenoise.android.media.AnimationTermination
 import dev.ipf.whitenoise.android.media.PreemptibleAnimation
 
 /** One automatic attempt per source owner; the cause of system-confirmed worker death remains unknown. */
-internal class ViewerAnimationRecoveryBudget {
+internal class ViewerAnimationRecovery {
     private var spent = false
 
     fun claim(reason: AnimationTermination): Boolean {
@@ -21,6 +21,7 @@ internal class ViewerAnimationRecoveryBudget {
 
 /** Healthy pauses retain their clock. A terminal reason alone never proves transport/protocol retirement. */
 @Composable
+@Suppress("FunctionNaming") // Compose effects follow the existing composable naming convention.
 internal fun ObserveViewerAnimationTermination(
     sourceKey: Any,
     drawable: Drawable?,

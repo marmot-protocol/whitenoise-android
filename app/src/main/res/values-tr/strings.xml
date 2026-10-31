@@ -2523,4 +2523,10 @@
     <string name="notification_tone_silent">Sessiz</string>
     <string name="notification_tone_off">Kapalı</string>
     <string name="notification_tone_default">Varsayılan</string>
+    <string name="media_viewer_fit_image">Görseli sığdır</string>
+    <string name="media_viewer_zoom_image">Yakınlaştır</string>
+    <string name="media_viewer_image_scale">%1$d%% yakınlaştırma</string>
+    <string name="media_viewer_actual_size">Gerçek boyut (1:1)</string>
+    <string name="media_viewer_zoom_out">Uzaklaştır</string>
+    <string name="media_viewer_toggle_controls">Kontrolleri göster veya gizle</string>
 </resources>

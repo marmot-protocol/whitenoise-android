@@ -493,8 +493,10 @@ internal class IsolatedAnimationSession private constructor(
                 ViewerAnimationOutput.fromAdmission(
                     dev.ipf.whitenoise.android.media
                         .admitAnimationSource(bytes),
-                ) ?: return null
-            return createAdmitted(context, bytes, maxOf(output.width, output.height), false, null, output)
+                )
+            return output?.let {
+                createAdmitted(context, bytes, maxOf(it.width, it.height), false, null, it)
+            }
         }
 
         /** Only the existing group seam carries a persistent pending ticket. */

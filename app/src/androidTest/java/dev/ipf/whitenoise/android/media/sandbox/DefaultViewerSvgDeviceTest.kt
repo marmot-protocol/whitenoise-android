@@ -24,8 +24,10 @@ class DefaultViewerSvgDeviceTest {
             val field = IsolatedMediaDecoder::class.java.getDeclaredField("transport").apply { isAccessible = true }
             assertTrue(field.get(IsolatedMediaDecoder) is ReusableMediaTransport)
             val source =
-                """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect x="12" y="12" width="0.001" height="0.02" fill="red"/></svg>"""
-                    .toByteArray()
+                (
+                    """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><r""" +
+                        """ect x="12" y="12" width="0.001" height="0.02" fill="red"/></svg>"""
+                ).toByteArray()
             assertEquals(ImageInspection(24, 24, "image/svg+xml", 1), IsolatedMediaDecoder.svgInspect(source))
             val pixels =
                 requireNotNull(
@@ -42,7 +44,11 @@ class DefaultViewerSvgDeviceTest {
             } finally {
                 pixels.recycle()
             }
-            val hostile = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><g font="1e30px serif"><text>a</text></g></svg>""".toByteArray()
+            val hostile =
+                (
+                    """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><g""" +
+                        """ font="1e30px serif"><text>a</text></g></svg>"""
+                ).toByteArray()
             assertNull(IsolatedMediaDecoder.svgInspect(hostile))
             assertEquals(ImageInspection(24, 24, "image/svg+xml", 1), IsolatedMediaDecoder.svgInspect(source))
             for (declaration in listOf(
@@ -54,7 +60,12 @@ class DefaultViewerSvgDeviceTest {
                 assertNull(IsolatedMediaDecoder.svgInspect(invalid))
                 assertNull(IsolatedMediaDecoder.svg(invalid))
             }
-            val standard = ("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>""" + source.toString(Charsets.UTF_8)).toByteArray()
+            val standard =
+                (
+                    (
+                        """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"""
+                    ) + source.toString(Charsets.UTF_8)
+                ).toByteArray()
             assertEquals(ImageInspection(24, 24, "image/svg+xml", 1), IsolatedMediaDecoder.svgInspect(standard))
             // Normal healthy successes retain the existing reusable worker; this is not per-input death qualification.
             assertEquals(worker.uid, requireNotNull(IsolatedMediaDecoder.lastIsolation).uid)

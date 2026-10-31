@@ -53,7 +53,11 @@ class ChatSvgPickTest {
     @Test
     fun imageAndDocumentPickPreserveValidatedVectorBytesAtEveryQuality() =
         runBlocking {
-            val bytes = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><text x="1" y="12" font-size="8">Detail</text></svg>""".toByteArray()
+            val bytes =
+                (
+                    """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><t""" +
+                        """ext x="1" y="12" font-size="8">Detail</text></svg>"""
+                ).toByteArray()
             val uri = pick(bytes)
             val reader = ConversationAttachmentReader(fixture.state, context)
             for (quality in MediaQuality.entries) {

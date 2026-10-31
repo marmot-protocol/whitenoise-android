@@ -34,6 +34,9 @@ internal fun writeAnimationFrame(
     callback: IBinder,
     frame: AnimationFrameInfo,
 ) {
+    // One-way Binder does not propagate a receiver's rejection back to the sender.
+    // Validate before even obtaining the Parcel; the receiver independently checks untrusted primitives.
+    require(frame.sequence > 0 && ViewerAnimationOutput.fromDimensions(frame.width, frame.height) != null)
     val parcel = Parcel.obtain()
     try {
         parcel.writeInterfaceToken(AnimationFrameProtocol.DESCRIPTOR)

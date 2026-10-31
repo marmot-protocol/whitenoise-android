@@ -29,8 +29,10 @@ class ViewerSvgIsolationDeviceTest {
         val transport = IsolatedMediaTransport(context)
         try {
             val source =
-                """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect x="12" y="12" width="0.001" height="0.02" fill="red"/></svg>"""
-                    .toByteArray()
+                (
+                    """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><r""" +
+                        """ect x="12" y="12" width="0.001" height="0.02" fill="red"/></svg>"""
+                ).toByteArray()
             assertEquals(ImageInspection(24, 24, "image/svg+xml", 1), transport.svgInspect(source))
             assertFalse(context.isEndpointAlive(1))
             val pixels = requireNotNull(transport.svgRegion(source, ViewerSvgRegion(12.0, 12.0, 12.023, 12.023), 512))
@@ -50,7 +52,11 @@ class ViewerSvgIsolationDeviceTest {
             } finally {
                 pixels.recycle()
             }
-            val hostile = """<!DOCTYPE svg [<!ENTITY x SYSTEM 'file:///private'>]><svg xmlns="http://www.w3.org/2000/svg">&x;</svg>""".toByteArray()
+            val hostile =
+                (
+                    """<!DOCTYPE svg [<!ENTITY x SYSTEM 'file:///private'>]><svg xmlns="""" +
+                        """http://www.w3.org/2000/svg">&x;</svg>"""
+                ).toByteArray()
             assertNull(transport.svgInspect(hostile))
             assertFalse(context.isEndpointAlive(3))
             requireNotNull(transport.decode(healthyPng(), 2, false, MediaDecodePolicy.DECODE)).recycle()

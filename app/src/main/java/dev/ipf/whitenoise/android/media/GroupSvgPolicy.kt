@@ -105,10 +105,7 @@ internal object GroupSvgPolicy {
             when (parser.eventType) {
                 XmlPullParser.START_TAG -> {
                     require(++count <= MAX_ELEMENTS && parser.depth <= MAX_DEPTH)
-                    val supportedElement =
-                        parser.name in elements ||
-                            (allowViewerText && parser.name in setOf("text", "tspan"))
-                    require(parser.namespace == SVG_NAMESPACE && supportedElement)
+                    requireSupportedElement(parser, allowViewerText)
                     if (!rootSeen) {
                         require(parser.name == "svg" && parser.depth == 1)
                         rootSeen = true
@@ -137,6 +134,14 @@ internal object GroupSvgPolicy {
         }
         require(rootSeen && references.all { it in gradients })
         return xml
+    }
+
+    private fun requireSupportedElement(
+        parser: XmlPullParser,
+        allowViewerText: Boolean,
+    ) {
+        val supported = parser.name in elements || (allowViewerText && parser.name in setOf("text", "tspan"))
+        require(parser.namespace == SVG_NAMESPACE && supported)
     }
 
     private fun validatedXml(bytes: ByteArray): String {

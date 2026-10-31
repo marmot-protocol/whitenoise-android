@@ -839,6 +839,67 @@ internal fun FullScreenMediaViewer(
     }
 }
 
+@Composable
+private fun mediaViewerMenuItems(
+    onSave: (() -> Unit)?,
+    onSetGroupPicture: (() -> Unit)?,
+    onGoToMessage: (() -> Unit)?,
+    actionsEnabled: Boolean,
+    groupPictureBusy: Boolean,
+): List<WhiteNoiseMenuItem> =
+    buildList {
+        if (onSave != null) {
+            add(
+                WhiteNoiseMenuItem(
+                    label = stringResource(R.string.media_save),
+                    icon = R.drawable.ic_download,
+                    onClick = onSave,
+                    enabled = actionsEnabled,
+                ),
+            )
+        }
+        if (onSetGroupPicture != null) {
+            add(
+                WhiteNoiseMenuItem(
+                    label = stringResource(R.string.media_set_group_picture),
+                    icon = R.drawable.ic_image,
+                    onClick = onSetGroupPicture,
+                    enabled = actionsEnabled && !groupPictureBusy,
+                ),
+            )
+        }
+        if (onGoToMessage != null) {
+            add(
+                WhiteNoiseMenuItem(
+                    label = stringResource(R.string.shared_content_go_to_message),
+                    icon = R.drawable.ic_settings_chat_bubble_outline,
+                    onClick = onGoToMessage,
+                    enabled = actionsEnabled,
+                ),
+            )
+        }
+    }
+
+private fun hasViewerBottomActions(
+    onShare: (() -> Unit)?,
+    onForwardMessage: (() -> Unit)?,
+): Boolean = onShare != null || onForwardMessage != null
+
+private fun reusableViewerPresentation(
+    presentation: DecodedAttachmentPresentation?,
+    promoteAnimation: Boolean,
+    replaceTerminatedAnimation: Boolean,
+    sourcePrepared: Boolean,
+): Boolean =
+    presentation != null &&
+        sourcePrepared &&
+        !viewerReplacementNeeded(promoteAnimation, replaceTerminatedAnimation)
+
+private fun viewerReplacementNeeded(
+    promoteAnimation: Boolean,
+    replaceTerminatedAnimation: Boolean,
+): Boolean = promoteAnimation || replaceTerminatedAnimation
+
 /**
  * Draws native edge-to-edge media with prototype chrome inside the supplied cutout/system safe insets. The media
  * [body] gets only the space the visible chrome and safe insets leave free, so opaque bars never cover the frame
@@ -927,7 +988,7 @@ internal fun MediaViewerFrame(
                             )
                         }
                     }
-                    if (onSave != null || onSetGroupPicture != null || onGoToMessage != null) {
+                    if (hasViewerOverflowActions(onSave, onSetGroupPicture, onGoToMessage)) {
                         Box {
                             IconButton(
                                 onClick = { moreExpanded = true },
@@ -943,38 +1004,13 @@ internal fun MediaViewerFrame(
                                 expanded = moreExpanded && actionsEnabled,
                                 onDismissRequest = { moreExpanded = false },
                                 items =
-                                    buildList {
-                                        if (onSave != null) {
-                                            add(
-                                                WhiteNoiseMenuItem(
-                                                    label = stringResource(R.string.media_save),
-                                                    icon = R.drawable.ic_download,
-                                                    onClick = onSave,
-                                                    enabled = actionsEnabled,
-                                                ),
-                                            )
-                                        }
-                                        if (onSetGroupPicture != null) {
-                                            add(
-                                                WhiteNoiseMenuItem(
-                                                    label = stringResource(R.string.media_set_group_picture),
-                                                    icon = R.drawable.ic_image,
-                                                    onClick = onSetGroupPicture,
-                                                    enabled = actionsEnabled && !groupPictureBusy,
-                                                ),
-                                            )
-                                        }
-                                        if (onGoToMessage != null) {
-                                            add(
-                                                WhiteNoiseMenuItem(
-                                                    label = stringResource(R.string.shared_content_go_to_message),
-                                                    icon = R.drawable.ic_settings_chat_bubble_outline,
-                                                    onClick = onGoToMessage,
-                                                    enabled = actionsEnabled,
-                                                ),
-                                            )
-                                        }
-                                    },
+                                    mediaViewerMenuItems(
+                                        onSave,
+                                        onSetGroupPicture,
+                                        onGoToMessage,
+                                        actionsEnabled,
+                                        groupPictureBusy,
+                                    ),
                             )
                         }
                     }
@@ -996,7 +1032,7 @@ internal fun MediaViewerFrame(
         )
     }
     val bottomChrome: @Composable () -> Unit = {
-        if (chromeShown && (onShare != null || onForwardMessage != null)) {
+        if (chromeShown && hasViewerBottomActions(onShare, onForwardMessage)) {
             Surface(
                 modifier =
                     Modifier
@@ -1127,7 +1163,7 @@ internal fun ViewerPage(
     var viewerFailed by remember(pageKey) { mutableStateOf(false) }
     // A verified image above the preview budget is not a failure: Retry cannot shrink it, Save and Share still work.
     var viewerTooLarge by remember(pageKey) { mutableStateOf(false) }
-    val animationRecovery = remember(pageKey) { ViewerAnimationRecoveryBudget() }
+    val animationRecovery = remember(pageKey) { ViewerAnimationRecovery() }
     var animationFailure by remember(pageKey) {
         mutableStateOf<dev.ipf.whitenoise.android.media.AnimationTermination?>(null)
     }
@@ -1175,7 +1211,7 @@ internal fun ViewerPage(
         }
         val replaceTerminatedAnimation = animationRestartRequested
         if (
-            presentation != null && !promoteAnimation && !replaceTerminatedAnimation && sourcePrepared
+            reusableViewerPresentation(presentation, promoteAnimation, replaceTerminatedAnimation, sourcePrepared)
         ) {
             return@LaunchedEffect
         }
@@ -1321,3 +1357,9 @@ internal fun ViewerPage(
         }
     }
 }
+
+private fun hasViewerOverflowActions(
+    onSave: (() -> Unit)?,
+    onSetGroupPicture: (() -> Unit)?,
+    onGoToMessage: (() -> Unit)?,
+): Boolean = onSave != null || onSetGroupPicture != null || onGoToMessage != null

@@ -50,11 +50,12 @@ internal fun animationFrameByteCount(
     capacity: Int,
     viewerOutput: ViewerAnimationOutput?,
 ): Int? {
-    if (ViewerAnimationOutput.fromDimensions(width, height) == null) return null
-    if (viewerOutput == null) {
-        if (edge !in 1..AnimationFrameProtocol.MAX_EDGE) return null
-    } else if (!viewerOutput.matches(width, height) || capacity != viewerOutput.capacityBytes) {
-        return null
-    }
-    return MediaDecodePolicy.pixelBytes(width, height, edge, capacity)
+    val sourceValid = ViewerAnimationOutput.fromDimensions(width, height) != null
+    val sessionValid =
+        if (viewerOutput == null) {
+            edge in 1..AnimationFrameProtocol.MAX_EDGE
+        } else {
+            viewerOutput.matches(width, height) && capacity == viewerOutput.capacityBytes
+        }
+    return if (sourceValid && sessionValid) MediaDecodePolicy.pixelBytes(width, height, edge, capacity) else null
 }

@@ -49,22 +49,16 @@ class ChatSvgBubbleViewerTest {
                 fixture.state,
                 conversationTimelineTestGroup().copy(groupIdHex = MediaDownloadIntegrationFixture.GROUP),
             )
-        val bytes = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect width="24" height="24" fill="red"/></svg>""".toByteArray()
+        val bytes =
+            (
+                """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><r""" +
+                    """ect width="24" height="24" fill="red"/></svg>"""
+            ).toByteArray()
         val ref = reference(0).copy(mediaType = "image/svg+xml", fileName = "synthetic-vector.svg", dim = "24x24")
         val vectors =
             java.util.concurrent.atomic
                 .AtomicInteger()
-        val transport =
-            object : MediaDecodeTransport by TestMediaDecodeTransport {
-                override fun svgRegion(
-                    bytes: ByteArray,
-                    region: ViewerSvgRegion,
-                    edge: Int,
-                ): android.graphics.Bitmap? {
-                    vectors.incrementAndGet()
-                    return TestMediaDecodeTransport.svgRegion(bytes, region, edge)
-                }
-            }
+        val transport = vectorTransport(vectors)
         IsolatedMediaDecoder.installTestTransport(transport)
         var opened by mutableStateOf<ConversationMediaViewerOpenRequest?>(null)
         try {
@@ -98,27 +92,8 @@ class ChatSvgBubbleViewerTest {
                     }
                 }
             }
-            rule.waitUntil(10_000) {
-                rule.onAllNodesWithContentDescription(ref.fileName).fetchSemanticsNodes().isNotEmpty()
-            }
-            rule.onNodeWithContentDescription(ref.fileName).assertIsDisplayed().performClick()
-            rule.waitUntil(10_000) {
-                rule.waitForIdle()
-                vectors.get() >= 2
-            }
-            rule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG).assertIsDisplayed()
-            rule.runOnIdle {
-                assertTrue(opened != null)
-                assertEquals(
-                    "image/svg+xml",
-                    opened
-                        ?.attachments
-                        ?.single()
-                        ?.value
-                        ?.mediaType,
-                )
-                assertEquals(0, fixture.calls.size)
-            }
+            openBubbleAndAwaitVector(ref.fileName, vectors)
+            assertOpenedVector({ opened }, fixture)
             val context = ApplicationProvider.getApplicationContext<Context>()
             rule.onNodeWithContentDescription(context.getString(R.string.close)).performClick()
             rule.runOnIdle { assertEquals(null, opened) }
@@ -128,5 +103,51 @@ class ChatSvgBubbleViewerTest {
             fixture.close()
             IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)
         }
+    }
+
+    private fun vectorTransport(vectors: java.util.concurrent.atomic.AtomicInteger): MediaDecodeTransport =
+        object : MediaDecodeTransport by TestMediaDecodeTransport {
+            override fun svgRegion(
+                bytes: ByteArray,
+                region: ViewerSvgRegion,
+                edge: Int,
+            ): android.graphics.Bitmap? {
+                vectors.incrementAndGet()
+                return TestMediaDecodeTransport.svgRegion(bytes, region, edge)
+            }
+        }
+
+    private fun assertOpenedVector(
+        currentOpened: () -> ConversationMediaViewerOpenRequest?,
+        fixture: MediaDownloadIntegrationFixture,
+    ) {
+        rule.runOnIdle {
+            val opened = currentOpened()
+            assertTrue(opened != null)
+            assertEquals(
+                "image/svg+xml",
+                opened
+                    ?.attachments
+                    ?.single()
+                    ?.value
+                    ?.mediaType,
+            )
+            assertEquals(0, fixture.calls.size)
+        }
+    }
+
+    private fun openBubbleAndAwaitVector(
+        fileName: String,
+        vectors: java.util.concurrent.atomic.AtomicInteger,
+    ) {
+        rule.waitUntil(10_000) {
+            rule.onAllNodesWithContentDescription(fileName).fetchSemanticsNodes().isNotEmpty()
+        }
+        rule.onNodeWithContentDescription(fileName).assertIsDisplayed().performClick()
+        rule.waitUntil(10_000) {
+            rule.waitForIdle()
+            vectors.get() >= 2
+        }
+        rule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG).assertIsDisplayed()
     }
 }

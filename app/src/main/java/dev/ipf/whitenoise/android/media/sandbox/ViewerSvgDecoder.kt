@@ -40,7 +40,15 @@ internal object ViewerSvgDecoder {
         edge: Int,
     ): Bitmap? {
         if (!canDecodeHere() || edge !in 1..MAX_VIEWPORT_EDGE) return null
-        val source = runCatching { document(bytes) }.getOrNull() ?: return null
+        val source = runCatching { document(bytes) }.getOrNull()
+        return source?.let { renderRegion(it, region, edge) }
+    }
+
+    private fun renderRegion(
+        source: Document,
+        region: ViewerSvgRegion,
+        edge: Int,
+    ): Bitmap? {
         if (!region.validFor(source.info.width, source.info.height)) return null
         // A vector crop must rerender at viewport resolution even when its document region
         // is only a few units wide; raster targetDimensions deliberately never upscales.
@@ -48,6 +56,7 @@ internal object ViewerSvgDecoder {
         val width = (region.width * ratio).toInt().coerceIn(1, edge)
         val height = (region.height * ratio).toInt().coerceIn(1, edge)
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        var completed = false
         return try {
             val canvas = Canvas(bitmap)
             canvas.scale((width / region.width).toFloat(), (height / region.height).toFloat())
@@ -56,10 +65,10 @@ internal object ViewerSvgDecoder {
                 canvas,
                 RectF(0f, 0f, source.info.width.toFloat(), source.info.height.toFloat()),
             )
+            completed = true
             bitmap
-        } catch (failure: Throwable) {
-            bitmap.recycle()
-            throw failure
+        } finally {
+            if (!completed) bitmap.recycle()
         }
     }
 

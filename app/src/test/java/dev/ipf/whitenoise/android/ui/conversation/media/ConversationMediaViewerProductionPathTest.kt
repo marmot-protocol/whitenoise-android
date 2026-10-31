@@ -146,38 +146,7 @@ class ConversationMediaViewerProductionPathTest {
         val zoomLabel = context.getString(R.string.media_viewer_zoom_image)
         val fitLabel = context.getString(R.string.media_viewer_fit_image)
         repeat(2) { source ->
-            composeRule.waitForIdle()
-            val zoomAction =
-                composeRule
-                    .onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG)
-                    .fetchSemanticsNode()
-                    .config[SemanticsActions.CustomActions]
-                    .first { it.label == zoomLabel }
-            repeat(3) { composeRule.runOnIdle { check(zoomAction.action()) } }
-            composeRule
-                .onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG)
-                .assert(
-                    SemanticsMatcher.expectValue(
-                        SemanticsProperties.StateDescription,
-                        context.getString(R.string.media_viewer_image_scale, 800),
-                    ),
-                )
-            composeRule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG).performTouchInput { doubleClick() }
-            composeRule
-                .onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG)
-                .assert(
-                    SemanticsMatcher.expectValue(
-                        SemanticsProperties.StateDescription,
-                        context.getString(R.string.media_viewer_image_scale, 100),
-                    ),
-                )
-            val fitAction =
-                composeRule
-                    .onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG)
-                    .fetchSemanticsNode()
-                    .config[SemanticsActions.CustomActions]
-                    .first { it.label == fitLabel }
-            composeRule.runOnIdle { check(fitAction.action()) }
+            assertSharedViewportZoomAndFit(zoomLabel, fitLabel)
             if (source == 0) composeRule.runOnIdle { publicImage = true }
         }
         composeRule.onNodeWithContentDescription(context.getString(R.string.close)).performClick()
@@ -436,5 +405,43 @@ class ConversationMediaViewerProductionPathTest {
         val SENDER_ID = "55".repeat(32)
         val DIRECT_MESSAGE_ID = "66".repeat(32)
         val MIXED_MESSAGE_ID = "77".repeat(32)
+    }
+
+    private fun assertSharedViewportZoomAndFit(
+        zoomLabel: String,
+        fitLabel: String,
+    ) {
+        composeRule.waitForIdle()
+        val zoomAction =
+            composeRule
+                .onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG)
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
+                .first { it.label == zoomLabel }
+        repeat(3) { composeRule.runOnIdle { check(zoomAction.action()) } }
+        composeRule
+            .onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG)
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.StateDescription,
+                    context.getString(R.string.media_viewer_image_scale, 800),
+                ),
+            )
+        composeRule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG).performTouchInput { doubleClick() }
+        composeRule
+            .onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG)
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.StateDescription,
+                    context.getString(R.string.media_viewer_image_scale, 100),
+                ),
+            )
+        val fitAction =
+            composeRule
+                .onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG)
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
+                .first { it.label == fitLabel }
+        composeRule.runOnIdle { check(fitAction.action()) }
     }
 }

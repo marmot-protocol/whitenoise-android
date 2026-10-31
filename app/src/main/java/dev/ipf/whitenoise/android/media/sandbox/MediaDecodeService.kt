@@ -130,21 +130,7 @@ class MediaDecodeService : Service() {
             return response
         }
         if (operation == MediaDecodePolicy.INSPECT || operation == MediaDecodePolicy.VIEWER_SVG_INSPECT) {
-            val inspection =
-                if (
-                    operation == MediaDecodePolicy.VIEWER_SVG_INSPECT
-                ) {
-                    ViewerSvgDecoder.inspect(bytes)
-                } else {
-                    PlatformMediaDecoder.inspect(bytes)
-                }
-            inspection?.let { info ->
-                response.putInt("width", info.width)
-                response.putInt("height", info.height)
-                response.putString("mime", info.mime)
-                response.putInt("orientation", info.orientation)
-                response.putBoolean("success", true)
-            }
+            writeInspection(bytes, operation, response)
             return response
         }
         val bitmap =
@@ -177,6 +163,28 @@ class MediaDecodeService : Service() {
             } ?: return response
         bitmap.usePixels(output, data.getInt("edge"), response)
         return response
+    }
+
+    private fun writeInspection(
+        bytes: ByteArray,
+        operation: Int,
+        response: Bundle,
+    ) {
+        val inspection =
+            if (
+                operation == MediaDecodePolicy.VIEWER_SVG_INSPECT
+            ) {
+                ViewerSvgDecoder.inspect(bytes)
+            } else {
+                PlatformMediaDecoder.inspect(bytes)
+            }
+        inspection?.let { info ->
+            response.putInt("width", info.width)
+            response.putInt("height", info.height)
+            response.putString("mime", info.mime)
+            response.putInt("orientation", info.orientation)
+            response.putBoolean("success", true)
+        }
     }
 
     private fun Bitmap.usePixels(

@@ -10,6 +10,9 @@ import kotlin.math.floor
 
 internal const val IMAGE_VIEWER_MAX_SCALE = 1024f
 internal const val VIEWER_DETAIL_EDGE = 2048
+private const val VIEWER_FALLBACK_EDGE = 4096.0
+private const val VIEWER_FALLBACK_PIXELS = 4_194_304.0
+private const val VIEWER_BASE_EDGE = 2560
 
 /**
  * Geometry uses original source dimensions (the chat preview uses raw EXIF coordinates), even while its sampled
@@ -32,6 +35,7 @@ internal data class ViewerViewportGeometry(
             scale in 1f..IMAGE_VIEWER_MAX_SCALE &&
             offset.x.isFinite() &&
             offset.y.isFinite()
+    private val detailEligible get() = valid && scale > 1f
     private val fit get() = viewerFitGeometry(width.toFloat(), height.toFloat(), sourceWidth, sourceHeight)
     val sourcePixelScale: Float get() = if (sourceWidth > 0) fit.baseWidth * scale / sourceWidth else 0f
 
@@ -60,9 +64,8 @@ internal data class ViewerViewportGeometry(
 
     /** SVG coordinates remain fractional even for a24-unit document at1024× zoom. */
     fun vectorDetailRegion(): ViewerSvgRegion? {
-        if (!valid || scale <= 1f) return null
         val step = sourcePixelScale.toDouble()
-        if (!step.isFinite() || step <= 0.0) return null
+        if (!detailEligible || !step.isFinite() || step <= 0.0) return null
         val full = sourceRectOnScreen(MediaImageRegion(0, 0, sourceWidth, sourceHeight))
         val quantum = (maxOf(width, height) / step / 32.0).coerceAtLeast(0.000000001)
 
@@ -85,9 +88,8 @@ internal data class ViewerViewportGeometry(
 
     /** Quantized outward to deduplicate tiny movements, with a modest halo for settling pans. */
     fun detailRegion(): MediaImageRegion? {
-        if (!valid || scale <= 1f) return null
         val step = sourcePixelScale
-        if (!step.isFinite() || step <= 0f) return null
+        if (!detailEligible || !step.isFinite() || step <= 0f) return null
         val full = sourceRectOnScreen(MediaImageRegion(0, 0, sourceWidth, sourceHeight))
         val quantum = maxOf(1, ceil(maxOf(width, height) / step / 16f).toInt())
         val halo = quantum * 2
@@ -120,9 +122,9 @@ internal fun viewerFallbackEdge(
     if (width <= 0 || height <= 0) return null
     val pixels = width.toDouble() * height
     val maximum = maxOf(width, height)
-    val factor = minOf(1.0, 4096.0 / maximum, kotlin.math.sqrt(4_194_304.0 / pixels))
+    val factor = minOf(1.0, VIEWER_FALLBACK_EDGE / maximum, kotlin.math.sqrt(VIEWER_FALLBACK_PIXELS / pixels))
     val edge = floor(maximum * factor).toInt()
-    return edge.takeIf { it > minOf(maximum, 2560) }
+    return edge.takeIf { it > minOf(maximum, VIEWER_BASE_EDGE) }
 }
 
 /** Raster codecs need integer pixels; vector renderers need the actual fractional document viewport. */

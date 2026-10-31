@@ -2,6 +2,10 @@ package dev.ipf.whitenoise.android.media.sandbox
 
 import android.os.Bundle
 
+internal const val VIEWER_SVG_SOURCE_EDGE = 8192
+private const val MIN_VIEWER_SVG_EXTENT = 0.000001
+private const val SVG_BOTTOM_COMPONENT_INDEX = 3
+
 /** Fractional original-document units; raster source-pixel regions remain integers. */
 internal data class ViewerSvgRegion(
     val left: Double,
@@ -25,8 +29,8 @@ internal data class ViewerSvgRegion(
             top >= 0.0 &&
             right <= sourceWidth &&
             bottom <= sourceHeight &&
-            width >= 0.000001 &&
-            height >= 0.000001
+            width >= MIN_VIEWER_SVG_EXTENT &&
+            height >= MIN_VIEWER_SVG_EXTENT
 }
 
 /** Reject omitted or substituted primitive types rather than using Bundle's zero/default conversions. */
@@ -34,5 +38,7 @@ internal data class ViewerSvgRegion(
 internal fun readViewerSvgRegion(data: Bundle): ViewerSvgRegion {
     val names = listOf("svgLeft", "svgTop", "svgRight", "svgBottom")
     val values = names.map { name -> data.get(name).also { require(it is Double) } as Double }
-    return ViewerSvgRegion(values[0], values[1], values[2], values[3]).also { require(it.validFor(8192, 8192)) }
+    return ViewerSvgRegion(values[0], values[1], values[2], values[SVG_BOTTOM_COMPONENT_INDEX]).also {
+        require(it.validFor(VIEWER_SVG_SOURCE_EDGE, VIEWER_SVG_SOURCE_EDGE))
+    }
 }

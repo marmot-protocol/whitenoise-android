@@ -9,6 +9,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.ui.conversation.media.MEDIA_VIEWER_PAGE_GESTURE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.media.MEDIA_VIEWER_TOP_CHROME_TAG
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventImagePane
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -69,6 +70,19 @@ class EventImageViewerScreenshotTest {
             }
         }
         composeRule.onNodeWithTag(MEDIA_VIEWER_TOP_CHROME_TAG).assertExists()
+        // Size callbacks publish the fitted viewport on the next frame; capture after that layer settles.
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.waitForIdle()
+        val viewport = composeRule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG).fetchSemanticsNode().boundsInRoot
+        val chrome = composeRule.onNodeWithTag(MEDIA_VIEWER_TOP_CHROME_TAG).fetchSemanticsNode().boundsInRoot
+        val metrics =
+            android.content.res.Resources
+                .getSystem()
+                .displayMetrics
+        println(
+            "EventImageFixture name=$name viewport=$viewport chrome=$chrome bitmap=180x120 " +
+                "density=${metrics.density} dpi=${metrics.densityDpi} sdk=${android.os.Build.VERSION.SDK_INT}",
+        )
         // Capture the actual fullscreen dialog root, including the shared image viewport and chrome.
         composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/$name.png")
     }

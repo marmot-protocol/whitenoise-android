@@ -25,10 +25,12 @@ internal class ViewerSvgTransformPolicy {
         for (match in TRANSFORM.findAll(value)) {
             require(value.substring(end, match.range.first).all { it.isWhitespace() || it == ',' })
             val numbers = match.groupValues[2].trim().split(Regex("[\\s,]+"))
-            require(numbers.size in 1..6)
+            require(numbers.size in 1..MATRIX_COMPONENT_COUNT)
             val values =
                 numbers.map {
-                    requireNotNull(it.toDoubleOrNull()).also { n -> require(n.isFinite() && abs(n) <= 8192.0) }
+                    requireNotNull(it.toDoubleOrNull()).also { n ->
+                        require(n.isFinite() && abs(n) <= MAX_LOCAL_COMPONENT)
+                    }
                 }
             result = result.then(operation(match.groupValues[1], values))
             end = match.range.last + 1
@@ -43,8 +45,15 @@ internal class ViewerSvgTransformPolicy {
     ): Affine =
         when (name) {
             "matrix" -> {
-                require(values.size == 6)
-                Affine(values[0], values[1], values[2], values[3], values[4], values[5])
+                require(values.size == MATRIX_COMPONENT_COUNT)
+                Affine(
+                    values[0],
+                    values[1],
+                    values[2],
+                    values[MATRIX_D_INDEX],
+                    values[MATRIX_E_INDEX],
+                    values[MATRIX_F_INDEX],
+                )
             }
             "translate" -> {
                 require(values.size in 1..2)
@@ -59,7 +68,7 @@ internal class ViewerSvgTransformPolicy {
         }
 
     private fun rotation(values: List<Double>): Affine {
-        require(values.size == 1 || values.size == 3)
+        require(values.size == 1 || values.size == ROTATION_PIVOT_COMPONENT_COUNT)
         val angle = Math.toRadians(values[0])
         val rotated = Affine(cos(angle), sin(angle), -sin(angle), cos(angle))
         return if (values.size == 1) {
@@ -80,8 +89,8 @@ internal class ViewerSvgTransformPolicy {
         val f: Double = 0.0,
     ) {
         init {
-            require(listOf(a, b, c, d).all { it.isFinite() && abs(it) <= 65536.0 })
-            require(listOf(e, f).all { it.isFinite() && abs(it) <= 1073741824.0 })
+            require(listOf(a, b, c, d).all { it.isFinite() && abs(it) <= MAX_LINEAR_COMPONENT })
+            require(listOf(e, f).all { it.isFinite() && abs(it) <= MAX_TRANSLATION_COMPONENT })
         }
 
         fun then(next: Affine): Affine =
@@ -96,6 +105,14 @@ internal class ViewerSvgTransformPolicy {
     }
 
     private companion object {
+        const val MATRIX_COMPONENT_COUNT = 6
+        const val MATRIX_D_INDEX = 3
+        const val MATRIX_E_INDEX = 4
+        const val MATRIX_F_INDEX = 5
+        const val ROTATION_PIVOT_COMPONENT_COUNT = 3
+        const val MAX_LOCAL_COMPONENT = 8192.0
+        const val MAX_LINEAR_COMPONENT = 65536.0
+        const val MAX_TRANSLATION_COMPONENT = 1073741824.0
         val TRANSFORM = Regex("([A-Za-z]+)\\s*\\(([^()]*)\\)")
     }
 }

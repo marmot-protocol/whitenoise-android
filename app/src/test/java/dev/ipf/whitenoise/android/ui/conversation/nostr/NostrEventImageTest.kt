@@ -105,7 +105,7 @@ class NostrEventImageTest {
             assertEquals(1, calls)
             AvatarImageLoader.clear()
         }
-        pending.complete(ImageBitmap(20, 10))
+        pending.complete(Bitmap.createBitmap(20, 10, Bitmap.Config.ARGB_8888).asImageBitmap())
         composeRule.waitForIdle()
         composeRule.onNodeWithContentDescription(string(R.string.close)).assertDoesNotExist()
         composeRule.runOnIdle { assertEquals(1, calls) }

@@ -300,7 +300,7 @@ internal class IsolatedMediaTransport(
             if (edge !in 1..ViewerSvgDecoder.MAX_VIEWPORT_EDGE) return@serialized null
             if (
                 bytes.size !in 1..dev.ipf.whitenoise.android.media.GroupSvgPolicy.MAX_BYTES ||
-                !region.validFor(8192, 8192)
+                !region.validFor(VIEWER_SVG_SOURCE_EDGE, VIEWER_SVG_SOURCE_EDGE)
             ) {
                 return@serialized null
             }

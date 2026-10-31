@@ -24,7 +24,11 @@ class ChatSvgAttachmentDecodeTest {
     fun positivelyValidatedOriginalSvgRendersWhateverItsAdvertisedMime() =
         runBlocking {
             IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)
-            val source = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect width="24" height="24" fill="red"/></svg>""".toByteArray()
+            val source =
+                (
+                    """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><r""" +
+                        """ect width="24" height="24" fill="red"/></svg>"""
+                ).toByteArray()
             val result = decodeMessageAttachmentImage(source, "image/png", 128)
             assertTrue(result is DecodedAttachmentPresentation.Static)
             val bitmap = (result as DecodedAttachmentPresentation.Static).bitmap
@@ -74,8 +78,10 @@ class ChatSvgAttachmentDecodeTest {
         runBlocking {
             IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)
             val unsafe =
-                """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><image href="https://example.invalid/private"/></svg>"""
-                    .toByteArray()
+                (
+                    """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><i""" +
+                        """mage href="https://example.invalid/private"/></svg>"""
+                ).toByteArray()
             assertNull(decodeMessageAttachmentImage(unsafe, "image/svg+xml", 128))
             assertNull(decodeMessageAttachmentImage("<svg>".toByteArray(), "image/svg+xml", 128))
         }

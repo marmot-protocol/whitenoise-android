@@ -33,6 +33,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.math.roundToInt
 
+private const val VIEWER_DETAIL_SETTLE_MS = 80L
+private const val VIEWER_FALLBACK_BYTES = 16 * 1024 * 1024
+
 /** A transient source owned by the current visible page only; never a protocol or persistent media cache. */
 internal data class ViewerOriginalImage(
     val bytes: ByteArray,
@@ -83,7 +86,8 @@ internal suspend fun inspectViewerSource(
 /** Exact mapping of the latest decoded source rectangle, not a thumbnail stretched over the whole image. */
 @Composable
 @OptIn(FlowPreview::class)
-@Suppress("LongMethod") // The source lifetime owns the collector, fallback child and decoded-pixel disposal together.
+// Compose naming; the source lifetime owns the collector, fallback child and pixel disposal together.
+@Suppress("FunctionNaming", "LongMethod")
 internal fun ViewerImageDetailOverlay(
     source: ViewerOriginalImage?,
     geometry: ViewerViewportGeometry,
@@ -112,7 +116,7 @@ internal fun ViewerImageDetailOverlay(
         var regionSupported = true
         val sourceScope = this
         snapshotFlow { latestGeometry.detailRequest(source.vector) }
-            .debounce(80L)
+            .debounce(VIEWER_DETAIL_SETTLE_MS)
             .distinctUntilChanged()
             .collectLatest { region ->
                 if (region == null) {
@@ -197,12 +201,12 @@ internal suspend fun decodeViewerDetail(
 
 /** A failed region never bypasses animation admission: only the page's static source can reach this path. */
 private suspend fun decodeViewerFallback(source: ViewerOriginalImage): ViewerImageDetail? {
-    if (source.vector) return null
-    val edge = viewerFallbackEdge(source.width, source.height) ?: return null
+    val edge = if (source.vector) null else viewerFallbackEdge(source.width, source.height)
+    if (edge == null) return null
     return decodeOwnedMedia(
         decode = {
             IsolatedMediaDecoder.decode(source.bytes, edge)?.let { bitmap ->
-                if (bitmap.allocationByteCount > 16 * 1024 * 1024) {
+                if (bitmap.allocationByteCount > VIEWER_FALLBACK_BYTES) {
                     bitmap.recycle()
                     null
                 } else {

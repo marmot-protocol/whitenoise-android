@@ -59,6 +59,7 @@ class AnimationFrameProtocolTest {
     fun viewerFramesPermitOnlyAdmittedCanvasDimensions() {
         val frame = AnimationFrameInfo(42, 1, 4096, 1024, true, false, false, -1)
         var received: AnimationFrameInfo? = null
+        var transactions = 0
         val receiver =
             object : Binder() {
                 override fun onTransact(
@@ -67,6 +68,7 @@ class AnimationFrameProtocolTest {
                     reply: Parcel?,
                     flags: Int,
                 ): Boolean {
+                    transactions++
                     received = readAnimationFrame(data)
                     return true
                 }
@@ -77,7 +79,55 @@ class AnimationFrameProtocolTest {
             assertThrows(IllegalArgumentException::class.java) {
                 writeAnimationFrame(receiver, frame.copy(width = width, height = height))
             }
+            assertEquals(1, transactions)
         }
+        for (sequence in listOf(0L, -1L)) {
+            assertThrows(IllegalArgumentException::class.java) {
+                writeAnimationFrame(receiver, frame.copy(sequence = sequence))
+            }
+            assertEquals(1, transactions)
+        }
+    }
+
+    /** Forged worker bytes bypass sender checks and must still fail in the independent host parser. */
+    @Test
+    fun forgedFramesCannotBypassReceiverCanvasOrSequenceValidation() {
+        val valid = AnimationFrameInfo(42, 1, 4096, 1024, true, false, false, -1)
+        val invalid =
+            listOf(
+                valid.copy(width = 4096, height = 4096),
+                valid.copy(width = Int.MAX_VALUE, height = 2),
+                valid.copy(width = 1, height = 4097),
+                valid.copy(width = 0),
+                valid.copy(height = -1),
+                valid.copy(sequence = 0),
+                valid.copy(sequence = -1),
+            )
+        for (frame in invalid) {
+            val parcel = Parcel.obtain()
+            try {
+                writeForgedFramePrimitives(parcel, frame)
+                parcel.setDataPosition(0)
+                assertThrows(IllegalArgumentException::class.java) { readAnimationFrame(parcel) }
+            } finally {
+                parcel.recycle()
+            }
+        }
+    }
+
+    private fun writeForgedFramePrimitives(
+        parcel: Parcel,
+        frame: AnimationFrameInfo,
+    ) {
+        parcel.writeInterfaceToken(AnimationFrameProtocol.DESCRIPTOR)
+        parcel.writeInt(frame.session)
+        parcel.writeLong(frame.sequence)
+        parcel.writeInt(frame.width)
+        parcel.writeInt(frame.height)
+        parcel.writeInt(1)
+        parcel.writeInt(0)
+        parcel.writeInt(0)
+        parcel.writeInt(frame.privateCanaryErrno)
     }
 
     /** A status round-trips as fixed primitives, and unknown codes, flags, missing fields or trailing data fail. */

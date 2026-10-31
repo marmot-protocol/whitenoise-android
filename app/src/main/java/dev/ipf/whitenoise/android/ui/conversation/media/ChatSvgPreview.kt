@@ -17,7 +17,13 @@ internal fun decodeChatAttachmentStill(
     ) {
         return null
     }
-    MediaPipeline.decodeSampledBitmap(bytes, maxEdgePx)?.let { return it }
+    return MediaPipeline.decodeSampledBitmap(bytes, maxEdgePx) ?: decodeValidatedChatSvg(bytes, maxEdgePx)
+}
+
+private fun decodeValidatedChatSvg(
+    bytes: ByteArray,
+    maxEdgePx: Int,
+): Bitmap? {
     // A failed raster is not SVG admission: the permissionless parser must positively validate it.
     val info = IsolatedMediaDecoder.svgInspect(bytes) ?: return null
     return IsolatedMediaDecoder.svgRegion(

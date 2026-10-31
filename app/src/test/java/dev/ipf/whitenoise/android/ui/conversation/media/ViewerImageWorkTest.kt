@@ -27,23 +27,7 @@ class ViewerImageWorkTest {
                     withViewerImageWork {
                         reads.incrementAndGet()
                         inspectViewerSource(byteArrayOf(1)) {
-                            val now = inspecting.incrementAndGet()
-                            peak.updateAndGet { maxOf(it, now) }
-                            entered.countDown()
-                            try {
-                                // Model a codec that does not immediately honor Thread.interrupt.
-                                // Ownership must remain held.
-                                while (release.count > 0) {
-                                    try {
-                                        release.await(20, TimeUnit.MILLISECONDS)
-                                    } catch (_: InterruptedException) {
-                                        // native call still returning
-                                    }
-                                }
-                                ImageInspection(20, 10, "image/png", 1)
-                            } finally {
-                                inspecting.decrementAndGet()
-                            }
+                            blockingInspection(entered, release, inspecting, peak)
                         }
                     }
                 }
@@ -84,4 +68,29 @@ class ViewerImageWorkTest {
             assertEquals(2, reads.get())
             assertEquals(1, peak.get())
         }
+
+    private fun blockingInspection(
+        entered: CountDownLatch,
+        release: CountDownLatch,
+        inspecting: AtomicInteger,
+        peak: AtomicInteger,
+    ): ImageInspection {
+        val now = inspecting.incrementAndGet()
+        peak.updateAndGet { maxOf(it, now) }
+        entered.countDown()
+        try {
+            // Model a codec that does not immediately honor Thread.interrupt.
+            // Ownership must remain held.
+            while (release.count > 0) {
+                try {
+                    release.await(20, TimeUnit.MILLISECONDS)
+                } catch (_: InterruptedException) {
+                    // native call still returning
+                }
+            }
+            return ImageInspection(20, 10, "image/png", 1)
+        } finally {
+            inspecting.decrementAndGet()
+        }
+    }
 }

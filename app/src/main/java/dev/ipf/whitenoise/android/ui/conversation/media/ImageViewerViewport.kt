@@ -40,9 +40,12 @@ import dev.ipf.whitenoise.android.ui.common.viewerOneToOneScale
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 
+private const val VIEWER_PERCENT = 100
+
 /** Shared image presentation; acquisition, decoded resources and transform lifetime stay with the source. */
 @Composable
-@Suppress("LongParameterList", "LongMethod") // One shared image viewport owns the complete transform interaction.
+// Compose naming and one shared viewport keep the complete transform interaction together.
+@Suppress("FunctionNaming", "LongParameterList", "LongMethod")
 internal fun ImageViewerViewport(
     sourceKey: Any,
     imageWidth: Int,
@@ -114,7 +117,11 @@ internal fun ImageViewerViewport(
         latestOnOffsetChange(next.offset)
     }
     LaunchedEffect(viewportSize, imageWidth, imageHeight) { applyZoom(1f) }
-    val zoomState = stringResource(R.string.media_viewer_image_scale, (displayTransform.scale * 100).roundToInt())
+    val zoomState =
+        stringResource(
+            R.string.media_viewer_image_scale,
+            (displayTransform.scale * VIEWER_PERCENT).roundToInt(),
+        )
     val imageModifier =
         Modifier
             .fillMaxSize()
@@ -126,22 +133,23 @@ internal fun ImageViewerViewport(
                         if (pressedCount == 0) break
                         val currentScale = latestScale
                         val currentOffset = latestOffset
-                        if (pressedCount < 2 && currentScale <= 1f) continue
-                        val next =
-                            applyViewerTransformGesture(
-                                current = ViewerTransform(currentScale, currentOffset),
-                                zoomFactor = event.calculateZoom(),
-                                panDelta = event.calculatePan(),
-                                viewportWidth = size.width.toFloat(),
-                                viewportHeight = size.height.toFloat(),
-                                imageWidth = latestWidth,
-                                imageHeight = latestHeight,
-                                maxScale = IMAGE_VIEWER_MAX_SCALE,
-                                centroid = event.calculateCentroid(useCurrent = false),
-                            )
-                        if (next.scale != currentScale) latestOnScaleChange(next.scale)
-                        if (next.offset != currentOffset) latestOnOffsetChange(next.offset)
-                        event.changes.forEach { it.consume() }
+                        if (pressedCount >= 2 || currentScale > 1f) {
+                            val next =
+                                applyViewerTransformGesture(
+                                    current = ViewerTransform(currentScale, currentOffset),
+                                    zoomFactor = event.calculateZoom(),
+                                    panDelta = event.calculatePan(),
+                                    viewportWidth = size.width.toFloat(),
+                                    viewportHeight = size.height.toFloat(),
+                                    imageWidth = latestWidth,
+                                    imageHeight = latestHeight,
+                                    maxScale = IMAGE_VIEWER_MAX_SCALE,
+                                    centroid = event.calculateCentroid(useCurrent = false),
+                                )
+                            if (next.scale != currentScale) latestOnScaleChange(next.scale)
+                            if (next.offset != currentOffset) latestOnOffsetChange(next.offset)
+                            event.changes.forEach { it.consume() }
+                        }
                     } while (true)
                 }
             }.graphicsLayer(

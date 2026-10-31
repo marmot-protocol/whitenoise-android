@@ -8,7 +8,7 @@ import org.junit.Test
 class ViewerAnimationRecoveryBudgetTest {
     @Test
     fun onlySystemConfirmedUnknownWorkerLossCanSpendTheSingleReplacement() {
-        val budget = ViewerAnimationRecoveryBudget()
+        val budget = ViewerAnimationRecovery()
         listOf(
             AnimationTermination.ProtocolRejected,
             AnimationTermination.TransportUnavailable,

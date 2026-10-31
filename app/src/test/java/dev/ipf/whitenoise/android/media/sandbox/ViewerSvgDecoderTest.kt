@@ -13,7 +13,11 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ViewerSvgDecoderTest {
-    private fun svg(content: String): ByteArray = """<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="4096">$content</svg>""".toByteArray()
+    private fun svg(content: String): ByteArray =
+        (
+            """<svg xmlns="http://www.w3.org/2000/svg" width="4096" height="4096""" +
+                """">$content</svg>"""
+        ).toByteArray()
 
     @Test
     fun originalVectorRegionRerendersSubpixelLineAtViewportResolution() {
@@ -32,8 +36,10 @@ class ViewerSvgDecoderTest {
     @Test
     fun tinyDocumentFractionalViewportDoesNotRoundOutToOneVectorUnit() {
         val bytes =
-            """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect x="12" y="12" width="0.001" height="0.02" fill="red"/></svg>"""
-                .toByteArray()
+            (
+                """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><r""" +
+                    """ect x="12" y="12" width="0.001" height="0.02" fill="red"/></svg>"""
+            ).toByteArray()
         val bitmap = requireNotNull(ViewerSvgDecoder.region(bytes, ViewerSvgRegion(12.0, 12.0, 12.023, 12.023), 512))
         try {
             assertEquals(512, bitmap.width)

@@ -68,18 +68,13 @@ internal fun viewerFitGeometry(
     imageWidth: Int,
     imageHeight: Int,
 ): ViewerFitGeometry {
-    if (viewportWidth <= 0f || viewportHeight <= 0f || !viewportWidth.isFinite() || !viewportHeight.isFinite()) {
+    if (!validViewport(viewportWidth, viewportHeight)) {
         return ViewerFitGeometry(0f, 0f)
     }
-    if (imageWidth <= 0 || imageHeight <= 0) {
-        return ViewerFitGeometry(viewportWidth, viewportHeight)
-    }
-    val imageAspect = imageWidth.toDouble() / imageHeight
-    val viewportAspect = viewportWidth.toDouble() / viewportHeight
-    return if (imageAspect > viewportAspect) {
-        ViewerFitGeometry(viewportWidth, (viewportWidth / imageAspect).toFloat())
+    return if (imageWidth <= 0 || imageHeight <= 0) {
+        ViewerFitGeometry(viewportWidth, viewportHeight)
     } else {
-        ViewerFitGeometry((viewportHeight * imageAspect).toFloat(), viewportHeight)
+        fitKnownViewerImage(viewportWidth, viewportHeight, imageWidth, imageHeight)
     }
 }
 
@@ -90,12 +85,7 @@ internal fun viewerPanExtents(
     imageHeight: Int,
     scale: Float,
 ): Pair<Float, Float> {
-    if (
-        !scale.isFinite() ||
-        scale < VIEWER_MIN_SCALE ||
-        !viewportWidth.isFinite() ||
-        !viewportHeight.isFinite()
-    ) {
+    if (!validViewerScale(scale) || !finiteViewport(viewportWidth, viewportHeight)) {
         return 0f to 0f
     }
     val fit = viewerFitGeometry(viewportWidth, viewportHeight, imageWidth, imageHeight)
@@ -120,15 +110,7 @@ internal fun clampViewerPanOffset(
     maxX: Float,
     maxY: Float,
 ): Offset =
-    if (!currentOffset.x.isFinite() ||
-        !currentOffset.y.isFinite() ||
-        !panDelta.x.isFinite() ||
-        !panDelta.y.isFinite() ||
-        !maxX.isFinite() ||
-        !maxY.isFinite() ||
-        maxX < 0f ||
-        maxY < 0f
-    ) {
+    if (!currentOffset.isFiniteOffset() || !panDelta.isFiniteOffset() || !validPanExtents(maxX, maxY)) {
         Offset.Zero
     } else {
         Offset(
@@ -148,34 +130,13 @@ internal fun applyViewerTransformGesture(
     maxScale: Float = VIEWER_MAX_SCALE,
     centroid: Offset? = null,
 ): ViewerTransform {
-    if (!current.scale.isFinite() ||
-        current.scale < VIEWER_MIN_SCALE ||
-        !zoomFactor.isFinite() ||
-        zoomFactor <= 0f ||
-        !current.offset.x.isFinite() ||
-        !current.offset.y.isFinite() ||
-        !panDelta.x.isFinite() ||
-        !panDelta.y.isFinite() ||
-        !viewportWidth.isFinite() ||
-        !viewportHeight.isFinite() ||
-        viewportWidth <= 0f ||
-        viewportHeight <= 0f ||
-        !maxScale.isFinite() ||
-        maxScale < VIEWER_MIN_SCALE ||
-        (centroid != null && (!centroid.x.isFinite() || !centroid.y.isFinite()))
-    ) {
-        return resetViewerTransform()
-    }
+    val validState = validViewerScale(current.scale) && current.offset.isFiniteOffset()
+    val validGesture = positiveFinite(zoomFactor) && panDelta.isFiniteOffset() && validCentroid(centroid)
+    val validBounds = validViewport(viewportWidth, viewportHeight) && validViewerScale(maxScale)
+    if (!validState || !validGesture || !validBounds) return resetViewerTransform()
     val nextScale = applyViewerPinchZoom(current.scale, zoomFactor, maxScale)
     val ratio = nextScale / current.scale.coerceAtLeast(VIEWER_MIN_SCALE)
-    val focal = centroid ?: Offset(viewportWidth / 2f, viewportHeight / 2f)
-    val centered = focal - Offset(viewportWidth / 2f, viewportHeight / 2f)
-    val anchoredOffset =
-        if (centroid == null) {
-            current.offset
-        } else {
-            current.offset + (centered - current.offset) * (1f - ratio)
-        }
+    val anchoredOffset = viewerAnchoredOffset(current.offset, centroid, viewportWidth, viewportHeight, ratio)
     val nextOffset =
         if (nextScale > VIEWER_MIN_SCALE) {
             val (maxX, maxY) =
@@ -227,4 +188,55 @@ internal fun viewerOneToOneScale(
         imageWidth / fit.baseWidth,
         imageHeight / fit.baseHeight,
     ).let { clampViewerScale(it, maxScale) }
+}
+
+private fun positiveFinite(value: Float): Boolean = value.isFinite() && value > 0f
+
+private fun validViewerScale(value: Float): Boolean = value.isFinite() && value >= VIEWER_MIN_SCALE
+
+private fun Offset.isFiniteOffset(): Boolean = x.isFinite() && y.isFinite()
+
+private fun finiteViewport(
+    width: Float,
+    height: Float,
+): Boolean = width.isFinite() && height.isFinite()
+
+private fun validViewport(
+    width: Float,
+    height: Float,
+): Boolean = positiveFinite(width) && positiveFinite(height)
+
+private fun validPanExtents(
+    maxX: Float,
+    maxY: Float,
+): Boolean = finiteViewport(maxX, maxY) && maxX >= 0f && maxY >= 0f
+
+private fun validCentroid(centroid: Offset?): Boolean = centroid == null || centroid.isFiniteOffset()
+
+private fun viewerAnchoredOffset(
+    offset: Offset,
+    centroid: Offset?,
+    viewportWidth: Float,
+    viewportHeight: Float,
+    ratio: Float,
+): Offset {
+    val centered =
+        (centroid ?: Offset(viewportWidth / 2f, viewportHeight / 2f)) -
+            Offset(viewportWidth / 2f, viewportHeight / 2f)
+    return if (centroid == null) offset else offset + (centered - offset) * (1f - ratio)
+}
+
+private fun fitKnownViewerImage(
+    viewportWidth: Float,
+    viewportHeight: Float,
+    imageWidth: Int,
+    imageHeight: Int,
+): ViewerFitGeometry {
+    val imageAspect = imageWidth.toDouble() / imageHeight
+    val viewportAspect = viewportWidth.toDouble() / viewportHeight
+    return if (imageAspect > viewportAspect) {
+        ViewerFitGeometry(viewportWidth, (viewportWidth / imageAspect).toFloat())
+    } else {
+        ViewerFitGeometry((viewportHeight * imageAspect).toFloat(), viewportHeight)
+    }
 }

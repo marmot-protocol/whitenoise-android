@@ -12,7 +12,11 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class ViewerSvgParserConsistencyTest {
-    private fun svg(body: String): String = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">$body</svg>"""
+    private fun svg(body: String): String =
+        (
+            """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">""" +
+                """$body</svg>"""
+        )
 
     @Test
     fun everyAncestorRejectsUnhandledInheritedFontAttributes() {
@@ -41,7 +45,10 @@ class ViewerSvgParserConsistencyTest {
     @Test
     fun nonUtf8DeclarationsCannotChangeCharactersBetweenParsers() {
         for (encoding in listOf("UTF-7", "UTF-16", "IMAP-mailbox-name", "SCSU", "BOCU-1")) {
-            val source = """<?xml version="1.0" encoding="$encoding"?>""" + svg("<g>+ADw-use href=+ACI-#a+ACI-/+AD4-</g>")
+            val source =
+                (
+                    """<?xml version="1.0" encoding="$encoding"?>"""
+                ) + svg("<g>+ADw-use href=+ACI-#a+ACI-/+AD4-</g>")
             assertThrows(IllegalArgumentException::class.java) { GroupSvgPolicy.validate(source.toByteArray()) }
             assertNull(ViewerSvgDecoder.inspect(source.toByteArray()))
         }
@@ -77,8 +84,19 @@ class ViewerSvgParserConsistencyTest {
 
     @Test
     fun utf8DeclarationAndNonAsciiTextRemainValid() {
-        val source = """<?xml version="1.0" encoding="UTF-8"?>""" + svg("<text x=\"1\" y=\"12\" font-size=\"8\">Åä é 水</text>")
+        val source =
+            (
+                """<?xml version="1.0" encoding="UTF-8"?>"""
+            ) + svg("<text x=\"1\" y=\"12\" font-size=\"8\">Åä é 水</text>")
         assertNotNull(ViewerSvgDecoder.inspect(source.toByteArray(Charsets.UTF_8)))
-        assertNotNull(GroupSvgPolicy.validate(("""<?xml version="1.0" encoding="UTF-8"?>""" + svg("<title>Åä é 水</title>")).toByteArray()))
+        assertNotNull(
+            GroupSvgPolicy.validate(
+                (
+                    (
+                        """<?xml version="1.0" encoding="UTF-8"?>"""
+                    ) + svg("<title>Åä é 水</title>")
+                ).toByteArray(),
+            ),
+        )
     }
 }
