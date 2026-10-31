@@ -14,6 +14,7 @@ import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -128,7 +129,7 @@ class GroupStateMemberRefreshGateTest {
                     initialGroup = group(),
                     groupRosterReader = { _, _ ->
                         if (failRead) error("roster unavailable")
-                        roster(member("alice", isAdmin = true, isSelf = true, local = true), memberCount = 2u)
+                        roster(member("alice", isAdmin = true, isSelf = true, local = true), memberCount = 0u)
                     },
                 )
             assertFalse(controller.hasKnownTranscriptPresentation)
@@ -219,7 +220,7 @@ class GroupStateMemberRefreshGateTest {
                                     member("alice", isAdmin = true, isSelf = true, local = true),
                                     member("ALICE", isAdmin = true, isSelf = true, local = true),
                                     member("bob", isAdmin = false),
-                                    memberCount = 2u,
+                                    memberCount = 3u,
                                 )
                             else -> error("refresh failed")
                         }
@@ -297,13 +298,15 @@ class GroupStateMemberRefreshGateTest {
     }
 
     @Test
-    fun lightweightRosterRejectsMemberCountMismatch() {
+    fun lightweightRosterRejectsPeopleExceedingLeafCount() {
         val resolution =
             resolveAuthoritativeGroupRoster(
                 currentGroup = group(),
                 roster =
                     roster(
                         member("alice", isAdmin = true, isSelf = true, local = true),
+                        member("bob", isAdmin = false),
+                        member("carol", isAdmin = false),
                         memberCount = 2u,
                     ),
                 activeAccountIdHex = "alice",
@@ -313,7 +316,28 @@ class GroupStateMemberRefreshGateTest {
     }
 
     @Test
-    fun lightweightRosterComparesAuthoritativeCountAfterIdentityDeduplication() {
+    fun lightweightPerLeafRowsAreValidWhenMemberCountCountsPeople() {
+        val resolution =
+            resolveAuthoritativeGroupRoster(
+                currentGroup = group(),
+                roster =
+                    roster(
+                        member("alice", isAdmin = true, isSelf = true, local = true),
+                        member("alice", isAdmin = true, isSelf = true),
+                        member("alice", isAdmin = true, isSelf = true),
+                        member("alice", isAdmin = true, isSelf = true),
+                        member("bob", isAdmin = false),
+                        memberCount = 2u,
+                    ),
+                activeAccountIdHex = "alice",
+            )
+
+        assertNull(resolution.invariant)
+        assertEquals(2, resolution.uniqueMemberCount)
+    }
+
+    @Test
+    fun lightweightMultiDeviceRosterMatchesLeafCountAndPresentsTwoPeople() {
         val resolution =
             resolveAuthoritativeGroupRoster(
                 currentGroup = group(),
@@ -321,14 +345,18 @@ class GroupStateMemberRefreshGateTest {
                     roster(
                         member("alice", isAdmin = true, isSelf = true, local = true),
                         member("ALICE", isAdmin = true, isSelf = true, local = true),
+                        member("alice", isAdmin = true, isSelf = true),
+                        member("alice", isAdmin = true, isSelf = true),
                         member("bob", isAdmin = false),
-                        memberCount = 2u,
+                        memberCount = 5u,
                     ),
                 activeAccountIdHex = "alice",
             )
 
         assertEquals(null, resolution.invariant)
         assertEquals(2, resolution.uniqueMemberCount)
+        assertEquals(5u, resolution.mlsMemberCount)
+        assertEquals(2, resolution.applied.members.size)
         assertEquals(listOf("alice", "bob"), resolution.applied.members.map { it.memberIdHex.lowercase() })
     }
 
