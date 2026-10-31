@@ -19,6 +19,10 @@ class NotificationIdentityImageCoverageTest {
     fun richCardsShareOneIdentitySnapshotAndRedactedCardsGetNone() {
         val presenter = source("LocalNotificationPresenter.kt")
         assertFalse("identity pictures go through setConversationIdentityImage", ".setLargeIcon(" in presenter)
+        assertFalse(
+            "content rewrites use the same identity snapshot",
+            ".setLargeIcon(" in source("NotificationCardContent.kt"),
+        )
         val firstPost =
             presenter
                 .substringAfter("NotificationStyleChoice.Messaging -> {")
@@ -65,17 +69,21 @@ class NotificationIdentityImageCoverageTest {
         assertFalse("never a second card write", "postNotificationSafely" in before || "notificationPoster" in before)
         assertFalse("no network wait on the posting path", "avatarBitmapResolver" in before)
         val payload = presenter.functionBody("previewPayload")
-        assertTrue("a hidden card makes the next rich post publish again", "::forgetShortcutSnapshot" in payload)
+        assertTrue(
+            "a hidden card makes the next rich post publish again",
+            "conversationShortcuts::forgetShortcutSnapshot" in payload,
+        )
         assertTrue("the shortcut is held for the coming write", "holdForPost = true" in before)
         assertTrue("and released once that write ends", "InFlightConversationShortcuts::release" in show)
         val release = show.indexOf("InFlightConversationShortcuts::release")
         assertTrue("even when it is cancelled or fails", show.lastIndexOf("} finally {", release) > publish)
-        val prune = presenter.functionBody("pruneConversationShortcutsBeforePublish")
+        val shortcuts = source("NotificationConversationShortcuts.kt")
+        val prune = shortcuts.functionBody("pruneConversationShortcutsBeforePublish")
         assertTrue(
             "pruning spares live and held shortcuts",
             "liveCardShortcutIds() + InFlightConversationShortcuts.ids()" in prune,
         )
-        val reuse = presenter.functionBody("reuseCachedShortcut")
+        val reuse = shortcuts.functionBody("reuseCachedShortcut")
         assertTrue("a cached snapshot needs the live shortcut", "shortcutId in dynamicShortcutIds()" in reuse)
         val share = File(notificationsRoot().parentFile, "share/ShareShortcutPublisher.kt").readText()
         assertTrue(
@@ -87,7 +95,7 @@ class NotificationIdentityImageCoverageTest {
     /** Late pictures also support a pre-upgrade text card until its next message replaces the old template. */
     @Test
     fun enrichmentRetainsCompatibilityWithPreUpgradeTextCards() {
-        val body = source("LocalNotificationPresenter.kt").functionBody("enrichedIdentityNotification")
+        val body = source("NotificationCardContent.kt").functionBody("enrichedIdentityNotification")
         assertTrue("conversation template", "enrichedMessagingStyle(active, sender)" in body)
         assertTrue("pre-upgrade long-message text block", "EXTRA_EXPANDED_SINGLE_MESSAGE_SENDER" in body)
         assertTrue("the same snapshot", "setConversationIdentityImage(identity)" in body)
@@ -100,7 +108,7 @@ class NotificationIdentityImageCoverageTest {
         val presenter = source("LocalNotificationPresenter.kt")
         val post = presenter.functionBody("postNotificationSafely")
         assertTrue("the final write uses the combined refresh", "withCurrentContactPictures(notification)" in post)
-        val refresh = presenter.functionBody("withCurrentContactPictures")
+        val refresh = source("NotificationCardContent.kt").functionBody("withCurrentContactPictures")
         assertTrue("the identity picture follows the contact choice", "withCurrentIdentityContact(" in refresh)
         assertTrue("redacted cards are never refreshed", "EXTRA_CONTENT_REDACTED" in refresh)
     }
@@ -110,6 +118,10 @@ class NotificationIdentityImageCoverageTest {
     fun liveCardRewritesNeverDropTheIdentityPicture() {
         val presenter = source("LocalNotificationPresenter.kt")
         assertFalse("no path clears the picture", "setLargeIcon(null" in presenter)
+        assertFalse(
+            "no content rewrite clears the picture",
+            "setLargeIcon(null" in source("NotificationCardContent.kt"),
+        )
         val refresh = source("NotificationIdentityImage.kt").functionBody("withCurrentIdentityContact")
         assertTrue("only a direct chat's own contact changes its picture", "IDENTITY_CONTACT" in refresh)
         assertTrue("a cleared choice falls back to the monogram", "notificationMonogramBitmap(title, seed)" in refresh)
@@ -148,7 +160,12 @@ class NotificationIdentityImageCoverageTest {
             val forget = section.indexOf("forgetNotificationConversationShortcut(")
             assertTrue("$name forgets inside the removal's lock", section.indexOf(removal) in 0 until forget)
         }
-        val forget = source("LocalNotificationPresenter.kt").functionBody("forgetConversationShortcut")
+        val presenter = source("LocalNotificationPresenter.kt")
+        assertTrue(
+            "local removal reaches the shortcut owner",
+            "conversationShortcuts.forgetConversationShortcut(" in presenter,
+        )
+        val forget = source("NotificationConversationShortcuts.kt").functionBody("forgetConversationShortcut")
         assertTrue("the snapshot goes", "forgetShortcutSnapshot(" in forget)
         assertTrue("and so does its recency", "shortcutLastUsed.remove(" in forget)
     }
@@ -178,13 +195,13 @@ class NotificationIdentityImageCoverageTest {
     /** An unchanged snapshot is re-read under the publication lock before only reporting use of the shortcut. */
     @Test
     fun unchangedSnapshotIsReReadUnderTheLockBeforeOnlyReportingUse() {
-        val presenter = source("LocalNotificationPresenter.kt")
-        val publish = presenter.functionBody("publishConversationShortcut")
+        val shortcuts = source("NotificationConversationShortcuts.kt")
+        val publish = shortcuts.functionBody("publishConversationShortcut")
         assertTrue("an unchanged snapshot goes through the locked reuse", "reuseCachedShortcut(" in publish)
         // The helper is expression-bodied, so read its whole declaration, lock call included.
-        val start = presenter.indexOf("private fun reuseCachedShortcut(")
-        val body = presenter.functionBody("reuseCachedShortcut")
-        val reuse = presenter.substring(start, presenter.indexOf(body, start) + body.length)
+        val start = shortcuts.indexOf("private fun reuseCachedShortcut(")
+        val body = shortcuts.functionBody("reuseCachedShortcut")
+        val reuse = shortcuts.substring(start, shortcuts.indexOf(body, start) + body.length)
         val report = reuse.indexOf("reportShortcutUsed(")
         val lock = reuse.lastIndexOf("synchronized(UserEventNotificationGroup.mutationLock)", report)
         val reRead = reuse.lastIndexOf("shortcutSnapshots[shortcutId] == snapshot", report)

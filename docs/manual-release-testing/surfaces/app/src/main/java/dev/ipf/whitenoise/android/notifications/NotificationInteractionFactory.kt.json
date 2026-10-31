@@ -1,0 +1,49 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationInteractionFactory.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "notification_content_contracts": [
+      {
+        "surface": "notification tap and draft handoff retain their exact target",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationInteractionFactory.kt",
+        "anchor": "fun conversationPendingIntent(",
+        "test_ids": [
+          "NTF-011",
+          "NTF-042"
+        ]
+      },
+      {
+        "surface": "Reply choices and Mark as read retain exact targets",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationInteractionFactory.kt",
+        "anchor": "fun replyNotificationAction(",
+        "test_ids": [
+          "NTF-042"
+        ]
+      },
+      {
+        "surface": "localized inline reply input label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationInteractionFactory.kt",
+        "anchor": "R.string.message",
+        "test_ids": [
+          "NTF-042"
+        ]
+      },
+      {
+        "surface": "localized Reply notification action label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationInteractionFactory.kt",
+        "anchor": "R.string.reply",
+        "test_ids": [
+          "NTF-042"
+        ]
+      },
+      {
+        "surface": "localized Mark as read notification action label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationInteractionFactory.kt",
+        "anchor": "R.string.chat_row_action_mark_read",
+        "test_ids": [
+          "NTF-042"
+        ]
+      }
+    ]
+  }
+}
