@@ -58,13 +58,13 @@ internal object MediaWorkerThroughput {
             }
         }
 
-    /** Runs every scenario for each variant in the given order (repeat names for ABBA ordering). */
-    fun run(variants: List<String>) {
+    /** Runs every scenario for each variant in the given order (repeat variants for ABBA ordering). */
+    fun run(variants: List<ThroughputVariant>) {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val prepared = SystemClock.elapsedRealtimeNanos()
         val corpus = ThroughputCorpus.create()
         MediaWorkerThroughputReport().use { report ->
-            report.emit(header(corpus, variants, SystemClock.elapsedRealtimeNanos() - prepared))
+            report.emit(header(corpus, variants.map { it.key }, SystemClock.elapsedRealtimeNanos() - prepared))
             variants.forEachIndexed { pass, variant ->
                 coldFirst(report, context, corpus, pass, variant, coldLaunch = true)
                 coldFirst(report, context, corpus, pass, variant, coldLaunch = false)
@@ -154,7 +154,7 @@ internal object MediaWorkerThroughput {
         context: Context,
         corpus: ThroughputCorpus,
         pass: Int,
-        variant: String,
+        variant: ThroughputVariant,
         coldLaunch: Boolean,
     ) {
         val scenario = if (coldLaunch) "cold_launch" else "cold_first"
@@ -173,7 +173,7 @@ internal object MediaWorkerThroughput {
             sampler.close()
         }
         rows.forEach { report.emit(it.put("pass", pass).put("scenario", scenario)) }
-        report.emit(summary(variant, pass, scenario, rows, 0L, starts, JSONArray(), sampler.snapshot()))
+        report.emit(summary(variant.key, pass, scenario, rows, 0L, starts, JSONArray(), sampler.snapshot()))
     }
 
     /** Waits until `ps` lists no image worker and no application zygote of this app; fails after a bound. */
@@ -197,7 +197,7 @@ internal object MediaWorkerThroughput {
         context: Context,
         corpus: ThroughputCorpus,
         pass: Int,
-        variant: String,
+        variant: ThroughputVariant,
         scenario: ThroughputScenario,
     ) {
         val rows = mutableListOf<JSONObject>()
@@ -229,7 +229,7 @@ internal object MediaWorkerThroughput {
         val starts = binding.getInt("binding_attempts") - startsBefore
         rows.forEach { report.emit(it.put("pass", pass).put("scenario", scenario.name)) }
         val endpoints = binding.getJSONArray("endpoints")
-        report.emit(summary(variant, pass, scenario.name, rows, elapsed, starts, endpoints, sampler.snapshot()))
+        report.emit(summary(variant.key, pass, scenario.name, rows, elapsed, starts, endpoints, sampler.snapshot()))
     }
 
     /**

@@ -126,7 +126,8 @@ synthetic corpus on one APK and device: `reuse` (the pre-#3373 reusable worker),
 `single_use` (the per-input lane: every request single-use, two clean spares)
 and `domain` (domain-bound generations as production configures them, one
 spare within three live generations). Only the `domain` lane receives each
-request's domain. Repeat names for ABBA ordering:
+request's domain. Repeat names for ABBA ordering. Without the argument it runs
+`reuse,domain,domain,reuse`, and an unknown name fails before any pass:
 
 ```sh
 adb -s <your-emulator> shell am instrument -w -r \

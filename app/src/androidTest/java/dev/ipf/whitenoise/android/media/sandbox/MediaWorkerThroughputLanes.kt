@@ -47,27 +47,25 @@ internal class ThroughputLane(
     }
 }
 
-/** Transport variants compared on one APK and device, names are stable report keys. */
+/** Transport variants compared on one APK and device, created from [ThroughputVariant]'s one list of names. */
 internal object ThroughputVariants {
-    /** Creates the named lane with a fresh read-only Binder witness and the shared admission observer. */
+    /** Creates [variant]'s lane with a fresh read-only Binder witness and the shared admission observer. */
     fun create(
-        variant: String,
+        variant: ThroughputVariant,
         context: Context,
         observer: MediaAdmissionObserver,
     ): ThroughputLane {
         val binding = MediaWorkerBaselineBinding(context)
         return when (variant) {
-            // The pre-#3373 lane: one reusable worker across inputs, whatever their domain.
-            "reuse" ->
-                ReusableMediaTransport(binding, "tp_reuse").let {
+            ThroughputVariant.REUSE ->
+                ReusableMediaTransport(binding, "tp_${variant.key}").let {
                     it.admissionObserver = observer
-                    ThroughputLane(variant, binding, it, it)
+                    ThroughputLane(variant.key, binding, it, it)
                 }
-            // The per-input lane with two spares: every request single-use, as before domains.
-            "single_use" -> fresh(variant, binding, observer, MediaWorkerPool.DEFAULT_SPARES, domains = false)
-            // Domain-bound generations with the production spare depth and live limit.
-            "domain" -> fresh(variant, binding, observer, MediaWorkerPool.DOMAIN_SPARES, domains = true)
-            else -> error("Unknown throughput variant $variant")
+            ThroughputVariant.SINGLE_USE ->
+                fresh(variant.key, binding, observer, MediaWorkerPool.DEFAULT_SPARES, domains = false)
+            ThroughputVariant.DOMAIN ->
+                fresh(variant.key, binding, observer, MediaWorkerPool.DOMAIN_SPARES, domains = true)
         }
     }
 }
