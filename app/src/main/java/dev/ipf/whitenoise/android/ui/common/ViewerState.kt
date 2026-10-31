@@ -35,12 +35,23 @@ internal fun clampViewerPageIndex(
     return requestedIndex.coerceIn(0, pageCount - 1)
 }
 
-internal fun clampViewerScale(scale: Float): Float = scale.coerceIn(VIEWER_MIN_SCALE, VIEWER_MAX_SCALE)
+internal fun clampViewerScale(
+    scale: Float,
+    maxScale: Float = VIEWER_MAX_SCALE,
+): Float {
+    val ceiling = maxScale.takeIf { it.isFinite() && it >= VIEWER_MIN_SCALE } ?: VIEWER_MAX_SCALE
+    return if (scale.isFinite()) scale.coerceIn(VIEWER_MIN_SCALE, ceiling) else VIEWER_MIN_SCALE
+}
 
 internal fun applyViewerPinchZoom(
     currentScale: Float,
     zoomFactor: Float,
-): Float = clampViewerScale(currentScale * zoomFactor)
+    maxScale: Float = VIEWER_MAX_SCALE,
+): Float {
+    if (!currentScale.isFinite() || !zoomFactor.isFinite() || zoomFactor <= 0f) return VIEWER_MIN_SCALE
+    val ceiling = maxScale.takeIf { it.isFinite() && it >= VIEWER_MIN_SCALE } ?: VIEWER_MAX_SCALE
+    return (currentScale.toDouble() * zoomFactor).coerceIn(VIEWER_MIN_SCALE.toDouble(), ceiling.toDouble()).toFloat()
+}
 
 internal fun viewerPagerScrollEnabled(scale: Float): Boolean = scale <= VIEWER_MIN_SCALE
 
@@ -57,15 +68,13 @@ internal fun viewerFitGeometry(
     imageWidth: Int,
     imageHeight: Int,
 ): ViewerFitGeometry {
-    if (imageWidth <= 0 || imageHeight <= 0) {
-        return ViewerFitGeometry(viewportWidth, viewportHeight)
+    if (!validViewport(viewportWidth, viewportHeight)) {
+        return ViewerFitGeometry(0f, 0f)
     }
-    val imageAspect = imageWidth.toFloat() / imageHeight.toFloat()
-    val viewportAspect = viewportWidth / viewportHeight
-    return if (imageAspect > viewportAspect) {
-        ViewerFitGeometry(viewportWidth, viewportWidth / imageAspect)
+    return if (imageWidth <= 0 || imageHeight <= 0) {
+        ViewerFitGeometry(viewportWidth, viewportHeight)
     } else {
-        ViewerFitGeometry(viewportHeight * imageAspect, viewportHeight)
+        fitKnownViewerImage(viewportWidth, viewportHeight, imageWidth, imageHeight)
     }
 }
 
@@ -76,9 +85,22 @@ internal fun viewerPanExtents(
     imageHeight: Int,
     scale: Float,
 ): Pair<Float, Float> {
+    if (!validViewerScale(scale) || !finiteViewport(viewportWidth, viewportHeight)) {
+        return 0f to 0f
+    }
     val fit = viewerFitGeometry(viewportWidth, viewportHeight, imageWidth, imageHeight)
-    val maxX = ((fit.baseWidth * scale) - viewportWidth).coerceAtLeast(0f) / 2f
-    val maxY = ((fit.baseHeight * scale) - viewportHeight).coerceAtLeast(0f) / 2f
+    val maxX =
+        (((fit.baseWidth.toDouble() * scale) - viewportWidth) / 2)
+            .coerceIn(
+                0.0,
+                Float.MAX_VALUE.toDouble(),
+            ).toFloat()
+    val maxY =
+        (((fit.baseHeight.toDouble() * scale) - viewportHeight) / 2)
+            .coerceIn(
+                0.0,
+                Float.MAX_VALUE.toDouble(),
+            ).toFloat()
     return maxX to maxY
 }
 
@@ -88,10 +110,14 @@ internal fun clampViewerPanOffset(
     maxX: Float,
     maxY: Float,
 ): Offset =
-    Offset(
-        (currentOffset.x + panDelta.x).coerceIn(-maxX, maxX),
-        (currentOffset.y + panDelta.y).coerceIn(-maxY, maxY),
-    )
+    if (!currentOffset.isFiniteOffset() || !panDelta.isFiniteOffset() || !validPanExtents(maxX, maxY)) {
+        Offset.Zero
+    } else {
+        Offset(
+            (currentOffset.x.toDouble() + panDelta.x).coerceIn(-maxX.toDouble(), maxX.toDouble()).toFloat(),
+            (currentOffset.y.toDouble() + panDelta.y).coerceIn(-maxY.toDouble(), maxY.toDouble()).toFloat(),
+        )
+    }
 
 internal fun applyViewerTransformGesture(
     current: ViewerTransform,
@@ -101,8 +127,16 @@ internal fun applyViewerTransformGesture(
     viewportHeight: Float,
     imageWidth: Int,
     imageHeight: Int,
+    maxScale: Float = VIEWER_MAX_SCALE,
+    centroid: Offset? = null,
 ): ViewerTransform {
-    val nextScale = applyViewerPinchZoom(current.scale, zoomFactor)
+    val validState = validViewerScale(current.scale) && current.offset.isFiniteOffset()
+    val validGesture = positiveFinite(zoomFactor) && panDelta.isFiniteOffset() && validCentroid(centroid)
+    val validBounds = validViewport(viewportWidth, viewportHeight) && validViewerScale(maxScale)
+    if (!validState || !validGesture || !validBounds) return resetViewerTransform()
+    val nextScale = applyViewerPinchZoom(current.scale, zoomFactor, maxScale)
+    val ratio = nextScale / current.scale.coerceAtLeast(VIEWER_MIN_SCALE)
+    val anchoredOffset = viewerAnchoredOffset(current.offset, centroid, viewportWidth, viewportHeight, ratio)
     val nextOffset =
         if (nextScale > VIEWER_MIN_SCALE) {
             val (maxX, maxY) =
@@ -113,7 +147,7 @@ internal fun applyViewerTransformGesture(
                     imageHeight = imageHeight,
                     scale = nextScale,
                 )
-            clampViewerPanOffset(current.offset, panDelta, maxX, maxY)
+            clampViewerPanOffset(anchoredOffset, panDelta, maxX, maxY)
         } else if (current.offset != Offset.Zero) {
             Offset.Zero
         } else {
@@ -146,10 +180,12 @@ internal fun viewerOneToOneScale(
     viewportHeight: Float,
     imageWidth: Int,
     imageHeight: Int,
+    maxScale: Float = VIEWER_MAX_SCALE,
 ): Float {
     val fit = viewerFitGeometry(viewportWidth, viewportHeight, imageWidth, imageHeight)
+    if (fit.baseWidth <= 0f || fit.baseHeight <= 0f) return VIEWER_MIN_SCALE
     return maxOf(
         imageWidth / fit.baseWidth,
         imageHeight / fit.baseHeight,
-    ).let(::clampViewerScale)
+    ).let { clampViewerScale(it, maxScale) }
 }

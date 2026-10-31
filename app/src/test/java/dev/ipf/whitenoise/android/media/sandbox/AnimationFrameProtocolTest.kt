@@ -38,7 +38,7 @@ class AnimationFrameProtocolTest {
                 parcel.writeInterfaceToken(AnimationFrameProtocol.DESCRIPTOR)
                 parcel.writeInt(42)
                 parcel.writeLong(if (variant == 1) 0 else 1)
-                parcel.writeInt(if (variant == 2) 4096 else 2)
+                parcel.writeInt(if (variant == 2) 4097 else 2)
                 parcel.writeInt(3)
                 parcel.writeInt(if (variant == 3) 7 else 1)
                 parcel.writeInt(0)
@@ -52,6 +52,106 @@ class AnimationFrameProtocolTest {
                 parcel.recycle()
             }
         }
+    }
+
+    /** A source-sized rectangular frame is bounded by pixels, not a square maximum-edge allocation. */
+    @Test
+    fun viewerFramesPermitOnlyAdmittedCanvasDimensions() {
+        val frame = AnimationFrameInfo(42, 1, 4096, 1024, true, false, false, -1)
+        var received: AnimationFrameInfo? = null
+        var transactions = 0
+        val receiver =
+            object : Binder() {
+                override fun onTransact(
+                    code: Int,
+                    data: Parcel,
+                    reply: Parcel?,
+                    flags: Int,
+                ): Boolean {
+                    transactions++
+                    received = readAnimationFrame(data)
+                    return true
+                }
+            }
+        writeAnimationFrame(receiver, frame)
+        assertEquals(frame, received)
+        for ((width, height) in listOf(4096 to 4096, Int.MAX_VALUE to 2, 1 to 4097)) {
+            assertThrows(IllegalArgumentException::class.java) {
+                writeAnimationFrame(receiver, frame.copy(width = width, height = height))
+            }
+            assertEquals(1, transactions)
+        }
+        for (sequence in listOf(0L, -1L)) {
+            assertThrows(IllegalArgumentException::class.java) {
+                writeAnimationFrame(receiver, frame.copy(sequence = sequence))
+            }
+            assertEquals(1, transactions)
+        }
+    }
+
+    /** Forged worker bytes bypass sender checks and must still fail in the independent host parser. */
+    @Test
+    fun forgedFramesCannotBypassReceiverCanvasOrSequenceValidation() {
+        val valid = AnimationFrameInfo(42, 1, 4096, 1024, true, false, false, -1)
+        val invalid =
+            listOf(
+                valid.copy(width = 4096, height = 4096),
+                valid.copy(width = Int.MAX_VALUE, height = 2),
+                valid.copy(width = 1, height = 4097),
+                valid.copy(width = 0),
+                valid.copy(height = -1),
+                valid.copy(sequence = 0),
+                valid.copy(sequence = -1),
+            )
+        for (frame in invalid) {
+            val parcel = Parcel.obtain()
+            try {
+                writeForgedFramePrimitives(parcel, frame)
+                parcel.setDataPosition(0)
+                assertThrows(IllegalArgumentException::class.java) { readAnimationFrame(parcel) }
+            } finally {
+                parcel.recycle()
+            }
+        }
+    }
+
+    private fun writeForgedFramePrimitives(
+        parcel: Parcel,
+        frame: AnimationFrameInfo,
+    ) {
+        parcel.writeInterfaceToken(AnimationFrameProtocol.DESCRIPTOR)
+        parcel.writeInt(frame.session)
+        parcel.writeLong(frame.sequence)
+        parcel.writeInt(frame.width)
+        parcel.writeInt(frame.height)
+        parcel.writeInt(1)
+        parcel.writeInt(0)
+        parcel.writeInt(0)
+        parcel.writeInt(frame.privateCanaryErrno)
+    }
+
+    @Test
+    fun unknownStatusReasonsAreRejectedBeforeTheOneWayTransaction() {
+        var transactions = 0
+        val receiver =
+            object : Binder() {
+                override fun onTransact(
+                    code: Int,
+                    data: Parcel,
+                    reply: Parcel?,
+                    flags: Int,
+                ): Boolean {
+                    transactions++
+                    return true
+                }
+            }
+        val status = AnimationStatusInfo(42, AnimationFrameProtocol.CODEC_REJECTED, true, false, false)
+        for (reason in listOf(Int.MIN_VALUE, -1, 0, 2, Int.MAX_VALUE)) {
+            assertThrows(IllegalArgumentException::class.java) {
+                writeAnimationStatus(receiver, status.copy(reason = reason))
+            }
+        }
+        assertEquals(0, transactions)
     }
 
     /** A status round-trips as fixed primitives, and unknown codes, flags, missing fields or trailing data fail. */

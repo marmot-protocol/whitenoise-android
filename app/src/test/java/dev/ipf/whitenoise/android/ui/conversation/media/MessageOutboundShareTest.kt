@@ -22,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -481,6 +482,33 @@ class MessageOutboundShareTest {
                 }.exceptionOrNull()
 
             assertTrue("$failure", failure is CancellationException)
+            assertNull(shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity)
+            assertTrue(sharedFiles().isEmpty())
+        }
+
+    /** Owner invalidation alone revokes an export even before viewer dismissal cancels its coroutine. */
+    @Test
+    fun ownerChangedDuringStagingRevokesShareInAnActiveCoroutine() =
+        runTest {
+            clearSharedFiles()
+            registerShareTarget(MARKDOWN)
+            var ownerCurrent = true
+            val source =
+                object : AttachmentPlaintext {
+                    override val size = 6L
+
+                    override fun copyTo(output: OutputStream) {
+                        output.write("secret".encodeToByteArray())
+                        ownerCurrent = false
+                    }
+
+                    override fun close() = Unit
+                }
+
+            val failure = runCatching { shareNotes(isCurrent = { ownerCurrent }) { source } }.exceptionOrNull()
+
+            currentCoroutineContext().ensureActive()
+            assertTrue(failure is CancellationException)
             assertNull(shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity)
             assertTrue(sharedFiles().isEmpty())
         }

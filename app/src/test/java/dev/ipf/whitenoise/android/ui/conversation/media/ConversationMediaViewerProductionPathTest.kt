@@ -1,11 +1,21 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
@@ -16,12 +26,22 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.twoFrameGif
+import dev.ipf.whitenoise.android.media.AnimationTermination
+import dev.ipf.whitenoise.android.media.PreemptibleAnimation
+import dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+import dev.ipf.whitenoise.android.media.sandbox.MediaDecodeTransport
+import dev.ipf.whitenoise.android.media.sandbox.TestMediaDecodeTransport
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled
+import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventImagePane
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -50,6 +70,7 @@ class ConversationMediaViewerProductionPathTest {
     fun releaseControllers() {
         fixtures.forEach { it.controller.onCleared() }
         fixtures.clear()
+        IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)
     }
 
     /** A pending or failed image page can always receive the tap that restores hidden chrome. */
@@ -78,6 +99,183 @@ class ConversationMediaViewerProductionPathTest {
         composeRule.waitForIdle()
 
         composeRule.runOnIdle { assertEquals(1, chromeToggleCount) }
+    }
+
+    /** Both real source entry points expose the same zoom/reset viewport, without constructing a fake attachment. */
+    @Test
+    fun attachmentAndPublicImageUseTheSameAccessibleViewport() {
+        val fixture = fixture(DIRECT_MESSAGE_ID)
+        var publicImage by mutableStateOf(false)
+        var dismissed = 0
+        val bitmap = android.graphics.Bitmap.createBitmap(20, 10, android.graphics.Bitmap.Config.ARGB_8888)
+        val bytes =
+            java.io.ByteArrayOutputStream().also {
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+            }
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                if (publicImage) {
+                    NostrEventImagePane(
+                        url = "https://images.example/shared-viewer",
+                        initiallyRequested = true,
+                        onFullscreenDismiss = { dismissed++ },
+                        loadImage = { _, _ -> bitmap.asImageBitmap() },
+                    )
+                } else {
+                    FullScreenMediaViewer(
+                        controller = fixture.controller,
+                        appState = fixture.appState,
+                        pages =
+                            listOf(
+                                MediaViewerPage(
+                                    DIRECT_MESSAGE_ID,
+                                    0,
+                                    reference(0, "image/png"),
+                                    false,
+                                    "Alex",
+                                    1uL,
+                                ),
+                            ),
+                        startIndex = 0,
+                        onDismiss = { dismissed++ },
+                        imageBytes = { bytes.toByteArray() },
+                    )
+                }
+            }
+        }
+        val zoomLabel = context.getString(R.string.media_viewer_zoom_image)
+        val fitLabel = context.getString(R.string.media_viewer_fit_image)
+        repeat(2) { source ->
+            assertSharedViewportZoomAndFit(zoomLabel, fitLabel)
+            if (source == 0) composeRule.runOnIdle { publicImage = true }
+        }
+        composeRule.onNodeWithContentDescription(context.getString(R.string.close)).performClick()
+        composeRule.runOnIdle { assertEquals(1, dismissed) }
+    }
+
+    @Test
+    fun aHealthyAnimationKeepsItsClockAndOnlyOneConfirmedDeathAutomaticallyReplacesIt() {
+        val drawables = java.util.concurrent.CopyOnWriteArrayList<ViewerTestAnimation>()
+        val calls =
+            java.util.concurrent.atomic
+                .AtomicInteger()
+        var visible by mutableStateOf(true)
+        renderAnimationFixture(drawables, calls) { visible }
+        composeRule.waitUntil(10_000) { calls.get() == 1 }
+        val first = drawables[0]
+        composeRule.runOnIdle { visible = false }
+        composeRule.runOnIdle { visible = true }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            assertEquals(1, calls.get())
+            first.terminal.complete(AnimationTermination.WorkerLostUnknown)
+        }
+        composeRule.waitUntil(10_000) { calls.get() == 2 }
+        composeRule.runOnIdle { drawables[1].terminal.complete(AnimationTermination.WorkerLostUnknown) }
+        composeRule.onNodeWithTag("media.viewer.retry").assertExists()
+        composeRule.runOnIdle { assertEquals(2, calls.get()) }
+        composeRule.onNodeWithTag("media.viewer.retry").performClick()
+        composeRule.waitUntil(10_000) { calls.get() == 3 }
+    }
+
+    @Test
+    fun protocolLossNeedsAnExplicitRetryAndDoesNotInventADeathProof() {
+        val drawables = java.util.concurrent.CopyOnWriteArrayList<ViewerTestAnimation>()
+        val calls =
+            java.util.concurrent.atomic
+                .AtomicInteger()
+        renderAnimationFixture(drawables, calls) { true }
+        composeRule.waitUntil(10_000) { calls.get() == 1 }
+        composeRule.runOnIdle { drawables[0].terminal.complete(AnimationTermination.ProtocolRejected) }
+        composeRule.onNodeWithTag("media.viewer.retry").assertExists()
+        composeRule.runOnIdle { assertEquals(1, calls.get()) }
+        composeRule.onNodeWithTag("media.viewer.retry").performClick()
+        composeRule.waitUntil(10_000) { calls.get() == 2 }
+    }
+
+    private fun renderAnimationFixture(
+        drawables: java.util.concurrent.CopyOnWriteArrayList<ViewerTestAnimation>,
+        calls: java.util.concurrent.atomic.AtomicInteger,
+        visible: () -> Boolean,
+    ) {
+        val fixture = fixture(DIRECT_MESSAGE_ID)
+        IsolatedMediaDecoder.installTestTransport(
+            object : MediaDecodeTransport by TestMediaDecodeTransport {
+                override fun animation(
+                    bytes: ByteArray,
+                    edge: Int,
+                ): android.graphics.drawable.Drawable =
+                    ViewerTestAnimation().also {
+                        drawables.add(it)
+                        calls.incrementAndGet()
+                    }
+            },
+        )
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                CompositionLocalProvider(LocalSystemAnimationsEnabled provides true) {
+                    ViewerPage(
+                        controller = fixture.controller,
+                        messageIdHex = DIRECT_MESSAGE_ID,
+                        attachmentIndex = 0,
+                        reference = reference(0, "image/gif"),
+                        scale = 1f,
+                        offset = Offset.Zero,
+                        onScaleChange = {},
+                        onOffsetChange = {},
+                        mine = false,
+                        isCurrent = visible(),
+                        onChromeToggle = {},
+                        imageBytes = { twoFrameGif() },
+                    )
+                }
+            }
+        }
+    }
+
+    private class ViewerTestAnimation :
+        android.graphics.drawable.Drawable(),
+        android.graphics.drawable.Animatable,
+        PreemptibleAnimation,
+        java.io.Closeable {
+        val terminal = kotlinx.coroutines.CompletableDeferred<AnimationTermination>()
+        private var running = false
+
+        override fun getIntrinsicWidth() = 2
+
+        override fun getIntrinsicHeight() = 2
+
+        override fun draw(canvas: android.graphics.Canvas) {
+            canvas.drawColor(android.graphics.Color.YELLOW)
+        }
+
+        override fun setAlpha(alpha: Int) = Unit
+
+        override fun setColorFilter(colorFilter: android.graphics.ColorFilter?) = Unit
+
+        @Suppress("DEPRECATION")
+        override fun getOpacity() = android.graphics.PixelFormat.TRANSLUCENT
+
+        override fun start() {
+            running = true
+        }
+
+        override fun stop() {
+            running = false
+        }
+
+        override fun isRunning() = running
+
+        override suspend fun awaitPreemption() {
+            kotlinx.coroutines.awaitCancellation()
+        }
+
+        override suspend fun awaitTermination() = terminal.await()
+
+        override fun close() {
+            running = false
+            terminal.complete(AnimationTermination.OwnerClosed)
+        }
     }
 
     /** Builds the minimal production controller and timeline item for one visual bubble. */
@@ -207,5 +405,43 @@ class ConversationMediaViewerProductionPathTest {
         val SENDER_ID = "55".repeat(32)
         val DIRECT_MESSAGE_ID = "66".repeat(32)
         val MIXED_MESSAGE_ID = "77".repeat(32)
+    }
+
+    private fun assertSharedViewportZoomAndFit(
+        zoomLabel: String,
+        fitLabel: String,
+    ) {
+        composeRule.waitForIdle()
+        val zoomAction =
+            composeRule
+                .onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG)
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
+                .first { it.label == zoomLabel }
+        repeat(3) { composeRule.runOnIdle { check(zoomAction.action()) } }
+        composeRule
+            .onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG)
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.StateDescription,
+                    context.getString(R.string.media_viewer_image_scale, 800),
+                ),
+            )
+        composeRule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG).performTouchInput { doubleClick() }
+        composeRule
+            .onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG)
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.StateDescription,
+                    context.getString(R.string.media_viewer_image_scale, 100),
+                ),
+            )
+        val fitAction =
+            composeRule
+                .onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG)
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
+                .first { it.label == fitLabel }
+        composeRule.runOnIdle { check(fitAction.action()) }
     }
 }

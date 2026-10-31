@@ -35,7 +35,7 @@ import java.io.File
 
 /**
  * Invariant gate: the full-screen viewer fits whole unzoomed media and never lays opaque chrome over it. Every
- * viewer image and the video surface use fit scaling, the frame gives its body only the rectangle its chrome and
+ * image uses its original-source fit rectangle and videos use fit scaling. The frame gives its body the area chrome and
  * the safe area leave free, and a video page reveals and hides the chrome with its native controller.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -49,7 +49,26 @@ class MediaViewerContentBoundsCoverageTest {
     fun everyViewerSurfaceFitsTheWholeFrame() {
         val viewer = source("MediaViewer.kt")
         val pageScales = scales(viewer.functionBody("ViewerPage"))
-        assertEquals("decoded still and animated images must both fit", listOf("Fit", "Fit"), pageScales)
+        assertEquals(
+            "decoded still and animated images fill only their authoritative fitted source rectangle",
+            listOf("FillBounds", "FillBounds"),
+            pageScales,
+        )
+        val viewport = source("ImageViewerViewport.kt").functionBody("ImageViewerViewport")
+        assertTrue("original dimensions must determine fit", "viewerFitGeometry(" in viewport)
+        assertTrue("both source axes must define fit", "imageWidth," in viewport && "imageHeight," in viewport)
+        assertTrue(
+            "the fitted rectangle must measure the base",
+            "Constraints.fixed(measuredWidth, measuredHeight)" in viewport,
+        )
+        assertTrue(
+            "fractional source width must survive measurement",
+            "scaleX = fit.baseWidth / measuredWidth" in viewport,
+        )
+        assertTrue(
+            "fractional source height must survive measurement",
+            "scaleY = fit.baseHeight / measuredHeight" in viewport,
+        )
         val pendingScales = scales(source("MediaViewerPendingFrame.kt"))
         assertTrue("pending frames must draw", pendingScales.isNotEmpty())
         assertEquals("pending thumbnails must fit", setOf("Fit"), pendingScales.toSet())

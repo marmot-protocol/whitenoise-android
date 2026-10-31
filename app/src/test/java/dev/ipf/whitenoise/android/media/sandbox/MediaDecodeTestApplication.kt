@@ -9,6 +9,7 @@ import java.io.File
 class MediaDecodeTestApplication : WhiteNoiseApplication() {
     override fun onCreate() {
         super.onCreate()
+        ViewerSvgDecoder.allowInProcessDecodingForTests()
         IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)
     }
 }
@@ -27,6 +28,14 @@ internal object TestMediaDecodeTransport : MediaDecodeTransport {
         } else {
             PlatformMediaDecoder.decode(bytes, edge, oriented)
         }
+
+    override fun svgInspect(bytes: ByteArray): ImageInspection? = ViewerSvgDecoder.inspect(bytes)
+
+    override fun svgRegion(
+        bytes: ByteArray,
+        region: ViewerSvgRegion,
+        edge: Int,
+    ): Bitmap? = ViewerSvgDecoder.region(bytes, region, edge)
 
     override fun exif(bytes: ByteArray): Int? =
         dev.ipf.whitenoise.android.media.MediaPipeline

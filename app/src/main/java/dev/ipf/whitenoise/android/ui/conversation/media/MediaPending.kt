@@ -48,8 +48,6 @@ import dev.ipf.whitenoise.android.ui.icons.filled.BrokenImage
 import dev.ipf.whitenoise.android.ui.icons.filled.Image
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 /** The optimistic tile dims exactly as far as the confirmed album overflow tile does. */
 private const val PENDING_OVERFLOW_SCRIM_ALPHA = 0.58f
@@ -360,18 +358,21 @@ private fun PendingGridTile(
 private fun rememberPendingVisualPreview(attachment: PendingAttachment?): ImageBitmap? {
     val bytes = attachment?.inMemoryBytes
     val isVideo = attachment != null && attachment.isPendingVideo
-    var bitmap by remember(bytes, isVideo) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    val bitmapState = remember(bytes, isVideo) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var bitmap by bitmapState
+    DisposableEffect(bitmapState) { onDispose { bitmapState.value?.recycle() } }
     LaunchedEffect(bytes, isVideo) {
         bitmap =
             if (bytes == null) {
                 null
             } else {
-                withContext(Dispatchers.Default) {
-                    if (isVideo) {
-                        pendingVideoPosterFrame(bytes, extractPoster = true).bitmap
-                    } else {
-                        MediaPipeline.decodeSampledBitmap(bytes, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
-                    }
+                if (isVideo) {
+                    decodePendingVideoPosterBitmap(bytes)
+                } else {
+                    dev.ipf.whitenoise.android.media.decodeOwnedMedia(
+                        decode = { decodeChatAttachmentStill(bytes, MediaPipeline.THUMBNAIL_MAX_EDGE_PX) },
+                        discard = { it.recycle() },
+                    )
                 }
             }
     }
@@ -434,15 +435,18 @@ private fun PendingVideoFallback(
  *  decoding or when [bytes] is null/undecodable. */
 @Composable
 private fun rememberSampledBitmap(bytes: ByteArray?): ImageBitmap? {
-    var bitmap by remember(bytes) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    val bitmapState = remember(bytes) { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var bitmap by bitmapState
+    DisposableEffect(bitmapState) { onDispose { bitmapState.value?.recycle() } }
     LaunchedEffect(bytes) {
         bitmap =
             if (bytes == null) {
                 null
             } else {
-                withContext(Dispatchers.Default) {
-                    MediaPipeline.decodeSampledBitmap(bytes, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
-                }
+                dev.ipf.whitenoise.android.media.decodeOwnedMedia(
+                    decode = { decodeChatAttachmentStill(bytes, MediaPipeline.THUMBNAIL_MAX_EDGE_PX) },
+                    discard = { it.recycle() },
+                )
             }
     }
     // Recycle the multi-MB ARGB buffer on key change and dispose instead of

@@ -15,6 +15,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -93,6 +94,42 @@ func (relay *offlineSignerRelay) diagnostics() string {
 // publishFailure preserves the command error and exposes only bounded diagnostic state.
 func (relay *offlineSignerRelay) publishFailure(ctx context.Context, err error, started, publishStarted time.Time, stderr string) error {
 	return fmt.Errorf("loopback ZSP failed: %w; phase=publish elapsed=%s total_elapsed=%s context=%v %s\n%s", err, time.Since(publishStarted), time.Since(started), ctx.Err(), relay.diagnostics(), stderr)
+}
+
+// preflightErrorCode never returns remote free text or fixture identities.
+func preflightErrorCode(err error) string {
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) {
+		return "unavailable_no_exit_document"
+	}
+	if len(exit.Stderr) > 4096 {
+		return "unavailable_oversize"
+	}
+	var document struct {
+		OK    *bool `json:"ok"`
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if json.Unmarshal(exit.Stderr, &document) != nil || document.OK == nil || *document.OK {
+		return "unavailable_malformed"
+	}
+	// Match the production publisher's explicit safe code vocabulary; never log unknown values.
+	switch document.Error.Code {
+	case "proof_required", "proof_unauthorized", "signer_unavailable", "release_already_published",
+		"release_downgrade", "no_new_apk", "publish_rejected", "upload_rejected",
+		"rate_limited", "temporary_failure", "cancelled", "invalid_apk", "invalid_arguments",
+		"apk_not_checked", "apk_selection_required", "source_failed", "no_apk",
+		"too_many_candidates", "publish_failed":
+		return document.Error.Code
+	default:
+		return "unavailable_unsupported"
+	}
+}
+
+func (relay *offlineSignerRelay) preflightFailure(ctx context.Context, err error, started time.Time) error {
+	return fmt.Errorf("real v2 read-only preflight failed: %w; phase=check elapsed=%s context=%v %s error_code=%s",
+		err, time.Since(started), ctx.Err(), relay.diagnostics(), preflightErrorCode(err))
 }
 
 // ServeHTTP serializes request handling and reply replay across connection orderings.
@@ -270,9 +307,10 @@ func rehearse() error {
 	// NIP-46 client, proof and catalog, before invoking the publication flags.
 	check := exec.CommandContext(ctx, binary, "--json", "check", "--channel", "main", "zapstore.yaml")
 	check.Dir, check.Env = cmd.Dir, cmd.Env
+	checkStarted := time.Now()
 	checked, err := check.Output()
 	if err != nil {
-		return fmt.Errorf("real v2 read-only preflight failed: %w", err)
+		return relay.preflightFailure(ctx, err, checkStarted)
 	}
 	var preflight struct {
 		OK         bool   `json:"ok"`

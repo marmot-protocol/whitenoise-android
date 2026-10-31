@@ -1,0 +1,74 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ImageViewerViewport.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ImageViewerViewport",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ImageViewerViewport.kt",
+        "anchor": "fun ImageViewerViewport(",
+        "test_ids": [
+          "MED-015",
+          "RDR-004"
+        ]
+      }
+    ],
+    "string_resources": [
+      {
+        "surface": "media_viewer_fit_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ImageViewerViewport.kt",
+        "anchor": "R.string.media_viewer_fit_image",
+        "test_ids": [
+          "RDR-004",
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "media_viewer_zoom_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ImageViewerViewport.kt",
+        "anchor": "R.string.media_viewer_zoom_image",
+        "test_ids": [
+          "RDR-004",
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "media_viewer_image_scale",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ImageViewerViewport.kt",
+        "anchor": "R.string.media_viewer_image_scale",
+        "test_ids": [
+          "RDR-004",
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "media_viewer_actual_size",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ImageViewerViewport.kt",
+        "anchor": "R.string.media_viewer_actual_size",
+        "test_ids": [
+          "MED-015",
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "media_viewer_zoom_out",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ImageViewerViewport.kt",
+        "anchor": "R.string.media_viewer_zoom_out",
+        "test_ids": [
+          "MED-015",
+          "RDR-004"
+        ]
+      },
+      {
+        "surface": "media_viewer_toggle_controls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ImageViewerViewport.kt",
+        "anchor": "R.string.media_viewer_toggle_controls",
+        "test_ids": [
+          "MED-015",
+          "RDR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -29,11 +29,18 @@ internal class MediaViewerActionGate(
     private val owner: ConversationMediaViewerOwner,
 ) {
     var currentPage: MediaViewerPage? = null
-    private var attached = true
+
+    @Volatile private var attached = true
 
     /** Detaches the actions from the viewer. */
     fun close() {
         attached = false
+    }
+
+    /** Owner lifetime remains independent of page changes during an explicit export. */
+    fun ownerIsCurrent(currentOwner: ConversationMediaViewerOwner): Boolean {
+        val account = owner.accountRef
+        return attached && account != null && currentOwner == owner
     }
 
     /** Runs [action] for the page when the owner is still current. */
@@ -42,7 +49,7 @@ internal class MediaViewerActionGate(
         currentOwner: ConversationMediaViewerOwner,
         action: (MediaViewerPage) -> Unit,
     ) {
-        val ownerMatches = attached && owner.accountRef != null && currentOwner == owner
+        val ownerMatches = ownerIsCurrent(currentOwner)
         if (ownerMatches && currentPage == page) action(page)
     }
 }
