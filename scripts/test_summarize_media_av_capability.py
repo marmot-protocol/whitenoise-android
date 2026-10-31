@@ -8,8 +8,10 @@ import sys
 import tempfile
 import unittest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import summarize_media_av_capability as report
+if __package__:
+    from . import summarize_media_av_capability as report
+else:
+    import summarize_media_av_capability as report
 
 
 def capture():
@@ -106,6 +108,24 @@ class CapabilitySummaryTests(unittest.TestCase):
         self.assertFalse(result["characterization_complete"])
         self.assertFalse(result["all_parsers_supported"])
         row["observation"]["output_read"] = True
+        self.reject(rows)
+
+    def test_terminal_only_deadline_matches_the_instrumented_producer(self):
+        """A pre-parser reply exception remains a captured unqualified deadline."""
+        rows = capture()
+        row = rows[1]
+        row['outcome'] = 'reply_deadline_unqualified'
+        row['observation'].update(timely_terminal_reply=False, terminal_reply_seen=False)
+        for name in ('isolated', 'internet_granted', 'runtime_initialized', 'private_canary_denied',
+                     'private_canary_errno', 'kernel_reply_uid'):
+            del row['observation'][name]
+        row['worker_diagnostics'] = [dict(row['worker_diagnostics'][-1], phase='reply')]
+        result = report.summarize(encode(rows))
+        self.assertTrue(result['capture_complete'])
+        self.assertFalse(result['characterization_complete'])
+        self.assertFalse(result['all_parsers_supported'])
+        self.assertEqual('unqualified_timeout', result['matrix'][0]['status'])
+        row['worker_diagnostics'] *= 2
         self.reject(rows)
 
     def test_healthy_operation_success_is_separate_from_production_qualification(self):

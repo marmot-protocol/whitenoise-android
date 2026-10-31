@@ -1,0 +1,9 @@
+{
+  global:
+    Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeOpen;
+    Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeClose;
+    Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeInfo;
+    Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeRead;
+    Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeSeek;
+  local: *;
+};

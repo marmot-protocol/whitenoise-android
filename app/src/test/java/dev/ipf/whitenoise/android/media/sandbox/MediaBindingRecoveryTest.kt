@@ -127,7 +127,7 @@ class MediaBindingRecoveryTest {
     fun defaultFacadeReusesItsWorkerAndAccountResetKeepsTheDefault() {
         val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = true)
         val fields =
-            listOf("transport", "mediaTransport", "installedContext", "imageOwner", "lastIsolation")
+            listOf("transport", "mediaTransport", "installedContext", "imageOwner", "mediaOwner", "lastIsolation")
                 .associateWith { name ->
                     IsolatedMediaDecoder::class.java.getDeclaredField(name).apply { isAccessible = true }
                 }
@@ -181,7 +181,7 @@ class MediaBindingRecoveryTest {
     fun facadeClearInstallAndAccountResetKeepTheSameDeathWitness() {
         val context = BindingFixture(ApplicationProvider.getApplicationContext())
         val fields =
-            listOf("transport", "mediaTransport", "installedContext", "imageOwner", "lastIsolation")
+            listOf("transport", "mediaTransport", "installedContext", "imageOwner", "mediaOwner", "lastIsolation")
                 .associateWith { name ->
                     IsolatedMediaDecoder::class.java.getDeclaredField(name).apply { isAccessible = true }
                 }
@@ -638,6 +638,240 @@ class MediaBindingRecoveryTest {
         }
     }
 
+    @Test
+    fun automaticMediaOwnerSurvivesResetUntilItsExactWorkerDies() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext())
+        val fields =
+            listOf("transport", "mediaTransport", "installedContext", "imageOwner", "mediaOwner", "lastIsolation")
+                .associateWith { IsolatedMediaDecoder::class.java.getDeclaredField(it).apply { isAccessible = true } }
+        val previous = fields.mapValues { (_, field) -> field.get(IsolatedMediaDecoder) }
+        val file = java.io.File.createTempFile("av-binding-", ".bin")
+        var owner: IsolatedMediaTransport? = null
+        var caller: Thread? = null
+        try {
+            file.writeBytes(byteArrayOf(1))
+            fields.filterKeys { it != "lastIsolation" }.values.forEach { it.set(IsolatedMediaDecoder, null) }
+            IsolatedMediaDecoder.install(context)
+            val lane = fields.getValue("mediaOwner").get(IsolatedMediaDecoder) as IsolatedMediaTransport
+            owner = lane
+            caller =
+                Thread {
+                    try {
+                        lane.probe(file, 1, false)
+                    } catch (_: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                    }
+                }.apply { start() }
+            val first = context.next()
+            assertEquals(MediaAvDecodeService::class.java.name, context.serviceClasses.single())
+            assertTrue(first.remote.retired.await(2, TimeUnit.SECONDS))
+            IsolatedMediaDecoder.clear()
+            IsolatedMediaDecoder.install(context)
+            IsolatedMediaDecoder.resetForAccount()
+            assertTrue(lane === fields.getValue("mediaOwner").get(IsolatedMediaDecoder))
+            caller.interrupt()
+            caller.join(2000)
+            assertFalse(caller.isAlive)
+            assertNull(lane.probe(file, 1, false))
+            assertEquals(1, context.bindings.size)
+            first.remote.die()
+            val next =
+                Thread {
+                    try {
+                        lane.probe(file, 1, false)
+                    } catch (_: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                    }
+                }.apply { start() }
+            caller = next
+            val second = context.next()
+            assertTrue(second.remote.retired.await(2, TimeUnit.SECONDS))
+            second.remote.die()
+            next.join(2000)
+            assertFalse(next.isAlive)
+        } finally {
+            caller?.interrupt()
+            caller?.join(2000)
+            context.dieAll()
+            IsolatedMediaDecoder.clear()
+            owner?.close()
+            fields.forEach { (name, field) -> field.set(IsolatedMediaDecoder, previous[name]) }
+            file.delete()
+        }
+    }
+
+    @Test
+    fun automaticSourceRefusalsAreBoundedByRevisionAndExpiryAndHealthySourceRecovers() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
+        var clock = 1L
+        val transport = IsolatedMediaTransport(context, "automatic_av", MediaAvDecodeService::class.java) { clock }
+        val file = java.io.File.createTempFile("av-refusal-", ".bin")
+        val calls = mutableListOf<AutomaticCall>()
+
+        fun request() = startAutomatic { transport.probe(file, 1, false) }.also { calls += it }
+        try {
+            file.writeBytes(byteArrayOf(1))
+            val first = request()
+            val firstWorker = context.next()
+            deliverAutomaticReply(firstWorker, success = false)
+            first.join()
+            assertNull(first.result.get())
+            assertNull(transport.probe(file, 1, false))
+            assertEquals(1, context.bindings.size)
+            file.writeBytes(byteArrayOf(1, 2))
+            val revised = request()
+            deliverAutomaticReply(context.next(), success = false)
+            revised.join()
+            assertNull(transport.probe(file, 1, false))
+            assertEquals(2, context.bindings.size)
+            clock += MediaDecodePolicy.REFUSAL_TTL_MS
+            val recovered = request()
+            deliverAutomaticReply(context.next(), success = true)
+            recovered.join()
+            assertTrue(recovered.result.get() is MediaProbe)
+            assertEquals(3, context.bindings.size)
+        } finally {
+            calls.forEach { it.interruptAndJoin() }
+            context.dieAll()
+            transport.close()
+            file.delete()
+        }
+    }
+
+    @Test
+    fun automaticByteAndWaveformRefusalsDoNotCreateASecondWorkerForTheSameRevision() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
+        val transport = IsolatedMediaTransport(context, "automatic_av", MediaAvDecodeService::class.java)
+        val file = java.io.File.createTempFile("waveform-refusal-", ".bin")
+        val calls = mutableListOf<AutomaticCall>()
+        try {
+            file.writeBytes(byteArrayOf(1))
+            val bytes = byteArrayOf(7, 8)
+            val probe = startAutomatic { transport.probeBytes(bytes, 1, false) }.also { calls += it }
+            deliverAutomaticReply(context.next(), success = false)
+            probe.join()
+            assertNull(transport.probeBytes(bytes, 1, false))
+            assertEquals(1, context.bindings.size)
+            val waveform = startAutomatic { transport.waveform(file) }.also { calls += it }
+            deliverAutomaticReply(context.next(), success = false)
+            waveform.join()
+            assertNull(transport.waveform(file))
+            assertEquals(2, context.bindings.size)
+        } finally {
+            calls.forEach { it.interruptAndJoin() }
+            context.dieAll()
+            transport.close()
+            file.delete()
+        }
+    }
+
+    @Test
+    fun missingAttestationAndContentionDoNotQuarantineAndAccountResetClearsConfirmedRefusal() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
+        val transport = IsolatedMediaTransport(context, "automatic_av", MediaAvDecodeService::class.java)
+        val file = java.io.File.createTempFile("av-reset-refusal-", ".bin")
+        val calls = mutableListOf<AutomaticCall>()
+
+        fun request() = startAutomatic { transport.probe(file, 1, false) }.also { calls += it }
+        try {
+            file.writeBytes(byteArrayOf(1))
+            val unknown = request()
+            val first = context.next()
+            assertTrue(first.remote.decoded.await(2, TimeUnit.SECONDS))
+            // Same-UID fake reply is deliberately untrusted; no source failure is established.
+            first.remote.deliverHeldReply(Bundle())
+            assertTrue(first.remote.retired.await(2, TimeUnit.SECONDS))
+            unknown.interruptAndJoin()
+            assertNull(transport.probe(file, 1, false)) // Held worker admission, never a source refusal.
+            assertEquals(1, context.bindings.size)
+            first.remote.die()
+            val confirmed = request()
+            deliverAutomaticReply(context.next(), success = false)
+            confirmed.join()
+            assertNull(transport.probe(file, 1, false))
+            assertEquals(2, context.bindings.size)
+            transport.invalidateSession()
+            transport.activateSession()
+            val reset = request()
+            deliverAutomaticReply(context.next(), success = true)
+            reset.join()
+            assertTrue(reset.result.get() is MediaProbe)
+            assertEquals(3, context.bindings.size)
+        } finally {
+            calls.forEach { it.interruptAndJoin() }
+            context.dieAll()
+            transport.close()
+            file.delete()
+        }
+    }
+
+    /** Simulated kernel identity only; real process/death qualification remains an instrumentation gate. */
+    private fun deliverAutomaticReply(
+        worker: Bound,
+        success: Boolean,
+    ) {
+        assertTrue(worker.remote.decoded.await(2, TimeUnit.SECONDS))
+        val identity =
+            org.robolectric.shadows.ShadowBinder.CallingIdentity
+                .newBuilder()
+                .setUid(android.os.Process.myUid() + 1)
+                .setPid(android.os.Process.myPid() + 1)
+                .setUserHandle(android.os.Process.myUserHandle())
+                .build()
+        val previous =
+            org.robolectric.shadows.ShadowBinder
+                .setCallingIdentityForCurrentThread(identity)
+        try {
+            assertTrue(
+                worker.remote.deliverHeldReply(
+                    Bundle().apply {
+                        putBoolean("isolated", true)
+                        putBoolean("success", success)
+                        putLong("duration", if (success) 1000L else 0L)
+                    },
+                ),
+            )
+        } finally {
+            org.robolectric.shadows.ShadowBinder
+                .setCallingIdentityForCurrentThread(previous)
+        }
+        assertTrue(worker.remote.retired.await(2, TimeUnit.SECONDS))
+        worker.remote.die()
+    }
+
+    private fun startAutomatic(block: () -> Any?): AutomaticCall {
+        val result = AtomicReference<Any?>()
+        val failed = AtomicReference<Throwable?>()
+        val thread =
+            Thread {
+                try {
+                    result.set(block())
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                } catch (failure: Throwable) {
+                    failed.set(failure)
+                }
+            }
+        return AutomaticCall(thread, result, failed).also { thread.start() }
+    }
+
+    private class AutomaticCall(
+        val thread: Thread,
+        val result: AtomicReference<Any?>,
+        private val failed: AtomicReference<Throwable?>,
+    ) {
+        fun join() {
+            thread.join(2000)
+            assertFalse("Automatic media caller must finish", thread.isAlive)
+            failed.get()?.let { throw AssertionError("Automatic media fixture failed", it) }
+        }
+
+        fun interruptAndJoin() {
+            thread.interrupt()
+            join()
+        }
+    }
+
     private fun start(
         transport: MediaDecodeTransport,
         value: Int,
@@ -733,6 +967,7 @@ class MediaBindingRecoveryTest {
         var acceptBind = true
         val bindings = mutableListOf<Bound>()
         val instanceNames = mutableListOf<String>()
+        val serviceClasses = mutableListOf<String?>()
         val unbound = mutableListOf<ServiceConnection>()
         val component = ComponentName(base, MediaDecodeService::class.java)
         private val arrivals = LinkedBlockingQueue<Bound>()
@@ -753,6 +988,7 @@ class MediaBindingRecoveryTest {
             synchronized(bindings) {
                 bindings += bound
                 instanceNames += instanceName
+                serviceClasses += service.component?.className
             }
             if (acceptBind && connect) conn.onServiceConnected(component, bound.remote)
             arrivals.put(bound)

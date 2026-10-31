@@ -89,7 +89,7 @@ def diagnostics(row, observation, deadline):
             terminals.append(log)
     require(len(terminals) <= 1 if deadline else len(terminals) == 1,
             "ambiguous terminal diagnostics")
-    require(any(log["outcome"] == "begin" for log in logs), "missing operation begin")
+    require(deadline or any(log["outcome"] == "begin" for log in logs), "missing operation begin")
     return terminals[0] if terminals else None
 
 

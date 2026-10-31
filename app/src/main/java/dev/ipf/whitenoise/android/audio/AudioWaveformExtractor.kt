@@ -14,7 +14,6 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
-import kotlin.math.ceil
 
 /**
  * Decodes a small voice clip to PCM and produces a 64-bar normalized
@@ -27,7 +26,6 @@ object AudioWaveformExtractor {
     const val BARS = 64
     private const val TAG = "WaveformExtractor"
     private const val TIMEOUT_US = 10_000L
-    private const val FLOOR = 0.05f
 
     // Decode work runs on Dispatchers.IO but still holds a scarce MediaCodec.
     // The elapsed cap is the primary runaway guard; the iteration ceiling is a
@@ -137,11 +135,7 @@ object AudioWaveformExtractor {
             // the final bar in that case. The total frame count is only known once
             // decoding finishes, so bucketing is deferred to the end. Chunk count
             // is bounded by the codec loop guard. See #277.
-            val chunkFrameStarts = ArrayList<Long>()
-            val chunkFrameCounts = ArrayList<Int>()
-            val chunkSums = ArrayList<Double>()
-            val chunkPeaks = ArrayList<Float>()
-            var totalFrames = 0L
+            val summary = WaveformAccumulator()
 
             // Output PCM layout, resolved once the codec reports its output
             // format. A decoder may emit float or 8-bit PCM and may be
@@ -209,11 +203,7 @@ object AudioWaveformExtractor {
                             frames++
                         }
                         if (frames > 0) {
-                            chunkFrameStarts.add(totalFrames)
-                            chunkFrameCounts.add(frames)
-                            chunkSums.add(sum)
-                            chunkPeaks.add(peak)
-                            totalFrames += frames
+                            summary.addChunk(sum, peak, frames)
                         }
                     }
                     activeCodec.releaseOutputBuffer(outIdx, false)
@@ -221,53 +211,7 @@ object AudioWaveformExtractor {
                 }
             }
 
-            if (totalFrames <= 0L) return null
-
-            // Track BOTH the peak per bucket and the running sum. Peak amplitude
-            // produces visually punchier bars than mean-abs (real speech has
-            // many quiet samples between syllables; mean averages them down).
-            // Each chunk spans a frame range; credit every bar bucket that range
-            // overlaps so short clips (fewer chunks than BARS) do not comb.
-            val peaks = FloatArray(BARS)
-            val sums = DoubleArray(BARS)
-            val weights = DoubleArray(BARS)
-            for (i in chunkFrameStarts.indices) {
-                val chunkStart = chunkFrameStarts[i].toDouble()
-                val chunkEnd = (chunkFrameStarts[i] + chunkFrameCounts[i]).coerceAtMost(totalFrames).toDouble()
-                if (chunkEnd <= chunkStart) continue
-                val firstBucket = ((chunkStart * BARS) / totalFrames).toInt().coerceIn(0, BARS - 1)
-                val lastBucket =
-                    (ceil((chunkEnd * BARS) / totalFrames.toDouble()).toInt() - 1)
-                        .coerceIn(0, BARS - 1)
-                val chunkMean = chunkSums[i] / chunkFrameCounts[i]
-                for (bucket in firstBucket..lastBucket) {
-                    val bucketFrameStart = bucket.toDouble() * totalFrames / BARS
-                    val bucketFrameEnd = (bucket + 1).toDouble() * totalFrames / BARS
-                    val overlapStart = maxOf(chunkStart, bucketFrameStart)
-                    val overlapEnd = minOf(chunkEnd, bucketFrameEnd)
-                    val overlapFrames = overlapEnd - overlapStart
-                    if (overlapFrames <= 0.0) continue
-                    if (chunkPeaks[i] > peaks[bucket]) peaks[bucket] = chunkPeaks[i]
-                    sums[bucket] += chunkMean * overlapFrames
-                    weights[bucket] += overlapFrames
-                }
-            }
-
-            // Hybrid signal: peak per bucket biased by mean (peak * 0.7 +
-            // mean * 0.3) — peaks give visual punch, mean prevents single-spike
-            // outliers from flattening neighbours. sqrt() applied at the end
-            // perceptually lifts quiet sections so the shape reads as audio
-            // dynamics, not raw linear power.
-            val hybrid =
-                FloatArray(BARS) { i ->
-                    val mean = if (weights[i] > 0.0) (sums[i] / weights[i]).toFloat() else 0f
-                    peaks[i] * 0.7f + mean * 0.3f
-                }
-            val maxV = hybrid.maxOrNull()?.takeIf { it > 0f } ?: return null
-            return FloatArray(BARS) { i ->
-                val norm = (hybrid[i] / maxV).coerceIn(0f, 1f)
-                FLOOR + (1f - FLOOR) * kotlin.math.sqrt(norm)
-            }
+            return summary.finish()
         } finally {
             if (codecStarted) runCatching { codec?.stop() }
             runCatching { codec?.release() }

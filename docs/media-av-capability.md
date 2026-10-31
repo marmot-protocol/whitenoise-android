@@ -1,8 +1,9 @@
 # Isolated audio/video capability experiment
 
 This debug-only experiment measures Android media API access from the app's
-permissionless isolated UID. Attachment decoding, playback,
-voice playback and fallback retain their existing production routes. Earlier API30
+permissionless isolated UID. The production automatic probe lane now uses bundled software decoding in an
+isolated process. This historical platform-API experiment remains separate from
+positive native-output qualification; playback migration is still pending. Earlier API30
 and API34 campaigns failed their A/V reply-deadline observations; these failures
 remain part of the evidence. Current-source API 30 and API 36 qualification remains pending.
 Issue #3374 remains open. The [feasibility decision](media-av-feasibility.md)

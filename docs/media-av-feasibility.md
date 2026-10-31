@@ -1,16 +1,17 @@
 # Audio/video containment feasibility
 
 This study concerns attachment parsing in [#3374](https://github.com/marmot-protocol/whitenoise-android/issues/3374).
-The selected-descriptor isolated prototype is available in debug builds. Supported
-permissionless platform A/V parsing remains unproven. Production automatic probes
-and playback retain the app-process exposure described below.
+The selected-descriptor isolated prototype is available in debug builds. The production automatic lane now performs selected-descriptor software decoding
+in an isolated UID. Current-source platform/output qualification is pending.
+Playback and transcription retain the app-process exposure described below until
+their migration is complete.
 
 ## Process and capability inventory
 
 | Path | Parser and process | Input and output capabilities | Residual exposure |
 | --- | --- | --- | --- |
-| Automatic video poster and duration, including draft and received files | `PlatformMediaTransport` calls `MediaProbeDecoder` and `MediaMetadataRetriever` from the app process; Android performs further work in media services | Bounded selected file descriptor; scalar duration/dimensions and copied bitmap | JNI/Binder client has app permissions and private-data access |
-| Automatic voice waveform | `PlatformMediaTransport` calls `AudioWaveformExtractor`; app-process `MediaExtractor` and `MediaCodec` clients | Selected descriptor; exactly 64 finite normalized bars | Client/native setup retains app authority; timed-out native calls keep the serialized slot |
+| Automatic video poster and duration, including draft and received files | `IsolatedMediaTransport` calls `MediaAvDecodeService`; FFmpeg/dav1d demux and decode in a permissionless process | Bounded selected file descriptor; scalar duration/dimensions and copied bitmap | Fixed raw-pixel/scalar reply boundary; current-source positive output and capability tests pending |
+| Automatic voice waveform | `MediaAvDecodeService` decodes PCM in the isolated UID and uses the shared 64-bar signal accumulator | Selected descriptor; exactly 64 finite normalized bars | Native decode is killable without terminating the app; replacement still requires exact death |
 | Received video viewer and looping playback | `MediaVideo` creates Media3 `ExoPlayer` in the app | `LocalVideoSource` admits file/content and explicitly builds a progressive source; decoded output goes to the player surface | Media3 container extraction runs with app authority; repeat mode adds no process boundary |
 | Pending/draft video | `DraftVideoPreview` creates its own Media3 player in the app | Materialized local URI, progressive source and player surface | Same app-process extraction exposure as received video |
 | Voice playback | `VoicePlaybackController` constructs app-process `MediaPlayer` | Selected local descriptor, audio output and existing audio-focus owner | Platform playback performs remote work, while the client retains app authority |
@@ -43,7 +44,7 @@ retains the app UID and its private-data access.
 | Existing isolated service with platform media clients | Permissionless UID; selected descriptor and reply capabilities | Retain as the measured prototype. API 30 service lookup blocks the retriever; successful parsing is unqualified on the tested corpus |
 | Separate same-UID `:media` service | Retains app data and permissions | Can contain some crashes and provide a killable process. It cannot satisfy the requested least-privilege boundary |
 | App-side media-service proxy or general opener | Delegates app capabilities into the worker | Excluded from this prototype: it changes the measured authority and needs a separately bounded protocol/security review |
-| Bundled software demuxer/decoder in an isolated service | Can retain selected-input authority | Requires a reviewed maintained codec dependency, supported-format policy, resource limits and compatibility evidence. No new dependency is selected in this study |
+| Bundled software demuxer/decoder in an isolated service | Selected-input authority with raw outputs | Selected for production: pinned FFmpeg 9.0.2 plus dav1d 1.5.4, disabled network/protocols and secondary opens, bounded output and explicit resource refusals. Automatic lane integrated; playback and platform qualification pending |
 | Separate installed permissionless package | Separate app sandbox, installation and IPC contract | Changes packaging/distribution and upgrade behavior; outside the unchanged playback-UX constraint |
 
 Explicit playback decision: preserve the current local-source players and audio
@@ -69,14 +70,14 @@ characterization contract while parsing remains unsupported.
 
 ## Failure, output and lifetime contract
 
-The host validates the kernel READY UID/PID and binds each reply to its exact
-endpoint, token and request. Replies cannot carry arbitrary descriptors. Successful
+The historical debug experiment validates the kernel READY UID/PID and binds
+each reply to its exact endpoint, token and request. Replies cannot carry arbitrary descriptors. Successful
 pixels are copied into a bounded app-owned bitmap after exact worker death;
 scalars and waveform bars pass the existing primitive validation. A worker's
 existing writable mapping remains untrusted until retirement. The host owns the
 copy and treats its pixel values as untrusted content.
 
-Startup without a confirmed endpoint remains held. Cancellation revokes the
+In that experiment, startup without a confirmed endpoint remains held. Cancellation revokes the
 callback and asks that exact endpoint to retire. Unbind, disconnect and elapsed
 time do not prove death. A six-second independent hard watchdog terminates probe
 work; waveform uses its existing longer ceiling. A blocked callback cannot delay
@@ -88,6 +89,11 @@ The current campaign includes malformed/truncated input and callback protocol
 fixtures, but supplies no complete production account-change or background/resume
 qualification. App-process native work remains non-killable without terminating
 the app. Endpoint death alone also supplies no descendant-process lifetime proof.
+
+The production automatic route uses the existing primitive reply protocol: the
+host validates the kernel callback UID and per-request Binder capability, then
+requires exact worker death before copying pixels. It does not claim the debug
+experiment's READY/PID/token handshake.
 
 ## Remaining qualification and implementation slices
 
@@ -106,6 +112,7 @@ the app. Endpoint death alone also supplies no descendant-process lifetime proof
    seeking, focus, loop state and background/resume. Keep current exposure visible
    until that implementation is reviewed and measured.
 
-The current change completes report validation and records the feasibility
-boundary. The unsupported platform paths and remaining acceptance evidence keep
-#3374 open.
+The implementation now includes the native source build, isolated automatic
+poster/duration/waveform route and report validation. Playback/transcription
+migration and positive current-source platform evidence remain required; #3374
+stays open.

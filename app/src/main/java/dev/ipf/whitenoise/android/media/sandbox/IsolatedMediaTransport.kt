@@ -72,10 +72,12 @@ internal interface MediaDecodeTransport {
 }
 
 /** One serialized image lane; each admitted input retains its worker until exact Binder death. */
-@Suppress("TooManyFunctions") // Cohesive binding, admission and descriptor lifecycle for one decoder lane.
+@Suppress("TooManyFunctions", "LargeClass") // Keep one lock owner for binding, admission and exact-death retirement.
 internal class IsolatedMediaTransport(
     private val context: Context,
     private val instanceName: String = "images",
+    private val serviceClass: Class<out android.app.Service> = MediaDecodeService::class.java,
+    private val refusalClock: () -> Long = android.os.SystemClock::elapsedRealtime,
 ) : MediaDecodeTransport,
     java.io.Closeable {
     private val gate = Semaphore(1)
@@ -83,7 +85,7 @@ internal class IsolatedMediaTransport(
     private val ids = AtomicInteger()
     private var epoch = 0L
 
-    @Volatile private var session: Session? = Session(epoch, MediaSourceAccess(context))
+    @Volatile private var session: Session? = Session(epoch, MediaSourceAccess(context), refusalClock)
 
     @Volatile private var closed = false
 
@@ -107,7 +109,7 @@ internal class IsolatedMediaTransport(
                 check(!closed || !active) { "A closed decoder cannot be reactivated" }
                 val previous = session
                 val retiringWorker = worker
-                session = if (active) Session(++epoch, MediaSourceAccess(context)) else null
+                session = if (active) Session(++epoch, MediaSourceAccess(context), refusalClock) else null
                 revokePending()
                 previous to retiringWorker
             }
@@ -152,7 +154,12 @@ internal class IsolatedMediaTransport(
                         if (reply.completed.compareAndSet(false, true)) {
                             reply.result = result
                             pending = null // Revoke the capability before retirement or another callback.
-                            result?.let(IsolatedMediaDecoder::recordIsolation)
+                            result?.let { receipt ->
+                                IsolatedMediaDecoder.recordIsolation(receipt)
+                                if (serviceClass == MediaAvDecodeService::class.java) {
+                                    IsolatedMediaDecoder.recordAvIsolation(receipt)
+                                }
+                            }
                             reply.ready.countDown()
                         }
                     }
@@ -310,8 +317,116 @@ internal class IsolatedMediaTransport(
         }
     }
 
+    override fun probe(
+        file: File,
+        edge: Int,
+        poster: Boolean,
+    ): MediaProbe? =
+        serialized { ticket ->
+            withMediaFile(ticket, file, "probe:$edge:$poster") { input ->
+                probeInput(ticket, input, edge, poster)
+            }
+        }
+
+    override fun probeBytes(
+        bytes: ByteArray,
+        edge: Int,
+        poster: Boolean,
+    ): MediaProbe? =
+        serialized { ticket ->
+            if (bytes.size.toLong() !in 1..MAX_MEDIA_SOURCE_BYTES) return@serialized null
+            val digest =
+                java.security.MessageDigest
+                    .getInstance("SHA-256")
+                    .digest(bytes)
+                    .joinToString("") { "%02x".format(it) }
+            mediaAttempt(ticket, "probe:$edge:$poster:$digest") {
+                ticket.session.sources.withInput(bytes) { input -> probeInput(ticket, input, edge, poster) }
+            }
+        }
+
+    override fun probeUri(
+        resolver: android.content.ContentResolver,
+        uri: android.net.Uri,
+        edge: Int,
+    ): MediaProbe? {
+        val selected = session ?: return null
+        return selected.sources.withMediaUriInput(resolver, uri) { input ->
+            serialized(selected) { ticket -> probeInput(ticket, input, edge, true) }
+        }
+    }
+
+    private fun probeInput(
+        ticket: Operation,
+        input: ParcelFileDescriptor,
+        edge: Int,
+        poster: Boolean,
+    ): MediaProbe? {
+        val capacity = MediaDecodePolicy.outputCapacity(edge) ?: return null
+        return SharedMemory.create("media-av-pixels", if (poster) capacity else Int.SIZE_BYTES).use { output ->
+            val spec = MediaDecodeRequest(edge, poster, MediaDecodePolicy.PROBE)
+            val result = exchange(ticket, input, output, spec) ?: return@use null
+            val bitmap =
+                if (result.getBoolean("pixels")) {
+                    copyPixels(ticket, result, output, edge) ?: return@use null
+                } else {
+                    null
+                }
+            validateMediaProbe(
+                MediaProbe(
+                    result.getInt("sourceWidth"),
+                    result.getInt("sourceHeight"),
+                    result.getLong("duration"),
+                    bitmap,
+                ),
+                edge,
+            )
+        }
+    }
+
+    override fun waveform(file: File): FloatArray? =
+        serialized(deadlineMs = MediaDecodePolicy.WAVEFORM_DEADLINE_MS) { ticket ->
+            withMediaFile(ticket, file, "waveform") { input ->
+                SharedMemory.create("media-av-waveform", Int.SIZE_BYTES).use { output ->
+                    val spec = MediaDecodeRequest(1, false, MediaDecodePolicy.WAVEFORM)
+                    exchange(ticket, input, output, spec)?.getFloatArray("waveform")?.takeIf {
+                        it.size == dev.ipf.whitenoise.android.audio.AudioWaveformExtractor.BARS &&
+                            it.all { value -> value.isFinite() && value in 0f..1f }
+                    }
+                }
+            }
+        }
+
+    private fun <T> withMediaFile(
+        ticket: Operation,
+        file: File,
+        operation: String,
+        block: (ParcelFileDescriptor) -> T?,
+    ): T? {
+        if (!file.isFile || file.length() !in 1..MAX_MEDIA_SOURCE_BYTES) return null
+        val key = "$operation:${file.absolutePath}:${file.length()}:${file.lastModified()}"
+        return mediaAttempt(ticket, key) {
+            ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { input ->
+                if (input.statSize !in 1..MAX_MEDIA_SOURCE_BYTES) null else block(input)
+            }
+        }
+    }
+
+    private fun <T> mediaAttempt(
+        ticket: Operation,
+        key: String,
+        block: () -> T?,
+    ): T? =
+        ticket.session.mediaRefusals.attempt(
+            key,
+            { check(current(ticket) && remaining(ticket) > 0) { "Media session retired or expired" } },
+            { ticket.workerRefused },
+            block,
+        )
+
     private fun <T> serialized(
         selected: Session? = session,
+        deadlineMs: Long = MediaDecodePolicy.DEADLINE_MS,
         block: (Operation) -> T?,
     ): T? {
         if (selected == null || closed) return null
@@ -319,7 +434,7 @@ internal class IsolatedMediaTransport(
         return if (!gate.tryAcquire(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)) {
             null
         } else {
-            val ticket = Operation(selected, android.os.SystemClock.elapsedRealtime() + MediaDecodePolicy.DEADLINE_MS)
+            val ticket = Operation(selected, android.os.SystemClock.elapsedRealtime() + deadlineMs)
             try {
                 if (!current(ticket)) {
                     null
@@ -329,6 +444,7 @@ internal class IsolatedMediaTransport(
                         result
                     } else {
                         (result as? Bitmap)?.recycle()
+                        (result as? MediaProbe)?.let(::disposeProbe)
                         null
                     }
                 }
@@ -520,7 +636,7 @@ internal class IsolatedMediaTransport(
         val accepted =
             try {
                 context.bindIsolatedService(
-                    Intent(context, MediaDecodeService::class.java),
+                    Intent(context, serviceClass),
                     Context.BIND_AUTO_CREATE,
                     workerInstanceName(instanceName, bindingSequence.incrementAndGet()),
                     callbackExecutor,
@@ -599,7 +715,9 @@ internal class IsolatedMediaTransport(
     private class Session(
         val epoch: Long,
         val sources: MediaSourceAccess,
+        refusalClock: () -> Long,
     ) {
+        val mediaRefusals = MediaRefusalCache(refusalClock)
         val refusals = LinkedHashMap<String, Long>()
     }
 

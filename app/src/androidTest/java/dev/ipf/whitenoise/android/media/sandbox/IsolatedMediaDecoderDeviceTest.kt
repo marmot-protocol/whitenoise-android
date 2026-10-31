@@ -192,15 +192,25 @@ class IsolatedMediaDecoderDeviceTest {
         val video = File.createTempFile("isolated-video", ".mp4", context.cacheDir)
         try {
             video.writeBytes(verifiedVideoFixture())
-            val probe = requireNotNull(IsolatedMediaDecoder.probe(video, edge = 96, poster = true))
-            assertEquals(320, probe.width)
-            assertEquals(240, probe.height)
-            assertTrue(probe.durationMs >= 9000L)
-            val poster = requireNotNull(probe.poster)
+            val canary = beginMediaCanary(context)
             try {
-                assertTrue(poster.width in 1..96 && poster.height in 1..96)
+                val previousReceipt = IsolatedMediaDecoder.lastAvIsolation
+                val probe = requireNotNull(IsolatedMediaDecoder.probe(video, edge = 96, poster = true))
+                assertEquals(320, probe.width)
+                assertEquals(240, probe.height)
+                assertTrue(probe.durationMs >= 9000L)
+                assertRestrictedMediaWorker(previousReceipt)
+                val poster = requireNotNull(probe.poster)
+                try {
+                    assertTrue(poster.width in 1..96 && poster.height in 1..96)
+                    val pixel = poster.getPixel(poster.width / 2, poster.height / 2)
+                    assertTrue(Color.red(pixel) <= 5 && Color.green(pixel) <= 5 && Color.blue(pixel) <= 5)
+                    assertEquals(255, Color.alpha(pixel))
+                } finally {
+                    poster.recycle()
+                }
             } finally {
-                poster.recycle()
+                canary.delete()
             }
         } finally {
             video.delete()
@@ -212,18 +222,69 @@ class IsolatedMediaDecoderDeviceTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         IsolatedMediaDecoder.install(context)
         val audio = File.createTempFile("isolated-waveform", ".wav", context.cacheDir)
+        val canary = beginMediaCanary(context)
         try {
             audio.writeBytes(pcmWaveFixture())
+            val previousReceipt = IsolatedMediaDecoder.lastAvIsolation
             val waveform = requireNotNull(IsolatedMediaDecoder.waveform(audio))
+            assertRestrictedMediaWorker(previousReceipt)
             assertEquals(dev.ipf.whitenoise.android.audio.AudioWaveformExtractor.BARS, waveform.size)
             assertTrue(waveform.all { it.isFinite() && it in 0f..1f })
             assertTrue(waveform.any { it > 0.05f })
+            val previousProbeReceipt = IsolatedMediaDecoder.lastAvIsolation
             val probe = requireNotNull(IsolatedMediaDecoder.probe(audio, edge = 32, poster = false))
             assertNull(probe.poster)
             assertTrue(probe.durationMs in 100L..300L)
+            assertRestrictedMediaWorker(previousProbeReceipt)
         } finally {
+            canary.delete()
             audio.delete()
         }
+    }
+
+    @Test
+    fun malformedAutomaticMediaCannotPoisonHealthySourceRecovery() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        IsolatedMediaDecoder.install(context)
+        val source = File.createTempFile("native-media-recovery", ".bin", context.cacheDir)
+        val canary = beginMediaCanary(context)
+        try {
+            repeat(3) {
+                source.writeBytes(verifiedVideoFixture().copyOf(16))
+                assertNull(IsolatedMediaDecoder.probe(source, 32, true))
+                source.writeBytes(verifiedVideoFixture())
+                val previousReceipt = IsolatedMediaDecoder.lastAvIsolation
+                val healthy = requireNotNull(IsolatedMediaDecoder.probe(source, 32, true))
+                try {
+                    assertNotNull(healthy.poster)
+                    assertTrue(healthy.durationMs >= 9000L)
+                    assertRestrictedMediaWorker(previousReceipt)
+                } finally {
+                    healthy.poster?.recycle()
+                }
+            }
+        } finally {
+            canary.delete()
+            source.delete()
+        }
+    }
+
+    private fun beginMediaCanary(context: android.content.Context): File =
+        File(context.filesDir, "media-containment-canary").also {
+            check(it.createNewFile()) { "Another fixture owns the private canary" }
+            it.writeText("synthetic-private-media-canary")
+        }
+
+    /** A fresh automatic A/V receipt is required; a still-image reply cannot satisfy this proof. */
+    private fun assertRestrictedMediaWorker(previousReceipt: WorkerIsolation?) {
+        val worker = requireNotNull(IsolatedMediaDecoder.lastAvIsolation)
+        org.junit.Assert.assertNotSame(previousReceipt, worker)
+        assertNotEquals(Process.myUid(), worker.uid)
+        assertTrue(worker.isolated)
+        assertFalse(worker.internetGranted)
+        assertFalse(worker.runtimeInitialized)
+        assertTrue(worker.privateCanaryDenied)
+        assertEquals(android.system.OsConstants.EBADF, worker.inputWriteErrno)
     }
 
     @Test

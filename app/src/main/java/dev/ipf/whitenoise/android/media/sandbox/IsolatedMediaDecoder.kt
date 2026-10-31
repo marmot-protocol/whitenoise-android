@@ -15,22 +15,32 @@ internal object IsolatedMediaDecoder {
     @Volatile private var mediaTransport: MediaDecodeTransport? = null
     private var installedContext: Context? = null
     private var imageOwner: IsolatedMediaTransport? = null
+    private var mediaOwner: IsolatedMediaTransport? = null
 
     @Volatile internal var lastIsolation: WorkerIsolation? = null
         private set
 
-    internal fun recordIsolation(result: android.os.Bundle) {
-        lastIsolation =
-            WorkerIsolation(
-                result.getInt("uid"),
-                result.getBoolean("isolated"),
-                result.getBoolean("internetGranted"),
-                result.getBoolean("runtimeInitialized"),
-                result.getBoolean("privateCanaryDenied"),
-                result.getInt("privateCanaryErrno"),
-                result.getInt("inputWriteErrno", -1),
-            )
+    @Volatile internal var lastAvIsolation: WorkerIsolation? = null
+        private set
+
+    internal fun recordAvIsolation(result: android.os.Bundle) {
+        lastAvIsolation = isolationReceipt(result)
     }
+
+    internal fun recordIsolation(result: android.os.Bundle) {
+        lastIsolation = isolationReceipt(result)
+    }
+
+    private fun isolationReceipt(result: android.os.Bundle): WorkerIsolation =
+        WorkerIsolation(
+            result.getInt("uid"),
+            result.getBoolean("isolated"),
+            result.getBoolean("internetGranted"),
+            result.getBoolean("runtimeInitialized"),
+            result.getBoolean("privateCanaryDenied"),
+            result.getInt("privateCanaryErrno"),
+            result.getInt("inputWriteErrno", -1),
+        )
 
     @Synchronized
     fun install(context: Context) = installSelected(context, lifetimeQualification = false)
@@ -60,7 +70,14 @@ internal object IsolatedMediaDecoder {
                 } else {
                     ReusableMediaTransport(context.applicationContext, "images")
                 }
-            mediaTransport = PlatformMediaTransport(context.applicationContext)
+            val automaticOwner =
+                mediaOwner ?: IsolatedMediaTransport(
+                    context.applicationContext,
+                    "automatic_av",
+                    MediaAvDecodeService::class.java,
+                ).also { mediaOwner = it }
+            automaticOwner.activateSession()
+            mediaTransport = automaticOwner
         }
     }
 
@@ -69,6 +86,7 @@ internal object IsolatedMediaDecoder {
     internal fun installTestTransport(next: MediaDecodeTransport?) {
         (transport as? ReusableMediaTransport)?.close()
         imageOwner?.invalidateSession()
+        mediaOwner?.invalidateSession()
         transport = next
         mediaTransport = next
     }
@@ -91,7 +109,11 @@ internal object IsolatedMediaDecoder {
         } else {
             (transport as? java.io.Closeable)?.close()
         }
-        (mediaTransport as? java.io.Closeable)?.close()
+        if (mediaTransport === mediaOwner) {
+            mediaOwner?.invalidateSession()
+        } else {
+            (mediaTransport as? java.io.Closeable)?.close()
+        }
         transport = null
         mediaTransport = null
     }
