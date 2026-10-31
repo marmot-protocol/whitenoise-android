@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -32,6 +33,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MarkdownBlockFfi
@@ -210,7 +212,9 @@ internal fun FocusedTextMessagePreview(
                 mentionedSelf = mentionedSelf,
                 mentionedYouLabel = mentionedYouLabel,
             ) {
-                if (!compact) reply?.invoke()
+                // Weighted, so it is measured after the message content, and dropped whole when it no
+                // longer fits: the decorative quote yields before the excerpt, warning or timestamp.
+                if (!compact && reply != null) ShownWhenItFits(Modifier.weight(1f, fill = false), reply)
                 content(compact)
             }
         }
@@ -247,6 +251,25 @@ internal fun FocusedTextMessagePreview(
                     },
                 ) { content(compact) }
             }
+        }
+    }
+}
+
+/** Shows [content] only when it fits whole in the height left to it; a clipped quote reads as damage. */
+@Composable
+private fun ShownWhenItFits(
+    modifier: Modifier,
+    content: @Composable () -> Unit,
+) {
+    Layout(content = content, modifier = modifier) { measurables, constraints ->
+        val natural = constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity)
+        val placeables = measurables.map { it.measure(natural) }
+        val width = placeables.maxOfOrNull { it.width } ?: 0
+        val height = placeables.maxOfOrNull { it.height } ?: 0
+        if (height > constraints.maxHeight) {
+            layout(0, 0) {}
+        } else {
+            layout(width, height) { placeables.forEach { it.placeRelative(0, 0) } }
         }
     }
 }

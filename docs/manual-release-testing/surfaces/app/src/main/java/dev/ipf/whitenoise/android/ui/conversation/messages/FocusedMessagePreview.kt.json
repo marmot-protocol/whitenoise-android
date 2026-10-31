@@ -30,6 +30,14 @@
           "MSG-015",
           "MSG-043"
         ]
+      },
+      {
+        "surface": "ShownWhenItFits",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessagePreview.kt",
+        "anchor": "private fun ShownWhenItFits(",
+        "test_ids": [
+          "MSG-043"
+        ]
       }
     ],
     "source_coverage": [

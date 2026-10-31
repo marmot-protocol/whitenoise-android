@@ -6,11 +6,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.state.MessageStatus
@@ -56,31 +60,48 @@ class FocusedMessageImeScreenshotTest {
     /** Just above the compact boundary, a reply and warning still leave the wrapped footer in view (issue #3532). */
     @Test
     fun replyAndWarningInAShortFrameKeepFooterVisible() {
+        captureShortFrame("focused_preview_short_frame_reply_warning_large_font_dark", 230.dp, dark = true)
+    }
+
+    /** At 201 dp the quoted reply no longer fits and is left out whole; the excerpt line stays whole (issue #3532). */
+    @Test
+    fun replyYieldsInATightFrameLightRtl() {
+        val name = "focused_preview_tight_frame_reply_yields_large_font_light_rtl"
+        captureShortFrame(name, 201.dp, dark = false, rtl = true)
+    }
+
+    private fun captureShortFrame(
+        name: String,
+        height: Dp,
+        dark: Boolean,
+        rtl: Boolean = false,
+    ) {
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = true, fontScale = 2f) {
-                Box(
-                    Modifier
-                        .size(260.dp, 230.dp)
-                        .background(MaterialTheme.colorScheme.background)
-                        .testTag("short-frame"),
-                ) {
-                    FocusedTextMessagePreview(
-                        presentation = messageBubblePresentation(deleted = false, mine = false),
-                        mine = false,
-                        text = "A long target message. ".repeat(20),
-                        document = null,
-                        time = "12:34",
-                        status = MessageStatus.Received,
-                        showStatus = false,
-                        reply = { Text("Quoted reply") },
-                        warning = "Edited after a signature check",
-                    )
+            val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
+            CompositionLocalProvider(LocalLayoutDirection provides direction) {
+                WhiteNoiseTheme(darkTheme = dark, fontScale = 2f) {
+                    Box(
+                        Modifier
+                            .size(260.dp, height)
+                            .background(MaterialTheme.colorScheme.background)
+                            .testTag("short-frame"),
+                    ) {
+                        FocusedTextMessagePreview(
+                            presentation = messageBubblePresentation(deleted = false, mine = false),
+                            mine = false,
+                            text = "A long target message. ".repeat(20),
+                            document = null,
+                            time = "12:34",
+                            status = MessageStatus.Received,
+                            showStatus = false,
+                            reply = { Text("Quoted reply") },
+                            warning = "Edited after a signature check",
+                        )
+                    }
                 }
             }
         }
-        composeRule
-            .onNodeWithTag("short-frame")
-            .captureRoboImage("src/test/snapshots/focused_preview_short_frame_reply_warning_large_font_dark.png")
+        composeRule.onNodeWithTag("short-frame").captureRoboImage("src/test/snapshots/$name.png")
     }
 
     @Test
