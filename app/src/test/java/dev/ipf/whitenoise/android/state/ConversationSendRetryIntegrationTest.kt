@@ -2657,6 +2657,10 @@ class ConversationSendRetryIntegrationTest {
                         assertEquals(expectedAttempts, attempts)
                         assertEquals(listOf("first", "second"), admitted.values.map { it.second })
                         assertEquals(2, admitted.keys.toSet().size)
+                        // A committed retry hands its optimistic row to the native ID for one drawn frame.
+                        repeat(4) {
+                            ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
+                        }
                         val pendingStatuses = controller.timeline.map { it.status }
                         assertEquals(listOf(MessageStatus.Pending, MessageStatus.Pending), pendingStatuses)
                         admitted.entries.forEachIndexed { index, (token, message) ->
