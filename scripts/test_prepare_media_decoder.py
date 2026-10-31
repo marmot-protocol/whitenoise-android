@@ -71,6 +71,8 @@ class NativeBuildTests(unittest.TestCase):
                                "url": "https://fixture.invalid/" + name, "bytes": len(data),
                                "sha256": hashlib.sha256(data).hexdigest(),
                                "version": {"ffmpeg": "9.0.2", "dav1d": "1.5.4", "meson": "1.12.1", "ninja": "1.13.2"}[name]}
+        for name in ("seccomp_filter.h", "generate_seccomp_filter.py"):
+            (self.native / name).write_bytes((Path(__file__).resolve().parents[1] / "native/media-decoder" / name).read_bytes())
         self.save_lock()
         self.ndk = self.root / "ndk"
         self.ndk.mkdir()
@@ -122,6 +124,19 @@ class NativeBuildTests(unittest.TestCase):
         with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}):
             return build.prepare(self.ndk, output or self.root / "output", abis or ["arm64-v8a"],
                                  opener=self.opener, command=self.fake_command)
+
+    def test_stale_or_changed_seccomp_program_cannot_reuse_a_build_identity(self):
+        first = build.cache_key(["arm64-v8a"])
+        self.assertFalse((self.native / "__pycache__").exists())
+        with (self.native / "generate_seccomp_filter.py").open("a") as output:
+            output.write("\n# reviewed source revision\n")
+        self.assertNotEqual(first, build.cache_key(["arm64-v8a"]))
+        with (self.native / "seccomp_filter.h").open("a") as output:
+            output.write("// fabricated stale header\n")
+        with self.assertRaisesRegex(ValueError, "seccomp header differs"):
+            build.cache_key(["arm64-v8a"])
+        self.assertEqual([], self.downloads)
+        self.assertEqual([], self.commands)
 
     def test_compiled_pcm_decoders_have_matching_runtime_codec_admission(self):
         source = (Path(__file__).resolve().parents[1] / "native/media-decoder/media_decoder.cpp").read_text()

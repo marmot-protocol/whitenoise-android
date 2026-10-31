@@ -7,6 +7,7 @@ archives and Python build-tool wheels are pinned in native/media-decoder/lock.js
 import argparse
 import fcntl
 import hashlib
+import runpy
 import json
 import os
 from pathlib import Path
@@ -48,10 +49,18 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def verify_seccomp_header():
+    # run_path executes the reviewed pure generator without writing source-tree bytecode.
+    generator = runpy.run_path(str(NATIVE / "generate_seccomp_filter.py"))
+    require((NATIVE / "seccomp_filter.h").read_text() == generator["header"](),
+            "seccomp header differs from reviewed generator")
+
+
 def cache_key(abis):
     require(abis and len(set(abis)) == len(abis) and all(abi in ABIS for abi in abis), "unique supported ABIs required")
+    verify_seccomp_header()
     values = {"abis": sorted(abis), "inputs": {name: sha(NATIVE / name)
-              for name in ("lock.json", "media_decoder.cpp", "exports.map")}, "builder": sha(__file__)}
+              for name in ("lock.json", "media_decoder.cpp", "exports.map", "seccomp_filter.h", "generate_seccomp_filter.py")}, "builder": sha(__file__)}
     return hashlib.sha256(json.dumps(values, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
@@ -321,6 +330,8 @@ def prepare(ndk, output, abis, *, jobs=2, opener=urllib.request.urlopen, command
         built = [build_abi(ndk, abi, lock, inputs, tools, output, jobs, command) for abi in abis]
         manifest = {"schema": 1, "cache_key": key, "lock_sha256": sha(NATIVE / "lock.json"),
                     "wrapper_sha256": sha(NATIVE / "media_decoder.cpp"), "build_script_sha256": sha(__file__),
+                    "seccomp_header_sha256": sha(NATIVE / "seccomp_filter.h"),
+                    "seccomp_generator_sha256": sha(NATIVE / "generate_seccomp_filter.py"),
                     "ndk": lock["ndk"], "api": lock["api"], "artifacts": built,
                     "qualification": "source-built outputs; exact-APK runtime and reproducibility checks remain required"}
         (output / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")

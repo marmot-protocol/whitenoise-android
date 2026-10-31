@@ -104,6 +104,7 @@ internal object IsolatedMediaDecoder {
     @Synchronized
     fun clear() {
         IsolatedAnimationSession.retireActive()
+        RawAvPlaybackEngine.retireAll()
         if (transport === imageOwner) {
             imageOwner?.invalidateSession()
         } else {
@@ -143,6 +144,33 @@ internal object IsolatedMediaDecoder {
         uri: Uri,
         edge: Int,
     ): MediaProbe? = safely { mediaTransport?.probeUri(resolver, uri, edge) }
+
+    /** Blocking compressed-audio work has a separate bounded analysis lane. */
+    internal fun openAudioStream(file: java.io.File): IsolatedAvStream {
+        val context =
+            synchronized(this) { installedContext } ?: throw java.io.IOException("Media decoder is unavailable")
+        return IsolatedAvStream.openFile(
+            context,
+            file,
+            wantVideo = false,
+            wantAudio = true,
+            lane = AvStreamLane.Analysis,
+        )
+    }
+
+    fun probeUriAt(
+        resolver: ContentResolver,
+        uri: Uri,
+        positionMs: Long,
+        edge: Int = 1280,
+    ): MediaProbe? =
+        safely {
+            if (positionMs !in 0..MAX_MEDIA_DURATION_MS) {
+                null
+            } else {
+                mediaTransport?.probeUriAt(resolver, uri, positionMs, edge)
+            }
+        }
 
     internal fun exerciseWatchdogForTest() {
         check(dev.ipf.whitenoise.android.BuildConfig.DEBUG)

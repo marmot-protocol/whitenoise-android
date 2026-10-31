@@ -21,19 +21,19 @@ Debug instrumentation may pass the exact path of an existing synthetic `media-co
 - Existing GIF/WebP canvas/frame/work admission precedes every still or animated decode. A refused animation cannot bypass admission through its first frame.
 - File media probes: at most 512 MiB, with validated descriptor offsets and lengths; this is not an attachment transfer quota.
 - Image worker watchdog: 6 seconds, with an 8-second host wait. An interrupted dispatched request also asks the worker to retire through its control looper. A worker still alive after timeout/cancellation blocks replacement admission; a system-confirmed death permits a fresh generation.
-- Automatic A/V: one retained process owner, with 8-second probe and 40-second waveform host deadlines. An independent worker watchdog kills probe work at 6 seconds and waveform work at 30 seconds. Each native call also has an interrupt deadline. Account reset revokes publication and retains the exact worker until confirmed Binder death; elapsed time and unbind do not permit replacement. Confirmed source refusals have bounded revision-specific cooldowns. The software decoder limits a decoded surface to 16 million pixels and individual allocations to 64 MiB; codec reference frames can exceed 64 MiB in aggregate. Playback retains its separate app-process exposure until migration is qualified.
+- Automatic A/V: one retained process owner, with 8-second probe and 40-second waveform host deadlines. An independent worker watchdog kills probe work at 6 seconds and waveform work at 30 seconds. Each native call also has an interrupt deadline. Account reset revokes publication and retains the exact worker until calibrated kernel PID disappearance and parent-resource cleanup are confirmed. Binder death, elapsed time and unbind alone leave admission held. Confirmed source refusals have bounded revision-specific cooldowns. The software decoder limits a decoded surface to 16 million pixels. A 64 MiB per-allocation ceiling applies to FFmpeg's allocation API; it is not a process-wide or aggregate native-memory limit. Dav1d internal allocations and runtime overhead are separate. Playback and transcription use separate isolated stream lanes; their current-source runtime qualification remains pending.
 - Failed source revisions have bounded in-memory quarantine. Account teardown retires the image worker, media delivery and pending reply capabilities; host cache-generation checks remain authoritative for UI publication.
 
 Native temporary allocations are not bounded solely by output dimensions. Worker isolation and watchdogs contain ordinary faults but cannot force a compromised worker to obey its own watchdog or prevent a kernel/system-service escape. A malicious provider that ignores cancellation can hold one admitted off-main staging operation; new readers must not bypass its gate.
 
-Automatic A/V demuxing and decoding execute in the permissionless native worker. Selected-descriptor bounds, primitive reply validation and exact death precede host pixel copying. Waveforms contain exactly 64 finite normalized values. Explicit playback and attachment transcription still retain the app-process paths documented in the [migration decision](media-av-feasibility.md); their migration is required before full attachment-containment completion.
+Automatic A/V demuxing and decoding execute in the permissionless native worker. Selected-descriptor bounds, primitive reply validation and observed kernel process disappearance precede automatic output publication. Waveforms contain exactly 64 finite normalized values. Explicit attachment playback and transcription consume bounded raw output from separate isolated streaming sessions. The app draws copied RGBA pixels and writes validated PCM16 to AudioTrack; it does not feed compressed local attachment bytes to Media3 extractors or platform codecs.
 
 The host rechecks source ownership and cancellation when a provider returns a
 descriptor, before staging its bytes or reading descriptor metadata. A provider
 that ignores cancellation cannot make a retired source enter those operations.
 
 Received-audio transcription reads an already materialized attachment through a
-separate serialized platform-codec adapter. It converts admitted mono/stereo
+separate serialized isolated software-decoder stream. It converts admitted mono/stereo
 PCM16 to 16 kHz mono, preserving the resampling phase across codec buffers, and
 feeds one continuous descriptor-backed request to the explicitly selected Offline
 Speech to Text 0.21.0 or later service on Android 13+. Earlier builds require an
@@ -45,7 +45,7 @@ produce a successful partial transcript. The provider owns its downloaded model;
 White Noise neither captures microphone audio nor falls back to another recognizer.
 Transcripts remain transient dialog state and are cleared on dismissal, background,
 source disposal or account/chat replacement. This path does not add MDK persistence
-or claim permissionless decoder isolation. Run `MED-038` against the exact provider
+or claim isolation of the external recognition provider. Run `MED-038` against the exact provider
 and candidate APK; source contracts alone do not prove recognition compatibility.
 
 The opt-in `AudioTranscriptionDeviceTest` uses Kokoro `af_heart` speech in a
@@ -67,7 +67,26 @@ Inline eligibility requires a visible row, a resumed lifecycle, focused window, 
 
 A startup timeout retains animation admission even before OPEN: an unconnected Android instance may still be starting. This favours the one-worker resource bound over automatic recovery from an unconfirmed startup. If Android never reports a connection or worker death, the animation lane can remain unavailable until app-process restart; the still-image lane remains independent.
 
-Received and picked video playback uses local file/content inputs and an explicit progressive source. A changed suffix cannot choose a network or playlist protocol. Media3 container extractors still execute in the app during explicit playback. Platform codec isolation is useful but does not isolate every Media3 parser. Referenced Nostr-event networking retains its existing owner and explicit loading policy.
+Received and picked video playback accepts local file/content inputs through the isolated decoder. Media3 supplies the existing player controls over a raw-output adapter. Voice playback shares the established voice focus owner; video has its own focus owner. Paused seeking uses an account-bound automatic poster request. Playback and transcription have distinct process-wide lanes, each retaining its resource and process retirement witness. Referenced Nostr-event networking retains its existing ExoPlayer owner and explicit loading policy; it remains outside local attachment containment.
+
+## Native audio/video policy
+
+Before parsing, JNI requires a successful process-wide TSYNC seccomp filter and
+NO_NEW_PRIVS. The filter denies new processes and exec, while permitting
+same-process threads. Failure refuses decoding. A synchronous READY callback
+captures the Binder caller UID and PID in the parent namespace; the parent first
+calibrates that PID as present. Only a later ESRCH observation proves its absence.
+PID reuse, unknown observations and incomplete resource closure keep admission held.
+This contains the process tree; it does not prove that hostile code obeys a
+watchdog or that the OS will terminate a compromised worker within a fixed time.
+
+Software playback preserves the source display aspect ratio and rotation. Video
+conversion targets square-pixel, full-range sRGB SDR. Supported PQ/HLG inputs are
+tone-mapped with libswscale; compatible Dolby Vision profile-8 inputs use their
+HDR base layer, while incompatible profiles refuse. Conversion intermediates have
+a separate eight-million-pixel budget, so some large outputs are downscaled with
+preserved framing. Actual HDR fidelity, common-format support, performance and
+four-ABI compatibility require current-source build and device evidence.
 
 ## MDK boundary
 
@@ -75,7 +94,7 @@ MDK retains reference validation, authenticated encryption/hash verification, sa
 
 ## Qualification
 
-Unit fixtures cover pixel limits, malformed bytes, primitive reply validation and explicit fail-closed transport. Hosted instrumentation must prove real UID separation, pixel fidelity, malformed-input recovery, account-reset behavior and real descriptor-based SVG/EXIF operations. Separate platform tests qualify video poster/duration and PCM waveform behavior; those tests do not attest image-worker isolation for media services. Physical testing additionally checks OS process identity, private-data/network denial, hung-worker death, descriptor/RSS stability, normal image/animation compatibility, SVG, poster/waveform output and large seekable video sources. Record exact source and APK bytes; installation alone is not feature coverage. API 30 compatibility needs its own emulator/device evidence. Do not treat unchecked manual cases or a JVM fake as completed device proof.
+Unit fixtures cover pixel limits, malformed bytes, primitive reply validation and explicit fail-closed transport. Hosted instrumentation must prove real UID separation, pixel fidelity, malformed-input recovery, account-reset behavior and real descriptor-based SVG/EXIF operations. Separate same-worker tests qualify isolated video poster/duration and PCM waveform behavior. Native sandbox tests must verify process identity, TSYNC on existing and new threads, denied process creation and independent blocked-worker retirement. Physical testing additionally checks OS process identity, private-data/network denial, hung-worker death, descriptor/RSS stability, normal image/animation compatibility, SVG, poster/waveform output and large seekable video sources. Record exact source and APK bytes; installation alone is not feature coverage. API 30 compatibility needs its own emulator/device evidence. Do not treat unchecked manual cases or a JVM fake as completed device proof.
 
 ## Photo compatibility and budget refusals
 

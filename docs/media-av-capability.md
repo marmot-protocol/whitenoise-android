@@ -3,9 +3,11 @@
 This debug-only experiment measures Android media API access from the app's
 permissionless isolated UID. The production automatic probe lane now uses bundled software decoding in an
 isolated process. This historical platform-API experiment remains separate from
-positive native-output qualification; playback migration is still pending. Earlier API30
-and API34 campaigns failed their A/V reply-deadline observations; these failures
-remain part of the evidence. Current-source API 30 and API 36 qualification remains pending.
+positive native-output qualification. Local attachment playback and transcription
+now have isolated software implementations; their current-source runtime
+qualification remains pending. The earlier API30 campaign failed its A/V reply-deadline observation. API34
+completed a timely negative characterization: the A/V JUnit checks passed while
+platform parsing remained unsupported. Both observations remain part of the evidence. Current-source API 30 and API 36 qualification remains pending.
 Issue #3374 remains open. The [feasibility decision](media-av-feasibility.md)
 records the path inventory, retained results and remaining implementation gates.
 

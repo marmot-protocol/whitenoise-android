@@ -269,6 +269,41 @@ class IsolatedMediaDecoderDeviceTest {
         }
     }
 
+    @Test
+    fun pausedSeekPosterUsesTheRequestedFrameAndCanRecoverToTheStart() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        IsolatedMediaDecoder.install(context)
+        val source = File.createTempFile("native-seek-colors", ".mp4", context.cacheDir)
+        val canary = beginMediaCanary(context)
+        try {
+            source.writeBytes(android.util.Base64.decode(SEEK_COLORS, android.util.Base64.DEFAULT))
+            val uri = android.net.Uri.fromFile(source)
+            listOf(-1L, Long.MAX_VALUE).forEach { invalid ->
+                val previousReceipt = IsolatedMediaDecoder.lastAvIsolation
+                assertNull(IsolatedMediaDecoder.probeUriAt(context.contentResolver, uri, invalid, 32))
+                org.junit.Assert.assertSame(previousReceipt, IsolatedMediaDecoder.lastAvIsolation)
+            }
+            val targets = listOf(0L to Color.RED, 1500L to Color.BLUE, 1999L to Color.BLUE, 0L to Color.RED)
+            targets.forEach { (time, color) ->
+                val previousReceipt = IsolatedMediaDecoder.lastAvIsolation
+                val probe =
+                    requireNotNull(IsolatedMediaDecoder.probeUriAt(context.contentResolver, uri, time, 32))
+                val bitmap = requireNotNull(probe.poster)
+                try {
+                    val pixel = bitmap.getPixel(bitmap.width / 2, bitmap.height / 2)
+                    assertTrue(kotlin.math.abs(Color.red(pixel) - Color.red(color)) < 50)
+                    assertTrue(kotlin.math.abs(Color.blue(pixel) - Color.blue(color)) < 50)
+                    assertRestrictedMediaWorker(previousReceipt)
+                } finally {
+                    bitmap.recycle()
+                }
+            }
+        } finally {
+            canary.delete()
+            source.delete()
+        }
+    }
+
     private fun beginMediaCanary(context: android.content.Context): File =
         File(context.filesDir, "media-containment-canary").also {
             check(it.createNewFile()) { "Another fixture owns the private canary" }
@@ -443,5 +478,35 @@ class IsolatedMediaDecoderDeviceTest {
         } finally {
             bitmap.recycle()
         }
+    }
+
+    private companion object {
+        // Synthetic 2-second H.264 fixture: one red second followed by one blue second, four frames/second.
+        const val SEEK_COLORS =
+            "AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAODbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAAB9AAAQAAAQAA" +
+                "AAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAA" +
+                "Aq50cmFrAAAAXHRraGQAAAADAAAAAAAAAAAAAAABAAAAAAAAB9AAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAA" +
+                "AAAAAAAAAAAAAABAAAAAAEAAAAAwAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAfQAAAgAAABAAAAAAImbWRpYQAAACBtZGhk" +
+                "AAAAAAAAAAAAAAAAAABAAAAAgABVxAAAAAAALWhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAABWaWRlb0hhbmRsZXIAAAAB0W1p" +
+                "bmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAAZFzdGJsAAAAwXN0c2QA" +
+                "AAAAAAAAAQAAALFhdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAEAAMABIAAAASAAAAAAAAAABFUxhdmM2MS4xOS4xMDEgbGli" +
+                "eDI2NAAAAAAAAAAAAAAAGP//AAAAN2F2Y0MBZAAK/+EAGWdkAAqscgREewEQAAADABAAAAMAgPEiWEYBAAdo6EOCMsiw/fj4AAAA" +
+                "ABBwYXNwAAAAAQAAAAEAAAAUYnRydAAAAAAAAA2AAAAAAAAAABhzdHRzAAAAAAAAAAEAAAAIAAAQAAAAABRzdHNzAAAAAAAAAAEA" +
+                "AAABAAAAOGN0dHMAAAAAAAAABQAAAAEAACAAAAAAAQAAgAAAAAABAAAwAAAAAAIAAAAAAAAAAwAAEAAAAAAcc3RzYwAAAAAAAAAB" +
+                "AAAAAQAAAAgAAAABAAAANHN0c3oAAAAAAAAAAAAAAAgAAALdAAAAGgAAABwAAAANAAAADQAAABEAAAARAAAAEQAAABRzdGNvAAAA" +
+                "AAAAAAEAAAOzAAAAYXVkdGEAAABZbWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAbWRpcmFwcGwAAAAAAAAAAAAAAAAsaWxzdAAAACSp" +
+                "dG9vAAAAHGRhdGEAAAABAAAAAExhdmY2MS43LjEwMwAAAAhmcmVlAAADaG1kYXQAAAKvBgX//6vcRem95tlIt5Ys2CDZI+7veDI2" +
+                "NCAtIGNvcmUgMTY0IHIzMTA4IDMxZTE5ZjkgLSBILjI2NC9NUEVHLTQgQVZDIGNvZGVjIC0gQ29weWxlZnQgMjAwMy0yMDIzIC0g" +
+                "aHR0cDovL3d3dy52aWRlb2xhbi5vcmcveDI2NC5odG1sIC0gb3B0aW9uczogY2FiYWM9MSByZWY9MTYgZGVibG9jaz0xOjA6MCBh" +
+                "bmFseXNlPTB4MzoweDEzMyBtZT11bWggc3VibWU9MTAgcHN5PTEgcHN5X3JkPTEuMDA6MC4wMCBtaXhlZF9yZWY9MSBtZV9yYW5n" +
+                "ZT0yNCBjaHJvbWFfbWU9MSB0cmVsbGlzPTIgOHg4ZGN0PTEgY3FtPTAgZGVhZHpvbmU9MjEsMTEgZmFzdF9wc2tpcD0xIGNocm9t" +
+                "YV9xcF9vZmZzZXQ9LTIgdGhyZWFkcz0xIGxvb2thaGVhZF90aHJlYWRzPTEgc2xpY2VkX3RocmVhZHM9MCBucj0wIGRlY2ltYXRl" +
+                "PTEgaW50ZXJsYWNlZD0wIGJsdXJheV9jb21wYXQ9MCBjb25zdHJhaW5lZF9pbnRyYT0wIGJmcmFtZXM9OCBiX3B5cmFtaWQ9MiBi" +
+                "X2FkYXB0PTIgYl9iaWFzPTAgZGlyZWN0PTMgd2VpZ2h0Yj0xIG9wZW5fZ29wPTAgd2VpZ2h0cD0yIGtleWludD0yNTAga2V5aW50" +
+                "X21pbj00IHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByY19sb29rYWhlYWQ9NjAgcmM9Y3JmIG1idHJlZT0xIGNyZj0xOC4w" +
+                "IHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCBpcF9yYXRpbz0xLjQwIGFxPTE6MS4wMACAAAAAJmWIgQACX/7u" +
+                "gr4FNs0QPwcsKsvJ+Zz46oL00L6dDupUQrYoBcbBAAAAFkGaCOxjQfAS4FAB/A+Ae6CH//7WqQ4AAAAYQZ4QZxBH/84kP+6Kw9VH" +
+                "IeKGnLsL+5gvAAAACQGeGC6IIf8BWwAAAAkBnhhOiCH/AVsAAAANAZ4YjUgh/9gK/+55uQAAAA0BnhitSCH/2Ar/7nm5AAAADQGe" +
+                "GM1IIf/YCv/uebk="
     }
 }

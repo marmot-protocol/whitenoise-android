@@ -21,6 +21,8 @@ on:
       - 'app/proguard-rules.pro'
       - 'app/src/main/AndroidManifest.xml'
       - 'app/src/main/marmotkit/**'
+      - 'native/media-decoder/**'
+      - 'scripts/prepare_media_decoder.py'
       - 'scripts/prepare_marmotkit_artifact.py'
       - 'scripts/prepare-marmotkit-artifact.sh'
       - 'scripts/prepare-marmotkit-artifact.ps1'

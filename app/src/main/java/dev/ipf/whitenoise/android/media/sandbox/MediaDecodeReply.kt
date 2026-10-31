@@ -12,15 +12,23 @@ internal fun sendMediaDecodeReply(
     callback: IBinder,
     id: Int,
     result: Bundle,
+    synchronous: Boolean = false,
 ) {
     val parcel = Parcel.obtain()
+    val response = if (synchronous) Parcel.obtain() else null
     try {
         parcel.writeInterfaceToken(MEDIA_REPLY_DESCRIPTOR)
         parcel.writeInt(id)
         writeMediaDecodePayload(parcel, result)
-        callback.transact(IBinder.FIRST_CALL_TRANSACTION, parcel, null, IBinder.FLAG_ONEWAY)
+        val flags = if (synchronous) 0 else IBinder.FLAG_ONEWAY
+        val accepted = callback.transact(IBinder.FIRST_CALL_TRANSACTION, parcel, response, flags)
+        if (synchronous) {
+            val acknowledgement = checkNotNull(response)
+            check(accepted && acknowledgement.dataAvail() == 0 && !acknowledgement.hasFileDescriptors())
+        }
     } finally {
         parcel.recycle()
+        response?.recycle()
     }
 }
 

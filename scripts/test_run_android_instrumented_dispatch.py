@@ -1,6 +1,8 @@
 """Behavioral tests for explicitly dispatched Android instrumented suites."""
 import pathlib
 import subprocess
+import sys
+import xml.etree.ElementTree as ET
 import tempfile
 import unittest
 
@@ -102,6 +104,66 @@ class InstrumentedDispatchTest(unittest.TestCase):
         self.assertNotIn("PullRequestDeviceSmoke", output)
         with self.assertRaises(subprocess.CalledProcessError):
             self.run_dispatch("workflow_dispatch", "false", "false", "false", "true", fail_required=True)
+
+    def test_native_sandbox_player_and_corpus_are_selected_and_required(self):
+        directory = ROOT / "app/src/androidTest/java/dev/ipf/whitenoise/android/media/sandbox"
+        methods = {
+            "NativeMediaSandboxDeviceTest": (
+                "installerCoversExistingAndNewJavaAndNativeThreads",
+                "clone3IsDeniedOrThePlatformTerminatesItsDedicatedWorker",
+                "blockedNativeReadEndsWithObservedOsProcessDisappearance"),
+            "IsolatedAttachmentPlayerDeviceTest": (
+                "pausedSeekingSpeedPauseAndRepeatUseRealRawPlayback",
+                "pixelCopyBufferOutlivesTimedOutRequestUntilItsCallback"),
+            "MediaAvNativeCorpusDeviceTest": (
+                "commonVideoFormatsReturnRedPixelsFromFreshRestrictedWorkers",
+                "commonAudioFormatsReturnFiniteWaveformsAndDurations"),
+        }
+        focused = self.run_dispatch("workflow_dispatch", "false", "false", "false", "true")
+        for name, names in methods.items():
+            source = (directory / (name + ".kt")).read_text()
+            self.assertIn("@MediaContainmentAcceptance", source)
+            self.assertIn("@PullRequestDeviceSmoke", source)
+            for method in names:
+                self.assertIn("fun " + method + "()", source)
+                case = "dev.ipf.whitenoise.android.media.sandbox." + name + "#" + method
+                self.assertIn(case, focused)
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.run_dispatch("workflow_dispatch", "false", "false", "false", "true", fail_app=True)
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.run_dispatch("workflow_dispatch", "false", "false", "false", "true", fail_required=True)
+
+    def test_actual_checker_rejects_missing_or_skipped_selected_native_case(self):
+        focused = self.run_dispatch("workflow_dispatch", "false", "false", "false", "true")
+        cases = [line for line in focused.splitlines() if line.startswith("dev.ipf.") and "#" in line]
+        native = [line for line in cases if any("." + name + "#" in line for name in (
+            "NativeMediaSandboxDeviceTest", "IsolatedAttachmentPlayerDeviceTest", "MediaAvNativeCorpusDeviceTest"))]
+        self.assertEqual(7, len(native))
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            required = root / "required.txt"
+            required.write_text("\n".join(cases) + "\n")
+
+            def run(missing=None, skipped=None):
+                suite = ET.Element("testsuite")
+                for case in cases:
+                    if case == missing:
+                        continue
+                    classname, method = case.split("#")
+                    entry = ET.SubElement(suite, "testcase", classname=classname, name=method)
+                    if case == skipped:
+                        ET.SubElement(entry, "skipped")
+                ET.ElementTree(suite).write(root / "results.xml")
+                return subprocess.run([sys.executable, str(ROOT / "scripts/check_instrumented_required_cases.py"),
+                                       str(root), "--required", str(required)], capture_output=True, text=True)
+
+            self.assertEqual(0, run().returncode)
+            for case in native:
+                for condition in ("missing", "skipped"):
+                    with self.subTest(case=case, condition=condition):
+                        result = run(**{condition: case})
+                        self.assertNotEqual(0, result.returncode)
+                        self.assertIn(case, result.stderr)
 
     def test_baseline_is_required_in_focused_containment_and_excluded_from_pr_smoke(self):
         """Check real class annotations plus the dispatcher's actual required-case selection."""

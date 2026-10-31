@@ -8,7 +8,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.common.Player
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -25,19 +25,25 @@ class LocalVideoSourceTest {
     @get:Rule val composeRule = createComposeRule()
 
     @Test
-    fun onlyFileAndContentUrisCanCreateProgressiveSources() {
+    fun onlyFileAndContentUrisCanCreateIsolatedPlayers() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        assertNotNull(localVideoSource(context, Uri.parse("file:///selected/movie.m3u8")))
-        assertNotNull(localVideoSource(context, Uri.parse("content://fixture/selected/movie")))
+        listOf("file:///selected/movie.m3u8", "content://fixture/selected/movie").forEach { uri ->
+            val player = localVideoPlayer(context, Uri.parse(uri))
+            try {
+                assertNotNull(player)
+            } finally {
+                player?.release()
+            }
+        }
         listOf("https://fixture/movie", "rtsp://fixture/movie", "data:movie", "/relative/movie").forEach {
-            assertNull(localVideoSource(context, Uri.parse(it)))
+            assertNull(localVideoPlayer(context, Uri.parse(it)))
         }
     }
 
     @Test
     fun restoredUnsupportedUriStaysPlayerlessAcrossForegroundTransitions() {
         val lifecycle = FixtureLifecycleOwner()
-        var player: ExoPlayer? = null
+        var player: Player? = null
         composeRule.setContent {
             CompositionLocalProvider(LocalLifecycleOwner provides lifecycle) {
                 player = rememberDraftVideoPlayer(Uri.parse("https://fixture/restored"), active = true)

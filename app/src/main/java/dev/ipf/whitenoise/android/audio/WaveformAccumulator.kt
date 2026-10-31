@@ -48,6 +48,7 @@ internal class WaveformAccumulator {
         addChunk(sum, peak, frames)
     }
 
+    @Suppress("ReturnCount") // Empty and silent input return no waveform; successful input returns normalized bars.
     fun finish(): FloatArray? {
         if (totalFrames <= 0L) return null
 

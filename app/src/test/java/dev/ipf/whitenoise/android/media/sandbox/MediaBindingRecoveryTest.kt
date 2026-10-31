@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicReference
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(application = android.app.Application::class)
+@Suppress("LargeClass") // Binding and automatic-lane regressions share one exact process/descriptor lifetime fixture.
 class MediaBindingRecoveryTest {
     @Test
     fun terminalReplyAndDisconnectCannotAdmitAnotherInputBeforeDeath() {
@@ -704,7 +705,15 @@ class MediaBindingRecoveryTest {
     fun automaticSourceRefusalsAreBoundedByRevisionAndExpiryAndHealthySourceRecovers() {
         val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
         var clock = 1L
-        val transport = IsolatedMediaTransport(context, "automatic_av", MediaAvDecodeService::class.java) { clock }
+        val transport =
+            IsolatedMediaTransport(
+                context,
+                "automatic_av",
+                MediaAvDecodeService::class.java,
+                processWitnessFactory = context::processWitness,
+            ) {
+                clock
+            }
         val file = java.io.File.createTempFile("av-refusal-", ".bin")
         val calls = mutableListOf<AutomaticCall>()
 
@@ -741,7 +750,13 @@ class MediaBindingRecoveryTest {
     @Test
     fun automaticByteAndWaveformRefusalsDoNotCreateASecondWorkerForTheSameRevision() {
         val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
-        val transport = IsolatedMediaTransport(context, "automatic_av", MediaAvDecodeService::class.java)
+        val transport =
+            IsolatedMediaTransport(
+                context,
+                "automatic_av",
+                MediaAvDecodeService::class.java,
+                processWitnessFactory = context::processWitness,
+            )
         val file = java.io.File.createTempFile("waveform-refusal-", ".bin")
         val calls = mutableListOf<AutomaticCall>()
         try {
@@ -768,7 +783,13 @@ class MediaBindingRecoveryTest {
     @Test
     fun missingAttestationAndContentionDoNotQuarantineAndAccountResetClearsConfirmedRefusal() {
         val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
-        val transport = IsolatedMediaTransport(context, "automatic_av", MediaAvDecodeService::class.java)
+        val transport =
+            IsolatedMediaTransport(
+                context,
+                "automatic_av",
+                MediaAvDecodeService::class.java,
+                processWitnessFactory = context::processWitness,
+            )
         val file = java.io.File.createTempFile("av-reset-refusal-", ".bin")
         val calls = mutableListOf<AutomaticCall>()
 
@@ -805,17 +826,403 @@ class MediaBindingRecoveryTest {
         }
     }
 
+    @Test
+    fun automaticFinalReplyRequiresSynchronousExactKernelPid() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
+        val transport =
+            IsolatedMediaTransport(
+                context,
+                "automatic_av",
+                MediaAvDecodeService::class.java,
+                processWitnessFactory = context::processWitness,
+            )
+        val file = java.io.File.createTempFile("av-final-identity-", ".bin")
+        val calls = mutableListOf<AutomaticCall>()
+        try {
+            file.writeBytes(byteArrayOf(1))
+            val call = startAutomatic { transport.probe(file, 1, false) }.also { calls += it }
+            val worker = context.next()
+            assertTrue(worker.remote.decoded.await(2, TimeUnit.SECONDS))
+            val receipt = IsolatedMediaDecoder.lastAvIsolation
+            for ((synchronous, pid) in listOf(
+                false to worker.remote.identityPid,
+                true to worker.remote.identityPid + 1,
+            )) {
+                val identity =
+                    org.robolectric.shadows.ShadowBinder.CallingIdentity
+                        .newBuilder()
+                        .setUid(worker.remote.identityUid)
+                        .setPid(pid)
+                        .setUserHandle(android.os.Process.myUserHandle())
+                        .build()
+                val previous =
+                    org.robolectric.shadows.ShadowBinder
+                        .setCallingIdentityForCurrentThread(identity)
+                try {
+                    val outcome = runCatching { worker.remote.deliverHeldReply(Bundle(), synchronous = synchronous) }
+                    assertTrue(outcome.isFailure || outcome.getOrNull() == false)
+                    org.junit.Assert.assertSame(receipt, IsolatedMediaDecoder.lastAvIsolation)
+                    assertTrue(call.thread.isAlive)
+                } finally {
+                    org.robolectric.shadows.ShadowBinder
+                        .setCallingIdentityForCurrentThread(previous)
+                }
+            }
+            deliverAutomaticReply(worker, success = true)
+            call.join()
+            assertTrue(call.result.get() is MediaProbe)
+        } finally {
+            calls.forEach { it.interruptAndJoin() }
+            context.dieAll()
+            transport.close()
+            file.delete()
+        }
+    }
+
+    @Test
+    fun selectedUriCloseMustFinishBeforeAnotherAutomaticSourceCanBind() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
+        val transport =
+            IsolatedMediaTransport(
+                context,
+                "automatic_av",
+                MediaAvDecodeService::class.java,
+                processWitnessFactory = context::processWitness,
+            )
+        val file = java.io.File.createTempFile("av-held-uri-close-", ".bin")
+        val provider =
+            HeldSourceProvider(file).apply {
+                holdClose = true
+                release.countDown()
+            }
+        val authority = "held.automatic.close"
+        provider.attachInfo(
+            context,
+            android.content.pm
+                .ProviderInfo()
+                .apply { this.authority = authority },
+        )
+        ShadowContentResolver.registerProviderInternal(authority, provider)
+        val calls = mutableListOf<AutomaticCall>()
+        try {
+            file.writeBytes(byteArrayOf(1))
+            val first =
+                startAutomatic {
+                    transport.probeUri(context.contentResolver, Uri.parse("content://$authority/source"), 1)
+                }.also { calls += it }
+            assertTrue(provider.closeEntered.await(2, TimeUnit.SECONDS))
+            val second = startAutomatic { transport.probe(file, 1, false) }.also { calls += it }
+            assertNull("Selected URI cleanup still owns automatic admission", context.poll(250))
+            provider.closeRelease.countDown()
+            deliverAutomaticReply(context.next(), success = true)
+            first.join()
+            deliverAutomaticReply(context.next(), success = true)
+            second.join()
+            assertTrue(first.result.get() is MediaProbe)
+            assertTrue(second.result.get() is MediaProbe)
+        } finally {
+            provider.closeRelease.countDown()
+            calls.forEach { it.interruptAndJoin() }
+            context.dieAll()
+            transport.close()
+            file.delete()
+        }
+    }
+
+    @Test
+    @Suppress("LongMethod") // Failure, account replacement and exact synthetic capability teardown are one fixture.
+    fun selectedUriCloseFailureHoldsAcrossAccountResetWithoutAnotherSourceOpen() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
+        val transport =
+            IsolatedMediaTransport(
+                context,
+                "automatic_av",
+                MediaAvDecodeService::class.java,
+                processWitnessFactory = context::processWitness,
+            )
+        val file = java.io.File.createTempFile("av-failed-uri-close-", ".bin")
+        val provider =
+            HeldSourceProvider(file).apply {
+                failClose = true
+                release.countDown()
+            }
+        val authority = "failed.automatic.close"
+        provider.attachInfo(
+            context,
+            android.content.pm
+                .ProviderInfo()
+                .apply { this.authority = authority },
+        )
+        ShadowContentResolver.registerProviderInternal(authority, provider)
+        val calls = mutableListOf<AutomaticCall>()
+        try {
+            file.writeBytes(byteArrayOf(1))
+            val first =
+                startAutomatic {
+                    transport.probeUri(context.contentResolver, Uri.parse("content://$authority/source"), 1)
+                }.also { calls += it }
+            assertTrue(first.joinFailure() is java.io.IOException)
+            transport.activateSession()
+            val held =
+                startAutomatic {
+                    transport.probeUri(context.contentResolver, Uri.parse("content://$authority/source"), 1)
+                }.also { calls += it }
+            held.join()
+            assertNull(held.result.get())
+            assertEquals(1, provider.openCount)
+            assertEquals(0, context.bindings.size)
+        } finally {
+            provider.failClose = false
+            // Teardown closes only synthetic capabilities; the production ledger remains failed, never reset.
+            val field =
+                IsolatedMediaTransport::class.java.getDeclaredField("parentResources").apply {
+                    isAccessible =
+                        true
+                }
+            val resources = field.get(transport) as MediaParentResources
+            val held = MediaParentResources::class.java.getDeclaredField("held").apply { isAccessible = true }
+
+            @Suppress("UNCHECKED_CAST")
+            val owners = synchronized(resources) { (held.get(resources) as Set<MediaParentResource<*>>).toList() }
+            owners.forEach { runCatching { it.value.close() } }
+            calls.forEach {
+                it.thread.interrupt()
+                it.thread.join(2000)
+            }
+            transport.close()
+            file.delete()
+        }
+    }
+
+    @Test
+    fun lateAccountReadyCannotHandOffInputAndNewUidWaitsForOldProcessAbsence() {
+        val context =
+            BindingFixture(ApplicationProvider.getApplicationContext(), reply = false).apply {
+                holdIdentity =
+                    true
+            }
+        val transport =
+            IsolatedMediaTransport(
+                context,
+                "automatic_av",
+                MediaAvDecodeService::class.java,
+                processWitnessFactory = context::processWitness,
+            )
+        val file = java.io.File.createTempFile("av-late-ready-", ".bin")
+        val calls = mutableListOf<AutomaticCall>()
+        try {
+            file.writeBytes(byteArrayOf(1))
+            val old = startAutomatic { transport.probe(file, 1, false) }.also { calls += it }
+            val worker = context.next()
+            assertTrue(worker.remote.identityRequested.await(2, TimeUnit.SECONDS))
+            transport.activateSession()
+            old.join() // Revoking the READY wait must not spend the old caller's full deadline.
+            assertNull(old.result.get())
+            assertFalse(worker.remote.deliverIdentity()) // Late identity is usable only for exact old-process cleanup.
+            assertEquals(0, worker.remote.requests)
+            val held = startAutomatic { transport.probe(file, 1, false) }.also { calls += it }
+            held.join()
+            assertNull(held.result.get())
+            assertEquals(1, context.bindings.size)
+            worker.remote.die()
+            assertTrue(awaitAutomaticRelease(transport))
+            val next = startAutomatic { transport.probe(file, 1, false) }.also { calls += it }
+            val replacement = context.next()
+            assertTrue(replacement.remote.identityRequested.await(2, TimeUnit.SECONDS))
+            replacement.remote.identityUid += 1
+            replacement.remote.identityPid += 1
+            assertTrue(replacement.remote.deliverIdentity())
+            deliverAutomaticReply(replacement, success = true)
+            next.join()
+            assertTrue(next.result.get() is MediaProbe)
+            assertEquals(replacement.remote.identityUid, IsolatedMediaDecoder.lastAvIsolation?.uid)
+        } finally {
+            calls.forEach { it.interruptAndJoin() }
+            context.dieAll()
+            transport.close()
+            file.delete()
+        }
+    }
+
+    @Test
+    fun automaticFalseBindNeedsOneSuccessfulUnbindBeforeReplacement() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
+        context.acceptBind = false
+        val transport =
+            IsolatedMediaTransport(
+                context,
+                "automatic_av",
+                MediaAvDecodeService::class.java,
+                processWitnessFactory = context::processWitness,
+            )
+        val file = java.io.File.createTempFile("av-false-bind-", ".bin")
+        try {
+            file.writeBytes(byteArrayOf(1))
+            repeat(2) {
+                val call = startAutomatic { transport.probe(file, 1, false) }
+                call.join()
+                assertNull(call.result.get())
+                assertTrue(awaitAutomaticRelease(transport))
+            }
+            assertEquals(2, context.bindings.size)
+            assertEquals(2, context.unbound.size)
+            assertTrue(context.bindings.all { it.remote.requests == 0 })
+        } finally {
+            transport.close()
+            file.delete()
+        }
+    }
+
+    @Test
+    fun automaticUnbindFailureHoldsEvenAfterConfirmedProcessAbsence() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
+        context.failUnbind = true
+        val transport =
+            IsolatedMediaTransport(
+                context,
+                "automatic_av",
+                MediaAvDecodeService::class.java,
+                processWitnessFactory = context::processWitness,
+            )
+        val file = java.io.File.createTempFile("av-unbind-refusal-", ".bin")
+        val calls = mutableListOf<AutomaticCall>()
+        try {
+            file.writeBytes(byteArrayOf(1))
+            val first = startAutomatic { transport.probe(file, 1, false) }.also { calls += it }
+            deliverAutomaticReply(context.next(), success = true)
+            assertTrue(first.thread.isAlive)
+            first.interruptAndJoin()
+            assertNull(first.result.get())
+            val held = startAutomatic { transport.probe(file, 1, false) }.also { calls += it }
+            held.join()
+            assertNull(held.result.get())
+            assertEquals(1, context.bindings.size)
+            assertEquals(1, context.unbound.size)
+        } finally {
+            calls.forEach { it.interruptAndJoin() }
+            transport.close()
+            stopAutomaticObserver(transport)
+            file.delete()
+        }
+    }
+
+    @Test
+    fun failedLiveCalibrationCannotHandOffInputOrReleaseAnUnknownProcess() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
+        context.kernelErrnoOverride = android.system.OsConstants.ESRCH
+        val transport =
+            IsolatedMediaTransport(
+                context,
+                "automatic_av",
+                MediaAvDecodeService::class.java,
+                processWitnessFactory = context::processWitness,
+            )
+        val file = java.io.File.createTempFile("av-calibration-refusal-", ".bin")
+        val calls = mutableListOf<AutomaticCall>()
+        try {
+            file.writeBytes(byteArrayOf(1))
+            val first = startAutomatic { transport.probe(file, 1, false) }.also { calls += it }
+            val worker = context.next()
+            first.join()
+            assertNull(first.result.get())
+            assertEquals(0, worker.remote.requests)
+            assertFalse(transport.isRequestDispatchedForTest())
+            worker.remote.die()
+            val held = startAutomatic { transport.probe(file, 1, false) }.also { calls += it }
+            held.join()
+            assertNull(held.result.get())
+            assertEquals(1, context.bindings.size)
+        } finally {
+            calls.forEach { it.interruptAndJoin() }
+            transport.close()
+            // The synthetic always-ESRCH vendor fault deliberately leaves production ownership held.
+            // End only this fixture's private observer thread; do not manufacture admission release.
+            stopAutomaticObserver(transport)
+            file.delete()
+        }
+    }
+
+    @Test
+    fun automaticBinderDeathCannotCopyOrReplaceWhileKernelProcessIsAlive() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
+        val transport =
+            IsolatedMediaTransport(
+                context,
+                "automatic_av",
+                MediaAvDecodeService::class.java,
+                processWitnessFactory = context::processWitness,
+            )
+        val file = java.io.File.createTempFile("av-process-witness-", ".bin")
+        val calls = mutableListOf<AutomaticCall>()
+        try {
+            file.writeBytes(byteArrayOf(1))
+            val first = startAutomatic { transport.probe(file, 1, false) }.also { calls += it }
+            val worker = context.next()
+            deliverAutomaticReply(worker, success = true, processGone = false)
+            // A successful primitive reply and Binder death still cannot publish output.
+            assertTrue(first.thread.isAlive)
+            first.interruptAndJoin()
+            assertNull(first.result.get())
+            val held = startAutomatic { transport.probe(file, 1, false) }.also { calls += it }
+            held.join()
+            assertNull(held.result.get())
+            assertEquals(1, context.bindings.size)
+            assertTrue(worker.remote.processAlive)
+            worker.remote.die() // Only injected ESRCH can retire this exact generation.
+            assertTrue(awaitAutomaticRelease(transport))
+            val next = startAutomatic { transport.probe(file, 1, false) }.also { calls += it }
+            deliverAutomaticReply(context.next(), success = true)
+            next.join()
+            assertTrue(next.result.get() is MediaProbe)
+            assertEquals(2, context.bindings.size)
+        } finally {
+            calls.forEach { it.interruptAndJoin() }
+            context.dieAll()
+            transport.close()
+            file.delete()
+        }
+    }
+
+    private fun awaitAutomaticRelease(transport: IsolatedMediaTransport): Boolean {
+        val owner = IsolatedMediaTransport::class.java.getDeclaredField("bindingLock").apply { isAccessible = true }
+        val worker = IsolatedMediaTransport::class.java.getDeclaredField("worker").apply { isAccessible = true }
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+        while (System.nanoTime() < deadline) {
+            if (synchronized(owner.get(transport)) { worker.get(transport) == null }) return true
+            Thread.sleep(10)
+        }
+        return false
+    }
+
+    private fun stopAutomaticObserver(transport: IsolatedMediaTransport) {
+        val field = IsolatedMediaTransport::class.java.getDeclaredField("callbackThread").apply { isAccessible = true }
+
+        @Suppress("UNCHECKED_CAST")
+        val observer = field.get(transport) as Lazy<android.os.HandlerThread>
+        if (observer.isInitialized()) observer.value.quitSafely()
+        val retirementField =
+            IsolatedMediaTransport::class.java.getDeclaredField("retirementThread").apply {
+                isAccessible =
+                    true
+            }
+
+        @Suppress("UNCHECKED_CAST")
+        val retirement = retirementField.get(transport) as Lazy<java.util.concurrent.ExecutorService>
+        if (retirement.isInitialized()) retirement.value.shutdown()
+    }
+
     /** Simulated kernel identity only; real process/death qualification remains an instrumentation gate. */
     private fun deliverAutomaticReply(
         worker: Bound,
         success: Boolean,
+        processGone: Boolean = true,
     ) {
         assertTrue(worker.remote.decoded.await(2, TimeUnit.SECONDS))
         val identity =
             org.robolectric.shadows.ShadowBinder.CallingIdentity
                 .newBuilder()
-                .setUid(android.os.Process.myUid() + 1)
-                .setPid(android.os.Process.myPid() + 1)
+                .setUid(worker.remote.identityUid)
+                .setPid(worker.remote.identityPid)
                 .setUserHandle(android.os.Process.myUserHandle())
                 .build()
         val previous =
@@ -829,6 +1236,7 @@ class MediaBindingRecoveryTest {
                         putBoolean("success", success)
                         putLong("duration", if (success) 1000L else 0L)
                     },
+                    synchronous = true,
                 ),
             )
         } finally {
@@ -836,7 +1244,7 @@ class MediaBindingRecoveryTest {
                 .setCallingIdentityForCurrentThread(previous)
         }
         assertTrue(worker.remote.retired.await(2, TimeUnit.SECONDS))
-        worker.remote.die()
+        if (processGone) worker.remote.die() else worker.remote.dieBinderOnly()
     }
 
     private fun startAutomatic(block: () -> Any?): AutomaticCall {
@@ -864,6 +1272,12 @@ class MediaBindingRecoveryTest {
             thread.join(2000)
             assertFalse("Automatic media caller must finish", thread.isAlive)
             failed.get()?.let { throw AssertionError("Automatic media fixture failed", it) }
+        }
+
+        fun joinFailure(): Throwable {
+            thread.join(2000)
+            assertFalse("Automatic failure caller must finish", thread.isAlive)
+            return checkNotNull(failed.get())
         }
 
         fun interruptAndJoin() {
@@ -909,6 +1323,11 @@ class MediaBindingRecoveryTest {
     ) : ContentProvider() {
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
+        val closeEntered = CountDownLatch(1)
+        val closeRelease = CountDownLatch(1)
+        var holdClose = false
+        var failClose = false
+        var openCount = 0
 
         override fun onCreate(): Boolean = true
 
@@ -918,10 +1337,20 @@ class MediaBindingRecoveryTest {
             uri: Uri,
             mode: String,
         ): AssetFileDescriptor {
+            openCount++
             entered.countDown()
             check(release.await(2, TimeUnit.SECONDS))
             val input = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-            return AssetFileDescriptor(input, 0, file.length())
+            return object : AssetFileDescriptor(input, 0, file.length()) {
+                override fun close() {
+                    if (holdClose) {
+                        closeEntered.countDown()
+                        check(closeRelease.await(5, TimeUnit.SECONDS))
+                    }
+                    if (failClose) throw java.io.IOException("Synthetic provider close failure")
+                    super.close()
+                }
+            }
         }
 
         override fun query(
@@ -964,6 +1393,9 @@ class MediaBindingRecoveryTest {
         private val failLink: Boolean = false,
         private val beforeBind: () -> Unit = {},
     ) : ContextWrapper(base) {
+        var holdIdentity = false
+        var kernelErrnoOverride: Int? = null
+        var failUnbind = false
         var acceptBind = true
         val bindings = mutableListOf<Bound>()
         val instanceNames = mutableListOf<String>()
@@ -971,6 +1403,21 @@ class MediaBindingRecoveryTest {
         val unbound = mutableListOf<ServiceConnection>()
         val component = ComponentName(base, MediaDecodeService::class.java)
         private val arrivals = LinkedBlockingQueue<Bound>()
+
+        fun processWitness(): KernelProcessWitness =
+            KernelProcessWitness { _, signal ->
+                check(signal == 0)
+                val alive = synchronized(bindings) { bindings.lastOrNull()?.remote?.processAlive }
+                val errno =
+                    kernelErrnoOverride ?: when (alive) {
+                        true -> android.system.OsConstants.EPERM
+                        false -> android.system.OsConstants.ESRCH
+                        null -> android.system.OsConstants.ENOSYS
+                    }
+                throw android.system.ErrnoException("kill", errno)
+            }
+
+        fun poll(timeoutMs: Long): Bound? = arrivals.poll(timeoutMs, TimeUnit.MILLISECONDS)
 
         fun next(): Bound = checkNotNull(arrivals.poll(2, TimeUnit.SECONDS)) { "Binding was not admitted" }
 
@@ -984,7 +1431,7 @@ class MediaBindingRecoveryTest {
             conn: ServiceConnection,
         ): Boolean {
             beforeBind()
-            val bound = Bound(conn, ReplyingBinder(reply, failLink))
+            val bound = Bound(conn, ReplyingBinder(reply, failLink, holdIdentity))
             synchronized(bindings) {
                 bindings += bound
                 instanceNames += instanceName
@@ -1001,6 +1448,7 @@ class MediaBindingRecoveryTest {
 
         override fun unbindService(conn: ServiceConnection) {
             unbound += conn
+            if (failUnbind) throw IllegalStateException("Synthetic unbind failure")
         }
     }
 
@@ -1008,10 +1456,16 @@ class MediaBindingRecoveryTest {
     private class ReplyingBinder(
         private val reply: Boolean,
         private val failLink: Boolean,
+        private val holdIdentity: Boolean = false,
     ) : Binder() {
         private val recipients = mutableListOf<IBinder.DeathRecipient>()
 
         @Volatile private var heldReply: Pair<IBinder, Int>? = null
+
+        @Volatile private var heldIdentity: Pair<IBinder, Int>? = null
+        var identityUid = android.os.Process.myUid() + 1
+        var identityPid = android.os.Process.myPid() + 1
+        val identityRequested = CountDownLatch(1)
         val beforeRetire = AtomicReference<(() -> Unit)?>(null)
         val retired = CountDownLatch(1)
         val decoded = CountDownLatch(1)
@@ -1034,9 +1488,39 @@ class MediaBindingRecoveryTest {
             flags: Int,
         ): Boolean = true
 
-        fun die() = synchronized(recipients) { recipients.toList() }.forEach { it.binderDied() }
+        @Volatile var processAlive = true
 
-        fun deliverHeldReply(result: Bundle = Bundle()): Boolean {
+        fun dieBinderOnly() = synchronized(recipients) { recipients.toList() }.forEach { it.binderDied() }
+
+        fun die() {
+            processAlive = false
+            dieBinderOnly()
+        }
+
+        fun deliverIdentity(): Boolean {
+            val (callback, request) = checkNotNull(heldIdentity)
+            val identity =
+                org.robolectric.shadows.ShadowBinder.CallingIdentity
+                    .newBuilder()
+                    .setUid(identityUid)
+                    .setPid(identityPid)
+                    .setUserHandle(android.os.Process.myUserHandle())
+                    .build()
+            val previous =
+                org.robolectric.shadows.ShadowBinder
+                    .setCallingIdentityForCurrentThread(identity)
+            return try {
+                sendAutomaticAvIdentity(callback, request)
+            } finally {
+                org.robolectric.shadows.ShadowBinder
+                    .setCallingIdentityForCurrentThread(previous)
+            }
+        }
+
+        fun deliverHeldReply(
+            result: Bundle = Bundle(),
+            synchronous: Boolean = false,
+        ): Boolean {
             val (callback, id) = checkNotNull(heldReply)
             var accepted: Boolean? = null
             val recording =
@@ -1048,7 +1532,7 @@ class MediaBindingRecoveryTest {
                         flags: Int,
                     ): Boolean = callback.transact(code, data, reply, flags).also { accepted = it }
                 }
-            sendMediaDecodeReply(recording, id, result)
+            sendMediaDecodeReply(recording, id, result, synchronous = synchronous)
             return checkNotNull(accepted)
         }
 
@@ -1062,6 +1546,11 @@ class MediaBindingRecoveryTest {
             data.enforceInterface("android.os.IMessenger")
             if (data.readInt() != 0) {
                 val message = Message.CREATOR.createFromParcel(data)
+                if (message.what == AutomaticAvIdentity.MESSAGE) {
+                    heldIdentity = message.replyTo.binder to message.arg1
+                    identityRequested.countDown()
+                    if (!holdIdentity) deliverIdentity()
+                }
                 if (message.what == MediaDecodePolicy.RETIRE) {
                     beforeRetire.getAndSet(null)?.invoke()
                     retired.countDown()

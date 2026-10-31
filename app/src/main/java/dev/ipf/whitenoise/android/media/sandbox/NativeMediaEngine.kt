@@ -36,5 +36,11 @@ internal object NativeMediaEngine {
         timeUs: Long,
     )
 
+    // Bounded zero-argument diagnostics; consumers must validate the versioned nine-scalar reply.
+    @JvmStatic external fun nativeSandboxDiagnostics(): LongArray
+
+    // Only a disposable debug-test worker probes this: Android may SIGSYS clone3 before returning errno.
+    @JvmStatic external fun nativeSandboxClone3Errno(): Int
+
     @JvmStatic external fun nativeClose(handle: Long)
 }

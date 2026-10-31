@@ -93,21 +93,7 @@ private class AvCapabilityCampaign(
     ): Boolean {
         fixture.writeBytes(case.bytes)
         val length = if (case.id == "overflow_range") Long.MAX_VALUE else fixture.length()
-        val row =
-            JSONObject()
-                .put("type", "case")
-                .put("case", case.id)
-                .put("run_token", token)
-                .put("request", index + 1)
-                .put("stage", case.stage)
-                .put(
-                    "input_sha256",
-                    java.security.MessageDigest
-                        .getInstance("SHA-256")
-                        .digest(case.bytes)
-                        .joinToString("") { "%02x".format(it) },
-                ).put("input_bytes", case.bytes.size)
-                .put("format", case.format)
+        val row = caseRow(index, case)
         var failed = false
         var emitted = false
         try {
@@ -153,6 +139,25 @@ private class AvCapabilityCampaign(
         }
         return failed
     }
+
+    private fun caseRow(
+        index: Int,
+        case: ProbeCase,
+    ): JSONObject =
+        JSONObject()
+            .put("type", "case")
+            .put("case", case.id)
+            .put("run_token", token)
+            .put("request", index + 1)
+            .put("stage", case.stage)
+            .put(
+                "input_sha256",
+                java.security.MessageDigest
+                    .getInstance("SHA-256")
+                    .digest(case.bytes)
+                    .joinToString("") { "%02x".format(it) },
+            ).put("input_bytes", case.bytes.size)
+            .put("format", case.format)
 
     private fun request(
         id: Int,

@@ -23,6 +23,8 @@ class MediaAvDecodeService : Service() {
     private val watchdog = Executors.newSingleThreadScheduledExecutor()
     private val messenger = Messenger(Handler(Looper.getMainLooper(), ::accept))
     private var admitted = false
+    private var identityRequest = 0
+    private var identityReply: android.os.IBinder? = null
 
     override fun onBind(intent: Intent) = messenger.binder
 
@@ -33,8 +35,10 @@ class MediaAvDecodeService : Service() {
             Process.killProcess(Process.myPid())
             return true
         }
+        if (message.what == AutomaticAvIdentity.MESSAGE) return acceptIdentity(message)
         if (message.what != MediaDecodePolicy.DECODE || admitted) return true
         val reply = message.replyTo?.binder ?: return true
+        if (identityRequest != message.arg1 || identityReply != reply) return true
         admitted = true
         val data = Bundle(message.data)
         val requestId = message.arg1
@@ -44,7 +48,7 @@ class MediaAvDecodeService : Service() {
             } else {
                 MediaDecodePolicy.WATCHDOG_MS
             }
-        // Never cancel the hard kill after a reply: a missing host retirement still cannot retain this process.
+        // Keep the trusted watchdog armed after a reply; host ownership still requires kernel process absence.
         watchdog.schedule({ Process.killProcess(Process.myPid()) }, limit, TimeUnit.MILLISECONDS)
         codec.execute {
             val response = isolation(data)
@@ -60,7 +64,20 @@ class MediaAvDecodeService : Service() {
                 } catch (_: OutOfMemoryError) {
                     Bundle()
                 }
-            runCatching { sendMediaDecodeReply(reply, requestId, result) }
+            runCatching { sendMediaDecodeReply(reply, requestId, result, synchronous = true) }
+        }
+        return true
+    }
+
+    /** No descriptor or output capability is admitted before the calibrated synchronous callback. */
+    @Suppress("ReturnCount") // Each input-free identity refusal precedes descriptor/native admission.
+    private fun acceptIdentity(message: Message): Boolean {
+        if (admitted || identityRequest != 0 || message.arg1 <= 0) return true
+        val reply = message.replyTo?.binder ?: return true
+        identityRequest = message.arg1
+        identityReply = reply
+        if (!runCatching { sendAutomaticAvIdentity(reply, message.arg1) }.getOrDefault(false)) {
+            Process.killProcess(Process.myPid())
         }
         return true
     }
@@ -74,6 +91,11 @@ class MediaAvDecodeService : Service() {
                 if (data.getInt("version") != MediaDecodePolicy.VERSION) return result
                 val operation = data.getInt("operation")
                 if (operation != MediaDecodePolicy.PROBE && operation != MediaDecodePolicy.WAVEFORM) return result
+                if (data.getLong("positionUs") !in
+                    0..TimeUnit.MILLISECONDS.toMicros(MAX_MEDIA_DURATION_MS)
+                ) {
+                    return result
+                }
                 val edge = data.getInt("edge")
                 if (MediaDecodePolicy.outputCapacity(edge) == null) return result
                 val length = data.getLong("length")
@@ -88,7 +110,7 @@ class MediaAvDecodeService : Service() {
                 val handle = NativeMediaEngine.nativeOpen(input.fd, offset, length, edge)
                 if (handle == 0L) return result
                 try {
-                    if (fillResult(handle, data, edge, output, result)) result.putBoolean("success", true)
+                    if (fillResult(handle, data, output, result)) result.putBoolean("success", true)
                 } finally {
                     NativeMediaEngine.nativeClose(handle)
                 }
@@ -101,7 +123,6 @@ class MediaAvDecodeService : Service() {
     private fun fillResult(
         handle: Long,
         data: Bundle,
-        edge: Int,
         output: SharedMemory,
         result: Bundle,
     ): Boolean {
@@ -109,13 +130,13 @@ class MediaAvDecodeService : Service() {
         val swapped = info.rotationDegrees == 90 || info.rotationDegrees == 270
         result.putInt("sourceWidth", if (swapped) info.height else info.width)
         result.putInt("sourceHeight", if (swapped) info.width else info.height)
-        result.putLong("duration", info.durationUs / 1000)
+        result.putLong("duration", TimeUnit.MICROSECONDS.toMillis(info.durationUs))
         if (data.getInt("operation") == MediaDecodePolicy.WAVEFORM) {
             if (info.channels == 0) return false
             val values = waveform(handle) ?: return false
             result.putFloatArray("waveform", values)
         } else if (data.getBoolean("oriented") && info.width > 0) {
-            return poster(handle, info.rotationDegrees, edge, output, result)
+            return poster(handle, info.rotationDegrees, data, output, result)
         }
         return true
     }
@@ -144,20 +165,22 @@ class MediaAvDecodeService : Service() {
     private fun poster(
         handle: Long,
         rotation: Int,
-        edge: Int,
+        data: Bundle,
         output: SharedMemory,
         result: Bundle,
     ): Boolean {
+        val edge = data.getInt("edge")
+        val targetUs = data.getLong("positionUs")
         val capacity = checkNotNull(MediaDecodePolicy.outputCapacity(edge))
         if (output.size < capacity) return false
+        if (targetUs > 0) NativeMediaEngine.nativeSeek(handle, targetUs)
         val pixels = output.mapReadWrite()
-        try {
+        return try {
             val source = if (rotation == 0) pixels else ByteBuffer.allocateDirect(capacity)
-            repeat(MAX_READS) {
-                source.clear()
-                val frame = NativeMediaOutputPolicy.frame(NativeMediaEngine.nativeRead(handle, source, null), edge)
-                if (frame.kind == 0) return false
-                check(frame.kind == 1) { "Unrequested PCM output" }
+            val frame = readPosterFrame(handle, source, edge, targetUs)
+            if (frame == null) {
+                false
+            } else {
                 val swapped = rotation == 90 || rotation == 270
                 val width = if (swapped) frame.height else frame.width
                 val height = if (swapped) frame.width else frame.height
@@ -165,12 +188,30 @@ class MediaAvDecodeService : Service() {
                 result.putInt("width", width)
                 result.putInt("height", height)
                 result.putBoolean("pixels", true)
-                return true
+                true
             }
         } finally {
             SharedMemory.unmap(pixels)
         }
-        return false
+    }
+
+    @Suppress("ReturnCount") // EOF, the target frame and the bounded iteration limit are distinct outcomes.
+    private fun readPosterFrame(
+        handle: Long,
+        source: ByteBuffer,
+        edge: Int,
+        targetUs: Long,
+    ): NativeMediaFrame? {
+        var previous: NativeMediaFrame? = null
+        repeat(MAX_READS) {
+            source.clear()
+            val frame = NativeMediaOutputPolicy.frame(NativeMediaEngine.nativeRead(handle, source, null), edge)
+            if (frame.kind == 0) return previous
+            check(frame.kind == 1) { "Unrequested PCM output" }
+            if (frame.ptsUs >= targetUs) return frame
+            previous = frame.takeIf { it.ptsUs >= 0 }
+        }
+        return null
     }
 
     private fun isolation(data: Bundle): Bundle =

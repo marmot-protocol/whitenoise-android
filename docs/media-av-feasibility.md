@@ -1,12 +1,21 @@
 # Audio/video containment feasibility
 
-This study concerns attachment parsing in [#3374](https://github.com/marmot-protocol/whitenoise-android/issues/3374).
-The selected-descriptor isolated prototype is available in debug builds. The production automatic lane now performs selected-descriptor software decoding
-in an isolated UID. Current-source platform/output qualification is pending.
-Playback and transcription retain the app-process exposure described below until
-their migration is complete.
+This document retains the original attachment-parsing study for
+[#3374](https://github.com/marmot-protocol/whitenoise-android/issues/3374).
+The inventory and explicit-playback decision below describe the pre-migration
+baseline. The current implementation is documented in
+[Multimedia containment](media-containment.md): automatic output, local attachment
+playback, voice playback and transcription now use isolated software decoders.
+Media3 controls operate over raw output; historical app-process parser entries
+below do not describe the new local-attachment path. Current-source build,
+API 30/current-API, corpus, visual and performance qualification remain pending.
+Remote Nostr network playback retains its separate platform path.
 
-## Process and capability inventory
+## Historical process and capability inventory
+
+This table records the automatic-only implementation stage: software automatic
+outputs were present, while playback and transcription still used their prior
+app-process paths. It is retained as the migration baseline.
 
 | Path | Parser and process | Input and output capabilities | Residual exposure |
 | --- | --- | --- | --- |
@@ -44,7 +53,7 @@ retains the app UID and its private-data access.
 | Existing isolated service with platform media clients | Permissionless UID; selected descriptor and reply capabilities | Retain as the measured prototype. API 30 service lookup blocks the retriever; successful parsing is unqualified on the tested corpus |
 | Separate same-UID `:media` service | Retains app data and permissions | Can contain some crashes and provide a killable process. It cannot satisfy the requested least-privilege boundary |
 | App-side media-service proxy or general opener | Delegates app capabilities into the worker | Excluded from this prototype: it changes the measured authority and needs a separately bounded protocol/security review |
-| Bundled software demuxer/decoder in an isolated service | Selected-input authority with raw outputs | Selected for production: pinned FFmpeg 9.0.2 plus dav1d 1.5.4, disabled network/protocols and secondary opens, bounded output and explicit resource refusals. Automatic lane integrated; playback and platform qualification pending |
+| Bundled software demuxer/decoder in an isolated service | Selected-input authority with raw outputs | Selected for production: pinned FFmpeg 9.0.2 plus dav1d 1.5.4, disabled network/protocols and secondary opens, bounded output and explicit resource refusals. Automatic lane was integrated at this decision; the current playback implementation and all current-source platform qualification are described above |
 | Separate installed permissionless package | Separate app sandbox, installation and IPC contract | Changes packaging/distribution and upgrade behavior; outside the unchanged playback-UX constraint |
 
 Explicit playback decision: preserve the current local-source players and audio
@@ -85,17 +94,21 @@ the independent kill. A missing READY, death witness or successful handle cleanu
 stops admission. Late output is discarded. Production account invalidation stays
 with the existing media/account owners; the debug experiment has no account.
 
-The current campaign includes malformed/truncated input and callback protocol
+The historical campaign includes malformed/truncated input and callback protocol
 fixtures, but supplies no complete production account-change or background/resume
-qualification. App-process native work remains non-killable without terminating
-the app. Endpoint death alone also supplies no descendant-process lifetime proof.
+qualification. Its old app-process parsing paths required terminating the app to
+stop native work. Endpoint death alone supplies no descendant-process lifetime proof.
 
-The production automatic route uses the existing primitive reply protocol: the
-host validates the kernel callback UID and per-request Binder capability, then
-requires exact worker death before copying pixels. It does not claim the debug
-experiment's READY/PID/token handshake.
+The current production automatic route requires a synchronous kernel UID/PID
+READY callback before input dispatch. The parent calibrates the PID as present,
+checks the final callback against the same UID/PID and per-request capability,
+and requires a later ESRCH observation and successful unbind before copying
+output. Replacement also waits for parent-resource cleanup. Binder endpoint
+death alone leaves admission held. A mandatory
+TSYNC seccomp filter denies process creation before native parsing. These source
+contracts require current-source kernel and device qualification.
 
-## Remaining qualification and implementation slices
+## Historical implementation sequence and remaining qualification
 
 1. Run the changed capture/report contract on API 30 and API 36 through the
    focused hosted containment campaign. Preserve exact source/APK, JUnit and raw
@@ -105,14 +118,14 @@ experiment's READY/PID/token handshake.
    and threads across repeated failures and healthy recovery on the same corpus.
    The historical reports do not establish a production memory or throughput
    budget. Increasing deadlines cannot supply a denied service capability.
-3. Select a bounded software parsing alternative only after its maintenance,
-   format coverage and resource costs are reviewed. Prototype automatic outputs
-   first, with cancellation and noncooperative-call retirement.
+3. The software parsing alternative is implemented. Qualify its maintenance,
+   format coverage and resource costs, including cancellation and
+   noncooperative-call retirement.
 4. Qualify explicit surface/audio playback separately, including account changes,
    seeking, focus, loop state and background/resume. Keep current exposure visible
-   until that implementation is reviewed and measured.
+   until the implemented path is reviewed and measured.
 
 The implementation now includes the native source build, isolated automatic
-poster/duration/waveform route and report validation. Playback/transcription
-migration and positive current-source platform evidence remain required; #3374
-stays open.
+poster/duration/waveform route, raw-output playback, attachment transcription and
+report validation. Positive current-source build, platform, compatibility and
+performance evidence remain required; #3374 stays open.
