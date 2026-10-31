@@ -180,12 +180,14 @@ internal fun FocusedTextMessagePreview(
             lastLineBaseline = { lastLineBaseline.takeIf { warning == null } },
         ) {
             Column {
+                // Weighted, so the warning is measured first and a short frame shortens the excerpt
+                // rather than squeezing the warning out of view.
                 MarkdownTimestampText(
                     text = excerpt,
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = if (compact) 1 else FOCUSED_PREVIEW_TEXT_LINES,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.testTag("message-actions-excerpt"),
+                    modifier = Modifier.weight(1f, fill = false).testTag("message-actions-excerpt"),
                     onTextLayout = { layout ->
                         lastLineLayout = layout
                     },

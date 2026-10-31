@@ -55,15 +55,32 @@ internal fun BubbleFooterLayout(
             Box { footer() }
         },
     ) { measurables, constraints ->
+        val gap = BubbleFooterGap.roundToPx()
         val footerPlaceable = measurables[1].measure(constraints.copy(minWidth = 0, minHeight = 0))
-        val contentPlaceable = measurables[0].measure(constraints.copy(minWidth = 0))
+        // A footer that drops below the body needs its own row (issue #3532). Clamping only the reported
+        // height would place it below the layout, where a clipping parent such as the focused-message
+        // preview hides it, so a bounded body gives up that row. Transcript bubbles are unbounded.
+        val bodyMaxHeight =
+            if (constraints.hasBoundedHeight && footerPlaceable.height > 0) {
+                (constraints.maxHeight - footerPlaceable.height - gap / 2).coerceAtLeast(0)
+            } else {
+                constraints.maxHeight
+            }
+        val contentPlaceable =
+            measurables[0].measure(
+                constraints.copy(
+                    minWidth = 0,
+                    minHeight = minOf(constraints.minHeight, bodyMaxHeight),
+                    maxHeight = bodyMaxHeight,
+                ),
+            )
         layoutMeasuredBubbleFooter(
             constraints = constraints,
             content = contentPlaceable,
             footer = footerPlaceable,
             lastLineWidth = lastLineWidth(),
             lastLineBaseline = lastLineBaseline(),
-            gap = BubbleFooterGap.roundToPx(),
+            gap = gap,
             allowInline = allowInline,
         )
     }

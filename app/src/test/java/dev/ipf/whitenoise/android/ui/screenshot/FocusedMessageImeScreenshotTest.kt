@@ -7,6 +7,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.IntRect
@@ -50,6 +51,36 @@ class FocusedMessageImeScreenshotTest {
     @Test
     fun captionedMediaAtLargeFontKeepsFooterVisible() {
         capture("focused_overlay_keyboard_captioned_media_large_font_dark", dark = true, fontScale = 2f, media = true)
+    }
+
+    /** Just above the compact boundary, a reply and warning still leave the wrapped footer in view (issue #3532). */
+    @Test
+    fun replyAndWarningInAShortFrameKeepFooterVisible() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, fontScale = 2f) {
+                Box(
+                    Modifier
+                        .size(260.dp, 230.dp)
+                        .background(MaterialTheme.colorScheme.background)
+                        .testTag("short-frame"),
+                ) {
+                    FocusedTextMessagePreview(
+                        presentation = messageBubblePresentation(deleted = false, mine = false),
+                        mine = false,
+                        text = "A long target message. ".repeat(20),
+                        document = null,
+                        time = "12:34",
+                        status = MessageStatus.Received,
+                        showStatus = false,
+                        reply = { Text("Quoted reply") },
+                        warning = "Edited after a signature check",
+                    )
+                }
+            }
+        }
+        composeRule
+            .onNodeWithTag("short-frame")
+            .captureRoboImage("src/test/snapshots/focused_preview_short_frame_reply_warning_large_font_dark.png")
     }
 
     @Test

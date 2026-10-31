@@ -19,7 +19,8 @@
         "anchor": "fun BubbleFooterLayout(",
         "test_ids": [
           "MSG-001",
-          "MSG-015"
+          "MSG-015",
+          "MSG-043"
         ]
       }
     ]
