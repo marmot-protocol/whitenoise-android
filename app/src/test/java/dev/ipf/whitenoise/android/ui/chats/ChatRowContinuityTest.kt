@@ -44,9 +44,11 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** Production-row regressions: metadata semantics never wait for decorative motion to finish. */
 @RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE) // Geometry assertions need real font metrics.
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
 class ChatRowContinuityTest {
     @get:Rule
@@ -99,7 +101,10 @@ class ChatRowContinuityTest {
         badge(1_001).assertIsDisplayed()
         val cappedBounds = badge(1_001).fetchSemanticsNode().boundsInRoot
         assertEquals(oneBounds.right, cappedBounds.right, 0.5f)
-        assertTrue("A capped count occupies more width than one digit", cappedBounds.width > oneBounds.width)
+        assertTrue(
+            "A capped count must occupy more width: one=$oneBounds, capped=$cappedBounds",
+            cappedBounds.width > oneBounds.width,
+        )
         publishChange {
             item.value =
                 item.value.copy(

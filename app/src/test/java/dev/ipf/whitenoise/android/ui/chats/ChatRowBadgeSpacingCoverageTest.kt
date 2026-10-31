@@ -37,9 +37,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** The production unread host occupies only the shared badge, returning unused width to the preview. */
 @RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE) // Geometry assertions need real font metrics.
 @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h780dp-mdpi")
 class ChatRowBadgeSpacingCoverageTest {
     @get:Rule val rule = createComposeRule()
@@ -162,7 +164,7 @@ class ChatRowBadgeSpacingCoverageTest {
                     if (value == 1_001uL) cappedPreview = preview
                     if (value == 1uL || value == 0uL) {
                         assertTrue(
-                            "A compact badge returns width to the production preview",
+                            "Count $value must return preview width: current=$preview, capped=$cappedPreview",
                             preview.width > cappedPreview!!.width,
                         )
                     }
