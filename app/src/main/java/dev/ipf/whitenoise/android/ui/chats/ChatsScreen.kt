@@ -141,6 +141,7 @@ import dev.ipf.whitenoise.android.ui.conversation.PlaybackTransportBar
 import dev.ipf.whitenoise.android.ui.group.groupAbandonmentBatchLabel
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ErrorOutline
+import dev.ipf.whitenoise.android.ui.navigation.conversationRouteBodyMotion
 import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatFoldersScreen
 import kotlinx.coroutines.delay
@@ -2265,7 +2266,7 @@ internal fun ChatsScreen(
                 },
             )
             ChatListBodyFrame(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().conversationRouteBodyMotion(),
                 ttsTransport = {
                     if (showPlaybackTransport) {
                         PlaybackTransportBar(

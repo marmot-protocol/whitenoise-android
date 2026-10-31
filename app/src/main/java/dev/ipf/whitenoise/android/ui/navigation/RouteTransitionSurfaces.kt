@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.key
@@ -38,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 
 /**
  * Conversation routes move only their full-screen render layers. Reading the
@@ -55,6 +57,7 @@ internal fun <T> ConversationRouteAnimatedContent(
     contentKey: (T) -> Any?,
     content: @Composable AnimatedContentScope.(T) -> Unit,
 ) {
+    val separatedChrome = LocalComposerFabHandoff.current?.morphSurface == true
     val travelPx = with(LocalDensity.current) { CONVERSATION_ROUTE_LAYER_TRAVEL.toPx() }
     // One intrinsic progress value (list = 0, conversation = 1) is stable under
     // interruption. A Back during enter reverses from the exact rendered float
@@ -65,10 +68,7 @@ internal fun <T> ConversationRouteAnimatedContent(
                 if (suppressMotion) {
                     snap()
                 } else {
-                    tween(
-                        durationMillis = CONVERSATION_ROUTE_TRANSITION_MILLIS,
-                        easing = FastOutSlowInEasing,
-                    )
+                    conversationRouteAnimationSpec
                 }
             },
             label = "conversation route visibility",
@@ -87,36 +87,58 @@ internal fun <T> ConversationRouteAnimatedContent(
                 .graphicsLayer {
                     val progress = conversationVisibility.value
                     val conversationRoute = route != null
-                    alpha = conversationRouteLayerAlpha(progress, conversationRoute, suppressMotion)
+                    alpha =
+                        if (separatedChrome) {
+                            1f
+                        } else {
+                            conversationRouteLayerAlpha(progress, conversationRoute, suppressMotion)
+                        }
                     translationX =
-                        travelPx *
+                        (if (separatedChrome) 0f else travelPx) *
                         routeForwardDirection *
                         conversationRouteLayerTranslation(progress, conversationRoute, suppressMotion)
                 },
         ) {
-            content(route)
+            CompositionLocalProvider(
+                LocalControlHandoffEndpointCurrent provides (contentKey(route) == contentKey(transition.targetState)),
+                LocalConversationBodyMotion provides
+                    if (separatedChrome) {
+                        ConversationBodyMotion(
+                            conversationVisibility,
+                            route != null,
+                            routeForwardDirection,
+                            suppressMotion,
+                        )
+                    } else {
+                        null
+                    },
+            ) {
+                content(route)
+            }
         }
     }
 }
 
+/** Visibility and slot retention must finish on the same immutable timing specification. */
+private val conversationRouteAnimationSpec =
+    tween<Float>(
+        durationMillis = CONVERSATION_ROUTE_TRANSITION_MILLIS,
+        easing = FastOutSlowInEasing,
+    )
+
 /** Retains both full-screen slots while draw-layer progress owns visible motion. */
 private fun <T> AnimatedContentTransitionScope<T>.routeContentTransform(suppressMotion: Boolean): ContentTransform {
     if (suppressMotion) return EnterTransition.None togetherWith ExitTransition.None
-    val animationSpec =
-        tween<Float>(
-            durationMillis = CONVERSATION_ROUTE_TRANSITION_MILLIS,
-            easing = FastOutSlowInEasing,
-        )
     // A non-zero delta keeps AnimatedContent's outgoing slot alive for the
     // layer animation. Visible alpha is owned by conversationRouteLayerAlpha.
     return (
         fadeIn(
             initialAlpha = CONVERSATION_ROUTE_SLOT_RETENTION_ALPHA,
-            animationSpec = animationSpec,
+            animationSpec = conversationRouteAnimationSpec,
         ) togetherWith
             fadeOut(
                 targetAlpha = CONVERSATION_ROUTE_SLOT_RETENTION_ALPHA,
-                animationSpec = animationSpec,
+                animationSpec = conversationRouteAnimationSpec,
             )
     ).using(SizeTransform(clip = false))
 }

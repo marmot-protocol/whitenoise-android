@@ -87,6 +87,8 @@ import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
 import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
+import dev.ipf.whitenoise.android.ui.common.LocalFinishControlMorph
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.conversation.CompactViableComposerHeight
 import dev.ipf.whitenoise.android.ui.conversation.composerMultilineControlsSuppressed
@@ -94,6 +96,8 @@ import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.resolveAutomaticComposerCeiling
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Delete
+import dev.ipf.whitenoise.android.ui.navigation.DictationComposerControlSlot
+import dev.ipf.whitenoise.android.ui.navigation.LocalShellDictationControls
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -499,6 +503,13 @@ internal fun ComposerBar(
     // reserved chrome because their parent already constrains the bottom bar.
     topInteractionClearance: Dp = 0.dp,
 ) {
+    var lastMeasuredHeight by remember { mutableStateOf(0) }
+    val routeDensity = LocalDensity.current
+    if (!LocalControlHandoffEndpointCurrent.current) {
+        // Retain only layout, never an outgoing input connection, focus target or action callback.
+        Box(modifier.fillMaxWidth().height(with(routeDensity) { lastMeasuredHeight.toDp() }))
+        return
+    }
     val actionColors = accountActionColors(appState)
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
@@ -923,7 +934,9 @@ internal fun ComposerBar(
         if (active != null && active.inputGeneration != textState.contentGeneration) sendMotion.clear()
     }
     var attachmentSendInFlight by remember(draftKey) { mutableStateOf(false) }
+    val finishControlMorph = LocalFinishControlMorph.current
     val submitMessage: () -> Unit = {
+        finishControlMorph()
         // An IME can commit text and request Send before the next composition.
         // Eligibility and submission must use the same live editor content.
         val acceptanceToken = textState.acceptanceToken()
@@ -1031,7 +1044,7 @@ internal fun ComposerBar(
     LaunchedEffect(showEmojiPane) {
         if (!showEmojiPane) customInputPaneHeightPx = 0f
     }
-    BoxWithConstraints(modifier.fillMaxWidth()) {
+    BoxWithConstraints(modifier.fillMaxWidth().onSizeChanged { lastMeasuredHeight = it.height }) {
         val statusBarTop = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
         val appliesImePadding =
             composerBottomClusterAppliesImePadding(
@@ -1457,12 +1470,14 @@ internal fun ComposerBar(
                             onComposerFocusChanged(focused)
                         },
                         onValueChange = { value ->
+                            finishControlMorph()
                             if (!isRecordingVoice && voiceReviewClip == null) {
                                 val applied = repairComposerMentionEdit(textFieldValue, value, mentionPickerEnabled)
                                 applyComposerFieldValue(applied)
                             }
                         },
                         onEmojiPickerToggle = {
+                            finishControlMorph()
                             if (composerEmojiPickerRequested) {
                                 showKeyboardFromEmojiPane()
                             } else {
@@ -1470,6 +1485,7 @@ internal fun ComposerBar(
                             }
                         },
                         onAttachmentsToggle = {
+                            finishControlMorph()
                             if (attachmentSheetState.isOpen) {
                                 attachmentSheetState.dismiss()
                             } else {
@@ -1519,11 +1535,18 @@ internal fun ComposerBar(
                         dictationControls =
                             activeDictationController?.takeIf { voiceReviewClip == null }?.let { activeController ->
                                 {
-                                    ConversationDictationCompactActions(
-                                        state = dictationState,
-                                        controller = activeController,
-                                        actionColors = actionColors,
-                                    )
+                                    if (LocalShellDictationControls.current != null) {
+                                        DictationComposerControlSlot(
+                                            dictationState.compactActionsWidth(activeController.captureInProgress),
+                                            actionColors,
+                                        )
+                                    } else {
+                                        ConversationDictationCompactActions(
+                                            state = dictationState,
+                                            controller = activeController,
+                                            actionColors = actionColors,
+                                        )
+                                    }
                                 }
                             },
                         highlightMentionChips = mentionPickerEnabled,

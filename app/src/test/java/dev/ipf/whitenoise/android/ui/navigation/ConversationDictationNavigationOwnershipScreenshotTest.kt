@@ -36,6 +36,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -351,6 +352,46 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
         assertEquals(ConversationDictationState.Idle, fixture.controller.state)
     }
 
+    /** Actual transformed hit testing keeps Cancel owned until its pointer-up dispatch. */
+    @Test
+    fun midpointCancelUsesOneRealActionAndCancelsOnce() {
+        val fixture = render()
+        firstNavigationFrame { fixture.route = origin.copy(selectedChatId = null, selectedGroupIdHex = null) }
+        composeRule.mainClock.advanceTimeBy(80)
+        assertSingleActionSet()
+        composeRule
+            .onNode(
+                hasContentDescription("Cancel") and hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)),
+            ).performTouchInput {
+                down(center)
+                up()
+            }
+        composeRule.runOnIdle {
+            assertEquals(ConversationDictationState.Idle, fixture.controller.state)
+            assertEquals(1, fixture.platform.cancels)
+        }
+    }
+
+    /** First/intermediate/settled pixels come from the production shell and its single control set. */
+    @Test
+    fun dictationMorphFramesAmoled() {
+        val fixture = render(dark = true, amoled = true)
+        listOf(false, true).forEach { returning ->
+            firstNavigationFrame {
+                fixture.route = if (returning) origin else origin.copy(selectedChatId = null, selectedGroupIdHex = null)
+            }
+            val direction = if (returning) "into_composer" else "into_capsule"
+            assertSingleActionSet()
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_morph_${direction}_first_amoled.png")
+            composeRule.mainClock.advanceTimeBy(80)
+            assertSingleActionSet()
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_morph_${direction}_middle_amoled.png")
+            composeRule.mainClock.advanceTimeBy(176)
+            assertSingleActionSet()
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_morph_${direction}_settled_amoled.png")
+        }
+    }
+
     /** No await-idle loop or recognition callback may advance the clock past this single commit. */
     private fun firstNavigationFrame(change: () -> Unit) {
         composeRule.mainClock.autoAdvance = false
@@ -538,6 +579,7 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
     }
 
     private class FakePlatform : ConversationDictationPlatform {
+        var cancels = 0
         lateinit var listener: ConversationDictationRecognitionListener
 
         override fun hasRecordAudioPermission() = true
@@ -552,7 +594,9 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
 
                 override fun stop() = Unit
 
-                override fun cancel() = Unit
+                override fun cancel() {
+                    cancels++
+                }
 
                 override fun destroy() = Unit
             }

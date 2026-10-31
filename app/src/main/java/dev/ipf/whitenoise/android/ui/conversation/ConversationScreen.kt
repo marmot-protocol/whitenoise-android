@@ -244,6 +244,7 @@ import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTilesState
 import dev.ipf.whitenoise.android.ui.medialibrary.toConversationViewerPages
+import dev.ipf.whitenoise.android.ui.navigation.conversationRouteBodyMotion
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.ui.settings.blockOutcomeMessage
 import dev.ipf.whitenoise.android.ui.settings.rememberRouteMotionModifier
@@ -4256,6 +4257,7 @@ internal fun ConversationScreen(
                         Modifier
                             .fillMaxSize()
                             .padding(conversationUnderlayScaffoldPadding(padding, overlayPadding))
+                            .conversationRouteBodyMotion()
                             // The composer bottomBar owns IME padding; consume here so the
                             // transcript does not count the keyboard a second time (#895).
                             .consumeWindowInsets(WindowInsets.ime)
