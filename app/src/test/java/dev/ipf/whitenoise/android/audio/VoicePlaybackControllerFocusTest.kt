@@ -33,9 +33,7 @@ class VoicePlaybackControllerFocusTest {
     fun dictationInterruptionInvalidatesPlaybackStillPreparingWithoutAnActivePlayer() {
         val requests = controllerField("playbackRequests") as StalenessGuard
         val preparing = requests.capture()
-
         assertNull(VoicePlaybackController.pauseForInterruption())
-
         assertFalse(requests.isCurrent(preparing))
     }
 
@@ -48,13 +46,11 @@ class VoicePlaybackControllerFocusTest {
         primeActivePlayer(mediaPlayer)
         val interruption = VoicePlaybackController.pauseForInterruption()
         assertNotNull(interruption)
-
         val userResume =
             runBlocking {
                 VoicePlaybackController.play("voice-key", File("unused.amr"), ownerKey = "owner")
             }
         VoicePlaybackController.pause()
-
         assertEquals(VoicePlaybackController.PlaybackStartResult.Resumed, userResume)
         assertFalse(VoicePlaybackController.resumeInterrupted(checkNotNull(interruption)))
         assertEquals(1, mediaPlayer.startCount)
@@ -234,37 +230,7 @@ class VoicePlaybackControllerFocusTest {
 
     /** Equal attachment keys under another account must prepare new bytes instead of resuming the old player. */
     @Test fun sameKeyDifferentAccountDoesNotResumeCapturedAudio() {
-        VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
-        val player = TrackingVoicePlayer()
-        primeActivePlayer(player)
-        val source = VoicePlaybackSource("personal", "chat", "message", "Maya")
-        setPlaybackState(VoicePlaybackController.state.value.copy(source = source, sessionId = 42, ready = true))
-        val freshFile = File("missing-voice-note.amr")
-        val preparations = CopyOnWriteArrayList<File>()
-        val retiredBeforePrepare = AtomicBoolean()
-        setControllerField(
-            "playerFactory",
-            VoicePlaybackPlayer.Factory { _, file ->
-                preparations += file
-                retiredBeforePrepare.set(player.released)
-                throw IOException("Synthetic new-account preparation refusal")
-            },
-        )
-        val result =
-            runBlocking {
-                VoicePlaybackController.play(
-                    "voice-key",
-                    freshFile,
-                    source = source.copy(accountRef = "work"),
-                )
-            }
-        assertEquals(VoicePlaybackController.PlaybackStartResult.PrepareFailed, result)
-        assertEquals(listOf(freshFile), preparations)
-        assertTrue(retiredBeforePrepare.get())
-        assertNull(controllerField("player"))
-        assertEquals(0, player.startCount)
-        assertTrue(player.released)
-        assertNull(VoicePlaybackController.state.value.source)
+        assertFreshAudioForNewAccount()
     }
 
     /** Display-name refreshes cannot replace the same account/message player or reset its playback position. */
@@ -293,31 +259,7 @@ class VoicePlaybackControllerFocusTest {
     /** New sources prepare on IO through the parser-free seam and retain the adopted source owner. */
     @Test
     fun newVoiceSourceUsesOffMainFactoryAndRetainsItsPlayer() {
-        val context = RuntimeEnvironment.getApplication()
-        VoicePlaybackController.attach(context)
-        shadowOf(context.getSystemService(AudioManager::class.java))
-            .setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
-        val player = TrackingVoicePlayer()
-        var preparedOffMain = false
-        var preparedFile: File? = null
-        val file = File("isolated-voice.amr")
-        setControllerField(
-            "playerFactory",
-            VoicePlaybackPlayer.Factory { _, selected ->
-                preparedOffMain = Looper.myLooper() != Looper.getMainLooper()
-                preparedFile = selected
-                player
-            },
-        )
-
-        val result = runBlocking { VoicePlaybackController.play("new-source", file, ownerKey = "owner") }
-
-        assertEquals(VoicePlaybackController.PlaybackStartResult.Started, result)
-        assertTrue(preparedOffMain)
-        assertSame(file, preparedFile)
-        assertSame(player, controllerField("player"))
-        assertEquals(1, player.startCount)
-        assertEquals(player.durationMs, VoicePlaybackController.state.value.durationMs)
+        assertNewSourcePreparedOffMain()
     }
 
     /** Changing speed preserves paused intent and exact retained source identity. */
@@ -433,40 +375,7 @@ class VoicePlaybackControllerFocusTest {
     /** Failed resume retires the active player and prevents its old owner from retaining audio focus. */
     @Test
     fun resumeStartFailureReleasesActivePlayerAndAbandonsFocus() {
-        val context = RuntimeEnvironment.getApplication()
-        val audioManager = context.getSystemService(AudioManager::class.java)
-        val shadowAudioManager = shadowOf(audioManager)
-        VoicePlaybackController.attach(context)
-
-        assertTrue(requestFocus())
-        val focusRequest = shadowAudioManager.lastAudioFocusRequest
-        assertNotNull(focusRequest)
-        val mediaPlayer = ThrowingStartVoicePlayer()
-        setControllerField("player", mediaPlayer)
-        setControllerField("currentKey", "voice-key")
-        setControllerField("currentOwnerKey", "old-owner")
-        setPlaybackState(
-            VoicePlaybackController.PlaybackState(
-                key = "voice-key",
-                isPlaying = false,
-                positionMs = 123,
-                durationMs = 456,
-            ),
-        )
-
-        val result =
-            runBlocking {
-                VoicePlaybackController.play("voice-key", File("unused.amr"), ownerKey = "new-owner")
-            }
-
-        assertEquals(VoicePlaybackController.PlaybackStartResult.StartFailed, result)
-        assertTrue(mediaPlayer.released)
-        assertNull(controllerField("player"))
-        assertNull(controllerField("currentKey"))
-        assertNull(controllerField("currentOwnerKey"))
-        assertNull(audioFocusOwnerField("focusRequest"))
-        assertSame(focusRequest.audioFocusRequest, shadowAudioManager.lastAbandonedAudioFocusRequest)
-        assertEquals(VoicePlaybackController.PlaybackState(), VoicePlaybackController.state.value)
+        assertFailedResumeRetiresPlayerAndFocus()
     }
 
     /** Temporary interruption retains the same focus handle and resumes only the interrupted player. */
@@ -664,107 +573,6 @@ class VoicePlaybackControllerFocusTest {
             assertEquals(VoicePlaybackController.PlaybackState(), VoicePlaybackController.state.value)
         }
     }
-
-    // Hit the private focus path directly; public playback needs isolated file
-    // setup and would obscure the focus bookkeeping this regression protects.
-
-    /** Invokes the production controller's private focus boundary against Robolectric's AudioManager. */
-    private fun requestFocus(): Boolean {
-        val method = VoicePlaybackController::class.java.getDeclaredMethod("requestFocus")
-        method.isAccessible = true
-        return method.invoke(VoicePlaybackController) as Boolean
-    }
-
-    /** Exercises production player adoption with the supplied failure-capable test player. */
-    private fun startPreparedNewPlayer(mediaPlayer: VoicePlaybackPlayer): Boolean {
-        val method =
-            VoicePlaybackController::class.java.getDeclaredMethod(
-                "startPreparedNewPlayer",
-                VoicePlaybackPlayer::class.java,
-            )
-        method.isAccessible = true
-        return method.invoke(VoicePlaybackController, mediaPlayer) as Boolean
-    }
-
-    /** Delivers a seek completion through the controller's actual private settle path. */
-    private fun settlePendingSeek(mediaPlayer: VoicePlaybackPlayer) {
-        val method =
-            VoicePlaybackController::class.java.getDeclaredMethod("settlePendingSeek", VoicePlaybackPlayer::class.java)
-        method.isAccessible = true
-        method.invoke(VoicePlaybackController, mediaPlayer)
-    }
-
-    /** Delivers a focus event through the controller's actual private callback. */
-    private fun handleAudioFocusChange(change: Int) {
-        val method = VoicePlaybackController::class.java.getDeclaredMethod("handleAudioFocusChange", Integer.TYPE)
-        method.isAccessible = true
-        method.invoke(VoicePlaybackController, change)
-    }
-
-    /**
-     * Installs one retained codec and matching public state so controls can be tested without reopening a media
-     * file.
-     */
-    private fun primeActivePlayer(mediaPlayer: TrackingVoicePlayer) {
-        setControllerField("player", mediaPlayer)
-        setControllerField("currentKey", "voice-key")
-        setControllerField("currentOwnerKey", "owner")
-        setPlaybackState(
-            VoicePlaybackController.PlaybackState(
-                key = "voice-key",
-                isPlaying = true,
-                positionMs = mediaPlayer.positionMs,
-                durationMs = mediaPlayer.durationMs,
-            ),
-        )
-    }
-
-    /** Reads private controller ownership for assertions without replacing its transition logic. */
-    private fun controllerField(name: String): Any? {
-        val field = VoicePlaybackController::class.java.getDeclaredField(name)
-        field.isAccessible = true
-        return field.get(VoicePlaybackController)
-    }
-
-    /** Reads the retained Android-focus owner to distinguish held, denied and abandoned requests. */
-    private fun audioFocusOwnerField(name: String): Any? {
-        val field = AudioFocusOwner::class.java.getDeclaredField(name)
-        field.isAccessible = true
-        return field.get(AudioFocusOwner)
-    }
-
-    /** Returns the installed focus listener so tests follow the real callback path. */
-    private fun audioFocusListener() = audioFocusOwnerField("focusListener") as AudioManager.OnAudioFocusChangeListener
-
-    /** Seeds only the test owner's focus fixture fields and leaves controller transition code intact. */
-    private fun setAudioFocusOwnerField(
-        name: String,
-        value: Any?,
-    ) {
-        val field = AudioFocusOwner::class.java.getDeclaredField(name)
-        field.isAccessible = true
-        field.set(AudioFocusOwner, value)
-    }
-
-    /** Publishes controlled session transitions through the controller flow observed by real shell controls. */
-    @Suppress("UNCHECKED_CAST")
-    private fun setPlaybackState(state: VoicePlaybackController.PlaybackState) {
-        val field = VoicePlaybackController::class.java.getDeclaredField("_state")
-        field.isAccessible = true
-        val stateFlow =
-            field.get(VoicePlaybackController) as MutableStateFlow<VoicePlaybackController.PlaybackState>
-        stateFlow.value = state
-    }
-
-    /** Sets a narrowly named controller fixture field before exercising the production boundary. */
-    private fun setControllerField(
-        name: String,
-        value: Any?,
-    ) {
-        val field = VoicePlaybackController::class.java.getDeclaredField(name)
-        field.isAccessible = true
-        field.set(VoicePlaybackController, value)
-    }
 }
 
 /** A parser-free control seam; every failure-capable subclass preserves the production transition tests. */
@@ -881,4 +689,204 @@ private class TrackingVoicePlayer(
     override fun release() {
         released = true
     }
+}
+
+// Hit the private focus path directly; public playback needs isolated file
+// setup and would obscure the focus bookkeeping this regression protects.
+
+/** Invokes the production controller's private focus boundary against Robolectric's AudioManager. */
+private fun requestFocus(): Boolean {
+    val method = VoicePlaybackController::class.java.getDeclaredMethod("requestFocus")
+    method.isAccessible = true
+    return method.invoke(VoicePlaybackController) as Boolean
+}
+
+/** Exercises production player adoption with the supplied failure-capable test player. */
+private fun startPreparedNewPlayer(mediaPlayer: VoicePlaybackPlayer): Boolean {
+    val method =
+        VoicePlaybackController::class.java.getDeclaredMethod(
+            "startPreparedNewPlayer",
+            VoicePlaybackPlayer::class.java,
+        )
+    method.isAccessible = true
+    return method.invoke(VoicePlaybackController, mediaPlayer) as Boolean
+}
+
+/** Delivers a seek completion through the controller's actual private settle path. */
+private fun settlePendingSeek(mediaPlayer: VoicePlaybackPlayer) {
+    val method =
+        VoicePlaybackController::class.java.getDeclaredMethod("settlePendingSeek", VoicePlaybackPlayer::class.java)
+    method.isAccessible = true
+    method.invoke(VoicePlaybackController, mediaPlayer)
+}
+
+/** Delivers a focus event through the controller's actual private callback. */
+private fun handleAudioFocusChange(change: Int) {
+    val method = VoicePlaybackController::class.java.getDeclaredMethod("handleAudioFocusChange", Integer.TYPE)
+    method.isAccessible = true
+    method.invoke(VoicePlaybackController, change)
+}
+
+/**
+ * Installs one retained codec and matching public state so controls can be tested without reopening a media
+ * file.
+ */
+private fun primeActivePlayer(mediaPlayer: TrackingVoicePlayer) {
+    setControllerField("player", mediaPlayer)
+    setControllerField("currentKey", "voice-key")
+    setControllerField("currentOwnerKey", "owner")
+    setPlaybackState(
+        VoicePlaybackController.PlaybackState(
+            key = "voice-key",
+            isPlaying = true,
+            positionMs = mediaPlayer.positionMs,
+            durationMs = mediaPlayer.durationMs,
+        ),
+    )
+}
+
+/** Reads private controller ownership for assertions without replacing its transition logic. */
+private fun controllerField(name: String): Any? {
+    val field = VoicePlaybackController::class.java.getDeclaredField(name)
+    field.isAccessible = true
+    return field.get(VoicePlaybackController)
+}
+
+/** Reads the retained Android-focus owner to distinguish held, denied and abandoned requests. */
+private fun audioFocusOwnerField(name: String): Any? {
+    val field = AudioFocusOwner::class.java.getDeclaredField(name)
+    field.isAccessible = true
+    return field.get(AudioFocusOwner)
+}
+
+/** Returns the installed focus listener so tests follow the real callback path. */
+private fun audioFocusListener() = audioFocusOwnerField("focusListener") as AudioManager.OnAudioFocusChangeListener
+
+/** Seeds only the test owner's focus fixture fields and leaves controller transition code intact. */
+private fun setAudioFocusOwnerField(
+    name: String,
+    value: Any?,
+) {
+    val field = AudioFocusOwner::class.java.getDeclaredField(name)
+    field.isAccessible = true
+    field.set(AudioFocusOwner, value)
+}
+
+/** Publishes controlled session transitions through the controller flow observed by real shell controls. */
+@Suppress("UNCHECKED_CAST")
+private fun setPlaybackState(state: VoicePlaybackController.PlaybackState) {
+    val field = VoicePlaybackController::class.java.getDeclaredField("_state")
+    field.isAccessible = true
+    val stateFlow =
+        field.get(VoicePlaybackController) as MutableStateFlow<VoicePlaybackController.PlaybackState>
+    stateFlow.value = state
+}
+
+/** Sets a narrowly named controller fixture field before exercising the production boundary. */
+private fun setControllerField(
+    name: String,
+    value: Any?,
+) {
+    val field = VoicePlaybackController::class.java.getDeclaredField(name)
+    field.isAccessible = true
+    field.set(VoicePlaybackController, value)
+}
+
+private fun assertFreshAudioForNewAccount() {
+    VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+    val player = TrackingVoicePlayer()
+    primeActivePlayer(player)
+    val source = VoicePlaybackSource("personal", "chat", "message", "Maya")
+    setPlaybackState(VoicePlaybackController.state.value.copy(source = source, sessionId = 42, ready = true))
+    val freshFile = File("missing-voice-note.amr")
+    val preparations = CopyOnWriteArrayList<File>()
+    val retiredBeforePrepare = AtomicBoolean()
+    setControllerField(
+        "playerFactory",
+        VoicePlaybackPlayer.Factory { _, file ->
+            preparations += file
+            retiredBeforePrepare.set(player.released)
+            throw IOException("Synthetic new-account preparation refusal")
+        },
+    )
+    val result =
+        runBlocking {
+            VoicePlaybackController.play(
+                "voice-key",
+                freshFile,
+                source = source.copy(accountRef = "work"),
+            )
+        }
+    assertEquals(VoicePlaybackController.PlaybackStartResult.PrepareFailed, result)
+    assertEquals(listOf(freshFile), preparations)
+    assertTrue(retiredBeforePrepare.get())
+    assertNull(controllerField("player"))
+    assertEquals(0, player.startCount)
+    assertTrue(player.released)
+    assertNull(VoicePlaybackController.state.value.source)
+}
+
+private fun assertNewSourcePreparedOffMain() {
+    val context = RuntimeEnvironment.getApplication()
+    VoicePlaybackController.attach(context)
+    shadowOf(context.getSystemService(AudioManager::class.java))
+        .setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+    val player = TrackingVoicePlayer()
+    var preparedOffMain = false
+    var preparedFile: File? = null
+    val file = File("isolated-voice.amr")
+    setControllerField(
+        "playerFactory",
+        VoicePlaybackPlayer.Factory { _, selected ->
+            preparedOffMain = Looper.myLooper() != Looper.getMainLooper()
+            preparedFile = selected
+            player
+        },
+    )
+
+    val result = runBlocking { VoicePlaybackController.play("new-source", file, ownerKey = "owner") }
+
+    assertEquals(VoicePlaybackController.PlaybackStartResult.Started, result)
+    assertTrue(preparedOffMain)
+    assertSame(file, preparedFile)
+    assertSame(player, controllerField("player"))
+    assertEquals(1, player.startCount)
+    assertEquals(player.durationMs, VoicePlaybackController.state.value.durationMs)
+}
+
+private fun assertFailedResumeRetiresPlayerAndFocus() {
+    val context = RuntimeEnvironment.getApplication()
+    val audioManager = context.getSystemService(AudioManager::class.java)
+    val shadowAudioManager = shadowOf(audioManager)
+    VoicePlaybackController.attach(context)
+
+    assertTrue(requestFocus())
+    val focusRequest = shadowAudioManager.lastAudioFocusRequest
+    assertNotNull(focusRequest)
+    val mediaPlayer = ThrowingStartVoicePlayer()
+    setControllerField("player", mediaPlayer)
+    setControllerField("currentKey", "voice-key")
+    setControllerField("currentOwnerKey", "old-owner")
+    setPlaybackState(
+        VoicePlaybackController.PlaybackState(
+            key = "voice-key",
+            isPlaying = false,
+            positionMs = 123,
+            durationMs = 456,
+        ),
+    )
+
+    val result =
+        runBlocking {
+            VoicePlaybackController.play("voice-key", File("unused.amr"), ownerKey = "new-owner")
+        }
+
+    assertEquals(VoicePlaybackController.PlaybackStartResult.StartFailed, result)
+    assertTrue(mediaPlayer.released)
+    assertNull(controllerField("player"))
+    assertNull(controllerField("currentKey"))
+    assertNull(controllerField("currentOwnerKey"))
+    assertNull(audioFocusOwnerField("focusRequest"))
+    assertSame(focusRequest.audioFocusRequest, shadowAudioManager.lastAbandonedAudioFocusRequest)
+    assertEquals(VoicePlaybackController.PlaybackState(), VoicePlaybackController.state.value)
 }

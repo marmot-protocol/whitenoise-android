@@ -9,7 +9,6 @@ import android.os.SystemClock
 import android.system.OsConstants
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Test
@@ -21,7 +20,6 @@ import java.util.UUID
 
 /** Unpaced production-route measurements on unchanged tiny inputs; no camera/HDR or exact-peak qualification. */
 @RunWith(AndroidJUnit4::class)
-@PullRequestDeviceSmoke
 @MediaContainmentAcceptance
 class MediaAvPerformanceDeviceTest {
     @Test(timeout = 600_000) // One finite 88-observation campaign; other device cases keep the runner default.

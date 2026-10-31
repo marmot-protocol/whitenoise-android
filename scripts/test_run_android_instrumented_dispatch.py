@@ -1,5 +1,6 @@
 """Behavioral tests for explicitly dispatched Android instrumented suites."""
 import pathlib
+import importlib.util
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
@@ -120,7 +121,6 @@ class InstrumentedDispatchTest(unittest.TestCase):
             "MediaAvNativeCorpusDeviceTest": (
                 "commonVideoFormatsReturnRedPixelsFromFreshRestrictedWorkers",
                 "commonAudioFormatsReturnFiniteWaveformsAndDurations"),
-            "MediaAvPerformanceDeviceTest": ("measureProductionCostsOnUnchangedCorpus",),
         }
         focused = self.run_dispatch("workflow_dispatch", "false", "false", "false", "true")
         for name, names in methods.items():
@@ -135,6 +135,33 @@ class InstrumentedDispatchTest(unittest.TestCase):
             self.run_dispatch("workflow_dispatch", "false", "false", "false", "true", fail_app=True)
         with self.assertRaises(subprocess.CalledProcessError):
             self.run_dispatch("workflow_dispatch", "false", "false", "false", "true", fail_required=True)
+
+    def test_production_performance_stays_required_without_joining_pr_smoke(self):
+        """Actual source annotations and consumed selectors keep expensive measurements in qualification lanes."""
+        name = "MediaAvPerformanceDeviceTest"
+        case = "dev.ipf.whitenoise.android.media.sandbox." + name + "#measureProductionCostsOnUnchangedCorpus"
+        directory = ROOT / "app/src/androidTest/java/dev/ipf/whitenoise/android/media/sandbox"
+        source = (directory / (name + ".kt")).read_text()
+        self.assertIn("@MediaContainmentAcceptance", source)
+        self.assertNotIn("@PullRequestDeviceSmoke", source)
+        self.assertNotIn("@ManualDeviceFixture", source)
+        smoke = self.run_dispatch("pull_request")
+        self.assertIn("RunnerArguments.annotation=dev.ipf.whitenoise.android.PullRequestDeviceSmoke", smoke)
+        self.assertNotIn(case, smoke)
+        for api in ("30", "36"):
+            focused = self.run_dispatch("workflow_dispatch", "false", "false", "false", "true",
+                                        "false", "false", "false", api)
+            annotation = "dev.ipf.whitenoise.android.media.sandbox.MediaContainmentAcceptance"
+            self.assertIn("RunnerArguments.annotation=" + annotation, focused)
+            self.assertIn(case, focused)
+        # The real AV producer selects this exact method, independently of either annotation.
+        spec = importlib.util.spec_from_file_location("hosted_av_selection", ROOT / "scripts/hosted-startup-trace.py")
+        trace = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(trace)
+        for api in ("30", "36"):
+            _, command, required = trace.selection("av", api)
+            self.assertEqual(case, required)
+            self.assertIn("-Pandroid.testInstrumentationRunnerArguments.class=" + case, command)
 
     def test_actual_checker_rejects_missing_or_skipped_selected_native_case(self):
         for api in ("30", "36"):
