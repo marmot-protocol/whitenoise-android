@@ -638,15 +638,16 @@ class RuntimeEvidenceTest(unittest.TestCase):
         self.assertEqual(int(journeys.group(1)), inventory()['case_count'])
 
     def test_long_input_timeout_fits_existing_fixture_and_cleanup_reserves(self):
-        """A measured typing overrun cannot silently enlarge the host lifetime or shard allowance."""
-        self.assertEqual(set(runtime.UI_TIMEOUTS), {'polls-question-boundary'})
+        """Measured typing and folder-replacement overruns cannot silently enlarge the host lifetime or shard allowance."""
+        self.assertEqual(set(runtime.UI_TIMEOUTS), {'polls-question-boundary', 'folder-rules-replace-saved-confirm'})
         for name, seconds in runtime.UI_TIMEOUTS.items():
             self.assertIn(name, runtime.CASES)
             self.assertLess(seconds + 30, 300)  # Native host's existing handoff deadline.
             self.assertLess(120 + seconds + 60 + 60 + 30 + 30 + 30 + 20, runtime.CASE_RESERVE_SECONDS)
-        with tempfile.TemporaryDirectory() as temporary, patch.object(runtime.subprocess, 'run') as run:
-            runtime.run_ui('polls-question-boundary', Path(temporary))
-            self.assertEqual(run.call_args.kwargs['timeout'], 240)
+        for name, seconds in (('polls-question-boundary', 240), ('folder-rules-replace-saved-confirm', 180)):
+            with tempfile.TemporaryDirectory() as temporary, patch.object(runtime.subprocess, 'run') as run:
+                runtime.run_ui(name, Path(temporary))
+                self.assertEqual(run.call_args.kwargs['timeout'], seconds)
 
     def test_poll_question_boundary_uses_bounded_input_without_weakening_the_limit(self):
         """Keep each device RPC bounded and prove all 1025 bytes before native validation."""
