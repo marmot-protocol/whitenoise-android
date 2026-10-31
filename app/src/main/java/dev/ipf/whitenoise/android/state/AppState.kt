@@ -1745,7 +1745,11 @@ class WhiteNoiseAppState private constructor(
         NotificationContentInvalidations(NOTIFICATION_CONTENT_INVALIDATION_CAPACITY)
     private val notificationReconcileLocks = Array(64) { Mutex() }
     private val inviteNotificationIdentityRefreshStore = GroupInviteNotificationIdentityRefreshStore()
-    private val appUpdateRepository = AppUpdateRepository(appContext)
+    private val appUpdateRepository =
+        AppUpdateRepository(
+            appContext,
+            selfUpdateEnabled = startPlatformServices && BuildConfig.SELF_UPDATE_ENABLED,
+        )
     private val appUpdateNotifier = AppUpdateNotifier(appContext)
     private val appSelfUpdateFlow = AppSelfUpdateFlows.create(appContext)
     internal val chatMutePreferences = ChatMutePreferences(appContext)
