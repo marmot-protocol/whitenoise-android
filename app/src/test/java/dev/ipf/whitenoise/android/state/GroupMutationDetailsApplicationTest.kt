@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.GroupDetailsFfi
 import dev.ipf.marmotkit.GroupMemberDetailsFfi
+import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.GroupProjector
 import org.junit.Assert.assertEquals
@@ -175,12 +176,12 @@ class GroupMutationDetailsApplicationTest {
     }
 
     @Test
-    fun joinedRosterMemberCountMustMatchMlsState() {
+    fun joinedRosterPeopleMustNotExceedMemberCount() {
         val resolution =
             resolveAuthoritativeGroupRoster(
                 details =
                     GroupDetailsFfi(
-                        mlsState = testMlsState(memberCount = 3u),
+                        mlsState = testMlsState(memberCount = 1u),
                         group = group(admins = listOf("alice")),
                         members =
                             listOf(
@@ -500,6 +501,74 @@ class GroupMutationDetailsApplicationTest {
         assertFalse(seed.membersVerified)
         assertFalse(seed.membersLoaded)
         assertEquals(emptyList<AppGroupMemberRecordFfi>(), seed.members)
+    }
+
+    @Test
+    fun bothRosterShapesAcceptPerLeafMultiDeviceMembership() {
+        assertRosterShape(listOf("alice", "ALICE", "alice", "alice", "bob"), 5u, 2, null)
+    }
+
+    @Test
+    fun bothRosterShapesAcceptPerAccountMultiDeviceMembership() {
+        assertRosterShape(listOf("alice", "bob", "carol", "dave"), 18u, 4, null)
+    }
+
+    @Test
+    fun bothRosterShapesAcceptSingleDeviceMembership() {
+        assertRosterShape(listOf("alice", "bob"), 2u, 2, null)
+    }
+
+    @Test
+    fun bothRosterShapesRejectPeopleExceedingLeaves() {
+        assertRosterShape(listOf("alice", "bob", "carol"), 2u, 3, GroupRosterInvariant.MEMBER_COUNT_MISMATCH)
+    }
+
+    @Test
+    fun bothRosterShapesAcceptPerLeafRowsWhenMemberCountCountsPeople() {
+        assertRosterShape(
+            listOf("alice", "ALICE", "alice", "alice", "bob"),
+            2u,
+            2,
+            null,
+        )
+    }
+
+    private fun assertRosterShape(
+        identities: List<String>,
+        leafCount: UInt,
+        peopleCount: Int,
+        expectedInvariant: GroupRosterInvariant?,
+    ) {
+        val currentGroup = group(admins = listOf("alice"))
+        val rows =
+            identities.mapIndexed { index, identity ->
+                member(identity, isAdmin = index == 0, isSelf = index == 0, local = index == 0)
+            }
+        val details =
+            GroupDetailsFfi(group = currentGroup, members = rows, mlsState = testMlsState(memberCount = leafCount))
+        val roster =
+            GroupRosterFfi(
+                groupIdHex = currentGroup.groupIdHex,
+                members = rows,
+                epoch = 7uL,
+                rosterRevision = 11uL,
+                selfMembership = SelfMembershipFfi.MEMBER,
+                memberCount = leafCount,
+                lifecycleState = dev.ipf.marmotkit.GroupLifecycleStateFfi.STABLE,
+            )
+
+        val resolutions =
+            listOf(
+                resolveAuthoritativeGroupRoster(details, activeAccountIdHex = "alice"),
+                resolveAuthoritativeGroupRoster(currentGroup, roster, activeAccountIdHex = "alice"),
+            )
+        resolutions.forEach { resolution ->
+            assertEquals(expectedInvariant, resolution.invariant)
+            assertEquals(peopleCount, resolution.uniqueMemberCount)
+            assertEquals(peopleCount, resolution.applied.members.size)
+            assertEquals(leafCount, resolution.mlsMemberCount)
+            assertTrue(resolution.containsLocalMember)
+        }
     }
 
     private fun group(

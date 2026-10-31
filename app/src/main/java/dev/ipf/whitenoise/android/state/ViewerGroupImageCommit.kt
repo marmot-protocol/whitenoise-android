@@ -50,10 +50,11 @@ internal suspend fun admitViewerGroupImageMutation(
         ViewerGroupImageAdmission(allowed = false)
     } else {
         val details = appState.marmotIo { groupDetails(account, groupId) }
-        val group = applyAuthoritativeGroupDetails(details).group
+        val applied = applyAuthoritativeGroupDetails(details)
+        val group = applied.group
         val targetMatches =
             group.groupIdHex.equals(groupId, ignoreCase = true) &&
-                !GroupProjector.isDm(details.members.size, group.name)
+                !GroupProjector.isDm(GroupProjector.uniqueMemberCount(applied.members), group.name)
         val allowed =
             change.isActive() && targetMatches && canCommitViewerGroupImage(group, appState.activeAccount?.accountIdHex)
         if (!allowed) {
