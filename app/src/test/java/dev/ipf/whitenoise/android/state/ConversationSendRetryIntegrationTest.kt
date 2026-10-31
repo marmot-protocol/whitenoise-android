@@ -2584,8 +2584,7 @@ class ConversationSendRetryIntegrationTest {
                     val releaseRecovery = CompletableDeferred<Unit>()
                     val admitted = linkedMapOf<String, Pair<String, String>>()
                     val attempts = mutableListOf<String>()
-                    var failure =
-                        if (history == AdmissionHistory.FRESH) null else MarmotKitException.Publish("signer refused")
+                    var failure = history.initialFailure
                     val nativeType = MarmotInterface::class.java
                     val metadata =
                         Proxy.newProxyInstance(nativeType.classLoader, arrayOf(nativeType)) { proxy, method, args ->
@@ -2648,13 +2647,7 @@ class ConversationSendRetryIntegrationTest {
                             }
                             controller.send("second")
                         }
-                        val expectedAttempts =
-                            if (history == AdmissionHistory.READMITTED) {
-                                listOf("first", "first", "second")
-                            } else {
-                                listOf("first", "second")
-                            }
-                        assertEquals(expectedAttempts, attempts)
+                        assertEquals(history.expectedAttempts, attempts)
                         assertEquals(listOf("first", "second"), admitted.values.map { it.second })
                         assertEquals(2, admitted.keys.toSet().size)
                         // A committed retry hands its optimistic row to the native ID for one drawn frame.
@@ -3582,10 +3575,13 @@ class ConversationSendRetryIntegrationTest {
         messageEditPublisher = { _, _, _, _ -> error("pending revision must not use a wire edit") },
     )
 
-    private enum class AdmissionHistory {
-        FRESH,
-        READMITTED,
-        COMMITTED_UNPUBLISHED,
+    private enum class AdmissionHistory(
+        val initialFailure: MarmotKitException?,
+        val expectedAttempts: List<String>,
+    ) {
+        FRESH(null, listOf("first", "second")),
+        READMITTED(MarmotKitException.Publish("signer refused"), listOf("first", "first", "second")),
+        COMMITTED_UNPUBLISHED(MarmotKitException.Publish("signer refused"), listOf("first", "second")),
     }
 
     private fun appState(
