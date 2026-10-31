@@ -36,7 +36,12 @@ internal class ComposerDraftExpansionBridge(
         groupIdHex: String,
         value: TextFieldValue,
     ) {
-        val currentText = draftStore.getDraft(accountRef, groupIdHex)?.textFieldValue?.text
+        val currentText =
+            draftStore
+                .getDraft(accountRef, groupIdHex)
+                ?.textFieldValue
+                ?.text
+                .orEmpty()
         draftStore.set(accountRef, groupIdHex, value)
         // Caret and IME composition are Android presentation state. Submitting unchanged
         // content would invalidate a dictation Send captured before this UI-only update.
