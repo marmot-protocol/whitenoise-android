@@ -129,6 +129,13 @@ class ChatListProfileReturnSnapCoverageTest {
             "onGroupCreateCompletedOpen(item, requestToken, newChatFlowReturnHead())" in flowHost,
         )
 
+        assertTrue(
+            "closing New Message must restore a head that moved behind it",
+            "onClose = ::closeNewChatFlow" in flowHost &&
+                "onSourceLeave = ::closeNewChatFlow" in chatsScreen &&
+                "chatListState.requestScrollToItem(0)" in chatsScreen.kotlinFunctionBody("closeNewChatFlow"),
+        )
+
         val createdGroupOpen =
             mainShell.requiredSection(
                 start = "val openGroupFromGroupCreateCompletion:",

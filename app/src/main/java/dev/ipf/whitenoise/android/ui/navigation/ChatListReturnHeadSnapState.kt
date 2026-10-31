@@ -77,7 +77,7 @@ internal fun openCreatedGroup(
     flowOriginHead: ChatListReturnHead?,
 ): ChatListReturnHeadSnapState =
     if (flowOriginHead != null) {
-        ChatListReturnHeadSnapState.Conversation(flowOriginHead)
+        openGroupFromChatList(state, flowOriginHead)
     } else {
         openGroupFromProfileSheet(state)
     }

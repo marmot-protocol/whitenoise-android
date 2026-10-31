@@ -983,6 +983,20 @@ internal fun ChatsScreen(
     /** The head a chat created through New Message returns against, preferring the one held when it opened. */
     fun newChatFlowReturnHead(): ChatListReturnHead? = newChatFlowOriginHead ?: visibleReturnHead()
 
+    /**
+     * Leaves New Message without opening a chat through it. A chat opened from a profile sheet
+     * inside the flow arms no return snap, so a head that moved meanwhile is restored here.
+     */
+    fun closeNewChatFlow() {
+        showNewChatFlow = false
+        val origin = newChatFlowOriginHead
+        if (origin != null && origin != visibleReturnHead()) {
+            programmaticViewportGeneration += 1L
+            chatListState.requestScrollToItem(0)
+        }
+        onGroupCreateFlowSuperseded()
+    }
+
     /** Opens the chat a search result came from, focused on that result's message. */
     fun openSearchMessage(
         groupIdHex: String,
@@ -1545,10 +1559,7 @@ internal fun ChatsScreen(
     if (showNewChatFlow) {
         dev.ipf.whitenoise.android.ui.conversation.PlaybackFlowContent(
             enabled = showPlaybackTransport,
-            onSourceLeave = {
-                showNewChatFlow = false
-                onGroupCreateFlowSuperseded()
-            },
+            onSourceLeave = ::closeNewChatFlow,
         ) {
             NewChatFlowHost(
                 appState = appState,
@@ -1556,10 +1567,7 @@ internal fun ChatsScreen(
                     showNewChatFlow = false
                     onOpenGroup(item, null, justCreated, newChatFlowReturnHead())
                 },
-                onClose = {
-                    showNewChatFlow = false
-                    onGroupCreateFlowSuperseded()
-                },
+                onClose = ::closeNewChatFlow,
                 onGroupCreateSubmitted = onGroupCreateSubmitted,
                 onGroupCreateCompletedOpen = { item, requestToken ->
                     showNewChatFlow = false
