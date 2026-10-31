@@ -23,7 +23,6 @@ name: folder-rules-match-any-reopen
     element:
       id: folder.match.
     direction: DOWN
-    centerElement: true
 - assertVisible:
     id: folder.match.
     containsChild:
