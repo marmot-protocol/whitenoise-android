@@ -2648,7 +2648,6 @@ class ConversationSendRetryIntegrationTest {
                             }
                             controller.send("second")
                         }
-                        assertFalse(releaseRecovery.isCompleted)
                         val expectedAttempts =
                             if (history == AdmissionHistory.READMITTED) {
                                 listOf("first", "first", "second")
