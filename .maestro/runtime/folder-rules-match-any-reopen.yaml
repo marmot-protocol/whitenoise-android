@@ -9,6 +9,10 @@ name: folder-rules-match-any-reopen
 - tapOn:
     id: folder.match.
 - tapOn: Match any
+- scrollUntilVisible:
+    element:
+      id: folder.match.
+    direction: UP
 - assertVisible:
     id: folder.match.
     containsChild:
