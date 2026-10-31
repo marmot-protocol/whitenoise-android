@@ -8516,7 +8516,9 @@ class ConversationController(
             )
             appState.pendingSendDiagnostics.alias(tempId, reconciliation.confirmedId)
             appState.pendingSendDiagnostics.recordAcceptedPending(tempId, reconciliation.acceptedPending)
-            convergeAcceptedPendingTextSend(account, reconciliation, tempId)
+            // MDK drains durable submissions and schedules convergence. A host recovery
+            // call here would hold the group commit lock across network maintenance,
+            // preventing the next message from even reaching durable admission.
             if (reconciliation.awaitingProjection) {
                 appState.pendingSendDiagnostics.update(tempId, PerformanceSendStage.WAITING_PROJECTION)
             }
@@ -8816,45 +8818,6 @@ class ConversationController(
                     )
                 }
         }
-    }
-
-    /** Keeps accepted-pending settlement alive when navigation disposes this conversation's visible route. */
-    private suspend fun convergeAcceptedPendingTextSend(
-        account: String,
-        reconciliation: SuccessfulTextSendReconciliation,
-        optimisticId: String,
-    ) {
-        if (!reconciliation.acceptedPending) return
-        appState.pendingSendDiagnostics.milestone(
-            optimisticId,
-            PerformancePhase.CONVERGENCE_START,
-            PerformanceSendStage.CONVERGENCE,
-            layer = PerformanceLayer.MDK,
-        )
-        var deferred = false
-        runAcceptedPendingTextConvergence(
-            acceptedPending = reconciliation.acceptedPending,
-            converge = {
-                appState.withGroupCommitLock(account, group.groupIdHex) {
-                    appState.marmotIo { retryGroupConvergence(account, group.groupIdHex) }
-                }
-            },
-            onFailure = { throwable ->
-                deferred = true
-                Log.w(
-                    "ConversationController",
-                    "accepted-pending convergence deferred; keeping preview pending",
-                    throwable,
-                )
-            },
-        )
-        appState.pendingSendDiagnostics.milestone(
-            optimisticId,
-            if (deferred) PerformancePhase.CONVERGENCE_DEFERRED else PerformancePhase.CONVERGENCE_RETURN,
-            PerformanceSendStage.WAITING_PROJECTION,
-            result = if (deferred) PerformanceResult.FAILURE else PerformanceResult.PENDING,
-            layer = PerformanceLayer.MDK,
-        )
     }
 
     /**
@@ -11101,7 +11064,6 @@ class ConversationController(
             )
             appState.pendingSendDiagnostics.alias(tempId, reconciliation.confirmedId)
             appState.pendingSendDiagnostics.recordAcceptedPending(tempId, reconciliation.acceptedPending)
-            convergeAcceptedPendingTextSend(account, reconciliation, tempId)
             if (reconciliation.awaitingProjection) {
                 appState.pendingSendDiagnostics.update(tempId, PerformanceSendStage.WAITING_PROJECTION)
             }
