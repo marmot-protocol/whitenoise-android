@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
@@ -212,10 +213,11 @@ internal fun FocusedTextMessagePreview(
                 mentionedSelf = mentionedSelf,
                 mentionedYouLabel = mentionedYouLabel,
             ) {
-                // Weighted, so it is measured after the message content, and dropped whole when it no
-                // longer fits: the decorative quote yields before the excerpt, warning or timestamp.
-                if (!compact && reply != null) ShownWhenItFits(Modifier.weight(1f, fill = false), reply)
-                content(compact)
+                if (compact || reply == null) {
+                    content(compact)
+                } else {
+                    QuoteAboveContent(reply) { content(compact) }
+                }
             }
         }
     } else {
@@ -255,24 +257,42 @@ internal fun FocusedTextMessagePreview(
     }
 }
 
-/** Shows [content] only when it fits whole in the height left to it; a clipped quote reads as damage. */
+/**
+ * Places a quoted reply above the message content, measuring the content first. Under a height bound a
+ * quote that no longer fits whole above the content is left out rather than cut, so the decorative quote
+ * yields before the excerpt, warning or timestamp, and no spacing is left behind for it.
+ */
 @Composable
-private fun ShownWhenItFits(
-    modifier: Modifier,
-    content: @Composable () -> Unit,
+private fun QuoteAboveContent(
+    quote: @Composable () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
-    Layout(content = content, modifier = modifier) { measurables, constraints ->
-        val natural = constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity)
-        val placeables = measurables.map { it.measure(natural) }
-        val width = placeables.maxOfOrNull { it.width } ?: 0
-        val height = placeables.maxOfOrNull { it.height } ?: 0
-        if (height > constraints.maxHeight) {
-            layout(0, 0) {}
-        } else {
-            layout(width, height) { placeables.forEach { it.placeRelative(0, 0) } }
+    Layout(
+        contents = listOf(quote, { Column(verticalArrangement = Arrangement.spacedBy(QuoteGap), content = content) }),
+    ) { (quoteMeasurables, contentMeasurables), constraints ->
+        val gap = QuoteGap.roundToPx()
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val body = contentMeasurables.single().measure(loose)
+        val room =
+            if (constraints.hasBoundedHeight) constraints.maxHeight - body.height - gap else Constraints.Infinity
+        val natural = loose.copy(maxHeight = Constraints.Infinity)
+        val quotes = quoteMeasurables.map { it.measure(natural) }
+        val quoteHeight = quotes.maxOfOrNull { it.height } ?: 0
+        val shown = quotes.isNotEmpty() && quoteHeight <= room
+        val top = if (shown) quoteHeight + gap else 0
+        val width = maxOf(body.width, if (shown) quotes.maxOf { it.width } else 0)
+        layout(
+            width.coerceIn(constraints.minWidth, constraints.maxWidth),
+            (top + body.height).coerceIn(constraints.minHeight, constraints.maxHeight),
+        ) {
+            if (shown) quotes.forEach { it.placeRelative(0, 0) }
+            body.placeRelative(0, top)
         }
     }
 }
+
+// Matches the bubble frame's spacing between its content blocks.
+private val QuoteGap = 6.dp
 
 /** Replays a natively remeasured display layer at one pixel per pixel; metadata is never GPU-scaled. */
 @Composable

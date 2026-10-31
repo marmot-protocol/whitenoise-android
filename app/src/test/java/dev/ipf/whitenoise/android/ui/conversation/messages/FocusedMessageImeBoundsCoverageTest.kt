@@ -86,6 +86,55 @@ class FocusedMessageImeBoundsCoverageTest {
         }
     }
 
+    /**
+     * Resizing an open preview, as the keyboard does, re-fits it in place. Only measured sizes and the
+     * footer position are asserted: after an in-place shrink the warning's reported position lagged its
+     * rendered position, which a captured image showed in place.
+     */
+    @Test fun openPreviewRefitsWhenItsFrameShrinksAndGrows() {
+        var height by mutableStateOf(400.dp)
+        composeRule.setContent { WarningPreview(height) }
+        composeRule.waitForIdle()
+        val naturalWarningHeight = nodeHeight(WARNING)
+
+        for (next in listOf(201.dp, 260.dp, 230.dp, 400.dp)) {
+            height = next
+            composeRule.waitForIdle()
+            assertExcerptLinesWhole("after resizing to $next")
+            assertEquals("warning height after resizing to $next", naturalWarningHeight, nodeHeight(WARNING))
+            assertInside(textNode("12:34"), label = "footer after resizing to $next")
+        }
+    }
+
+    /** Without a height bound the preview keeps its quoted reply and its full excerpt. */
+    @Test fun unboundedPreviewKeepsReplyAndExcerpt() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.width(260.dp)) {
+                    FocusedTextMessagePreview(
+                        presentation = messageBubblePresentation(deleted = false, mine = false),
+                        mine = false,
+                        text = "A long target message. ".repeat(20),
+                        document = null,
+                        time = "12:34",
+                        status = MessageStatus.Received,
+                        showStatus = false,
+                        reply = { Text("Quoted reply") },
+                        warning = WARNING,
+                    )
+                }
+            }
+        }
+
+        assertTrue("reply must be shown", nodeHeight("Quoted reply") > 0)
+        val results = mutableListOf<TextLayoutResult>()
+        composeRule
+            .onNodeWithTag("message-actions-excerpt")
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
+        assertEquals(5, results.single().lineCount)
+        assertExcerptLinesWhole("without a bound")
+    }
+
     /** A one-line message whose footer fits inline keeps its line whole in a keyboard-tiny frame. */
     @Test fun inlineFooterKeepsTheExcerptLineWholeInATinyFrame() {
         composeRule.setContent {

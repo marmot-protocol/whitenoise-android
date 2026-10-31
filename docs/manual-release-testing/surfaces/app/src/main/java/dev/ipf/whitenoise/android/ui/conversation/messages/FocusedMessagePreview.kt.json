@@ -32,9 +32,9 @@
         ]
       },
       {
-        "surface": "ShownWhenItFits",
+        "surface": "QuoteAboveContent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessagePreview.kt",
-        "anchor": "private fun ShownWhenItFits(",
+        "anchor": "fun QuoteAboveContent(",
         "test_ids": [
           "MSG-043"
         ]
