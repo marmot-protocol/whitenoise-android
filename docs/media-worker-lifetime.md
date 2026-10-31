@@ -76,34 +76,32 @@ required.
 `MediaWorkerGenerationTest` and `MediaBindingRecoveryTest` drive the real
 transport and pool through controlled callbacks: per-request retirement,
 distinct generations, late and revoked replies, refused and throwing binds,
-startup timeout and late connection, death/close and reset races, a worker
-that ignores RETIRE, spare bounds and fail-closed replacement.
-`MediaWorkerDomainTest` adds domains: a generation never serves another
-domain, even with more concurrent domains than slots; same-domain reuse;
-cross-domain admission while another domain's request is in flight, with only
-requests that hold a worker holding descriptors however many domains wait;
-eviction
-only through the victim's death; failure retirement and quarantine per domain;
-the input cap and idle timeout; account reset; Unique staying single-use; and
+startup timeout and late connection, death/close and reset races, a worker that
+ignores RETIRE, spare bounds and fail-closed replacement.
+`MediaWorkerDomainTest` adds domains: a generation never serves another domain,
+even with more concurrent domains than slots; same-domain reuse; cross-domain
+admission while another domain's request is in flight, with only requests that
+hold a worker holding descriptors however many domains wait; eviction only
+through the victim's death; failure retirement and quarantine per domain; the
+input cap and idle timeout; account reset; Unique staying single-use; and
 failing requests in four domains at once keeping every quarantine entry, its
 bound and no exception. `MediaRefusalLedgerTest` hammers the session's refusal
-ledger from eight threads; without its lock it throws. `PictureDomainCoverageTest`
-and `PictureDomainMappingTest` check that every production picture names its
-domain and that only member-pinned bytes reach a conversation's worker;
-`PhotoEditorDomainTest`, `PhotoDraftStagerTest` and `PhotoEditorCommitterTest`
-check that every decode of one pick, edited or not, runs in that pick's own
-outgoing worker and never another pick's, also under concurrency, and
-`ConversationDraftRestorationPlanTest` that each restored draft attachment is its
-own pick. `PickWorkerRetirementTest` checks that removing a photo or a document
-retires exactly that pick's worker, and that sending retires a document's worker
-at once while a photo keeps its worker for its just-sent poster;
-`ConversationMediaSendReconciliationThumbnailTest` that the poster decodes in
-that pick's own domain and then retires it. `MediaWorkerDomainTest` adds a
-ten-pick concurrency canary, parallel eviction for an album of new picks, and
-the retirement of an idle or busy pick's domain. `MediaClaimDeadlineTest` checks
-that a missed deadline after a long wait for a worker quarantines nothing, while
-the same miss without that wait still does. Those JVM fixtures exercise owner
-ordering only.
+ledger from eight threads; without its lock it throws.
+`PictureDomainCoverageTest` and `PictureDomainMappingTest` check that every
+production picture names its domain, that only member-pinned bytes reach a
+conversation's worker and that `MediaTrustDomain.outgoing` is the only place an
+outgoing domain is made; `PhotoEditorDomainTest`, `PhotoDraftStagerTest` and
+`PhotoEditorCommitterTest` check that every decode of a draft's picks, edited,
+staged or recovered, runs in its conversation's shared outgoing worker and never
+another conversation's, also under concurrency. `SharedOutgoingWorkerTest`
+checks that removing a photo or a document, or sending one, retires nothing and
+the draft's next decode reaches the same worker;
+`ConversationMediaSendReconciliationIntegrationTest` that the just-sent poster
+decodes in its send's account and conversation domain. `MediaWorkerDomainTest`
+adds a ten-draft concurrency canary and parallel eviction for several new
+domains at once. `MediaClaimDeadlineTest` checks that a missed deadline after a
+long wait for a worker quarantines nothing, while the same miss without that
+wait still does. Those JVM fixtures exercise owner ordering only.
 
 `IsolatedMediaDecoderDeviceTest` supplies the operating-system evidence on a
 real device. A debug worker-state canary shows source A's retained digest and
@@ -117,8 +115,8 @@ not as a self-exit.
 `MediaWorkerDomainDeviceTest` uses the same canary across domains: a
 conversation's later input lands in the worker holding its earlier input's
 state, and another conversation's input lands in a different process holding
-none of it. Its per-pick case does the same for two picks of one conversation,
-then retires the first pick and shows its next input in a fresh process holding
-nothing. These cases ran on API 30 and API 36 emulators and run in the hosted
-API 34 pull-request lane. MED-031 and MED-032 keep their image, account-switching and
-format checks.
+none of it. Its draft case shows two picks of one conversation's draft sharing
+one outgoing process, a second conversation's picks never reaching it, and no
+other domain sharing it. These cases ran on API 30 and API 36 emulators and run
+in the hosted API 34 pull-request lane. MED-031 and MED-032 keep their image,
+account-switching and format checks.

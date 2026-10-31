@@ -4,7 +4,7 @@
 
 Still-image decode and inspection, EXIF inspection and SVG preparation use a nonexported `android:isolatedProcess` service. The worker has a separate UID and no application permissions. Application startup skips account state, diagnostics, locale preferences, playback, transfers and background scheduling in that process.
 
-The app decodes still images in domain-bound worker generations: each isolated worker serves one conversation's member-pinned media, the account's public profile pictures, one picked file to send or the account's display-only local files, and any other input gets a single-use worker; see [Domain-bound worker generations](#domain-bound-worker-generations). Video poster/duration probes and voice waveform extraction use a separate, process-wide serialized platform-service adapter. Android denies `media.player` and `media.extractor` discovery to isolated UIDs on API 30; attempting those operations in the image worker is unsupported. This is an explicit route, with no isolated-attempt/privileged-fallback sequence. A slow waveform must not occupy the notification-avatar lane. Production calls on the main looper or without a configured transport fail closed. JVM tests explicitly inject their codec fixture; those tests do not prove process isolation.
+The app decodes still images in domain-bound worker generations: each isolated worker serves one conversation's member-pinned media, the account's public profile pictures, one conversation's draft of files to send or the account's display-only local files, and any other input gets a single-use worker; see [Domain-bound worker generations](#domain-bound-worker-generations). Video poster/duration probes and voice waveform extraction use a separate, process-wide serialized platform-service adapter. Android denies `media.player` and `media.extractor` discovery to isolated UIDs on API 30; attempting those operations in the image worker is unsupported. This is an explicit route, with no isolated-attempt/privileged-fallback sequence. A slow waveform must not occupy the notification-avatar lane. Production calls on the main looper or without a configured transport fail closed. JVM tests explicitly inject their codec fixture; those tests do not prove process isolation.
 
 Input bytes are written only after their temporary file is unlinked, then passed by read-only descriptor. Picked images and media use a process-wide staging gate, with provider cancellation and bounded reads. Whole-file seekable videos pass their descriptor without a full-video array copy. Provider subranges are copied into their own unlinked inode, so a decoder cannot read bytes outside the selected asset. No URLs, account objects, keys or general file-access callback enter the worker.
 
@@ -134,7 +134,7 @@ caller cannot place under the rule decodes single-use.
 | --- | --- | --- |
 | Conversation | account, conversation | Bytes a member fixed: encrypted, hash-verified message media, thumbnails, bubbles and the viewer; custom emoji received as the message's own attachments; link-preview JPEGs whose digest the message pins, checked before decode; and the group's encrypted, hash-pinned image wherever it is drawn, in the chat list, durable chat rows and the notification loader included. |
 | Public profiles | account | Kind-0 profile pictures and banners, of people in every conversation and of the user's own accounts. They are published to relays, so anyone can fetch all of them and anyone may choose their bytes; sharing one worker exposes nothing new. A group's image is never one of these. Every caller names this domain explicitly. |
-| Outgoing | account, conversation, pick | One file the user picked from the device to send into one conversation, for its whole life in the draft: its composer and shelf previews, staging (inspection, EXIF and the Original or standard render), the photo editor's inspection, preview and edited render, its thumbhash and its just-sent thumbnail. Gallery files come from many authors, so each pick gets its own worker. The pick is the composer slot's id, which a restored draft attachment keeps as its own, or a document's URI. Removing a pick, or its last decode after sending, retires its worker. |
+| Outgoing | account, conversation | Every file the user picks from the device to send into one conversation, for its whole life in that conversation's draft: composer and shelf previews, staging (inspection, EXIF and the Original or standard render), the photo editor's inspection, preview and edited render, thumbhashes, just-sent thumbnails and restored draft attachments. The draft's picks share this one worker on every device; see [shared draft worker](#shared-draft-worker). Removing or sending a pick retires nothing. |
 | Local | account | Display-only files of this device: the user's custom-emoji files, notification emoji included, and stored private contact pictures. Their decoded pixels are drawn on this device or exported only to this user's own notification surfaces (notification emoji are re-encoded as PNG and shared with the system through the app's FileProvider); they are never sent, and an emoji is sent as its stored file. |
 | Unique | none | Anything else. Each input gets its own single-use generation, as in the per-input lane. Today: GIPHY first frames, Nostr event and linked-note images, a group's URL picture (in a header, the chat list, a durable row whose group has a URL, or a notification), web image search results and typed image URLs, picks during sign-up, identity-picture cropping, profile and group picture picks, preparing a new private contact picture, the avatar viewer, and picker rows that may show either a group or a person. The avatar loader and the generic picture rows fall back to this when a caller names nothing. |
 
@@ -155,18 +155,19 @@ Audit of the conversation rows against the rule, after round 3's review:
 | GIPHY first frame | GIPHY, an allow-listed host, with no digest | Unique (was Conversation) |
 | Nostr event and linked-note images | The note's author and its host | Unique (was Conversation) |
 | Direct chat peer's picture in a header or notification | Its host; it is published | Public profiles (was Conversation) |
-| Each pick to send, every decode of it included | That file's author | Outgoing, one domain per pick (was one per conversation, and before that account-wide Local) |
-| Edited renders and the editor preview | That pick's own file | The pick's own outgoing domain (round 5 made them single-use; one worker per pick protects every other pick's redactions without it) |
+| Each pick to send, every decode of it included | That file's author | Outgoing, one shared domain per conversation's draft (round 6 measured one per pick, superseded; before that, account-wide Local) |
+| Edited renders and the editor preview | The draft's own picks | The draft's shared outgoing domain (round 5 made them single-use, round 6 per pick; both superseded) |
 
 Within its domain a compromised worker can still read every later input the
 generation serves, including descriptors it retained; alter the pixels it
 returns, which the parent validates for shape but not content; and use CPU and
-memory up to its watchdog. An outgoing worker only ever sees one pick: a
-hostile file can see no other pick, removed from the draft or not, so it can
-neither carry one into a sent image nor undo a crop, blur or mark of another
-pick. It can return wrong pixels for its own pick, including an edit of that
-same file with its crop, blur or mark undone, since any worker that decodes it
-is compromised alike; that content is its author's own. In the local domain a hostile emoji file can draw a private
+memory up to its watchdog. A conversation's outgoing worker serves every pick of
+that conversation's draft. A hostile picked file can therefore reach the other
+picks of the same draft, their originals included, and nothing else: it can
+substitute another pick's original pixels into its own output, or into another
+pick's render, so it could undo a crop, blur or mark of a photo in the same
+message. It reaches no other conversation's draft, no received media, no other
+account and no other domain. In the local domain a hostile emoji file can draw a private
 contact picture in an emoji slot, on this device or in this user's own
 notification. Escapes through the kernel or system services are not contained
 by domains.
@@ -195,15 +196,11 @@ Lifetime:
 - A generation is replaced after 64 inputs and retired after 30 seconds idle,
   so none serves its domain indefinitely and a quiet conversation frees its
   memory. A replacement costs one application-zygote fork on stock Android.
-- Account reset and close retire every generation and spare. Removing a pick
-  from the draft retires that pick's generation: at once when it is idle, after
-  its request in flight otherwise. A sent document's generation retires at
-  acceptance when the shelf is unchanged since the send began, otherwise after
-  30 seconds idle; a sent photo's after its just-sent poster, or after 30
-  seconds idle when it gets none. A decode that arrives after its pick retired,
-  such as a late shelf tile or pending preview, or a removed pick's staging
-  still in flight, starts a fresh worker for that same pick; it serves no other
-  pick and idles out after 30 seconds.
+- Account reset and close retire every generation and spare. Removing or sending
+  a pick retires nothing: the draft's shared outgoing worker still serves its
+  other picks, and retires like any domain's, after 30 seconds idle, after 64
+  inputs, on a crash, watchdog, deadline miss or invalid reply, or at account
+  reset.
 - A Unique input gets a single-use generation, retired after its reply. Its
   Binder death precedes the parent pixel copy and the next Unique input.
 - Retirement sends RETIRE first; the worker's own exit normally follows within
@@ -226,7 +223,7 @@ Admission:
 - A new domain takes the spare or a free slot. When every slot is taken, it
   evicts the least recently used idle domain, and only that worker's Binder
   death frees the slot; a busy domain is never evicted. As many evictions run
-  at once as requests wait for a slot, so an album of new picks is not served
+  at once as requests wait for a slot, so several new domains are not served
   one eviction at a time, and none beyond that: slots already being freed are
   awaited while they cover every waiting request.
 - A refused bind fails that input. A binding Android reports dead or null before
@@ -600,9 +597,10 @@ Round 4's review moved every edited render and the editor's own preview to
 single-use workers, so a worker an earlier pick compromised cannot restore what
 a crop, blur or mark removed. Round 6 replaced this with one worker per pick
 (below), which protects every other pick's redactions in every decode, not only
-the editor's. The one measured row this moves is U5's editor
-half, whose harness decodes through the editor preview. It was measured again on
-the domain lane, recorded beforehand, against the same budget:
+the editor's; the [shared draft worker](#shared-draft-worker) superseded both.
+The one measured row this moves is U5's editor half, whose harness decodes
+through the editor preview. It was measured again on the domain lane, recorded
+beforehand, against the same budget:
 
 | Editor cancelled mid-decode: pixels delivered; next image p50/max (first try) | Domain + zygote | Domain, no zygote |
 | --- | ---: | ---: |
@@ -613,6 +611,9 @@ U5 stays met on both builds and both APIs. Containment acceptance passed 34 of
 34 on both APIs with the same build.
 
 #### Round 6: one worker per pick
+
+*Superseded by the [shared draft worker](#shared-draft-worker). This section and
+its measurements record the per-pick design as it was measured.*
 
 Round 5's review found that one outgoing worker per conversation let a hostile
 pick read every later pick of that conversation, originals included, before any
@@ -956,18 +957,58 @@ the window keeps a margin of more than 9.5 seconds and stays as it is.
 
 ##### Verification
 
-The domain canary gains a per-pick case: a second pick of the same conversation
-gets a fresh process holding nothing of the first, the first pick's later input
-returns to its own worker, and after the pick is retired its next input meets a
-new process with nothing left behind. Containment acceptance, which runs it,
-passed 35 of 35 on API 30 and API 36 with the final build. Three earlier API 30
-runs on the build of `a9443e30e`, which differed from it only in comment text,
-each failed `AvCapabilityLogCaptureDeviceTest`: the parent process did not see
-its own 512th log line from logd within 3 s. One of them also refused to
-overwrite an earlier run's baseline report, which had not been moved aside. That
-test is unchanged from master and outside the still-image path, and in isolation
-on that emulator it failed 3 of 6 runs on the `4562586f8` build too, which had
-passed 35 of 35 before.
+The domain canary gained a per-pick case for this round; the shared draft worker
+replaced it with a case where a draft's picks share one process. Containment
+acceptance, which runs it, passed 35 of 35 on API 30 and API 36 with the final
+build. Three earlier API 30 runs on the build of `a9443e30e`, which differed
+from it only in comment text, each failed `AvCapabilityLogCaptureDeviceTest`:
+the parent process did not see its own 512th log line from logd within 3 s. One
+of them also refused to overwrite an earlier run's baseline report, which had
+not been moved aside. That test is unchanged from master and outside the
+still-image path, and in isolation on that emulator it failed 3 of 6 runs on the
+`4562586f8` build too, which had passed 35 of 35 before.
+
+#### Shared draft worker
+
+This design replaced one worker per pick after release-type kits measured both
+on two phones. On a stock Pixel 9 Pro XL, where workers fork from the
+application zygote, a ten-photo album took 8178 ms to prepare and 9873 ms to
+send with one worker per pick, against master's 4409 ms and 4660 ms, while one
+worker for the conversation's picks took 4820 ms and 4536 ms. On a Pixel 9a
+running GrapheneOS, whose exec spawning starts every worker as a full process,
+one worker per pick took 17451 ms and 19929 ms, against 5396 ms and 5345 ms with
+one worker for the conversation's picks. One worker per pick roughly doubled
+master's album times on stock Android as well, so the design changed on every
+device, with no launch-mode detection.
+
+Every file the user picks to send into a conversation now decodes in that
+account and conversation's one outgoing worker, for its whole life in the draft:
+composer, shelf and preview tiles, staging, the photo editor's inspection,
+preview and edited render, thumbhashes, the just-sent poster, which decodes in
+its send's own account and conversation, and attachments restored from a saved
+draft. `MediaTrustDomain.outgoing(account, conversation)` is the only place an
+outgoing domain is made, and `PictureDomainCoverageTest` fails on any other
+construction, so every decode of a pick agrees. The pick no longer keys the
+domain.
+
+Removing or sending a pick retires nothing, since the worker still serves the
+draft's other picks. It retires like any domain's worker: after 30 seconds idle,
+after 64 inputs, on a crash, watchdog kill, deadline miss or invalid reply, and
+at account reset.
+
+The trade is the draft. A hostile picked file can reach the other picks of the
+same conversation's draft, their unredacted originals included, and can
+substitute another pick's pixels into its own output or into another pick's
+render, so it could undo a crop, blur or mark of a photo in the same message. It
+reaches no other conversation's draft, none of the conversation's received
+media, no other account and no other domain.
+
+The measurement harnesses follow production. The album harness keeps two lanes,
+`master` and `conversation`, and the conversation lane maps its picks through
+production's policy; its per-pick lane is gone. The UI harness's editor
+cancellation rows decode both picks in the open conversation's shared worker.
+The round-6 emulator album rows above measured the per-pick and conversation
+lanes side by side; the conversation lane is this design.
 
 #### Rejected alternatives
 
@@ -980,10 +1021,12 @@ On the same emulators:
   GrapheneOS every input would pay a full process start.
 - One worker for every group image or for the chat list: a group's image would
   reach a decoder that another group's image may have compromised.
-- One outgoing worker per conversation (round 4) or per account (round 3): a
-  hostile pick reads every later pick of that conversation, originals before
-  any crop, blur or mark included. Round 5's single-use editor renders covered
-  only the editor's own decodes.
+- One outgoing worker per account (round 3): a hostile pick would reach every
+  conversation's drafts.
+- One outgoing worker per pick (round 6): no pick reaches another, but a
+  ten-photo album took about twice master's time on a stock Pixel 9 Pro XL and
+  over three times the shared worker's on a GrapheneOS Pixel 9a; see the [shared
+  draft worker](#shared-draft-worker).
 - A bound on admitted requests across domains, tried in a stopped run: a freed
   permit went to a domain without a worker, which evicted the one that had just
   finished (mixed-burst p50/p95 821/2257 ms on API 30). Claiming the worker
@@ -1017,20 +1060,21 @@ for that decision.
   and requires every production avatar-loader call to name its domain, which
   leaves that loader's inheritance to test and harness code. Other production
   paths rely on scope inheritance by design: `MediaPipeline`'s decode functions
-  default to the enclosing scope, the photo editor declares its pick's domain
+  default to the enclosing scope, the photo editor declares its draft's domain
   through its render context, and the notification presenter declares each
   picture slot's domain around its resolver. Whether a named domain is the right
   one rests on review and on the audit above.
 - The avatar cache and its in-flight requests are keyed by URL, not domain. If
   one URL were both a person's published picture and a group's URL picture, the
   first request's domain would decode it for both.
-- An outgoing worker serves one pick, so a hostile file reaches only itself; a
-  pick's identity is its composer slot or document URI, and a caller that
-  attributed two files to one pick would let them share a worker. A hostile
-  file can still undo a crop, blur or mark of itself. In the local
-  domain a hostile emoji file can draw a private contact picture in an emoji
-  slot, on this device or in this user's own notification; nothing from the
-  local domain is sent.
+- A conversation's outgoing worker serves every pick of its draft, so a hostile
+  picked file can reach the other picks of the same draft, their originals
+  included, and substitute their pixels into its own output or into another
+  pick's render, undoing an edit of a photo in the same message. It reaches
+  nothing outside that draft.
+- In the local domain a hostile emoji file can draw a private contact picture in
+  an emoji slot, on this device or in this user's own notification; nothing from
+  the local domain is sent.
 - A cooperative self-exit ends the worker process only. Android's escalation
   kill covers the process group. A forked descendant of a compromised worker is
   outside the Binder witness.
@@ -1044,13 +1088,12 @@ for that decision.
   from Android 13. Workers started without the application zygote, as on master,
   keep the app's level. This is a source reading, not a device observation; see
   [native heap memory tagging](native-heap-memory-tagging.md).
-- On GrapheneOS, every new domain, every pick and every Unique input pays an
-  exec-spawned process start; see the [proposed budget](#measurements-and-proposed-budget)
-  for the lower bound measured without the application zygote. There, a
-  ten-photo album took 3.6 to 4.7 s to prepare and 5.5 to 6.8 s to send against
-  master's 0.8 to 1.3 s and 0.5 to 0.9 s, missing A1 and A2 of the
-  [round 6 amendment](#round-6-one-worker-per-pick), and A3 at API 30 (T11
-  by one descriptor).
+- On GrapheneOS, every new domain and every Unique input pays an exec-spawned
+  process start; see the [proposed budget](#measurements-and-proposed-budget)
+  for the lower bound measured without the application zygote. A draft's picks
+  share one worker, so an album pays one start for its picks rather than one per
+  photo: on a Pixel 9a a ten-photo album took 5396 ms to prepare and 5345 ms to
+  send, against 17451 ms and 19929 ms with the superseded worker per pick.
 - Unique inputs are admitted one at a time, each after the previous single-use
   worker's death. Without the application zygote, ten notifications with group
   URL pictures behind a burst missed the 2.5 s artwork bound for a third to
