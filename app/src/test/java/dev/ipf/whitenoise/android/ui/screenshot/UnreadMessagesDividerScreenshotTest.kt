@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.MaterialTheme
@@ -25,8 +24,6 @@ import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.conversation.UNREAD_MESSAGES_DIVIDER_CONTENT_TAG
 import dev.ipf.whitenoise.android.ui.conversation.UnreadMessagesDivider
-import dev.ipf.whitenoise.android.ui.conversation.conversationClusterTopGap
-import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -59,29 +56,17 @@ class UnreadMessagesDividerScreenshotTest {
         composeRule.onNodeWithTag(ROOT_TAG).captureRoboImage("src/test/snapshots/unread_divider_dark_large_rtl.png")
     }
 
-    /**
-     * The real transcript row also opens its sender cluster, and that gap must not stack on the
-     * divider's own inset: the first unread message keeps one 18dp interval, not 18dp plus 12dp.
-     */
+    /** The divider alone owns the inset before its first unread row. */
     @Test
-    fun firstUnreadRowDoesNotStackTheClusterGap() {
-        renderWithClusterGap(followsUnreadDivider = true)
+    fun firstUnreadRowKeepsTheDividerInterval() {
+        renderWithCompactRow()
         val divider = composeRule.onNodeWithTag(UNREAD_MESSAGES_DIVIDER_CONTENT_TAG).fetchSemanticsNode().boundsInRoot
         val unread = composeRule.onNodeWithTag(UNREAD_TAG).fetchSemanticsNode().boundsInRoot
         assertEquals(18f, unread.top - divider.bottom, 1f)
     }
 
-    /** The control: a new sender that no divider separated still opens the prototype's cluster gap. */
-    @Test
-    fun newSenderWithoutADividerKeepsTheClusterGap() {
-        renderWithClusterGap(followsUnreadDivider = false)
-        val divider = composeRule.onNodeWithTag(UNREAD_MESSAGES_DIVIDER_CONTENT_TAG).fetchSemanticsNode().boundsInRoot
-        val unread = composeRule.onNodeWithTag(UNREAD_TAG).fetchSemanticsNode().boundsInRoot
-        assertEquals(18f + WhiteNoiseSpacing.ConversationCluster.value, unread.top - divider.bottom, 1f)
-    }
-
-    /** Mounts the divider above a row that opens a sender cluster, the way TimelineRow composes them. */
-    private fun renderWithClusterGap(followsUnreadDivider: Boolean) {
+    /** Mounts the divider above the compact row without a second spacing owner. */
+    private fun renderWithCompactRow() {
         composeRule.setContent {
             WhiteNoiseTheme {
                 Surface(modifier = Modifier.width(360.dp).height(180.dp).testTag(ROOT_TAG)) {
@@ -91,13 +76,7 @@ class UnreadMessagesDividerScreenshotTest {
                                 UnreadMessagesDivider(count = 5)
                                 Box(
                                     Modifier
-                                        .padding(
-                                            top =
-                                                conversationClusterTopGap(
-                                                    sameSenderAsOlderBubble = false,
-                                                    followsUnreadDivider = followsUnreadDivider,
-                                                ),
-                                        ).fillMaxWidth()
+                                        .fillMaxWidth()
                                         .height(48.dp)
                                         .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                                         .testTag(UNREAD_TAG),
