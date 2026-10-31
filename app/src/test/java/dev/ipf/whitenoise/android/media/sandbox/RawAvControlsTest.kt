@@ -328,7 +328,7 @@ class RawAvControlsTest {
         setField(engine, "status", RawAvPlaybackEngine.Status.Ready)
         setField(engine, "pausedUs", 2250000L)
         setField(engine, "targetUs", 2250000L)
-        (field(engine, "prepared") as SettableFuture<Void>).set(null)
+        (field(engine, "prepared") as SettableFuture<Void?>).set(null)
     }
 
     private fun seedActiveOutput(

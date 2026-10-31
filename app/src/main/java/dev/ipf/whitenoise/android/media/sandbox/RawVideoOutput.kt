@@ -3,6 +3,7 @@
 package dev.ipf.whitenoise.android.media.sandbox
 
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.SurfaceTexture
@@ -118,21 +119,7 @@ internal class RawVideoOutput(
             try {
                 val canvas = target.lockCanvas(null)
                 try {
-                    canvas.drawColor(Color.BLACK)
-                    val rotated = rotation == 90 || rotation == 270
-                    val width = if (rotated) bitmap.height else bitmap.width
-                    val height = if (rotated) bitmap.width else bitmap.height
-                    val scale = minOf(canvas.width.toFloat() / width, canvas.height.toFloat() / height)
-                    val checkpoint = canvas.save()
-                    try {
-                        canvas.translate(canvas.width / 2f, canvas.height / 2f)
-                        canvas.rotate(rotation.toFloat())
-                        canvas.scale(scale, scale)
-                        canvas.translate(-bitmap.width / 2f, -bitmap.height / 2f)
-                        canvas.drawBitmap(bitmap, 0f, 0f, paint)
-                    } finally {
-                        canvas.restoreToCount(checkpoint)
-                    }
+                    drawRawVideoFrame(canvas, bitmap, rotation, paint)
                 } finally {
                     target.unlockCanvasAndPost(canvas)
                 }
@@ -188,5 +175,29 @@ internal class RawVideoOutput(
             output = null
             releaseSurface()
         }
+    }
+}
+
+/** Draws validated raw pixels in square-pixel display geometry; surface lifetime stays with the caller. */
+internal fun drawRawVideoFrame(
+    canvas: Canvas,
+    bitmap: Bitmap,
+    rotation: Int,
+    paint: Paint,
+) {
+    canvas.drawColor(Color.BLACK)
+    val rotated = rotation == 90 || rotation == 270
+    val width = if (rotated) bitmap.height else bitmap.width
+    val height = if (rotated) bitmap.width else bitmap.height
+    val scale = minOf(canvas.width.toFloat() / width, canvas.height.toFloat() / height)
+    val checkpoint = canvas.save()
+    try {
+        canvas.translate(canvas.width / 2f, canvas.height / 2f)
+        canvas.rotate(rotation.toFloat())
+        canvas.scale(scale, scale)
+        canvas.translate(-bitmap.width / 2f, -bitmap.height / 2f)
+        canvas.drawBitmap(bitmap, 0f, 0f, paint)
+    } finally {
+        canvas.restoreToCount(checkpoint)
     }
 }

@@ -18,8 +18,8 @@ import androidx.media3.common.TrackGroup
 import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
-import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import com.google.common.util.concurrent.SettableFuture
 import java.io.FileNotFoundException
 import java.io.IOException
 
@@ -143,7 +143,7 @@ internal class IsolatedAttachmentPlayer(
         return done()
     }
 
-    override fun handleSetVideoOutput(videoOutput: Any?): ListenableFuture<*> {
+    override fun handleSetVideoOutput(videoOutput: Any): ListenableFuture<*> {
         engine.attachVideo(videoOutput)
         return done()
     }
@@ -211,7 +211,7 @@ internal class IsolatedAttachmentPlayer(
         )
     }
 
-    private fun done(): ListenableFuture<Void> = Futures.immediateVoidFuture()
+    private fun done(): ListenableFuture<Void> = SettableFuture.create<Void>().apply { set(null) }
 
     companion object {
         private val commands =

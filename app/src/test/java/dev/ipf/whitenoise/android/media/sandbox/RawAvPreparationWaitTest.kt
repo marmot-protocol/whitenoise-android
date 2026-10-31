@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class RawAvPreparationWaitTest {
     @Test
     fun selectedRenderActivationHeldBeforeWaitCannotPrepareOrOpenAfterStop() {
-        val context = RuntimeEnvironment.getApplication<Application>()
+        val context = RuntimeEnvironment.getApplication()
         val probes = AtomicInteger()
         val engine = engine(context, probes)
         val prior = field(engine, "prepared")
@@ -77,7 +77,7 @@ class RawAvPreparationWaitTest {
 
     @Test
     fun queuedPausedSeekHeldBeforeWaitCannotRestartStoppedPreparationAndProducerStillAcceptsLaterTargets() {
-        val context = RuntimeEnvironment.getApplication<Application>()
+        val context = RuntimeEnvironment.getApplication()
         val probes = AtomicInteger()
         val engine = engine(context, probes)
         val prior = field(engine, "prepared")
@@ -135,7 +135,7 @@ class RawAvPreparationWaitTest {
 
     @Test
     fun seekBeforeFirstPrepareWaitsForTheSamePromiseUntilAnExplicitControlAdmitsIt() {
-        val context = RuntimeEnvironment.getApplication<Application>()
+        val context = RuntimeEnvironment.getApplication()
         val probes = AtomicInteger()
         val engine = engine(context, probes)
         val initial = field(engine, "prepared")
