@@ -88,9 +88,7 @@ internal class PhotoDraftStager(
         legacyOccurrenceIndex: Int? = null,
     ): PhotoDraftStageResult {
         val attachmentId = stagedPhotoAttachmentId(accountRef, groupIdHex, attachmentSlotId)
-        // The slot is the pick: every decode of this source runs in that pick's own worker.
-        val pick = attachmentSlotId
-        findExisting(attachmentId, accountRef, groupIdHex, pick)?.let { return it }
+        findExisting(attachmentId, accountRef, groupIdHex)?.let { return it }
 
         val staged =
             try {
@@ -107,7 +105,6 @@ internal class PhotoDraftStager(
                     occurrenceIndex = legacyOccurrenceIndex,
                     accountRef = accountRef,
                     groupIdHex = groupIdHex,
-                    pick = pick,
                 )
             if (restored != null) {
                 withContext(NonCancellable + ioDispatcher) {
@@ -123,15 +120,10 @@ internal class PhotoDraftStager(
             accountRef = accountRef,
             groupIdHex = groupIdHex,
             quality = quality,
-            pick = pick,
         )
     }
 
-    /**
-     * Byte entry point used by already-materialized sources and deterministic tests. Its decodes run in [pick]'s own
-     * outgoing worker, the attachment itself unless the caller names its composer slot.
-     */
-    @Suppress("LongParameterList") // The draft identity, its source, its quality and the pick that keys its worker.
+    /** Byte entry point used by already-materialized sources and deterministic tests. */
     suspend fun stageBytes(
         sourceBytes: ByteArray,
         displayName: String,
@@ -139,9 +131,8 @@ internal class PhotoDraftStager(
         accountRef: String,
         groupIdHex: String,
         quality: MediaQuality,
-        pick: String = attachmentId,
     ): PhotoDraftStageResult {
-        findExisting(attachmentId, accountRef, groupIdHex, pick)?.let { return it }
+        findExisting(attachmentId, accountRef, groupIdHex)?.let { return it }
         val staged =
             try {
                 withContext(ioDispatcher) { sources.stageBytes(sourceBytes) }
@@ -157,12 +148,11 @@ internal class PhotoDraftStager(
             accountRef = accountRef,
             groupIdHex = groupIdHex,
             quality = quality,
-            pick = pick,
         )
     }
 
     // One transaction owns inspection, Original fallback, MDK commit, and lease cleanup.
-    @Suppress("LongMethod", "CyclomaticComplexMethod", "LongParameterList")
+    @Suppress("LongMethod", "CyclomaticComplexMethod")
     private suspend fun stageLease(
         leaseId: String,
         displayName: String,
@@ -170,11 +160,11 @@ internal class PhotoDraftStager(
         accountRef: String,
         groupIdHex: String,
         quality: MediaQuality,
-        pick: String,
     ): PhotoDraftStageResult {
+        // Every decode of a pick runs in its conversation's shared outgoing worker.
         val domain =
             dev.ipf.whitenoise.android.media.MediaTrustDomain
-                .outgoing(accountRef, groupIdHex, pick)
+                .outgoing(accountRef, groupIdHex)
         var committed = false
         try {
             val sourceBytes =
@@ -242,7 +232,7 @@ internal class PhotoDraftStager(
                             .getOrNull()
                             ?.mediaAttachments
                             ?.firstOrNull { it.id == attachmentId }
-                    val recovered = reread?.let { recover(it, accountRef, groupIdHex, pick) }
+                    val recovered = reread?.let { recover(it, accountRef, groupIdHex) }
                     if (recovered != null) {
                         PhotoDraftStageResult.Success(recovered)
                     } else if (reread != null) {
@@ -269,7 +259,7 @@ internal class PhotoDraftStager(
         }
     }
 
-    /** The Original-quality attachment for the user's own pick, inspected in that pick's [domain]. */
+    /** The Original-quality attachment for the user's own pick, inspected in its conversation's outgoing [domain]. */
     private fun originalAttachment(
         sourceBytes: ByteArray,
         displayName: String,
@@ -331,12 +321,11 @@ internal class PhotoDraftStager(
         }
     }
 
-    /** Reopens [attachment]'s committed editor session, inspecting its source in [pick]'s own outgoing worker. */
+    /** Reopens [attachment]'s committed editor session, inspecting its source in the conversation's outgoing worker. */
     private suspend fun recover(
         attachment: MessageDraftAttachmentFfi,
         accountRef: String,
         groupIdHex: String,
-        pick: String,
     ): DraftBackedPhoto? {
         val digest = attachment.editorDigest()
         val session =
@@ -353,7 +342,7 @@ internal class PhotoDraftStager(
             } ?: return null
         val domain =
             dev.ipf.whitenoise.android.media.MediaTrustDomain
-                .outgoing(accountRef, groupIdHex, pick)
+                .outgoing(accountRef, groupIdHex)
         val inspected = renderer.inspect(sourceBytes, domain) as? PhotoEditorInspectResult.Success ?: return null
         return DraftBackedPhoto(
             attachment = attachment,
@@ -366,12 +355,11 @@ internal class PhotoDraftStager(
         )
     }
 
-    /** The draft's existing attachment [attachmentId], recovered for [pick], or null when there is none. */
+    /** The draft's existing attachment [attachmentId], recovered, or null when there is none. */
     private suspend fun findExisting(
         attachmentId: String,
         accountRef: String,
         groupIdHex: String,
-        pick: String,
     ): PhotoDraftStageResult? {
         val currentResult = drafts.draft(accountRef, groupIdHex)
         if (currentResult.isFailure) return PhotoDraftStageResult.DraftUnavailable
@@ -381,7 +369,7 @@ internal class PhotoDraftStager(
                 ?.mediaAttachments
                 ?.firstOrNull { it.id == attachmentId }
                 ?: return null
-        val recovered = recover(existing, accountRef, groupIdHex, pick)
+        val recovered = recover(existing, accountRef, groupIdHex)
         return recovered?.let { PhotoDraftStageResult.Success(it) }
             ?: PhotoDraftStageResult.PreparedOnly(
                 DraftPreparedPhoto(
@@ -403,7 +391,6 @@ internal class PhotoDraftStager(
         occurrenceIndex: Int,
         accountRef: String,
         groupIdHex: String,
-        pick: String,
     ): DraftBackedPhoto? {
         if (occurrenceIndex < 0) return null
         val attachments =
@@ -418,7 +405,7 @@ internal class PhotoDraftStager(
             val session = sessions.committed(accountRef, groupIdHex, attachment.id, digest)
             if (session?.sourceLeaseId == sourceLeaseId) {
                 if (matchingOccurrence == occurrenceIndex) {
-                    return recover(attachment, accountRef, groupIdHex, pick)
+                    return recover(attachment, accountRef, groupIdHex)
                 }
                 matchingOccurrence++
             }

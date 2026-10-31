@@ -88,8 +88,8 @@ internal class PhotoEditorRenderer(
     private val onEncode: () -> Unit = {},
 ) {
     /**
-     * Validates [sourceBytes] as an editable still, inspected in [domain]: the pick's own outgoing domain, whose
-     * worker never sees another pick. Single-use when the caller names none.
+     * Validates [sourceBytes] as an editable still, inspected in [domain]: the conversation's shared outgoing
+     * domain, whose worker never sees another conversation's picks. Single-use when the caller names none.
      */
     suspend fun inspect(
         sourceBytes: ByteArray,
@@ -100,8 +100,8 @@ internal class PhotoEditorRenderer(
         }
 
     /**
-     * A bounded, upright preview of [sourceBytes] for the editor, or null, decoded in [domain]: the pick's own
-     * outgoing domain, so no worker that served another pick sees what the user is about to crop, blur or mark.
+     * A bounded, upright preview of [sourceBytes] for the editor, or null, decoded in [domain]: the conversation's
+     * shared outgoing domain, which only that draft's own picks ever reach.
      */
     suspend fun decodePreview(
         sourceBytes: ByteArray,
@@ -128,9 +128,9 @@ internal class PhotoEditorRenderer(
         }
 
     /**
-     * Renders [recipe] over [sourceBytes] at [quality], inspecting and decoding in [domain]: the pick's own outgoing
-     * domain, edited or not. That worker has only ever seen this pick, so it cannot carry another pick's original
-     * into the render, and this pick's own original reveals nothing its worker did not already hold.
+     * Renders [recipe] over [sourceBytes] at [quality], inspecting and decoding in [domain]: the conversation's
+     * shared outgoing domain, edited or not. Its worker has seen only this draft's picks, so a hostile pick of the
+     * same draft could undo this edit, but nothing from another conversation, account or domain reaches it.
      */
     suspend fun render(
         sourceBytes: ByteArray,

@@ -36,17 +36,18 @@ sealed interface MediaTrustDomain {
     }
 
     /**
-     * One file the account's user picked from the device to send into one conversation, for its whole life in the
-     * draft: its composer and shelf previews, staging (inspection, EXIF and the Original or standard render), the
-     * photo editor's inspection, preview and edited render, its thumbhash and its just-sent thumbnail. Gallery files
-     * come from many authors, so each pick gets its own worker: a hostile file can only ever see itself, never
-     * another pick or that pick's unredacted original. Its own worker seeing its own original reveals nothing new.
-     * [pick] is the composer slot's id, which a restored draft attachment keeps as its own, or a document's URI.
+     * The files the account's user picked from the device to send into one conversation, for their whole life in that
+     * conversation's draft: their composer and shelf previews, staging (inspection, EXIF and the Original or standard
+     * render), the photo editor's inspection, preview and edited render, their thumbhashes and their just-sent
+     * thumbnails, restored draft attachments included. Every pick of the draft shares this one worker, on every device:
+     * one worker per pick about doubled album times against master on stock Android, and took over three times this
+     * shared worker's on GrapheneOS. A hostile picked file can therefore reach the other picks of the same draft, their
+     * originals included, and could substitute another pick's pixels into its own output or undo an edit of another
+     * photo in the same message. It reaches no other conversation, account or domain.
      */
     data class Outgoing(
         val account: String,
         val conversation: String,
-        val pick: String,
     ) : MediaTrustDomain {
         /** Redacted: the kind only. */
         override fun toString(): String = "Outgoing"
@@ -88,16 +89,18 @@ sealed interface MediaTrustDomain {
                 PublicProfiles(account)
             }
 
-        /** [Outgoing] for one [pick] of [account] into [conversation], or [Unique] when any of them is unknown. */
+        /**
+         * [Outgoing] for the files [account] picks to send into [conversation], or [Unique] when either is unknown.
+         * The one place an outgoing domain is made, so every decode of a pick agrees.
+         */
         fun outgoing(
             account: String?,
             conversation: String?,
-            pick: String?,
         ): MediaTrustDomain =
-            if (account.isNullOrEmpty() || conversation.isNullOrEmpty() || pick.isNullOrEmpty()) {
+            if (account.isNullOrEmpty() || conversation.isNullOrEmpty()) {
                 Unique
             } else {
-                Outgoing(account, conversation, pick)
+                Outgoing(account, conversation)
             }
 
         /** [Local] for [account], or [Unique] when no account is known, as before sign-up completes. */

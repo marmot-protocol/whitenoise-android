@@ -232,18 +232,19 @@ class MediaWorkerDomainTest {
     }
 
     /**
-     * An album of new picks, with every slot held by an idle domain, evicts as many idle domains at once as picks
-     * wait instead of one at a time, and still uses no victim's slot before that victim's death.
+     * New domains arriving together, such as several conversations' outgoing drafts, with every slot held by an
+     * idle domain, evict as many idle domains at once as domains wait instead of one at a time, and still use no
+     * victim's slot before that victim's death.
      */
     @Test
-    fun albumOfNewPicksEvictsIdleDomainsInParallel() {
+    fun newDomainsEvictIdleDomainsInParallel() {
         val context = BindingFixture(ApplicationProvider.getApplicationContext(), validReplyAt = { true })
         val transport = domainLane(context)
         val waiting = mutableListOf<DecodeCall>()
         try {
-            (1..3).forEach { finish(decodeIn(transport, it, pick(it))) }
+            (1..3).forEach { finish(decodeIn(transport, it, outgoingIn(it))) }
             val victims = context.bindings.toList()
-            (4..6).forEach { waiting += decodeIn(transport, it, pick(it)) }
+            (4..6).forEach { waiting += decodeIn(transport, it, outgoingIn(it)) }
             assertTrue(
                 "Every idle domain is evicted at once",
                 victims.all { it.remote.retired.await(2, TimeUnit.SECONDS) },
@@ -267,15 +268,15 @@ class MediaWorkerDomainTest {
         }
     }
 
-    /** Under concurrent picks of one conversation, from more picks than slots, every worker sees one pick only. */
+    /** Under concurrent requests from more outgoing domains than slots, every worker serves one domain only. */
     @Test
-    fun concurrentPicksOfOneConversationNeverShareAWorker() {
+    fun concurrentOutgoingDomainsNeverShareAWorker() {
         val context =
             BindingFixture(ApplicationProvider.getApplicationContext(), validReplyAt = { true }, dieOnRetire = true)
         val transport = domainLane(context)
-        val picks = (1..PICKS).map(::pick)
+        val drafts = (1..DRAFTS).map(::outgoingIn)
         val callers =
-            picks.mapIndexed { index, domain ->
+            drafts.mapIndexed { index, domain ->
                 Thread {
                     repeat(INPUTS_PER_DOMAIN) { input -> finish(decodeIn(transport, index * 16 + input + 1, domain)) }
                 }.apply { start() }
@@ -289,59 +290,9 @@ class MediaWorkerDomainTest {
                         .map { (it - 1) / 16 }
                         .toSet()
                 }
-            assertTrue("A worker saw two picks: $served", served.all { it.size <= 1 })
-            assertEquals(picks.size * INPUTS_PER_DOMAIN, context.bindings.sumOf { it.remote.requests })
+            assertTrue("A worker saw two domains: $served", served.all { it.size <= 1 })
+            assertEquals(drafts.size * INPUTS_PER_DOMAIN, context.bindings.sumOf { it.remote.requests })
         } finally {
-            context.dieAll()
-            transport.close()
-        }
-    }
-
-    /** Retiring an idle pick's domain, as removing or sending it does, stops its worker before its next input. */
-    @Test
-    fun retiringAnIdleDomainStopsItsWorkerBeforeItsNextInput() {
-        val context = BindingFixture(ApplicationProvider.getApplicationContext(), validReplyAt = { true })
-        val transport = domainLane(context)
-        var next: DecodeCall? = null
-        try {
-            finish(decodeIn(transport, 1, pick(1)))
-            val first = context.bindings.single()
-            transport.retireDomain(pick(1))
-            assertTrue("The retired pick's worker is told to retire", first.remote.retired.await(2, TimeUnit.SECONDS))
-            next = decodeIn(transport, 2, pick(1))
-            Thread.sleep(FENCE_OBSERVATION_MS)
-            assertEquals("The pick's next input waits for its retired worker's death", 1, context.bindings.size)
-            first.remote.die()
-            finish(next)
-            assertEquals(
-                listOf(2),
-                context.bindings[1]
-                    .remote.inputs
-                    .toList(),
-            )
-        } finally {
-            next?.interruptAndJoin()
-            context.dieAll()
-            transport.close()
-        }
-    }
-
-    /** Retiring a pick's domain while its request is in flight lets the request finish, then retires that worker. */
-    @Test
-    fun retiringABusyDomainRetiresItsWorkerOnceItsRequestEnds() {
-        val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
-        val transport = domainLane(context)
-        val call = decodeIn(transport, 1, pick(1))
-        try {
-            val worker = context.next()
-            assertTrue(worker.remote.decoded.await(2, TimeUnit.SECONDS))
-            transport.retireDomain(pick(1))
-            assertEquals("A busy worker is not retired under its request", 1L, worker.remote.retired.count)
-            assertTrue(withWorkerIdentity { worker.remote.deliverHeldReply(successfulPixelReply()) })
-            finish(call)
-            assertTrue("The worker retires once its request ends", worker.remote.retired.await(2, TimeUnit.SECONDS))
-        } finally {
-            call.interruptAndJoin()
             context.dieAll()
             transport.close()
         }
@@ -596,10 +547,10 @@ class MediaWorkerDomainTest {
         val C = MediaTrustDomain.Conversation("account", "c")
         val D = MediaTrustDomain.PublicProfiles("account")
 
-        /** Pick [n] of one album sent into one conversation, its own outgoing domain. */
-        fun pick(n: Int): MediaTrustDomain = MediaTrustDomain.Outgoing("account", "album", "pick-$n")
+        /** Conversation [n]'s outgoing draft domain, one per conversation. */
+        fun outgoingIn(n: Int): MediaTrustDomain = MediaTrustDomain.Outgoing("account", "conversation-$n")
 
-        const val PICKS = 10
+        const val DRAFTS = 10
         const val INPUTS_PER_DOMAIN = 6
         const val FENCE_OBSERVATION_MS = 300L
         const val SERVE_SECONDS = 5L

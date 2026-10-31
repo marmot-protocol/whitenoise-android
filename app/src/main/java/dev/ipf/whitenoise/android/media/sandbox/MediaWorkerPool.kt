@@ -173,7 +173,7 @@ internal class MediaWorkerPool(
                 worker.busy = false
                 worker.inputs++
                 worker.lastUsedNanos = System.nanoTime()
-                val spent = worker.inputs >= DOMAIN_INPUT_CAP || worker.retireOnRelease
+                val spent = worker.inputs >= DOMAIN_INPUT_CAP
                 // Retiring under the same lock, so no claim can take a spent generation before RETIRE is sent.
                 if (spent) worker.retiring = true
                 signalLocked()
@@ -188,46 +188,18 @@ internal class MediaWorkerPool(
 
     /**
      * Returns a claimed generation its request never sent input to. One claimed fresh for this request becomes a
-     * clean spare again, while a domain's earlier generation waits for that domain's next input, unless the domain was
-     * retired meanwhile.
+     * clean spare again, while a domain's earlier generation simply waits for that domain's next input.
      */
     fun unclaim(worker: MediaWorker) {
-        val retireNow =
-            synchronized(lock) {
-                worker.busy = false
-                if (!worker.served) {
-                    worker.domain = null
-                    worker.reusable = false
-                    worker.retireOnRelease = false
-                    if (singleUseFence === worker) singleUseFence = null
-                }
-                // A served generation whose domain was retired meanwhile retires now instead of waiting idle.
-                val retireNow = worker.served && worker.retireOnRelease && !worker.retiring
-                if (retireNow) worker.retiring = true
-                signalLocked()
-                retireNow
+        synchronized(lock) {
+            worker.busy = false
+            if (!worker.served) {
+                worker.domain = null
+                worker.reusable = false
+                if (singleUseFence === worker) singleUseFence = null
             }
-        if (retireNow) retire(worker)
-    }
-
-    /**
-     * Retires [domain]'s live generation, such as a pick removed from a draft or sent: at once when it is idle,
-     * after its request in flight otherwise. Its next input, if any, waits for its death as usual.
-     */
-    fun retireDomain(domain: Any) {
-        val idle =
-            synchronized(lock) {
-                val owner =
-                    generations.firstOrNull { it.domain == domain && !it.retiring && it.dead.count != 0L }
-                        ?: return
-                if (owner.busy) {
-                    owner.retireOnRelease = true
-                    null
-                } else {
-                    owner.also { it.retiring = true }
-                }
-            }
-        idle?.let(::retire)
+            signalLocked()
+        }
     }
 
     private fun retireIfIdle(
@@ -585,9 +557,6 @@ internal class MediaWorker(
 
     /** Claimed for an input now in flight. */
     var busy = false
-
-    /** Its domain was retired while this request was in flight, so it retires when the request is released. */
-    var retireOnRelease = false
 
     /** Sent at least one input; a generation that never was can return to being a clean spare. */
     var served = false

@@ -114,13 +114,13 @@ class PhotoEditorCommitterTest {
             assertEquals(0, fixture.gateway.saveCalls)
         }
 
-    /** An edit commits through a render in the edited pick's own outgoing worker, never another pick's (#3373). */
+    /** An edit commits through a render in its conversation's shared outgoing worker, as the draft names it (#3373). */
     @Test
-    fun editRendersInTheEditedPicksOwnWorker() =
+    fun editRendersInTheConversationsSharedWorker() =
         runTest {
             EditorDomainRecorder().use { recorder ->
                 val fixture = fixture()
-                val pick = MediaTrustDomain.Outgoing(ACCOUNT, GROUP, "slot-a")
+                val outgoing = MediaTrustDomain.outgoing(ACCOUNT, GROUP)
                 val result =
                     fixture.committer.commit(
                         accountRef = ACCOUNT,
@@ -130,10 +130,10 @@ class PhotoEditorCommitterTest {
                         sourceLeaseId = fixture.sourceLeaseId,
                         recipe = PhotoEditRecipe(quarterTurnsClockwise = 1),
                         quality = MediaQuality.Standard,
-                        domain = pick,
+                        domain = outgoing,
                     )
                 assertTrue(result is PhotoEditorCommitResult.Success)
-                assertEquals(setOf(pick), recorder.domains())
+                assertEquals(setOf(outgoing), recorder.domains())
             }
         }
 

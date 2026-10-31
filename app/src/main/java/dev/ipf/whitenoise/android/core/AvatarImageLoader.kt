@@ -108,7 +108,7 @@ object AvatarImageLoader {
      * therefore inherits that scope's domain. `PictureDomainCoverageTest` does not see scopes, so it requires every
      * production avatar-loader call to name its domain instead, so for this loader the inherited default is reachable
      * only from test and harness code. Other production paths do rely on scope inheritance by design:
-     * `MediaPipeline`'s decode functions default to the enclosing scope, the photo editor declares its pick's domain
+     * `MediaPipeline`'s decode functions default to the enclosing scope, the photo editor declares its draft's domain
      * through its render context, and the notification presenter declares each picture slot's domain around its
      * resolver.
      */

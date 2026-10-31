@@ -108,22 +108,17 @@ internal sealed interface MediaPreviewImage {
     data object Failed : MediaPreviewImage
 }
 
-/** The decoded preview of [pick], or null while it is loading and after it failed. */
+/** The decoded preview, or null while it is loading and after it failed. */
 @Composable
 internal fun rememberMediaPreviewBitmap(
     uri: android.net.Uri,
     isVideo: Boolean,
     maxEdgePx: Int,
-    pick: String,
     prepared: PreparedPhotoPreview? = null,
-): ImageBitmap? {
-    val image = rememberMediaPreviewImage(uri, isVideo, maxEdgePx, pick, prepared)
-    return (image as? MediaPreviewImage.Ready)?.bitmap
-}
+): ImageBitmap? = (rememberMediaPreviewImage(uri, isVideo, maxEdgePx, prepared) as? MediaPreviewImage.Ready)?.bitmap
 
 /**
- * Decode the prepared send artifact when available, otherwise the original local Uri, in [pick]'s own outgoing
- * worker, which never sees another pick.
+ * Decode the prepared send artifact when available, otherwise the original local Uri.
  *
  * A GIF or WebP reaches a decoder only after content admission, whatever its provider MIME type claims,
  * and a refused or unreadable source ends as [MediaPreviewImage.Failed] rather than a permanent spinner.
@@ -133,11 +128,10 @@ internal fun rememberMediaPreviewImage(
     uri: android.net.Uri,
     isVideo: Boolean,
     maxEdgePx: Int,
-    pick: String,
     prepared: PreparedPhotoPreview? = null,
 ): MediaPreviewImage {
     val context = LocalContext.current
-    val domain = LocalPickMediaDomains.current(pick)
+    val domain = LocalPickedMediaDomain.current
     var bitmap by
         remember(uri, isVideo, maxEdgePx, prepared?.revision) {
             mutableStateOf<android.graphics.Bitmap?>(null)
@@ -240,21 +234,15 @@ private fun decodeStagedPreviewBitmap(
 internal sealed class StagedPreviewItem {
     abstract val uri: android.net.Uri
 
-    /** The pick whose own outgoing worker decodes this item: the slot id, or the document's URI. */
-    abstract val pick: String
-
     data class Media(
         val slot: PendingMediaSlot,
     ) : StagedPreviewItem() {
         override val uri: android.net.Uri = slot.uri
-        override val pick: String = slot.id
     }
 
     data class Document(
         override val uri: android.net.Uri,
-    ) : StagedPreviewItem() {
-        override val pick: String = uri.toString()
-    }
+    ) : StagedPreviewItem()
 }
 
 internal fun stagedPreviewItems(

@@ -37,13 +37,18 @@ import java.util.Random
 /**
  * Opt-in album measurements (#3373, `BUDGET-v3-amend-picks`): ten synthetic camera-sized photos picked into one
  * conversation, prepared and sent through the composer's own decode entry points on one named lane per run
- * (`-e album_lane master|conversation|pick`, `-e album_repeats N`, repeat runs in ABBA order). Rows go to the
- * instrumentation status key `media_worker_album_json`. Synthetic files only, under the app's own cache.
+ * (`-e album_lane master|conversation`, `-e album_repeats N`, repeat runs in ABBA order). The conversation lane maps
+ * its picks through production's own policy, the draft's one shared outgoing worker. The per-pick lane of round 6
+ * is gone with that design. Rows go to the instrumentation status key `media_worker_album_json`. Synthetic files
+ * only, under the app's own cache.
  */
 @RunWith(AndroidJUnit4::class)
 @ManualDeviceFixture
 class MediaWorkerAlbumDeviceTest {
-    private val lane: String = InstrumentationRegistry.getArguments().getString("album_lane") ?: "pick"
+    private val lane: String =
+        (InstrumentationRegistry.getArguments().getString("album_lane") ?: "conversation").also {
+            require(it in LANES) { "Unknown album lane $it, expected one of $LANES" }
+        }
     private val repeats: Int = InstrumentationRegistry.getArguments().getString("album_repeats")?.toIntOrNull() ?: 5
 
     /** Prepares and sends the album [repeats] times on the named lane, emitting one row per phase. */
@@ -53,10 +58,10 @@ class MediaWorkerAlbumDeviceTest {
         val album = SyntheticAlbum.write(target)
         try {
             UiLane.install(if (lane == "master") "reuse" else "domain").use { installed ->
-                repeat(repeats) { attempt ->
-                    val picks = album.picks(lane, attempt)
+                repeat(repeats) {
+                    val picks = album.picks()
                     emit(AlbumScenarios.prepare(target, installed, picks).put("lane", lane))
-                    emit(AlbumScenarios.send(target, installed, picks, retire = lane == "pick").put("lane", lane))
+                    emit(AlbumScenarios.send(target, installed, picks).put("lane", lane))
                 }
             }
         } finally {
@@ -72,6 +77,9 @@ class MediaWorkerAlbumDeviceTest {
 
     private companion object {
         const val KEY = "media_worker_album_json"
+
+        /** The lanes this harness measures: the reusable master lane, and production's shared draft worker. */
+        val LANES = setOf("master", "conversation")
     }
 }
 
@@ -87,17 +95,10 @@ internal class SyntheticAlbum private constructor(
     private val uris: List<Uri>,
 ) {
     /**
-     * This attempt's picks on [lane]: one outgoing domain per pick for `pick`, one for every pick of the
-     * conversation for `conversation` (the previous head's mapping), and either for `master`, which ignores domains.
+     * This attempt's picks: every pick in the conversation's one shared outgoing domain, by production's own policy.
+     * The master lane ignores domains.
      */
-    fun picks(
-        lane: String,
-        attempt: Int,
-    ): List<AlbumPick> =
-        uris.mapIndexed { index, uri ->
-            val pick = if (lane == "conversation") "conversation" else "attempt-$attempt-pick-$index"
-            AlbumPick(uri, MediaTrustDomain.Outgoing(ACCOUNT, CONVERSATION, pick))
-        }
+    fun picks(): List<AlbumPick> = uris.map { uri -> AlbumPick(uri, MediaTrustDomain.outgoing(ACCOUNT, CONVERSATION)) }
 
     /** Removes the album's files. */
     fun delete() {
@@ -218,14 +219,13 @@ internal object AlbumScenarios {
 
     /**
      * Send tap -> attachments encoded for upload, then just-sent posters: the picks in slot order, as an unprepared
-     * slot is read at send time, then each sent attachment's poster. With [retire], as on the pick lane, each pick's
-     * worker is retired after its poster, as sending a photo does.
+     * slot is read at send time, then each sent attachment's poster. Sending retires nothing: the draft's shared
+     * worker serves every poster.
      */
     fun send(
         context: Context,
         lane: UiLane,
         picks: List<AlbumPick>,
-        retire: Boolean,
     ): JSONObject {
         val started = SystemClock.elapsedRealtimeNanos()
         val results = mutableListOf<Pair<Long, Boolean>>()
@@ -251,7 +251,6 @@ internal object AlbumScenarios {
                     MediaPipeline.decodeSampledBitmap(it, MediaPipeline.THUMBNAIL_MAX_EDGE_PX, domain = domain)
                 }
             poster?.recycle()
-            if (retire) IsolatedMediaDecoder.retireDomain(pick.domain)
             val (spent, ok) = results[index]
             results[index] = (spent + SystemClock.elapsedRealtimeNanos() - begin) to (ok && poster != null)
         }

@@ -65,12 +65,6 @@ internal interface MediaDecodeTransport {
     ): MediaProbe? = null
 
     fun waveform(file: File): FloatArray? = null
-
-    /**
-     * Retires [domain]'s worker, such as a pick removed from a draft or sent. A lane without domain-bound workers
-     * has nothing to retire.
-     */
-    fun retireDomain(domain: MediaTrustDomain) = Unit
 }
 
 /**
@@ -125,14 +119,6 @@ internal class IsolatedMediaTransport(
     internal fun activateSession() = replaceSession(true)
 
     internal fun invalidateSession() = replaceSession(false)
-
-    /**
-     * Retires [domain]'s worker generation, such as a pick removed from a draft or sent: at once when idle, after
-     * its request in flight otherwise. A later input of [domain] waits for that generation's death as usual.
-     */
-    override fun retireDomain(domain: MediaTrustDomain) {
-        if (domain != MediaTrustDomain.Unique) pool.retireDomain(domain)
-    }
 
     private fun replaceSession(active: Boolean) {
         val (previous, retiring) =

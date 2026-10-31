@@ -30,7 +30,7 @@ class PictureDomainCoverageTest {
     }
 
     /**
-     * Each production photo-editor inspection, preview and render names its worker domain: its pick's own outgoing
+     * Each production photo-editor inspection, preview and render names its worker domain: its draft's shared outgoing
      * domain, or single-use for an identity or contact picture. The renderer's single-use default is never relied on.
      */
     @Test
@@ -49,6 +49,36 @@ class PictureDomainCoverageTest {
                 call.arguments.size < count && call.arguments.none { it.name == "domain" }
             }
         assertEquals("renderer calls without a domain", emptyList<String>(), undeclared.map { it.first.location })
+    }
+
+    /**
+     * Every outgoing domain is made by `MediaTrustDomain.outgoing`, the one policy that maps a draft's picks to their
+     * conversation's shared worker, so no preview, staging, editor, thumbhash or poster decode can disagree.
+     */
+    @Test
+    fun outgoingDomainsAreMadeOnlyByTheirPickPolicy() {
+        val construction = Regex("""(?<![A-Za-z0-9_])Outgoing\s*\(""")
+        val outside =
+            mainSources().flatMap { file ->
+                val text = file.readText()
+                construction
+                    .findAll(text)
+                    .filterNot { text.substring(maxOf(0, it.range.first - 6), it.range.first) == "class " }
+                    .filterNot { file.name == "MediaTrustDomain.kt" && insidePickPolicy(text, it.range.first) }
+                    .map { "${file.name}:${lineOf(text, it.range.first)}" }
+                    .toList()
+            }
+        assertEquals("outgoing domains made outside the pick policy", emptyList<String>(), outside)
+    }
+
+    /** Whether [offset] lies in the body of `fun outgoing(` in the domain's own file. */
+    private fun insidePickPolicy(
+        text: String,
+        offset: Int,
+    ): Boolean {
+        val start = text.indexOf("fun outgoing(")
+        val end = text.indexOf("fun local(", start)
+        return start in 0..offset && offset < end
     }
 
     /** No production code passes a decoding avatar-loader function by reference, which could only use the default. */

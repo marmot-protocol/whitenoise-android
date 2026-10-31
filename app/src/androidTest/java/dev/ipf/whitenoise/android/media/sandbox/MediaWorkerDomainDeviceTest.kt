@@ -55,36 +55,34 @@ class MediaWorkerDomainDeviceTest {
     }
 
     /**
-     * Two picks of one conversation never share a process: the second pick's worker holds nothing of the first, the
-     * first pick's later input still reaches its own worker, and once that pick is retired its next input starts a
-     * fresh process that holds nothing either.
+     * A draft's picks share their conversation's outgoing worker: the second pick's input reaches the process that
+     * holds the first pick's state. A second conversation's picks never reach it, and no other domain shares it, not
+     * even the same conversation's received media.
      */
     @Test
-    fun eachPickKeepsItsOwnWorkerUntilItIsRetired() {
+    fun aDraftsPicksShareTheirConversationsOutgoingWorker() {
         val context = MediaWorkerBaselineBinding(InstrumentationRegistry.getInstrumentation().targetContext)
         val transport =
             IsolatedMediaTransport(
                 context,
-                "pick_canary",
+                "draft_canary",
                 MediaWorkerPool.DOMAIN_SPARES,
                 liveLimit = MediaWorkerPool.MAX_LIVE_GENERATIONS,
             )
         try {
             val sourceA = png(Color.RED)
-            val firstA = canary(transport, PICK_A, sourceA)
-            val pickB = canary(transport, PICK_B, png(Color.BLUE))
-            val secondA = canary(transport, PICK_A, png(Color.GREEN))
-            // Another pick of the same conversation never lands where pick A's input was.
-            assertEquals(WorkerCanary(pickB.pid, "-", "-"), pickB)
-            assertNotEquals(firstA.pid, pickB.pid)
-            assertEquals(firstA.pid, secondA.pid)
-            assertEquals(digest(sourceA), secondA.previousState)
-            transport.retireDomain(PICK_A)
-            val afterRetire = canary(transport, PICK_A, png(Color.YELLOW))
-            // Retiring the pick ends its worker: its next input meets a new process with nothing left behind.
-            assertEquals(WorkerCanary(afterRetire.pid, "-", "-"), afterRetire)
-            assertNotEquals(firstA.pid, afterRetire.pid)
-            assertNotEquals(pickB.pid, afterRetire.pid)
+            val firstPick = canary(transport, DRAFT_A, sourceA)
+            val secondPick = canary(transport, DRAFT_A, png(Color.BLUE))
+            val otherDraft = canary(transport, DRAFT_B, png(Color.GREEN))
+            val received = canary(transport, CONVERSATION_A, png(Color.YELLOW))
+            // The draft's second pick lands where its first pick was, holding that pick's state.
+            assertEquals(firstPick.pid, secondPick.pid)
+            assertEquals(digest(sourceA), secondPick.previousState)
+            // Another conversation's draft, and this conversation's received media, never reach that worker.
+            assertEquals(WorkerCanary(otherDraft.pid, "-", "-"), otherDraft)
+            assertNotEquals(firstPick.pid, otherDraft.pid)
+            assertEquals(WorkerCanary(received.pid, "-", "-"), received)
+            assertNotEquals(firstPick.pid, received.pid)
         } finally {
             transport.close()
             context.closeObservers()
@@ -123,8 +121,8 @@ class MediaWorkerDomainDeviceTest {
     private companion object {
         val CONVERSATION_A = MediaTrustDomain.Conversation("device-test", "a")
         val CONVERSATION_B = MediaTrustDomain.Conversation("device-test", "b")
-        val PICK_A = MediaTrustDomain.Outgoing("device-test", "a", "pick-a")
-        val PICK_B = MediaTrustDomain.Outgoing("device-test", "a", "pick-b")
+        val DRAFT_A = MediaTrustDomain.outgoing("device-test", "a")
+        val DRAFT_B = MediaTrustDomain.outgoing("device-test", "b")
         const val CANARY_DIGEST_CHARS = 16
     }
 }

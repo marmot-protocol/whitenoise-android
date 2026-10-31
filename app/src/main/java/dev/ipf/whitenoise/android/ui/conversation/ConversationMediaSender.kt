@@ -103,8 +103,8 @@ internal class ConversationAttachmentReader(
     private val context: Context,
     private val fileBackedLimits: () -> FileBackedSendLimits? = ::nativeFileBackedSendLimits,
     private val usableSpace: (java.io.File) -> Long = ::usableSpaceFor,
-    /** The worker domain of one pick, a slot id or a document URI, read at each image read, single-use when unset. */
-    private val domain: (String?) -> dev.ipf.whitenoise.android.media.MediaTrustDomain = {
+    /** The conversation's shared outgoing domain for the user's own picks, read at each image read, or single-use. */
+    private val domain: () -> dev.ipf.whitenoise.android.media.MediaTrustDomain = {
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique
     },
 ) {
@@ -125,14 +125,13 @@ internal class ConversationAttachmentReader(
             )
         }
 
-    /** Reads one image pick at the chosen quality, inspecting and decoding it in [pick]'s own outgoing worker. */
+    /** Reads one image pick at the chosen quality, inspecting and decoding it in the conversation's outgoing worker. */
     fun readImageAttachment(
         uri: android.net.Uri,
         remainingBytes: Long,
-        pick: String?,
     ): ImageAttachmentReadOutcome =
         dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
-            .within(domain(pick)) { readImageAttachmentInScope(uri, remainingBytes) }
+            .within(domain()) { readImageAttachmentInScope(uri, remainingBytes) }
 
     private fun readImageAttachmentInScope(
         uri: android.net.Uri,
@@ -322,8 +321,7 @@ internal class ConversationAttachmentReader(
         remainingBytes: Long,
         state: DocumentReadAccumulator,
     ) {
-        // A document is its own pick, keyed by its URI.
-        val outcome = readImageAttachment(uri, remainingBytes, uri.toString())
+        val outcome = readImageAttachment(uri, remainingBytes)
         val attachment = outcome.attachment
         when {
             outcome.overflowed && remainingBytes < MEDIA_ATTACHMENT_MAX_BYTES -> state.albumOverflowed = true
@@ -428,17 +426,14 @@ internal class ConversationAttachmentReader(
      * Reads visual picks in order. Without [fileBacked], every pick shares the in-memory album budget
      * exactly as before. With it, a video that does not fit the remaining [inMemoryBytesBudget] is
      * staged to a private file, and every accepted item is charged against the message's file budget.
-     * A named [pick] is one picked file and decodes in that pick's own worker, so it reads at most one URI.
      */
     suspend fun readPickedImages(
         uris: List<android.net.Uri>,
         fileBacked: FileBackedPickBudget? = null,
         inMemoryBytesBudget: Long = MEDIA_ALBUM_MAX_TOTAL_BYTES,
-        pick: String? = null,
-    ): VisualReadOutcome {
-        require(pick == null || uris.size <= 1) { "One pick names one picked file" }
+    ): VisualReadOutcome =
         // A file-backed pick copies up to 512 MiB, which belongs on the IO pool rather than a CPU worker.
-        return withContext(if (fileBacked == null) Dispatchers.Default else Dispatchers.IO) {
+        withContext(if (fileBacked == null) Dispatchers.Default else Dispatchers.IO) {
             val checkCancellation = { ensureActive() }
             val attachments = mutableListOf<PendingAttachment>()
             var consumedBytes = 0L
@@ -451,7 +446,7 @@ internal class ConversationAttachmentReader(
                     overflowed = true
                     break
                 }
-                val outcome = readVisualAttachment(uri, remainingBytes, fileBacked, checkCancellation, pick)
+                val outcome = readVisualAttachment(uri, remainingBytes, fileBacked, checkCancellation)
                 overflowed = overflowed || outcome.overflowed
                 storageUnavailable = storageUnavailable || outcome.storageUnavailable
                 videoMetadataRefused = videoMetadataRefused || outcome.videoMetadataRefused
@@ -471,20 +466,11 @@ internal class ConversationAttachmentReader(
             }
             VisualReadOutcome(attachments, overflowed, storageUnavailable, videoMetadataRefused)
         }
-    }
 
-    /**
-     * Reads one visual [pick] through the same transform and in-memory limits used at send time, decoding in that
-     * pick's own outgoing worker, while a read that names no pick decodes single-use.
-     */
-    suspend fun readVisualDraft(
-        uri: android.net.Uri,
-        pick: String? = null,
-    ): PendingAttachment? =
+    /** Reads one visual pick through the same transform and in-memory limits used at send time. */
+    suspend fun readVisualDraft(uri: android.net.Uri): PendingAttachment? =
         withContext(Dispatchers.Default) {
-            readVisualAttachment(uri, MEDIA_ALBUM_MAX_TOTAL_BYTES, fileBacked = null, pick = pick)
-                .attachment
-                ?.copy(pick = pick)
+            readVisualAttachment(uri, MEDIA_ALBUM_MAX_TOTAL_BYTES, fileBacked = null).attachment
         }
 
     /** Reads one document pick through the same MIME and byte limits used at send time. */
@@ -499,7 +485,6 @@ internal class ConversationAttachmentReader(
         remainingBytes: Long,
         fileBacked: FileBackedPickBudget?,
         checkCancellation: () -> Unit = {},
-        pick: String? = null,
     ): ImageAttachmentReadOutcome {
         val mime = safeGetType(context.contentResolver, uri)
         val isVideo = mime.startsWith("video/", ignoreCase = true)
@@ -508,7 +493,7 @@ internal class ConversationAttachmentReader(
         return when {
             // Images stay in memory; with no budget left there is nothing to decode for.
             !isVideo && remainingBytes <= 0L -> ImageAttachmentReadOutcome(null, overflowed = true)
-            !isVideo -> readImageAttachment(uri, remainingBytes, pick)
+            !isVideo -> readImageAttachment(uri, remainingBytes)
             fileBacked != null && (inMemoryCap <= 0L || declaredSize > inMemoryCap) ->
                 readFileBackedVideo(uri, mime, declaredSize, fileBacked, checkCancellation)
             else -> readInMemoryVideo(uri, mime, remainingBytes, fileBacked, checkCancellation)
@@ -623,13 +608,9 @@ internal class ConversationMediaSender(
     private val onRevealSent: () -> Unit,
 ) {
     private val attachmentReader =
-        ConversationAttachmentReader(
-            appState,
-            context,
-            fileBackedLimits,
-            usableSpace,
-            controller::outgoingMediaTrustDomain,
-        )
+        ConversationAttachmentReader(appState, context, fileBackedLimits, usableSpace) {
+            controller.outgoingMediaTrustDomain
+        }
 
     /** Captures the reply before contact serialization can suspend. */
     fun sendSharedContact(contact: SharedContact) {
@@ -824,7 +805,7 @@ internal class ConversationMediaSender(
             val documents =
                 prepared.documents.copy(
                     attachments =
-                        addMissingThumbhashes(prepared.documents.attachments, controller::outgoingMediaTrustDomain),
+                        addMissingThumbhashes(prepared.documents.attachments, controller.outgoingMediaTrustDomain),
                 )
             prepared.copy(documents = documents)
         } else {
@@ -952,7 +933,7 @@ internal class ConversationMediaSender(
             if (uri in preparedDocuments.refused) {
                 failures += DocumentReadFailure.VIDEO_METADATA
             } else if (staged != null && staged.plaintextBytes.size.toLong() <= remaining) {
-                attachments += staged.copy(pick = uri.toString())
+                attachments += staged
                 totalBytes += staged.plaintextBytes.size
             } else if (staged != null && !allowFileBacked) {
                 overflowed = true
@@ -962,11 +943,11 @@ internal class ConversationMediaSender(
                         val budget = attachmentReader.fileBackedBudget(staging)
                         stageDraftDocumentToFile(staged, budget)
                     }
-                attachments += copied.attachments.map { it.copy(pick = uri.toString()) }
+                attachments += copied.attachments
                 failures += copied.failures
             } else {
                 val read = attachmentReader.readPickedDocuments(listOf(uri), remaining, allowFileBacked, staging)
-                attachments += read.attachments.map { it.copy(pick = uri.toString()) }
+                attachments += read.attachments
                 totalBytes += read.totalBytes
                 failures += read.failures
                 overflowed = overflowed || read.albumOverflowed
@@ -1008,17 +989,17 @@ internal class ConversationMediaSender(
                 overflowed = overflowed || refusal == FileBackedPickFailure.TOO_LARGE
                 storageUnavailable = storageUnavailable || refusal == FileBackedPickFailure.STORAGE
             } else if (prepared != null) {
-                attachments += prepared.copy(pick = slot.id)
+                attachments += prepared
                 inMemoryBytes += prepared.plaintextBytes.size
             } else {
                 val read =
                     if (fileBacked == null) {
-                        attachmentReader.readPickedImages(listOf(slot.uri), pick = slot.id)
+                        attachmentReader.readPickedImages(listOf(slot.uri))
                     } else {
                         val remaining = (MEDIA_ALBUM_MAX_TOTAL_BYTES - inMemoryBytes).coerceAtLeast(0L)
-                        attachmentReader.readPickedImages(listOf(slot.uri), fileBacked, remaining, pick = slot.id)
+                        attachmentReader.readPickedImages(listOf(slot.uri), fileBacked, remaining)
                     }
-                attachments += read.attachments.map { it.copy(pick = slot.id) }
+                attachments += read.attachments
                 inMemoryBytes += read.attachments.sumOf { it.plaintextBytes.size.toLong() }
                 overflowed = overflowed || read.albumOverflowed
                 storageUnavailable = storageUnavailable || read.storageUnavailable
@@ -1178,7 +1159,7 @@ private fun limitAttachmentsToBudget(
  */
 private suspend fun addMissingThumbhashes(
     attachments: List<PendingAttachment>,
-    domainOf: (String?) -> dev.ipf.whitenoise.android.media.MediaTrustDomain,
+    domain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
 ): List<PendingAttachment> =
     if (attachments.isEmpty()) {
         emptyList()
@@ -1196,8 +1177,7 @@ private suspend fun addMissingThumbhashes(
                         MediaPipeline.decodeSampledBitmap(
                             attachment.plaintextBytes,
                             MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
-                            // Each document's thumbhash decodes in that document's own outgoing worker.
-                            domain = domainOf(attachment.pick),
+                            domain = domain,
                         )
                     val hash = bitmap?.let { Thumbhash.encodeFromBitmap(it) }
                     bitmap?.recycle()

@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import android.content.Context
-import android.graphics.Bitmap
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
@@ -12,9 +11,11 @@ import dev.ipf.whitenoise.android.media.editor.EditorSessionStore
 import dev.ipf.whitenoise.android.media.editor.EditorStringStore
 import dev.ipf.whitenoise.android.media.editor.MessageDraftGateway
 import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
-import dev.ipf.whitenoise.android.media.sandbox.ImageInspection
+import dev.ipf.whitenoise.android.media.sandbox.BindingFixture
 import dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
-import dev.ipf.whitenoise.android.media.sandbox.MediaDecodeTransport
+import dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaTransport
+import dev.ipf.whitenoise.android.media.sandbox.TestMediaDecodeTransport
+import dev.ipf.whitenoise.android.media.sandbox.startDecode
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -25,7 +26,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -34,67 +34,68 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import java.util.concurrent.CopyOnWriteArrayList
+import org.robolectric.annotation.GraphicsMode
 
-/** Removing or sending a pick retires that pick's own worker, and never another pick's. */
+/**
+ * A conversation's draft keeps one shared outgoing worker for all its picks: removing a pick or sending some never
+ * retires it, so the next pick's decode reaches the same worker. It retires only by its idle, input-cap, failure and
+ * account-reset rules.
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
-class PickWorkerRetirementTest {
-    /** Removing a photo or a document from the draft retires exactly that pick's outgoing worker. */
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+class SharedOutgoingWorkerTest {
+    /** Removing a photo and a document and sending others leaves the draft's shared worker serving the next pick. */
     @Test
-    fun removingAPickRetiresOnlyThatPicksWorker() =
-        withDraft { owner, group, retired ->
-            val document = Uri.parse("content://picker/document-b")
-            owner.releasePreparedPhoto(PHOTO_A)
-            owner.releasePreparedDocument(document)
-            assertEquals(
-                listOf(
-                    MediaTrustDomain.Outgoing(ACCOUNT, group, PHOTO_A),
-                    MediaTrustDomain.Outgoing(ACCOUNT, group, document.toString()),
-                ),
-                retired.toList(),
-            )
-        }
-
-    /**
-     * Sending retires a document's worker at acceptance, as it gets no poster, while a sent photo keeps its worker
-     * for its pending preview and just-sent poster.
-     */
-    @Test
-    fun sendingRetiresADocumentAtOnceAndLeavesAPhotoForItsPoster() =
-        withDraft { owner, group, retired ->
-            val document = Uri.parse("content://picker/document-b")
-            owner.forgetAcceptedAttachments(setOf(PHOTO_A), setOf(document))
-            assertEquals(listOf(MediaTrustDomain.Outgoing(ACCOUNT, group, document.toString())), retired.toList())
-        }
-
-    /** Runs [block] against a fresh draft owner while recording every domain the facade is asked to retire. */
-    private fun withDraft(block: DraftCheck) =
+    fun removingOrSendingPicksNeverRetiresTheSharedWorker() =
         runTest {
             val dispatcher = StandardTestDispatcher(testScheduler)
             Dispatchers.setMain(dispatcher)
             val context = ApplicationProvider.getApplicationContext<Context>()
-            val sessions = EditorSessionStore(RetirementStrings)
+            val sessions = EditorSessionStore(SharedWorkerStrings)
             val app =
                 WhiteNoiseAppState(
                     context = context,
-                    draftStore = DraftStore(RetirementDrafts),
+                    draftStore = DraftStore(SharedWorkerDrafts),
                     accountIdHexResolver = { null },
                     accounts = emptyList(),
                     activeAccountRef = ACCOUNT,
-                    messageDraftRepository = MessageDraftRepository(RetirementDraftGateway(), sessions, dispatcher),
+                    messageDraftRepository = MessageDraftRepository(SharedWorkerDraftGateway(), sessions, dispatcher),
                 )
             val group = conversationTimelineTestGroup()
             val controller = ConversationController(app, group)
-            val recorder = RetireRecorder()
-            IsolatedMediaDecoder.installTestTransport(recorder)
+            val fixture = BindingFixture(context, validReplyAt = { true })
+            val transport = IsolatedMediaTransport(fixture, "images", spares = 0, liveLimit = 1)
+            IsolatedMediaDecoder.installTestTransport(transport)
             try {
-                val messages = PhotoEditorMessages("", "", "", "")
-                val owner = ConversationMediaDraftState(app, controller, context, backgroundScope, messages)
-                block(owner, group.groupIdHex, recorder.retired)
+                val outgoing = controller.outgoingMediaTrustDomain
+                assertEquals(MediaTrustDomain.Outgoing(ACCOUNT, group.groupIdHex), outgoing)
+                val first = startDecode(transport, 1, outgoing, sized = true)
+                first.join()
+                first.result.get()?.recycle()
+                val worker = fixture.bindings.single()
+                val owner =
+                    ConversationMediaDraftState(
+                        app,
+                        controller,
+                        context,
+                        backgroundScope,
+                        PhotoEditorMessages("", "", "", ""),
+                    )
+                owner.releasePreparedPhoto("slot-a")
+                owner.releasePreparedDocument(Uri.parse("content://picker/document-b"))
+                owner.forgetAcceptedAttachments(setOf("slot-c"), setOf(Uri.parse("content://picker/document-d")))
+                assertEquals("the shared worker was told to retire", 1L, worker.remote.retired.count)
+                val next = startDecode(transport, 2, outgoing, sized = true)
+                next.join()
+                next.result.get()?.recycle()
+                assertEquals("the next pick reached the same worker", listOf(1, 2), worker.remote.inputs.toList())
+                assertEquals(1, fixture.bindings.size)
             } finally {
-                IsolatedMediaDecoder.installTestTransport(null)
+                IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)
+                fixture.dieAll()
+                transport.close()
                 controller.onCleared()
                 app.mutationsScope.coroutineContext[Job]?.cancelAndJoin()
                 Dispatchers.resetMain()
@@ -103,36 +104,11 @@ class PickWorkerRetirementTest {
 
     private companion object {
         const val ACCOUNT = "account"
-        const val PHOTO_A = "slot-a"
-    }
-}
-
-/** One check against a fresh draft owner, its conversation id and the domains retired so far. */
-private typealias DraftCheck = suspend TestScope.(ConversationMediaDraftState, String, List<MediaTrustDomain>) -> Unit
-
-/** Decodes nothing and records each domain the facade retires. */
-private class RetireRecorder : MediaDecodeTransport {
-    val retired = CopyOnWriteArrayList<MediaTrustDomain>()
-
-    /** No pixels: these tests only follow retirement. */
-    override fun decode(
-        bytes: ByteArray,
-        edge: Int,
-        oriented: Boolean,
-        operation: Int,
-    ): Bitmap? = null
-
-    /** No inspection: these tests only follow retirement. */
-    override fun inspect(bytes: ByteArray): ImageInspection? = null
-
-    /** Records [domain] in call order. */
-    override fun retireDomain(domain: MediaTrustDomain) {
-        retired += domain
     }
 }
 
 /** An in-memory native draft, so removal never reaches the bindings. */
-private class RetirementDraftGateway : MessageDraftGateway {
+private class SharedWorkerDraftGateway : MessageDraftGateway {
     private var current: MessageDraftFfi? = null
 
     /** The draft last saved, if any. */
@@ -167,7 +143,7 @@ private class RetirementDraftGateway : MessageDraftGateway {
 }
 
 /** Keeps editor sessions independent of device preferences. */
-private object RetirementStrings : EditorStringStore {
+private object SharedWorkerStrings : EditorStringStore {
     /** Nothing stored. */
     override fun readAll(): Map<String, String> = emptyMap()
 
@@ -179,7 +155,7 @@ private object RetirementStrings : EditorStringStore {
 }
 
 /** Keeps unrelated composer text persistence in memory. */
-private object RetirementDrafts : DraftPersistence {
+private object SharedWorkerDrafts : DraftPersistence {
     /** Nothing stored. */
     override fun read(): Map<String, String> = emptyMap()
 

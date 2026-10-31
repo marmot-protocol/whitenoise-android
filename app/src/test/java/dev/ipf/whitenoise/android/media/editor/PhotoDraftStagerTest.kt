@@ -285,30 +285,36 @@ class PhotoDraftStagerTest {
         }
 
     /**
-     * Two picks staged through their content URIs, one at standard and one at Original quality, each run every
-     * inspection, render and Original preparation in their own outgoing worker and never in the other's (#3373).
+     * Picks staged through their content URIs, at standard and Original quality, run every inspection, render and
+     * Original preparation in their conversation's one shared outgoing worker, and a pick of another conversation
+     * runs in that conversation's own. Staging an attachment the draft already holds, as restoring a draft does,
+     * inspects it in the same shared worker (#3373).
      */
     @Test
-    fun eachStagedPickDecodesOnlyInItsOwnWorker() =
+    fun everyStagedPickDecodesInItsConversationsSharedWorker() =
         runTest {
             EditorDomainRecorder().use { recorder ->
                 val fixture = fixture()
                 val bytes = pngBytes()
                 ShadowContentResolver.reset()
-                val uris = listOf("slot-a", "slot-b").map { Uri.parse("content://photo-editor/$it") }
-                uris.forEach { uri ->
+                val uris =
+                    listOf("slot-a", "slot-b", "slot-c").associateWith { Uri.parse("content://photo-editor/$it") }
+                uris.values.forEach { uri ->
                     shadowOf(app.contentResolver).registerInputStreamSupplier(uri) { ByteArrayInputStream(bytes) }
                 }
-                val cases = listOf("slot-a" to MediaQuality.Standard, "slot-b" to MediaQuality.Original)
-                cases.forEachIndexed { index, case ->
-                    val (slot, quality) = case
-                    recorder.clear()
-                    val staged = fixture.stager.stage(uris[index], slot, ACCOUNT, GROUP, quality)
-                    assertTrue(staged is PhotoDraftStageResult.Success)
-                    assertEquals(
-                        setOf(MediaTrustDomain.Outgoing(ACCOUNT, GROUP, slot)),
-                        recorder.domains(),
+                val cases =
+                    listOf(
+                        Triple("slot-a", GROUP, MediaQuality.Standard),
+                        Triple("slot-b", GROUP, MediaQuality.Original),
+                        Triple("slot-c", OTHER_GROUP, MediaQuality.Standard),
+                        // Already in the draft: restored through its committed session, not staged again.
+                        Triple("slot-a", GROUP, MediaQuality.Standard),
                     )
+                cases.forEach { (slot, group, quality) ->
+                    recorder.clear()
+                    val staged = fixture.stager.stage(uris.getValue(slot), slot, ACCOUNT, group, quality)
+                    assertTrue(staged is PhotoDraftStageResult.Success)
+                    assertEquals(setOf(MediaTrustDomain.Outgoing(ACCOUNT, group)), recorder.domains())
                 }
             }
         }
@@ -408,6 +414,7 @@ class PhotoDraftStagerTest {
     companion object {
         private const val ACCOUNT = "account"
         private const val GROUP = "group"
+        private const val OTHER_GROUP = "other-group"
         private const val PNG_IEND_CHUNK_BYTES = 12
         private const val SENSITIVE_METADATA = "private gps metadata"
     }

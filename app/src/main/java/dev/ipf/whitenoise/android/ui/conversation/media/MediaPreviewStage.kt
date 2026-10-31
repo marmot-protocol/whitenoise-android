@@ -202,7 +202,7 @@ private fun MediaPreviewImagePage(
 ) {
     val image =
         metadata?.let {
-            rememberMediaPreviewImage(item.uri, it.isVideo, MediaPipeline.THUMBNAIL_MAX_EDGE_PX, item.pick, prepared)
+            rememberMediaPreviewImage(item.uri, it.isVideo, MediaPipeline.THUMBNAIL_MAX_EDGE_PX, prepared)
         } ?: MediaPreviewImage.Loading
     BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         val bitmap =
@@ -395,9 +395,7 @@ private fun MediaPreviewThumb(
                 ).clip(MaterialTheme.shapes.small)
         val bitmap =
             (item as? StagedPreviewItem.Media)?.let { media ->
-                metadata?.let {
-                    rememberMediaPreviewBitmap(media.uri, it.isVideo, THUMBNAIL_MAX_EDGE_PX, media.pick, prepared)
-                }
+                metadata?.let { rememberMediaPreviewBitmap(media.uri, it.isVideo, THUMBNAIL_MAX_EDGE_PX, prepared) }
             }
         if (bitmap != null) {
             Image(

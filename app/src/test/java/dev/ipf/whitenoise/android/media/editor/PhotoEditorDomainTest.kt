@@ -29,9 +29,9 @@ import java.io.ByteArrayOutputStream
 import java.util.Collections
 
 /**
- * Which worker domain each photo-editor decode names (#3373). Every decode of one pick, its inspection, the editor's
- * preview and its unedited or edited render, runs in that pick's own outgoing worker, which never sees another pick,
- * so no earlier pick's worker can restore what a crop, blur or mark removed from a later one.
+ * Which worker domain each photo-editor decode names (#3373). Every decode of a pick, its inspection, the editor's
+ * preview and its unedited or edited render, runs in its conversation's shared outgoing worker, which never sees
+ * another conversation's picks.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -78,9 +78,12 @@ class PhotoEditorDomainTest {
         IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)
     }
 
-    /** Inspection, the editor preview and an unedited or edited render of one pick all run in that pick's domain. */
+    /**
+     * Inspection, the editor preview and an unedited or edited render of a pick all run in its conversation's shared
+     * outgoing domain, the one the draft names.
+     */
     @Test
-    fun everyEditorDecodeOfAPickRunsInThatPicksOwnWorker() =
+    fun everyEditorDecodeOfAPickRunsInItsConversationsSharedWorker() =
         runTest {
             val renderer = renderer()
             val source = source(EDGE_A)
@@ -94,9 +97,12 @@ class PhotoEditorDomainTest {
             assertEquals(setOf(PICK_A), seen.map { it.first }.toSet())
         }
 
-    /** Editing one pick while another renders never puts either pick's source in the other pick's worker. */
+    /**
+     * Editing a pick of one conversation while a pick of another renders never puts either source in the other
+     * conversation's outgoing worker.
+     */
     @Test
-    fun editingOnePickNeverReachesAnotherPicksWorker() =
+    fun editingInOneConversationNeverReachesAnotherConversationsWorker() =
         runTest {
             val renderer = renderer()
             val first = source(EDGE_A)
@@ -115,8 +121,8 @@ class PhotoEditorDomainTest {
             }
             val byDomain = seen.toList().groupBy({ it.first }, { it.second }).mapValues { it.value.toSet() }
             assertEquals(setOf(PICK_A, PICK_B), byDomain.keys)
-            assertTrue("pick B's source reached pick A's worker", first.size !in byDomain.getValue(PICK_B))
-            assertTrue("pick A's source reached pick B's worker", second.size !in byDomain.getValue(PICK_A))
+            assertTrue("A's source reached B's worker", first.size !in byDomain.getValue(PICK_B))
+            assertTrue("B's source reached A's worker", second.size !in byDomain.getValue(PICK_A))
         }
 
     /** A renderer that encodes with an ample memory budget. */
@@ -138,8 +144,11 @@ class PhotoEditorDomainTest {
     }
 
     private companion object {
-        val PICK_A = MediaTrustDomain.Outgoing("account", "conversation", "pick-a")
-        val PICK_B = MediaTrustDomain.Outgoing("account", "conversation", "pick-b")
+        /** A pick's domain in conversation A, the conversation's shared outgoing worker. */
+        val PICK_A = MediaTrustDomain.outgoing("account", "conversation-a")
+
+        /** A pick's domain in conversation B. */
+        val PICK_B = MediaTrustDomain.outgoing("account", "conversation-b")
         const val EDGE_A = 64
         const val EDGE_B = 96
         const val ROUNDS = 4
