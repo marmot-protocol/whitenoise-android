@@ -1,0 +1,33 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationConversationShortcuts.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "notification_content_contracts": [
+      {
+        "surface": "conversation shortcut identity publication and privacy fencing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationConversationShortcuts.kt",
+        "anchor": "fun publishConversationShortcut(",
+        "test_ids": [
+          "NTF-042",
+          "NTF-006"
+        ]
+      },
+      {
+        "surface": "conversation shortcut eviction preserves active notifications",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationConversationShortcuts.kt",
+        "anchor": "private fun pruneConversationShortcutsBeforePublish(",
+        "test_ids": [
+          "NTF-042"
+        ]
+      },
+      {
+        "surface": "conversation shortcut invalidation after local removal",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationConversationShortcuts.kt",
+        "anchor": "fun forgetConversationShortcut(",
+        "test_ids": [
+          "NTF-042"
+        ]
+      }
+    ]
+  }
+}

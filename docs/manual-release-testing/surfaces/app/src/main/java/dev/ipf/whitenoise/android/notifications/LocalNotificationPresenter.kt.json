@@ -145,6 +145,15 @@
           "NTF-043",
           "NTF-044"
         ]
+      },
+      {
+        "surface": "notification card orchestration shares shortcut and interaction owners",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
+        "anchor": "private val interactions = NotificationInteractionFactory(context, tapTokens)",
+        "test_ids": [
+          "NTF-042",
+          "NTF-011"
+        ]
       }
     ],
     "source_coverage": [

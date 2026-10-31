@@ -3,30 +3,21 @@ package dev.ipf.whitenoise.android.notifications
 import android.annotation.SuppressLint
 import android.app.Notification
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.Typeface
 import android.os.Bundle
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.Person
-import androidx.core.app.RemoteInput
 import androidx.core.content.LocusIdCompat
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
-import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
-import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.EXTRA_GENERATION
 import dev.ipf.whitenoise.android.notifications.UserEventNotificationGroup.dismissalTime
@@ -44,9 +35,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import java.util.Locale
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.cancellation.CancellationException
 
 private const val EXTRA_EXPANDED_SINGLE_MESSAGE_BODY =
@@ -147,22 +135,6 @@ private fun postLocalNotification(
     manager.notify(tag, id, notification)
 }
 
-internal fun preferredConversationShortcutTitle(
-    candidate: String,
-    existing: String?,
-): String {
-    val existingTitle = existing?.takeIf { it.isNotBlank() }
-    return if (
-        IdentityFormatter.isNostrIdentityFallback(candidate) &&
-        existingTitle != null &&
-        !IdentityFormatter.isNostrIdentityFallback(existingTitle)
-    ) {
-        existingTitle
-    } else {
-        candidate
-    }
-}
-
 class LocalNotificationPresenter(
     private val context: Context,
     private val shortcutPublisher: (ShortcutInfoCompat) -> Unit = { shortcut ->
@@ -207,10 +179,17 @@ class LocalNotificationPresenter(
 
     private val enrichmentRunner = NotificationEnrichmentRunner(enrichmentLauncher)
 
-    private val shortcutSnapshots = ConcurrentHashMap<String, ConversationShortcutSnapshot>()
-    private val shortcutLastUsed = ConcurrentHashMap<String, Long>()
-    private val shortcutAccessClock = AtomicLong()
     private val tapTokens = NotificationTapTokens.create(context)
+    private val interactions = NotificationInteractionFactory(context, tapTokens)
+    private val conversationShortcuts =
+        NotificationConversationShortcuts(
+            context = context,
+            shortcutPublisher = shortcutPublisher,
+            dynamicShortcutIds = dynamicShortcutIds,
+            activeNotificationsProvider = activeNotificationsProvider,
+            currentContactAvatar = ::currentContactAvatar,
+            interactions = interactions,
+        )
     private val conversationVibrationPreferences = ConversationVibrationPreferences(context)
     private val profileNotificationOverrides by lazy { ProfileNotificationOverridePreferences(context) }
     private val profileNotificationChannels by lazy { ProfileNotificationChannels(context) }
@@ -228,45 +207,19 @@ class LocalNotificationPresenter(
     /** Rechecks OS cards on process start/resume and after auto-cancel notification taps. */
     fun reconcileNotificationGroup() = groupReconciliation()
 
-    fun hideConversationShortcutsFromDirectShare() {
-        hideConversationShortcutsFromDirectShare(context)
-        shortcutSnapshots.clear()
-        InFlightConversationShortcuts.forgetAllPublished()
-        shortcutLastUsed.clear()
-    }
+    fun hideConversationShortcutsFromDirectShare() = conversationShortcuts.hideConversationShortcutsFromDirectShare()
 
-    /** Clears platform/cache presentation while the caller holds an acknowledged credential-revocation fence. */
+    /** Clears shortcut presentation under the caller's acknowledged credential-revocation fence. */
     fun clearRevokedConversationShortcutsForAccount(
         accountRef: String,
         includeUnscopedLegacy: Boolean,
-    ) {
-        runCatching { clearRevokedConversationShortcutsForAccount(context, accountRef, includeUnscopedLegacy) }
-        val accountScope = conversationShortcutAccountScope(accountRef) ?: return
-        shortcutSnapshots
-            .filterValues { it.accountScope == accountScope }
-            .keys
-            .forEach { shortcutId ->
-                forgetShortcutSnapshot(shortcutId)
-                shortcutLastUsed.remove(shortcutId)
-            }
-    }
+    ) = conversationShortcuts.clearRevokedConversationShortcutsForAccount(accountRef, includeUnscopedLegacy)
 
-    /**
-     * Forgets the published-shortcut snapshot of one locally removed conversation (abandon, reset or local delete).
-     * A new conversation under the same group id then publishes its identity shortcut again before its first card,
-     * instead of only reporting use of a shortcut that no longer exists. It takes the shared publication lock, so the
-     * caller runs it off the main thread, inside the same lock section as the platform removal.
-     */
+    /** Called off the main thread in the same publication-lock section as platform removal. */
     internal fun forgetConversationShortcut(
         accountRef: String,
         groupIdHex: String,
-    ) {
-        val shortcutId = conversationShortcutId(accountRef, groupIdHex) ?: return
-        synchronized(UserEventNotificationGroup.mutationLock) {
-            forgetShortcutSnapshot(shortcutId)
-            shortcutLastUsed.remove(shortcutId)
-        }
-    }
+    ) = conversationShortcuts.forgetConversationShortcut(accountRef, groupIdHex)
 
     fun canPostNotifications(): Boolean = notificationPermissionGranted(context)
 
@@ -1162,8 +1115,9 @@ class LocalNotificationPresenter(
                                     silent = silentChild,
                                 )
                             }.setSmallIcon(R.drawable.ic_stat_whitenoise)
-                            .setContentIntent(conversationPendingIntent(update, notificationContent.notificationTag))
-                            .setCategory(decision.category)
+                            .setContentIntent(
+                                interactions.conversationPendingIntent(update, notificationContent.notificationTag),
+                            ).setCategory(decision.category)
                             .setPriority(decision.importance.toCompatPriority())
                             .setShowWhen(true)
                             .setAutoCancel(true)
@@ -1279,14 +1233,17 @@ class LocalNotificationPresenter(
                                             when (action) {
                                                 NotificationActionKind.REPLY ->
                                                     builder.addAction(
-                                                        replyNotificationAction(actionTarget, quickReactions),
+                                                        interactions.replyNotificationAction(
+                                                            actionTarget,
+                                                            quickReactions,
+                                                        ),
                                                     )
                                                 // Reaction choices ride on Reply's RemoteInput so SystemUI
                                                 // can render them inline.
                                                 NotificationActionKind.REACT -> Unit
                                                 NotificationActionKind.MARK_READ ->
                                                     builder.addAction(
-                                                        markReadNotificationAction(actionTarget),
+                                                        interactions.markReadNotificationAction(actionTarget),
                                                     )
                                             }
                                         }
@@ -1677,7 +1634,7 @@ class LocalNotificationPresenter(
     ): String? {
         val shortcutId = messaging.shortcutId ?: return null
         return withContext(Dispatchers.Default) {
-            publishConversationShortcut(
+            conversationShortcuts.publishConversationShortcut(
                 update = update,
                 content = content,
                 shortcutId = shortcutId,
@@ -1839,7 +1796,7 @@ class LocalNotificationPresenter(
                 return@withLock
             }
             messaging.shortcutId?.let { shortcutId ->
-                publishConversationShortcut(
+                conversationShortcuts.publishConversationShortcut(
                     update = update,
                     content = content,
                     shortcutId = shortcutId,
@@ -2022,7 +1979,7 @@ class LocalNotificationPresenter(
                 senderAvatar = senderPicture,
             )
         card.shortcutId?.let { shortcutId ->
-            publishConversationShortcut(
+            conversationShortcuts.publishConversationShortcut(
                 update = refresh.update,
                 content = refresh.content,
                 shortcutId = shortcutId,
@@ -2406,7 +2363,7 @@ class LocalNotificationPresenter(
             notification
         } else {
             // A hidden card leaves its conversation shortcut generic, so the next rich post must publish it again.
-            notification.shortcutId?.let(::forgetShortcutSnapshot)
+            notification.shortcutId?.let(conversationShortcuts::forgetShortcutSnapshot)
             notificationWithoutPreview(context, notification, shortcut = hiddenShortcut?.invoke())
         }
     }
@@ -2919,355 +2876,6 @@ class LocalNotificationPresenter(
                 )
             }
         }
-
-    /** A direct chat's current private contact choice. A group shows no member's picture, so it reads none. */
-    private fun directContactAvatar(update: NotificationUpdateFfi): Pair<Boolean, Bitmap?> =
-        if (update.isDm) currentContactAvatar(update.accountRef, update.sender.accountIdHex) else false to null
-
-    /**
-     * Cached private pixels replace a direct chat's protocol-sourced bitmaps; when none are cached, the public ones
-     * stay. A group keeps only its own picture and drops its member's.
-     */
-    private fun ownedShortcutAvatars(
-        update: NotificationUpdateFfi,
-        conversationAvatarBitmap: Bitmap?,
-        senderAvatarBitmap: Bitmap?,
-        sender: Person,
-    ): Triple<Bitmap?, Bitmap?, Person> {
-        if (!update.isDm) return Triple(conversationAvatarBitmap, null, sender)
-        val (override, currentAvatar) = currentContactAvatar(update.accountRef, update.sender.accountIdHex)
-        return if (!override) {
-            Triple(conversationAvatarBitmap, senderAvatarBitmap, sender)
-        } else {
-            val senderAvatar = currentAvatar ?: senderAvatarBitmap
-            Triple(currentAvatar ?: conversationAvatarBitmap, senderAvatar, contactAvatarPerson(sender, senderAvatar))
-        }
-    }
-
-    /**
-     * Revalidates account-private icon overrides at the serialized shortcut write while retaining route and
-     * preview ownership. An unchanged snapshot only reports the shortcut used. A changed one, such as a picture
-     * that arrived after the post, is republished and reported used once more. A cached snapshot counts as published
-     * only while the platform still lists the shortcut, so a dropped push or a shortcut another publisher removed is
-     * published again instead of leaving every later card naming a missing shortcut. With [holdForPost] the
-     * published shortcut is held in [InFlightConversationShortcuts], under the same lock as the write, for the
-     * caller's coming card write. Returns whether it was held.
-     */
-    @Suppress("LongMethod") // One serialized platform write retains its alert, routing and privacy snapshot.
-    private fun publishConversationShortcut(
-        update: NotificationUpdateFfi,
-        content: LocalNotificationContent,
-        shortcutId: String,
-        locusId: LocusIdCompat,
-        conversationAvatarUrl: String?,
-        conversationAvatarBitmap: android.graphics.Bitmap?,
-        senderAvatarUrl: String?,
-        senderAvatarBitmap: android.graphics.Bitmap?,
-        sender: Person,
-        directShareEligible: Boolean,
-        isPublishAllowed: () -> Boolean,
-        holdForPost: Boolean = false,
-    ): Boolean =
-        runCatching {
-            val (ownedConversationAvatar, ownedSenderAvatar, ownedSender) =
-                ownedShortcutAvatars(update, conversationAvatarBitmap, senderAvatarBitmap, sender)
-            val candidateTitle = content.conversationTitle ?: content.title
-            val existingTitle =
-                shortcutSnapshots[shortcutId]?.longLabel
-                    ?: ShortcutManagerCompat
-                        .getDynamicShortcuts(context)
-                        .firstOrNull { it.id == shortcutId }
-                        ?.longLabel
-                        ?.toString()
-            val title = preferredConversationShortcutTitle(candidateTitle, existingTitle)
-            val accountScope = conversationShortcutAccountScope(update.accountRef) ?: return false
-            val snapshot =
-                ConversationShortcutSnapshot(
-                    shortcutId = shortcutId,
-                    accountScope = accountScope,
-                    shortLabel = title.take(24).ifBlank { context.getString(R.string.app_name) },
-                    longLabel = title,
-                    notificationTag = content.notificationTag,
-                    senderName = content.senderName,
-                    senderKey = content.senderKey,
-                    avatarUrl = conversationAvatarUrl,
-                    avatarGenerationId = ownedConversationAvatar?.generationId,
-                    senderAvatarUrl = senderAvatarUrl.takeIf { update.isDm },
-                    senderAvatarGenerationId = ownedSenderAvatar?.generationId,
-                    directShareEligible = directShareEligible,
-                    previewRevision = NotificationPreviewPreferences.capture(context).revision,
-                )
-            shortcutLastUsed[shortcutId] = shortcutAccessClock.incrementAndGet()
-            if (shortcutSnapshots[shortcutId] == snapshot) {
-                reuseCachedShortcut(shortcutId, snapshot, isPublishAllowed, holdForPost)?.let { return it }
-            }
-            val intent = conversationShortcutOpenIntent(update, content)
-            val build = { shareEligible: Boolean ->
-                conversationShortcutInfo(
-                    shortcutId = shortcutId,
-                    snapshot = snapshot,
-                    intent = intent,
-                    locusId = locusId,
-                    sender = notificationShortcutSender(content, ownedSender),
-                    conversationAvatarBitmap = ownedConversationAvatar,
-                    directShareEligible = shareEligible,
-                )
-            }
-            val shortcut = build(directShareEligible)
-            // A refresh that retains this shortcut for its card keeps a twin that is never a share target (#3322).
-            val retainable = if (directShareEligible) build(false) else shortcut
-            synchronized(UserEventNotificationGroup.mutationLock) {
-                // A cap filled by protected shortcuts skips the publication, and the card keeps the existing fallback.
-                if (isPublishAllowed() && pruneConversationShortcutsBeforePublish(shortcutId)) {
-                    val (currentChoice, pixels) = directContactAvatar(update)
-                    val preview = NotificationPreviewPreferences.capture(context)
-                    val finish = { built: ShortcutInfoCompat ->
-                        built.extras?.let { stampShortcutPreview(preview, it) }
-                        stampContactPictureShortcut(built, update.sender.accountIdHex, update.isDm)
-                        if (!shortcutPreviewAllowed(context, built)) {
-                            genericNotificationShortcut(context, built)
-                        } else if (currentChoice) {
-                            withContactPictureIcon(context, built, update.sender.accountIdHex, pixels)
-                        } else {
-                            built
-                        }
-                    }
-                    val currentShortcut = finish(shortcut)
-                    val retainedShortcut = if (retainable === shortcut) currentShortcut else finish(retainable)
-                    shortcutPublisher(currentShortcut)
-                    shortcutSnapshots[shortcutId] = snapshot
-                    InFlightConversationShortcuts.consumeIdentityLost(shortcutId)
-                    ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
-                    InFlightConversationShortcuts.rememberPublished(shortcutId, currentShortcut, retainedShortcut)
-                    if (holdForPost) InFlightConversationShortcuts.hold(shortcutId)
-                    holdForPost
-                } else {
-                    false
-                }
-            }
-        }.onFailure {
-            notificationDebug { "conversation shortcut skipped group=${update.groupIdHex.take(8)}" }
-        }.getOrDefault(false)
-
-    /**
-     * Reuses an unchanged cached publication. Re-read under the lock: a local removal may have forgotten the snapshot
-     * after the caller's check, or the platform may have lost the shortcut, and then it must be published again rather
-     * than only reported used. Returns whether the reused shortcut was held, or null when it must be republished.
-     */
-    private fun reuseCachedShortcut(
-        shortcutId: String,
-        snapshot: ConversationShortcutSnapshot,
-        isPublishAllowed: () -> Boolean,
-        holdForPost: Boolean,
-    ): Boolean? =
-        synchronized(UserEventNotificationGroup.mutationLock) {
-            // A Direct Share refresh that rebuilt the shortcut without its picture leaves the snapshot stale too.
-            val published =
-                shortcutSnapshots[shortcutId] == snapshot &&
-                    shortcutId in dynamicShortcutIds() &&
-                    !InFlightConversationShortcuts.consumeIdentityLost(shortcutId)
-            if (!published) {
-                if (shortcutSnapshots.remove(shortcutId, snapshot)) {
-                    InFlightConversationShortcuts.forgetPublished(shortcutId)
-                }
-                null
-            } else if (isPublishAllowed()) {
-                ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
-                if (holdForPost) InFlightConversationShortcuts.hold(shortcutId)
-                holdForPost
-            } else {
-                false
-            }
-        }
-
-    /** Forgets one shortcut's publication snapshot together with the rich copy kept for holds of it. */
-    private fun forgetShortcutSnapshot(shortcutId: String) {
-        shortcutSnapshots.remove(shortcutId)
-        InFlightConversationShortcuts.forgetPublished(shortcutId)
-    }
-
-    private fun conversationShortcutOpenIntent(
-        update: NotificationUpdateFfi,
-        content: LocalNotificationContent,
-    ): Intent =
-        Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            NotificationNavigation.fromUpdate(update)?.let { target ->
-                NotificationNavigation.applyToIntent(this, target, content.notificationTag, tapTokens.tokenFor(content.notificationTag))
-            }
-        }
-
-    private fun conversationShortcutInfo(
-        shortcutId: String,
-        snapshot: ConversationShortcutSnapshot,
-        intent: Intent,
-        locusId: LocusIdCompat,
-        sender: Person,
-        conversationAvatarBitmap: android.graphics.Bitmap?,
-        directShareEligible: Boolean,
-    ): ShortcutInfoCompat {
-        val builder =
-            ShortcutInfoCompat
-                .Builder(context, shortcutId)
-                .setShortLabel(snapshot.shortLabel)
-                .setLongLabel(snapshot.longLabel)
-                .setIcon(
-                    notificationConversationIcon(
-                        title = snapshot.longLabel,
-                        seed = snapshot.shortcutId,
-                        avatarBitmap = conversationAvatarBitmap,
-                    ),
-                ).setIntent(intent)
-                .setLocusId(locusId)
-                .setPerson(sender)
-                .setLongLived(true)
-                .setExtras(conversationShortcutAccountScopeExtras(snapshot.accountScope))
-        if (directShareEligible) {
-            builder.setCategories(setOf(CONVERSATION_SHARE_TARGET_CATEGORY))
-        }
-        return builder.build()
-    }
-
-    /**
-     * Makes room for [shortcutId] under the platform's per-activity cap, which counts every dynamic shortcut and every
-     * manifest shortcut, by removing the least recently used app-owned conversation shortcuts. Shortcuts backing a
-     * live card or held for a pending card write are never removed. Returns false when they leave no room, so the
-     * caller skips the publication instead of letting the platform evict one of them.
-     */
-    private fun pruneConversationShortcutsBeforePublish(shortcutId: String): Boolean {
-        val maxShortcuts = ShortcutManagerCompat.getMaxShortcutCountPerActivity(context)
-        if (maxShortcuts <= 0) return true
-        val manifestCount =
-            runCatching {
-                ShortcutManagerCompat.getShortcuts(context, ShortcutManagerCompat.FLAG_MATCH_MANIFEST).size
-            }.getOrDefault(0)
-        val protectedIds = liveCardShortcutIds() + InFlightConversationShortcuts.ids()
-        val idsToRemove =
-            conversationShortcutPrunePlan(
-                dynamicShortcutIds(),
-                manifestCount,
-                maxShortcuts,
-                shortcutId,
-                protectedIds,
-                shortcutLastUsed,
-            )
-        if (!idsToRemove.isNullOrEmpty()) {
-            ShortcutManagerCompat.removeDynamicShortcuts(context, idsToRemove)
-            idsToRemove.forEach {
-                forgetShortcutSnapshot(it)
-                shortcutLastUsed.remove(it)
-            }
-        }
-        return idsToRemove != null
-    }
-
-    /** Conversation shortcut ids that this app's live cards name, read through the injected notification source. */
-    private fun liveCardShortcutIds(): Set<String> =
-        runCatching {
-            context
-                .getSystemService(NotificationManager::class.java)
-                ?.let(activeNotificationsProvider)
-                .orEmpty()
-                .mapNotNullTo(mutableSetOf()) { it.notification.shortcutId?.takeIf(::isConversationShortcutId) }
-        }.getOrDefault(emptySet())
-
-    private fun replyNotificationAction(
-        actionTarget: NotificationActionTarget,
-        reactionChoices: List<String>,
-    ): NotificationCompat.Action {
-        val remoteInput =
-            RemoteInput
-                .Builder(NotificationActions.KEY_TEXT_REPLY)
-                .setLabel(context.getString(R.string.message))
-                .setChoices(reactionChoices.toTypedArray())
-                .setAllowFreeFormInput(true)
-                .setEditChoicesBeforeSending(RemoteInput.EDIT_CHOICES_BEFORE_SENDING_DISABLED)
-                .build()
-        return NotificationCompat
-            .Action
-            .Builder(
-                R.drawable.ic_stat_whitenoise,
-                context.getString(R.string.reply),
-                actionPendingIntent(
-                    actionTarget,
-                    NotificationActionKind.REPLY,
-                    acceptsInlineReactionChoices = reactionChoices.isNotEmpty(),
-                ),
-            ).addRemoteInput(remoteInput)
-            .setAllowGeneratedReplies(false)
-            .setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_REPLY)
-            .setShowsUserInterface(false)
-            .build()
-    }
-
-    private fun markReadNotificationAction(actionTarget: NotificationActionTarget): NotificationCompat.Action =
-        NotificationCompat
-            .Action
-            .Builder(
-                R.drawable.ic_stat_whitenoise,
-                context.getString(R.string.chat_row_action_mark_read),
-                actionPendingIntent(actionTarget, NotificationActionKind.MARK_READ),
-            ).setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_MARK_AS_READ)
-            .setShowsUserInterface(false)
-            .build()
-
-    private fun actionPendingIntent(
-        actionTarget: NotificationActionTarget,
-        kind: NotificationActionKind,
-        acceptsInlineReactionChoices: Boolean = false,
-    ): PendingIntent {
-        val actionIntent =
-            Intent(context, NotificationActionReceiver::class.java).apply {
-                NotificationActions.applyToIntent(
-                    this,
-                    kind,
-                    actionTarget,
-                    acceptsInlineReactionChoices,
-                )
-            }
-        val mutableFlag =
-            if (kind == NotificationActionKind.REPLY || kind == NotificationActionKind.REACT) {
-                PendingIntent.FLAG_MUTABLE
-            } else {
-                PendingIntent.FLAG_IMMUTABLE
-            }
-        return PendingIntent.getBroadcast(
-            context,
-            NotificationActions.requestCode(kind, actionTarget.notificationTag),
-            actionIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or mutableFlag,
-        )
-    }
-
-    private fun conversationPendingIntent(
-        update: NotificationUpdateFfi,
-        tag: String,
-    ): PendingIntent {
-        val acceptsDraft = update.trigger == NotificationTriggerFfi.NEW_MESSAGE && update.reactionEmoji.isNullOrBlank()
-        val target = NotificationNavigation.fromUpdate(update)
-        val signature = target?.takeIf { acceptsDraft }?.let { tapTokens.signatureFor(tag, it) }
-        val tapIntent =
-            Intent(context, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                // Key the tap target on the notification tag (per-conversation
-                // for messages) so the accumulating card always reopens the
-                // same conversation. PendingIntents compare by URI, not extras.
-                target?.let { destination ->
-                    if (signature != null) {
-                        NotificationNavigation.applyBoundToIntent(this, destination, tag, signature)
-                    } else {
-                        NotificationNavigation.applyToIntent(this, destination, tag, tapTokens.tokenFor(tag))
-                    }
-                }
-            }
-        return PendingIntent.getActivity(
-            context,
-            NotificationNavigation.requestCode(tag),
-            tapIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or
-                if (signature != null) PendingIntent.FLAG_MUTABLE else PendingIntent.FLAG_IMMUTABLE,
-        )
-    }
 }
 
 private data class MessagingPostContext(
@@ -3294,110 +2902,6 @@ private data class LateIdentityRefresh(
     val isCurrent: () -> Boolean,
 )
 
-/** Pixel generations invalidate image-only changes without retaining another copy of bitmap memory. */
-private data class ConversationShortcutSnapshot(
-    val shortcutId: String,
-    val accountScope: String,
-    val shortLabel: String,
-    val longLabel: String,
-    val notificationTag: String,
-    val senderName: String,
-    val senderKey: String,
-    val avatarUrl: String?,
-    val avatarGenerationId: Int?,
-    val senderAvatarUrl: String?,
-    val senderAvatarGenerationId: Int?,
-    val directShareEligible: Boolean,
-    val previewRevision: Long,
-)
-
-/**
- * Normal bitmaps avoid IconCompat's adaptive-icon safe-zone crop, which can cut
- * into already-tight headshots. Android's conversation surfaces still apply
- * their own circular presentation. Missing avatars get a stable per-conversation
- * monogram instead of every shortcut sharing the launcher icon.
- */
-internal fun notificationConversationIcon(
-    title: String,
-    seed: String,
-    avatarBitmap: Bitmap?,
-): IconCompat = IconCompat.createWithBitmap(avatarBitmap ?: notificationMonogramBitmap(title, seed))
-
-internal fun notificationMonogramBitmap(
-    title: String,
-    seed: String,
-    sizePx: Int = NOTIFICATION_MONOGRAM_SIZE_PX,
-): Bitmap {
-    require(sizePx > 0) { "sizePx must be positive" }
-    val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
-    val canvas = Canvas(bitmap)
-    canvas.drawColor(notificationMonogramBackgroundColor(seed))
-    val paint =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.WHITE
-            textAlign = Paint.Align.CENTER
-            textSize = sizePx * 0.44f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-        }
-    val baseline = sizePx / 2f - (paint.ascent() + paint.descent()) / 2f
-    canvas.drawText(notificationAvatarInitials(title), sizePx / 2f, baseline, paint)
-    return bitmap
-}
-
-internal fun notificationMonogramBackgroundColor(seed: String): Int {
-    val hue = Math.floorMod(seed.hashCode(), 360).toFloat()
-    return Color.HSVToColor(floatArrayOf(hue, 0.58f, 0.45f))
-}
-
-internal fun notificationAvatarInitials(title: String): String {
-    val words = title.trim().split(Regex("[\\s\\p{Z}]+")).filter(String::isNotBlank)
-    val initials =
-        buildString {
-            words.take(if (words.size > 1) 2 else 1).forEach { word ->
-                word.firstMonogramCodePoint()?.let(::appendCodePoint)
-            }
-        }.uppercase(Locale.ROOT)
-    return initials.ifBlank { "?" }
-}
-
-private fun String.firstMonogramCodePoint(): Int? {
-    var offset = 0
-    while (offset < length) {
-        val codePoint = codePointAt(offset)
-        offset += Character.charCount(codePoint)
-        val type = Character.getType(codePoint)
-        if (!Character.isWhitespace(codePoint) &&
-            !Character.isISOControl(codePoint) &&
-            type != Character.FORMAT.toInt()
-        ) {
-            return codePoint
-        }
-    }
-    return null
-}
-
-internal fun notificationSenderPerson(
-    content: LocalNotificationContent,
-    avatarBitmap: Bitmap?,
-    redacted: Boolean = false,
-): Person =
-    Person
-        .Builder()
-        .setName(content.senderName)
-        .setKey(content.senderKey)
-        .apply {
-            if (!redacted) {
-                val icon =
-                    if (content.isGroupConversation && content.senderKey.isNotBlank()) {
-                        groupSenderIcon()
-                    } else {
-                        avatarBitmap?.let(IconCompat::createWithBitmap)
-                    }
-                icon?.let(::setIcon)
-            }
-        }.build()
-
-private const val NOTIFICATION_MONOGRAM_SIZE_PX = 128
 private const val AVATAR_NOTIFICATION_FETCH_TIMEOUT_MS = 2_500L
 
 /** Bound for a group's encrypted picture in the late refresh; it delays no other card, only this silent rewrite. */

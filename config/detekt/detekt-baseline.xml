@@ -430,8 +430,8 @@
     <ID>MagicNumber:IdentityFormatter.kt:IdentityFormatter$60</ID>
     <ID>MagicNumber:IdentityFormatter.kt:IdentityFormatter$7L</ID>
     <ID>MagicNumber:IdentityFormatter.kt:IdentityFormatter$86_400</ID>
-    <ID>MagicNumber:LocalNotificationPresenter.kt:0.45f</ID>
-    <ID>MagicNumber:LocalNotificationPresenter.kt:0.58f</ID>
+    <ID>MagicNumber:NotificationIdentityRendering.kt:0.45f</ID>
+    <ID>MagicNumber:NotificationIdentityRendering.kt:0.58f</ID>
     <ID>MagicNumber:LocalNotificationPresenter.kt:LocalNotificationPresenter$16</ID>
     <ID>MagicNumber:LocalNotificationPresenter.kt:LocalNotificationPresenter$8</ID>
     <ID>MagicNumber:LocationShare.kt:180.0</ID>
@@ -742,7 +742,7 @@
     <ID>MaxLineLength:LocalNotificationPresenter.kt:LocalNotificationPresenter$.</ID>
     <ID>MaxLineLength:LocalNotificationPresenter.kt:LocalNotificationPresenter$// Cap carried-forward history; the extracted style is otherwise re-serialized unbounded across Binder on every post.</ID>
     <ID>MaxLineLength:LocalNotificationPresenter.kt:LocalNotificationPresenter$NotificationActionKind.MARK_READ -&gt; builder.addAction(markReadNotificationAction(actionTarget))</ID>
-    <ID>MaxLineLength:LocalNotificationPresenter.kt:LocalNotificationPresenter$NotificationNavigation.applyToIntent(this, target, content.notificationTag, tapTokens.tokenFor(content.notificationTag))</ID>
+    <ID>MaxLineLength:NotificationInteractionFactory.kt:NotificationInteractionFactory$NotificationNavigation.applyToIntent(this, target, content.notificationTag, tapTokens.tokenFor(content.notificationTag))</ID>
     <ID>MaxLineLength:LocalNotificationPresenter.kt:LocalNotificationPresenter$stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)</ID>
     <ID>MaxLineLength:LocalNotificationPresenterConversationTest.kt:LocalNotificationPresenterConversationTest$ConversationNotificationChannels.conversationChannelId(NotificationChannelSpec.GROUP_MESSAGES.id, shortcutId!!)</ID>
     <ID>MaxLineLength:LocalNotificationPresenterConversationTest.kt:LocalNotificationPresenterConversationTest$assertEquals(notificationMonogramBackgroundColor("conversation-a"), notificationMonogramBackgroundColor("conversation-a"))</ID>
@@ -1006,7 +1006,7 @@
     <ID>ReturnCount:LocalNotificationPostDecision.kt:internal fun shouldCancelRepliedConversationCard: Boolean</ID>
     <ID>ReturnCount:LocalNotificationPresenter.kt:LocalNotificationPresenter$@SuppressLint("MissingPermission") suspend fun show: Boolean</ID>
     <ID>ReturnCount:LocalNotificationPresenter.kt:LocalNotificationPresenter$fun dismissConversationSiblingCardsNotNewerThan: Boolean</ID>
-    <ID>ReturnCount:LocalNotificationPresenter.kt:LocalNotificationPresenter$private fun pruneConversationShortcutsBeforePublish</ID>
+    <ID>ReturnCount:NotificationConversationShortcuts.kt:NotificationConversationShortcuts$private fun pruneConversationShortcutsBeforePublish</ID>
     <ID>ReturnCount:LocationShare.kt:@SuppressLint("MissingPermission") internal suspend fun fetchCurrentLocation: SharedLocation?</ID>
     <ID>ReturnCount:LocationShare.kt:internal fun parseSharedLocationFromText: SharedLocation?</ID>
     <ID>ReturnCount:Lud16Resolver.kt:Lud16Address$fun parse: Parsed?</ID>
