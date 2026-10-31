@@ -139,6 +139,8 @@ internal fun ImageViewerViewport(
                         // Read the owner after the first event, then accumulate without waiting for recomposition.
                         val current = accumulated ?: ViewerTransform(latestScale, latestOffset)
                         accumulated = current
+                        // A new down has no previous centroid; retain the owner until a shared sample exists.
+                        if (event.changes.none { it.pressed && it.previousPressed }) continue
                         val currentScale = current.scale
                         val currentOffset = current.offset
                         if (pressedCount >= 2 || currentScale > 1f) {

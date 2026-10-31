@@ -161,6 +161,56 @@ class ImageViewerViewportStateTest {
     }
 
     @Test
+    fun initialDownPreservesZoomedOwnerUntilAPreviousPointerSampleExists() {
+        var scale by mutableFloatStateOf(8f)
+        var offset by mutableStateOf(Offset(40f, 20f))
+        var writes = 0
+        rule.setContent {
+            Box(Modifier.size(300.dp)) {
+                ImageViewerViewport(
+                    sourceKey = "zoomed-down",
+                    imageWidth = 1000,
+                    imageHeight = 1000,
+                    scale = scale,
+                    offset = offset,
+                    onScaleChange = {
+                        writes++
+                        scale = it
+                    },
+                    onOffsetChange = {
+                        writes++
+                        offset = it
+                    },
+                    onChromeToggle = {},
+                ) { imageModifier -> Box(imageModifier) }
+            }
+        }
+        rule.waitForIdle()
+        rule.runOnIdle { writes = 0 }
+        rule.mainClock.autoAdvance = false
+        try {
+            val node = rule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG)
+            node.performTouchInput { down(Offset(150f, 150f)) }
+            assertEquals(0, writes)
+            assertEquals(8f, scale, 0f)
+            assertEquals(Offset(40f, 20f), offset)
+            node.performTouchInput {
+                updatePointerTo(0, Offset(160f, 155f))
+                move(delayMillis = 0L)
+                up()
+            }
+        } finally {
+            rule.mainClock.autoAdvance = true
+        }
+        rule.runOnIdle {
+            assertTrue(writes > 0)
+            assertEquals(8f, scale, 0f)
+            assertEquals(50f, offset.x, 0.01f)
+            assertEquals(25f, offset.y, 0.01f)
+        }
+    }
+
+    @Test
     fun repeatedBatchedPinchesRetainTheOwnerTransformAcrossIdleBoundaries() {
         var scale by mutableFloatStateOf(1f)
         var offset by mutableStateOf(Offset.Zero)
