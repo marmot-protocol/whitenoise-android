@@ -29,6 +29,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -163,6 +164,16 @@ class ConversationAttachmentReaderFileBackedTest {
             outcome.attachments.forEach { checkNotNull(it.sourceFile).close() }
             assertTrue("the refused video leaves no snapshot", uploadSources.list().orEmpty().isEmpty())
         }
+
+    /** A named pick is one picked file: reading two URIs under one pick fails before any worker decodes them. */
+    @Test
+    fun aNamedPickReadsAtMostOneFile() {
+        val first = pick("first.mp4", "video/mp4", minimalMp4(1024), declaredSize = 1024)
+        val second = pick("second.mp4", "video/mp4", minimalMp4(1024), declaredSize = 1024)
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { reader().readPickedImages(listOf(first, second), pick = "slot-a") }
+        }
+    }
 
     /**
      * A video small enough for memory that follows a staged one still uploads from a file, so its two

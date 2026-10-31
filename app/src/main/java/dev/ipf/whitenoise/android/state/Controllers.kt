@@ -6425,6 +6425,10 @@ internal typealias MediaPublisher =
 
 internal typealias InviteAcceptor = suspend (String, String) -> AppGroupRecordFfi
 
+/** Decodes a just-sent attachment's poster in the given worker domain, the domain of the pick it came from. */
+internal typealias MediaThumbnailDecoder =
+    suspend (PendingAttachment, dev.ipf.whitenoise.android.media.MediaTrustDomain) -> android.graphics.Bitmap?
+
 private const val MESSAGE_EDIT_EVENT_KIND = 1009uL
 
 class ConversationController(
@@ -6476,11 +6480,8 @@ class ConversationController(
         }
     },
     private val mediaPublisher: MediaPublisher? = null,
-    // A just-sent pick decodes in its own outgoing domain, which then retires: the pick has left the draft.
-    private val mediaThumbnailDecoder: suspend (PendingAttachment) -> android.graphics.Bitmap? = { attachment ->
-        val domain =
-            dev.ipf.whitenoise.android.media.MediaTrustDomain
-                .outgoing(accountRefOverride ?: appState.activeAccountRef, initialGroup.groupIdHex, attachment.pick)
+    // A just-sent pick decodes in the domain its send names, the pick's own, which then retires: it left the draft.
+    private val mediaThumbnailDecoder: MediaThumbnailDecoder = { attachment, domain ->
         decodeMediaThumbnailOffMain(attachment, domain).also {
             dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
                 .retireDomain(domain)
@@ -9602,7 +9603,11 @@ class ConversationController(
                         // Offload the multi-MB ARGB decode to Default; the
                         // main-confined thumbnail-cache put resumes on Main.
                         // Mirrors the receive/render path in WhiteNoiseApp.
-                        val decoded = mediaThumbnailDecoder(attachment)
+                        // The send's own account and group name the pick's domain, the one its previews used.
+                        val pickDomain =
+                            dev.ipf.whitenoise.android.media.MediaTrustDomain
+                                .outgoing(account, group.groupIdHex, attachment.pick)
+                        val decoded = mediaThumbnailDecoder(attachment, pickDomain)
                         if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
                         if (decoded != null) {
                             appState.cacheMediaThumbnail(confirmedKey, decoded)

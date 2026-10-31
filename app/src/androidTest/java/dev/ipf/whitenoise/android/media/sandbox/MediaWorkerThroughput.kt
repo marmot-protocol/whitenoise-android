@@ -300,7 +300,7 @@ internal object MediaWorkerThroughput {
             .put("outcome", if (success) "success" else "no_result")
     }
 
-    /** One distinct thumbnail decode, as a request of [domain]. */
+    /** One thumbnail decode of corpus image [index] modulo the corpus size, as a request of [domain]. */
     private fun thumbnail(
         lane: ThroughputLane,
         corpus: ThroughputCorpus,

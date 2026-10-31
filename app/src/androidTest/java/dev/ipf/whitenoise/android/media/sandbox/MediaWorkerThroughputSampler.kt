@@ -20,6 +20,7 @@ internal class MediaWorkerThroughputSampler : java.io.Closeable {
     private var maxCallerRssKb = 0L
     private var minMemAvailableKb = Long.MAX_VALUE
     private var samples = 0
+    private var failedProcessSamples = 0
     private val thread =
         Thread {
             while (running.get()) {
@@ -32,9 +33,16 @@ internal class MediaWorkerThroughputSampler : java.io.Closeable {
             start()
         }
 
-    /** Records one process/FD/RSS observation, failures leave the previous maxima untouched. */
+    /**
+     * Records one process/FD/RSS observation. A failed process listing is counted apart and is not a sample, so it
+     * never reads as a moment with no workers.
+     */
     private fun sampleOnce() {
-        val processes = runCatching { shell("ps -A -o RSS,NAME") }.getOrDefault("")
+        val processes = runCatching { shell("ps -A -o RSS,NAME") }.getOrNull()
+        if (processes == null) {
+            synchronized(monitor) { failedProcessSamples++ }
+            return
+        }
         val workers = decoderProcesses(processes)
         val zygotes = appZygoteCount(processes)
         val fds = callerFdCount()
@@ -57,6 +65,7 @@ internal class MediaWorkerThroughputSampler : java.io.Closeable {
         synchronized(monitor) {
             JSONObject()
                 .put("samples", samples)
+                .put("failed_process_samples", failedProcessSamples)
                 .put("max_live_image_workers", maxWorkers)
                 .put("max_app_zygotes", maxZygotes)
                 .put("max_worker_rss_sum_kb", maxWorkerRssKb)

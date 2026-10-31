@@ -88,6 +88,11 @@ internal class IsolatedMediaTransport(
     spares: Int = MediaWorkerPool.DEFAULT_SPARES,
     private val deadlineMs: Long = MediaDecodePolicy.DEADLINE_MS,
     liveLimit: Int = 1 + spares.coerceIn(0, MediaWorkerPool.MAX_SPARES),
+    /**
+     * How much of a request's deadline may pass before dispatch, waiting for a worker, while a missed deadline still
+     * counts against its source: a worker then had at least its own watchdog's time to answer.
+     */
+    private val claimAllowanceMs: Long = MediaDecodePolicy.DEADLINE_MS - MediaDecodePolicy.WATCHDOG_MS,
 ) : MediaDecodeTransport,
     java.io.Closeable {
     /** Admission for single-use requests, which share one serialized lane. */
@@ -378,6 +383,17 @@ internal class IsolatedMediaTransport(
         if (--lane.users == 0) lanes.remove(domain)
     }
 
+    /**
+     * Whether a request of the current session failed after dispatch in a way that says something about its source:
+     * always, unless its reply wait ran out after waiting for a worker had used more than [claimAllowanceMs] of its
+     * deadline.
+     */
+    private fun failureIsEvidence(ticket: Operation): Boolean {
+        if (!ticket.dispatched || !current(ticket)) return false
+        val waitedMs = deadlineMs - ticket.dispatchBudgetMs
+        return !ticket.replyTimedOut || waitedMs <= claimAllowanceMs
+    }
+
     private fun remaining(ticket: Operation): Long {
         val timeLeft = ticket.deadline - android.os.SystemClock.elapsedRealtime()
         return timeLeft.coerceAtLeast(0L)
@@ -418,8 +434,9 @@ internal class IsolatedMediaTransport(
                     exchange(ticket, input, output, spec)
                 }
             // Any dispatched request without a valid result (crash, watchdog kill, deadline miss or refusal)
-            // quarantines these bytes, as the reusable lane does. Interruption and reset never reach here.
-            if (result == null && ticket.dispatched && current(ticket)) {
+            // quarantines these bytes, as the reusable lane does. Interruption and reset never reach here. A missed
+            // deadline counts only when the worker had its full time: a long wait for a worker is not the source's.
+            if (result == null && failureIsEvidence(ticket)) {
                 recordRefusal(ticket.session, key, android.os.SystemClock.elapsedRealtime())
             }
             result?.let { use(it, output) }
@@ -456,7 +473,10 @@ internal class IsolatedMediaTransport(
             )
             // Warm a spare while this generation serves, a new domain or single-use input takes it.
             pool.refill()
-            if (!await(exchange.ready, ticket)) return null
+            if (!await(exchange.ready, ticket)) {
+                ticket.replyTimedOut = true
+                return null
+            }
             val result = exchange.result ?: return null
             if (reusable) {
                 keep = validResult(result) && current(ticket)
@@ -491,6 +511,7 @@ internal class IsolatedMediaTransport(
             } else {
                 // Descriptor admission linearizes before a concurrent reset.
                 ticket.dispatched = true
+                ticket.dispatchBudgetMs = remaining(ticket)
                 selected.served = true
                 selected.exchange = exchange
                 pending += selected
@@ -613,6 +634,12 @@ internal class IsolatedMediaTransport(
     ) {
         /** The generation this request claimed before creating any descriptor. */
         var worker: MediaWorker? = null
+
+        /** What was left of [deadline] when the request was dispatched. */
+        var dispatchBudgetMs: Long = 0L
+
+        /** Whether the worker's reply did not arrive before [deadline]. */
+        var replyTimedOut: Boolean = false
     }
 
     /** One reusable domain's admission, kept while any of its requests is queued or running. */
