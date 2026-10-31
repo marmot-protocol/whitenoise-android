@@ -66,7 +66,7 @@ internal fun readAnimationFrame(parcel: Parcel): AnimationFrameInfo {
             value
         }
     val canary = parcel.readInt()
-    require(sequence > 0 && width in 1..AnimationFrameProtocol.MAX_EDGE && height in 1..AnimationFrameProtocol.MAX_EDGE)
+    require(sequence > 0 && ViewerAnimationOutput.fromDimensions(width, height) != null)
     require(parcel.dataAvail() == 0)
     return AnimationFrameInfo(session, sequence, width, height, flags[0] == 1, flags[1] == 1, flags[2] == 1, canary)
 }

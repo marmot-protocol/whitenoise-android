@@ -25,6 +25,7 @@ internal class WorkerAnimation(
     private val handler: Handler,
     private val publish: (Long, Int, Int) -> Unit,
     private val nativeWork: (() -> Unit) -> Unit,
+    private val viewerOutput: ViewerAnimationOutput? = null,
 ) : Drawable.Callback {
     private val drawable: AnimatedImageDrawable
     private val bitmap: Bitmap
@@ -40,15 +41,28 @@ internal class WorkerAnimation(
 
     init {
         require(bytes.size in 1..MediaDecodePolicy.MAX_INPUT_BYTES)
-        require(edge in 1..AnimationFrameProtocol.MAX_EDGE)
-        require(admitAnimationSource(bytes) is AnimationSourceAdmission.Admitted)
+        val admission = admitAnimationSource(bytes) as? AnimationSourceAdmission.Admitted
+        require(admission != null)
+        if (viewerOutput == null) {
+            require(edge in 1..AnimationFrameProtocol.MAX_EDGE)
+        } else {
+            require(viewerOutput == ViewerAnimationOutput.fromAdmission(admission))
+            require(edge == maxOf(viewerOutput.width, viewerOutput.height))
+            require(output.size == viewerOutput.capacityBytes)
+        }
         drawable =
             requireNotNull(
                 ImageDecoder.decodeDrawable(ImageDecoder.createSource(ByteBuffer.wrap(bytes))) { decoder, info, _ ->
                     require(info.size.width in 1..MAX_ANIMATION_SOURCE_EDGE_PX)
                     require(info.size.height in 1..MAX_ANIMATION_SOURCE_EDGE_PX)
                     require(info.size.width.toLong() * info.size.height <= MAX_ANIMATION_SOURCE_CANVAS_PIXELS)
-                    val target = MediaPipeline.targetDimensions(info.size.width, info.size.height, edge)
+                    require(info.size.width == admission.canvasWidth && info.size.height == admission.canvasHeight)
+                    val target =
+                        if (viewerOutput == null) {
+                            MediaPipeline.targetDimensions(info.size.width, info.size.height, edge)
+                        } else {
+                            viewerOutput.width to viewerOutput.height
+                        }
                     decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
                     decoder.setTargetSize(target.first, target.second)
                 } as? AnimatedImageDrawable,

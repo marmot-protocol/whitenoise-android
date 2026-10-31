@@ -76,6 +76,7 @@ class MediaAnimationService : Service() {
         nativeWork {
             val bytes = input.use { requireNotNull(readDecoderInput(it)) }
             val canary = canaryErrno(data)
+            val viewerOutput = readViewerAnimationOutput(data)
             animation =
                 try {
                     WorkerAnimation(bytes, data.getInt("edge"), output, codec, { sequence, width, height ->
@@ -95,7 +96,7 @@ class MediaAnimationService : Service() {
                             ),
                         )
                         armIdle()
-                    }, ::nativeWork)
+                    }, ::nativeWork, viewerOutput)
                 } catch (rejected: java.io.IOException) {
                     reportCodecRejection(callback)
                     throw rejected

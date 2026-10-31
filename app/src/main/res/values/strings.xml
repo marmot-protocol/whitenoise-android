@@ -2692,4 +2692,10 @@
     <string name="notification_tone_silent">Silent</string>
     <string name="notification_tone_off">Off</string>
     <string name="notification_tone_default">Default</string>
+    <string name="media_viewer_fit_image">Fit image</string>
+    <string name="media_viewer_zoom_image">Zoom in</string>
+    <string name="media_viewer_image_scale">%1$d%% zoom</string>
+    <string name="media_viewer_actual_size">Actual size (1:1)</string>
+    <string name="media_viewer_zoom_out">Zoom out</string>
+    <string name="media_viewer_toggle_controls">Show or hide controls</string>
 </resources>

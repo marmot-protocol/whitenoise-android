@@ -21,6 +21,8 @@ internal object MediaDecodePolicy {
     const val RETIRE = 9
     const val REGION = 10
     const val DEBUG_BAD_REPLY = 11
+    const val VIEWER_SVG_INSPECT = 12
+    const val VIEWER_SVG_REGION = 13
     const val DEBUG_REPLY_KINDS = 4
     const val MAX_REGION_DECODE_PIXELS = 16_777_216L
     const val WAVEFORM_DEADLINE_MS = 40000L

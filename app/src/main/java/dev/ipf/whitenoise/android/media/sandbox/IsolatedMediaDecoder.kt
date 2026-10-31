@@ -148,12 +148,30 @@ internal object IsolatedMediaDecoder {
     ): Bitmap? = safely { it.region(bytes, region, edge) }
 
     /** Ordinary callers keep nullable refusal so attachment viewers can use their sampled-still fallback. */
+    fun svgInspect(bytes: ByteArray): ImageInspection? = safely { it.svgInspect(bytes) }
+
+    fun svgRegion(
+        bytes: ByteArray,
+        region: ViewerSvgRegion,
+        edge: Int,
+    ): Bitmap? = safely { it.svgRegion(bytes, region, edge) }
+
     fun animation(
         bytes: ByteArray,
         edge: Int,
         decorative: Boolean = false,
         waitForDecorativeAdmission: Boolean = false,
     ): android.graphics.drawable.Drawable? = animationAttempt(bytes, edge, decorative, waitForDecorativeAdmission)
+
+    /** Source-sized viewer animation remains in the existing isolated admission and frame stream. */
+    fun viewerAnimation(bytes: ByteArray): android.graphics.drawable.Drawable? =
+        safely { transport ->
+            if (transport is IsolatedMediaTransport || transport is ReusableMediaTransport) {
+                installedContext?.let { context -> IsolatedAnimationSession.createViewer(context, bytes) }
+            } else {
+                transport.animation(bytes, dev.ipf.whitenoise.android.media.MAX_ANIMATION_SOURCE_EDGE_PX)
+            }
+        }
 
     /** Only the existing group playback owner opts into finite typed fault recovery. */
     fun groupAnimation(

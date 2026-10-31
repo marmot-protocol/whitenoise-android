@@ -1,0 +1,193 @@
+package dev.ipf.whitenoise.android.ui.conversation.media
+
+import android.os.SystemClock
+import android.view.InputDevice
+import android.view.MotionEvent
+import androidx.activity.ComponentActivity
+import androidx.compose.foundation.Canvas
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.doubleClick
+import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.viewerFitGeometry
+import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventImagePane
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import kotlin.math.abs
+
+/** Real window multitouch through the same viewport used by attachment and public event image owners. */
+@RunWith(AndroidJUnit4::class)
+@PullRequestDeviceSmoke
+class SharedImageViewerPinchDeviceTest {
+    @get:Rule
+    val rule = createAndroidComposeRule<ComponentActivity>()
+
+    @Test
+    fun repeatedPinchExceedsFiveTimesAndPreservesItsOffCentreSourcePoint() {
+        var scale by mutableStateOf(1f)
+        var offset by mutableStateOf(Offset.Zero)
+        var geometry: ViewerViewportGeometry? = null
+        rule.setContent {
+            WhiteNoiseTheme {
+                ImageViewerViewport(
+                    "gesture-fixture",
+                    4096,
+                    4096,
+                    scale,
+                    offset,
+                    { scale = it },
+                    { offset = it },
+                    {},
+                    onViewportChange = { geometry = it },
+                ) { modifier -> Canvas(modifier) { drawRect(Color.White) } }
+            }
+        }
+        rule.waitForIdle()
+        val node = rule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG)
+        val bounds = node.fetchSemanticsNode().screenRect()
+        val localFocal = Offset(bounds.width() * 0.55f, bounds.height() / 2f + bounds.width() * 0.05f)
+        val fit = viewerFitGeometry(bounds.width().toFloat(), bounds.height().toFloat(), 4096, 4096)
+        val sourceX = (localFocal.x - bounds.width() / 2f) / fit.baseWidth
+        val sourceY = (localFocal.y - bounds.height() / 2f) / fit.baseHeight
+        repeat(3) {
+            injectViewerPinch(
+                bounds.left + localFocal.x,
+                bounds.top + localFocal.y,
+                bounds.width() * 0.025f,
+                bounds.width() * 0.10f,
+            )
+            rule.waitForIdle()
+        }
+        rule.runOnIdle {
+            assertTrue("Repeated real pinch must exceed the old 5x ceiling: $scale", scale > 5f)
+            assertTrue(scale.isFinite() && offset.x.isFinite() && offset.y.isFinite())
+            assertTrue(abs(sourceX * fit.baseWidth * scale + bounds.width() / 2f + offset.x - localFocal.x) < 20f)
+            assertTrue(abs(sourceY * fit.baseHeight * scale + bounds.height() / 2f + offset.y - localFocal.y) < 20f)
+            assertTrue(requireNotNull(geometry).scale > 5f)
+        }
+        node.performTouchInput { doubleClick() }
+        rule.runOnIdle {
+            assertEquals(1f, scale)
+            assertEquals(Offset.Zero, offset)
+        }
+    }
+
+    @Test
+    fun actualPublicImageEntryUsesTheSharedPinchResetAndDismissPathWithoutReload() {
+        var loads = 0
+        var dismissals = 0
+        rule.setContent {
+            WhiteNoiseTheme {
+                NostrEventImagePane(
+                    url = "https://images.example/synthetic-no-network",
+                    loadImage = { _, _ ->
+                        loads++
+                        ImageBitmap(512, 512)
+                    },
+                    initiallyRequested = true,
+                    onFullscreenDismiss = { dismissals++ },
+                )
+            }
+        }
+        rule.waitForIdle()
+        val node = rule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG)
+        val fitted = node.fetchSemanticsNode().config[SemanticsProperties.StateDescription]
+        val bounds = node.fetchSemanticsNode().screenRect()
+        injectViewerPinch(bounds.exactCenterX(), bounds.exactCenterY(), bounds.width() * 0.025f, bounds.width() * 0.15f)
+        rule.waitForIdle()
+        assertNotEquals(fitted, node.fetchSemanticsNode().config[SemanticsProperties.StateDescription])
+        node.performTouchInput { doubleClick() }
+        rule.waitForIdle()
+        assertEquals(fitted, node.fetchSemanticsNode().config[SemanticsProperties.StateDescription])
+        val close = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.close)
+        rule.onNodeWithContentDescription(close).assertIsDisplayed().performClick()
+        rule.runOnIdle {
+            assertEquals(1, loads)
+            assertEquals(1, dismissals)
+        }
+    }
+}
+
+/** One bounded two-pointer touch sequence through Android's actual input dispatch; no host ADB gesture API. */
+private fun injectViewerPinch(
+    centerX: Float,
+    centerY: Float,
+    startHalfSpan: Float,
+    endHalfSpan: Float,
+) {
+    val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+    val downTime = SystemClock.uptimeMillis()
+    val properties =
+        Array(2) { id ->
+            MotionEvent.PointerProperties().apply {
+                this.id = id
+                toolType = MotionEvent.TOOL_TYPE_FINGER
+            }
+        }
+    val coordinates =
+        Array(2) {
+            MotionEvent.PointerCoords().apply {
+                pressure = 1f
+                size = 1f
+            }
+        }
+
+    fun send(
+        action: Int,
+        count: Int,
+        span: Float,
+    ) {
+        coordinates[0].x = centerX - span
+        coordinates[1].x = centerX + span
+        coordinates.forEach { it.y = centerY }
+        val event =
+            MotionEvent.obtain(
+                downTime,
+                SystemClock.uptimeMillis(),
+                action,
+                count,
+                properties,
+                coordinates,
+                0,
+                0,
+                1f,
+                1f,
+                0,
+                0,
+                InputDevice.SOURCE_TOUCHSCREEN,
+                0,
+            )
+        try {
+            check(automation.injectInputEvent(event, true))
+        } finally {
+            event.recycle()
+        }
+    }
+    send(MotionEvent.ACTION_DOWN, 1, startHalfSpan)
+    send(MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 2, startHalfSpan)
+    for (step in 1..12) {
+        SystemClock.sleep(16)
+        send(MotionEvent.ACTION_MOVE, 2, startHalfSpan + (endHalfSpan - startHalfSpan) * step / 12f)
+    }
+    send(MotionEvent.ACTION_POINTER_UP or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 2, endHalfSpan)
+    send(MotionEvent.ACTION_UP, 1, endHalfSpan)
+}

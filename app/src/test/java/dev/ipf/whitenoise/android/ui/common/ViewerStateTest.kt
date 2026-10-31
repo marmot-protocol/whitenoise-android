@@ -8,6 +8,96 @@ import org.junit.Test
 
 class ViewerStateTest {
     @Test
+    fun defaultGesturePreservesAvatarPanWhileExplicitChatCenterAnchorsZoom() {
+        val current = ViewerTransform(2f, Offset(50f, 0f))
+        val avatar = applyViewerTransformGesture(current, 2f, Offset.Zero, 400f, 400f, 4000, 4000)
+        val chat =
+            applyViewerTransformGesture(
+                current,
+                2f,
+                Offset.Zero,
+                400f,
+                400f,
+                4000,
+                4000,
+                maxScale = 1024f,
+                centroid = Offset(200f, 200f),
+            )
+        assertEquals(4f, avatar.scale)
+        assertEquals(50f, avatar.offset.x, 0.001f)
+        assertEquals(100f, chat.offset.x, 0.001f)
+    }
+
+    @Test
+    fun corruptGeometryNeverPublishesNonFiniteCoordinates() {
+        fun transform(
+            state: ViewerTransform = ViewerTransform(2f, Offset.Zero),
+            zoom: Float = 2f,
+            pan: Offset = Offset.Zero,
+            width: Float = 400f,
+            height: Float = 400f,
+            ceiling: Float = 1024f,
+            focal: Offset? = null,
+        ) = applyViewerTransformGesture(state, zoom, pan, width, height, 4000, 4000, ceiling, focal)
+        val invalid =
+            listOf(
+                transform(state = ViewerTransform(Float.NaN, Offset.Zero)),
+                transform(state = ViewerTransform(2f, Offset(Float.POSITIVE_INFINITY, 0f))),
+                transform(pan = Offset(Float.NaN, 0f)),
+                transform(focal = Offset(0f, Float.NEGATIVE_INFINITY)),
+                transform(zoom = Float.NaN),
+                transform(zoom = Float.POSITIVE_INFINITY),
+                transform(zoom = 0f),
+                transform(width = Float.NaN),
+                transform(height = Float.POSITIVE_INFINITY),
+                transform(width = 0f),
+                transform(ceiling = Float.NaN),
+                transform(ceiling = 0.5f),
+            )
+        invalid.forEach { assertEquals(resetViewerTransform(), it) }
+        assertEquals(1f, clampViewerScale(Float.NaN, Float.NaN))
+        assertEquals(2f, clampViewerScale(2f, Float.NaN))
+    }
+
+    @Test
+    fun deepViewerOptInDoesNotRaiseTheAvatarLimit() {
+        assertEquals(5f, applyViewerPinchZoom(4f, 4f))
+        assertEquals(16f, applyViewerPinchZoom(4f, 4f, 1024f))
+        assertEquals(1024f, applyViewerPinchZoom(1000f, 4f, 1024f))
+        assertEquals(1f, clampViewerScale(Float.NaN, 1024f))
+    }
+
+    @Test
+    fun zoomPreservesAnOffCenterFocalPointAndClampsAtTheImageEdge() {
+        val current = ViewerTransform(2f, Offset(10f, 20f))
+        val next =
+            applyViewerTransformGesture(
+                current,
+                4f,
+                Offset.Zero,
+                400f,
+                400f,
+                4000,
+                4000,
+                maxScale = 1024f,
+                centroid = Offset(250f, 250f),
+            )
+        assertEquals(8f, next.scale)
+        // The source coordinate beneath (250,250) stays fixed: (focal-center-offset)/scale.
+        assertEquals((50f - current.offset.x) / current.scale, (50f - next.offset.x) / next.scale, 0.001f)
+        assertEquals((50f - current.offset.y) / current.scale, (50f - next.offset.y) / next.scale, 0.001f)
+        val fitted = applyViewerTransformGesture(next, 0.01f, Offset.Zero, 400f, 400f, 4000, 4000, 1024f)
+        assertEquals(resetViewerTransform(), fitted)
+    }
+
+    @Test
+    fun actualSizeUsesOriginalDimensionsRatherThanTheSampledPreview() {
+        assertEquals(20f, viewerOneToOneScale(400f, 400f, 8000, 4000, 1024f))
+        assertEquals(5f, viewerOneToOneScale(400f, 400f, 8000, 4000))
+        assertEquals(1f, viewerOneToOneScale(0f, 0f, 8000, 4000, 1024f))
+    }
+
+    @Test
     fun clampViewerPageIndexCoercesBelowLowerBound() {
         assertEquals(0, clampViewerPageIndex(-3, pageCount = 5))
     }

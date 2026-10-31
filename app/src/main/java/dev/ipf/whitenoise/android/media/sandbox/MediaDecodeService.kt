@@ -129,8 +129,16 @@ class MediaDecodeService : Service() {
             response.putBoolean("success", true)
             return response
         }
-        if (operation == MediaDecodePolicy.INSPECT) {
-            PlatformMediaDecoder.inspect(bytes)?.let { info ->
+        if (operation == MediaDecodePolicy.INSPECT || operation == MediaDecodePolicy.VIEWER_SVG_INSPECT) {
+            val inspection =
+                if (
+                    operation == MediaDecodePolicy.VIEWER_SVG_INSPECT
+                ) {
+                    ViewerSvgDecoder.inspect(bytes)
+                } else {
+                    PlatformMediaDecoder.inspect(bytes)
+                }
+            inspection?.let { info ->
                 response.putInt("width", info.width)
                 response.putInt("height", info.height)
                 response.putString("mime", info.mime)
@@ -148,6 +156,12 @@ class MediaDecodeService : Service() {
                         data.getBoolean("oriented"),
                     )
                 MediaDecodePolicy.SVG -> PlatformMediaDecoder.svg(bytes)
+                MediaDecodePolicy.VIEWER_SVG_REGION ->
+                    ViewerSvgDecoder.region(
+                        bytes,
+                        readViewerSvgRegion(data),
+                        data.getInt("edge"),
+                    )
                 MediaDecodePolicy.REGION ->
                     PlatformMediaDecoder.region(
                         bytes,

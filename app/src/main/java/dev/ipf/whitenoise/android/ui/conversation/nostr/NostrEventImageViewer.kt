@@ -11,25 +11,23 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -40,8 +38,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
-import dev.ipf.whitenoise.android.ui.icons.Icons
-import dev.ipf.whitenoise.android.ui.icons.automirrored.outlined.ArrowBack
+import dev.ipf.whitenoise.android.ui.conversation.media.ImageViewerViewport
+import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerFrame
 import kotlinx.coroutines.CancellationException
 
 /** Uses the existing bounded MDK public-image fetch path, only after an explicit tap. */
@@ -53,13 +51,17 @@ internal fun NostrEventImagePane(
     initiallyRequested: Boolean = false,
     onFullscreenDismiss: (() -> Unit)? = null,
 ) {
-    var attempt by remember(url, initiallyRequested) { mutableIntStateOf(if (initiallyRequested) 1 else 0) }
-    var image by remember(url) { mutableStateOf(AvatarImageLoader.peekBanner(url, IMAGE_WIDTH_PX)) }
-    var loading by remember(url) { mutableStateOf(false) }
-    var failed by remember(url) { mutableStateOf(false) }
-    var fullscreen by remember(url, initiallyRequested) { mutableStateOf(initiallyRequested) }
-    LaunchedEffect(url, attempt) {
-        val selectedCachedImage = initiallyRequested && attempt == 1 && image != null
+    val lifetime = AvatarImageLoader.currentCacheLifetime()
+    // A link tap belongs to its original runtime; cache invalidation must not replay that consent.
+    val initialRequestLifetime = remember(url, initiallyRequested) { lifetime }
+    val requestInitially = initiallyRequested && initialRequestLifetime == lifetime
+    var attempt by remember(url, lifetime, initiallyRequested) { mutableIntStateOf(if (requestInitially) 1 else 0) }
+    var image by remember(url, lifetime) { mutableStateOf(AvatarImageLoader.peekBanner(url, IMAGE_WIDTH_PX)) }
+    var loading by remember(url, lifetime) { mutableStateOf(false) }
+    var failed by remember(url, lifetime) { mutableStateOf(false) }
+    var fullscreen by remember(url, lifetime, initiallyRequested) { mutableStateOf(requestInitially) }
+    LaunchedEffect(url, lifetime, attempt) {
+        val selectedCachedImage = requestInitially && attempt == 1 && image != null
         if (attempt == 0 || selectedCachedImage) return@LaunchedEffect
         loading = true
         failed = false
@@ -196,26 +198,43 @@ private fun NostrImageAction(
     }
 }
 
+/** Public images enter the same chrome and viewport as chat, without attachment-only actions. */
 @Composable
 private fun NostrFullscreenImage(
     bitmap: ImageBitmap,
     onDismiss: () -> Unit,
 ) {
+    var scale by remember(bitmap) { mutableFloatStateOf(1f) }
+    var offset by remember(bitmap) { mutableStateOf(Offset.Zero) }
+    var chromeVisible by remember(bitmap) { mutableStateOf(true) }
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-            Box(Modifier.fillMaxSize().systemBarsPadding()) {
+        MediaViewerFrame(
+            senderLabel = stringResource(R.string.nostr_event_type_image),
+            recordedAtLabel = "",
+            onDismiss = onDismiss,
+            snackbarHostState = remember { SnackbarHostState() },
+            actionOwner = bitmap,
+            chromeVisible = chromeVisible,
+        ) {
+            ImageViewerViewport(
+                sourceKey = bitmap,
+                imageWidth = bitmap.width,
+                imageHeight = bitmap.height,
+                scale = scale,
+                offset = offset,
+                onScaleChange = { scale = it },
+                onOffsetChange = { offset = it },
+                onChromeToggle = { chromeVisible = !chromeVisible },
+            ) { imageModifier ->
                 Image(
                     bitmap = bitmap,
                     contentDescription = stringResource(R.string.nostr_event_type_image),
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.FillBounds,
+                    modifier = imageModifier,
                 )
-                IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.TopStart)) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.close))
-                }
             }
         }
     }

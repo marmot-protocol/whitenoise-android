@@ -162,18 +162,51 @@ internal class ReusableMediaTransport(
             }
         }
 
-    override fun inspect(bytes: ByteArray): ImageInspection? =
+    override fun svgInspect(bytes: ByteArray): ImageInspection? =
+        inspection(
+            bytes,
+            MediaDecodePolicy.VIEWER_SVG_INSPECT,
+        )
+
+    override fun svgRegion(
+        bytes: ByteArray,
+        region: ViewerSvgRegion,
+        edge: Int,
+    ): Bitmap? =
         serialized {
+            if (edge !in 1..ViewerSvgDecoder.MAX_VIEWPORT_EDGE ||
+                bytes.size !in 1..dev.ipf.whitenoise.android.media.GroupSvgPolicy.MAX_BYTES ||
+                !region.validFor(8192, 8192)
+            ) {
+                return@serialized null
+            }
+            val capacity = MediaDecodePolicy.outputCapacity(edge) ?: return@serialized null
+            SharedMemory.create("media-vector-region", capacity).use { output ->
+                val spec = MediaDecodeRequest(edge, false, MediaDecodePolicy.VIEWER_SVG_REGION, svgRegion = region)
+                request(bytes, spec, output)?.let { copyPixels(it, output, edge) }
+            }
+        }
+
+    override fun inspect(bytes: ByteArray): ImageInspection? = inspection(bytes, MediaDecodePolicy.INSPECT)
+
+    private fun inspection(
+        bytes: ByteArray,
+        operation: Int,
+    ): ImageInspection? =
+        serialized {
+            if (operation == MediaDecodePolicy.VIEWER_SVG_INSPECT &&
+                bytes.size !in 1..dev.ipf.whitenoise.android.media.GroupSvgPolicy.MAX_BYTES
+            ) {
+                return@serialized null
+            }
             SharedMemory.create("media-inspection", Int.SIZE_BYTES).use { output ->
-                val result = request(bytes, 1, false, MediaDecodePolicy.INSPECT, output) ?: return@serialized null
-                val width = result.getInt("width")
-                val height = result.getInt("height")
-                if (width <= 0 || height <= 0) return@serialized null
-                ImageInspection(
-                    width,
-                    height,
-                    result.getString("mime").orEmpty().take(MediaDecodePolicy.MAX_MIME_CHARS),
+                val result = request(bytes, 1, false, operation, output) ?: return@serialized null
+                validatedImageInspection(
+                    result.getInt("width"),
+                    result.getInt("height"),
+                    result.getString("mime").orEmpty(),
                     result.getInt("orientation"),
+                    svg = operation == MediaDecodePolicy.VIEWER_SVG_INSPECT,
                 )
             }
         }
@@ -209,18 +242,24 @@ internal class ReusableMediaTransport(
         oriented: Boolean,
         operation: Int,
         output: SharedMemory,
-    ): Bundle? {
+    ): Bundle? = request(bytes, MediaDecodeRequest(edge, oriented, operation), output)
+
+    @Suppress("ReturnCount") // Shared source, cooldown and poison guards also cover vector regions.
+    private fun request(bytes: ByteArray, spec: MediaDecodeRequest, output: SharedMemory): Bundle? {
         val limit = MediaDecodePolicy.MAX_INPUT_BYTES.toLong()
         if (bytes.size.toLong() !in 1..limit || poisoned) return null
         val digest =
             java.security.MessageDigest
                 .getInstance("SHA-256")
                 .digest(bytes)
-        val key = "$operation:$edge:$oriented:" + digest.joinToString("") { "%02x".format(it) }
+        val regionKey = spec.svgRegion?.let { "${it.left}:${it.top}:${it.right}:${it.bottom}:" }.orEmpty()
+        val key =
+            "${spec.operation}:${spec.edge}:${spec.option}:" + regionKey +
+                digest.joinToString("") { "%02x".format(it) }
         val now = android.os.SystemClock.elapsedRealtime()
         if ((refusals[key] ?: 0L) > now) return null
         val result =
-            sources.withInput(bytes) { input -> exchange(input, output, MediaDecodeRequest(edge, oriented, operation)) }
+            sources.withInput(bytes) { input -> exchange(input, output, spec) }
         if (result == null && requestDispatched) recordRefusal(key, now)
         return result
     }
@@ -302,6 +341,13 @@ internal class ReusableMediaTransport(
             putBoolean("oriented", request.option)
             putLong("offset", request.offset)
             putLong("length", request.length ?: input.statSize)
+            request.svgRegion?.let {
+                check(request.operation == MediaDecodePolicy.VIEWER_SVG_REGION && request.region == null)
+                putDouble("svgLeft", it.left)
+                putDouble("svgTop", it.top)
+                putDouble("svgRight", it.right)
+                putDouble("svgBottom", it.bottom)
+            }
             request.region?.let {
                 putInt("left", it.left)
                 putInt("top", it.top)

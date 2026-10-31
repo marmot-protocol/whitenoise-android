@@ -38,7 +38,7 @@ class AnimationFrameProtocolTest {
                 parcel.writeInterfaceToken(AnimationFrameProtocol.DESCRIPTOR)
                 parcel.writeInt(42)
                 parcel.writeLong(if (variant == 1) 0 else 1)
-                parcel.writeInt(if (variant == 2) 4096 else 2)
+                parcel.writeInt(if (variant == 2) 4097 else 2)
                 parcel.writeInt(3)
                 parcel.writeInt(if (variant == 3) 7 else 1)
                 parcel.writeInt(0)
@@ -50,6 +50,32 @@ class AnimationFrameProtocolTest {
                 assertThrows(IllegalArgumentException::class.java) { readAnimationFrame(parcel) }
             } finally {
                 parcel.recycle()
+            }
+        }
+    }
+
+    /** A source-sized rectangular frame is bounded by pixels, not a square maximum-edge allocation. */
+    @Test
+    fun viewerFramesPermitOnlyAdmittedCanvasDimensions() {
+        val frame = AnimationFrameInfo(42, 1, 4096, 1024, true, false, false, -1)
+        var received: AnimationFrameInfo? = null
+        val receiver =
+            object : Binder() {
+                override fun onTransact(
+                    code: Int,
+                    data: Parcel,
+                    reply: Parcel?,
+                    flags: Int,
+                ): Boolean {
+                    received = readAnimationFrame(data)
+                    return true
+                }
+            }
+        writeAnimationFrame(receiver, frame)
+        assertEquals(frame, received)
+        for ((width, height) in listOf(4096 to 4096, Int.MAX_VALUE to 2, 1 to 4097)) {
+            assertThrows(IllegalArgumentException::class.java) {
+                writeAnimationFrame(receiver, frame.copy(width = width, height = height))
             }
         }
     }

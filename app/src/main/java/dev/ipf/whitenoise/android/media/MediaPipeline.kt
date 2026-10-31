@@ -488,6 +488,13 @@ object MediaPipeline {
         }
     }
 
+    /** The viewer retains each admitted animation's original bounded canvas for detail inspection. */
+    internal fun decodeViewerAnimatedDrawable(bytes: ByteArray): Drawable? =
+        decodeAdmittedNativeAnimation(bytes) {
+            dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                .viewerAnimation(bytes)
+        }
+
     /** Group recovery alone receives typed startup faults and its lifecycle-owned pending ticket. */
     internal fun decodeGroupThumbnailAnimation(
         bytes: ByteArray,

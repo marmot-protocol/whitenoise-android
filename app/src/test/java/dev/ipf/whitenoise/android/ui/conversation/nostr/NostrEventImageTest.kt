@@ -3,6 +3,9 @@ package dev.ipf.whitenoise.android.ui.conversation.nostr
 import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Column
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -18,9 +21,11 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.nostr.NostrEvent
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -34,6 +39,77 @@ import java.util.concurrent.atomic.AtomicInteger
 @Config(sdk = [36], qualifiers = "en")
 class NostrEventImageTest {
     @get:Rule val composeRule = createComposeRule()
+
+    @After
+    fun resetImageRuntime() {
+        AvatarImageLoader.clear()
+        AvatarImageLoader.resetProfileImageFetcherForTests()
+    }
+
+    @Test
+    fun warmReopenReusesPixelsButRuntimeClearDoesNotReplayLinkConsent() {
+        val fetches = AtomicInteger()
+        val png =
+            java.util.Base64.getDecoder().decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+            )
+        AvatarImageLoader.attachProfileImageFetcher { _, _ ->
+            fetches.incrementAndGet()
+            png
+        }
+        val url = "https://images.example/warm-reopen.png"
+        // Seed the real size-keyed loader, then mount the real link entry path repeatedly.
+        val cached = kotlinx.coroutines.runBlocking { AvatarImageLoader.loadBanner(url, 1440) }
+        org.junit.Assert.assertNotNull(cached)
+        var visible by mutableStateOf(true)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                if (visible) NostrEventImagePane(url, initiallyRequested = true)
+            }
+        }
+        val closeLabel = string(R.string.close)
+        composeRule.onNodeWithContentDescription(closeLabel).assertIsDisplayed()
+        composeRule.runOnIdle { visible = false }
+        composeRule.runOnIdle { visible = true }
+        composeRule.onNodeWithContentDescription(closeLabel).assertIsDisplayed()
+        composeRule.runOnIdle {
+            assertEquals(1, fetches.get())
+            org.junit.Assert.assertSame(cached, AvatarImageLoader.peekBanner(url, 1440))
+            AvatarImageLoader.clear()
+        }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithContentDescription(closeLabel).assertDoesNotExist()
+        composeRule.runOnIdle { assertEquals(1, fetches.get()) }
+        // The new runtime can fetch again only after another explicit user action.
+        composeRule.onNodeWithText(string(R.string.nostr_event_view_image)).performClick()
+        composeRule.waitUntil(10_000) { fetches.get() == 2 }
+    }
+
+    @Test
+    fun retiringRuntimeCancelsAnOldImageAndDoesNotPublishItsLatePixels() {
+        val pending = CompletableDeferred<ImageBitmap?>()
+        var calls = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                NostrEventImagePane(
+                    url = "https://images.example/retired-runtime",
+                    initiallyRequested = true,
+                    loadImage = { _, _ ->
+                        calls++
+                        pending.await()
+                    },
+                )
+            }
+        }
+        composeRule.runOnIdle {
+            assertEquals(1, calls)
+            AvatarImageLoader.clear()
+        }
+        pending.complete(ImageBitmap(20, 10))
+        composeRule.waitForIdle()
+        composeRule.onNodeWithContentDescription(string(R.string.close)).assertDoesNotExist()
+        composeRule.runOnIdle { assertEquals(1, calls) }
+    }
 
     @Test
     fun explicitLinkedImageRequestsOnceAndDismissesFullscreenInOneAction() {

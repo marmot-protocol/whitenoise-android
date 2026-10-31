@@ -3,9 +3,6 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import android.text.format.DateUtils
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.calculatePan
-import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -51,8 +48,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
@@ -91,10 +86,8 @@ import dev.ipf.whitenoise.android.state.retryAttachmentTransfer
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.common.IdentityImageCropDialog
 import dev.ipf.whitenoise.android.ui.common.SwipeDismissibleSnackbar
-import dev.ipf.whitenoise.android.ui.common.ViewerTransform
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
-import dev.ipf.whitenoise.android.ui.common.applyViewerTransformGesture
 import dev.ipf.whitenoise.android.ui.common.clampViewerPageIndex
 import dev.ipf.whitenoise.android.ui.common.resetViewerTransform
 import dev.ipf.whitenoise.android.ui.common.viewerPagerScrollEnabled
@@ -447,6 +440,8 @@ internal fun FullScreenMediaViewer(
             controller.group.groupIdHex,
             appState.runtimeGeneration,
         )
+    val sourceOwnerCurrent = currentActionOwner() == actionOwner && controller.boundAccountRef == actionOwner.accountRef
+    LaunchedEffect(sourceOwnerCurrent) { if (!sourceOwnerCurrent) onDismiss() }
     // Group-image failures are app toasts. The viewer's modal claims the app's banner slot, so they show in
     // this window above the viewer, once, with their Copy and dismiss actions (#3312).
     val pictureFailures =
@@ -802,8 +797,9 @@ internal fun FullScreenMediaViewer(
                             onScaleChange = { if (isCurrent) scale = it },
                             onOffsetChange = { if (isCurrent) offset = it },
                             mine = pageDescriptor.mine,
-                            isCurrent = isCurrent,
+                            isCurrent = isCurrent && sourceOwnerCurrent,
                             onChromeToggle = { if (isCurrent) chromeVisible = !chromeVisible },
+                            runtimeGeneration = appState.runtimeGeneration,
                             imageBytes = imageBytes?.let { loader -> { loader(pageDescriptor) } },
                         )
                     }
@@ -854,8 +850,8 @@ internal fun MediaViewerFrame(
     senderLabel: String,
     recordedAtLabel: String,
     onDismiss: () -> Unit,
-    onSave: () -> Unit,
-    onShare: () -> Unit,
+    onSave: (() -> Unit)? = null,
+    onShare: (() -> Unit)? = null,
     snackbarHostState: SnackbarHostState,
     contentWindowInsets: WindowInsets = WindowInsets.safeDrawing,
     modifier: Modifier = Modifier,
@@ -914,67 +910,73 @@ internal fun MediaViewerFrame(
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        Text(
-                            text =
-                                stringResource(
-                                    R.string.media_viewer_metadata,
-                                    recordedAtLabel,
-                                    currentPosition,
-                                    pageCount,
-                                ),
-                            modifier = Modifier.testTag("conversation.media.viewer.position"),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    Box {
-                        IconButton(
-                            onClick = { moreExpanded = true },
-                            enabled = actionsEnabled,
-                            modifier = Modifier.size(48.dp),
-                        ) {
-                            Icon(
-                                icons.more,
-                                contentDescription = stringResource(R.string.more_options),
+                        if (recordedAtLabel.isNotBlank()) {
+                            Text(
+                                text =
+                                    stringResource(
+                                        R.string.media_viewer_metadata,
+                                        recordedAtLabel,
+                                        currentPosition,
+                                        pageCount,
+                                    ),
+                                modifier = Modifier.testTag("conversation.media.viewer.position"),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        WhiteNoiseDropdownMenu(
-                            expanded = moreExpanded && actionsEnabled,
-                            onDismissRequest = { moreExpanded = false },
-                            items =
-                                buildList {
-                                    add(
-                                        WhiteNoiseMenuItem(
-                                            label = stringResource(R.string.media_save),
-                                            icon = R.drawable.ic_download,
-                                            onClick = onSave,
-                                            enabled = actionsEnabled,
-                                        ),
-                                    )
-                                    if (onSetGroupPicture != null) {
-                                        add(
-                                            WhiteNoiseMenuItem(
-                                                label = stringResource(R.string.media_set_group_picture),
-                                                icon = R.drawable.ic_image,
-                                                onClick = onSetGroupPicture,
-                                                enabled = actionsEnabled && !groupPictureBusy,
-                                            ),
-                                        )
-                                    }
-                                    if (onGoToMessage != null) {
-                                        add(
-                                            WhiteNoiseMenuItem(
-                                                label = stringResource(R.string.shared_content_go_to_message),
-                                                icon = R.drawable.ic_settings_chat_bubble_outline,
-                                                onClick = onGoToMessage,
-                                                enabled = actionsEnabled,
-                                            ),
-                                        )
-                                    }
-                                },
-                        )
+                    }
+                    if (onSave != null || onSetGroupPicture != null || onGoToMessage != null) {
+                        Box {
+                            IconButton(
+                                onClick = { moreExpanded = true },
+                                enabled = actionsEnabled,
+                                modifier = Modifier.size(48.dp),
+                            ) {
+                                Icon(
+                                    icons.more,
+                                    contentDescription = stringResource(R.string.more_options),
+                                )
+                            }
+                            WhiteNoiseDropdownMenu(
+                                expanded = moreExpanded && actionsEnabled,
+                                onDismissRequest = { moreExpanded = false },
+                                items =
+                                    buildList {
+                                        if (onSave != null) {
+                                            add(
+                                                WhiteNoiseMenuItem(
+                                                    label = stringResource(R.string.media_save),
+                                                    icon = R.drawable.ic_download,
+                                                    onClick = onSave,
+                                                    enabled = actionsEnabled,
+                                                ),
+                                            )
+                                        }
+                                        if (onSetGroupPicture != null) {
+                                            add(
+                                                WhiteNoiseMenuItem(
+                                                    label = stringResource(R.string.media_set_group_picture),
+                                                    icon = R.drawable.ic_image,
+                                                    onClick = onSetGroupPicture,
+                                                    enabled = actionsEnabled && !groupPictureBusy,
+                                                ),
+                                            )
+                                        }
+                                        if (onGoToMessage != null) {
+                                            add(
+                                                WhiteNoiseMenuItem(
+                                                    label = stringResource(R.string.shared_content_go_to_message),
+                                                    icon = R.drawable.ic_settings_chat_bubble_outline,
+                                                    onClick = onGoToMessage,
+                                                    enabled = actionsEnabled,
+                                                ),
+                                            )
+                                        }
+                                    },
+                            )
+                        }
                     }
                 }
             }
@@ -994,7 +996,7 @@ internal fun MediaViewerFrame(
         )
     }
     val bottomChrome: @Composable () -> Unit = {
-        if (chromeShown) {
+        if (chromeShown && (onShare != null || onForwardMessage != null)) {
             Surface(
                 modifier =
                     Modifier
@@ -1013,12 +1015,14 @@ internal fun MediaViewerFrame(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(
-                        onClick = onShare,
-                        enabled = actionsEnabled,
-                        modifier = Modifier.size(48.dp).testTag("conversation.media.viewer.share"),
-                    ) {
-                        Icon(icons.share, contentDescription = stringResource(R.string.share))
+                    if (onShare != null) {
+                        IconButton(
+                            onClick = onShare,
+                            enabled = actionsEnabled,
+                            modifier = Modifier.size(48.dp).testTag("conversation.media.viewer.share"),
+                        ) {
+                            Icon(icons.share, contentDescription = stringResource(R.string.share))
+                        }
                     }
                     if (onForwardMessage != null) {
                         IconButton(
@@ -1090,32 +1094,25 @@ internal fun ViewerPage(
     isCurrent: Boolean,
     onChromeToggle: () -> Unit,
     imageBytes: (suspend () -> ByteArray)? = null,
+    runtimeGeneration: Int = 0,
 ) {
-    // `pointerInput(pageKey)` only restarts when the key changes — its
-    // coroutine outlives any single gesture. Function parameters
-    // (`scale`, `offset`, the callbacks) captured directly inside that
-    // coroutine would stay at their initial values for the lifetime of
-    // the gesture, causing jumpy zoom/pan and stale callback dispatch.
-    // `rememberUpdatedState` snapshots each parameter into a stable
-    // State<T> whose `.value` reads inside the coroutine always reflect
-    // the most recent recomposition's value.
-    val latestScale by rememberUpdatedState(scale)
-    val latestOffset by rememberUpdatedState(offset)
-    val latestOnScaleChange by rememberUpdatedState(onScaleChange)
-    val latestOnOffsetChange by rememberUpdatedState(onOffsetChange)
-    val latestOnChromeToggle by rememberUpdatedState(onChromeToggle)
     val latestImageBytes by rememberUpdatedState(imageBytes)
     // `sourceEpoch` is folded into the page key so a viewer that failed
     // its first decrypt at epoch 0 (typed reference not yet loaded) re-keys
     // and retries when the real reference arrives.
-    val pageKey = "$messageIdHex#$attachmentIndex#${reference.sourceEpoch}"
+    val pageKey = listOf(controller, messageIdHex, attachmentIndex, reference.sourceEpoch, runtimeGeneration)
+    var original by remember(pageKey) { mutableStateOf<ViewerOriginalImage?>(null) }
+    var originalInspection by remember(pageKey) {
+        mutableStateOf<dev.ipf.whitenoise.android.media.sandbox.ImageInspection?>(null)
+    }
+    var sourcePrepared by remember(pageKey) { mutableStateOf(false) }
     val animationsEnabled =
         dev.ipf.whitenoise.android.ui.common
             .rememberSystemAnimationsEnabled()
     val viewerLifecycle by androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle.currentStateFlow
         .collectAsState()
-    val animateCurrent =
-        isCurrent && animationsEnabled && viewerLifecycle.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+    val detailCurrent = isCurrent && viewerLifecycle.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+    val animateCurrent = detailCurrent && animationsEnabled
     val cachedThumbnail =
         remember(pageKey) {
             controller
@@ -1130,54 +1127,132 @@ internal fun ViewerPage(
     var viewerFailed by remember(pageKey) { mutableStateOf(false) }
     // A verified image above the preview budget is not a failure: Retry cannot shrink it, Save and Share still work.
     var viewerTooLarge by remember(pageKey) { mutableStateOf(false) }
+    val animationRecovery = remember(pageKey) { ViewerAnimationRecoveryBudget() }
+    var animationFailure by remember(pageKey) {
+        mutableStateOf<dev.ipf.whitenoise.android.media.AnimationTermination?>(null)
+    }
+    var animationRestartRequested by remember(pageKey) { mutableStateOf(false) }
     var viewerReloadToken by remember(pageKey) { mutableIntStateOf(0) }
+    ObserveViewerAnimationTermination(
+        sourceKey = pageKey,
+        drawable = (presentation as? DecodedAttachmentPresentation.Animated)?.drawable,
+        active = animateCurrent,
+    ) { terminated, reason ->
+        if ((presentation as? DecodedAttachmentPresentation.Animated)?.drawable === terminated) {
+            animationFailure = reason
+            if (animationRecovery.claim(reason)) {
+                animationRestartRequested = true
+                sourcePrepared = false
+                viewerReloadToken++
+            }
+        }
+    }
     val imageWidth =
-        when (val current = presentation) {
-            is DecodedAttachmentPresentation.Static -> current.bitmap.width
-            is DecodedAttachmentPresentation.Animated -> current.drawable.intrinsicWidth
-            null -> 0
-        }
+        originalInspection?.width
+            ?: when (val current = presentation) {
+                is DecodedAttachmentPresentation.Static -> current.bitmap.width
+                is DecodedAttachmentPresentation.Animated -> current.drawable.intrinsicWidth
+                null -> 0
+            }
     val imageHeight =
-        when (val current = presentation) {
-            is DecodedAttachmentPresentation.Static -> current.bitmap.height
-            is DecodedAttachmentPresentation.Animated -> current.drawable.intrinsicHeight
-            null -> 0
-        }
-    LaunchedEffect(pageKey, viewerReloadToken, isCurrent, animateCurrent) {
+        originalInspection?.height
+            ?: when (val current = presentation) {
+                is DecodedAttachmentPresentation.Static -> current.bitmap.height
+                is DecodedAttachmentPresentation.Animated -> current.drawable.intrinsicHeight
+                null -> 0
+            }
+    LaunchedEffect(pageKey, viewerReloadToken, detailCurrent, animateCurrent) {
         // Mirror the video page's gating: neighbour pages composed during a
         // swipe must not each run a viewer-resolution decode (with its ~4×
         // transient) concurrently with the current page's. A page decodes
         // once it becomes current; an already-decoded bitmap is kept.
         val promoteAnimation =
             animateCurrent && (presentation as? DecodedAttachmentPresentation.Static)?.animationDeferred == true
-        if (!isCurrent || (presentation != null && !promoteAnimation)) return@LaunchedEffect
+        if (!detailCurrent) {
+            original = null
+            sourcePrepared = false
+            return@LaunchedEffect
+        }
+        val replaceTerminatedAnimation = animationRestartRequested
+        if (
+            presentation != null && !promoteAnimation && !replaceTerminatedAnimation && sourcePrepared
+        ) {
+            return@LaunchedEffect
+        }
         viewerFailed = false
         viewerTooLarge = false
         try {
-            val data =
-                latestImageBytes?.invoke()
-                    ?: attachmentBytes(controller, messageIdHex, attachmentIndex, reference, mine)
-            val decoded =
-                decodeMessageAttachmentImage(
-                    bytes = data,
-                    animationAllowed = animateCurrent,
-                    mediaType = reference.mediaType,
-                    staticMaxEdgePx = MediaPipeline.VIEWER_MAX_EDGE_PX,
-                )
-            if (decoded != null) {
-                if (decoded is DecodedAttachmentPresentation.Static) {
-                    // Queue the asynchronous texture upload before the next draw needs these pixels.
-                    decoded.bitmap.prepareToDraw()
+            withViewerImageWork {
+                val data =
+                    latestImageBytes?.invoke()
+                        ?: attachmentBytes(controller, messageIdHex, attachmentIndex, reference, mine)
+                if (data.size > dev.ipf.whitenoise.android.media.sandbox.MediaDecodePolicy.MAX_INPUT_BYTES) {
+                    throw AttachmentTooLargeToPresentException(
+                        dev.ipf.whitenoise.android.media.sandbox.MediaDecodePolicy.MAX_INPUT_BYTES
+                            .toLong(),
+                        data.size.toLong(),
+                    )
                 }
-                presentation = decoded
-            } else if (!promoteAnimation) {
-                viewerFailed = true
+                val inspectedSource = inspectViewerSource(data)
+                val inspected = inspectedSource?.image
+                val isVector = inspected?.mime == "image/svg+xml"
+                val staticSource = inspectedSource?.staticSource == true
+                val source = inspected?.takeIf { staticSource }?.let { ViewerOriginalImage(data, it) }
+                if (presentation != null && !promoteAnimation && !replaceTerminatedAnimation) {
+                    originalInspection = inspected
+                    original = source
+                    sourcePrepared = true
+                    return@withViewerImageWork
+                }
+                val decoded =
+                    if (isVector && source != null) {
+                        dev.ipf.whitenoise.android.media.decodeOwnedMedia(
+                            decode = {
+                                dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                                    .svgRegion(
+                                        data,
+                                        dev.ipf.whitenoise.android.media.sandbox.ViewerSvgRegion(
+                                            0.0,
+                                            0.0,
+                                            source.inspection.width.toDouble(),
+                                            source.inspection.height.toDouble(),
+                                        ),
+                                        VIEWER_DETAIL_EDGE,
+                                    )?.let { DecodedAttachmentPresentation.Static(it) }
+                            },
+                            discard = { it.releaseOwnedPresentation() },
+                        )
+                    } else {
+                        decodeMessageAttachmentImage(
+                            bytes = data,
+                            animationAllowed = animateCurrent,
+                            mediaType = reference.mediaType,
+                            staticMaxEdgePx = MediaPipeline.VIEWER_MAX_EDGE_PX,
+                            viewerOriginalAnimation = true,
+                        )
+                    }
+                if (replaceTerminatedAnimation) animationRestartRequested = false
+                if (decoded != null) animationFailure = null
+                originalInspection = inspected
+                original = source.takeIf { decoded != null }
+                sourcePrepared = decoded != null
+                if (decoded != null) {
+                    if (decoded is DecodedAttachmentPresentation.Static) {
+                        // Queue the asynchronous texture upload before the next draw needs these pixels.
+                        decoded.bitmap.prepareToDraw()
+                    }
+                    presentation = decoded
+                } else if (!promoteAnimation) {
+                    viewerFailed = true
+                }
             }
         } catch (cancel: kotlinx.coroutines.CancellationException) {
             throw cancel
         } catch (_: AttachmentTooLargeToPresentException) {
+            animationRestartRequested = false
             viewerTooLarge = !promoteAnimation
         } catch (_: Throwable) {
+            animationRestartRequested = false
             viewerFailed = !promoteAnimation
         }
     }
@@ -1188,77 +1263,45 @@ internal fun ViewerPage(
         }
     }
 
-    val viewerGestureModifier =
-        Modifier
-            .fillMaxSize()
-            .pointerInput(pageKey) {
-                awaitEachGesture {
-                    do {
-                        val event = awaitPointerEvent()
-                        val pressedCount =
-                            event.changes.count { it.pressed }
-                        if (pressedCount == 0) break
-                        val zoom = event.calculateZoom()
-                        val pan = event.calculatePan()
-                        val currentScale = latestScale
-                        val currentOffset = latestOffset
-                        val handleAsTransform =
-                            pressedCount >= 2 || currentScale > 1f
-                        if (!handleAsTransform) {
-                            continue
-                        }
-                        val next =
-                            applyViewerTransformGesture(
-                                current = ViewerTransform(currentScale, currentOffset),
-                                zoomFactor = zoom,
-                                panDelta = pan,
-                                viewportWidth = size.width.toFloat(),
-                                viewportHeight = size.height.toFloat(),
-                                imageWidth = imageWidth,
-                                imageHeight = imageHeight,
-                            )
-                        if (next.scale != currentScale) latestOnScaleChange(next.scale)
-                        if (next.offset != currentOffset) latestOnOffsetChange(next.offset)
-                        event.changes.forEach { it.consume() }
-                    } while (true)
-                }
-            }.graphicsLayer(
-                scaleX = scale,
-                scaleY = scale,
-                translationX = offset.x,
-                translationY = offset.y,
-            )
-
-    Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .viewerTapGestureModifier(
-                    gestureKey = pageKey,
-                    onSingleTap = { latestOnChromeToggle() },
-                    onDoubleTap = {
-                        val reset = resetViewerTransform()
-                        latestOnScaleChange(reset.scale)
-                        latestOnOffsetChange(reset.offset)
-                    },
-                ).testTag(MEDIA_VIEWER_PAGE_GESTURE_TAG),
-    ) {
+    ImageViewerViewport(
+        sourceKey = pageKey,
+        imageWidth = imageWidth,
+        imageHeight = imageHeight,
+        scale = scale,
+        offset = offset,
+        onScaleChange = onScaleChange,
+        onOffsetChange = onOffsetChange,
+        onChromeToggle = onChromeToggle,
+        overlay = { geometry -> ViewerImageDetailOverlay(original, geometry, detailCurrent) },
+    ) { imageModifier ->
         when (val current = presentation) {
             is DecodedAttachmentPresentation.Static ->
                 Image(
                     bitmap = current.toImageBitmap(),
                     contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
-                    contentScale = ContentScale.Fit,
-                    modifier = viewerGestureModifier,
+                    contentScale = ContentScale.FillBounds,
+                    modifier = imageModifier,
                 )
-            is DecodedAttachmentPresentation.Animated ->
-                AnimatedDrawableAttachmentImage(
-                    drawable = current.drawable,
-                    active = animateCurrent,
-                    contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
-                    contentScale = ContentScale.Fit,
-                    modifier = viewerGestureModifier,
-                )
+            is DecodedAttachmentPresentation.Animated -> {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    AnimatedDrawableAttachmentImage(
+                        drawable = current.drawable,
+                        active = animateCurrent && animationFailure == null,
+                        contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
+                        contentScale = ContentScale.FillBounds,
+                        modifier = imageModifier,
+                    )
+                    if (animationFailure != null && !animationRestartRequested) {
+                        MediaViewerLoadFailed(onRetry = {
+                            if (!animationRestartRequested) {
+                                animationRestartRequested = true
+                                sourcePrepared = false
+                                viewerReloadToken++
+                            }
+                        })
+                    }
+                }
+            }
             null ->
                 MediaViewerPendingFrame(
                     cachedThumbnail = cachedThumbnail,
