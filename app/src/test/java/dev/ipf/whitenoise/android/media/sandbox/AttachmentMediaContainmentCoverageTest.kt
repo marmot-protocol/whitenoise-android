@@ -177,7 +177,8 @@ class AttachmentMediaContainmentCoverageTest {
                 .filterNot { it.trimStart().startsWith("//") }
                 .joinToString("\n")
         return Regex(
-            """\b(?:android\.media\.)?(?:MediaMetadataRetriever|MediaExtractor|MediaPlayer|MediaCodec)\b|\b(?:androidx\.media3\.exoplayer\.)?ExoPlayer\b""",
+            """\b(?:android\.media\.)?(?:MediaMetadataRetriever|MediaExtractor|MediaPlayer|MediaCodec)\b|""" +
+                """\b(?:androidx\.media3\.exoplayer\.)?ExoPlayer\b""",
         ).containsMatchIn(executable)
     }
 

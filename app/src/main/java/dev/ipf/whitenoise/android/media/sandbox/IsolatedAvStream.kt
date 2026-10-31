@@ -271,6 +271,7 @@ internal class IsolatedAvStream private constructor(
             require((wantVideo && info.hasVideo) || (wantAudio && info.hasAudio))
         }
 
+    @Suppress("TooGenericExceptionCaught") // Any binding exception leaves process creation uncertain.
     private fun bind() {
         bindingAttempted = true
         val accepted =
@@ -292,6 +293,7 @@ internal class IsolatedAvStream private constructor(
         if (!accepted) throw IOException("Media worker binding refused")
     }
 
+    @Suppress("CyclomaticComplexMethod") // Validate and own one exact typed shared-memory output in this call.
     fun read(preferred: Int = AvStreamProtocol.ANY_TRACK): AvStreamFrame =
         call {
             require(preferred in AvStreamProtocol.ANY_TRACK..AvStreamProtocol.AUDIO_TRACK)
@@ -351,7 +353,7 @@ internal class IsolatedAvStream private constructor(
             Unit
         }
 
-    @Suppress("TooGenericExceptionCaught") // All failed IPC/copy paths revoke the exact media capability.
+    @Suppress("TooGenericExceptionCaught", "ThrowsCount") // Every failed IPC/copy revokes this capability.
     private fun <T> call(action: () -> T): T {
         check(Looper.myLooper() != Looper.getMainLooper()) { "Media IPC must run off the main thread" }
         synchronized(operationLock) {
@@ -381,6 +383,8 @@ internal class IsolatedAvStream private constructor(
         }
     }
 
+    @Suppress("CyclomaticComplexMethod", "ThrowsCount", "TooGenericExceptionCaught")
+    // One RPC owns tuple validation, deadline, parcel recycling and its lifetime credit on every failure.
     private fun transact(
         code: Int,
         resultCount: Int,
@@ -438,7 +442,7 @@ internal class IsolatedAvStream private constructor(
             close()
             throw IOException("Media operation timed out", failure)
         } catch (failure: java.util.concurrent.ExecutionException) {
-            throw IOException("Media worker operation failed", failure.cause)
+            throw IOException("Media worker operation failed", failure.cause ?: failure)
         }
     }
 
@@ -512,6 +516,25 @@ internal class IsolatedAvStream private constructor(
             observeLater()
             return
         }
+        closeDescriptorsOnce()
+        val release =
+            synchronized(stateLock) {
+                lifetime.releasable() && parentResources.available() && cleaned.compareAndSet(false, true)
+            }
+        if (!release) {
+            observeLater()
+        } else {
+            endpoint?.let { runCatching { it.unlinkToDeath(death, 0) } }
+            rpc.shutdown()
+            retirement.shutdown()
+            callbacks.quitSafely()
+            admissions.release(lane, this)
+            released.countDown()
+        }
+    }
+
+    @Suppress("TooGenericExceptionCaught") // A failed close retains the resource budget for any capability type.
+    private fun closeDescriptorsOnce() {
         if (descriptorCleanupStarted.compareAndSet(false, true)) {
             for (resource in listOf<AutoCloseable?>(input, video, audio)) {
                 try {
@@ -521,20 +544,6 @@ internal class IsolatedAvStream private constructor(
                 }
             }
         }
-        val release =
-            synchronized(stateLock) {
-                lifetime.releasable() && parentResources.available() && cleaned.compareAndSet(false, true)
-            }
-        if (!release) {
-            observeLater()
-            return
-        }
-        endpoint?.let { runCatching { it.unlinkToDeath(death, 0) } }
-        rpc.shutdown()
-        retirement.shutdown()
-        callbacks.quitSafely()
-        admissions.release(lane, this)
-        released.countDown()
     }
 
     private fun observeLater() {
@@ -608,7 +617,7 @@ internal class IsolatedAvStream private constructor(
         ): IsolatedAvStream = openFixed(context, wantVideo, wantAudio, edge, lane) { it.initialize(selected) }
 
         // One reserved source owns every startup failure.
-        @Suppress("TooGenericExceptionCaught", "LongParameterList")
+        @Suppress("TooGenericExceptionCaught", "LongParameterList", "ThrowsCount")
         private fun openFixed(
             context: Context,
             wantVideo: Boolean,

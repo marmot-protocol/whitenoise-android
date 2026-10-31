@@ -765,119 +765,120 @@ class VoicePlaybackControllerFocusTest {
         field.isAccessible = true
         field.set(VoicePlaybackController, value)
     }
+}
 
-    /** A parser-free control seam; every failure-capable subclass preserves the production transition tests. */
-    private open class FakeVoicePlayer : VoicePlaybackPlayer {
-        override val isPlaying: Boolean get() = false
-        override val duration: Int get() = 0
-        override val currentPosition: Int get() = 0
+/** A parser-free control seam; every failure-capable subclass preserves the production transition tests. */
+private open class FakeVoicePlayer : VoicePlaybackPlayer {
+    override val isPlaying: Boolean get() = false
+    override val duration: Int get() = 0
+    override val currentPosition: Int get() = 0
 
-        override fun start() = Unit
+    override fun start() = Unit
 
-        override fun pause() = Unit
+    override fun pause() = Unit
 
-        override fun stop() = Unit
+    override fun stop() = Unit
 
-        override fun release() = Unit
+    override fun release() = Unit
 
-        override fun seekTo(positionMs: Int) = Unit
+    override fun seekTo(positionMs: Int) = Unit
 
-        override fun setSpeed(speed: Float) = Unit
+    override fun setSpeed(speed: Float) = Unit
 
-        override fun setVolume(
-            left: Float,
-            right: Float,
-        ) = Unit
+    override fun setVolume(
+        left: Float,
+        right: Float,
+    ) = Unit
 
-        override fun setOnCompletionListener(listener: (VoicePlaybackPlayer) -> Unit) = Unit
+    override fun setOnCompletionListener(listener: (VoicePlaybackPlayer) -> Unit) = Unit
 
-        override fun setOnSeekCompleteListener(listener: (VoicePlaybackPlayer) -> Unit) = Unit
+    override fun setOnSeekCompleteListener(listener: (VoicePlaybackPlayer) -> Unit) = Unit
 
-        override fun setOnErrorListener(listener: (VoicePlaybackPlayer, Int, Int) -> Boolean) = Unit
+    override fun setOnErrorListener(listener: (VoicePlaybackPlayer, Int, Int) -> Boolean) = Unit
+}
+
+private class ThrowingStartVoicePlayer : FakeVoicePlayer() {
+    var released = false
+        private set
+
+    override fun start(): Unit = throw IllegalStateException("start failed")
+
+    override fun release() {
+        released = true
+    }
+}
+
+private class TrackingVoicePlayer(
+    private val failPause: Boolean = false,
+    private val failVolumeChange: Boolean = false,
+    private val failVolumeRestore: Boolean = false,
+    private val failPlayingQuery: Boolean = false,
+    private val failSeek: Boolean = false,
+) : FakeVoicePlayer() {
+    var playing = true
+    var released = false
+    var leftVolume = 1f
+    var rightVolume = 1f
+    var startCount = 0
+    var positionMs = 123
+    var durationMs = 456
+    var failDurationQuery = false
+    var appliedSpeed = 1f
+
+    override fun setSpeed(speed: Float) {
+        appliedSpeed = speed
     }
 
-    private class ThrowingStartVoicePlayer : FakeVoicePlayer() {
-        var released = false
-            private set
-
-        override fun start(): Unit = throw IllegalStateException("start failed")
-
-        override fun release() {
-            released = true
+    override val isPlaying: Boolean
+        get() {
+            if (failPlayingQuery) throw IllegalStateException("isPlaying failed")
+            return playing
         }
+
+    override fun pause() {
+        if (failPause) throw IllegalStateException("pause failed")
+        playing = false
     }
 
-    private class TrackingVoicePlayer(
-        private val failPause: Boolean = false,
-        private val failVolumeChange: Boolean = false,
-        private val failVolumeRestore: Boolean = false,
-        private val failPlayingQuery: Boolean = false,
-        private val failSeek: Boolean = false,
-    ) : FakeVoicePlayer() {
-        var playing = true
-        var released = false
-        var leftVolume = 1f
-        var rightVolume = 1f
-        var startCount = 0
-        var positionMs = 123
-        var durationMs = 456
-        var failDurationQuery = false
-        var appliedSpeed = 1f
+    override fun start() {
+        startCount += 1
+        playing = true
+    }
 
-        override fun setSpeed(speed: Float) {
-            appliedSpeed = speed
+    override fun stop() {
+        playing = false
+    }
+
+    override val currentPosition: Int get() = positionMs
+
+    var seekedToMs: Int? = null
+
+    /** Records the clamped target the controller hands to the codec, or rejects it like an invalid player. */
+    override fun seekTo(msec: Int) {
+        if (failSeek) throw IllegalStateException("seekTo failed")
+        seekedToMs = msec
+    }
+
+    /** Models codecs that discover duration late or reject a metadata query without losing the player. */
+    override val duration: Int
+        get() {
+            if (failDurationQuery) throw IllegalStateException("duration unavailable")
+            return durationMs
         }
 
-        override val isPlaying: Boolean
-            get() {
-                if (failPlayingQuery) throw IllegalStateException("isPlaying failed")
-                return playing
-            }
-
-        override fun pause() {
-            if (failPause) throw IllegalStateException("pause failed")
-            playing = false
+    override fun setVolume(
+        leftVolume: Float,
+        rightVolume: Float,
+    ) {
+        val restoringUnity = failVolumeRestore && leftVolume == 1f && rightVolume == 1f
+        if (failVolumeChange || restoringUnity) {
+            throw IllegalStateException("setVolume failed")
         }
+        this.leftVolume = leftVolume
+        this.rightVolume = rightVolume
+    }
 
-        override fun start() {
-            startCount += 1
-            playing = true
-        }
-
-        override fun stop() {
-            playing = false
-        }
-
-        override val currentPosition: Int get() = positionMs
-
-        var seekedToMs: Int? = null
-
-        /** Records the clamped target the controller hands to the codec, or rejects it like an invalid player. */
-        override fun seekTo(msec: Int) {
-            if (failSeek) throw IllegalStateException("seekTo failed")
-            seekedToMs = msec
-        }
-
-        /** Models codecs that discover duration late or reject a metadata query without losing the player. */
-        override val duration: Int
-            get() {
-                if (failDurationQuery) throw IllegalStateException("duration unavailable")
-                return durationMs
-            }
-
-        override fun setVolume(
-            leftVolume: Float,
-            rightVolume: Float,
-        ) {
-            if (failVolumeChange || (failVolumeRestore && leftVolume == 1f && rightVolume == 1f)) {
-                throw IllegalStateException("setVolume failed")
-            }
-            this.leftVolume = leftVolume
-            this.rightVolume = rightVolume
-        }
-
-        override fun release() {
-            released = true
-        }
+    override fun release() {
+        released = true
     }
 }

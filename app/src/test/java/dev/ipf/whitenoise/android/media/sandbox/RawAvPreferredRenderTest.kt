@@ -20,7 +20,7 @@ import java.io.IOException
 @Config(sdk = [30, 36])
 class RawAvPreferredRenderTest {
     @Test fun longGopPrerollDrainsTheActualBoundedReaderAndRetainsCrossingPcmOnce() =
-        runBlocking {
+        runBlocking<Unit> {
             val legacy = PrerollPackets()
             val exhausted =
                 assertThrows(IOException::class.java) {

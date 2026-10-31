@@ -48,13 +48,8 @@ class MediaAvPlaybackService : Service() {
                     if (data.dataAvail() == 0 && !data.hasFileDescriptors()) Process.killProcess(Process.myPid())
                     return true
                 }
-                if (code !in AvStreamProtocol.OPEN..AvStreamProtocol.SEEK ||
-                    reply == null ||
-                    flags and IBinder.FLAG_ONEWAY != 0 ||
-                    data.dataSize() > 2048
-                ) {
-                    return false
-                }
+                if (code !in AvStreamProtocol.OPEN..AvStreamProtocol.SEEK || reply == null) return false
+                if (flags and IBinder.FLAG_ONEWAY != 0 || data.dataSize() > 2048) return false
                 val killer =
                     watchdog.schedule(
                         { Process.killProcess(Process.myPid()) },

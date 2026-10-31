@@ -308,16 +308,22 @@ class IsolatedAttachmentPlayerDeviceTest {
         while (SystemClock.elapsedRealtime() < deadline) {
             failure.get()?.let { throw AssertionError("Raw playback failed before its Surface frame", it) }
             val pixel = copyCenter(view)
-            if (pixel != null &&
-                kotlin.math.abs(Color.red(pixel) - Color.red(expected)) < 50 &&
-                kotlin.math.abs(Color.green(pixel) - Color.green(expected)) < 50 &&
-                kotlin.math.abs(Color.blue(pixel) - Color.blue(expected)) < 50
-            ) {
+            if (matchesColor(pixel, expected)) {
                 return
             }
             SystemClock.sleep(30)
         }
         throw AssertionError("Expected synthetic frame color was not rendered on the actual Surface")
+    }
+
+    private fun matchesColor(
+        pixel: Int?,
+        expected: Int,
+    ): Boolean {
+        if (pixel == null) return false
+        return kotlin.math.abs(Color.red(pixel) - Color.red(expected)) < 50 &&
+            kotlin.math.abs(Color.green(pixel) - Color.green(expected)) < 50 &&
+            kotlin.math.abs(Color.blue(pixel) - Color.blue(expected)) < 50
     }
 
     private class PixelSample {

@@ -185,17 +185,16 @@ internal class IsolatedMediaTransport(
                     if (automaticAv && code == AutomaticAvIdentity.CALLBACK) {
                         return acceptIdentity(selected, data, response, flags)
                     }
-                    if (automaticAv &&
-                        (
-                            response == null ||
-                                flags and IBinder.FLAG_ONEWAY != 0 ||
-                                !selected.processWitness.acceptsCaller(
-                                    android.os.Binder.getCallingUid(),
-                                    android.os.Binder.getCallingPid(),
-                                )
-                        )
-                    ) {
-                        return false
+                    if (automaticAv) {
+                        val invalidReply = response == null || flags and IBinder.FLAG_ONEWAY != 0
+                        if (invalidReply ||
+                            !selected.processWitness.acceptsCaller(
+                                android.os.Binder.getCallingUid(),
+                                android.os.Binder.getCallingPid(),
+                            )
+                        ) {
+                            return false
+                        }
                     }
                     if (code != IBinder.FIRST_CALL_TRANSACTION) return super.onTransact(code, data, response, flags)
                     if (pending !== reply || data.dataAvail() > MediaDecodePolicy.MAX_REPLY_BYTES) return false
@@ -364,13 +363,10 @@ internal class IsolatedMediaTransport(
         }
         val gone = selected.definitiveNoWorker || selected.processWitness.confirmedGone()
         synchronized(bindingLock) {
-            if (gone && selected.unbound) selected.safeToCopy.countDown()
-            if (gone &&
-                selected.unbound &&
-                !selected.operationActive &&
-                !selected.retireRpcActive &&
-                parentResources.available()
-            ) {
+            val detached = gone && selected.unbound
+            if (detached) selected.safeToCopy.countDown()
+            val operationIdle = !selected.operationActive && !selected.retireRpcActive
+            if (detached && operationIdle && parentResources.available()) {
                 if (selected.disposed) return
                 selected.disposed = true
                 if (worker === selected) worker = null
@@ -501,15 +497,16 @@ internal class IsolatedMediaTransport(
         edge: Int,
     ): MediaProbe? {
         val selected = session ?: return null
-        if (!automaticAv) {
-            return selected.sources.withMediaUriInput(resolver, uri) { input ->
+        return if (!automaticAv) {
+            selected.sources.withMediaUriInput(resolver, uri) { input ->
                 serialized(selected) { ticket -> probeInput(ticket, input, edge, true) }
             }
-        }
-        return serialized(selected) { ticket ->
-            selected.sources.withMediaUriInput(resolver, uri) { input ->
-                ticket.deadline = android.os.SystemClock.elapsedRealtime() + MediaDecodePolicy.DEADLINE_MS
-                probeInput(ticket, input, edge, true)
+        } else {
+            serialized(selected) { ticket ->
+                selected.sources.withMediaUriInput(resolver, uri) { input ->
+                    ticket.deadline = android.os.SystemClock.elapsedRealtime() + MediaDecodePolicy.DEADLINE_MS
+                    probeInput(ticket, input, edge, true)
+                }
             }
         }
     }
@@ -521,17 +518,18 @@ internal class IsolatedMediaTransport(
         edge: Int,
     ): MediaProbe? {
         val selected = session?.takeIf { positionMs in 0..MAX_MEDIA_DURATION_MS } ?: return null
-        if (!automaticAv) {
-            return selected.sources.withMediaUriInput(resolver, uri) { input ->
+        return if (!automaticAv) {
+            selected.sources.withMediaUriInput(resolver, uri) { input ->
                 serialized(selected) { ticket ->
                     probeInput(ticket, input, edge, true, TimeUnit.MILLISECONDS.toMicros(positionMs))
                 }
             }
-        }
-        return serialized(selected) { ticket ->
-            selected.sources.withMediaUriInput(resolver, uri) { input ->
-                ticket.deadline = android.os.SystemClock.elapsedRealtime() + MediaDecodePolicy.DEADLINE_MS
-                probeInput(ticket, input, edge, true, TimeUnit.MILLISECONDS.toMicros(positionMs))
+        } else {
+            serialized(selected) { ticket ->
+                selected.sources.withMediaUriInput(resolver, uri) { input ->
+                    ticket.deadline = android.os.SystemClock.elapsedRealtime() + MediaDecodePolicy.DEADLINE_MS
+                    probeInput(ticket, input, edge, true, TimeUnit.MILLISECONDS.toMicros(positionMs))
+                }
             }
         }
     }
@@ -675,7 +673,8 @@ internal class IsolatedMediaTransport(
         return result
     }
 
-    @Suppress("ReturnCount") // Connection, deadline and exact reply shape are separate fail-closed boundaries.
+    @Suppress("ReturnCount", "CyclomaticComplexMethod")
+    // One input capability owns READY, exact reply, deadline and retirement; every refusal stays fail-closed.
     private fun exchange(
         ticket: Operation,
         input: ParcelFileDescriptor,
@@ -747,18 +746,19 @@ internal class IsolatedMediaTransport(
         ticket: Operation,
     ): Worker? =
         synchronized(bindingLock) {
-            if (!current(ticket) ||
-                worker != null ||
-                remaining(ticket) == 0L ||
-                (automaticAv && !parentResources.healthy())
-            ) {
+            if (!current(ticket)) {
                 null
             } else {
-                Worker(reply).also {
-                    it.connection = connection(it)
-                    worker = it
-                    ticket.worker = it
-                    pending = reply
+                val occupied = worker != null || remaining(ticket) == 0L
+                if (occupied || (automaticAv && !parentResources.healthy())) {
+                    null
+                } else {
+                    Worker(reply).also {
+                        it.connection = connection(it)
+                        worker = it
+                        ticket.worker = it
+                        pending = reply
+                    }
                 }
             }
         }

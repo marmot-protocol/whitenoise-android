@@ -109,21 +109,21 @@ internal class RawPcmDeviceQueue(
     ) {
         // Once terminal data started, do not re-enter filling with fewer than the platform minimum left.
         if (ending && played > terminalHead) return
-        if (resizeForPriming &&
-            pending > 0 &&
-            played < outputFrames &&
-            (played == 0L || nowMs() - lastAdvancedAt >= 20 || endOfStream)
-        ) {
-            val requested = minOf(pending, normalFrames.toLong()).toInt()
-            val actual = resize(requested)
-            if (actual !in 1..normalFrames) throw RawOutputFailure("Raw audio priming buffer refused")
-            effectiveFrames = actual
-            if (restartedHead != played) {
-                restart()
-                restartedHead = played
-            }
-            if (actual > pending && actual > 16) {
-                throw RawOutputFailure("Raw audio minimum priming buffer exceeds the bounded quantum")
+        val canPrime = resizeForPriming && pending > 0 && played < outputFrames
+        if (canPrime) {
+            val primingNeeded = played == 0L || nowMs() - lastAdvancedAt >= 20 || endOfStream
+            if (primingNeeded) {
+                val requested = minOf(pending, normalFrames.toLong()).toInt()
+                val actual = resize(requested)
+                if (actual !in 1..normalFrames) throw RawOutputFailure("Raw audio priming buffer refused")
+                effectiveFrames = actual
+                if (restartedHead != played) {
+                    restart()
+                    restartedHead = played
+                }
+                if (actual > pending && actual > 16) {
+                    throw RawOutputFailure("Raw audio minimum priming buffer exceeds the bounded quantum")
+                }
             }
         }
     }

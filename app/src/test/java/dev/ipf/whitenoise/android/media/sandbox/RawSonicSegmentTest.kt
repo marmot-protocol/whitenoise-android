@@ -82,17 +82,22 @@ class RawSonicSegmentTest {
                     whole.endOfInput()
                     partial.endOfInput()
                     val expected = drain(whole)
-                    val actual = mutableListOf<Short>()
-                    val output = partial.output()
-                    while (output.hasRemaining()) {
-                        actual += output.short
-                        if (output.hasRemaining()) assertSame(output, partial.output())
-                    }
+                    val actual = drainPartially(partial)
                     assertEquals(expected, actual)
                     assertTrue(partial.ended)
                 }
             }
         }
+    }
+
+    private fun drainPartially(segment: RawSonicSegment): List<Short> {
+        val actual = mutableListOf<Short>()
+        val output = segment.output()
+        while (output.hasRemaining()) {
+            actual += output.short
+            if (output.hasRemaining()) assertSame(output, segment.output())
+        }
+        return actual
     }
 
     @Test

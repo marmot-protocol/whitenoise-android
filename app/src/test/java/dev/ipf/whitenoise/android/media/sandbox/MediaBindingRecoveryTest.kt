@@ -1435,7 +1435,7 @@ class MediaBindingRecoveryTest {
      * rebuilds provider AFDs, so a provider subclass close override is not a client close hook.
      */
     @Implements(ContentResolver::class)
-    class SelectedAssetCloseResolverShadow : ShadowContentResolver() {
+    open class SelectedAssetCloseResolverShadow : ShadowContentResolver() {
         @Implementation
         protected fun openAssetFileDescriptor(
             uri: Uri,

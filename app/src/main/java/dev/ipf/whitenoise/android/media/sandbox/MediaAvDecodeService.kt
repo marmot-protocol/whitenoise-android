@@ -100,7 +100,7 @@ class MediaAvDecodeService : Service() {
                 if (MediaDecodePolicy.outputCapacity(edge) == null) return result
                 val length = data.getLong("length")
                 val offset = data.getLong("offset")
-                if (input.statSize !in 1..MAX_MEDIA_SOURCE_BYTES || !validMediaRange(input.statSize, offset, length)) {
+                if (!validSelectedMediaRange(input, offset, length)) {
                     return result
                 }
                 val mode = Os.fcntlInt(input.fileDescriptor, OsConstants.F_GETFL, 0) and OsConstants.O_ACCMODE
@@ -226,27 +226,6 @@ class MediaAvDecodeService : Service() {
             putBoolean("privateCanaryDenied", errno in setOf(OsConstants.EACCES, OsConstants.EPERM, OsConstants.ENOENT))
         }
 
-    private fun readOnlyErrno(input: ParcelFileDescriptor): Int {
-        if (!dev.ipf.whitenoise.android.BuildConfig.DEBUG) return -1
-        return try {
-            Os.write(input.fileDescriptor, byteArrayOf(0), 0, 1)
-            0
-        } catch (failure: android.system.ErrnoException) {
-            failure.errno
-        }
-    }
-
-    private fun canaryErrno(data: Bundle): Int {
-        val path = data.getString("canaryPath")?.takeIf { it.endsWith("/files/media-containment-canary") }
-        if (!dev.ipf.whitenoise.android.BuildConfig.DEBUG || path == null) return -1
-        return try {
-            Os.close(Os.open(path, OsConstants.O_RDONLY, 0))
-            0
-        } catch (failure: android.system.ErrnoException) {
-            failure.errno
-        }
-    }
-
     override fun onDestroy() {
         codec.shutdownNow()
         watchdog.shutdownNow()
@@ -259,3 +238,30 @@ class MediaAvDecodeService : Service() {
         const val MAX_READS = 500000
     }
 }
+
+private fun readOnlyErrno(input: ParcelFileDescriptor): Int {
+    if (!dev.ipf.whitenoise.android.BuildConfig.DEBUG) return -1
+    return try {
+        Os.write(input.fileDescriptor, byteArrayOf(0), 0, 1)
+        0
+    } catch (failure: android.system.ErrnoException) {
+        failure.errno
+    }
+}
+
+private fun canaryErrno(data: Bundle): Int {
+    val path = data.getString("canaryPath")?.takeIf { it.endsWith("/files/media-containment-canary") }
+    if (!dev.ipf.whitenoise.android.BuildConfig.DEBUG || path == null) return -1
+    return try {
+        Os.close(Os.open(path, OsConstants.O_RDONLY, 0))
+        0
+    } catch (failure: android.system.ErrnoException) {
+        failure.errno
+    }
+}
+
+private fun validSelectedMediaRange(
+    input: ParcelFileDescriptor,
+    offset: Long,
+    length: Long,
+): Boolean = input.statSize in 1..MAX_MEDIA_SOURCE_BYTES && validMediaRange(input.statSize, offset, length)

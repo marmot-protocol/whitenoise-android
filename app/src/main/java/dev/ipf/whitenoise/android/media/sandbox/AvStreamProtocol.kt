@@ -102,12 +102,7 @@ internal data class AvStreamOutput(
                     require(if (values[0] == 3L) video else audio)
                     require(values.drop(1).all { it == 0L })
                 }
-                1 -> {
-                    require(video && values[1] in 1..edge.toLong() && values[2] in 1..edge.toLong())
-                    require(values[3] == 0L && values[4] == 0L)
-                    val bytes = values[1] * values[2] * 4
-                    require(bytes <= AvStreamProtocol.pixelCapacity(edge) && values[6] == bytes)
-                }
+                1 -> validateVideoFrame(values, edge, video)
                 2 -> {
                     require(audio && values[1] == 0L && values[2] == 0L)
                     require(values[3] in 8000L..96000L && values[4] in 1L..2L)
@@ -123,6 +118,17 @@ internal data class AvStreamOutput(
                 values[5],
                 values[6].toInt(),
             )
+        }
+
+        private fun validateVideoFrame(
+            values: LongArray,
+            edge: Int,
+            video: Boolean,
+        ) {
+            require(video && values[1] in 1..edge.toLong() && values[2] in 1..edge.toLong())
+            require(values[3] == 0L && values[4] == 0L)
+            val bytes = values[1] * values[2] * 4
+            require(bytes <= AvStreamProtocol.pixelCapacity(edge) && values[6] == bytes)
         }
     }
 }

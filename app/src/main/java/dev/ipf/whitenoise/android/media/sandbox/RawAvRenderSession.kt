@@ -204,8 +204,11 @@ internal class RawAvRenderSession(
         var audio: PendingPcm? = null
     }
 
-    /** Parent-only finite reader seam; production passes the exact owned isolated stream methods. */
-    @Suppress("LongMethod", "CyclomaticComplexMethod", "NestedBlockDepth") // One pending frame/PCM owner.
+    /**
+     * Parent-only finite reader seam; production passes the exact owned isolated stream methods.
+     * Ownership/preroll retries and final EOF exit keep bitmap and PCM cleanup under this exact owner.
+     */
+    @Suppress("LongMethod", "CyclomaticComplexMethod", "NestedBlockDepth", "LoopWithTooManyJumpStatements")
     internal suspend fun consumeFrames(
         info: AvStreamInfo,
         activation: Long,
@@ -293,12 +296,7 @@ internal class RawAvRenderSession(
         activation: Long,
         read: (Int) -> AvStreamFrame,
     ) {
-        while (sourceHasAudio &&
-            valid(activation, appliedSeek) &&
-            !progress.audioEnded &&
-            progress.audio == null &&
-            progress.prerollAudioUs < discardedVideoUs
-        ) {
+        while (needsPrerollAudio(progress, discardedVideoUs, activation)) {
             val frame = read(AvStreamProtocol.AUDIO_TRACK)
             if (!valid(activation, appliedSeek)) {
                 if (frame is AvStreamFrame.Video) frame.bitmap.recycle()
@@ -317,6 +315,15 @@ internal class RawAvRenderSession(
                 else -> throw IOException("Unexpected output from preroll audio read")
             }
         }
+    }
+
+    private fun needsPrerollAudio(
+        progress: Progress,
+        discardedVideoUs: Long,
+        activation: Long,
+    ): Boolean {
+        if (!sourceHasAudio || !valid(activation, appliedSeek)) return false
+        return !progress.audioEnded && progress.audio == null && progress.prerollAudioUs < discardedVideoUs
     }
 
     private suspend fun ensureAudioForVideo(
@@ -411,7 +418,8 @@ internal class RawAvRenderSession(
         val sink = pcm
         val ending = progress.audioEnded && progress.audio == null
         val tolerance = sink?.prepareForWait(ending) ?: 1000L
-        if (ending && (sink == null || sink.drained()) && sourceHasAudio && !eofWallClock) {
+        val drained = ending && (sink == null || sink.drained())
+        if (drained && sourceHasAudio && !eofWallClock) {
             synchronized(clockLock) {
                 wallAnchorUs = positionUs()
                 wallStartedMs = SystemClock.elapsedRealtime()

@@ -3,6 +3,7 @@
 package dev.ipf.whitenoise.android.audio
 
 import dev.ipf.whitenoise.android.media.sandbox.AvStreamFrame
+import dev.ipf.whitenoise.android.media.sandbox.AvStreamInfo
 import dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
 import dev.ipf.whitenoise.android.media.sandbox.MAX_MEDIA_SOURCE_BYTES
 import dev.ipf.whitenoise.android.media.sandbox.hasAudio
@@ -65,37 +66,50 @@ private class AttachmentAudioDecoder(
 
     suspend fun decode(consume: suspend (AttachmentPcmChunk) -> Unit) {
         IsolatedMediaDecoder.openAudioStream(file).use { stream ->
-            val info = stream.info
-            if (!info.hasAudio || info.durationUs > MAX_PCM_DURATION_SECONDS * MICROS_PER_SECOND) {
-                throw IOException("Attachment contains no supported audio within the duration limit")
-            }
-            val pcm = AttachmentPcmBuffer(info.sampleRate, info.channels)
+            val pcm = createBuffer(stream.info)
             var iterations = 0
             while (true) {
                 budget.check()
                 if (++iterations > MAX_DECODE_ITERATIONS) {
                     throw IOException("Attachment audio exceeded decode iteration limit")
                 }
-                when (val frame = stream.read()) {
-                    is AvStreamFrame.Audio -> {
-                        if (frame.sampleRate != pcm.sampleRateHz || frame.channels != pcm.channelCount) {
-                            throw IOException("Attachment PCM format changed during decoding")
-                        }
-                        for (chunk in pcm.append(ByteBuffer.wrap(frame.bytes), 0, frame.bytes.size)) {
-                            budget.deliver(chunk, consume)
-                        }
-                    }
-                    is AvStreamFrame.Video -> {
-                        frame.bitmap.recycle()
-                        throw IOException("Unexpected video from an audio-only worker")
-                    }
-                    AvStreamFrame.End, AvStreamFrame.AudioEnd -> break
-                    AvStreamFrame.VideoEnd -> throw IOException("Unexpected video EOF from an audio-only worker")
-                }
+                val frame = audioFrame(stream.read()) ?: break
+                append(frame, pcm, consume)
             }
             budget.check()
             if (pcm.totalFrames == 0L) throw IOException("Attachment contains empty audio")
             for (chunk in pcm.finish()) budget.deliver(chunk, consume)
+        }
+    }
+
+    private fun createBuffer(info: AvStreamInfo): AttachmentPcmBuffer {
+        if (!info.hasAudio || info.durationUs > MAX_PCM_DURATION_SECONDS * MICROS_PER_SECOND) {
+            throw IOException("Attachment contains no supported audio within the duration limit")
+        }
+        return AttachmentPcmBuffer(info.sampleRate, info.channels)
+    }
+
+    private fun audioFrame(frame: AvStreamFrame): AvStreamFrame.Audio? =
+        when (frame) {
+            is AvStreamFrame.Audio -> frame
+            is AvStreamFrame.Video -> {
+                frame.bitmap.recycle()
+                throw IOException("Unexpected video from an audio-only worker")
+            }
+            AvStreamFrame.End, AvStreamFrame.AudioEnd -> null
+            AvStreamFrame.VideoEnd -> throw IOException("Unexpected video EOF from an audio-only worker")
+        }
+
+    private suspend fun append(
+        frame: AvStreamFrame.Audio,
+        pcm: AttachmentPcmBuffer,
+        consume: suspend (AttachmentPcmChunk) -> Unit,
+    ) {
+        if (frame.sampleRate != pcm.sampleRateHz || frame.channels != pcm.channelCount) {
+            throw IOException("Attachment PCM format changed during decoding")
+        }
+        for (chunk in pcm.append(ByteBuffer.wrap(frame.bytes), 0, frame.bytes.size)) {
+            budget.deliver(chunk, consume)
         }
     }
 }

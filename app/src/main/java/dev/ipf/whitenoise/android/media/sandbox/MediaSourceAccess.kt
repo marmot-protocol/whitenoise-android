@@ -228,6 +228,7 @@ internal class MediaSourceAccess(
     }
 
     @Synchronized
+    @Suppress("TooGenericExceptionCaught") // Rejected cleanup submission must retain every source/resource credit.
     override fun close() {
         if (resources != null && closed) return
         closed = true

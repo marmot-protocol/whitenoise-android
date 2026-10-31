@@ -252,18 +252,23 @@ internal class RawAvPlaybackEngine(
             finishRefusedProbe(generation, completion)
         } finally {
             poster?.recycle()
-            synchronized(lock) {
-                if (prepareJobGeneration == generation) {
-                    prepareJob = null
-                    prepareJobGeneration = -1
-                }
-                // A stopped synchronous probe still owns its resources until return; only then start its successor.
-                if (current() && preparationRequested && !headerReady && prepareGeneration != generation) {
-                    startPreparationLocked()
-                }
-            }
-            signal.trySend(Unit)
+            finishProbe(generation)
         }
+    }
+
+    private fun finishProbe(generation: Long) {
+        synchronized(lock) {
+            if (prepareJobGeneration == generation) {
+                prepareJob = null
+                prepareJobGeneration = -1
+            }
+            // A stopped synchronous probe still owns its resources until return; only then start its successor.
+            val preparing = current() && preparationRequested && !headerReady
+            if (preparing && prepareGeneration != generation) {
+                startPreparationLocked()
+            }
+        }
+        signal.trySend(Unit)
     }
 
     private fun finishRefusedProbe(

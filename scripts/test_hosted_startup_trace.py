@@ -18,7 +18,7 @@ import json,os,pathlib,sys,time
 a=sys.argv[3:];mode=os.environ.get('FAKE_MODE','ok')
 with open('adb-calls.jsonl','a') as f:f.write(json.dumps(a)+'\\n')
 if a[:2]==['shell','getprop']:
- print('29' if mode=='unsupported' else {'ro.build.version.sdk':'30','ro.product.cpu.abi':'x86_64'}.get(a[2],'fixture-runtime'))
+ print('29' if mode=='unsupported' else {'ro.build.version.sdk':os.environ.get('FAKE_API','30'),'ro.product.cpu.abi':'x86_64'}.get(a[2],'fixture-runtime'))
 elif a[:2]==['shell','cat']:
  if a[2].endswith('available_events'):
   needed='sched:sched_switch sched:sched_waking sched:sched_process_fork sched:sched_process_exit task:task_newtask task:task_rename'
@@ -209,7 +209,7 @@ class HostedStartupTraceTests(unittest.TestCase):
         workflow=(ROOT/'.github/workflows/android-instrumented.yml').read_text()
         marker='      - name: Reject incompatible startup trace inputs\n'
         condition=workflow.split(marker,1)[1].splitlines()[0].strip().removeprefix('if: ')
-        defaults=dict(media_startup_trace=True,media_sandbox_only=True,media_sandbox_api='30',
+        defaults=dict(media_trace_target='healthy',range_selection_only=False,media_startup_trace=True,media_sandbox_only=True,media_sandbox_api='30',
                       maestro_pilot=False,responsiveness_only=False,outbound_share_only=False,
                       mdk_adoption_only=False,mdk_qualification=False,mdk_preview_qualification=False,
                       review_demo_e2e=False,document_provider_matrix=False)
@@ -228,6 +228,9 @@ class HostedStartupTraceTests(unittest.TestCase):
             self.assertTrue(evaluate(condition,**{flag:True}))
         self.assertTrue(evaluate(condition,media_sandbox_only=False))
         self.assertTrue(evaluate(condition,media_sandbox_api='36'))
+        self.assertFalse(evaluate(condition,media_trace_target='av',media_sandbox_api='30'))
+        self.assertFalse(evaluate(condition,media_trace_target='av',media_sandbox_api='36'))
+        self.assertTrue(evaluate(condition,media_trace_target='av',media_sandbox_api='34'))
         self.assertTrue(evaluate(condition,event='push'))
         cancellation=re.search(r'^  cancel-in-progress: (.+)$',workflow,re.M).group(1)
         self.assertFalse(evaluate(cancellation))
@@ -399,6 +402,188 @@ class HostedStartupTraceTests(unittest.TestCase):
         self.assertEqual(workflow.count('hosted-startup-trace.init.gradle'), 1)
         self.assertNotIn('hosted-startup-trace.init.gradle', workflow.split('  compile-tests:', 1)[1])
         self.assertIn('inputs.capture_benchmark_dependency_inputs', workflow)
+
+
+
+    def test_fixed_av_actual_cli_both_supported_apis(self):
+        for api in ('30', '36'):
+            with self.subTest(api=api):
+                root, env = self.fixture()
+                env['FAKE_API'] = api
+                result = subprocess.run(['python3', 'scripts/hosted-startup-trace.py', 'run-av', api], cwd=root, env=env, capture_output=True, timeout=35)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                report = root/'app/build/reports/media-startup-trace'
+                receipt = json.loads((report/'capture-receipt.json').read_text())
+                self.assertEqual(receipt['trace_mode'], 'av')
+                self.assertEqual(receipt['android_api'], api)
+                self.assertFalse(receipt['capture_qualified'])
+                self.assertIn('sampled RSS', receipt['memory_scope'])
+                args = (root/'gradle-arguments.txt').read_text().splitlines()
+                self.assertIn(':app:connectedDevZapstoreDebugAndroidTest', args)
+                self.assertIn('-PmediaAvStartupTrace=true', args)
+                self.assertIn('-Pandroid.testInstrumentationRunnerArguments.timeout_msec=600000', args)
+                case='dev.ipf.whitenoise.android.media.sandbox.MediaAvPerformanceDeviceTest#measureProductionCostsOnUnchangedCorpus'
+                self.assertIn('-Pandroid.testInstrumentationRunnerArguments.class='+case,args)
+                self.assertEqual((report/'required-cases.txt').read_text(),case+'\n')
+                config=(root/'config-stdin.bin').read_text()
+                self.assertEqual(config,(report/'config.pbtxt').read_text())
+                self.assertIn('duration_ms: 600000',config)
+                self.assertIn('proc_stats_poll_ms: 100',config)
+                self.assertIn('max_file_size_bytes: 134217728',config)
+                self.assertIn('sched/sched_process_exit',config)
+
+    def test_av_wrong_api_and_non_dispatch_never_start(self):
+        for args,event in [(['run-av','34'],'workflow_dispatch'),(['run-av','30'],'pull_request'),(['run-av','36'],'push')]:
+            root,env=self.fixture();env['GITHUB_EVENT_NAME']=event
+            result=subprocess.run(['python3','scripts/hosted-startup-trace.py',*args],cwd=root,env=env,capture_output=True,timeout=10)
+            self.assertNotEqual(result.returncode,0)
+            self.assertFalse((root/'adb-calls.jsonl').exists())
+
+    def test_av_failures_preserve_holds_and_instrumentation_result(self):
+        for mode,code in [('start-fail',0),('flush-fail',0),('oversize',0),('missing-case',0),('ok',23)]:
+            root,env=self.fixture(mode,code)
+            result=subprocess.run(['python3','scripts/hosted-startup-trace.py','run-av','30'],cwd=root,env=env,capture_output=True,timeout=35)
+            receipt=json.loads((root/'app/build/reports/media-startup-trace/capture-receipt.json').read_text())
+            self.assertNotEqual(result.returncode,0)
+            self.assertFalse(receipt['capture_qualified'])
+            calls=[json.loads(x) for x in (root/'adb-calls.jsonl').read_text().splitlines()]
+            if mode in ('start-fail','flush-fail','oversize'):
+                self.assertEqual(receipt['cleanup'],'HELD')
+                self.assertFalse(any(x[:2]==['shell','rm'] for x in calls))
+            if code: self.assertEqual(result.returncode,code)
+
+    def test_av_shell_selection_and_backward_compatible_default(self):
+        for api,target,event,trace,expected in [('30','av','workflow_dispatch','true',0),('36','av','workflow_dispatch','true',0),('34','av','workflow_dispatch','true',2),('30','other','workflow_dispatch','true',2),('30','av','pull_request','true',2),('30','av','workflow_dispatch','false',2),('30','healthy','workflow_dispatch','true',0),('36','healthy','workflow_dispatch','true',2)]:
+            with self.subTest(api=api,target=target,event=event,trace=trace),tempfile.TemporaryDirectory() as td:
+                root=Path(td);(root/'scripts').mkdir();(root/'scripts/hosted-startup-trace.py').write_text('import sys;print(sys.argv[1:])')
+                args=[event,'false','false','false','true','false','false',trace,api,'false',target]
+                result=subprocess.run(['bash',str(ROOT/'scripts/run-android-instrumented-tests.sh'),*args],cwd=root,capture_output=True,text=True)
+                self.assertEqual(result.returncode,expected,result.stderr)
+                if expected==0:self.assertIn("['run-av', '"+api+"']" if target=='av' else "['run']",result.stdout)
+
+    def test_av_init_branch_keeps_real_debug_closure_and_fixed_task_hook(self):
+        init=(ROOT/'scripts/hosted-startup-trace.init.gradle').read_text()
+        av=init.split("} else {",1)[1]
+        self.assertIn("selected.tasks.named('connectedDevZapstoreDebugAndroidTest')",av)
+        self.assertIn("spec.commandLine 'python3', 'scripts/hosted-startup-trace.py', 'start'",av)
+        self.assertNotIn('setIncludes',av)
+        self.assertNotIn('initWith',av)
+        self.assertIn("if (avTrace == 'false')",init)
+
+
+
+    def test_workflow_av_selection_defaults_and_concurrency_are_explicit(self):
+        import yaml
+        workflow=(ROOT/'.github/workflows/android-instrumented.yml').read_text()
+        parsed=yaml.safe_load(workflow)
+        dispatch=(parsed.get('on') or parsed[True])['workflow_dispatch']['inputs']
+        self.assertEqual(dispatch['media_trace_target']['default'],'healthy')
+        self.assertEqual(dispatch['media_trace_target']['options'],['healthy','av'])
+        self.assertIn("inputs.media_trace_target == 'av' && (!inputs.media_startup_trace || github.event_name != 'workflow_dispatch')",workflow)
+        self.assertIn("inputs.media_trace_target == 'av' && inputs.media_sandbox_api != '30' && inputs.media_sandbox_api != '36'",workflow)
+        self.assertIn("inputs.media_trace_target || 'healthy'",workflow)
+        self.assertIn("RETAIN_STARTUP_TRACE: ${{ inputs.media_startup_trace && inputs.media_trace_target != 'av' }}",workflow)
+        self.assertIn("inputs.media_startup_trace && 'android-media-startup-trace'",workflow)
+        self.assertIn("cancel-in-progress: ${{ !(github.event_name == 'workflow_dispatch' && (inputs.maestro_pilot || inputs.media_startup_trace",workflow)
+        # YAML and source contracts only; GitHub expression execution is not simulated.
+
+
+
+    def test_all_job_admission_rejects_invalid_av_and_preserves_legacy(self):
+        import yaml
+        current=yaml.safe_load((ROOT/'.github/workflows/android-instrumented.yml').read_text())['jobs']
+        # Golden selectors from the pre-AV workflow; independent of the current selectors.
+        before = {'changes': {'if': '${{ !github.event.pull_request.draft && !inputs.mdk_preview_qualification }}'},
+         'attachment-fixture': {'if': '${{ !inputs.media_startup_trace && '
+                                      "needs.changes.outputs.attachment_fixture == 'true' && "
+                                      '!inputs.mdk_adoption_only && !inputs.range_selection_only && '
+                                      '!inputs.outbound_share_only && !inputs.media_sandbox_only && '
+                                      "(github.event_name != 'workflow_dispatch' || (!inputs.maestro_pilot "
+                                      '&& !inputs.media_sandbox_only && !inputs.responsiveness_only)) && '
+                                      '!inputs.mdk_qualification && !inputs.mdk_preview_qualification }}'},
+         'instrumented': {'if': "needs.changes.outputs.connected == 'true' && (inputs.media_startup_trace "
+                                "|| github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot || "
+                                'inputs.responsiveness_only || inputs.media_sandbox_only || '
+                                'inputs.outbound_share_only || inputs.mdk_adoption_only || '
+                                'inputs.range_selection_only) && !inputs.mdk_qualification && '
+                                '!inputs.mdk_preview_qualification'},
+         'maestro-pilot': {'if': '${{ !inputs.media_startup_trace && github.event_name == '
+                                 "'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only "
+                                 '&& !inputs.range_selection_only && !inputs.media_sandbox_only && '
+                                 '!inputs.responsiveness_only && !inputs.outbound_share_only && '
+                                 '!inputs.mdk_qualification && !inputs.mdk_preview_qualification && '
+                                 "!startsWith(inputs.maestro_suite, 'runtime-') }}"},
+         'maestro-runtime-build': {'if': '${{ !inputs.media_startup_trace && github.event_name == '
+                                         "'workflow_dispatch' && inputs.maestro_pilot && "
+                                         '!inputs.mdk_adoption_only && !inputs.range_selection_only && '
+                                         '!inputs.media_sandbox_only && !inputs.responsiveness_only && '
+                                         '!inputs.outbound_share_only && !inputs.mdk_qualification && '
+                                         '!inputs.mdk_preview_qualification && '
+                                         "startsWith(inputs.maestro_suite, 'runtime-') }}"},
+         'maestro-runtime': {'if': '${{ !inputs.media_startup_trace }}'},
+         'maestro-runtime-summary': {'if': '${{ !inputs.media_startup_trace && always() && '
+                                           "github.event_name == 'workflow_dispatch' && "
+                                           'inputs.maestro_pilot && !inputs.mdk_adoption_only && '
+                                           '!inputs.range_selection_only && !inputs.media_sandbox_only && '
+                                           '!inputs.responsiveness_only && !inputs.outbound_share_only && '
+                                           '!inputs.mdk_qualification && !inputs.mdk_preview_qualification '
+                                           "&& startsWith(inputs.maestro_suite, 'runtime-') }}"},
+         'mdk-qualification': {'if': "github.event_name == 'workflow_dispatch' && inputs.mdk_qualification "
+                                     '&& !inputs.mdk_preview_qualification'},
+         'mdk-signed-preview': {'if': "github.event_name == 'workflow_dispatch' && "
+                                      'inputs.mdk_preview_qualification'}}
+        defaults=dict(media_trace_target='healthy',media_startup_trace=False,media_sandbox_only=False,
+                      media_sandbox_api='30',range_selection_only=False,maestro_pilot=False,
+                      responsiveness_only=False,outbound_share_only=False,mdk_adoption_only=False,
+                      mdk_qualification=False,mdk_preview_qualification=False,review_demo_e2e=False,
+                      document_provider_matrix=False,maestro_suite='onboarding')
+        def evaluate(expr,event='workflow_dispatch',draft=False,**values):
+            expr=expr.strip().removeprefix('${{').removesuffix('}}').replace('&&',' and ').replace('||',' or ')
+            expr=re.sub(r'!(?!=)','not ',expr).strip()
+            return bool(eval(expr,{'__builtins__':{}},dict(
+                inputs=SimpleNamespace(**{**defaults,**values}),
+                github=SimpleNamespace(event_name=event,event=SimpleNamespace(pull_request=SimpleNamespace(draft=draft))),
+                needs=SimpleNamespace(changes=SimpleNamespace(outputs=SimpleNamespace(connected='true',attachment_fixture='true'))),
+                always=lambda:True,startsWith=lambda text,prefix:text.startswith(prefix))))
+        flags=['maestro_pilot','responsiveness_only','outbound_share_only','mdk_adoption_only',
+               'mdk_qualification','mdk_preview_qualification','range_selection_only','review_demo_e2e',
+               'document_provider_matrix','media_sandbox_only','media_startup_trace']
+        cases=[{}]+[{flag:True} for flag in flags]+[dict(maestro_pilot=True,maestro_suite='runtime-all')]
+        for event in ['pull_request','push','schedule','workflow_dispatch','merge_group']:
+            for draft in [False,True]:
+                for target in ['healthy','']:
+                    for values in cases:
+                        for job in current:
+                            with self.subTest(event=event,draft=draft,target=target,values=values,job=job):
+                                self.assertEqual(evaluate(current[job]['if'],event,draft,media_trace_target=target,**values),
+                                                 evaluate(before[job]['if'],event,draft,media_trace_target=target,**values))
+        valid=dict(media_trace_target='av',media_startup_trace=True,media_sandbox_only=True)
+        for api in ['30','36']:
+            values={**valid,'media_sandbox_api':api}
+            self.assertTrue(evaluate(current['instrumented']['if'],**values))
+            for job in current:
+                if job not in ('changes','instrumented'):self.assertFalse(evaluate(current[job]['if'],**values))
+        invalid=[dict(media_trace_target='av'),dict(media_trace_target='other')]
+        invalid += [{**valid,flag:True} for flag in flags if flag not in ('media_sandbox_only','media_startup_trace')]
+        invalid += [{**valid,'media_startup_trace':False,'maestro_pilot':True},
+                    {**valid,'media_startup_trace':False,'mdk_qualification':True},
+                    {**valid,'media_startup_trace':False,'mdk_preview_qualification':True},
+                    {**valid,'media_sandbox_only':False},{**valid,'media_sandbox_api':'34'}]
+        for values in invalid:
+            self.assertTrue(evaluate(current['changes']['if'],**values))
+            for job in current:
+                if job!='changes':self.assertFalse(evaluate(current[job]['if'],**values),(job,values))
+        for event in ['pull_request','push','schedule','merge_group']:
+            for job in current:
+                if job!='changes':self.assertFalse(evaluate(current[job]['if'],event,**valid),(job,event))
+        first=current['changes']['steps'][0]
+        self.assertIn('Reject incompatible AV trace selection',first['name'])
+        for values in invalid:
+            self.assertFalse(evaluate(first['env']['TRACE_MODE_VALID'],**values))
+        self.assertTrue(evaluate(first['env']['TRACE_MODE_VALID'],**valid))
+        for result,expected in [('true',0),('false',1)]:
+            run=subprocess.run(['bash','-c',first['run']],env={**os.environ,'TRACE_MODE_VALID':result},capture_output=True)
+            self.assertEqual(run.returncode,expected)
 
 
 if __name__ == '__main__':

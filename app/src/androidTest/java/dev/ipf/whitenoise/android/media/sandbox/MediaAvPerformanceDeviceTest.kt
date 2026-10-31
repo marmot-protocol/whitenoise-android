@@ -54,17 +54,28 @@ class MediaAvPerformanceDeviceTest {
             }
         } catch (failure: Throwable) {
             originalFailure = failure
+        }
+        val cleanupFailure = cleanFixtures(staged, heldSources, canary)
+        originalFailure?.let { failure ->
+            cleanupFailure?.let(failure::addSuppressed)
             throw failure
-        } finally {
+        }
+        cleanupFailure?.let { throw it }
+    }
+
+    private fun cleanFixtures(
+        staged: List<PerformanceInput>,
+        heldSources: Set<File>,
+        canary: File,
+    ): Throwable? =
+        runCatching {
             val deleted = staged.map { it.file !in heldSources && it.file.delete() }.all { it }
             if (!canary.delete() || !deleted) {
                 val retained = heldSources.map { it.name }
                 val message = "Performance fixture cleanup incomplete; retained sources: $retained"
-                val cleanup = IllegalStateException(message)
-                if (originalFailure == null) throw cleanup else originalFailure.addSuppressed(cleanup)
+                throw IllegalStateException(message)
             }
-        }
-    }
+        }.exceptionOrNull()
 
     private fun stageInputs(staged: MutableList<PerformanceInput>) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -147,25 +158,8 @@ private class ProductionPerformanceCampaign(
         val previous = IsolatedMediaDecoder.lastAvIsolation
         row.put("start_elapsed_ns", SystemClock.elapsedRealtimeNanos())
         try {
-            if (waveform) {
-                val returned = IsolatedMediaDecoder.waveform(input.file)
-                row.put("return_elapsed_ns", SystemClock.elapsedRealtimeNanos())
-                val values = requireNotNull(returned) { "Waveform refused" }
-                check(values.size == 64 && values.all { it.isFinite() && it in 0f..1f })
-                row.put("waveform_bars", values.size)
-            } else {
-                val returned = IsolatedMediaDecoder.probe(input.file, 256, input.video)
-                row.put("return_elapsed_ns", SystemClock.elapsedRealtimeNanos())
-                val probe = requireNotNull(returned) { "Probe refused" }
-                try {
-                    check(probe.durationMs > 0)
-                    if (input.video) check(probe.poster != null)
-                    row.put("duration_us", probe.durationMs * 1000)
-                    row.put("poster_pixels", probe.poster?.let { it.width.toLong() * it.height } ?: 0)
-                } finally {
-                    probe.poster?.recycle()
-                }
-            }
+            if (waveform) recordWaveform(input, row) else recordProbe(input, row)
+
             // Automatic completion already includes worker retirement; this fresh receipt binds its UID interval.
             val worker = requireNotNull(IsolatedMediaDecoder.lastAvIsolation)
             check(worker !== previous && worker.uid != Process.myUid() && worker.isolated)
@@ -176,15 +170,54 @@ private class ProductionPerformanceCampaign(
         } catch (failure: Exception) {
             failed(row, input, operation, failure)
         } finally {
-            val observed = IsolatedMediaDecoder.lastAvIsolation
-            if (observed !== previous && observed != null && observed.isolated && observed.uid != Process.myUid()) {
-                row.put("attested_worker_uid", observed.uid)
-                row.put("automatic_identity_status", "fresh_authenticated_receipt")
-            } else {
-                row.put("automatic_identity_status", "unavailable")
-            }
+            recordAutomaticIdentity(row, previous)
             row.put("end_elapsed_ns", SystemClock.elapsedRealtimeNanos())
             report.emit(row)
+        }
+    }
+
+    private fun recordWaveform(
+        input: PerformanceInput,
+        row: JSONObject,
+    ) {
+        val returned = IsolatedMediaDecoder.waveform(input.file)
+        row.put("return_elapsed_ns", SystemClock.elapsedRealtimeNanos())
+        val values = requireNotNull(returned) { "Waveform refused" }
+        check(values.size == 64 && values.all { it.isFinite() && it in 0f..1f })
+        row.put("waveform_bars", values.size)
+    }
+
+    private fun recordProbe(
+        input: PerformanceInput,
+        row: JSONObject,
+    ) {
+        val returned = IsolatedMediaDecoder.probe(input.file, 256, input.video)
+        row.put("return_elapsed_ns", SystemClock.elapsedRealtimeNanos())
+        val probe = requireNotNull(returned) { "Probe refused" }
+        try {
+            check(probe.durationMs > 0)
+            if (input.video) check(probe.poster != null)
+            row.put("duration_us", probe.durationMs * 1000)
+            row.put("poster_pixels", probe.poster?.let { it.width.toLong() * it.height } ?: 0)
+        } finally {
+            probe.poster?.recycle()
+        }
+    }
+
+    private fun recordAutomaticIdentity(
+        row: JSONObject,
+        previous: WorkerIsolation?,
+    ) {
+        val observed = IsolatedMediaDecoder.lastAvIsolation
+        if (observed === previous || observed == null) {
+            row.put("automatic_identity_status", "unavailable")
+            return
+        }
+        if (observed.isolated && observed.uid != Process.myUid()) {
+            row.put("attested_worker_uid", observed.uid)
+            row.put("automatic_identity_status", "fresh_authenticated_receipt")
+        } else {
+            row.put("automatic_identity_status", "unavailable")
         }
     }
 
@@ -476,7 +509,7 @@ private class ProductionPerformanceReport : Closeable {
             .put("attested_worker_pid", JSONObject.NULL)
             .put("retirement_confirmed", JSONObject.NULL)
             .put("outcome", "incomplete")
-            .put("memory_qualification", PerformanceMemoryScope)
+            .put("memory_qualification", PERFORMANCE_MEMORY_SCOPE)
 
     fun emit(row: JSONObject) {
         measurementRows++
@@ -496,7 +529,7 @@ private class ProductionPerformanceReport : Closeable {
                 .put("measurement_rows", measurementRows)
                 .put("failed_operations", failures)
                 .put("outcome", if (failures == 0) "series_complete" else "observations_failed")
-                .put("qualification", PerformanceCompletionScope),
+                .put("qualification", PERFORMANCE_COMPLETION_SCOPE),
         )
         InstrumentationRegistry.getInstrumentation().sendStatus(
             0,
@@ -524,8 +557,8 @@ private fun performanceSha(bytes: ByteArray): String =
         .digest(bytes)
         .joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
 
-private const val PerformanceMemoryScope =
+private const val PERFORMANCE_MEMORY_SCOPE =
     "point_samples_only_ready_pid_attribution_and_automatic_memory_" + "require_lifetime_trace"
 
-private const val PerformanceCompletionScope =
+private const val PERFORMANCE_COMPLETION_SCOPE =
     "stream_lifetime_join_automatic_memory_trace_and_" + "representative_camera_hdr_pending"

@@ -20,7 +20,9 @@ internal class KernelProcessWitness(
         uid: Int,
         pid: Int,
     ): Boolean {
-        if (identity != null || uid <= 0 || uid == ownUid || pid <= 0 || pid == ownPid) return false
+        val foreignUid = uid > 0 && uid != ownUid
+        val foreignPid = pid > 0 && pid != ownPid
+        if (identity != null || !foreignUid || !foreignPid) return false
         identity = uid to pid
         calibrated = observe(pid) == Presence.Alive
         return calibrated
@@ -35,10 +37,10 @@ internal class KernelProcessWitness(
 
     /** PID reuse, zombies, permission denial and unknown errors remain held without a TTL. */
     @Synchronized fun confirmedGone(): Boolean {
-        if (gone) return true
-        val pid = identity?.second ?: return false
-        if (!calibrated) return false
-        gone = observe(pid) == Presence.Gone
+        if (!gone) {
+            val pid = identity?.second
+            if (pid != null && calibrated) gone = observe(pid) == Presence.Gone
+        }
         return gone
     }
 

@@ -180,7 +180,8 @@ internal class RawPcmOutput(
             queue.acceptedOutput(count)
         }
         output = segment.output()
-        if (!output.hasRemaining() && !segmentEnding && (inputEnded || segment.speed != requestedSpeed)) {
+        val segmentReady = !output.hasRemaining() && !segmentEnding
+        if (segmentReady && (inputEnded || segment.speed != requestedSpeed)) {
             segment.endOfInput()
             segmentEnding = true
             output = segment.output()
@@ -244,10 +245,14 @@ internal class RawPcmOutput(
         }
     }
 
-    @Suppress("TooGenericExceptionCaught", "SwallowedException") // Store the original cause in the typed fault.
-    private inline fun <T> checked(operation: () -> T): T {
+    private fun checkActive() {
         fault?.let { throw it }
         if (closed) throw RawOutputFailure("Raw audio output retired")
+    }
+
+    @Suppress("TooGenericExceptionCaught", "SwallowedException") // Store the original cause in the typed fault.
+    private inline fun <T> checked(operation: () -> T): T {
+        checkActive()
         return try {
             operation()
         } catch (failure: Exception) {
