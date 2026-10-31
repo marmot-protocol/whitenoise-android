@@ -2,8 +2,9 @@
 
 This characterization was introduced before worker-per-input retirement, when
 the production transport reused its worker after successful requests. Preserve
-those measurements separately from successor lifetime candidates. The full
-isolation goals of #3373 remain pending qualification.
+those measurements separately from later lifetime measurements. The baseline
+drives the domain-bound transport (#3373), which production installs pending
+approval of its budget.
 The audio/video containment, sender-trust, video-metadata and document-privacy
 work in #3374–#3377 remains pending.
 
@@ -80,22 +81,23 @@ with controlled session, retirement, exact-death and held-URI cases in
 execution supplies the platform evidence.
 
 Review raw healthy and negative samples before choosing a regression budget.
-Historical baseline measurements remain separate from the candidate's per-input
-lifetime behavior. Matched performance-budget approval, worker-resource evidence
-and platform qualification for the lifetime candidate remain pending. Default
-adoption stays held until those gates are reviewed.
+Historical baseline measurements remain separate from the candidate's
+domain-bound lifetime behavior. Matched performance-budget approval, worker-resource evidence
+and platform qualification for the lifetime candidate remain pending. The
+default is switched pending that review; restore the reusable default if the
+budget is rejected.
 
 The original `non-production` invariant exemption applies to the historical
 test-only baseline slice. The lifetime implementation has separate behavioral
 tests and platform requirements. All five issues remain open. Existing permanent
 manual IDs and unchecked results are retained.
 
-The [still-image lifetime candidate](media-worker-lifetime.md) documents the
-successor owner and its separate qualification requirements.
+The [still-image worker lifetime](media-worker-lifetime.md) documents the
+production owner and its qualification boundaries.
 
-Production installation uses the current reusable worker. The per-input lifetime
-transport remains explicit qualification code; its timing and failure evidence
-do not approve production adoption.
+Production installation uses the domain-bound transport, pending approval of
+its budget. That approval rests on the matched throughput comparison and
+UI-level checks below, not on this sequential corpus.
 
 ## Healthy startup timing
 
@@ -115,3 +117,72 @@ before comparing measurements. Debug characterization results must not be
 relabeled as release performance.
 
 The release-like trace mode does not retain its benchmark APK through the existing debug-APK failure upload. Preserve the trace reports; a failed run without a retained exact benchmark APK cannot qualify a performance comparison.
+
+## Matched throughput comparison
+
+`MediaWorkerThroughputDeviceTest` is an opt-in `ManualDeviceFixture`, excluded
+from every hosted suite. It drives named transport variants through the same
+synthetic corpus on one APK and device: `reuse` (the pre-#3373 reusable worker),
+`single_use` (the per-input lane: every request single-use, two clean spares)
+and `domain` (domain-bound generations as production configures them, one
+spare within three live generations). Only the `domain` lane receives each
+request's domain. Repeat names for ABBA ordering. Without the argument it runs
+`reuse,domain,domain,reuse`, and an unknown name fails before any pass:
+
+```sh
+adb -s <your-emulator> shell am instrument -w -r \
+  -e class dev.ipf.whitenoise.android.media.sandbox.MediaWorkerThroughputDeviceTest \
+  -e throughput_variants reuse,single_use,domain,domain,single_use,reuse \
+  dev.ipf.whitenoise.android.dev.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+Scenarios: five first thumbnails after launch, each on a new lane once no
+image worker or application zygote of the app is alive (`cold_launch`); eight
+first thumbnails on new lanes started back to back, so an application zygote may
+still be warm (`cold_first`); eight first thumbnails in new conversations on a
+warm lane, 400 ms apart (`new_domain`); 24 idle thumbnails 400 ms apart; ten
+1920×1440 viewer decodes 600 ms apart; the six-operation mix back to back; 24-,
+48- and 96-request bursts released together within one conversation; a
+48-request burst across six conversations (`mixed_burst`); a cold chat list of
+24 profile pictures and 8 groups' own images released together (`chat_list`);
+eight overlapping scroll rounds of eight tiles every 400 ms; and, last, the same
+cold chat list with every group showing a URL picture that decodes single-use
+(`chat_list_url`). Unless named otherwise, every request belongs to one
+conversation. The sampler and the cold-launch wait count only the measured
+package's workers and application zygote, so another installed build on a
+physical device does not disturb them.
+Inputs repeat on purpose: thumbnails come from 160 distinct images chosen by
+request index, so indices wrap after 160 requests in one pass; the viewer rows
+cycle ten decodes over four 1920×1440 images; and the mix reuses its three fixed
+inputs. Rows go to instrumentation status key
+`media_worker_throughput_json` and, when available, a
+`media-worker-throughput-*.jsonl` file. Each request records latency, admission
+wait and whether it reached the lane within the eight-second deadline.
+Each scenario records binding attempts (the `worker_starts` field counts every
+`bindIsolatedService` call, refused and throwing ones included, so it bounds
+process starts rather than observing them), bind-to-connect times, the most live worker
+processes and their RSS sum (read through `ps` as the shell UID), caller RSS
+and FD maxima and the lowest system MemAvailable. RSS counts pages shared with
+the zygote once per process; measure PSS separately with `dumpsys meminfo`.
+Results are performance observations, never a security qualification. Compare
+only matching corpus digests on the same device, API and build configuration.
+
+## UI-level checks
+
+`MediaWorkerUiDeviceTest` runs in the focused containment campaign against the
+installed lane: a real three-column Compose grid of 120 distinct JPEG tiles,
+each decoded through the production bubble decode and scrolled to its end by
+touch; notification avatar artwork within the presenter's 2.5-second bound and
+emoji artwork within its 250 ms bound, idle and behind a 24-image burst in
+another conversation (the measurement fixture adds the same conversation); and
+viewer and photo-editor decodes cancelled once their input reached a worker,
+followed by another image. `MediaWorkerUiThroughputDeviceTest` is the opt-in
+`ManualDeviceFixture` that repeats the same scenarios for a named lane
+(`-e ui_lane reuse|single_use|domain|default`, one grid pass per run) and emits
+rows under `media_worker_ui_json`. Its `measureGroupNotificationArtwork` method
+repeats the notification rows with a group's URL picture as the avatar, which
+decodes single-use (scenario names end in `_group_url`). Each grid row also records the setup time,
+the slowest loaded tile with its start, and the settle window a visible tile
+has once scrolling stops, so an outlier can be placed in its run and the margin
+read off.
+Both use synthetic images only.

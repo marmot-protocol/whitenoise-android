@@ -3,6 +3,37 @@
 The main application requests `android:memtagMode="async"`. Debug builds replace
 that value with `sync` for fault attribution. Play, Zapstore and preview overlays
 inherit this policy, as do the isolated image and animation decoder processes.
+On stock Android the still-image worker forks from the app's application zygote
+(#3373). A worker starts from its zygote's heap-tagging state, and Bionic cannot
+turn tagging back on in a process where it was disabled
+([`SetHeapTaggingLevel`](https://android.googlesource.com/platform/bionic/+/refs/tags/android-15.0.0_r1/libc/bionic/heap_tagging.cpp#144)).
+In the AOSP source, read on 31 October 2026:
+
+- Android 11 and 12.0 start every application zygote with runtime flags 0, which
+  turns its tagging off
+  ([`AppZygote`](https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-12.0.0_r1/core/java/android/os/AppZygote.java#113)),
+  so its workers run without MTE and without pointer tagging (TBI). Whether any
+  Android 12.0 device enables MTE was not checked; the TBI loss applies to arm64
+  devices on those versions.
+- Android 12.1 gives the application zygote the app's own level
+  ([`decideTaggingLevelForAppZygote`](https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-12.1.0_r1/services/core/java/com/android/server/am/ProcessList.java#1751)),
+  so workers keep MTE on capable hardware, and keep TBI for an app targeting
+  above API 31, as this one does.
+- Android 13 and later also give it the app's level
+  ([`AppZygote`](https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-13.0.0_r1/core/java/android/os/AppZygote.java#112)),
+  so workers keep MTE on MTE hardware. Without MTE hardware, the app's TBI level
+  is reset to none for an app targeting above API 31
+  ([`getMemorySafetyRuntimeFlagsForSecondaryZygote`](https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-15.0.0_r1/core/java/com/android/internal/os/Zygote.java#1488)),
+  the opposite of what that compat change's own description says. Its workers
+  still request TBI and Bionic refuses it, so they run untagged.
+
+Workers started without the application zygote, as master starts them, keep the
+app's level. GrapheneOS exec-spawns those workers instead, each with the app's
+own level. Everything above is a source reading, not a device observation. On a
+non-MTE arm64 device or emulator, a worker's libc log line `SetHeapTaggingLevel:
+re-enabling tagging after it was disabled is not supported` confirms the TBI
+loss; the qualification below records each worker's state on MTE hardware.
+
 Native libraries, ABIs, the minimum Android version and package/signing identities
 retain their existing configuration.
 
@@ -35,7 +66,8 @@ Release qualification requires the following evidence in addition to the source 
   distributions, persistent preview and debug: the release ASYNC request, debug SYNC
   request and inherited process policy. Bind observations to the exact APK and native dependency.
 - On MTE-capable arm64 hardware, record OS/build, manifest requests and MTE state
-  (enabled, disabled or unverified) in the app and both decoder processes. Require
+  (enabled, disabled or unverified) in the app, both decoder processes and the
+  image worker's application zygote. Require
   MTE enabled on capable hardware; no fault-mode probe is required. Ordinary emulators and
   unsupported hardware establish compatibility only. Test GrapheneOS separately
   when available; retain separate results for each OS.

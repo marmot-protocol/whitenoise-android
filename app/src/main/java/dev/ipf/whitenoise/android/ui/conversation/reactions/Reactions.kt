@@ -39,7 +39,7 @@ import dev.ipf.whitenoise.android.state.ReactionParticipant
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
-import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.PersonAvatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.design.BottomAnchoredPopupPositionProvider
@@ -276,7 +276,7 @@ private fun ReactionParticipantRow(
             { ReactionParticipantSupportingText(text) }
         }
     val leading: @Composable () -> Unit = {
-        Avatar(
+        PersonAvatar(
             title = displayName,
             seed = participant.sender,
             size = 48.dp,

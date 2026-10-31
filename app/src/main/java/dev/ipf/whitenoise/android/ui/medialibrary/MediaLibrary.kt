@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.IndexedAttachment
 import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -1418,6 +1419,7 @@ private fun SenderAvatar(
         seed = sender,
         size = 36.dp,
         pictureUrl = appState.contactAvatarSource(sender),
+        pictureDomain = AvatarImageLoader.publicProfiles(),
     )
 }
 

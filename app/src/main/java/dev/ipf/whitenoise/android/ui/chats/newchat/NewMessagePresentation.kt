@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.StartingAccount
@@ -250,7 +251,13 @@ internal fun NewMessagePersonRow(
                     .recipientRelationshipSemantics(followed, null),
             leadingContent = {
                 Box(Modifier.size(48.dp)) {
-                    Avatar(candidate.displayName, candidate.accountIdHex, size = 48.dp, pictureUrl = person.avatarUrl)
+                    Avatar(
+                        candidate.displayName,
+                        candidate.accountIdHex,
+                        size = 48.dp,
+                        pictureUrl = person.avatarUrl,
+                        pictureDomain = AvatarImageLoader.publicProfiles(),
+                    )
                     if (candidate.isFollowing) FollowedPersonBadge(Modifier.align(Alignment.BottomEnd))
                 }
             },

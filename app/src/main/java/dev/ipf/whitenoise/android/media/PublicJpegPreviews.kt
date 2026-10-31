@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.os.SystemClock
 import android.util.LruCache
 import dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -201,12 +202,16 @@ internal class PublicJpegPreviewLoader {
             .forEach(pixels::remove)
     }
 
+    /**
+     * One serialized, cancellable acquisition and admission boundary. The linked JPEG is inspected and
+     * decoded in a worker serving only [domain], the conversation whose message links it.
+     */
     @Suppress("CyclomaticComplexMethod", "LongMethod")
-    // One serialized, cancellable acquisition and admission boundary.
     suspend fun load(
         owner: String,
         url: String,
         allowed: () -> Boolean,
+        domain: MediaTrustDomain = MediaTrustDomain.Unique,
         fetch: suspend (String, ULong) -> ByteArray,
     ): Bitmap? =
         withContext(Dispatchers.IO) {
@@ -226,13 +231,18 @@ internal class PublicJpegPreviewLoader {
                         if (!admitted()) return@withTimeoutOrNull null
                         val bytes = fetch(url, PUBLIC_JPEG_MAX_BYTES.toULong())
                         if (!admitted() || !publicJpegPayloadMatches(bytes, digest)) return@withTimeoutOrNull null
-                        val info = IsolatedMediaDecoder.inspect(bytes) ?: return@withTimeoutOrNull null
+                        val info =
+                            MediaTrustScope.within(domain) { IsolatedMediaDecoder.inspect(bytes) }
+                                ?: return@withTimeoutOrNull null
                         val dimensionsAllowed =
                             info.width in 1..MAX_EDGE &&
                                 info.height in 1..MAX_EDGE &&
                                 info.width.toLong() * info.height <= MAX_PIXELS
                         if (info.mime != "image/jpeg" || !dimensionsAllowed) return@withTimeoutOrNull null
-                        val image = IsolatedMediaDecoder.decode(bytes, edge = PREVIEW_DECODE_EDGE, oriented = true)
+                        val image =
+                            MediaTrustScope.within(domain) {
+                                IsolatedMediaDecoder.decode(bytes, edge = PREVIEW_DECODE_EDGE, oriented = true)
+                            }
                         image?.takeIf { admitted() }?.also {
                             pixels.put(key, it)
                             if (!admitted()) pixels.remove(key)

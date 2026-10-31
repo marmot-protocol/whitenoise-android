@@ -415,7 +415,14 @@ private suspend fun decodeOwnedGiphyPresentation(
     bytes: ByteArray,
 ): DecodedAttachmentPresentation? {
     if (!controller.ownsRetainedForegroundPresentation) throw CancellationException("GIPHY owner retired")
-    val result = decodeMessageAttachmentImage(bytes, request.mediaType, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
+    val result =
+        decodeMessageAttachmentImage(
+            bytes,
+            request.mediaType,
+            MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+            // GIPHY serves these bytes from an allow-listed host with no digest a member pinned, so single-use.
+            domain = dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
+        )
     if (!controller.ownsRetainedForegroundPresentation) {
         result?.releaseOwnedPresentation()
         throw CancellationException("GIPHY owner retired during decode")

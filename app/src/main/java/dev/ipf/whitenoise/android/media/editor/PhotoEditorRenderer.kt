@@ -12,6 +12,8 @@ import android.graphics.Rect
 import android.graphics.RectF
 import dev.ipf.whitenoise.android.media.ImageAnimationStatus
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
+import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
 import dev.ipf.whitenoise.android.state.MediaQuality
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -85,13 +87,27 @@ internal class PhotoEditorRenderer(
     private val memoryBudgetBytes: () -> Long = ::defaultEditorMemoryBudgetBytes,
     private val onEncode: () -> Unit = {},
 ) {
-    suspend fun inspect(sourceBytes: ByteArray): PhotoEditorInspectResult =
-        withContext(renderDispatcher) {
+    /**
+     * Validates [sourceBytes] as an editable still, inspected in [domain]: the conversation's shared outgoing
+     * domain, whose worker never sees another conversation's picks. Single-use when the caller names none.
+     */
+    suspend fun inspect(
+        sourceBytes: ByteArray,
+        domain: MediaTrustDomain = MediaTrustDomain.Unique,
+    ): PhotoEditorInspectResult =
+        withContext(renderContext(domain)) {
             inspectNow(sourceBytes)
         }
 
-    suspend fun decodePreview(sourceBytes: ByteArray): Bitmap? =
-        withContext(renderDispatcher) {
+    /**
+     * A bounded, upright preview of [sourceBytes] for the editor, or null, decoded in [domain]: the conversation's
+     * shared outgoing domain, which only that draft's own picks ever reach.
+     */
+    suspend fun decodePreview(
+        sourceBytes: ByteArray,
+        domain: MediaTrustDomain = MediaTrustDomain.Unique,
+    ): Bitmap? =
+        withContext(renderContext(domain)) {
             when (inspectNow(sourceBytes)) {
                 is PhotoEditorInspectResult.Failure -> null
                 is PhotoEditorInspectResult.Success -> {
@@ -111,12 +127,18 @@ internal class PhotoEditorRenderer(
             }
         }
 
+    /**
+     * Renders [recipe] over [sourceBytes] at [quality], inspecting and decoding in [domain]: the conversation's
+     * shared outgoing domain, edited or not. Its worker has seen only this draft's picks, so a hostile pick of the
+     * same draft could undo this edit, but nothing from another conversation, account or domain reaches it.
+     */
     suspend fun render(
         sourceBytes: ByteArray,
         recipe: PhotoEditRecipe,
         quality: MediaQuality,
+        domain: MediaTrustDomain = MediaTrustDomain.Unique,
     ): PhotoEditorRenderResult =
-        withContext(renderDispatcher) {
+        withContext(renderContext(domain)) {
             processRenderMutex.withLock {
                 currentCoroutineContext().ensureActive()
                 val inspected = inspectNow(sourceBytes)
@@ -198,6 +220,9 @@ internal class PhotoEditorRenderer(
             effectiveLabel = "$profileName · ${geometry.outputSize.width} × ${geometry.outputSize.height}",
         )
     }
+
+    /** The render dispatcher, declaring [domain] as the worker domain on whichever thread decodes. */
+    private fun renderContext(domain: MediaTrustDomain) = renderDispatcher + MediaTrustScope.element(domain)
 
     @Suppress("CyclomaticComplexMethod") // Fail-closed source validation is intentionally centralized.
     private fun inspectNow(sourceBytes: ByteArray): PhotoEditorInspectResult {

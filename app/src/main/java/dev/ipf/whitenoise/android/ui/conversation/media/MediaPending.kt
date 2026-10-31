@@ -39,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
 import dev.ipf.whitenoise.android.state.FileUploadProgress
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.PendingAttachment
@@ -360,13 +361,14 @@ private fun PendingGridTile(
 private fun rememberPendingVisualPreview(attachment: PendingAttachment?): ImageBitmap? {
     val bytes = attachment?.inMemoryBytes
     val isVideo = attachment != null && attachment.isPendingVideo
+    val domain = LocalPickedMediaDomain.current
     var bitmap by remember(bytes, isVideo) { mutableStateOf<android.graphics.Bitmap?>(null) }
     LaunchedEffect(bytes, isVideo) {
         bitmap =
             if (bytes == null) {
                 null
             } else {
-                withContext(Dispatchers.Default) {
+                withContext(Dispatchers.Default + MediaTrustScope.element(domain)) {
                     if (isVideo) {
                         pendingVideoPosterFrame(bytes, extractPoster = true).bitmap
                     } else {

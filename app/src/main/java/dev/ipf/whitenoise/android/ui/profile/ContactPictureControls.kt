@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.ui.common.Avatar
 
 /** Accessible text actions remain vertically reachable at large font scales in the editor's scroll container. */
@@ -28,7 +29,14 @@ internal fun ContactPictureControls(
     Column {
         Text(stringResource(R.string.contact_private_picture), style = MaterialTheme.typography.titleSmall)
         // The contact identity seeds the monogram colour exactly as every other surface does.
-        Avatar(title, seed, 64.dp, source.takeIf { state.preview == null }, state.preview)
+        Avatar(
+            title,
+            seed,
+            64.dp,
+            source.takeIf { state.preview == null },
+            state.preview,
+            pictureDomain = AvatarImageLoader.publicProfiles(),
+        )
         TextButton(onPick, enabled = !state.busy, modifier = Modifier.testTag("contact_picture.pick")) {
             val label = if (state.hasPicture) R.string.contact_picture_replace else R.string.contact_picture_pick
             Text(stringResource(label))

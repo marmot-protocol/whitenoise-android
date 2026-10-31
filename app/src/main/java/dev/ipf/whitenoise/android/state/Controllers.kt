@@ -966,9 +966,13 @@ internal suspend fun removeMediaMemoryCacheKeys(
  *
  * A photo decodes its own bytes. A video has a frame pulled from the same bytes instead, so the
  * confirmed bubble opens on the poster the optimistic one already showed rather than waiting for
- * the file to be materialized and read again (#2732).
+ * the file to be materialized and read again (#2732). A photo decodes in [domain]'s worker.
  */
-private suspend fun decodeMediaThumbnailOffMain(attachment: PendingAttachment): android.graphics.Bitmap? {
+private suspend fun decodeMediaThumbnailOffMain(
+    attachment: PendingAttachment,
+    domain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
+        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
+): android.graphics.Bitmap? {
     // A file-backed item has no bytes here; its confirmed bubble paints the thumbhash, then MDK's copy.
     val bytes = attachment.inMemoryBytes ?: return null
     return withContext(Dispatchers.Default) {
@@ -978,6 +982,7 @@ private suspend fun decodeMediaThumbnailOffMain(attachment: PendingAttachment): 
             MediaPipeline.decodeSampledBitmap(
                 bytes,
                 MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+                domain = domain,
             )
         }
     }
@@ -5552,17 +5557,32 @@ class ChatsController private constructor(
         row.lastMessage?.sender?.let(appState::requestProfile)
     }
 
+    /**
+     * Warms the pictures a row's next notification may show, in this controller's own account's workers: a
+     * replaced controller recomputing after an account switch never decodes its rows in the new account's worker.
+     */
     private fun preWarmNotificationAvatars(item: ChatListItem) {
         val conversationAvatar =
             ProfileSanitizer.protocolImageUrl(item.group.avatarUrl)
                 ?: ProfileSanitizer.protocolImageUrl(item.projection?.avatarUrl)
+        val profiles =
+            dev.ipf.whitenoise.android.media.MediaTrustDomain
+                .publicProfiles(accountRef)
         if (item.selectedAvatarAsset == null) {
-            AvatarImageLoader.preWarm(conversationAvatar)
+            // A group's own picture here is its URL, whose host chooses the bytes, so it decodes single-use, and a
+            // direct chat's peer picture is a published one.
+            val domain =
+                if (GroupProjector.ownsGroupPicture(item)) {
+                    dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique
+                } else {
+                    profiles
+                }
+            AvatarImageLoader.preWarm(conversationAvatar, domain)
             GroupProjector
                 .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
-                ?.let(appState::preWarmProfileAvatar)
+                ?.let { appState.preWarmProfileAvatar(it, profiles) }
         }
-        item.latest?.sender?.let(appState::preWarmProfileAvatar)
+        item.latest?.sender?.let { appState.preWarmProfileAvatar(it, profiles) }
     }
 
     private fun firstFrameAvatarSeed(item: ChatListItem): ChatListAvatarSeed? {
@@ -6411,6 +6431,10 @@ internal typealias MediaPublisher =
 
 internal typealias InviteAcceptor = suspend (String, String) -> AppGroupRecordFfi
 
+/** Decodes a just-sent attachment's poster in the given worker domain, its send's shared outgoing domain. */
+internal typealias MediaThumbnailDecoder =
+    suspend (PendingAttachment, dev.ipf.whitenoise.android.media.MediaTrustDomain) -> android.graphics.Bitmap?
+
 private const val MESSAGE_EDIT_EVENT_KIND = 1009uL
 
 class ConversationController(
@@ -6462,8 +6486,10 @@ class ConversationController(
         }
     },
     private val mediaPublisher: MediaPublisher? = null,
-    private val mediaThumbnailDecoder: suspend (PendingAttachment) -> android.graphics.Bitmap? =
-        ::decodeMediaThumbnailOffMain,
+    // A just-sent pick decodes in the domain its send names, the conversation's shared outgoing worker.
+    private val mediaThumbnailDecoder: MediaThumbnailDecoder = { attachment, domain ->
+        decodeMediaThumbnailOffMain(attachment, domain)
+    },
     private val markdownParser: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
     private val groupArchivedUpdater: suspend (String, String, Boolean) -> AppGroupRecordFfi =
         { account, groupIdHex, archived ->
@@ -6864,6 +6890,21 @@ class ConversationController(
     private val conversationRuntimeGeneration = appState.runtimeGeneration
     internal val boundAccountRef: String?
         get() = conversationAccountRef
+
+    /** This conversation's media trust domain: a worker that decodes its images serves no other conversation. */
+    internal val mediaTrustDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain
+        get() =
+            dev.ipf.whitenoise.android.media.MediaTrustDomain
+                .conversation(conversationAccountRef, group.groupIdHex)
+
+    /**
+     * The domain every file this conversation's user picks to send here decodes in, restored draft attachments
+     * included: the draft's one shared outgoing worker, never another conversation's.
+     */
+    internal val outgoingMediaTrustDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain
+        get() =
+            dev.ipf.whitenoise.android.media.MediaTrustDomain
+                .outgoing(conversationAccountRef, group.groupIdHex)
 
     /** Current retained owner eligibility; the shell's privacy and route admission remain independent. */
     internal val ownsRetainedForegroundPresentation: Boolean
@@ -9566,7 +9607,11 @@ class ConversationController(
                         // Offload the multi-MB ARGB decode to Default; the
                         // main-confined thumbnail-cache put resumes on Main.
                         // Mirrors the receive/render path in WhiteNoiseApp.
-                        val decoded = mediaThumbnailDecoder(attachment)
+                        // The send's own account and conversation name the outgoing domain its previews used.
+                        val outgoing =
+                            dev.ipf.whitenoise.android.media.MediaTrustDomain
+                                .outgoing(account, group.groupIdHex)
+                        val decoded = mediaThumbnailDecoder(attachment, outgoing)
                         if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
                         if (decoded != null) {
                             appState.cacheMediaThumbnail(confirmedKey, decoded)

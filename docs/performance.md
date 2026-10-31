@@ -373,6 +373,21 @@ concurrency, or a signed release candidate. Those require their own fixtures and
 passing this diagnostic must not be treated as proof that all field latency
 tails are eliminated.
 
+### Still-image worker lane throughput
+
+`MediaWorkerThroughputDeviceTest` compares still-image transport variants on one
+APK, device and synthetic corpus: cold first thumbnails, first images in new
+conversations, idle thumbnails and viewer decodes, the six-operation mix,
+24/48/96-request bursts within one conversation, a mixed burst across
+conversations, a cold chat list and overlapping scroll rounds. It records latency, admission wait, eight-second admission
+timeouts, worker starts, live worker processes and caller FD/RSS. It is an
+opt-in `ManualDeviceFixture`; run it with `am instrument` on a disposable
+emulator or dedicated device, in ABBA order. The procedure and record format are
+in [the still-worker baseline](media-worker-baseline.md#matched-throughput-comparison);
+the #3373 results and proposed budget are recorded with the
+[domain-bound worker generations](media-containment.md#domain-bound-worker-generations). Measure worker
+PSS separately with `dumpsys meminfo`; RSS counts shared zygote pages per process.
+
 ### Deterministic Android media regressions
 
 Run `MediaDownloadHostRegressionTest` for the actual app-state download and

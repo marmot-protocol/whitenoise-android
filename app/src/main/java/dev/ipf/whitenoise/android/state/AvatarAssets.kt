@@ -50,12 +50,14 @@ internal fun AvatarAssetFfi.cacheKey(accountRef: String): String? {
  * A visible asset the engine does not hold yet is also requested here, because MarmotKit acquires avatars
  * only for targets a screen names; the acquired bytes arrive as a later projection with a new content
  * revision, which re-keys the caller. Missing or deferred local bytes remain a lazy placeholder; the
- * caller never substitutes a second URL acquisition for an authoritative MDK asset.
+ * caller never substitutes a second URL acquisition for an authoritative MDK asset. The decode runs in
+ * [domain]'s worker, or the domain the chat list names for this asset when null.
  */
 internal suspend fun WhiteNoiseAppState.durableAvatar(
     asset: AvatarAssetFfi?,
     accountRef: String? = activeAccountRef,
     acquireMissing: Boolean = true,
+    domain: dev.ipf.whitenoise.android.media.MediaTrustDomain? = null,
 ): ImageBitmap? {
     val ownedAsset = asset?.copy()
     val lifetime = AvatarImageLoader.currentCacheLifetime()
@@ -65,10 +67,44 @@ internal suspend fun WhiteNoiseAppState.durableAvatar(
     val account = accountRef
     val key = account?.let { renderable?.cacheKey(it) }
     if (reference == null || key == null || account == null) return null
-    return AvatarImageLoader.loadStored(key, lifetime) {
+    val decodeDomain = domain ?: durableAvatarDomain(renderable, account)
+    return AvatarImageLoader.loadStored(key, lifetime, decodeDomain) {
         readDurableAvatarBytes(account, checkNotNull(renderable))
     }
 }
+
+/**
+ * The worker domain of a chat-list row's avatar: a group's encrypted picture belongs to its conversation, a group's
+ * URL picture decodes single-use, and any other row shows a person's published picture.
+ */
+internal fun chatListAvatarDomain(
+    item: ChatListItem,
+    accountRef: String?,
+): dev.ipf.whitenoise.android.media.MediaTrustDomain =
+    dev.ipf.whitenoise.android.ui.common.groupAvatarDecodeDomain(
+        dev.ipf.whitenoise.android.core.GroupProjector
+            .ownsGroupPicture(item),
+        dev.ipf.whitenoise.android.core.GroupProjector
+            .pictureIsMemberPinned(item.group),
+        accountRef,
+        item.group.groupIdHex,
+    )
+
+/**
+ * The worker domain of a durable [asset] some chat-list row selects, or single-use when no current row selects it,
+ * since the asset alone does not say whether a group or a person owns it.
+ */
+internal fun WhiteNoiseAppState.durableAvatarDomain(
+    asset: AvatarAssetFfi,
+    accountRef: String,
+): dev.ipf.whitenoise.android.media.MediaTrustDomain =
+    chatListItemsForAvatarDomains()
+        .firstOrNull { item ->
+            item.selectedAvatarAsset?.let {
+                it.reference == asset.reference && it.contentRevision == asset.contentRevision
+            } == true
+        }?.let { chatListAvatarDomain(it, accountRef) }
+        ?: dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique
 
 /** Accepts bytes only for the immutable reference/revision selected by this presentation. */
 internal fun AvatarBytesFfi.matchesAvatarAsset(asset: AvatarAssetFfi): Boolean {

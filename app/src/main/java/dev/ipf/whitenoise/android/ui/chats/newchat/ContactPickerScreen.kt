@@ -35,6 +35,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ChatListIdentifierSearch
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
@@ -327,6 +328,7 @@ internal fun ContactPickerScreen(
                             trailing = {
                                 SelectionIndicator(selected = isSelected, dimmed = alreadyMember)
                             },
+                            avatarDomain = AvatarImageLoader.publicProfiles(),
                         )
                     }
                 } else if (matches.isEmpty()) {
@@ -378,6 +380,7 @@ internal fun ContactPickerScreen(
                                 }
                             },
                             trailing = { SelectionIndicator(selected = isSelected) },
+                            avatarDomain = AvatarImageLoader.publicProfiles(),
                         )
                     }
                     if (userSearch.isSearching || resolution.state == RecipientPreviewState.Resolving) {

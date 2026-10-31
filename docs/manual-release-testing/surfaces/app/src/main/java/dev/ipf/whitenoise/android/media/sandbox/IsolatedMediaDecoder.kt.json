@@ -4,6 +4,14 @@
   "categories": {
     "source_coverage": [
       {
+        "surface": "Production install selects domain-bound still-image worker generations",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/sandbox/IsolatedMediaDecoder.kt",
+        "anchor": "fun install(context: Context)",
+        "test_ids": [
+          "MED-031"
+        ]
+      },
+      {
         "surface": "Account reset retains the still-image process owner and revokes the old session",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/media/sandbox/IsolatedMediaDecoder.kt",
         "anchor": "fun resetForAccount()",

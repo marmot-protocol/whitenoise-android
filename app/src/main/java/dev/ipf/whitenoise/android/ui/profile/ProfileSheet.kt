@@ -553,7 +553,7 @@ internal fun ProfileSheet(
     val displayTitle = contactNickname ?: title
     val pictureUrl = hex?.let { appState.contactAvatarSource(it) } ?: profile.pictureUrl
     val bannerUrl = profile.bannerUrl
-    val avatarImageAvailable = rememberAvatarImageAvailable(pictureUrl)
+    val avatarImageAvailable = rememberAvatarImageAvailable(pictureUrl, AvatarImageLoader.publicProfiles())
     val about = profile.about
     val nip05 = profile.nip05
     var nip05ResolvedHex by remember(nip05) { mutableStateOf<String?>(null) }
@@ -1192,7 +1192,10 @@ internal fun rememberProfileBannerLoadState(
     bannerUrl: String,
     targetWidthPx: Int,
     peek: (String, Int) -> ImageBitmap? = AvatarImageLoader::peekBanner,
-    load: suspend (String, Int) -> ImageBitmap? = AvatarImageLoader::loadBanner,
+    load: suspend (String, Int) -> ImageBitmap? = { url, width ->
+        // A kind-0 banner is published, so it decodes in the public profiles.
+        AvatarImageLoader.loadBanner(url, width, AvatarImageLoader.publicProfiles())
+    },
 ): ProfileBannerLoadState {
     var image by remember(bannerUrl, targetWidthPx) { mutableStateOf(peek(bannerUrl, targetWidthPx)) }
     var settled by remember(bannerUrl, targetWidthPx) { mutableStateOf(image != null) }
@@ -1210,7 +1213,10 @@ internal fun rememberProfileBannerLoadState(
 internal fun ProfileBannerImage(
     bannerUrl: String,
     peek: (String, Int) -> ImageBitmap? = AvatarImageLoader::peekBanner,
-    load: suspend (String, Int) -> ImageBitmap? = AvatarImageLoader::loadBanner,
+    load: suspend (String, Int) -> ImageBitmap? = { url, width ->
+        // A kind-0 banner is published, so it decodes in the public profiles.
+        AvatarImageLoader.loadBanner(url, width, AvatarImageLoader.publicProfiles())
+    },
 ) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val targetWidthPx = profileBannerTargetWidthPx(maxWidth)
@@ -1489,6 +1495,7 @@ internal fun ProfileAddToGroupsContent(
                         avatarUrl = avatar.pictureUrl,
                         avatarImage = avatar.image,
                         groupAnimation = avatar.groupAnimation,
+                        avatarDomain = avatar.pictureDomain,
                         enabled = !busy,
                         onClick = {
                             if (isSelected) selected.remove(groupId) else selected.add(groupId)
@@ -1664,6 +1671,7 @@ internal fun ProfileMakeAdminContent(
                             avatarUrl = avatar.pictureUrl,
                             avatarImage = avatar.image,
                             groupAnimation = avatar.groupAnimation,
+                            avatarDomain = avatar.pictureDomain,
                             enabled = !busy,
                             onClick = { selectedGroupId = item.group.groupIdHex },
                             trailing = { SelectionIndicator(selected = selected) },

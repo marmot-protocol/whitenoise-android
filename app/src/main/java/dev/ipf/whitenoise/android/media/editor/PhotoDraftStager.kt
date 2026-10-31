@@ -161,6 +161,10 @@ internal class PhotoDraftStager(
         groupIdHex: String,
         quality: MediaQuality,
     ): PhotoDraftStageResult {
+        // Every decode of a pick runs in its conversation's shared outgoing worker.
+        val domain =
+            dev.ipf.whitenoise.android.media.MediaTrustDomain
+                .outgoing(accountRef, groupIdHex)
         var committed = false
         try {
             val sourceBytes =
@@ -171,15 +175,15 @@ internal class PhotoDraftStager(
                 } catch (_: Exception) {
                     null
                 } ?: return PhotoDraftStageResult.SourceUnavailable
-            val inspected = renderer.inspect(sourceBytes)
+            val inspected = renderer.inspect(sourceBytes, domain)
             if (inspected is PhotoEditorInspectResult.Failure) {
                 return PhotoDraftStageResult.NotEditable(inspected.reason)
             }
             val sourceInfo = (inspected as PhotoEditorInspectResult.Success).source
             val attachment =
-                originalAttachment(sourceBytes, displayName, attachmentId, quality)
+                originalAttachment(sourceBytes, displayName, attachmentId, quality, domain)
                     ?: run {
-                        val rendered = renderer.render(sourceBytes, PhotoEditRecipe.Original, quality)
+                        val rendered = renderer.render(sourceBytes, PhotoEditRecipe.Original, quality, domain)
                         if (rendered !is PhotoEditorRenderResult.Success) {
                             return PhotoDraftStageResult.SourceUnavailable
                         }
@@ -255,15 +259,17 @@ internal class PhotoDraftStager(
         }
     }
 
+    /** The Original-quality attachment for the user's own pick, inspected in its conversation's outgoing [domain]. */
     private fun originalAttachment(
         sourceBytes: ByteArray,
         displayName: String,
         attachmentId: String,
         quality: MediaQuality,
+        domain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
     ): MessageDraftAttachmentFfi? {
         if (!quality.preservesOriginalImageBytes) return null
         val original =
-            MediaPipeline.prepareOriginalImageForUpload(sourceBytes, displayName)
+            MediaPipeline.prepareOriginalImageForUpload(sourceBytes, displayName, domain)
                 as? MediaPipeline.OriginalImageReadResult.Success
                 ?: return null
         return MessageDraftAttachmentFfi(
@@ -315,6 +321,7 @@ internal class PhotoDraftStager(
         }
     }
 
+    /** Reopens [attachment]'s committed editor session, inspecting its source in the conversation's outgoing worker. */
     private suspend fun recover(
         attachment: MessageDraftAttachmentFfi,
         accountRef: String,
@@ -333,7 +340,10 @@ internal class PhotoDraftStager(
             } catch (_: Exception) {
                 null
             } ?: return null
-        val inspected = renderer.inspect(sourceBytes) as? PhotoEditorInspectResult.Success ?: return null
+        val domain =
+            dev.ipf.whitenoise.android.media.MediaTrustDomain
+                .outgoing(accountRef, groupIdHex)
+        val inspected = renderer.inspect(sourceBytes, domain) as? PhotoEditorInspectResult.Success ?: return null
         return DraftBackedPhoto(
             attachment = attachment,
             attachmentDigest = digest,
@@ -345,6 +355,7 @@ internal class PhotoDraftStager(
         )
     }
 
+    /** The draft's existing attachment [attachmentId], recovered, or null when there is none. */
     private suspend fun findExisting(
         attachmentId: String,
         accountRef: String,

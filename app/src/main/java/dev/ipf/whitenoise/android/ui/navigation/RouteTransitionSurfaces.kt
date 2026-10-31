@@ -36,6 +36,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 
@@ -293,6 +294,7 @@ private fun QuickAccountSwitchCue(cue: QuickAccountSwitchTransition) {
                 seed = cue.targetSeed,
                 pictureUrl = cue.targetPictureUrl,
                 size = 72.dp,
+                pictureDomain = AvatarImageLoader.publicProfiles(),
             )
             EmojiLabel(
                 text = stringResource(R.string.switching_to_account, cue.targetTitle),

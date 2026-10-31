@@ -5,6 +5,7 @@ import android.graphics.Color
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
 import dev.ipf.marmotkit.MessageDraftSummaryFfi
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.state.MediaQuality
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -111,6 +112,29 @@ class PhotoEditorCommitterTest {
 
             assertTrue(result is PhotoEditorCommitResult.RenderFailed)
             assertEquals(0, fixture.gateway.saveCalls)
+        }
+
+    /** An edit commits through a render in its conversation's shared outgoing worker, as the draft names it (#3373). */
+    @Test
+    fun editRendersInTheConversationsSharedWorker() =
+        runTest {
+            EditorDomainRecorder().use { recorder ->
+                val fixture = fixture()
+                val outgoing = MediaTrustDomain.outgoing(ACCOUNT, GROUP)
+                val result =
+                    fixture.committer.commit(
+                        accountRef = ACCOUNT,
+                        groupIdHex = GROUP,
+                        currentAttachment = fixture.original,
+                        expectedDigest = fixture.original.editorDigest(),
+                        sourceLeaseId = fixture.sourceLeaseId,
+                        recipe = PhotoEditRecipe(quarterTurnsClockwise = 1),
+                        quality = MediaQuality.Standard,
+                        domain = outgoing,
+                    )
+                assertTrue(result is PhotoEditorCommitResult.Success)
+                assertEquals(setOf(outgoing), recorder.domains())
+            }
         }
 
     private fun fixture(

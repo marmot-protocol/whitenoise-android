@@ -21,7 +21,13 @@ import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
-/** One serialized reusable worker. A live worker that misses its deadline poisons further admission. */
+/**
+ * One serialized reusable worker. A live worker that misses its deadline poisons further admission.
+ *
+ * Production no longer installs this lane — domain-bound generations replaced it (#3373), pending approval of
+ * their proposed budget. It stays as the lane to restore if that budget is rejected and as the measurement
+ * baseline. Removing it is a follow-up after that decision and after #3439, which edits the facade's type checks.
+ */
 @Suppress("TooManyFunctions") // Cohesive binding, admission and descriptor lifecycle for one decoder lane.
 internal class ReusableMediaTransport(
     private val context: Context,
@@ -193,12 +199,22 @@ internal class ReusableMediaTransport(
             }
         }
 
+    /** Measurement-only queue observer, used by matched lane characterization. */
+    @Volatile internal var admissionObserver: MediaAdmissionObserver? = null
+
     private fun <T> serialized(block: () -> T?): T? {
-        if (closed || poisoned || !gate.tryAcquire(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)) return null
-        return try {
-            if (closed || poisoned) null else block()
-        } finally {
-            gate.release()
+        if (closed || poisoned) return null
+        val queued = System.nanoTime()
+        val admitted = gate.tryAcquire(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)
+        admissionObserver?.admission(System.nanoTime() - queued, admitted)
+        return if (!admitted) {
+            null
+        } else {
+            try {
+                if (closed || poisoned) null else block()
+            } finally {
+                gate.release()
+            }
         }
     }
 

@@ -50,8 +50,14 @@ import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.DiskByteCacheKeyProvider
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.media.PresentationMemoryTrim
 import dev.ipf.whitenoise.android.media.minimalMp4Header
+import dev.ipf.whitenoise.android.media.sandbox.ImageInspection
+import dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+import dev.ipf.whitenoise.android.media.sandbox.MediaDecodeTransport
+import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
+import dev.ipf.whitenoise.android.media.sandbox.TestMediaDecodeTransport
 import dev.ipf.whitenoise.android.ui.conversation.ConversationMediaSender
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollCoordinator
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollMode
@@ -95,6 +101,7 @@ import org.robolectric.annotation.Config
 import java.lang.reflect.Proxy
 import java.nio.file.Files
 import java.time.Duration
+import java.util.concurrent.CopyOnWriteArrayList
 import javax.crypto.spec.SecretKeySpec
 
 @RunWith(RobolectricTestRunner::class)
@@ -722,7 +729,7 @@ class ConversationMediaSendReconciliationThumbnailTest {
                     mediaUploader = { _, _, _ -> uploadResult(reference) },
                     mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
                     mediaPublisher = { _, _, _, _ -> requireNotNull(uploadResult(reference).sent) },
-                    mediaThumbnailDecoder = {
+                    mediaThumbnailDecoder = { _, _ ->
                         val original = controller.timeline.single()
                         pendingId = original.presentationId
                         val projection =
@@ -751,6 +758,45 @@ class ConversationMediaSendReconciliationThumbnailTest {
                 )
                 assertEquals(pendingId, controller.timeline.single().presentationId)
             } finally {
+                finishMediaFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
+
+    /**
+     * A just-sent photo's poster decodes in its send's account and conversation outgoing domain, the shared draft
+     * worker its previews used, and never in another conversation's.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun justSentPosterDecodesInItsConversationsSharedWorker() =
+        runTest {
+            Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            val reference = mediaReference()
+            val recorder = PosterDomainRecorder()
+            IsolatedMediaDecoder.installTestTransport(recorder)
+            val controller =
+                ConversationController(
+                    appState = state,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    groupRosterReader = { _, _ -> authoritativeRoster() },
+                    mediaUploader = { _, _, _ -> uploadResult(reference) },
+                    mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
+                    mediaPublisher = { _, _, _, _ -> requireNotNull(uploadResult(reference).sent) },
+                )
+            try {
+                controller.retryMembers()
+                controller.sendAttachments(
+                    listOf(PendingAttachment(PHOTO_BYTES, "image/png", "photo.png", "1x1")),
+                    null,
+                )
+                val outgoing = MediaTrustDomain.Outgoing(ACCOUNT_REF, GROUP_ID)
+                assertEquals(outgoing, controller.outgoingMediaTrustDomain)
+                assertEquals(listOf(outgoing), recorder.decoded.toList())
+            } finally {
+                IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)
                 finishMediaFixture(controller, state)
                 Dispatchers.resetMain()
             }
@@ -1145,6 +1191,26 @@ private val GROUP_ID = "b2".repeat(32)
 private val CONFIRMED_MESSAGE_ID = "c3".repeat(32)
 private const val VIDEO_MEDIA_TYPE = "video/mp4"
 private val VIDEO_BYTES = byteArrayOf(0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109)
+private val PHOTO_BYTES = byteArrayOf(1, 2, 3, 4)
+
+/** Decodes nothing and records the domain of every still decode, in order. */
+private class PosterDomainRecorder : MediaDecodeTransport {
+    val decoded = CopyOnWriteArrayList<MediaTrustDomain>()
+
+    /** Records the domain the decode declares and returns no pixels. */
+    override fun decode(
+        bytes: ByteArray,
+        edge: Int,
+        oriented: Boolean,
+        operation: Int,
+    ): android.graphics.Bitmap? {
+        decoded += MediaTrustScope.current()
+        return null
+    }
+
+    /** No inspection: the poster path only decodes. */
+    override fun inspect(bytes: ByteArray): ImageInspection? = null
+}
 
 /** Allocates a test-only opaque native draft token without loading the device ABI. */
 private fun mediaReplyRevisionStub(): MessageDraftRevisionFfi {

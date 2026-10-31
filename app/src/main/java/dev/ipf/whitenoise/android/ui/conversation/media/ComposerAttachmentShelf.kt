@@ -53,6 +53,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.decodeLocalPreviewAnimation
 import dev.ipf.whitenoise.android.media.readLocalPreviewSource
+import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAccessoryRemoveButton
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -359,10 +360,11 @@ private fun ComposerAttachmentFilename(
 private fun rememberShelfAnimation(uri: Uri): Drawable? {
     val resolver = LocalContext.current.contentResolver
     val resources = LocalContext.current.resources
+    val domain = LocalPickedMediaDomain.current
     return key(resolver, uri) {
         val drawable by produceState<Drawable?>(null, resolver, uri) {
             value =
-                withContext(Dispatchers.IO) {
+                withContext(Dispatchers.IO + MediaTrustScope.element(domain)) {
                     val source =
                         readLocalPreviewSource(
                             open = { resolver.openInputStream(uri) },

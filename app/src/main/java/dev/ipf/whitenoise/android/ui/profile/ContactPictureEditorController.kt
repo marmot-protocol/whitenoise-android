@@ -75,8 +75,10 @@ internal class ContactPictureEditorController(
     /** Decodes bounded picker bytes off the main thread and publishes crop state only to the still-current editor. */
     private suspend fun openCrop(bytes: ByteArray) {
         val renderer = PhotoEditorRenderer()
-        val inspected = renderer.inspect(bytes) as? PhotoEditorInspectResult.Success
-        val preview = checkNotNull(renderer.decodePreview(bytes))
+        // A private contact picture being prepared is no outgoing pick: it decodes single-use.
+        val single = dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique
+        val inspected = renderer.inspect(bytes, single) as? PhotoEditorInspectResult.Success
+        val preview = checkNotNull(renderer.decodePreview(bytes, single))
         val source = IdentityImageCropSource(bytes, preview, checkNotNull(inspected).source.orientedSize)
         if (isCurrent()) mutableState.value = mutableState.value.copy(crop = source)
     }
@@ -86,7 +88,8 @@ internal class ContactPictureEditorController(
         edit {
             val source = checkNotNull(mutableState.value.crop)
             val normalized = preparePrivateContactPicture(source.bytes, crop)
-            val preview = checkNotNull(PhotoEditorRenderer().decodePreview(normalized)).asImageBitmap()
+            val single = dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique
+            val preview = checkNotNull(PhotoEditorRenderer().decodePreview(normalized, single)).asImageBitmap()
             if (isCurrent()) {
                 sourceBytes = source.bytes
                 change = ContactPictureChange.Replace(normalized)
