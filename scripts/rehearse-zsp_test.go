@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"os/exec"
 	"strings"
 	"sync"
 	"testing"
@@ -364,5 +365,42 @@ func TestOfflinePublisherDeadlineDiagnostic(t *testing.T) {
 		if !strings.Contains(err.Error(), field) {
 			t.Fatalf("missing diagnostic field %q: %v", field, err)
 		}
+	}
+}
+
+// A CLI failure may contain arbitrary remote text; only bounded allowlisted codes reach logs.
+func TestPreflightFailureRedactsCLIErrorDocument(t *testing.T) {
+	cases := []struct{ name, stderr, expected string }{
+		{"known", `{"ok":false,"error":{"code":"signer_unavailable","message":"private-secret-key"},"client":"private-client-id"}`, "signer_unavailable"},
+		{"unknown", `{"ok":false,"error":{"code":"private-secret-key","message":"private-client-id"}}`, "unavailable_unsupported"},
+		{"malformed", `private-secret-key private-client-id`, "unavailable_malformed"},
+		{"oversize", strings.Repeat("private-secret-key", 4096), "unavailable_oversize"},
+		{"missing-status", `{"error":{"code":"signer_unavailable"}}`, "unavailable_malformed"},
+		{"success-status", `{"ok":true,"error":{"code":"signer_unavailable"}}`, "unavailable_malformed"},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			commandErr := &exec.ExitError{Stderr: []byte(test.stderr)}
+			ctx, cancel := context.WithCancel(context.Background())
+			cancel()
+			relay := newOfflineSignerRelay(ctx, nil, "private-client-id")
+			relay.mu.Lock()
+			err := relay.preflightFailure(ctx, commandErr, time.Now())
+			relay.mu.Unlock()
+			if !errors.Is(err, commandErr) {
+				t.Fatal("diagnostic discarded original failure")
+			}
+			for _, field := range []string{"phase=check", "elapsed=", "context=context canceled", "relay_counters=busy", "error_code=" + test.expected} {
+				if !strings.Contains(err.Error(), field) {
+					t.Fatalf("missing field %q: %v", field, err)
+				}
+			}
+			if strings.Contains(err.Error(), "private-") {
+				t.Fatal("diagnostic exposed remote text or fixture identity")
+			}
+		})
+	}
+	if got := preflightErrorCode(errors.New("private-secret-key")); got != "unavailable_no_exit_document" {
+		t.Fatalf("non-exit failure must have no remote code: %q", got)
 	}
 }
