@@ -1178,7 +1178,7 @@ internal fun sameRenderableSendTags(
 /**
  * Find a projected timeline row that matches [optimistic] and is committed locally
  * but not yet published (`sourceMessageIdHex == null`). Used when retrying a failed
- * optimistic send so we drive `retryGroupConvergence` instead of minting a duplicate.
+ * optimistic send so we wait for native publication instead of minting a duplicate.
  */
 internal fun committedButUnpublishedProjectionForOptimistic(
     timelineRecords: Map<String, TimelineMessageRecordFfi>,
@@ -8518,7 +8518,9 @@ class ConversationController(
             )
             appState.pendingSendDiagnostics.alias(tempId, reconciliation.confirmedId)
             appState.pendingSendDiagnostics.recordAcceptedPending(tempId, reconciliation.acceptedPending)
-            convergeAcceptedPendingTextSend(account, reconciliation, tempId)
+            // MDK drains durable submissions and schedules convergence. A host recovery
+            // call here would hold the group commit lock across network maintenance,
+            // preventing the next message from even reaching durable admission.
             if (reconciliation.awaitingProjection) {
                 appState.pendingSendDiagnostics.update(tempId, PerformanceSendStage.WAITING_PROJECTION)
             }
@@ -8818,45 +8820,6 @@ class ConversationController(
                     )
                 }
         }
-    }
-
-    /** Keeps accepted-pending settlement alive when navigation disposes this conversation's visible route. */
-    private suspend fun convergeAcceptedPendingTextSend(
-        account: String,
-        reconciliation: SuccessfulTextSendReconciliation,
-        optimisticId: String,
-    ) {
-        if (!reconciliation.acceptedPending) return
-        appState.pendingSendDiagnostics.milestone(
-            optimisticId,
-            PerformancePhase.CONVERGENCE_START,
-            PerformanceSendStage.CONVERGENCE,
-            layer = PerformanceLayer.MDK,
-        )
-        var deferred = false
-        runAcceptedPendingTextConvergence(
-            acceptedPending = reconciliation.acceptedPending,
-            converge = {
-                appState.withGroupCommitLock(account, group.groupIdHex) {
-                    appState.marmotIo { retryGroupConvergence(account, group.groupIdHex) }
-                }
-            },
-            onFailure = { throwable ->
-                deferred = true
-                Log.w(
-                    "ConversationController",
-                    "accepted-pending convergence deferred; keeping preview pending",
-                    throwable,
-                )
-            },
-        )
-        appState.pendingSendDiagnostics.milestone(
-            optimisticId,
-            if (deferred) PerformancePhase.CONVERGENCE_DEFERRED else PerformancePhase.CONVERGENCE_RETURN,
-            PerformanceSendStage.WAITING_PROJECTION,
-            result = if (deferred) PerformanceResult.FAILURE else PerformanceResult.PENDING,
-            layer = PerformanceLayer.MDK,
-        )
     }
 
     /**
@@ -11030,9 +10993,6 @@ class ConversationController(
             if (committedProjection != null) {
                 optimisticSendPhases[key] = OptimisticSendPhase.ACCEPTED_PENDING
                 preserveOptimisticDisplayPosition(committedProjection.messageIdHex, tempId)
-                appState.withGroupCommitLock(account, group.groupIdHex) {
-                    appState.marmotIo { retryGroupConvergence(account, group.groupIdHex) }
-                }
                 completeDurableAcceptance(key)
                 transferRetentionAtSend(tempId, committedProjection.messageIdHex)
                 appState.commitOptimisticSentPreview(
@@ -11043,12 +11003,7 @@ class ConversationController(
                 )
                 optimisticMessages.remove(key)
                 messageById.remove(tempId)
-                val projectedAction = TimelineProjector.toAppMessageRecord(committedProjection)
-                val projectedRecord =
-                    projectedAction.withRecordedAtOverride(
-                        localTimelineTimestampOverrides[committedProjection.messageIdHex],
-                    )
-                messageById[committedProjection.messageIdHex] = projectedRecord
+                val projectedRecord = upsertProjectedRecord(committedProjection)
                 handoffPendingMessageEdit(tempId, committedProjection.messageIdHex, ready = true)
                 invalidatedProjectionIdsMatchingMessage(timelineRecords, projectedRecord)
                     .forEach(::removeProjectedRecord)
@@ -11103,7 +11058,6 @@ class ConversationController(
             )
             appState.pendingSendDiagnostics.alias(tempId, reconciliation.confirmedId)
             appState.pendingSendDiagnostics.recordAcceptedPending(tempId, reconciliation.acceptedPending)
-            convergeAcceptedPendingTextSend(account, reconciliation, tempId)
             if (reconciliation.awaitingProjection) {
                 appState.pendingSendDiagnostics.update(tempId, PerformanceSendStage.WAITING_PROJECTION)
             }
