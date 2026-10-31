@@ -15,6 +15,8 @@ import dev.ipf.whitenoise.android.core.IdentityFormatter
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
+private const val GROUP_ID_LOG_PREFIX_LENGTH = 8
+
 internal fun preferredConversationShortcutTitle(
     candidate: String,
     existing: String?,
@@ -210,7 +212,9 @@ internal class NotificationConversationShortcuts(
                 }
             }
         }.onFailure {
-            notificationDebug { "conversation shortcut skipped group=${update.groupIdHex.take(8)}" }
+            notificationDebug {
+                "conversation shortcut skipped group=${update.groupIdHex.take(GROUP_ID_LOG_PREFIX_LENGTH)}"
+            }
         }.getOrDefault(false)
 
     /**

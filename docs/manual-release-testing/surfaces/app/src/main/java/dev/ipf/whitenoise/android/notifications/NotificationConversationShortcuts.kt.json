@@ -27,6 +27,14 @@
         "test_ids": [
           "NTF-042"
         ]
+      },
+      {
+        "surface": "fallback app label for blank conversation shortcut titles",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationConversationShortcuts.kt",
+        "anchor": "R.string.app_name",
+        "test_ids": [
+          "NTF-042"
+        ]
       }
     ]
   }

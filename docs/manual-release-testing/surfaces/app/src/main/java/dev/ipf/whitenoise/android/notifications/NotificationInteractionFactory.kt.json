@@ -19,6 +19,30 @@
         "test_ids": [
           "NTF-042"
         ]
+      },
+      {
+        "surface": "localized inline reply input label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationInteractionFactory.kt",
+        "anchor": "R.string.message",
+        "test_ids": [
+          "NTF-042"
+        ]
+      },
+      {
+        "surface": "localized Reply notification action label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationInteractionFactory.kt",
+        "anchor": "R.string.reply",
+        "test_ids": [
+          "NTF-042"
+        ]
+      },
+      {
+        "surface": "localized Mark as read notification action label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationInteractionFactory.kt",
+        "anchor": "R.string.chat_row_action_mark_read",
+        "test_ids": [
+          "NTF-042"
+        ]
       }
     ]
   }
