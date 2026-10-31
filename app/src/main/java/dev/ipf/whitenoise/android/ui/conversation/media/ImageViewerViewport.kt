@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
@@ -139,11 +140,9 @@ internal fun ImageViewerViewport(
                         // Read the owner after the first event, then accumulate without waiting for recomposition.
                         val current = accumulated ?: ViewerTransform(latestScale, latestOffset)
                         accumulated = current
-                        // A new down has no previous centroid; retain the owner until a shared sample exists.
-                        if (event.changes.none { it.pressed && it.previousPressed }) continue
                         val currentScale = current.scale
                         val currentOffset = current.offset
-                        if (pressedCount >= 2 || currentScale > 1f) {
+                        if (event.hasViewerTransformSample(pressedCount, currentScale)) {
                             val next =
                                 applyViewerTransformGesture(
                                     current = current,
@@ -240,3 +239,9 @@ internal fun ImageViewerViewport(
         overlay(geometry)
     }
 }
+
+/** A new down has no previous centroid; transform only shared samples from a pinch or zoomed pan. */
+private fun PointerEvent.hasViewerTransformSample(
+    pressedCount: Int,
+    scale: Float,
+): Boolean = changes.any { it.pressed && it.previousPressed } && (pressedCount >= 2 || scale > 1f)
