@@ -142,7 +142,14 @@ class ConversationRowSpacingTest : ConversationRowSpacingFixtures() {
         var unreadId by mutableStateOf<String?>(rows[1].record.messageIdHex)
         composeRule.setContent { Transcript(rows, firstUnreadId = unreadId) }
         assertActivityBottomInset(8f)
-        composeRule.onNodeWithTag(UNREAD_MESSAGES_DIVIDER_CONTENT_TAG).assertExists()
+        val divider =
+            composeRule.onNodeWithTag(UNREAD_MESSAGES_DIVIDER_CONTENT_TAG).getUnclippedBoundsInRoot()
+        assertEquals(
+            "unread divider alone owns the bubble interval",
+            18f,
+            bubbleBounds(rows[1]).top.value - divider.bottom.value,
+            0.5f,
+        )
         composeRule.runOnIdle {
             unreadId = null
             rows = listOf(activity, message(2, 86_400uL))
