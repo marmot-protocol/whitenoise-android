@@ -5557,26 +5557,32 @@ class ChatsController private constructor(
         row.lastMessage?.sender?.let(appState::requestProfile)
     }
 
+    /**
+     * Warms the pictures a row's next notification may show, in this controller's own account's workers: a
+     * replaced controller recomputing after an account switch never decodes its rows in the new account's worker.
+     */
     private fun preWarmNotificationAvatars(item: ChatListItem) {
         val conversationAvatar =
             ProfileSanitizer.protocolImageUrl(item.group.avatarUrl)
                 ?: ProfileSanitizer.protocolImageUrl(item.projection?.avatarUrl)
+        val profiles =
+            dev.ipf.whitenoise.android.media.MediaTrustDomain
+                .publicProfiles(accountRef)
         if (item.selectedAvatarAsset == null) {
-            // A group's own picture here is its URL, whose host chooses the bytes, so it decodes single-use; a
+            // A group's own picture here is its URL, whose host chooses the bytes, so it decodes single-use, and a
             // direct chat's peer picture is a published one.
             val domain =
                 if (GroupProjector.ownsGroupPicture(item)) {
                     dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique
                 } else {
-                    dev.ipf.whitenoise.android.media.MediaTrustDomain
-                        .publicProfiles(appState.activeAccountRef)
+                    profiles
                 }
             AvatarImageLoader.preWarm(conversationAvatar, domain)
             GroupProjector
                 .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
-                ?.let(appState::preWarmProfileAvatar)
+                ?.let { appState.preWarmProfileAvatar(it, profiles) }
         }
-        item.latest?.sender?.let(appState::preWarmProfileAvatar)
+        item.latest?.sender?.let { appState.preWarmProfileAvatar(it, profiles) }
     }
 
     private fun firstFrameAvatarSeed(item: ChatListItem): ChatListAvatarSeed? {

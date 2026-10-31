@@ -11928,26 +11928,32 @@ class WhiteNoiseAppState private constructor(
 
     /**
      * Start local profile materialization and image decoding without waiting for
-     * either. Chat/message projections call this before notification delivery;
-     * [applyProfilePresentation] queues the image as soon as local storage (or a
-     * relay refresh) yields a sanitized URL.
+     * either. Chat/message projections call this before notification delivery,
+     * and [applyProfilePresentation] queues the image as soon as local storage (or
+     * a relay refresh) yields a sanitized URL. The decode runs in [domain], the
+     * caller's account's public profiles. Only the active account's caller queues
+     * that later warm, which runs in the active account's worker.
      */
-    internal fun preWarmProfileAvatar(accountIdHex: String) {
+    internal fun preWarmProfileAvatar(
+        accountIdHex: String,
+        domain: dev.ipf.whitenoise.android.media.MediaTrustDomain = AvatarImageLoader.publicProfiles(),
+    ) {
         val id = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return
+        val deferrable = domain == AvatarImageLoader.publicProfiles()
         val cachedAvatar =
             synchronized(profilePresentationLock) {
                 val avatar = profilePresentations[id]?.avatarUrl
                 if (avatar != null) {
                     pendingAvatarPreWarmAccountIds.remove(id)
-                } else {
-                    // Reinsert to keep the set in recent-conversation order; a
-                    // live sender must not sit behind old avatarless profiles.
+                } else if (deferrable) {
+                    // Reinsert to keep the set in recent-conversation order, so a
+                    // live sender never sits behind old avatarless profiles.
                     pendingAvatarPreWarmAccountIds.remove(id)
                     pendingAvatarPreWarmAccountIds.add(id)
                 }
                 avatar
             }
-        AvatarImageLoader.preWarm(cachedAvatar, AvatarImageLoader.publicProfiles())
+        AvatarImageLoader.preWarm(cachedAvatar, domain)
         // Starts an ungated local materialization on a miss and observes its
         // revision; applyProfilePresentation consumes the pending warm above once
         // the URL lands. The relay refresh remains independently cooldown-gated.
