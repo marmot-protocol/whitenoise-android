@@ -30,6 +30,14 @@
         "test_ids": [
           "MSG-041"
         ]
+      },
+      {
+        "surface": "Compact bubble and activity boundaries",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TimelineRow.kt",
+        "anchor": "// Sender runs own attribution only;",
+        "test_ids": [
+          "MSG-043"
+        ]
       }
     ]
   },
