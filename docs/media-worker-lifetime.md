@@ -26,9 +26,11 @@ that request's reply capability. A domain's generation then returns to its
 domain and the pixels are copied; a Unique generation is sent RETIRE and the
 parent waits for its Binder death before reading shared pixels. A revoked or
 failed reply retires the generation; the next claim still enforces its death.
-A dispatched request without a valid result quarantines its source bytes for
-the existing 60-second cooldown, unless the caller was interrupted or the
-session was reset. A domain's generation is replaced after 64 inputs and
+A dispatched request without a valid result quarantines its source bytes for the
+existing 60-second cooldown, unless the caller was interrupted or the session
+was reset, or its reply deadline ran out after waiting for a worker had used
+more than two of its eight seconds, leaving the worker less than its own
+six-second watchdog. A domain's generation is replaced after 64 inputs and
 retired after 30 seconds idle.
 
 Binding, reply and death share one eight-second host deadline after the
@@ -48,8 +50,11 @@ A session reset captures the generations that predate it, revokes the pending
 reply and retires them, clean spares included; a generation started for the new
 session is never swept up by a slow old-source close. A request admitted before
 reset may transfer its descriptors; its result is discarded. Standalone close is
-terminal: it unbinds every generation and releases callback resources after
-the last death. Animation and platform audio/video keep their own owners.
+terminal: it retires every generation and unbinds each connected one at once.
+An accepted binding that never connected stays bound until Android reports it
+dead, normally at its start timeout, or a late connection arrives; the callback
+thread is released once the last generation is gone. Animation and platform
+audio/video keep their own owners.
 
 ## Output and threat boundary
 
@@ -91,9 +96,14 @@ outgoing worker and never another pick's, also under concurrency, and
 `ConversationDraftRestorationPlanTest` that each restored draft attachment is its
 own pick. `PickWorkerRetirementTest` checks that removing a photo or a document
 retires exactly that pick's worker, and that sending retires a document's worker
-at once while a photo keeps its worker for its just-sent poster. `MediaWorkerDomainTest` adds a ten-pick concurrency canary, parallel
-eviction for an album of new picks, and the retirement of an idle or busy pick's
-domain. Those JVM fixtures exercise owner ordering only.
+at once while a photo keeps its worker for its just-sent poster;
+`ConversationMediaSendReconciliationThumbnailTest` that the poster decodes in
+that pick's own domain and then retires it. `MediaWorkerDomainTest` adds a
+ten-pick concurrency canary, parallel eviction for an album of new picks, and
+the retirement of an idle or busy pick's domain. `MediaClaimDeadlineTest` checks
+that a missed deadline after a long wait for a worker quarantines nothing, while
+the same miss without that wait still does. Those JVM fixtures exercise owner
+ordering only.
 
 `IsolatedMediaDecoderDeviceTest` supplies the operating-system evidence on a
 real device. A debug worker-state canary shows source A's retained digest and

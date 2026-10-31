@@ -150,11 +150,16 @@ cold chat list with every group showing a URL picture that decodes single-use
 conversation. The sampler and the cold-launch wait count only the measured
 package's workers and application zygote, so another installed build on a
 physical device does not disturb them.
-Every input has distinct bytes. Rows go to instrumentation status key
+Inputs repeat on purpose: thumbnails come from 160 distinct images chosen by
+request index, so indices wrap after 160 requests in one pass; the viewer rows
+cycle ten decodes over four 1920×1440 images; and the mix reuses its three fixed
+inputs. Rows go to instrumentation status key
 `media_worker_throughput_json` and, when available, a
 `media-worker-throughput-*.jsonl` file. Each request records latency, admission
 wait and whether it reached the lane within the eight-second deadline.
-Each scenario records worker starts, bind-to-connect times, the most live worker
+Each scenario records binding attempts (the `worker_starts` field counts every
+`bindIsolatedService` call, refused and throwing ones included, so it bounds
+process starts rather than observing them), bind-to-connect times, the most live worker
 processes and their RSS sum (read through `ps` as the shell UID), caller RSS
 and FD maxima and the lowest system MemAvailable. RSS counts pages shared with
 the zygote once per process; measure PSS separately with `dumpsys meminfo`.

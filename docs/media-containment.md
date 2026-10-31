@@ -4,7 +4,7 @@
 
 Still-image decode and inspection, EXIF inspection and SVG preparation use a nonexported `android:isolatedProcess` service. The worker has a separate UID and no application permissions. Application startup skips account state, diagnostics, locale preferences, playback, transfers and background scheduling in that process.
 
-The app decodes still images in domain-bound worker generations: each isolated worker serves one conversation's member-pinned media, the account's public profile pictures, one conversation's outgoing picks or the account's display-only local files, and any other input gets a single-use worker; see [Domain-bound worker generations](#domain-bound-worker-generations). Video poster/duration probes and voice waveform extraction use a separate, process-wide serialized platform-service adapter. Android denies `media.player` and `media.extractor` discovery to isolated UIDs on API 30; attempting those operations in the image worker is unsupported. This is an explicit route, with no isolated-attempt/privileged-fallback sequence. A slow waveform must not occupy the notification-avatar lane. Production calls on the main looper or without a configured transport fail closed. JVM tests explicitly inject their codec fixture; those tests do not prove process isolation.
+The app decodes still images in domain-bound worker generations: each isolated worker serves one conversation's member-pinned media, the account's public profile pictures, one picked file to send or the account's display-only local files, and any other input gets a single-use worker; see [Domain-bound worker generations](#domain-bound-worker-generations). Video poster/duration probes and voice waveform extraction use a separate, process-wide serialized platform-service adapter. Android denies `media.player` and `media.extractor` discovery to isolated UIDs on API 30; attempting those operations in the image worker is unsupported. This is an explicit route, with no isolated-attempt/privileged-fallback sequence. A slow waveform must not occupy the notification-avatar lane. Production calls on the main looper or without a configured transport fail closed. JVM tests explicitly inject their codec fixture; those tests do not prove process isolation.
 
 Input bytes are written only after their temporary file is unlinked, then passed by read-only descriptor. Picked images and media use a process-wide staging gate, with provider cancellation and bounded reads. Whole-file seekable videos pass their descriptor without a full-video array copy. Provider subranges are copied into their own unlinked inode, so a decoder cannot read bytes outside the selected asset. No URLs, account objects, keys or general file-access callback enter the worker.
 
@@ -187,15 +187,23 @@ Lifetime:
   reusable lane does, so one hostile source cannot fork a worker or hold its
   domain on every request. The domain's next input waits for the retired
   generation's Binder death. Caller interruption and account reset are not
-  evidence about the source and record nothing.
+  evidence about the source and record nothing. A request's eight-second
+  deadline also covers its wait for a worker, so a missed deadline counts only
+  when that wait left the worker at least its own six-second watchdog: after a
+  longer wait the generation is still retired, but the source is not
+  quarantined.
 - A generation is replaced after 64 inputs and retired after 30 seconds idle,
   so none serves its domain indefinitely and a quiet conversation frees its
   memory. A replacement costs one application-zygote fork on stock Android.
 - Account reset and close retire every generation and spare. Removing a pick
   from the draft retires that pick's generation: at once when it is idle, after
-  its request in flight otherwise. A sent document's generation retires at once;
-  a sent photo's after its just-sent poster, its last decode, or after 30 seconds
-  idle when it gets none.
+  its request in flight otherwise. A sent document's generation retires at
+  acceptance when the shelf is unchanged since the send began, otherwise after
+  30 seconds idle; a sent photo's after its just-sent poster, or after 30
+  seconds idle when it gets none. A decode that arrives after its pick retired,
+  such as a late shelf tile or pending preview, or a removed pick's staging
+  still in flight, starts a fresh worker for that same pick; it serves no other
+  pick and idles out after 30 seconds.
 - A Unique input gets a single-use generation, retired after its reply. Its
   Binder death precedes the parent pixel copy and the next Unique input.
 - Retirement sends RETIRE first; the worker's own exit normally follows within
@@ -617,10 +625,13 @@ without the application zygote.
 
 Removing a pick retires its worker at once when it is idle, after its request
 otherwise, behind the same death fence as every retirement. A sent document
-retires at acceptance. A sent photo retires after its just-sent poster, or after
-30 seconds idle without one: retiring it at acceptance made its pending preview
-and its poster each start a fresh worker for the same pick, two process starts
-per photo where one suffices (step 4 of the order of work below).
+retires at acceptance when the shelf is unchanged since the send began, and
+otherwise after 30 seconds idle. A sent photo retires after its just-sent
+poster, which decodes in the domain the send names for its pick, or after 30
+seconds idle without one: retiring it at acceptance made its pending preview and
+its poster each start a fresh worker for the same pick, two process starts per
+photo where one suffices (step 4 of the order of work below). A late decode
+after retirement starts a fresh worker for that same pick, which idles out.
 
 Admission changed in one way. When every slot is taken, as many idle domains
 are evicted at once as claims wait for a slot, so ten new picks start up to
@@ -666,9 +677,14 @@ Order of work, from the campaign's ordering log:
    Album rows only were re-run on builds of `37d5befcf`. No other measured
    path changed, so run 2's other rows stand for the final code.
 5. 11:27:52: after reading the re-run, a further API 30 album pass was declared
-   before it ran, each lane starting below load 4. The re-run's load log showed
-   10.2 at the end of its stock API 30 block, against 2.7 to 4.1 at every other
-   lane start. All three album runs are shown; none replaces another.
+   before it ran, each lane starting below load 4. The re-run's load log records
+   block boundaries only: 4.08 at the start of its stock API 30 block, 10.20 at
+   that block's end, which was also the start of the proxy API 30 block, and
+   2.74 and 2.91 at the starts of the two API 36 blocks. The loaded proxy block
+   also supplied the re-run's API 30 master baseline, 1276/921 ms (preparation
+   and send p95) against 877/559 in run 2 and 905/619 in run 3, so both sides of
+   that comparison ran under load. All three album runs are shown; none
+   replaces another.
 
 ##### Run 2: throughput and UI rows
 
@@ -790,7 +806,10 @@ belongs to that build's process rather than to domains, but A3 is judged as
 written and records the miss. Without the application zygote the domain lane
 misses what it missed in round 4: T7, T8 both ways, T12, U4 and U3 with group
 URL pictures. On API 30 it also misses T11 by one descriptor, 66 against 65,
-where round 4 met it at 66 against 66.
+where round 4 met it at 66 against 66. In the group-URL notification rounds
+behind a burst in the same conversation, its emoji also arrived within 250 ms
+for only 48 of 60 on both APIs, against 60 of 60 with the zygote; U4's own
+rounds miss already, so no verdict changes.
 
 U5's editor half now decodes in two picks' own domains, the cancelled pick's
 and the next one's, so the next image pays a worker start: p50 48 to 51 ms with
@@ -803,7 +822,8 @@ Ten-photo albums, ten per lane per build in ABBA order, milliseconds. The
 *Conversation* lanes decode every pick of the album in one outgoing domain, the
 previous head's mapping, on this head's pool.
 
-Run 2, builds of `2463aa3c1` (sent photos retired at acceptance):
+Run 2, builds of `2463aa3c1`, which retired a sent photo at acceptance; `d29121c69` superseded that, so
+run 2's send rows measure the slower, superseded code:
 
 | Ten-photo album, API 30, ms | Master | Reusable + zygote | Conversation + zygote | Pick + zygote | Conversation, no zygote | Pick, no zygote |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -859,14 +879,20 @@ Run 3, API 30 only, the same builds, each lane started below load 4:
 | A2 Album send p95 within master + 1.0 s, all within 10 s, run 3 | Met, +517 over master 619, max 1136 | **Not met**, +6044 over master 619, max 6663 | not run | not run |
 | A3 No BUDGET-v3 item newly missed, run 2 | Met, no item newly missed | **Not met**, T11 newly missed by one FD (66 vs 65) | **Not met**, T11 newly missed (122 vs 104) | Met, no item newly missed |
 
-With the application zygote, one worker per pick cost 0.4 to 0.6 s per
-ten-photo album in run 2, in run 3 and on API 36 in the re-run: preparation p95
-+376 to +544 ms over master, send p95 +488 to +612 ms, within A1 and A2.
+With the application zygote, one worker per pick cost 0.4 to 0.6 s per ten-photo
+album in run 2, in run 3 and on API 36 in the re-run: preparation p95 +376 to
++544 ms over master, send p95 +488 to +612 ms, within A1 and A2. A3 is met on
+stock API 30 and on the proxy at API 36, and not met on stock API 36 (T11, 122
+against 104) or on the proxy at API 30 (T11, 66 against 65). For A2 on stock API
+30, only run 3 (met) and the loaded re-run (missed) measured the final code, and
+the amendment sets no rule for repeated runs, so that verdict is mixed rather
+than met.
 
 On API 30 the stock lane met A1 and A2 in run 2 (+544 and +550 ms) and run 3
 (+391 and +517 ms), and missed both in the re-run: preparation +1045 ms over
-master's 1276, send +1073 over 921. That block is the one whose load log read
-10.2 at its end; its reusable and conversation lanes ran about 200 to 450 ms
+master's 1276, send +1073 over 921. That block started at load 4.08 and its
+log read 10.2 at its end, and the master baseline it was judged against came
+from the next, loaded block; its reusable and conversation lanes ran about 200 to 450 ms
 slower than in the other runs, while the pick lane, which starts and kills a
 process per photo, slowed most. The miss is recorded, not discounted: on a
 loaded API 30 emulator one worker per pick can cost about 1 s per album.
@@ -960,12 +986,11 @@ On the same emulators:
 
 ### Default
 
-Production installation uses domain-bound generations, switched in #3516
-pending approval of the [proposed budget](#measurements-and-proposed-budget).
-`ReusableMediaTransport` is no longer installed. It stays in production code as
-the lane to restore if the budget is rejected and as the measurement baseline.
-Removing it waits for that decision and for #3439, which edits the facade's
-animation type checks.
+Production installation uses domain-bound generations, pending approval of the
+[proposed budget](#measurements-and-proposed-budget). `ReusableMediaTransport`
+is no longer installed. It stays in production code as the lane to restore if
+the budget is rejected and as the measurement baseline, and removing it waits
+for that decision.
 
 ### Residual risks
 
@@ -1004,14 +1029,19 @@ animation type checks.
   zygote on stock Android.
 - On stock Android, forks share the application zygote's layout for preloaded
   code, so one generation's address-space disclosure applies to later ones.
-- Heap tagging through the application-zygote launch path is unqualified on
-  MTE hardware; see [native heap memory tagging](native-heap-memory-tagging.md).
+- Through the application zygote, by the AOSP source, workers keep the app's MTE
+  level on MTE hardware from Android 12.1, but run without heap tagging on
+  Android 11 and 12.0, and without pointer tagging (TBI) on hardware without MTE
+  from Android 13. Workers started without the application zygote, as on master,
+  keep the app's level. This is a source reading, not a device observation; see
+  [native heap memory tagging](native-heap-memory-tagging.md).
 - On GrapheneOS, every new domain, every pick and every Unique input pays an
   exec-spawned process start; see the [proposed budget](#measurements-and-proposed-budget)
   for the lower bound measured without the application zygote. There, a
   ten-photo album took 3.6 to 4.7 s to prepare and 5.5 to 6.8 s to send against
   master's 0.8 to 1.3 s and 0.5 to 0.9 s, missing A1 and A2 of the
-  [round 6 amendment](#round-6-one-worker-per-pick).
+  [round 6 amendment](#round-6-one-worker-per-pick), and A3 at API 30 (T11
+  by one descriptor).
 - Unique inputs are admitted one at a time, each after the previous single-use
   worker's death. Without the application zygote, ten notifications with group
   URL pictures behind a burst missed the 2.5 s artwork bound for a third to
