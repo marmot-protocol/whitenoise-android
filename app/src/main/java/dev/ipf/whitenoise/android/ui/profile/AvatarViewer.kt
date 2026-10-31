@@ -520,14 +520,17 @@ private fun ZoomableAvatarImage(
                     )
                 }.pointerInput(image, bitmapWidth, bitmapHeight) {
                     awaitEachGesture {
+                        var gestureTransform: ViewerTransform? = null
                         do {
                             val event = awaitPointerEvent()
                             val pressedCount = event.changes.count { it.pressed }
                             if (pressedCount == 0) break
                             val zoom = event.calculateZoom()
                             val pan = event.calculatePan()
-                            val currentScale = latestScale
-                            val currentOffset = latestOffset
+                            val current = gestureTransform ?: ViewerTransform(latestScale, latestOffset)
+                            gestureTransform = current
+                            val currentScale = current.scale
+                            val currentOffset = current.offset
                             val handleAsTransform = pressedCount >= 2 || currentScale > VIEWER_MIN_SCALE
                             if (!handleAsTransform) continue
 
@@ -541,6 +544,7 @@ private fun ZoomableAvatarImage(
                                     imageWidth = bitmapWidth,
                                     imageHeight = bitmapHeight,
                                 )
+                            gestureTransform = next
                             if (next.scale != currentScale) latestOnScaleChange(next.scale)
                             if (next.offset != currentOffset) latestOnOffsetChange(next.offset)
                             event.changes.forEach { it.consume() }

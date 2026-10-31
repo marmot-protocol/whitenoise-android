@@ -60,7 +60,8 @@ internal fun ImageViewerViewport(
     overlay: @Composable BoxScope.(ViewerViewportGeometry) -> Unit = {},
     image: @Composable BoxScope.(Modifier) -> Unit,
 ) {
-    var viewportSize by remember(sourceKey) { mutableStateOf(IntSize.Zero) }
+    // Layout dimensions belong to the viewport instance, independently of the source being displayed.
+    var viewportSize by remember { mutableStateOf(IntSize.Zero) }
     val displayTransform =
         applyViewerTransformGesture(
             ViewerTransform(scale, offset),
@@ -117,7 +118,9 @@ internal fun ImageViewerViewport(
         latestOnScaleChange(next.scale)
         latestOnOffsetChange(next.offset)
     }
-    LaunchedEffect(viewportSize, imageWidth, imageHeight) { applyZoom(1f) }
+    LaunchedEffect(viewportSize, imageWidth, imageHeight) {
+        if (viewportSize.width > 0 && viewportSize.height > 0) applyZoom(1f)
+    }
     val zoomState =
         stringResource(
             R.string.media_viewer_image_scale,
@@ -128,16 +131,20 @@ internal fun ImageViewerViewport(
             .fillMaxSize()
             .pointerInput(sourceKey) {
                 awaitEachGesture {
+                    var accumulated: ViewerTransform? = null
                     do {
                         val event = awaitPointerEvent()
                         val pressedCount = event.changes.count { it.pressed }
                         if (pressedCount == 0) break
-                        val currentScale = latestScale
-                        val currentOffset = latestOffset
+                        // Read the owner after the first event, then accumulate without waiting for recomposition.
+                        val current = accumulated ?: ViewerTransform(latestScale, latestOffset)
+                        accumulated = current
+                        val currentScale = current.scale
+                        val currentOffset = current.offset
                         if (pressedCount >= 2 || currentScale > 1f) {
                             val next =
                                 applyViewerTransformGesture(
-                                    current = ViewerTransform(currentScale, currentOffset),
+                                    current = current,
                                     zoomFactor = event.calculateZoom(),
                                     panDelta = event.calculatePan(),
                                     viewportWidth = size.width.toFloat(),
@@ -147,6 +154,7 @@ internal fun ImageViewerViewport(
                                     maxScale = IMAGE_VIEWER_MAX_SCALE,
                                     centroid = event.calculateCentroid(useCurrent = false),
                                 )
+                            accumulated = next
                             if (next.scale != currentScale) latestOnScaleChange(next.scale)
                             if (next.offset != currentOffset) latestOnOffsetChange(next.offset)
                             event.changes.forEach { it.consume() }
