@@ -13,6 +13,7 @@ import android.os.ParcelFileDescriptor
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -31,9 +32,30 @@ import java.util.concurrent.atomic.AtomicReference
 
 /** Fixed production entrypoints, controlled SDK close faults and definitive false bindings; no native parsing. */
 @RunWith(RobolectricTestRunner::class)
-@Config(application = android.app.Application::class)
+@Config(application = android.app.Application::class, shadows = [BorrowedDescriptorStatShadow::class])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class AvStreamSourceOwnershipTest {
+    @Test
+    fun duplicatedDescriptorsReportTheirActualFileLengthWithoutReplacingOriginalObjects() {
+        for (length in listOf(7, 4097)) {
+            val file = File.createTempFile("selected-stat-", ".bin")
+            try {
+                file.writeBytes(ByteArray(length))
+                ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { original ->
+                    ParcelFileDescriptor.dup(original.fileDescriptor).use { duplicate ->
+                        assertNotSame(original, duplicate)
+                        assertEquals(length.toLong(), original.statSize)
+                        assertEquals(file.length(), duplicate.statSize)
+                    }
+                    assertTrue(original.fileDescriptor.valid())
+                    assertEquals(file.length(), original.statSize)
+                }
+            } finally {
+                file.delete()
+            }
+        }
+    }
+
     @Test
     fun originalFileCloseRetainsAdmissionUntilAckAndHoldsOnFailure() {
         exercise(staged = false, fails = false)
@@ -151,12 +173,12 @@ class AvStreamSourceOwnershipTest {
             release.countDown()
             calls.first().join(2000)
             assertFalse(calls.first().isAlive)
-            assertTrue(firstFailure.get() is IOException)
+            assertTrue(firstFailure.get()?.stackTraceToString(), firstFailure.get() is IOException)
             if (fails) {
                 // The held old owner times out before this second request can acquire any source descriptor.
                 calls[1].join(AvStreamProtocol.CALL_DEADLINE_MS + 2000)
                 assertFalse(calls[1].isAlive)
-                assertTrue(secondFailure.get() is MediaAdmissionFailure)
+                assertTrue(secondFailure.get()?.stackTraceToString(), secondFailure.get() is MediaAdmissionFailure)
                 assertEquals(if (staged) 1 else 0, opens)
                 IsolatedAvStream.retireActive()
                 val replacementFailure = AtomicReference<Throwable?>()
@@ -174,7 +196,7 @@ class AvStreamSourceOwnershipTest {
             } else {
                 calls[1].join(2000)
                 assertFalse(calls[1].isAlive)
-                assertTrue(secondFailure.get() is IOException)
+                assertTrue(secondFailure.get()?.stackTraceToString(), secondFailure.get() is IOException)
                 assertTrue(nextSourceOpened.await(2, TimeUnit.SECONDS))
                 assertEquals(if (staged) 2 else 1, opens)
             }

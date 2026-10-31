@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.ServiceConnection
 import android.os.Binder
+import android.os.HandlerThread
 import android.os.IBinder
 import android.os.Parcel
 import android.system.ErrnoException
@@ -16,7 +17,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.time.Duration
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -91,10 +94,13 @@ class AvStreamRetirementTest {
             assertTrue("AMS cleanup cannot queue behind the hostile endpoint", unbound.await(2, TimeUnit.SECONDS))
             assertEquals(1, unbindCalls)
             alive.set(false)
+            val callbacks = field(stream, "callbacks") as HandlerThread
+            shadowOf(callbacks.looper).idleFor(Duration.ofSeconds(1))
             assertTrue(
                 "Process observer must progress before retirement RPC returns",
                 absentObserved.await(2, TimeUnit.SECONDS),
             )
+            assertEquals(1L, unblock.count)
             assertEquals(1L, released.count)
             assertFalse(lifetime.releasable())
             assertTrue(admissions.current(AvStreamLane.Analysis, epoch) === stream)

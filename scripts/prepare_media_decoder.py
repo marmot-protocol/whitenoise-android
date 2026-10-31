@@ -5,7 +5,6 @@ No platform codec, URL protocol or secondary-source opener is included. Source
 archives and Python build-tool wheels are pinned in native/media-decoder/lock.json.
 """
 import argparse
-import fcntl
 import hashlib
 import runpy
 import json
@@ -300,6 +299,7 @@ def build_abi(ndk, abi, lock, sources, tools, output, jobs, command=run):
 def prepare(ndk, output, abis, *, jobs=2, opener=urllib.request.urlopen, command=run):
     lock = load_lock()
     require(platform.system() == "Linux" and platform.machine() == "x86_64", "Linux x86_64 build host required")
+    import fcntl  # Linux-only locking is unnecessary for portable --cache-key/--plan inspection.
     require(type(jobs) is int and 1 <= jobs <= 8, "build worker count refused")
     require(abis and len(set(abis)) == len(abis) and all(abi in ABIS for abi in abis), "unique supported ABIs required")
     for abi in abis:

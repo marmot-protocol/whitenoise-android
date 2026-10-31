@@ -89,7 +89,8 @@ private class AttachmentAudioDecoder(
                         frame.bitmap.recycle()
                         throw IOException("Unexpected video from an audio-only worker")
                     }
-                    AvStreamFrame.End -> break
+                    AvStreamFrame.End, AvStreamFrame.AudioEnd -> break
+                    AvStreamFrame.VideoEnd -> throw IOException("Unexpected video EOF from an audio-only worker")
                 }
             }
             budget.check()

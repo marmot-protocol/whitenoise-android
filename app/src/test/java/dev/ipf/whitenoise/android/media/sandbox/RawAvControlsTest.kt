@@ -6,6 +6,7 @@ import android.media.AudioAttributes
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Looper
+import androidx.media3.common.PlaybackParameters
 import com.google.common.util.concurrent.SettableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -195,21 +196,95 @@ class RawAvControlsTest {
 
     @Test
     fun adapterSpeedRefusalDoesNotThrowToUiOrFalselyPublishTheRequestedRate() {
+        for (rate in listOf(RawPcmCapacity.MIN_SPEED, RawPcmCapacity.MAX_SPEED)) {
+            val player = IsolatedAttachmentPlayer(RuntimeEnvironment.getApplication(), Uri.parse("file:///fixture.mp4"))
+            val engine = field(player, "engine") as RawAvPlaybackEngine
+            engines += engine
+            val sink = FakeSink(failSpeed = true)
+            seedActiveOutput(engine, sink)
+            try {
+                player.prepare()
+                shadowOf(Looper.getMainLooper()).idle()
+                player.setPlaybackSpeed(rate)
+                shadowOf(Looper.getMainLooper()).idle()
+                assertEquals(1f, player.playbackParameters.speed, 0f)
+                assertTrue(engine.snapshot().error is RawOutputFailure)
+                assertNotNull(player.playerError)
+                assertFalse(engine.snapshot().playWhenReady)
+                assertTrue(sink.closed)
+            } finally {
+                player.release()
+            }
+        }
+    }
+
+    @Test
+    fun unsupportedPublicPlaybackParametersLeaveAcceptedRateAndHealthyOutputUnchanged() {
         val player = IsolatedAttachmentPlayer(RuntimeEnvironment.getApplication(), Uri.parse("file:///fixture.mp4"))
         val engine = field(player, "engine") as RawAvPlaybackEngine
         engines += engine
-        val sink = FakeSink(failSpeed = true)
+        val sink = FakeSink()
         seedActiveOutput(engine, sink)
         try {
             player.prepare()
             shadowOf(Looper.getMainLooper()).idle()
-            player.setPlaybackSpeed(2f)
+            player.setPlaybackSpeed(1.5f)
             shadowOf(Looper.getMainLooper()).idle()
-            assertEquals(1f, player.playbackParameters.speed, 0f)
-            assertTrue(engine.snapshot().error is RawOutputFailure)
-            assertNotNull(player.playerError)
-            assertFalse(engine.snapshot().playWhenReady)
-            assertTrue(sink.closed)
+            val unsupportedParameters =
+                listOf(
+                    PlaybackParameters(0.125f),
+                    PlaybackParameters(3f),
+                    PlaybackParameters(1f, 1.2f),
+                )
+            for (unsupported in unsupportedParameters) {
+                player.playbackParameters = unsupported
+                shadowOf(Looper.getMainLooper()).idle()
+                assertEquals(1.5f, player.playbackParameters.speed, 0f)
+                assertEquals(1f, player.playbackParameters.pitch, 0f)
+                assertEquals(1.5f, engine.snapshot().speed, 0f)
+                assertNull(engine.snapshot().error)
+                assertNull(player.playerError)
+                assertFalse(sink.closed)
+            }
+        } finally {
+            player.release()
+        }
+    }
+
+    @Test
+    fun defaultVideoQuarterAndMaximumChoicesAreAcceptedAndRejectedChangesPreserveThem() {
+        val player = IsolatedAttachmentPlayer(RuntimeEnvironment.getApplication(), Uri.parse("file:///fixture.mp4"))
+        val engine = field(player, "engine") as RawAvPlaybackEngine
+        engines += engine
+        val sink = FakeSink()
+        seedActiveOutput(engine, sink)
+        try {
+            player.prepare()
+            shadowOf(Looper.getMainLooper()).idle()
+            val unsupported =
+                listOf(
+                    PlaybackParameters(0.125f),
+                    PlaybackParameters(3f),
+                    PlaybackParameters(1f, 1.2f),
+                )
+            for (rate in listOf(RawPcmCapacity.MIN_SPEED, RawPcmCapacity.MAX_SPEED)) {
+                player.setPlaybackSpeed(rate)
+                shadowOf(Looper.getMainLooper()).idle()
+                assertEquals(rate, player.playbackParameters.speed, 0f)
+                assertEquals(rate, engine.snapshot().speed, 0f)
+                assertEquals(rate, sink.appliedSpeed, 0f)
+                for (rejected in unsupported) {
+                    player.playbackParameters = rejected
+                    shadowOf(Looper.getMainLooper()).idle()
+                    assertEquals(rate, player.playbackParameters.speed, 0f)
+                    assertEquals(1f, player.playbackParameters.pitch, 0f)
+                    assertEquals(rate, engine.snapshot().speed, 0f)
+                    assertEquals(rate, sink.appliedSpeed, 0f)
+                    assertNull(engine.snapshot().error)
+                    assertNull(player.playerError)
+                    assertFalse(sink.closed)
+                }
+            }
         } finally {
             player.release()
         }

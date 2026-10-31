@@ -4,6 +4,7 @@ package dev.ipf.whitenoise.android.media.sandbox
 
 /** Streaming AudioTrack needs strictly more than speed times its platform minimum at speeds above1. */
 internal object RawPcmCapacity {
+    const val MIN_SPEED = 0.25f
     const val MAX_SPEED = 2f
     const val MAX_BUFFER_BYTES = 1024 * 1024
 

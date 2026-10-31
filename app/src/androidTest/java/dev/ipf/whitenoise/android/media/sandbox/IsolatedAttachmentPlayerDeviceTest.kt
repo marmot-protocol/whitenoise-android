@@ -36,6 +36,91 @@ import java.util.concurrent.atomic.AtomicReference
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class IsolatedAttachmentPlayerDeviceTest {
     @Test
+    fun tinyRawSonicEosProducesNonzeroPcmAndDrainsTheUnityDeviceAtQuarterSpeed() {
+        val source = byteArrayOf(0, 32, 0, 32)
+        RawSonicSegment(8000, 1, .25f).use { sonic ->
+            sonic.queueInput(source, 0, source.size)
+            sonic.endOfInput()
+            val produced = sonic.output()
+            val bytes = ByteArray(produced.remaining())
+            produced.get(bytes)
+            assertEquals(16, bytes.size)
+            assertTrue("Explicit Sonic EOS must produce nonzero raw PCM", bytes.any { it != 0.toByte() })
+            assertTrue(sonic.ended)
+        }
+        RawPcmOutput(
+            8000,
+            1,
+            android.media.AudioAttributes
+                .Builder()
+                .build(),
+        ).use { output ->
+            output.speed(.25f)
+            output.play()
+            var offset = 0
+            val deadline = SystemClock.elapsedRealtime() + 8000
+            while (offset < source.size && SystemClock.elapsedRealtime() < deadline) {
+                offset += output.write(source, offset)
+                SystemClock.sleep(5)
+            }
+            assertEquals(source.size, offset)
+            while (!output.drained() && SystemClock.elapsedRealtime() < deadline) {
+                output.prepareForWait(true)
+                SystemClock.sleep(5)
+            }
+            assertTrue("Unity AudioTrack must physically consume the transformed tiny output", output.drained())
+            assertEquals(250L, output.positionUs())
+        }
+    }
+
+    @Test
+    fun quarterSpeedRawPcmRefillsAfterAnInteriorUnderrunWithoutResettingTheMediaClock() {
+        RawPcmOutput(
+            8000,
+            1,
+            android.media.AudioAttributes
+                .Builder()
+                .build(),
+        ).use { output ->
+            output.speed(.25f)
+            output.play()
+            val source = ByteArray(640) { if (it % 2 == 1) 32 else 0 }
+            var previous = 0L
+            repeat(2) { burst ->
+                val beforeBurst = output.positionUs()
+                var offset = 0
+                val deadline = SystemClock.elapsedRealtime() + 8000
+                while (offset < source.size && SystemClock.elapsedRealtime() < deadline) {
+                    offset += output.write(source, offset)
+                    output.prepareForWait(false)
+                    assertTrue(output.positionUs() >= previous)
+                    previous = output.positionUs()
+                    SystemClock.sleep(5)
+                }
+                assertEquals(source.size, offset)
+                // Exhaust the currently submitted device queue, then refill that same track.
+                repeat(80) {
+                    output.prepareForWait(false)
+                    SystemClock.sleep(5)
+                }
+                assertTrue("Nonterminal burst $burst must advance before EOS", output.positionUs() > beforeBurst)
+                assertTrue(
+                    "Submitted PCM must catch up before the next refill",
+                    output.positionUs() + 1000 >= output.bufferedPositionUs(),
+                )
+                SystemClock.sleep(100)
+            }
+            val deadline = SystemClock.elapsedRealtime() + 8000
+            while (!output.drained() && SystemClock.elapsedRealtime() < deadline) {
+                output.prepareForWait(true)
+                SystemClock.sleep(5)
+            }
+            assertTrue(output.drained())
+            assertEquals(80_000L, output.positionUs())
+        }
+    }
+
+    @Test
     @Suppress("LongMethod") // One fixture owns the player, display and selected file through controls and cleanup.
     fun pausedSeekingSpeedPauseAndRepeatUseRealRawPlayback() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()

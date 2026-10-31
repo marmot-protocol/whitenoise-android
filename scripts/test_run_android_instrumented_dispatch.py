@@ -114,7 +114,9 @@ class InstrumentedDispatchTest(unittest.TestCase):
                 "blockedNativeReadEndsWithObservedOsProcessDisappearance"),
             "IsolatedAttachmentPlayerDeviceTest": (
                 "pausedSeekingSpeedPauseAndRepeatUseRealRawPlayback",
-                "pixelCopyBufferOutlivesTimedOutRequestUntilItsCallback"),
+                "pixelCopyBufferOutlivesTimedOutRequestUntilItsCallback",
+                "tinyRawSonicEosProducesNonzeroPcmAndDrainsTheUnityDeviceAtQuarterSpeed",
+                "quarterSpeedRawPcmRefillsAfterAnInteriorUnderrunWithoutResettingTheMediaClock"),
             "MediaAvNativeCorpusDeviceTest": (
                 "commonVideoFormatsReturnRedPixelsFromFreshRestrictedWorkers",
                 "commonAudioFormatsReturnFiniteWaveformsAndDurations"),
@@ -134,36 +136,40 @@ class InstrumentedDispatchTest(unittest.TestCase):
             self.run_dispatch("workflow_dispatch", "false", "false", "false", "true", fail_required=True)
 
     def test_actual_checker_rejects_missing_or_skipped_selected_native_case(self):
-        focused = self.run_dispatch("workflow_dispatch", "false", "false", "false", "true")
-        cases = [line for line in focused.splitlines() if line.startswith("dev.ipf.") and "#" in line]
-        native = [line for line in cases if any("." + name + "#" in line for name in (
-            "NativeMediaSandboxDeviceTest", "IsolatedAttachmentPlayerDeviceTest", "MediaAvNativeCorpusDeviceTest"))]
-        self.assertEqual(7, len(native))
-        with tempfile.TemporaryDirectory() as temporary:
-            root = pathlib.Path(temporary)
-            required = root / "required.txt"
-            required.write_text("\n".join(cases) + "\n")
+        for api in ("30", "36"):
+            focused = self.run_dispatch("workflow_dispatch", "false", "false", "false", "true", "false", "false", "false", api)
+            cases = [line for line in focused.splitlines() if line.startswith("dev.ipf.") and "#" in line]
+            native = [line for line in cases if any("." + name + "#" in line for name in (
+                "NativeMediaSandboxDeviceTest", "IsolatedAttachmentPlayerDeviceTest", "MediaAvNativeCorpusDeviceTest"))]
+            self.assertEqual(9, len(native))
+            for method in ("tinyRawSonicEosProducesNonzeroPcmAndDrainsTheUnityDeviceAtQuarterSpeed",
+                           "quarterSpeedRawPcmRefillsAfterAnInteriorUnderrunWithoutResettingTheMediaClock"):
+                self.assertTrue(any(case.endswith("#" + method) for case in native))
+            with tempfile.TemporaryDirectory() as temporary:
+                root = pathlib.Path(temporary)
+                required = root / "required.txt"
+                required.write_text("\n".join(cases) + "\n")
 
-            def run(missing=None, skipped=None):
-                suite = ET.Element("testsuite")
-                for case in cases:
-                    if case == missing:
-                        continue
-                    classname, method = case.split("#")
-                    entry = ET.SubElement(suite, "testcase", classname=classname, name=method)
-                    if case == skipped:
-                        ET.SubElement(entry, "skipped")
-                ET.ElementTree(suite).write(root / "results.xml")
-                return subprocess.run([sys.executable, str(ROOT / "scripts/check_instrumented_required_cases.py"),
-                                       str(root), "--required", str(required)], capture_output=True, text=True)
+                def run(missing=None, skipped=None):
+                    suite = ET.Element("testsuite")
+                    for case in cases:
+                        if case == missing:
+                            continue
+                        classname, method = case.split("#")
+                        entry = ET.SubElement(suite, "testcase", classname=classname, name=method)
+                        if case == skipped:
+                            ET.SubElement(entry, "skipped")
+                    ET.ElementTree(suite).write(root / "results.xml")
+                    return subprocess.run([sys.executable, str(ROOT / "scripts/check_instrumented_required_cases.py"),
+                                           str(root), "--required", str(required)], capture_output=True, text=True)
 
-            self.assertEqual(0, run().returncode)
-            for case in native:
-                for condition in ("missing", "skipped"):
-                    with self.subTest(case=case, condition=condition):
-                        result = run(**{condition: case})
-                        self.assertNotEqual(0, result.returncode)
-                        self.assertIn(case, result.stderr)
+                self.assertEqual(0, run().returncode)
+                for case in native:
+                    for condition in ("missing", "skipped"):
+                        with self.subTest(case=case, condition=condition):
+                            result = run(**{condition: case})
+                            self.assertNotEqual(0, result.returncode)
+                            self.assertIn(case, result.stderr)
 
     def test_baseline_is_required_in_focused_containment_and_excluded_from_pr_smoke(self):
         """Check real class annotations plus the dispatcher's actual required-case selection."""

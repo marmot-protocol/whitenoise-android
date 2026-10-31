@@ -24,9 +24,24 @@ Debug instrumentation may pass the exact path of an existing synthetic `media-co
 - Automatic A/V: one retained process owner, with 8-second probe and 40-second waveform host deadlines. An independent worker watchdog kills probe work at 6 seconds and waveform work at 30 seconds. Each native call also has an interrupt deadline. Account reset revokes publication and retains the exact worker until calibrated kernel PID disappearance and parent-resource cleanup are confirmed. Binder death, elapsed time and unbind alone leave admission held. Confirmed source refusals have bounded revision-specific cooldowns. The software decoder limits a decoded surface to 16 million pixels. A 64 MiB per-allocation ceiling applies to FFmpeg's allocation API; it is not a process-wide or aggregate native-memory limit. Dav1d internal allocations and runtime overhead are separate. Playback and transcription use separate isolated stream lanes; their current-source runtime qualification remains pending.
 - Failed source revisions have bounded in-memory quarantine. Account teardown retires the image worker, media delivery and pending reply capabilities; host cache-generation checks remain authoritative for UI publication.
 
+If an automatic A/V worker disconnects before the parent establishes its kernel
+process identity, that lane remains held in the app process. No selected input
+was sent, but that does not prove the worker exited. Binder death, successful
+unbind, elapsed time and account changes cannot release this unknown lifetime.
+A late exact synchronous identity callback can still identify the retired worker
+for cleanup without admitting input. Replacement requires a calibrated process
+absence observation and every parent-resource, RPC and unbind acknowledgment.
+If no trusted PID is ever established, the current lane has no process-absence
+witness and automatic A/V requests remain unavailable.
+
 Native temporary allocations are not bounded solely by output dimensions. Worker isolation and watchdogs contain ordinary faults but cannot force a compromised worker to obey its own watchdog or prevent a kernel/system-service escape. A malicious provider that ignores cancellation can hold one admitted off-main staging operation; new readers must not bypass its gate.
 
 Automatic A/V demuxing and decoding execute in the permissionless native worker. Selected-descriptor bounds, primitive reply validation and observed kernel process disappearance precede automatic output publication. Waveforms contain exactly 64 finite normalized values. Explicit attachment playback and transcription consume bounded raw output from separate isolated streaming sessions. The app draws copied RGBA pixels and writes validated PCM16 to AudioTrack; it does not feed compressed local attachment bytes to Media3 extractors or platform codecs.
+
+Playback speed is applied to raw PCM by the pinned Media3 1.11.1 Sonic processor. AudioTrack remains at unity speed and pitch. Each fixed-rate segment receives at most ten milliseconds of aligned PCM per input; its owned output must be consumed before another input or explicit end-of-input flush. A rate change drains the old segment before starting the latest requested rate on the same device. Position snapshots use cached source-time anchors and never resize or query the device from a UI getter. The source-derived maximum individual processor payload is 442,800 bytes; reachable payload plus one resize is below 2 MiB. Object headers, garbage awaiting collection and total process memory are outside that bound. A Media3 upgrade requires a new allocation proof.
+
+Preferred per-track reads retain one copied video frame and one PCM block suffix in the parent. They do not remove the native compressed-packet limit of 8 MiB or 512 packets. A file whose audio ends well before a long video-only tail can exceed that interleave budget while establishing real audio EOF and refuse. That bounded-skew case remains unqualified; no universal-format or long-tail playback guarantee is made. Real Sonic tiny-input tests, device progress and audible-output checks establish different facts. API 30 and current-device EOS, refill and audible-tail qualification require actual execution.
+
 
 The host rechecks source ownership and cancellation when a provider returns a
 descriptor, before staging its bytes or reading descriptor metadata. A provider

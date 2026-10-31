@@ -75,8 +75,19 @@ class MediaAvPlaybackService : Service() {
                                 sequence = tuple.second
                                 when (code) {
                                     AvStreamProtocol.READ -> {
+                                        val preferred = data.readInt()
                                         require(data.dataAvail() == 0 && handle != 0L)
-                                        NativeMediaEngine.nativeRead(handle, videoBuffer, audioBuffer).also {
+                                        require(preferred in AvStreamProtocol.ANY_TRACK..AvStreamProtocol.AUDIO_TRACK)
+                                        require(preferred != AvStreamProtocol.VIDEO_TRACK || videoBuffer != null)
+                                        require(preferred != AvStreamProtocol.AUDIO_TRACK || audioBuffer != null)
+                                        val engine = NativeMediaEngine
+                                        val result =
+                                            if (preferred == AvStreamProtocol.ANY_TRACK) {
+                                                engine.nativeRead(handle, videoBuffer, audioBuffer)
+                                            } else {
+                                                engine.nativeReadPreferred(handle, videoBuffer, audioBuffer, preferred)
+                                            }
+                                        result.also {
                                             AvStreamOutput.from(it, edge, videoBuffer != null, audioBuffer != null)
                                         }
                                     }

@@ -646,6 +646,51 @@ void queuePacket(Session& s) {
     av_packet_unref(s.packet);
 }
 
+// Playback may hold one video while requesting the PCM needed by its bounded raw processor.
+// The other track keeps at most its existing decoded frame; compressed queues retain their old limits.
+jlongArray readPreferred(JNIEnv* env, Session& s, jobject videoOut, jobject audioOut, int preferred) {
+    check(preferred == 1 || preferred == 2, "preferred_track_refused");
+    const bool wantVideo = videoOut != nullptr;
+    const bool wantAudio = audioOut != nullptr;
+    check((preferred == 1 && wantVideo) || (preferred == 2 && wantAudio), "preferred_track_not_selected");
+    if (!s.modeChosen) {
+        if (wantVideo) openTrack(s, s.video, AVMEDIA_TYPE_VIDEO);
+        if (wantAudio) openTrack(s, s.audio, AVMEDIA_TYPE_AUDIO);
+        s.modeChosen = true; s.wantVideo = wantVideo; s.wantAudio = wantAudio;
+    }
+    check(s.wantVideo == wantVideo && s.wantAudio == wantAudio, "output_track_selection_changed");
+    Track& selected = preferred == 1 ? s.video : s.audio;
+    for (int step = 0; step < kMaxReadSteps; ++step) {
+        check(!interrupted(&s), "media_read_deadline");
+        pump(s, selected);
+        if (selected.hasFrame) {
+            if (preferred == 1) {
+                auto result = video(env, s, videoOut);
+                selected.hasFrame = false; av_frame_unref(selected.frame);
+                return result;
+            }
+            auto padding = playbackPadding(env, s, audioOut, timestamp(s, s.audio, s.audio.frame));
+            if (padding) return padding;
+            auto result = audio(env, s, audioOut, false);
+            selected.hasFrame = false; av_frame_unref(selected.frame);
+            if (result) return result;
+            continue;
+        }
+        if (!selected.codec || selected.ended) {
+            if (preferred == 2 && !s.resampleDrained) {
+                auto result = audio(env, s, audioOut, true);
+                if (result) return result;
+                s.resampleDrained = true;
+            }
+            // AudioEnd is real decoder+resampler exhaustion, never an indefinite container-duration tail.
+            return longs(env, {preferred == 1 ? 3 : 4, 0, 0, 0, 0, 0, 0});
+        }
+        check(!s.inputEnded, "media_track_drain_stalled");
+        queuePacket(s);
+    }
+    throw Failure("media_decode_work_budget_refused");
+}
+
 jlongArray read(JNIEnv* env, Session& s, jobject videoOut, jobject audioOut) {
     const bool wantVideo = videoOut != nullptr;
     const bool wantAudio = audioOut != nullptr;
@@ -814,6 +859,14 @@ Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeRead(
     JNIEnv* env, jobject, jlong handle, jobject videoOut, jobject audioOut) {
     std::lock_guard<std::mutex> guard(sessionMutex);
     try { return read(env, session(handle), videoOut, audioOut); }
+    catch (const std::exception& error) { fail(env, error.what()); return nullptr; }
+}
+
+extern "C" JNIEXPORT jlongArray JNICALL
+Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeReadPreferred(
+    JNIEnv* env, jobject, jlong handle, jobject videoOut, jobject audioOut, jint preferred) {
+    std::lock_guard<std::mutex> guard(sessionMutex);
+    try { return readPreferred(env, session(handle), videoOut, audioOut, preferred); }
     catch (const std::exception& error) { fail(env, error.what()); return nullptr; }
 }
 

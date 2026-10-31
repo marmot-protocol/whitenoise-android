@@ -7,6 +7,22 @@ import org.junit.Test
 
 class RawAvTimingTest {
     @Test
+    fun quarterSpeedClockReanchorsAfterMaximumRatePauseAndSeekWithoutAudioHardware() {
+        val atMaximum = RawAvTiming.wallPosition(2_000_000, 0, 1000, RawPcmCapacity.MAX_SPEED)
+        assertEquals(4_000_000L, atMaximum)
+        val atQuarter = RawAvTiming.wallPosition(atMaximum, 1000, 3000, RawPcmCapacity.MIN_SPEED)
+        assertEquals(4_500_000L, atQuarter)
+        // A paused snapshot is its stored anchor; resuming starts a fresh elapsed interval.
+        assertEquals(atQuarter, RawAvTiming.wallPosition(atQuarter, 3000, 3000, RawPcmCapacity.MIN_SPEED))
+        assertEquals(4_750_000L, RawAvTiming.wallPosition(atQuarter, 3000, 4000, RawPcmCapacity.MIN_SPEED))
+        val sought = RawAvTiming.wallPosition(5_000_000, 4000, 4000, RawPcmCapacity.MIN_SPEED)
+        assertEquals(5_000_000L, sought)
+        assertEquals(5_250_000L, RawAvTiming.wallPosition(sought, 4000, 5000, RawPcmCapacity.MIN_SPEED))
+        assertTrue(RawAvTiming.videoIsDue(5_250_000, 5_250_000))
+        assertFalse(RawAvTiming.videoIsDue(5_300_000, 5_250_000))
+    }
+
+    @Test
     fun seekKeepsThePcmSuffixCrossingTheTarget() {
         val slice = RawAvTiming.clipPcm(48000 * 4, 48000, 2, 0, 250_000)
         assertEquals(12000 * 4, slice.offset)

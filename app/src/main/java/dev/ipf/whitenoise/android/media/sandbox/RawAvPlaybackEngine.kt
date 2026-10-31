@@ -443,7 +443,7 @@ internal class RawAvPlaybackEngine(
     }
 
     fun setSpeed(value: Float): Boolean {
-        require(value.isFinite() && value in 0.5f..RawPcmCapacity.MAX_SPEED)
+        require(value.isFinite() && value in RawPcmCapacity.MIN_SPEED..RawPcmCapacity.MAX_SPEED)
         return synchronized(lock) {
             if (!current()) return@synchronized false
             val refusal = renderer.speed(value)

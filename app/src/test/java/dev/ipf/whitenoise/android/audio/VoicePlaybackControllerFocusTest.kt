@@ -20,7 +20,10 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowSystemClock
 import java.io.File
+import java.io.IOException
 import java.time.Duration
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicBoolean
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -236,15 +239,29 @@ class VoicePlaybackControllerFocusTest {
         primeActivePlayer(player)
         val source = VoicePlaybackSource("personal", "chat", "message", "Maya")
         setPlaybackState(VoicePlaybackController.state.value.copy(source = source, sessionId = 42, ready = true))
+        val freshFile = File("missing-voice-note.amr")
+        val preparations = CopyOnWriteArrayList<File>()
+        val retiredBeforePrepare = AtomicBoolean()
+        setControllerField(
+            "playerFactory",
+            VoicePlaybackPlayer.Factory { _, file ->
+                preparations += file
+                retiredBeforePrepare.set(player.released)
+                throw IOException("Synthetic new-account preparation refusal")
+            },
+        )
         val result =
             runBlocking {
                 VoicePlaybackController.play(
                     "voice-key",
-                    File("missing-voice-note.amr"),
+                    freshFile,
                     source = source.copy(accountRef = "work"),
                 )
             }
         assertEquals(VoicePlaybackController.PlaybackStartResult.PrepareFailed, result)
+        assertEquals(listOf(freshFile), preparations)
+        assertTrue(retiredBeforePrepare.get())
+        assertNull(controllerField("player"))
         assertEquals(0, player.startCount)
         assertTrue(player.released)
         assertNull(VoicePlaybackController.state.value.source)

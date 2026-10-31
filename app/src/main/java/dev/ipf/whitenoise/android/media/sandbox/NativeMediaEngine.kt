@@ -31,6 +31,13 @@ internal object NativeMediaEngine {
         audioOut: ByteBuffer?,
     ): LongArray
 
+    @JvmStatic external fun nativeReadPreferred(
+        handle: Long,
+        videoOut: ByteBuffer?,
+        audioOut: ByteBuffer?,
+        preferred: Int,
+    ): LongArray
+
     @JvmStatic external fun nativeSeek(
         handle: Long,
         timeUs: Long,

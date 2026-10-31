@@ -109,8 +109,14 @@ internal class IsolatedAttachmentPlayer(
     ): ListenableFuture<*> = engine.seekToAsync(positionMs)
 
     override fun handleSetPlaybackParameters(playbackParameters: PlaybackParameters): ListenableFuture<*> {
-        require(playbackParameters.pitch == 1f)
-        if (engine.setSpeed(playbackParameters.speed)) parameters = playbackParameters
+        val speed = playbackParameters.speed
+        if (
+            playbackParameters.pitch == 1f &&
+            speed.isFinite() &&
+            speed in RawPcmCapacity.MIN_SPEED..RawPcmCapacity.MAX_SPEED
+        ) {
+            if (engine.setSpeed(speed)) parameters = playbackParameters
+        }
         return done()
     }
 

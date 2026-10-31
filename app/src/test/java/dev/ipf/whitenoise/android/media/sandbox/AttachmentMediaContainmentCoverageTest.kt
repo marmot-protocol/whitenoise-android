@@ -150,6 +150,24 @@ class AttachmentMediaContainmentCoverageTest {
         )
     }
 
+    @Test
+    fun sonicAllocationProofRequiresTheExactReviewedMedia3Implementation() {
+        val catalog =
+            listOf(File("../gradle/libs.versions.toml"), File("gradle/libs.versions.toml"))
+                .first(File::exists)
+                .readText()
+        val pinned = Regex("""(?m)^media3 = "1\.11\.1"$""").containsMatchIn(catalog)
+        assertTrue("Re-prove Sonic allocations before changing Media3", pinned)
+        val segment = source("media/sandbox/RawSonicSegment.kt").readText()
+        assertTrue(
+            "The proof assumes at most ten milliseconds per input",
+            "sampleRate / INPUT_QUANTA_PER_SECOND" in segment && "INPUT_QUANTA_PER_SECOND = 100" in segment,
+        )
+        assertTrue("The proof requires bounded processor output", "177_120" in segment)
+        val device = source("media/sandbox/RawPcmDevice.kt").readText()
+        assertTrue("Platform time stretching must remain unity", ".setSpeed(1f).setPitch(1f)" in device)
+    }
+
     private fun containsPrivilegedParser(source: String): Boolean {
         // Import declarations are included, so aliases cannot hide a platform parser.
         val executable =

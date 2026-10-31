@@ -47,6 +47,28 @@ class Response(io.BytesIO):
         return self.url
 
 
+class PortableInspectionTests(unittest.TestCase):
+    def test_cache_key_and_plan_do_not_import_unavailable_fcntl(self):
+        probe = """import importlib.abc, runpy, sys
+class NoFcntl(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname == 'fcntl':
+            raise ModuleNotFoundError('fcntl is unavailable on this host')
+sys.modules.pop('fcntl', None)
+sys.meta_path.insert(0, NoFcntl())
+script, option = sys.argv[1:]
+sys.argv = [script, option]
+runpy.run_path(script, run_name='__main__')
+"""
+        for option in ('--cache-key', '--plan'):
+            result = subprocess.run([sys.executable, '-I', '-B', '-c', probe, build.__file__, option],
+                                    capture_output=True, text=True, check=True)
+            if option == '--cache-key':
+                self.assertRegex(result.stdout.strip(), r'^[a-f0-9]{64}$')
+            else:
+                self.assertEqual(json.loads(result.stdout)['lock']['ndk'], '29.0.14206865')
+
+
 class NativeBuildTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()

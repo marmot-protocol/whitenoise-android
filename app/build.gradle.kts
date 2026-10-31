@@ -122,7 +122,8 @@ val mediaDecoderCacheKey =
     providers
         .exec {
             commandLine(
-                listOf("python3", rootProject.file("scripts/prepare_media_decoder.py").absolutePath, "--cache-key") +
+                marmotKitPreparationLauncher +
+                    listOf(rootProject.file("scripts/prepare_media_decoder.py").absolutePath, "--cache-key") +
                     mediaDecoderAbiArguments,
             )
         }.standardOutput.asText
@@ -144,23 +145,25 @@ val prepareNativeMediaDecoder =
         environment("PYTHONDONTWRITEBYTECODE", "1")
         doFirst {
             commandLine(
-                listOf(
-                    "python3",
-                    rootProject.file("scripts/prepare_media_decoder.py").absolutePath,
-                    "--ndk",
-                    androidComponents.sdkComponents.ndkDirectory
-                        .get()
-                        .asFile.absolutePath,
-                    "--output",
-                    mediaDecoderPreparedDir.absolutePath,
-                    "--jobs",
-                    "2",
-                ) + mediaDecoderAbiArguments,
+                marmotKitPreparationLauncher +
+                    listOf(
+                        rootProject.file("scripts/prepare_media_decoder.py").absolutePath,
+                        "--ndk",
+                        androidComponents.sdkComponents.ndkDirectory
+                            .get()
+                            .asFile.absolutePath,
+                        "--output",
+                        mediaDecoderPreparedDir.absolutePath,
+                        "--jobs",
+                        "2",
+                    ) + mediaDecoderAbiArguments,
             )
         }
     }
 tasks.configureEach {
-    if (name.startsWith("merge") && name.endsWith("NativeLibs")) dependsOn(prepareNativeMediaDecoder)
+    if (name.startsWith("merge") && (name.endsWith("NativeLibs") || name.endsWith("JniLibFolders"))) {
+        dependsOn(prepareNativeMediaDecoder)
+    }
 }
 
 val stageMarmotKitApiSignature =

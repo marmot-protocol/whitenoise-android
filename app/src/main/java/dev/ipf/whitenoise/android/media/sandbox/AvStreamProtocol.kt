@@ -8,13 +8,16 @@ import java.io.IOException
 
 /** Raw-output protocol. The worker receives no presentation, file-opening or account capability. */
 internal object AvStreamProtocol {
-    const val DESCRIPTOR = "dev.ipf.whitenoise.media.av.stream.v1"
+    const val DESCRIPTOR = "dev.ipf.whitenoise.media.av.stream.v2"
     const val READY_DESCRIPTOR = "dev.ipf.whitenoise.media.av.stream.ready.v1"
     const val OPEN = IBinder.FIRST_CALL_TRANSACTION
     const val READ = IBinder.FIRST_CALL_TRANSACTION + 1
     const val SEEK = IBinder.FIRST_CALL_TRANSACTION + 2
     const val RETIRE = IBinder.FIRST_CALL_TRANSACTION + 3
     const val READY = IBinder.FIRST_CALL_TRANSACTION
+    const val ANY_TRACK = 0
+    const val VIDEO_TRACK = 1
+    const val AUDIO_TRACK = 2
     const val MAX_REPLY_BYTES = 512
     const val MAX_EDGE = 4096
     const val MAX_PIXEL_BYTES = 64 * 1024 * 1024
@@ -92,9 +95,13 @@ internal data class AvStreamOutput(
         ): AvStreamOutput {
             require(values.size == 7)
             AvStreamProtocol.pixelCapacity(edge)
-            require(values[0] in 0L..2L && values[5] in -10_000_000L..AvStreamProtocol.MAX_DURATION_US)
+            require(values[0] in 0L..4L && values[5] in -10_000_000L..AvStreamProtocol.MAX_DURATION_US)
             when (values[0].toInt()) {
                 0 -> require(values.all { it == 0L })
+                3, 4 -> {
+                    require(if (values[0] == 3L) video else audio)
+                    require(values.drop(1).all { it == 0L })
+                }
                 1 -> {
                     require(video && values[1] in 1..edge.toLong() && values[2] in 1..edge.toLong())
                     require(values[3] == 0L && values[4] == 0L)

@@ -45,7 +45,7 @@ internal object RawAvTiming {
         nowMs: Long,
         speed: Float,
     ): Long {
-        require(speed.isFinite() && speed in 0.5f..RawPcmCapacity.MAX_SPEED)
+        require(speed.isFinite() && speed in RawPcmCapacity.MIN_SPEED..RawPcmCapacity.MAX_SPEED)
         val elapsed = (nowMs - startedMs).coerceAtLeast(0).toDouble()
         val delta = (elapsed * 1000 * speed).coerceAtMost(AvStreamProtocol.MAX_DURATION_US.toDouble()).toLong()
         return (anchorUs + delta).coerceIn(0, AvStreamProtocol.MAX_DURATION_US)
