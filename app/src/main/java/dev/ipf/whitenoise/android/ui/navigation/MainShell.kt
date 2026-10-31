@@ -1339,9 +1339,13 @@ internal fun MainShell(
         selectedChat = item
         appState.clearPresentedProfile()
     }
-    val openGroupFromGroupCreateCompletion: (ChatListItem, Long) -> Unit = { item, requestToken ->
+    val openGroupFromGroupCreateCompletion: (ChatListItem, Long, ChatListReturnHead?) -> Unit = {
+        item,
+        requestToken,
+        flowOriginHead,
+        ->
         if (commitGroupCreateCompletionOpen(item.group.groupIdHex, requestToken)) {
-            chatListReturnHeadSnap = openGroupFromProfileSheet(chatListReturnHeadSnap)
+            chatListReturnHeadSnap = openCreatedGroup(chatListReturnHeadSnap, flowOriginHead)
             // The conversation cannot otherwise tell a group that was created moments ago from one
             // that has been around, and the two deserve different answers when an advisory
             // recovery read fails. `selectedChatJustCreated` stays false: it drives the DM-only
@@ -1803,7 +1807,9 @@ internal fun MainShell(
                 },
             onOpenConversation = openGroupFromProfile,
             onGroupCreateSubmitted = onGroupCreateSubmitted,
-            onGroupCreateCompletedOpen = openGroupFromGroupCreateCompletion,
+            onGroupCreateCompletedOpen = { item, requestToken ->
+                openGroupFromGroupCreateCompletion(item, requestToken, null)
+            },
             onGroupCreateFlowSuperseded = supersedePendingGroupCreateOpen,
             onDismissProfile = {
                 chatListReturnHeadSnap = dismissChatListProfile(chatListReturnHeadSnap)
