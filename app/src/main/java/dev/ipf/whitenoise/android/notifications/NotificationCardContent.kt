@@ -271,7 +271,7 @@ internal class NotificationCardContent(
                         ).apply {
                             // The long first message is one entry identified by the card's stamped message.
                             bundle.getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX)?.let {
-                                extras.putString(LocalNotificationFormatter.EXTRA_ENTRY_MESSAGE_ID_HEX, it)
+                                this.extras.putString(LocalNotificationFormatter.EXTRA_ENTRY_MESSAGE_ID_HEX, it)
                             }
                         },
                 )

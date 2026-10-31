@@ -9,6 +9,7 @@ import androidx.core.app.Person
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Test
@@ -104,7 +105,9 @@ class NotificationCardContentTest {
                     },
                 ).build()
         val rewritten = checkNotNull(content.renamedSenderNotification(original, "sender", "Nickname"))
+        assertFalse(rewritten.extras.containsKey(LocalNotificationFormatter.EXTRA_ENTRY_MESSAGE_ID_HEX))
         val message = checkNotNull(content.expandedSingleMessage(rewritten.extras)).single()
+        assertFalse(rewritten.extras.containsKey(LocalNotificationFormatter.EXTRA_ENTRY_MESSAGE_ID_HEX))
         assertEquals("legacy body", message.text)
         assertEquals(123L, message.timestamp)
         assertEquals("Nickname", message.person?.name)
