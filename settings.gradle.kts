@@ -10,8 +10,11 @@ pluginManagement {
         mavenCentral()
         gradlePluginPortal {
             content {
-                // The portal marker differs from the reviewed Maven Central POM.
+                // These portal markers differ from the reviewed Maven Central POMs.
                 excludeModule("dev.detekt", "dev.detekt.gradle.plugin")
+                excludeModule("org.jetbrains.kotlin.jvm", "org.jetbrains.kotlin.jvm.gradle.plugin")
+                excludeModule("org.jetbrains.kotlin.plugin.compose", "org.jetbrains.kotlin.plugin.compose.gradle.plugin")
+                excludeModule("org.jetbrains.kotlinx.kover", "org.jetbrains.kotlinx.kover.gradle.plugin")
             }
         }
     }

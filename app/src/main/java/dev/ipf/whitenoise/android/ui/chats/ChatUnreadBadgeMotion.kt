@@ -4,8 +4,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -15,15 +13,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.ManualUnreadDot
@@ -55,11 +50,6 @@ internal fun ChatUnreadBadgeMotion(
         if (current == null) retained = null
     }
     val visual = current ?: retained.takeIf { enabled } ?: return
-    val labelWidth =
-        rememberTextMeasurer()
-            .measure("999+", MaterialTheme.typography.labelSmall)
-            .size.width
-    val slotWidth = with(LocalDensity.current) { labelWidth.toDp() + 8.dp }
     val accessibleCount = count.coerceAtMost(Int.MAX_VALUE.toULong()).toInt()
     val description =
         if (count > 0uL) {
@@ -70,7 +60,6 @@ internal fun ChatUnreadBadgeMotion(
     Box(
         modifier =
             Modifier
-                .width(slotWidth)
                 .clearAndSetSemantics {
                     if (current != null) {
                         contentDescription = description

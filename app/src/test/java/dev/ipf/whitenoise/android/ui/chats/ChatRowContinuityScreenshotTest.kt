@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.chats
 
 import android.content.Context
 import android.provider.Settings
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
@@ -23,6 +24,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
@@ -77,6 +79,66 @@ class ChatRowContinuityScreenshotTest {
     /** AMOLED and double-size RTL text keep the selected unread row legible in a narrow viewport. */
     @Test
     fun amoledLargeRtlSelectedFrame() = capture("amoled_large_rtl", elapsed = 240, dark = true, largeRtl = true)
+
+    /** Actual compact count, dot and neighboring metadata geometry in light mode. */
+    @Test
+    fun compactBadgeMetadataLight() = captureCompactMetadata("light", dark = false)
+
+    /** The same production metadata keeps the dark theme's colors and compact gaps. */
+    @Test
+    fun compactBadgeMetadataDark() = captureCompactMetadata("dark", dark = true)
+
+    /** Narrow AMOLED rows mirror the metadata at double font scale, including mention and delivery siblings. */
+    @Test
+    fun compactBadgeMetadataAmoledLargeRtl() = captureCompactMetadata("amoled_large_rtl", dark = true, largeRtl = true)
+
+    /** Pin every settled label in a real row, rather than the standalone badge leaves. */
+    private fun captureCompactMetadata(
+        variant: String,
+        dark: Boolean,
+        largeRtl: Boolean = false,
+    ) {
+        val appState = ChatRowPortFixtures.state(context)
+        rule.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(
+                LocalDensity provides Density(density.density, if (largeRtl) 2f else 1f),
+                LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = largeRtl) {
+                    Surface(Modifier.width(280.dp).testTag("compact.metadata")) {
+                        Column {
+                            listOf(1uL, 9uL, 10uL, 999uL, 1_001uL, 0uL).forEachIndexed { index, count ->
+                                val original =
+                                    ChatRowPortFixtures.item(
+                                        unread = true,
+                                        delivery =
+                                            if (index % 3 == 0) {
+                                                ChatListMessageDeliveryStateFfi.DELIVERED
+                                            } else {
+                                                ChatListMessageDeliveryStateFfi.NOT_APPLICABLE
+                                            },
+                                    )
+                                val item =
+                                    original.copy(
+                                        projection =
+                                            requireNotNull(original.projection).copy(
+                                                unreadCount = count,
+                                                unreadMention = index % 2 == 0,
+                                                manuallyMarkedUnread = count == 0uL,
+                                            ),
+                                    )
+                                ChatRow(item, appState, onClick = {}, onOpenProfile = {})
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        rule
+            .onNodeWithTag("compact.metadata")
+            .captureRoboImage("src/test/snapshots/chat_row_compact_metadata_$variant.png")
+    }
 
     /** Changes only selection state; the same production row and unread projection survive every captured phase. */
     private fun capture(

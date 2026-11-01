@@ -219,8 +219,12 @@ internal fun ChatsScreen(
     onTtsTransportBodyClick: (() -> Unit)? = null,
     showPlaybackTransport: Boolean = true,
     onGroupCreateSubmitted: () -> Long = { 0L },
-    onGroupCreateCompletedOpen: (ChatListItem, Long) -> Unit = { item, _ ->
-        onOpenGroup(item, null, false, null)
+    onGroupCreateCompletedOpen: (ChatListItem, Long, flowOriginHead: ChatListReturnHead?) -> Unit = {
+        item,
+        _,
+        flowOriginHead,
+        ->
+        onOpenGroup(item, null, false, flowOriginHead)
     },
     onGroupCreateFlowSuperseded: () -> Unit = {},
     diagnosticsPrompt: @Composable () -> Unit = {},
@@ -230,7 +234,12 @@ internal fun ChatsScreen(
     }
     val groupTitleCopy = rememberGroupTitleCopy()
     var showNewChatFlow by rememberSaveable { mutableStateOf(false) }
-    val openNewMessageFlow = { showNewChatFlow = true }
+    // The list head when New Message opened, the row its keyed scroll anchor holds while the
+    // flow replaces it. Not saved: after process death the open falls back to the current head.
+    var newChatFlowOriginHead by
+        remember(appState.activeAccountRef, appState.runtimeGeneration) {
+            mutableStateOf<ChatListReturnHead?>(null)
+        }
     var actionSheetChatId by
         remember(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
     val actionMenuOwner =
@@ -949,16 +958,30 @@ internal fun ChatsScreen(
                 )
             }
 
+    /** The visible filtered head the return scroll compares against, or null for archived and advanced views. */
+    fun visibleReturnHead(): ChatListReturnHead? {
+        val ordinaryView = !showArchived && !advancedFolder
+        return if (ordinaryView) chatListReturnHead(visibleItems) else null
+    }
+
     /** Opens a chat from the visible list, remembering the list head for the return scroll. */
     fun openGroupFromVisibleList(
         item: ChatListItem,
         focusMessageId: String?,
         justCreated: Boolean,
     ) {
-        val visibleHead =
-            if (showArchived || advancedFolder) null else chatListReturnHead(visibleItems)
-        onOpenGroup(item, focusMessageId, justCreated, visibleHead)
+        onOpenGroup(item, focusMessageId, justCreated, visibleReturnHead())
     }
+
+    // Taken while the list is still on screen, since it may already include the new chat
+    // by the time the flow completes (#3529).
+    val openNewMessageFlow = {
+        newChatFlowOriginHead = visibleReturnHead()
+        showNewChatFlow = true
+    }
+
+    /** The head a chat created through New Message returns against, preferring the one held when it opened. */
+    fun newChatFlowReturnHead(): ChatListReturnHead? = newChatFlowOriginHead ?: visibleReturnHead()
 
     /** Opens the chat a search result came from, focused on that result's message. */
     fun openSearchMessage(
@@ -1531,7 +1554,7 @@ internal fun ChatsScreen(
                 appState = appState,
                 onOpenConversation = { item, justCreated ->
                     showNewChatFlow = false
-                    openGroupFromVisibleList(item, null, justCreated)
+                    onOpenGroup(item, null, justCreated, newChatFlowReturnHead())
                 },
                 onClose = {
                     showNewChatFlow = false
@@ -1540,7 +1563,7 @@ internal fun ChatsScreen(
                 onGroupCreateSubmitted = onGroupCreateSubmitted,
                 onGroupCreateCompletedOpen = { item, requestToken ->
                     showNewChatFlow = false
-                    onGroupCreateCompletedOpen(item, requestToken)
+                    onGroupCreateCompletedOpen(item, requestToken, newChatFlowReturnHead())
                 },
             )
         }
