@@ -4,6 +4,25 @@ import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.whitenoise.android.core.MessageProjector
 
 /**
+ * Keep a local send-time retention hint only while it can bridge an actual
+ * optimistic handoff or the conversation still has retention enabled. A null
+ * authoritative projection after retention is disabled must retire any
+ * remembered hint instead of re-seeding it from the previous UI row.
+ */
+internal fun retentionHintForProjection(
+    projectedRetentionSeconds: ULong?,
+    currentGroupRetentionSeconds: ULong,
+    optimisticSnapshot: ULong?,
+    rememberedSnapshot: ULong?,
+): ULong? =
+    when {
+        projectedRetentionSeconds != null -> null
+        optimisticSnapshot != null -> optimisticSnapshot
+        currentGroupRetentionSeconds == 0uL -> null
+        else -> rememberedSnapshot
+    }
+
+/**
  * Whether send-time disappearing expiry should stay suspended for [record]
  * until the user scrolls past it (#797). Own sends always use send-time or a
  * display anchor; received rows after the persisted read watermark stay
@@ -31,7 +50,8 @@ internal fun isDisappearingSendTimeExpiryDeferred(
  * retention event on controller recreation, then a session read anchor can make it reappear after
  * the next send. All other projected row kinds retain their existing expiry behavior.
  */
-internal fun shouldApplyLocalDisappearingExpiry(record: AppMessageRecordFfi): Boolean = !MessageProjector.isGroupSystem(record)
+internal fun shouldApplyLocalDisappearingExpiry(record: AppMessageRecordFfi): Boolean =
+    !MessageProjector.isGroupSystem(record)
 
 /** Applies the row-owned deadline only to ordinary message history. */
 internal fun isTimelineRecordLocallyExpired(

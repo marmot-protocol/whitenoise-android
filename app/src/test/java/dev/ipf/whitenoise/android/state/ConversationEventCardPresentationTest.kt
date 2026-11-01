@@ -120,7 +120,10 @@ class ConversationEventCardPresentationTest {
             }
             fixture.awaitIdleCondition { readsFinished }
             assertFalse("an abandoned read cannot write after its budget", owner.eventCardSnapshots.isKnown(reference))
-            assertTrue("the completed Markdown parse remains usable", warmed.messages.single().contentTokens.blocks.isNotEmpty())
+            assertTrue(
+                "the completed Markdown parse remains usable",
+                warmed.messages.single().contentTokens.blocks.isNotEmpty(),
+            )
         } finally {
             blocked.countDown()
             fixture.close()

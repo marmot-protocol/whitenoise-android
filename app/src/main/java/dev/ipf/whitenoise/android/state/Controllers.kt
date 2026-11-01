@@ -656,81 +656,6 @@ private class OptimisticSendCancelledException : Exception("Optimistic send canc
 
 private const val MAX_CANCELLED_SEND_TOMBSTONES = 64
 
-/**
- * Preserve a failed optimistic text send as a local timeline row instead of
- * deleting the user's draft on publish failure. The failed row keeps the same
- * temp id/order so retry/delete affordances can operate on the live optimistic
- * state and the body remains copyable from the bubble.
- */
-internal fun retainFailedOptimisticTextSend(
-    optimisticMessages: MutableMap<String, TimelineMessage>,
-    messageById: MutableMap<String, AppMessageRecordFfi>,
-    key: String,
-    optimistic: AppMessageRecordFfi,
-    timelineOrder: ULong,
-) {
-    val retentionAtSendSeconds = optimisticMessages[key]?.retentionAtSendSeconds
-    messageById[optimistic.messageIdHex] = optimistic
-    optimisticMessages[key] =
-        TimelineMessage(
-            key,
-            optimistic,
-            MessageStatus.Failed,
-            timelineOrder = timelineOrder,
-            retentionAtSendSeconds = retentionAtSendSeconds,
-        )
-}
-
-/**
- * Keep a local send-time retention hint only while it can bridge an actual
- * optimistic handoff or the conversation still has retention enabled. A null
- * authoritative projection after retention is disabled must retire any
- * remembered hint instead of re-seeding it from the previous UI row.
- */
-internal fun retentionHintForProjection(
-    projectedRetentionSeconds: ULong?,
-    currentGroupRetentionSeconds: ULong,
-    optimisticSnapshot: ULong?,
-    rememberedSnapshot: ULong?,
-): ULong? =
-    when {
-        projectedRetentionSeconds != null -> null
-        optimisticSnapshot != null -> optimisticSnapshot
-        currentGroupRetentionSeconds == 0uL -> null
-        else -> rememberedSnapshot
-    }
-
-/**
- * Trim [messageById] to the records still referenced by the loaded window
- * ([windowIds]) or by in-flight [optimisticMessages], dropping projected records
- * that have scrolled out of the window.
- *
- * [messageById] holds full decrypted records (plaintext + parsed tokens). The
- * live Projection/Upsert path adds one per delivered message but never trims, so
- * a long-lived busy conversation accumulates decrypted content far beyond the
- * rendered window — a memory-growth and privacy-footprint issue (#373). This is
- * the same retain-set the window-replace path already applies on page load (#68).
- */
-internal fun pruneMessageByIdToWindow(
-    messageById: MutableMap<String, AppMessageRecordFfi>,
-    windowIds: Set<String>,
-    optimisticMessages: Collection<TimelineMessage>,
-) {
-    val retain = HashSet(windowIds)
-    optimisticMessages.forEach { retain.add(it.record.messageIdHex) }
-    messageById.keys.retainAll(retain)
-}
-
-internal fun retainedMessageOverlayTargets(
-    timelineMessageIds: Collection<String>,
-    optimisticMessageIds: Collection<String>,
-    overlayTargetIds: Collection<String>,
-): Set<String> {
-    val present = HashSet(timelineMessageIds)
-    present.addAll(optimisticMessageIds)
-    return overlayTargetIds.filterTo(linkedSetOf()) { it in present }
-}
-
 /** Shared membership gate for optimistic work that the engine later validates. */
 private fun canAcceptSeededMemberMutation(
     accountRef: String?,
@@ -12530,7 +12455,9 @@ class ConversationController(
                 // Cards appear once their message's Markdown does, so their cached state is read before it applies.
                 hydrate = { pending ->
                     hydrateTimelineMarkdown(pending).also { hydrated ->
-                        if (warmEventCards) eventCardPresentation.warmEventCardSnapshots(hydrated.filter(::mayRenderNostrEventCard))
+                        if (warmEventCards) {
+                            eventCardPresentation.warmEventCardSnapshots(hydrated.filter(::mayRenderNostrEventCard))
+                        }
                     }
                 },
                 applyHydrated = { hydrated ->
