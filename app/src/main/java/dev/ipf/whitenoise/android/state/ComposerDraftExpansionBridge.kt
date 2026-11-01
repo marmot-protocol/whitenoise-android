@@ -36,12 +36,11 @@ internal class ComposerDraftExpansionBridge(
         groupIdHex: String,
         value: TextFieldValue,
     ) {
-        val currentText =
-            draftStore
-                .getDraft(accountRef, groupIdHex)
-                ?.textFieldValue
-                ?.text
-                .orEmpty()
+        val currentDraft = draftStore.getDraft(accountRef, groupIdHex)
+        // An absent draft can still own native ordering metadata or a pending-send
+        // recovery marker. An unchanged empty callback must not clear either.
+        if (currentDraft == null && value.text.isEmpty()) return
+        val currentText = currentDraft?.textFieldValue?.text.orEmpty()
         draftStore.set(accountRef, groupIdHex, value)
         // Caret and IME composition are Android presentation state. Submitting unchanged
         // content would invalidate a dictation Send captured before this UI-only update.
