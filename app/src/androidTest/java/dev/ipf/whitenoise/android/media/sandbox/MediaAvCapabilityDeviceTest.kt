@@ -35,7 +35,8 @@ class MediaAvCapabilityDeviceTest {
             report.writeText(
                 JSONObject()
                     .put("type", "header")
-                    .put("capture_schema", 2)
+                    .put("capture_schema", 3)
+                    .put("app_uid", android.os.Process.myUid())
                     .put("run_token", token)
                     .put("api", Build.VERSION.SDK_INT)
                     .put("fingerprint", Build.FINGERPRINT)
@@ -92,13 +93,7 @@ private class AvCapabilityCampaign(
     ): Boolean {
         fixture.writeBytes(case.bytes)
         val length = if (case.id == "overflow_range") Long.MAX_VALUE else fixture.length()
-        val row =
-            JSONObject()
-                .put("type", "case")
-                .put("case", case.id)
-                .put("run_token", token)
-                .put("request", index + 1)
-                .put("stage", case.stage)
+        val row = caseRow(index, case)
         var failed = false
         var emitted = false
         try {
@@ -145,6 +140,25 @@ private class AvCapabilityCampaign(
         return failed
     }
 
+    private fun caseRow(
+        index: Int,
+        case: ProbeCase,
+    ): JSONObject =
+        JSONObject()
+            .put("type", "case")
+            .put("case", case.id)
+            .put("run_token", token)
+            .put("request", index + 1)
+            .put("stage", case.stage)
+            .put(
+                "input_sha256",
+                java.security.MessageDigest
+                    .getInstance("SHA-256")
+                    .digest(case.bytes)
+                    .joinToString("") { "%02x".format(it) },
+            ).put("input_bytes", case.bytes.size)
+            .put("format", case.format)
+
     private fun request(
         id: Int,
         stage: String,
@@ -185,7 +199,15 @@ private class ProbeCase(
     val id: String,
     val stage: String,
     val bytes: ByteArray,
-)
+) {
+    val format: String
+        get() =
+            when {
+                id == "empty_range" -> "empty"
+                id.startsWith("audio_") || id == "overflow_range" -> "audio/wav"
+                else -> "video/mp4"
+            }
+}
 
 /** Bounded worker-PID read; unrelated processes cannot displace the correlated request's log tail. */
 internal object AvCapabilityLogs {

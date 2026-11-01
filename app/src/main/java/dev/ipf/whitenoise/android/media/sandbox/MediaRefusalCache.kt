@@ -11,6 +11,7 @@ internal class MediaRefusalCache(
     fun <T> attempt(
         key: String,
         check: () -> Unit,
+        attributable: () -> Boolean = { true },
         block: () -> T?,
     ): T? {
         check()
@@ -27,7 +28,7 @@ internal class MediaRefusalCache(
             } catch (_: OutOfMemoryError) {
                 null
             }
-        if (result == null) {
+        if (result == null && attributable()) {
             check() // A retired or timed-out call cannot mark a healthy source as malformed.
             refusals[key] = now() + MediaDecodePolicy.REFUSAL_TTL_MS
             while (refusals.size > MediaDecodePolicy.MAX_REFUSALS) refusals.remove(refusals.keys.first())

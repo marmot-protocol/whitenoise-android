@@ -13,12 +13,25 @@ mdk_adoption_only="${7:-false}"
 media_startup_trace="${8:-false}"
 media_startup_api="${9:-30}"
 range_selection_only="${10:-false}"
+media_trace_target="${11:-healthy}"
+
+if [[ "$media_trace_target" != "healthy" && "$media_trace_target" != "av" ]]; then
+  echo "Fixed trace target required" >&2; exit 2
+fi
+if [[ "$media_trace_target" != "healthy" && "$media_startup_trace" != "true" ]]; then
+  echo "AV trace target requires explicit trace dispatch" >&2; exit 2
+fi
 
 if [[ "$media_startup_trace" == "true" ]]; then
-  if [[ "$range_selection_only" == "true" || "$event_name" != "workflow_dispatch" || "$media_sandbox_only" != "true" || "$media_startup_api" != "30" || "$review_demo_e2e" == "true" || "$document_provider_matrix" == "true" || "$responsiveness_only" == "true" || "$outbound_share_only" == "true" || "$mdk_adoption_only" == "true" ]]; then
+  if [[ "$range_selection_only" == "true" || "$event_name" != "workflow_dispatch" || "$media_sandbox_only" != "true" || "$review_demo_e2e" == "true" || "$document_provider_matrix" == "true" || "$responsiveness_only" == "true" || "$outbound_share_only" == "true" || "$mdk_adoption_only" == "true" ]]; then
     echo "Startup tracing requires the exclusive hosted API 30 media dispatch" >&2
     exit 2
   fi
+  if [[ "$media_trace_target" == "av" ]]; then
+    [[ "$media_startup_api" == "30" || "$media_startup_api" == "36" ]] || exit 2
+    exec python3 scripts/hosted-startup-trace.py run-av "$media_startup_api"
+  fi
+  [[ "$media_startup_api" == "30" ]] || exit 2
   exec python3 scripts/hosted-startup-trace.py run
 fi
 
@@ -73,7 +86,7 @@ if [[ "$event_name" == "workflow_dispatch" && "$media_sandbox_only" == "true" ]]
     --no-daemon --stacktrace
   required_file="$(mktemp)"
   trap 'rm -f "$required_file"' EXIT
-  grep -E '\.(IsolatedMediaDecoderDeviceTest|AnimationSourceAdmissionDeviceTest|MediaCodecCorpusDeviceTest|MediaWorkerBaselineDeviceTest|MediaAvCapabilityDeviceTest|AvCapabilityLogCaptureDeviceTest)#' config/instrumented-required-cases.txt > "$required_file"
+  grep -E '\.(IsolatedMediaDecoderDeviceTest|AnimationSourceAdmissionDeviceTest|MediaCodecCorpusDeviceTest|MediaWorkerBaselineDeviceTest|MediaAvCapabilityDeviceTest|AvCapabilityLogCaptureDeviceTest|NativeMediaSandboxDeviceTest|IsolatedAttachmentPlayerDeviceTest|MediaAvNativeCorpusDeviceTest|MediaAvPerformanceDeviceTest)#' config/instrumented-required-cases.txt > "$required_file"
   python3 scripts/check_instrumented_required_cases.py app/build/outputs/androidTest-results/connected --required "$required_file"
   exit 0
 fi

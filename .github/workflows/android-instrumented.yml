@@ -54,10 +54,16 @@ on:
         type: boolean
         default: false
       media_startup_trace:
-        description: Trace only the fixed image baseline on hosted API 30
+        description: Trace a fixed synthetic media case on a hosted emulator
         required: false
         type: boolean
         default: false
+      media_trace_target:
+        description: Fixed trace case; AV measures sampled RSS on unchanged tiny inputs
+        required: false
+        type: choice
+        options: [healthy, av]
+        default: healthy
       media_sandbox_api:
         description: Android API for focused decoder compatibility
         required: false
@@ -307,7 +313,7 @@ jobs:
   # Draft PRs boot no emulators; ready_for_review starts the run.
   changes:
     name: Select emulator lanes
-    if: ${{ !github.event.pull_request.draft && !inputs.mdk_preview_qualification }}
+    if: ${{ (!github.event.pull_request.draft && !inputs.mdk_preview_qualification) || (inputs.media_trace_target && inputs.media_trace_target != 'healthy') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -315,6 +321,11 @@ jobs:
       attachment_fixture_scope: ${{ steps.select.outputs.attachment_fixture_scope }}
       connected: ${{ steps.select.outputs.connected }}
     steps:
+      - name: Reject incompatible AV trace selection before independent campaigns
+        if: inputs.media_trace_target && inputs.media_trace_target != 'healthy'
+        env:
+          TRACE_MODE_VALID: ${{ (github.event_name == 'workflow_dispatch' && inputs.media_trace_target == 'av' && inputs.media_startup_trace && inputs.media_sandbox_only && (inputs.media_sandbox_api == '30' || inputs.media_sandbox_api == '36') && !inputs.range_selection_only && !inputs.maestro_pilot && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_adoption_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && !inputs.review_demo_e2e && !inputs.document_provider_matrix) }}
+        run: '[[ "$TRACE_MODE_VALID" == "true" ]]'
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -330,7 +341,7 @@ jobs:
 
   attachment-fixture:
     needs: changes
-    if: ${{ !inputs.media_startup_trace && needs.changes.outputs.attachment_fixture == 'true' && !inputs.mdk_adoption_only && !inputs.range_selection_only && !inputs.outbound_share_only && !inputs.media_sandbox_only && (github.event_name != 'workflow_dispatch' || (!inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only)) && !inputs.mdk_qualification && !inputs.mdk_preview_qualification }}
+    if: ${{ (!inputs.media_trace_target || inputs.media_trace_target == 'healthy' || (github.event_name == 'workflow_dispatch' && inputs.media_trace_target == 'av' && inputs.media_startup_trace && inputs.media_sandbox_only && (inputs.media_sandbox_api == '30' || inputs.media_sandbox_api == '36') && !inputs.range_selection_only && !inputs.maestro_pilot && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_adoption_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && !inputs.review_demo_e2e && !inputs.document_provider_matrix)) && (!inputs.media_startup_trace && needs.changes.outputs.attachment_fixture == 'true' && !inputs.mdk_adoption_only && !inputs.range_selection_only && !inputs.outbound_share_only && !inputs.media_sandbox_only && (github.event_name != 'workflow_dispatch' || (!inputs.maestro_pilot && !inputs.media_sandbox_only && !inputs.responsiveness_only)) && !inputs.mdk_qualification && !inputs.mdk_preview_qualification) }}
     name: Controlled attachment fixture (${{ matrix.distribution }})
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -390,7 +401,7 @@ jobs:
 
   instrumented:
     needs: changes
-    if: needs.changes.outputs.connected == 'true' && (inputs.media_startup_trace || github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot || inputs.responsiveness_only || inputs.media_sandbox_only || inputs.outbound_share_only || inputs.mdk_adoption_only || inputs.range_selection_only) && !inputs.mdk_qualification && !inputs.mdk_preview_qualification
+    if: ${{ (!inputs.media_trace_target || inputs.media_trace_target == 'healthy' || (github.event_name == 'workflow_dispatch' && inputs.media_trace_target == 'av' && inputs.media_startup_trace && inputs.media_sandbox_only && (inputs.media_sandbox_api == '30' || inputs.media_sandbox_api == '36') && !inputs.range_selection_only && !inputs.maestro_pilot && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_adoption_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && !inputs.review_demo_e2e && !inputs.document_provider_matrix)) && (needs.changes.outputs.connected == 'true' && (inputs.media_startup_trace || github.event_name != 'workflow_dispatch' || !inputs.maestro_pilot || inputs.responsiveness_only || inputs.media_sandbox_only || inputs.outbound_share_only || inputs.mdk_adoption_only || inputs.range_selection_only) && !inputs.mdk_qualification && !inputs.mdk_preview_qualification) }}
     name: Connected Android tests (emulator)
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -399,8 +410,12 @@ jobs:
       RELEASE_VERIFY_REPORT_DIR: app/build/reports/outbound-share-contract
 
     steps:
+      - name: Reject AV trace selection without explicit trace dispatch
+        if: inputs.media_trace_target == 'av' && (!inputs.media_startup_trace || github.event_name != 'workflow_dispatch')
+        run: exit 2
+
       - name: Reject incompatible startup trace inputs
-        if: inputs.media_startup_trace && (github.event_name != 'workflow_dispatch' || !inputs.media_sandbox_only || inputs.media_sandbox_api != '30' || inputs.maestro_pilot || inputs.responsiveness_only || inputs.outbound_share_only || inputs.mdk_adoption_only || inputs.review_demo_e2e || inputs.document_provider_matrix)
+        if: inputs.media_startup_trace && (github.event_name != 'workflow_dispatch' || !inputs.media_sandbox_only || ((inputs.media_trace_target != 'av' && inputs.media_sandbox_api != '30') || (inputs.media_trace_target == 'av' && inputs.media_sandbox_api != '30' && inputs.media_sandbox_api != '36')) || inputs.maestro_pilot || inputs.responsiveness_only || inputs.outbound_share_only || inputs.mdk_adoption_only || inputs.review_demo_e2e || inputs.document_provider_matrix)
         run: exit 2
 
       - name: Reject incompatible MDK acceptance inputs
@@ -516,7 +531,7 @@ jobs:
           disable-animations: true
           # android-emulator-runner executes this input through /bin/sh. Keep it
           # to one command and delegate conditional selection to the executable.
-          script: ./scripts/run-android-instrumented-tests.sh "${{ github.event_name }}" "${{ inputs.review_demo_e2e }}" "${{ inputs.document_provider_matrix }}" "${{ inputs.responsiveness_only }}" "${{ inputs.media_sandbox_only }}" "${{ inputs.outbound_share_only }}" "${{ inputs.mdk_adoption_only }}" "${{ inputs.media_startup_trace }}" "${{ inputs.media_sandbox_api }}" "${{ inputs.range_selection_only }}"
+          script: ./scripts/run-android-instrumented-tests.sh "${{ github.event_name }}" "${{ inputs.review_demo_e2e }}" "${{ inputs.document_provider_matrix }}" "${{ inputs.responsiveness_only }}" "${{ inputs.media_sandbox_only }}" "${{ inputs.outbound_share_only }}" "${{ inputs.mdk_adoption_only }}" "${{ inputs.media_startup_trace }}" "${{ inputs.media_sandbox_api }}" "${{ inputs.range_selection_only }}" "${{ inputs.media_trace_target || 'healthy' }}"
 
       - name: Upload instrumented test reports
         if: always()
@@ -541,7 +556,7 @@ jobs:
         shell: bash
         env:
           RETAIN_FAILED_MEDIA: ${{ job.status != 'success' }}
-          RETAIN_STARTUP_TRACE: ${{ inputs.media_startup_trace }}
+          RETAIN_STARTUP_TRACE: ${{ inputs.media_startup_trace && inputs.media_trace_target != 'av' }}
         run: |
           if [[ "$RETAIN_FAILED_MEDIA" == 'true' ]]; then
             shopt -s nullglob
@@ -576,7 +591,7 @@ jobs:
 
   maestro-pilot:
     name: Optional Maestro onboarding pilot
-    if: ${{ !inputs.media_startup_trace && github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.range_selection_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && !startsWith(inputs.maestro_suite, 'runtime-') }}
+    if: ${{ (!inputs.media_trace_target || inputs.media_trace_target == 'healthy' || (github.event_name == 'workflow_dispatch' && inputs.media_trace_target == 'av' && inputs.media_startup_trace && inputs.media_sandbox_only && (inputs.media_sandbox_api == '30' || inputs.media_sandbox_api == '36') && !inputs.range_selection_only && !inputs.maestro_pilot && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_adoption_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && !inputs.review_demo_e2e && !inputs.document_provider_matrix)) && (!inputs.media_startup_trace && github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.range_selection_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && !startsWith(inputs.maestro_suite, 'runtime-')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -688,7 +703,7 @@ jobs:
 
   maestro-runtime-build:
     name: Build isolated Maestro fixture pair
-    if: ${{ !inputs.media_startup_trace && github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.range_selection_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && startsWith(inputs.maestro_suite, 'runtime-') }}
+    if: ${{ (!inputs.media_trace_target || inputs.media_trace_target == 'healthy' || (github.event_name == 'workflow_dispatch' && inputs.media_trace_target == 'av' && inputs.media_startup_trace && inputs.media_sandbox_only && (inputs.media_sandbox_api == '30' || inputs.media_sandbox_api == '36') && !inputs.range_selection_only && !inputs.maestro_pilot && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_adoption_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && !inputs.review_demo_e2e && !inputs.document_provider_matrix)) && (!inputs.media_startup_trace && github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.range_selection_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && startsWith(inputs.maestro_suite, 'runtime-')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -744,7 +759,7 @@ jobs:
           retention-days: 7
 
   maestro-runtime:
-    if: ${{ !inputs.media_startup_trace }}
+    if: ${{ (!inputs.media_trace_target || inputs.media_trace_target == 'healthy' || (github.event_name == 'workflow_dispatch' && inputs.media_trace_target == 'av' && inputs.media_startup_trace && inputs.media_sandbox_only && (inputs.media_sandbox_api == '30' || inputs.media_sandbox_api == '36') && !inputs.range_selection_only && !inputs.maestro_pilot && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_adoption_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && !inputs.review_demo_e2e && !inputs.document_provider_matrix)) && (!inputs.media_startup_trace) }}
     name: Maestro generated accounts (${{ matrix.slice }} ${{ matrix.partition }}/${{ matrix.partitions }})
     needs: maestro-runtime-build
     runs-on: ubuntu-latest
@@ -881,7 +896,7 @@ jobs:
 
   maestro-runtime-summary:
     name: Reconcile every selected Maestro runtime case
-    if: ${{ !inputs.media_startup_trace && always() && github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.range_selection_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && startsWith(inputs.maestro_suite, 'runtime-') }}
+    if: ${{ (!inputs.media_trace_target || inputs.media_trace_target == 'healthy' || (github.event_name == 'workflow_dispatch' && inputs.media_trace_target == 'av' && inputs.media_startup_trace && inputs.media_sandbox_only && (inputs.media_sandbox_api == '30' || inputs.media_sandbox_api == '36') && !inputs.range_selection_only && !inputs.maestro_pilot && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_adoption_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && !inputs.review_demo_e2e && !inputs.document_provider_matrix)) && (!inputs.media_startup_trace && always() && github.event_name == 'workflow_dispatch' && inputs.maestro_pilot && !inputs.mdk_adoption_only && !inputs.range_selection_only && !inputs.media_sandbox_only && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && startsWith(inputs.maestro_suite, 'runtime-')) }}
     needs: [maestro-runtime-build, maestro-runtime]
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -915,7 +930,7 @@ jobs:
 
   mdk-qualification:
     name: Populated MarmotKit upgrade and recovery (emulator)
-    if: github.event_name == 'workflow_dispatch' && inputs.mdk_qualification && !inputs.mdk_preview_qualification
+    if: ${{ (!inputs.media_trace_target || inputs.media_trace_target == 'healthy' || (github.event_name == 'workflow_dispatch' && inputs.media_trace_target == 'av' && inputs.media_startup_trace && inputs.media_sandbox_only && (inputs.media_sandbox_api == '30' || inputs.media_sandbox_api == '36') && !inputs.range_selection_only && !inputs.maestro_pilot && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_adoption_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && !inputs.review_demo_e2e && !inputs.document_provider_matrix)) && (github.event_name == 'workflow_dispatch' && inputs.mdk_qualification && !inputs.mdk_preview_qualification) }}
     runs-on: ubuntu-latest
     timeout-minutes: 75
     steps:
@@ -973,7 +988,7 @@ jobs:
 
   mdk-signed-preview:
     name: Exact trusted preview upgrade and cold restart
-    if: github.event_name == 'workflow_dispatch' && inputs.mdk_preview_qualification
+    if: ${{ (!inputs.media_trace_target || inputs.media_trace_target == 'healthy' || (github.event_name == 'workflow_dispatch' && inputs.media_trace_target == 'av' && inputs.media_startup_trace && inputs.media_sandbox_only && (inputs.media_sandbox_api == '30' || inputs.media_sandbox_api == '36') && !inputs.range_selection_only && !inputs.maestro_pilot && !inputs.responsiveness_only && !inputs.outbound_share_only && !inputs.mdk_adoption_only && !inputs.mdk_qualification && !inputs.mdk_preview_qualification && !inputs.review_demo_e2e && !inputs.document_provider_matrix)) && (github.event_name == 'workflow_dispatch' && inputs.mdk_preview_qualification) }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:

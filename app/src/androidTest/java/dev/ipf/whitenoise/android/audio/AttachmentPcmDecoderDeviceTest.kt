@@ -11,7 +11,6 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.ByteArrayOutputStream
@@ -111,13 +110,15 @@ class AttachmentPcmDecoderDeviceTest {
         }
 
     @Test
-    fun rawPcm24IsNotRelabeled() =
+    fun rawPcm24IsConvertedToPcm16() =
         runBlocking {
-            withPcmBytes(16_000, 1, 24, ByteArray(30) { it.toByte() }) { file ->
-                var chunks = 0
-                val failure = runCatching { decodeAttachmentPcm(file) { chunks++ } }.exceptionOrNull()
-                assertTrue(failure is IOException)
-                assertEquals(0, chunks)
+            val source = byteArrayOf(0, 0, 0, 0, 0, 64, 0, 0, -64)
+            withPcmBytes(16_000, 1, 24, source) { file ->
+                val received = ByteArrayOutputStream()
+                decodeAttachmentPcm(file) { received.write(it.bytes) }
+                val expected = ByteBuffer.allocate(6).order(ByteOrder.LITTLE_ENDIAN)
+                expected.putShort(0).putShort(16_384).putShort(-16_384)
+                assertArrayEquals(expected.array(), received.toByteArray())
             }
         }
 
@@ -187,6 +188,8 @@ class AttachmentPcmDecoderDeviceTest {
         header.putShort(frameBytes.toShort()).putShort(bits.toShort())
         header.put("data".toByteArray(Charsets.US_ASCII)).putInt(pcm.size)
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+            .install(context)
         val file = File.createTempFile("attachment-pcm-", ".wav", context.cacheDir)
         try {
             file.outputStream().use { output ->

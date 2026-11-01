@@ -49,6 +49,22 @@ def supplemental_campaigns(event, base, head):
 
 
 class CiChangesTest(unittest.TestCase):
+    def test_native_build_inputs_keep_full_supplemental_and_tooling_validation(self):
+        for path in ('native/media-decoder/media_decoder.cpp', 'native/media-decoder/lock.json',
+                     'native/media-decoder/exports.map', 'scripts/prepare_media_decoder.py'):
+            for event in ('pull_request', 'merge_group', 'push', 'schedule', 'workflow_dispatch'):
+                with self.subTest(path=path, event=event):
+                    values = cli_outputs(event, 'merge-queue', [], entry(path))
+                    self.assertEqual('full', values['ci_mode'])
+                    self.assertEqual('false', values['precheck'])
+                    self.assertEqual('false', values['docs_only'])
+                    self.assertEqual('true', values['supplemental_campaigns'])
+                    self.assertEqual('true', values['tooling_regressions'])
+        ordinary = cli_outputs('pull_request', 'merge-queue', [],
+                               entry('app/src/main/java/example/Screen.kt'))
+        self.assertEqual('precheck', ordinary['ci_mode'])
+        self.assertEqual('false', ordinary['supplemental_campaigns'])
+
     def test_precheck_requires_activation_current_labels_and_known_complete_diff(self):
         ordinary = entry('app/src/main/java/example/Screen.kt')
         self.assertTrue(precheck_mode('pull_request', 'merge-queue', [], ordinary))

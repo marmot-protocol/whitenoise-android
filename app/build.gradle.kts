@@ -107,6 +107,65 @@ val prepareMarmotKitArtifact =
         marmotKitArtifactOverride?.let { args("--artifact", it) }
         if (gradle.startParameter.isOffline) args("--offline")
     }
+// Native codec code is linked only into the isolated media worker. Compilation is
+// attached to native packaging; Kotlin tooling and unit-only work do not build codecs.
+val mediaDecoderAbis =
+    providers
+        .gradleProperty("android.injected.build.abi")
+        .orNull
+        ?.split(",")
+        ?.map(String::trim)
+        ?.filter(String::isNotEmpty)
+        ?: listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+val mediaDecoderAbiArguments = mediaDecoderAbis.flatMap { listOf("--abi", it) }
+val mediaDecoderCacheKey =
+    providers
+        .exec {
+            commandLine(
+                marmotKitPreparationLauncher +
+                    listOf(rootProject.file("scripts/prepare_media_decoder.py").absolutePath, "--cache-key") +
+                    mediaDecoderAbiArguments,
+            )
+        }.standardOutput.asText
+        .get()
+        .trim()
+check(mediaDecoderCacheKey.matches(Regex("[a-f0-9]{64}"))) { "Invalid media decoder cache identity" }
+val mediaDecoderPreparedDir =
+    gradle.gradleUserHomeDir.resolve("caches/whitenoise/media-decoder/$mediaDecoderCacheKey")
+val prepareNativeMediaDecoder =
+    tasks.register<Exec>("prepareNativeMediaDecoder") {
+        group = "build setup"
+        description = "Build verified software codecs for the permissionless media worker"
+        inputs.dir(rootProject.file("native/media-decoder"))
+        inputs.file(rootProject.file("scripts/prepare_media_decoder.py"))
+        inputs.property("abiSelection", mediaDecoderAbis)
+        outputs.dir(mediaDecoderPreparedDir.resolve("jniLibs"))
+        // The preparer verifies every cached binary against its manifest before reuse.
+        outputs.upToDateWhen { false }
+        environment("PYTHONDONTWRITEBYTECODE", "1")
+        doFirst {
+            commandLine(
+                marmotKitPreparationLauncher +
+                    listOf(
+                        rootProject.file("scripts/prepare_media_decoder.py").absolutePath,
+                        "--ndk",
+                        androidComponents.sdkComponents.ndkDirectory
+                            .get()
+                            .asFile.absolutePath,
+                        "--output",
+                        mediaDecoderPreparedDir.absolutePath,
+                        "--jobs",
+                        "2",
+                    ) + mediaDecoderAbiArguments,
+            )
+        }
+    }
+tasks.configureEach {
+    if (name.startsWith("merge") && (name.endsWith("NativeLibs") || name.endsWith("JniLibFolders"))) {
+        dependsOn(prepareNativeMediaDecoder)
+    }
+}
+
 val stageMarmotKitApiSignature =
     tasks.register<Sync>("stageMarmotKitApiSignature") {
         group = "verification"
@@ -286,6 +345,7 @@ val buildShortSha =
 
 android {
     namespace = "dev.ipf.whitenoise.android"
+    ndkVersion = "29.0.14206865"
     compileSdk {
         version =
             release(37) {
@@ -642,6 +702,7 @@ android {
             kotlin.srcDir(marmotKitPreparedDir.resolve("kotlin"))
             @Suppress("DEPRECATION")
             jniLibs.srcDir(marmotKitPreparedDir.resolve("jniLibs"))
+            jniLibs.srcDir(mediaDecoderPreparedDir.resolve("jniLibs"))
         }
         getByName("test") {
             kotlin.directories.add("src/testSupport/kotlin")

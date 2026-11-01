@@ -52,6 +52,28 @@ class LocalNoticesTest(unittest.TestCase):
         """Persist the case's independent inputs before invoking the production generator."""
         self.path.write_text(json.dumps(self.catalog), encoding='utf-8')
 
+    def test_bundled_native_notice_is_included_without_a_maven_artifact(self):
+        """Native source builds retain attribution in every packaged variant."""
+        data = b'Copyright Synthetic native decoder\nBSD licence fixture\n'
+        (self.root / 'texts/native.txt').write_bytes(data)
+        self.catalog['notices'].append({'id': 'native', 'name': 'Native decoder',
+                                       'text': 'texts/native.txt', 'sha256': hashlib.sha256(data).hexdigest(),
+                                       'source': 'Synthetic reviewed native source archive'})
+        self.catalog['bundled_notice_ids'] = ['native']
+        self.write_catalog()
+        output = self.root / 'with-native'
+        self.assertEqual(3, notices.generate(self.path, self.selected, output))
+        self.assertIn(b' Native decoder\n', (output / 'third_party_license_metadata').read_bytes())
+        self.assertIn(data, (output / 'third_party_licenses').read_bytes())
+
+    def test_bundled_native_attribution_cannot_name_missing_or_duplicate_notices(self):
+        for value in (['missing'], ['0', '0'], '0', [True], [{}], [[]]):
+            with self.subTest(value=value):
+                self.catalog['bundled_notice_ids'] = value
+                self.write_catalog()
+                with self.assertRaisesRegex(ValueError, 'Invalid bundled native attribution'):
+                    notices.generate(self.path, self.selected, self.root / 'invalid-native')
+
     def test_byte_ranges_and_order_are_deterministic(self):
         """Multibyte text uses byte lengths, shared storage, and stable visible names."""
         self.write_catalog()
