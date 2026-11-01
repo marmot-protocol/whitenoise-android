@@ -165,8 +165,8 @@ that no candidate was checked.
 
 ### Account switching
 
-`op=account_switch` follows one switch to a different account, from the start
-of activation preparation (`elapsed_ms` is measured from it) through local
+`op=account_switch` follows one switch to a different account, from the
+request (`elapsed_ms` is measured from it, including setup routing) through local
 preparation, publication and the target chat list's first frame (#3496):
 
 | Phase | Stage |

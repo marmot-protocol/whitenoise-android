@@ -6806,6 +6806,7 @@ class WhiteNoiseAppState private constructor(
                 null
             }
         var accountSwitchOutcome = HostPerformanceOutcomeFfi.UNAVAILABLE
+        updatePendingAccountSwitchTrace(request.label, switchingAccounts = request.label != activeAccountRef)
         try {
             val receipt =
                 accountSession.activate(
@@ -6841,7 +6842,6 @@ class WhiteNoiseAppState private constructor(
             generation: Long,
             switchingAccounts: Boolean,
         ): PreparedAccountSessionActivation? {
-            updatePendingAccountSwitchTrace(request.label, switchingAccounts)
             val target = accounts.firstOrNull { it.label == request.label }
             if (!restoreSignedOutAccountForActivation(target, request.label, request.deferUnreadRefresh)) return null
             return PreparedAccountSessionActivation(
@@ -6923,8 +6923,9 @@ class WhiteNoiseAppState private constructor(
     }
 
     /**
-     * Starts or clears the latency trace without adding policy branches to activation. Debug builds always
-     * trace, and any build traces while a WNPerf diagnostic session is active, so release switches can be measured.
+     * Starts or clears the latency trace when a switch is requested, before setup routing and restoration, so its
+     * elapsed time covers the whole path from the tap. Debug builds always trace, and any build traces while a
+     * WNPerf diagnostic session is active, so release switches can be measured.
      */
     private fun updatePendingAccountSwitchTrace(
         label: String,
