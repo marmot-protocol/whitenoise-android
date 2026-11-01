@@ -1,0 +1,57 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationImportedMediaSlots.kt",
+  "legacy_sha256": "538138f1ac48ff514c5ace1463b7d22763cb7fcf5376ab378d8283a425650bbd",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "restoreImportedMediaSlots",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationImportedMediaSlots.kt",
+        "anchor": "fun restoreImportedMediaSlots(",
+        "test_ids": [
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "mergeRestoredComposerAttachments",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationImportedMediaSlots.kt",
+        "anchor": "fun mergeRestoredComposerAttachments(",
+        "test_ids": [
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "restoreImportedComposerAttachments",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationImportedMediaSlots.kt",
+        "anchor": "fun restoreImportedComposerAttachments(",
+        "test_ids": [
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "importedComposerExceedsLimit",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationImportedMediaSlots.kt",
+        "anchor": "fun importedComposerExceedsLimit(",
+        "test_ids": [
+          "SYS-005"
+        ]
+      },
+      {
+        "surface": "admitComposerAttachments",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationImportedMediaSlots.kt",
+        "anchor": "fun <T> admitComposerAttachments(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "Dropped attachment count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationImportedMediaSlots.kt",
+        "anchor": "R.plurals.toast_share_attachments_dropped",
+        "test_ids": [
+          "MED-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

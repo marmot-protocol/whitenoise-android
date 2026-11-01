@@ -199,6 +199,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.aggregateMessageAttachme
 import dev.ipf.whitenoise.android.ui.conversation.media.appendPendingMediaSlots
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeReceiveContentImageUri
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
+import dev.ipf.whitenoise.android.ui.conversation.media.newPendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOutcome
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberConversationCameraCapture
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberConversationMediaViewerSessionState
@@ -1936,16 +1937,24 @@ internal fun ConversationScreen(
             // grows the staging shelf instead of clobbering whatever the user
             // already queued. Each occurrence gets its own stable slot identity
             // so selecting the same URI twice still produces independent edits.
-            pendingMediaSlots = appendPendingMediaSlots(pendingMediaSlots, uris, MEDIA_PICKER_MAX_ITEMS)
+            val admission =
+                admitComposerAttachments(uris, pendingMediaSlots.size, pendingDocumentUris.size, MEDIA_PICKER_MAX_ITEMS)
+            pendingMediaSlots = pendingMediaSlots + admission.accepted.map(::newPendingMediaSlot)
+            appState.presentDroppedAttachments(context, admission.droppedCount)
         }
     val launchCameraCapture =
         rememberConversationCameraCapture(
             origin = "$conversationAccountRef:${chat.group.groupIdHex}",
             onCaptured = { captured ->
-                val updated = appendPendingMediaSlots(pendingMediaSlots, listOf(captured), MEDIA_PICKER_MAX_ITEMS)
-                val accepted = updated.size > pendingMediaSlots.size
-                pendingMediaSlots = updated
-                accepted
+                val admission =
+                    admitComposerAttachments(
+                        listOf(captured),
+                        pendingMediaSlots.size,
+                        pendingDocumentUris.size,
+                        MEDIA_PICKER_MAX_ITEMS,
+                    )
+                pendingMediaSlots = pendingMediaSlots + admission.accepted.map(::newPendingMediaSlot)
+                admission.accepted.isNotEmpty()
             },
             onFailure = { appState.present(R.string.toast_couldnt_decode_image, copyable = true) },
             isCurrent = {
@@ -1954,13 +1963,7 @@ internal fun ConversationScreen(
                     !appState.signOutInProgress &&
                     !appState.wipeInProgress
             },
-            onRejected = {
-                appState.presentText(
-                    AppText.Plain(
-                        context.resources.getQuantityString(R.plurals.toast_share_attachments_dropped, 1, 1),
-                    ),
-                )
-            },
+            onRejected = { appState.presentDroppedAttachments(context, 1) },
         )
 
     // TakePicture needs no permission of its own, but because CAMERA is declared
@@ -2268,8 +2271,15 @@ internal fun ConversationScreen(
             // Append into the document side of the staging shelf rather than
             // sending immediately. The preview sheet renders both lists and
             // a single Send dispatches both decoders into one kind-9 album.
-            val merged = appendRecoveredDocuments(pendingDocumentUris, uris, MEDIA_PICKER_MAX_ITEMS)
-            pendingDocumentUris = merged
+            val admission =
+                admitComposerAttachments(
+                    uris.filterNot { it in pendingDocumentUris }.distinct(),
+                    pendingMediaSlots.size,
+                    pendingDocumentUris.size,
+                    MEDIA_PICKER_MAX_ITEMS,
+                )
+            pendingDocumentUris = pendingDocumentUris + admission.accepted
+            appState.presentDroppedAttachments(context, admission.droppedCount)
         }
 
     /** Resolves a message id to its current list index after every leading structural row. */
@@ -4173,18 +4183,28 @@ internal fun ConversationScreen(
                             null
                         },
                     onPasteImageUris = { uris ->
-                        val openSlots = (MEDIA_PICKER_MAX_ITEMS - pendingMediaSlots.size).coerceAtLeast(0)
-                        val pasteCandidates = uris.take(openSlots)
+                        val admission =
+                            admitComposerAttachments(
+                                uris,
+                                pendingMediaSlots.size,
+                                pendingDocumentUris.size,
+                                MEDIA_PICKER_MAX_ITEMS,
+                            )
+                        val pasteCandidates = admission.accepted
                         val localUris =
                             pasteCandidates.mapNotNull { uri ->
                                 materializeReceiveContentImageUri(context, uri)
                             }
-                        if (localUris.size < pasteCandidates.size) {
+                        val unreadable = localUris.size < pasteCandidates.size
+                        // One notice carries both outcomes, since a second notice would replace the first.
+                        if (admission.droppedCount > 0) {
+                            val detail = AppText.Resource(R.string.toast_couldnt_decode_image).takeIf { unreadable }
+                            appState.presentDroppedAttachments(context, admission.droppedCount, detail)
+                        } else if (unreadable) {
                             appState.present(R.string.toast_couldnt_decode_image, copyable = true)
                         }
                         if (localUris.isNotEmpty()) {
-                            pendingMediaSlots =
-                                appendPendingMediaSlots(pendingMediaSlots, localUris, MEDIA_PICKER_MAX_ITEMS)
+                            pendingMediaSlots = pendingMediaSlots + localUris.map(::newPendingMediaSlot)
                         }
                     },
                     voiceRecordingController = voiceRecordingController,
