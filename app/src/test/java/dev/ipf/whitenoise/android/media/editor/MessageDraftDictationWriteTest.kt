@@ -74,11 +74,13 @@ class MessageDraftDictationWriteTest {
             val bridge = draftBridge(writer, store, repository)
             val captured = writer.generation(ACCOUNT, GROUP)
 
+            store.replaceSummaries(ACCOUNT, mapOf(GROUP to 123_000L))
             bridge.setDraft(ACCOUNT, GROUP, TextFieldValue(""))
             writer.flush()
 
             assertEquals(captured, writer.generation(ACCOUNT, GROUP))
             assertEquals(null, store.getDraft(ACCOUNT, GROUP))
+            assertEquals(123uL, store.draftedAtSecondsFor(ACCOUNT, GROUP))
             assertEquals(listOf(media), gateway.values.getValue(ACCOUNT to GROUP).mediaAttachments)
         }
 
@@ -110,7 +112,7 @@ class MessageDraftDictationWriteTest {
             val gateway = KeyedDraftGateway(mutableMapOf((ACCOUNT to GROUP) to draft(GROUP, "caption", listOf(media))))
             val repository = repository(gateway, UnconfinedTestDispatcher(testScheduler))
             val writer = CoalescingMessageDraftWriter(this, repository, debounceMillis = 0)
-            val store = DraftStore(NoOpDraftPersistence)
+            val store = DraftStore(NoOpDraftPersistence, nowSeconds = { 10L })
             val changes = mutableListOf<Triple<String, String, Boolean>>()
             val bridge =
                 draftBridge(writer, store, repository) { account, group, consumed ->
@@ -123,13 +125,19 @@ class MessageDraftDictationWriteTest {
             val token = requireNotNull(bridge.captureForSend(ACCOUNT, GROUP))
             assertTrue(bridge.hideForPendingSend(token))
             assertEquals(null, store.getDraft(ACCOUNT, GROUP))
+            store.applyAuthoritativeTimestamp(ACCOUNT, GROUP, 20_000L)
 
             bridge.setDraft(ACCOUNT, GROUP, TextFieldValue("", composition = TextRange(0)))
             writer.flush()
+            // A summary arriving after the callback must keep the pending send hidden
+            // and must not replace the newer authoritative timestamp kept for recovery.
+            store.replaceSummaries(ACCOUNT, mapOf(GROUP to 15_000L))
+            assertEquals(null, store.draftedAtSecondsFor(ACCOUNT, GROUP))
             bridge.restoreAfterTerminalFailure(token)
 
             assertEquals(token.generation, writer.generation(ACCOUNT, GROUP))
             assertEquals(original, store.getDraft(ACCOUNT, GROUP)?.textFieldValue)
+            assertEquals(20uL, store.draftedAtSecondsFor(ACCOUNT, GROUP))
             assertEquals(nativeDraft, repository.draft(ACCOUNT, GROUP).getOrThrow())
             assertEquals(listOf(Triple(ACCOUNT, GROUP, false)), changes)
         }
