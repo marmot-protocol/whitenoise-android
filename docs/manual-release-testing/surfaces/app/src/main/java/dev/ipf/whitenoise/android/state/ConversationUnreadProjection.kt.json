@@ -1,0 +1,16 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationUnreadProjection.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "An off-window read anchor uses the authoritative unread projection instead of counting retained history",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationUnreadProjection.kt",
+        "anchor": "internal fun countUnreadIncoming(",
+        "test_ids": [
+          "CON-003"
+        ]
+      }
+    ]
+  }
+}
