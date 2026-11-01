@@ -9,7 +9,9 @@
         "anchor": "fun MainShellNoticeLayout(",
         "test_ids": [
           "DIC-001",
-          "DIC-002"
+          "DIC-002",
+          "NCH-008",
+          "DIC-011"
         ]
       }
     ],
@@ -19,7 +21,18 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShellNoticeLayout.kt",
         "anchor": "dictationController.completionControlsRequired",
         "test_ids": [
-          "DIC-002"
+          "DIC-002",
+          "NCH-008",
+          "DIC-011"
+        ]
+      },
+      {
+        "surface": "Measured control morph ownership and presentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShellNoticeLayout.kt",
+        "anchor": "package dev.ipf.whitenoise.android",
+        "test_ids": [
+          "NCH-008",
+          "DIC-011"
         ]
       }
     ]

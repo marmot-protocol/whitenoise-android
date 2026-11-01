@@ -18,7 +18,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.content.MediaType
 import androidx.compose.foundation.content.ReceiveContentListener
 import androidx.compose.foundation.content.TransferableContent
@@ -81,6 +80,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.input.key.Key
@@ -146,6 +146,9 @@ import dev.ipf.whitenoise.android.ui.conversation.media.receiveContentImageUriOr
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
 import dev.ipf.whitenoise.android.ui.icons.filled.Key
+import dev.ipf.whitenoise.android.ui.navigation.ComposerFabEndpoint
+import dev.ipf.whitenoise.android.ui.navigation.LocalComposerFabHandoff
+import dev.ipf.whitenoise.android.ui.navigation.composerFabSurface
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
@@ -1200,16 +1203,23 @@ internal fun ComposerPill(
             sendMotion?.sourceBottomRadius = with(density) { 24.dp.toPx() }
             sendMotion?.sourceStrokeWidth = with(density) { ComposerOutlineThickness.toPx() }
         }
+        val morphing = LocalComposerFabHandoff.current?.active == true
         Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            shape = RoundedCornerShape(24.dp),
-            border = BorderStroke(ComposerOutlineThickness, MaterialTheme.colorScheme.outlineVariant),
+            color = if (morphing) Color.Transparent else sourceFill,
+            // Custom clipping owns motion; settled chrome remains the original Material surface.
+            shape = if (morphing) RectangleShape else RoundedCornerShape(24.dp),
+            border = if (morphing) null else BorderStroke(ComposerOutlineThickness, sourceBorder),
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .then(expandedHeightModifier)
                     .testTag(COMPOSER_PILL_SURFACE_TAG)
-                    .onGloballyPositioned { sendMotion?.sourceSurface = it },
+                    .composerFabSurface(
+                        ComposerFabEndpoint.Composer,
+                        MaterialTheme.colorScheme.surfaceContainerHigh,
+                        MaterialTheme.colorScheme.outlineVariant,
+                        radiusDp = 24f,
+                    ).onGloballyPositioned { sendMotion?.sourceSurface = it },
         ) {
             Box {
                 // Keep resize semantics inside the surface; an underlying sibling is pruned by Android.

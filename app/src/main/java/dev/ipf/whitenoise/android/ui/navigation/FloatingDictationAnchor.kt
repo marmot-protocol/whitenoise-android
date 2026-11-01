@@ -36,11 +36,33 @@ import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.common.AccountActionColors
+import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoff
 import kotlin.math.roundToInt
 
 /** Only visible layout obstacles, including both sides of an animated route transition. */
 internal class FloatingDictationAnchor {
     private val bounds = mutableStateMapOf<Any, Rect>()
+    private val composerControls = mutableStateMapOf<Any, Rect>()
+
+    var composerControlColors: AccountActionColors? by mutableStateOf(null)
+        private set
+    val composerControlBounds: Rect? get() = composerControls.values.lastOrNull()
+
+    fun reportComposerControls(
+        token: Any,
+        rect: Rect,
+        colors: AccountActionColors? = null,
+    ) {
+        composerControlColors = colors
+        if (rect.width > 0f && rect.height > 0f) composerControls[token] = rect else composerControls.remove(token)
+    }
+
+    fun removeComposerControls(token: Any) {
+        composerControls.remove(token)
+        if (composerControls.isEmpty()) composerControlColors = null
+    }
+
     private val footerViewports = mutableStateMapOf<Any, Rect>()
     private val capsuleSlots = mutableStateMapOf<Any, Rect>()
     private val footerScrolls = mutableMapOf<Any, ScrollState>()
@@ -199,11 +221,15 @@ internal fun FloatingDictationLayout(
     anchor: FloatingDictationAnchor,
     content: @Composable () -> Unit,
     control: @Composable () -> Unit,
+    inlineControl: Boolean = false,
+    controlMotion: MeasuredControlHandoff? = null,
 ) {
     val statusBars = WindowInsets.statusBars
     val ime = WindowInsets.ime
     val navigationBars = WindowInsets.navigationBars
     var rootTop by remember { mutableStateOf(0f) }
+    var rootLeft by remember { mutableStateOf(0f) }
+    val controlToken = remember(controlMotion) { Any() }
     val idleScroll = rememberScrollState()
     val controlSlot: @Composable () -> Unit =
         remember(anchor, control) {
@@ -222,7 +248,11 @@ internal fun FloatingDictationLayout(
         }
     val contentSlots = remember(content) { DictationContentSlots(content) }
     SubcomposeLayout(
-        modifier = Modifier.fillMaxSize().onPlaced { rootTop = it.positionInWindow().y },
+        modifier =
+            Modifier.fillMaxSize().onPlaced {
+                rootTop = it.positionInWindow().y
+                rootLeft = it.positionInWindow().x
+            },
     ) { constraints ->
         // Insets are read while measuring, so a keyboard frame remeasures the shell without recomposing it.
         val statusBarTop = statusBars.getTop(this)
@@ -230,11 +260,25 @@ internal fun FloatingDictationLayout(
         val bubble =
             subcompose("control", controlSlot)
                 .single()
-                .measure(constraints.copy(minWidth = 0, minHeight = 0))
-                .takeIf { it.width > 0 && it.height > 0 }
+                .measure(
+                    constraints.copy(
+                        minWidth = 0,
+                        minHeight = 0,
+                        maxWidth =
+                            if (inlineControl) {
+                                anchor.composerControlBounds
+                                    ?.width
+                                    ?.roundToInt()
+                                    ?.coerceIn(0, constraints.maxWidth)
+                                    ?: constraints.maxWidth
+                            } else {
+                                constraints.maxWidth
+                            },
+                    ),
+                ).takeIf { it.width > 0 && it.height > 0 }
         val safeTop = (statusBarTop - rootTop).roundToInt().coerceAtLeast(0)
         val footerSpace =
-            bubble?.let {
+            bubble?.takeUnless { inlineControl }?.let {
                 val available = (constraints.maxHeight - fallbackInset - safeTop).coerceAtLeast(0)
                 val slot = it.height + 12.dp.roundToPx()
                 if (available < slot + 48.dp.roundToPx()) {
@@ -247,19 +291,56 @@ internal fun FloatingDictationLayout(
         layout(constraints.maxWidth, constraints.maxHeight) {
             body.place(0, 0)
             if (bubble != null) {
+                val inlineBounds = anchor.composerControlBounds.takeIf { inlineControl }
+                // The composer slot reports during body placement, before its shell controls are placed.
+                // Missing current slot geometry uses the existing safe capsule position, never stale bounds.
                 val bottom = anchor.topInWindow?.minus(rootTop)?.roundToInt() ?: (constraints.maxHeight - fallbackInset)
                 val availableGap = (bottom - bubble.height - safeTop).coerceIn(0, 12.dp.roundToPx())
                 val scrolling = anchor.scrollingCapsule.takeIf { footerSpace?.capsuleSlot != 0.dp }
-                val x = (constraints.maxWidth - bubble.width - 16.dp.roundToPx()).coerceAtLeast(0)
-                if (scrolling == null) {
-                    bubble.place(x, (bottom - bubble.height - availableGap).coerceAtLeast(safeTop))
-                } else {
-                    val (slot, viewport) = scrolling
-                    val y = (slot.top - rootTop).roundToInt()
-                    val localClip = viewport.translate(-x.toFloat(), -rootTop - y)
+                val x =
+                    inlineBounds?.let { (it.right - rootLeft - bubble.width).roundToInt() }
+                        ?: (constraints.maxWidth - bubble.width - 16.dp.roundToPx()).coerceAtLeast(0)
+                val y =
+                    if (scrolling != null && !inlineControl) {
+                        (scrolling.first.top - rootTop).roundToInt()
+                    } else {
+                        inlineBounds?.let { (it.top - rootTop).roundToInt() }
+                            ?: (bottom - bubble.height - availableGap).coerceAtLeast(safeTop)
+                    }
+                val owner =
+                    if (inlineControl) {
+                        ConversationDictationControlOwner.Composer
+                    } else {
+                        ConversationDictationControlOwner.Persistent
+                    }
+                controlMotion?.report(
+                    owner,
+                    controlToken,
+                    Rect(rootLeft + x, rootTop + y, rootLeft + x + bubble.width, rootTop + y + bubble.height),
+                )
+                if (scrolling == null || inlineControl) {
                     bubble.placeWithLayer(x, y) {
+                        val target = controlMotion?.targetBounds
+                        val moving = controlMotion?.renderedBounds
+                        if (controlMotion?.active == true && target != null && moving != null) {
+                            translationX = moving.left - target.left
+                            translationY = moving.top - target.top
+                        }
+                    }
+                } else {
+                    val viewport = scrolling.second
+                    val localClip = viewport.translate(-rootLeft - x, -rootTop - y)
+                    bubble.placeWithLayer(x, y) {
+                        val target = controlMotion?.targetBounds
+                        val moving = controlMotion?.renderedBounds
+                        if (controlMotion?.active == true && target != null && moving != null) {
+                            translationX = moving.left - target.left
+                            translationY = moving.top - target.top
+                        }
                         clip = true
-                        shape = GenericShape { _, _ -> addRect(localClip) }
+                        // Layer motion must not move the footer viewport in window coordinates.
+                        val fixedClip = localClip.translate(-translationX, -translationY)
+                        shape = GenericShape { _, _ -> addRect(fixedClip) }
                     }
                 }
             }

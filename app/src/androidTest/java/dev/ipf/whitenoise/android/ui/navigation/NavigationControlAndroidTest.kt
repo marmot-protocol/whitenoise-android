@@ -257,7 +257,7 @@ class NavigationControlAndroidTest {
         assertTrue(fixture.writes.isEmpty())
     }
 
-    /** Measured production endpoints carry only an outline; rapid return and app lock never duplicate draft input. */
+    /** Measured production containers preserve rapid return and never duplicate private draft input. */
     @Test
     fun composerFabRoundTripKeepsDraftPrivateAndClearsGeometryOnLock() {
         destination = ComposerFabEndpoint.Composer
@@ -268,9 +268,10 @@ class NavigationControlAndroidTest {
         repeat(3) { rule.mainClock.advanceTimeByFrame() }
         rule.onAllNodes(hasSetTextAction()).assertCountEquals(0)
         rule.onNodeWithText(PRIVATE_DRAFT, substring = true).assertDoesNotExist()
+        rule.runOnIdle { assertNotNull("the actual FAB must admit the measured container", handoff?.renderedBounds) }
         rule.onNodeWithContentDescription("New Message").assertIsDisplayed().performClick()
         assertEquals(1, fabClicks)
-        rule.runOnIdle { assertNotNull("the actual FAB must admit the measured outline", handoff?.renderedBounds) }
+        rule.runOnIdle { assertNull("activation must retire the decoration immediately", handoff?.renderedBounds) }
         rule.runOnIdle { destination = ComposerFabEndpoint.Composer }
         repeat(3) { rule.mainClock.advanceTimeByFrame() }
         rule.onAllNodes(hasSetTextAction()).assertCountEquals(1)
@@ -324,10 +325,7 @@ class NavigationControlAndroidTest {
                                             onCancelReply = {},
                                             onSend = { _, _ -> error("This fixture must never send") },
                                             initialDraft = fixture.draft,
-                                            modifier =
-                                                Modifier
-                                                    .align(Alignment.BottomCenter)
-                                                    .composerFabEndpoint(ComposerFabEndpoint.Composer),
+                                            modifier = Modifier.align(Alignment.BottomCenter),
                                         )
                                     } else if (destination == ComposerFabEndpoint.NewMessage) {
                                         Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
