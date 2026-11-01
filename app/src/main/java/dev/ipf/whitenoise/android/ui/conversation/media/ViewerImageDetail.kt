@@ -161,6 +161,15 @@ internal fun ViewerImageDetailLayer(
     }
 
     val current = detail?.takeIf { active && source != null && geometry.scale > 1f }
+    viewerImageDetailPresentation(current, geometry, preview)
+}
+
+@Composable
+private fun viewerImageDetailPresentation(
+    current: ViewerImageDetail?,
+    geometry: ViewerViewportGeometry,
+    preview: @Composable () -> Unit,
+) {
     val destination =
         current
             ?.let { geometry.sourceRectOnScreen(it.sourceRegion.rectangle) }
