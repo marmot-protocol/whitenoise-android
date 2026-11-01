@@ -69,6 +69,55 @@ runpy.run_path(script, run_name='__main__')
                 self.assertEqual(json.loads(result.stdout)['lock']['ndk'], '29.0.14206865')
 
 
+class ToolWheelTests(unittest.TestCase):
+    def extract(self, directory, entries):
+        path = directory / "ninja.whl"
+        path.write_bytes(wheel(entries))
+        return build.extract_tools([path], directory / "tools")
+
+    def test_pinned_ninja_wheel_script_layout_and_permissions(self):
+        # This literal is independently checked against the SHA-pinned wheel's RECORD.
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            binary = self.extract(root, {"ninja-1.13.2.data/scripts/ninja": b"synthetic executable"})
+            self.assertEqual(root / "tools/ninja-1.13.2.data/scripts/ninja", binary)
+            self.assertEqual(b"synthetic executable", binary.read_bytes())
+            self.assertEqual(0o755, binary.stat().st_mode & 0o777)
+
+    def test_missing_old_or_other_version_paths_never_fall_back(self):
+        for entries in ({}, {"ninja/data/bin/ninja": b"old layout"},
+                        {"ninja-1.13.3.data/scripts/ninja": b"different version"}):
+            with self.subTest(entries=entries), tempfile.TemporaryDirectory() as temporary:
+                with self.assertRaisesRegex(ValueError, "pinned ninja executable missing"):
+                    self.extract(Path(temporary), entries)
+
+    def test_tool_wheel_traversal_absolute_and_symlink_entries_refused(self):
+        for name, mode in (("../outside", 0o100644), ("/outside", 0o100644),
+                           ("ninja-1.13.2.data/scripts/ninja", 0o120777)):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                path = root / "ninja.whl"
+                with zipfile.ZipFile(path, "w") as result:
+                    entry = zipfile.ZipInfo(name)
+                    entry.external_attr = mode << 16
+                    result.writestr(entry, b"/outside")
+                with self.assertRaisesRegex(ValueError, "unsafe tool wheel entry"):
+                    build.extract_tools([path], root / "tools")
+                self.assertFalse((root / "outside").exists())
+
+    def test_tool_extraction_budget_still_refused_before_extract(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / "ninja.whl"
+            path.write_bytes(wheel({"ninja-1.13.2.data/scripts/ninja": b"tiny"}))
+            entry = zipfile.ZipInfo("ninja-1.13.2.data/scripts/ninja")
+            entry.file_size = 32 * 1024 * 1024 + 1
+            with patch.object(zipfile.ZipFile, "infolist", return_value=[entry]):
+                with self.assertRaisesRegex(ValueError, "tool extraction budget refused"):
+                    build.extract_tools([path], root / "tools")
+            self.assertEqual([], list((root / "tools").iterdir()))
+
+
 class NativeBuildTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
@@ -85,7 +134,7 @@ class NativeBuildTests(unittest.TestCase):
             "ffmpeg": archive("ffmpeg-9.0.2", {"configure": b"#!/bin/sh\nexit 99\n"}),
             "dav1d": archive("dav1d-1.5.4", {"meson.build": b"# fixture\n"}),
             "meson": wheel({"mesonbuild/__init__.py": b""}),
-            "ninja": wheel({"ninja/data/bin/ninja": b"synthetic executable"}),
+            "ninja": wheel({"ninja-1.13.2.data/scripts/ninja": b"synthetic executable"}),
         }
         self.lock = {"schema": 1, "ndk": "29.0.14206865", "api": 30, "source_date_epoch": 1789687190}
         for name, data in self.data.items():
@@ -125,6 +174,9 @@ class NativeBuildTests(unittest.TestCase):
         self.commands.append(command)
         self.assertEqual("1789687190", env["SOURCE_DATE_EPOCH"])
         self.assertEqual("C", env["LC_ALL"])
+        self.assertTrue(env["NINJA"].endswith("/tools/ninja-1.13.2.data/scripts/ninja"))
+        if "-C" in command:
+            self.assertEqual(command[0], env["NINJA"])
         if command[0].endswith("/configure"):
             components = "\n".join("#define CONFIG_" + name.upper() + suffix + " 1"
                                    for suffix, names in (("_DECODER", build.DECODERS),

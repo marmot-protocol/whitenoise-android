@@ -37,6 +37,8 @@ DECODERS = (
 DEMUXERS = ("mov", "matroska", "ogg", "wav", "mp3", "aac", "flac", "amr")
 PARSERS = ("h264", "hevc", "vp8", "vp9", "av1", "aac", "aac_latm", "opus", "vorbis", "mpegaudio", "flac")
 ALLOWED_NEEDED = {"libc.so", "libm.so", "libdl.so"}
+# Wheel script location in the exact Ninja 1.13.2 archive pinned by lock.json.
+NINJA_RELATIVE_PATH = Path("ninja-1.13.2.data/scripts/ninja")
 
 
 def require(condition, reason):
@@ -136,7 +138,7 @@ def extract_tools(wheels, destination):
                 require(not path.is_absolute() and ".." not in path.parts and
                         (item.external_attr >> 16) & 0o170000 != 0o120000, "unsafe tool wheel entry")
             source.extractall(destination)
-    binaries = list(destination.glob("ninja/data/bin/ninja"))
+    binaries = list(destination.glob(str(NINJA_RELATIVE_PATH)))
     require(len(binaries) == 1 and binaries[0].is_file(), "pinned ninja executable missing")
     binaries[0].chmod(0o755)
     return binaries[0]
@@ -260,7 +262,7 @@ def build_abi(ndk, abi, lock, sources, tools, output, jobs, command=run):
         env = {key: value for key, value in os.environ.items()
                if key not in {"CFLAGS", "CXXFLAGS", "CPPFLAGS", "LDFLAGS", "PKG_CONFIG_PATH", "PYTHONPATH", "PYTHONHOME"}}
         env.update(SOURCE_DATE_EPOCH=str(lock["source_date_epoch"]), LC_ALL="C", TZ="UTC", ZERO_AR_DATE="1",
-                   NINJA=str(tools / "ninja/data/bin/ninja"), PKG_CONFIG_LIBDIR=str(dav1d_install / "lib/pkgconfig"))
+                   NINJA=str(tools / NINJA_RELATIVE_PATH), PKG_CONFIG_LIBDIR=str(dav1d_install / "lib/pkgconfig"))
         meson = [sys.executable, "-I", "-c",
                  "import sys;sys.path.insert(0," + repr(str(tools)) + ");from mesonbuild.mesonmain import main;sys.exit(main())"]
         dav1d_build = work / "dav1d-build"
@@ -270,7 +272,7 @@ def build_abi(ndk, abi, lock, sources, tools, output, jobs, command=run):
                          "-Denable_tools=false", "-Denable_tests=false", "-Denable_examples=false", "-Denable_docs=false",
                          "-Denable_asm=" + ("false" if abi in {"x86", "x86_64"} else "true"), "-Dbitdepths=8,16"],
                 cwd=work, env=env)
-        command([tools / "ninja/data/bin/ninja", "-C", dav1d_build, "-j", str(jobs), "install"], cwd=work, env=env)
+        command([tools / NINJA_RELATIVE_PATH, "-C", dav1d_build, "-j", str(jobs), "install"], cwd=work, env=env)
         command([ffmpeg / "configure", *arguments], cwd=ffmpeg_build, env=env)
         audit_components(ffmpeg_build / "config_components.h")
         normalize_configuration(ffmpeg_build / "config.h", arguments, work, ndk)
