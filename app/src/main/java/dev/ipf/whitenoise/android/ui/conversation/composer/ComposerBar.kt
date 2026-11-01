@@ -109,7 +109,15 @@ private val ComposerManualChromeHeight = 72.dp
 private val ComposerManualCompactChromeHeight = 36.dp
 
 // The resting single-line row: 12 dp above and below the line, plus the 12 dp outer padding.
+internal val ComposerOuterVerticalPadding = 6.dp
+internal val ComposerRestingPillMinimumHeight = 48.dp
 private val ComposerAutomaticEmptyChromeHeight = 36.dp
+
+/** Resting single-line geometry, shared with the chat-list pen placement. */
+@Composable
+internal fun rememberComposerRestingPillHeight(): Dp =
+    (rememberComposerEditorLineHeight() + ComposerResizeStripHeight + 12.dp)
+        .coerceAtLeast(ComposerRestingPillMinimumHeight)
 
 /** How close to an endpoint a release still counts as landing on it rather than resting free. */
 private val ComposerSettleDeadband = 24.dp
@@ -1217,7 +1225,7 @@ internal fun ComposerBar(
                                 automaticComposerHeightPx = size.height.toFloat()
                             }
                             onTimelineComposerMeasured(size.height, automaticComposerHeightPx.toInt().coerceAtLeast(0))
-                        }.padding(horizontal = 16.dp, vertical = 6.dp),
+                        }.padding(horizontal = 16.dp, vertical = ComposerOuterVerticalPadding),
                 fillEditorHeight = composerExpansion.mode != ComposerExpansionMode.Automatic,
                 minimumEditorHeight = with(density) { minimumManualComposerHeightPx.toDp() } - 12.dp,
             ) {

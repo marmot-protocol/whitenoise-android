@@ -7,8 +7,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -482,9 +483,10 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
     ) {
         Box(Modifier.fillMaxSize()) {
             if (chatId == null) {
-                Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
-                    ChatsNewMessageFabContent(missingRelays = false) {}
-                }
+                Scaffold(
+                    contentWindowInsets = WindowInsets.navigationBars,
+                    floatingActionButton = { ChatsNewMessageFabContent(missingRelays = false) {} },
+                ) { _ -> Box(Modifier.fillMaxSize()) }
             }
             if (chatId != null) {
                 val group = if (chatId == origin.selectedChatId) GROUP else "other-group"

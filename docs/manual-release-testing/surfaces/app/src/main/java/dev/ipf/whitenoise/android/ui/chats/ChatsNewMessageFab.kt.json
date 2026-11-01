@@ -19,7 +19,8 @@
         "anchor": "fun ChatsNewMessageFabContent(",
         "test_ids": [
           "NCH-001",
-          "DIC-002"
+          "DIC-002",
+          "NCH-008"
         ]
       }
     ],

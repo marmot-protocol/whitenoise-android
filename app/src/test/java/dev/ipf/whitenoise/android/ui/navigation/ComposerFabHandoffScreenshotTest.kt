@@ -4,8 +4,10 @@ import android.content.Context
 import android.provider.Settings
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -36,7 +38,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
@@ -180,9 +181,10 @@ class ComposerFabHandoffScreenshotTest {
                             .testTag(COMPOSER_TAG),
                 )
             } else {
-                Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
-                    ChatsNewMessageFabContent(missingRelays = false) {}
-                }
+                Scaffold(
+                    contentWindowInsets = WindowInsets.navigationBars,
+                    floatingActionButton = { ChatsNewMessageFabContent(missingRelays = false) {} },
+                ) { _ -> Box(Modifier.fillMaxSize()) }
             }
         }
     }

@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
@@ -16,7 +15,6 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
@@ -140,8 +138,8 @@ class ChatOrganizationScreenshotTest {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = dark || amoled, amoled = amoled) {
                 Surface(Modifier.fillMaxSize()) {
-                    Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.BottomEnd) {
-                        ChatsNewMessageFabContent(missing) {}
+                    Scaffold(floatingActionButton = { ChatsNewMessageFabContent(missing) {} }) { _ ->
+                        Box(Modifier.fillMaxSize())
                     }
                 }
             }

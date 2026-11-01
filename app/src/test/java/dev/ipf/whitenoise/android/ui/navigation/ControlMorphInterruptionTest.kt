@@ -107,6 +107,14 @@ class ControlMorphInterruptionTest {
         scheduler.runCurrent()
         rule.mainClock.advanceTimeByFrame()
         rule.mainClock.advanceTimeBy(80)
+        assertIntermediateContinuity(state, retarget)
+    }
+
+    /** Both interruption paths preserve the exact live sample before explicit retirement. */
+    private fun assertIntermediateContinuity(
+        state: MeasuredControlHandoff,
+        retarget: Boolean,
+    ) {
         rule.runOnIdle {
             assertTrue(state.active)
             val bounds = state.renderedBounds

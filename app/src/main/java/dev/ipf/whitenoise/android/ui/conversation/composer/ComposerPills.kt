@@ -1261,7 +1261,7 @@ internal fun ComposerPill(
                         modifier =
                             Modifier
                                 .weight(1f, fill = expansionMode != ComposerExpansionMode.Automatic)
-                                .heightIn(min = if (voiceReviewContent == null) 48.dp else 96.dp)
+                                .heightIn(min = if (voiceReviewContent == null) ComposerRestingPillMinimumHeight else 96.dp)
                                 .then(expandedHeightModifier),
                     ) {
                         Box(
