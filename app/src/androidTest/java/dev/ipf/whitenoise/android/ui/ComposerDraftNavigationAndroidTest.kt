@@ -180,7 +180,7 @@ class ComposerDraftNavigationAndroidTest {
                             onPickFromGallery = {},
                             onPickDocument = {},
                             initialDraft = value,
-                            onDraftChange = { value = it },
+                            onDraftChange = { draftValue, _ -> value = draftValue },
                             textState =
                                 rememberComposerTextState(
                                     draftKey = "navigation-fixture",

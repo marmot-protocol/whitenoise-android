@@ -308,6 +308,14 @@
         "test_ids": [
           "MSG-012"
         ]
+      },
+      {
+        "surface": "Actual composer text edits remain distinct from unchanged presentation across draft hydration and remount",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "conversationDictationDraftWriter(",
+        "test_ids": [
+          "DIC-011"
+        ]
       }
     ]
   },

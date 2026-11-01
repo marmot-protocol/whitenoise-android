@@ -35,12 +35,16 @@ internal class ComposerDraftExpansionBridge(
         accountRef: String,
         groupIdHex: String,
         value: TextFieldValue,
+        textChanged: Boolean? = null,
     ) {
-        val currentText = draftStore.getDraft(accountRef, groupIdHex)?.textFieldValue?.text
+        val currentDraft = draftStore.getDraft(accountRef, groupIdHex)
+        // The mounted editor knows whether raw text changed, including whitespace
+        // omitted by DraftStore. Other producers retain the cached-text comparison.
+        val currentText = currentDraft?.textFieldValue?.text.orEmpty()
+        val changed = textChanged ?: (currentText != value.text)
+        if (!changed && (currentDraft == null || currentText != value.text)) return
         draftStore.set(accountRef, groupIdHex, value)
-        // Caret and IME composition are Android presentation state. Submitting unchanged
-        // content would invalidate a dictation Send captured before this UI-only update.
-        if (currentText == value.text) return
+        if (!changed) return
         val generation = draftWriter.submit(accountRef, groupIdHex, value.text)
         sentPresentation.onDraftChanged(accountRef, groupIdHex, generation, value.text)
         expansionRetention.onDraftGenerationAdvanced(accountRef, groupIdHex, generation.value)

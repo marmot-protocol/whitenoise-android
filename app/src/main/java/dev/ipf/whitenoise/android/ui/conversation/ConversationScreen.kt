@@ -4080,10 +4080,10 @@ internal fun ConversationScreen(
                             accountRef = draftAccountRef,
                             groupIdHex = controller.group.groupIdHex,
                             presentationRevision = composerDictationRevision,
-                            write = {
+                            write = { value, textChanged ->
                                 // A local edit is not a newly restored navigation-entry draft.
                                 composerAutoFocusConsumed.value = true
-                                appState.setDraft(draftAccountRef, controller.group.groupIdHex, it)
+                                appState.setDraft(draftAccountRef, controller.group.groupIdHex, value, textChanged)
                             },
                         ),
                     composerTextState = composerTextState,

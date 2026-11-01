@@ -25,6 +25,16 @@
           "DIC-002"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Actual composer text edits remain distinct from unchanged presentation across draft hydration and remount",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationBottomBar.kt",
+        "anchor": "onDraftChange:",
+        "test_ids": [
+          "DIC-011"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

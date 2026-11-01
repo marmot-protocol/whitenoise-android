@@ -57,7 +57,7 @@ class ConversationExitRouteComposeTest {
             conversationOpen = { conversationOpen },
             imeIsOpen = { imeIsOpen },
             draft = { draft },
-            onDraftChange = { draft = it },
+            onDraftChange = { draftValue, _ -> draft = draftValue },
             onOpenConversation = { conversationOpen = true },
             onRouteToChatList = {
                 routeCount.incrementAndGet()
@@ -113,7 +113,7 @@ class ConversationExitRouteComposeTest {
         conversationOpen: () -> Boolean,
         imeIsOpen: () -> Boolean,
         draft: () -> TextFieldValue,
-        onDraftChange: (TextFieldValue) -> Unit,
+        onDraftChange: (TextFieldValue, Boolean) -> Unit,
         onOpenConversation: () -> Unit,
         onRouteToChatList: () -> Unit,
     ) {

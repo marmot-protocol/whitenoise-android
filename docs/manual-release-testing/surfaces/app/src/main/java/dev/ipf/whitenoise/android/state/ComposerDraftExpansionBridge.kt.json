@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ComposerDraftExpansionBridge.kt",
+  "legacy_sha256": "3c4a46b7607d6ae9d44138d2ede427d4cea9f549dc2ad1cf9044c7c25070eadf",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Composer cursor updates during dictation Send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ComposerDraftExpansionBridge.kt",
+        "anchor": "fun setDraft(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "Empty-field updates preserve dictation Send, native draft ordering, pending-send hiding/recovery and real-edit generation fences",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ComposerDraftExpansionBridge.kt",
+        "anchor": "fun setDraft(",
+        "test_ids": [
+          "DIC-011"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
