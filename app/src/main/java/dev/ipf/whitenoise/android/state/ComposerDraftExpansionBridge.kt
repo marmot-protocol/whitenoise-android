@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
  * Keeps Android's composer geometry transaction aligned with the MDK-owned
  * draft transaction without putting UI state in the protocol repository.
  */
-@Suppress("LongParameterList") // Every collaborator owns one distinct side of the draft/geometry transaction.
+@Suppress("LongParameterList", "TooManyFunctions") // One owner aligns draft, send, hydration and geometry lifecycles.
 internal class ComposerDraftExpansionBridge(
     private val draftWriter: CoalescingMessageDraftWriter,
     private val draftStore: DraftStore,
@@ -30,6 +30,11 @@ internal class ComposerDraftExpansionBridge(
 ) {
     private val sentPresentation = SentComposerDraftPresentation()
 
+    // DraftStore intentionally omits whitespace. Remember only the accepted
+    // editor transition so deleting that text still reaches the native draft,
+    // even if an intervening attachment edit advances the repository generation.
+    private val whitespaceEdits = mutableSetOf<Pair<String, String>>()
+
     /** Stores editor presentation and advances the stale-send fence only for changed text. */
     fun setDraft(
         accountRef: String,
@@ -39,13 +44,16 @@ internal class ComposerDraftExpansionBridge(
         val currentDraft = draftStore.getDraft(accountRef, groupIdHex)
         // An absent draft can still own native ordering metadata or a pending-send
         // recovery marker. An unchanged empty callback must not clear either.
-        if (currentDraft == null && value.text.isEmpty()) return
+        val key = accountRef to groupIdHex
+        val clearsWhitespace = value.text.isEmpty() && key in whitespaceEdits
+        if (currentDraft == null && value.text.isEmpty() && !clearsWhitespace) return
         val currentText = currentDraft?.textFieldValue?.text.orEmpty()
         draftStore.set(accountRef, groupIdHex, value)
         // Caret and IME composition are Android presentation state. Submitting unchanged
         // content would invalidate a dictation Send captured before this UI-only update.
-        if (currentText == value.text) return
+        if (currentText == value.text && !clearsWhitespace) return
         val generation = draftWriter.submit(accountRef, groupIdHex, value.text)
+        rememberWhitespaceEdit(accountRef, groupIdHex, value.text)
         sentPresentation.onDraftChanged(accountRef, groupIdHex, generation, value.text)
         expansionRetention.onDraftGenerationAdvanced(accountRef, groupIdHex, generation.value)
     }
@@ -73,9 +81,21 @@ internal class ComposerDraftExpansionBridge(
                 content = value.text,
             ) ?: return null
         draftStore.set(accountRef, groupIdHex, value)
+        rememberWhitespaceEdit(accountRef, groupIdHex, value.text)
         sentPresentation.onDraftChanged(accountRef, groupIdHex, generation, value.text)
         expansionRetention.onDraftGenerationAdvanced(accountRef, groupIdHex, generation.value)
         return generation.value
+    }
+
+    /** A committed hydration replaces editor presentation, including omitted whitespace. */
+    fun replaceHydratedDraft(
+        accountRef: String,
+        groupIdHex: String,
+        content: String?,
+        updatedAtMs: Long?,
+    ) {
+        draftStore.replaceFromAuthoritative(accountRef, groupIdHex, content, updatedAtMs)
+        whitespaceEdits.remove(accountRef to groupIdHex)
     }
 
     /** Returns the generation an explicit resize must capture for this exact draft owner. */
@@ -110,6 +130,7 @@ internal class ComposerDraftExpansionBridge(
                 }
             }
         if (claimed) {
+            whitespaceEdits.remove(token.accountRef to token.groupIdHex)
             sentPresentation.hide(token)
             expansionRetention.onSendAccepted(
                 token.accountRef,
@@ -150,6 +171,7 @@ internal class ComposerDraftExpansionBridge(
             draftWriter.beginSuccessfulSendCleanup(accountRef, groupIdHex, sentGeneration) {
                 draftStore.set(accountRef, groupIdHex, TextFieldValue(""))
             } ?: return
+        whitespaceEdits.remove(accountRef to groupIdHex)
         sentPresentation.hide(token, cleanupGeneration)
         expansionRetention.onSendDurablyAccepted(
             accountRef,
@@ -197,7 +219,24 @@ internal class ComposerDraftExpansionBridge(
             },
         )
 
-    fun removeAccount(accountRef: String) = sentPresentation.removeAccount(accountRef)
+    fun removeAccount(accountRef: String) {
+        whitespaceEdits.removeAll { it.first == accountRef }
+        sentPresentation.removeAccount(accountRef)
+    }
+
+    /** Retains omitted whitespace until an accepted text edit or send replaces its editor state. */
+    private fun rememberWhitespaceEdit(
+        accountRef: String,
+        groupIdHex: String,
+        text: String,
+    ) {
+        val key = accountRef to groupIdHex
+        if (text.isNotEmpty() && text.isBlank()) {
+            whitespaceEdits.add(key)
+        } else {
+            whitespaceEdits.remove(key)
+        }
+    }
 
     /** Flushes queued edits before the owning group removes its authoritative draft. */
     suspend fun deleteBeforeGroupRemoval(
@@ -205,6 +244,8 @@ internal class ComposerDraftExpansionBridge(
         groupIdHex: String,
     ): MessageDraftMutationResult {
         draftWriter.flush()
-        return draftRepository.delete(accountRef, groupIdHex)
+        return draftRepository.delete(accountRef, groupIdHex).also { result ->
+            if (result is MessageDraftMutationResult.Success) whitespaceEdits.remove(accountRef to groupIdHex)
+        }
     }
 }
