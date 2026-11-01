@@ -102,25 +102,7 @@ class SharedImageViewerPinchDeviceTest {
             assertTrue(abs(sourceY * fit.baseHeight * scale + bounds.height() / 2f + offset.y - localFocal.y) < 20f)
             assertTrue(requireNotNull(geometry).scale > 5f)
         }
-        node.performTouchInput { doubleClick() }
-        rule.runOnIdle {
-            assertEquals(1f, scale)
-            assertEquals(Offset.Zero, offset)
-        }
-        injectPinchAndAwaitIdle(bounds, localFocal)
-        rule.runOnIdle { assertTrue(scale > 1f) }
-        node.performTouchInput {
-            down(center)
-            up()
-            advanceEventTime(60L)
-            down(center)
-            moveTo(center + Offset(1f, 1f), delayMillis = 10L)
-            up()
-        }
-        rule.runOnIdle {
-            assertEquals(1f, scale)
-            assertEquals(Offset.Zero, offset)
-        }
+        assertStationaryAndJitteredDoubleTapReset(bounds, localFocal, { scale }, { offset })
     }
 
     @Test
@@ -168,6 +150,34 @@ class SharedImageViewerPinchDeviceTest {
             val maxY = (fit.baseHeight * scale - bounds.height()) / 2f
             assertTrue(abs(offset.y) <= maxY)
             assertEquals(scale, requireNotNull(geometry).scale, 0.001f)
+        }
+    }
+
+    private fun assertStationaryAndJitteredDoubleTapReset(
+        bounds: Rect,
+        localFocal: Offset,
+        scale: () -> Float,
+        offset: () -> Offset,
+    ) {
+        val node = rule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG)
+        node.performTouchInput { doubleClick() }
+        rule.runOnIdle {
+            assertEquals(1f, scale())
+            assertEquals(Offset.Zero, offset())
+        }
+        injectPinchAndAwaitIdle(bounds, localFocal)
+        rule.runOnIdle { assertTrue(scale() > 1f) }
+        node.performTouchInput {
+            down(center)
+            up()
+            advanceEventTime(60L)
+            down(center)
+            moveTo(center + Offset(1f, 1f), delayMillis = 10L)
+            up()
+        }
+        rule.runOnIdle {
+            assertEquals(1f, scale())
+            assertEquals(Offset.Zero, offset())
         }
     }
 
