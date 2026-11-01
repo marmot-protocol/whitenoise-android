@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -13,10 +14,13 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.IntRect
 import dev.ipf.whitenoise.android.media.decodeOwnedMedia
 import dev.ipf.whitenoise.android.media.sandbox.ImageInspection
 import dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
@@ -86,12 +90,13 @@ internal suspend fun inspectViewerSource(
 /** Exact mapping of the latest decoded source rectangle, not a thumbnail stretched over the whole image. */
 @Composable
 @OptIn(FlowPreview::class)
-// Compose naming; the source lifetime owns the collector, fallback child and pixel disposal together.
-@Suppress("FunctionNaming", "LongMethod")
+// Compose naming and preview slot; the source lifetime owns decode hooks, collector and pixel disposal.
+@Suppress("FunctionNaming", "LongParameterList", "LongMethod")
 internal fun ViewerImageDetailLayer(
     source: ViewerOriginalImage?,
     geometry: ViewerViewportGeometry,
     active: Boolean,
+    preview: @Composable () -> Unit = {},
     fallback: suspend (ViewerOriginalImage) -> ViewerImageDetail? = ::decodeViewerFallback,
     decode: suspend (ViewerOriginalImage, ViewerDetailRegion) -> ViewerImageDetail? = ::decodeViewerDetail,
 ) {
@@ -155,18 +160,44 @@ internal fun ViewerImageDetailLayer(
             }
     }
 
-    detail?.takeIf { active && source != null && geometry.scale > 1f }?.let { current ->
+    val current = detail?.takeIf { active && source != null && geometry.scale > 1f }
+    val destination =
+        current
+            ?.let { geometry.sourceRectOnScreen(it.sourceRegion.rectangle) }
+            ?.takeUnless { it.isEmpty }
+            ?.let {
+                val left = it.left.roundToInt()
+                val top = it.top.roundToInt()
+                IntRect(
+                    left,
+                    top,
+                    left + it.width.roundToInt().coerceAtLeast(1),
+                    top + it.height.roundToInt().coerceAtLeast(1),
+                )
+            }
+    // Remove preview pixels before drawing detail, including transparent detail pixels. Both
+    // operations use the same integer destination in viewport coordinates, outside the image transform.
+    Box(
+        Modifier.fillMaxSize().drawWithContent {
+            if (destination == null) {
+                drawContent()
+            } else {
+                clipRect(
+                    destination.left.toFloat(),
+                    destination.top.toFloat(),
+                    destination.right.toFloat(),
+                    destination.bottom.toFloat(),
+                    clipOp = ClipOp.Difference,
+                ) { this@drawWithContent.drawContent() }
+            }
+        },
+    ) { preview() }
+    if (current != null && destination != null) {
         Canvas(Modifier.fillMaxSize().testTag("conversation.media.viewer.detail")) {
-            val destination = geometry.sourceRectOnScreen(current.sourceRegion.rectangle)
-            if (destination.isEmpty) return@Canvas
             drawImage(
                 image = current.bitmap.asImageBitmap(),
-                dstOffset = IntOffset(destination.left.roundToInt(), destination.top.roundToInt()),
-                dstSize =
-                    IntSize(
-                        destination.width.roundToInt().coerceAtLeast(1),
-                        destination.height.roundToInt().coerceAtLeast(1),
-                    ),
+                dstOffset = IntOffset(destination.left, destination.top),
+                dstSize = destination.size,
             )
         }
     }

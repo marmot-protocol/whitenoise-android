@@ -1289,7 +1289,9 @@ internal fun ViewerPage(
         onScaleChange = onScaleChange,
         onOffsetChange = onOffsetChange,
         onChromeToggle = onChromeToggle,
-        overlay = { geometry -> ViewerImageDetailLayer(original, geometry, detailCurrent) },
+        imageLayer = { geometry, preview ->
+            ViewerImageDetailLayer(original, geometry, detailCurrent, preview = preview)
+        },
     ) { imageModifier ->
         when (val current = presentation) {
             is DecodedAttachmentPresentation.Static ->

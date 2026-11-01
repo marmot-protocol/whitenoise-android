@@ -59,7 +59,8 @@ internal fun ImageViewerViewport(
     onOffsetChange: (Offset) -> Unit,
     onChromeToggle: () -> Unit,
     onViewportChange: (ViewerViewportGeometry) -> Unit = {},
-    overlay: @Composable BoxScope.(ViewerViewportGeometry) -> Unit = {},
+    imageLayer: @Composable BoxScope.(ViewerViewportGeometry, @Composable () -> Unit) -> Unit =
+        { _, preview -> preview() },
     image: @Composable BoxScope.(Modifier) -> Unit,
 ) {
     // Layout dimensions belong to the viewport instance, independently of the source being displayed.
@@ -239,8 +240,7 @@ internal fun ImageViewerViewport(
                     )
             }.testTag(MEDIA_VIEWER_PAGE_GESTURE_TAG),
     ) {
-        image(imageModifier)
-        overlay(geometry)
+        imageLayer(geometry) { image(imageModifier) }
     }
 }
 
