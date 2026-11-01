@@ -3107,7 +3107,7 @@ class WhiteNoiseAppState private constructor(
                 .loadIfCurrent(accountRef, groupIdHex, generation)
                 ?.onSuccess { draft ->
                     draftWriter.runHydrationIfCurrent(accountRef, groupIdHex, generation) {
-                        draftStore.replaceFromAuthoritative(
+                        composerDraftExpansionBridge.replaceHydratedDraft(
                             accountRef,
                             groupIdHex,
                             draft?.content,

@@ -84,6 +84,92 @@ class MessageDraftDictationWriteTest {
             assertEquals(listOf(media), gateway.values.getValue(ACCOUNT to GROUP).mediaAttachments)
         }
 
+    /** Deleting an omitted whitespace caption still saves empty text and fences stale producers. */
+    @Test
+    fun deletingWhitespaceCaptionPreservesAttachmentsAndInvalidatesGeneration() =
+        runTest {
+            val media = attachment("kept", byteArrayOf(1))
+            val gateway = KeyedDraftGateway(mutableMapOf((ACCOUNT to GROUP) to draft(GROUP, "", listOf(media))))
+            val repository = repository(gateway, UnconfinedTestDispatcher(testScheduler))
+            val writer = CoalescingMessageDraftWriter(this, repository, debounceMillis = 0)
+            val store = DraftStore(NoOpDraftPersistence)
+            val bridge = draftBridge(writer, store, repository)
+            bridge.setDraft(ACCOUNT, GROUP, TextFieldValue(" "))
+            writer.flush()
+            assertEquals(null, store.getDraft(ACCOUNT, GROUP))
+            assertEquals(" ", gateway.values.getValue(ACCOUNT to GROUP).content)
+            val added = attachment("added", byteArrayOf(2))
+            repository.addAttachment(ACCOUNT, GROUP, added)
+            val captured = writer.generation(ACCOUNT, GROUP)
+
+            bridge.setDraft(ACCOUNT, GROUP, TextFieldValue(""))
+            writer.flush()
+
+            assertEquals(captured.value + 1, writer.generation(ACCOUNT, GROUP).value)
+            assertEquals("", gateway.values.getValue(ACCOUNT to GROUP).content)
+            assertEquals(listOf(media, added), gateway.values.getValue(ACCOUNT to GROUP).mediaAttachments)
+            assertFalse(bridge.setDraftIfCurrent(ACCOUNT, GROUP, captured.value, TextFieldValue("stale")))
+            val cleared = writer.generation(ACCOUNT, GROUP)
+            bridge.setDraft(ACCOUNT, GROUP, TextFieldValue("", composition = TextRange(0)))
+            assertEquals(cleared, writer.generation(ACCOUNT, GROUP))
+        }
+
+    /** Send presentation and durable cleanup retire omitted whitespace before later empty callbacks. */
+    @Test
+    fun emptyCallbacksAfterWhitespaceSendKeepPendingAndCleanupGenerations() =
+        runTest {
+            for (hideBeforeCleanup in listOf(false, true)) {
+                val gateway = KeyedDraftGateway(mutableMapOf())
+                val repository = repository(gateway, UnconfinedTestDispatcher(testScheduler))
+                val writer = CoalescingMessageDraftWriter(this, repository, debounceMillis = 0)
+                val store = DraftStore(NoOpDraftPersistence)
+                val bridge = draftBridge(writer, store, repository)
+                bridge.setDraft(ACCOUNT, GROUP, TextFieldValue(" "))
+                val token = requireNotNull(bridge.captureForSend(ACCOUNT, GROUP))
+                if (hideBeforeCleanup) {
+                    assertTrue(bridge.hideForPendingSend(token))
+                    bridge.setDraft(ACCOUNT, GROUP, TextFieldValue(""))
+                    assertEquals(token.generation, writer.generation(ACCOUNT, GROUP))
+                }
+                bridge.clearAfterDurableAcceptance(token)
+                advanceUntilIdle()
+                val cleaned = writer.generation(ACCOUNT, GROUP)
+                assertEquals(token.generation.value + 1, cleaned.value)
+
+                bridge.setDraft(ACCOUNT, GROUP, TextFieldValue(""))
+
+                assertEquals(cleaned, writer.generation(ACCOUNT, GROUP))
+            }
+        }
+
+    /** Reopening a normalized whitespace draft cannot turn an unchanged empty callback into an edit. */
+    @Test
+    fun acceptedHydrationRetiresOmittedWhitespacePresentation() =
+        runTest {
+            val media = attachment("kept", byteArrayOf(1))
+            val gateway = KeyedDraftGateway(mutableMapOf((ACCOUNT to GROUP) to draft(GROUP, "", listOf(media))))
+            val repository = repository(gateway, UnconfinedTestDispatcher(testScheduler))
+            val writer = CoalescingMessageDraftWriter(this, repository, debounceMillis = 0)
+            val store = DraftStore(NoOpDraftPersistence)
+            val bridge = draftBridge(writer, store, repository)
+            bridge.setDraft(ACCOUNT, GROUP, TextFieldValue(" "))
+            writer.flush()
+            val captured = writer.generation(ACCOUNT, GROUP)
+            val loaded = requireNotNull(writer.loadIfCurrent(ACCOUNT, GROUP, captured)).getOrThrow()
+            assertTrue(
+                writer.runHydrationIfCurrent(ACCOUNT, GROUP, captured) {
+                    bridge.replaceHydratedDraft(ACCOUNT, GROUP, loaded?.content, loaded?.updatedAtMs)
+                },
+            )
+            assertEquals(null, store.getDraft(ACCOUNT, GROUP))
+
+            bridge.setDraft(ACCOUNT, GROUP, TextFieldValue("", composition = TextRange(0)))
+
+            assertEquals(captured, writer.generation(ACCOUNT, GROUP))
+            assertEquals(" ", gateway.values.getValue(ACCOUNT to GROUP).content)
+            assertEquals(listOf(media), gateway.values.getValue(ACCOUNT to GROUP).mediaAttachments)
+        }
+
     /** A real text edit reverted to empty still rejects a producer holding the original generation. */
     @Test
     fun editingTextBackToEmptyStillInvalidatesCapturedGeneration() =
