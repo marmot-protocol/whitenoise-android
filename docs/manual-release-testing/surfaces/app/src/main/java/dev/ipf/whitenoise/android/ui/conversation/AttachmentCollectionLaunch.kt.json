@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionLaunch.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "R.string.attachment_collection_reselect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionLaunch.kt",
+        "anchor": "R.string.attachment_collection_reselect",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.share_import_storage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionLaunch.kt",
+        "anchor": "R.string.share_import_storage",
+        "test_ids": [
+          "MED-045"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

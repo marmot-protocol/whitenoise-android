@@ -44,9 +44,9 @@
         ]
       },
       {
-        "surface": "Dropped attachment count",
+        "surface": "Accepted, rejected and limit notice",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationImportedMediaSlots.kt",
-        "anchor": "R.plurals.toast_share_attachments_dropped",
+        "anchor": "R.plurals.attachment_collection_limit_result",
         "test_ids": [
           "MED-001"
         ]
