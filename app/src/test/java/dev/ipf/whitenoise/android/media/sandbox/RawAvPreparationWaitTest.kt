@@ -112,6 +112,7 @@ class RawAvPreparationWaitTest {
             assertTrue(entered.await(2, TimeUnit.SECONDS))
             engine.stop()
             assertTrue(first.completion.isCancelled)
+            assertFalse(engine.posterCurrent(first.target))
             release.countDown()
             assertTrue(returned.await(2, TimeUnit.SECONDS))
             assertEquals(RawAvPlaybackEngine.Status.Idle, engine.snapshot().status)
@@ -120,6 +121,7 @@ class RawAvPreparationWaitTest {
 
             // Only this new admitted control starts preparation; cancellation did not kill the paused producer.
             engine.prepare().get(2, TimeUnit.SECONDS)
+            assertFalse(engine.posterCurrent(first.target))
             val second = request(engine, 2, 2000)
             producer.submit(second)
             second.completion.get(2, TimeUnit.SECONDS)

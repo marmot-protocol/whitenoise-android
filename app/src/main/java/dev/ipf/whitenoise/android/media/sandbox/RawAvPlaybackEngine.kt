@@ -530,6 +530,10 @@ internal class RawAvPlaybackEngine(
     fun stop() {
         setPlaying(false)
         synchronized(lock) {
+            pendingSeek?.cancel(false)
+            pendingSeek = null
+            activation++
+            revision++
             preparationRequested = false
             prepareGeneration++
             if (!prepared.isDone) prepared.cancel(false)

@@ -4,6 +4,7 @@ package dev.ipf.whitenoise.android.media.sandbox
 internal object NativeSandboxExitEvidence {
     const val MAX_BYTES = 65536
     private const val MILLIS_PER_SECOND = 1000
+    private const val SIGNAL_GROUP = 3
     private val record =
         Regex(
             """^\s*([0-9]+(?:\.[0-9]+)?)\s+[0-9]+\s+[0-9]+\s+I\s+Zygote\s*:\s*""" +
@@ -32,7 +33,7 @@ internal object NativeSandboxExitEvidence {
                 timestamp >= startedAtMs &&
                 timestamp <= endedAtMs &&
                 match.groupValues[2].toIntOrNull() == pid &&
-                match.groupValues[3].toIntOrNull() == signal
+                match.groupValues[SIGNAL_GROUP].toIntOrNull() == signal
         }
     }
 }
