@@ -84,6 +84,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -1726,8 +1727,8 @@ class ConversationFileBackedMediaSendTest {
         }
 
     /**
-     * A draft photo that follows a large video is left out once the album's native ciphertext bound is spent,
-     * so the video still sends instead of the whole album failing on every Retry.
+     * A draft photo picked with a large video no longer shares the video's album: the collection plan sends the
+     * video alone first (#2576), so the album never spends its ciphertext bound and nothing is left out.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
@@ -1761,7 +1762,7 @@ class ConversationFileBackedMediaSendTest {
                 )
 
                 assertEquals(listOf("clip.mp4"), uploaded.await())
-                assertEquals(
+                assertNotEquals(
                     AppText.Resource(dev.ipf.whitenoise.android.R.string.media_album_too_large),
                     state.toast?.title,
                 )
@@ -1773,9 +1774,9 @@ class ConversationFileBackedMediaSendTest {
         }
 
     /**
-     * A draft photo after a large video uploads from a file too, so its two disk copies must fit beside
-     * the staged copy still owed to the video. When they do not, the photo is left out with the storage notice
-     * and the video still sends, instead of the whole album failing during upload.
+     * A draft photo after a large video is its own chunk now (#2576), prepared only after the video's upload has
+     * released its staged copy, so it no longer competes with the video for disk and the video sends first
+     * without a storage notice.
      */
     @Test
     fun albumLeavesOutADraftPhotoWhoseCopiesNoLongerFitBesideALargeVideo() =
@@ -1816,7 +1817,7 @@ class ConversationFileBackedMediaSendTest {
                 )
 
                 assertEquals(listOf("clip.mp4"), uploaded.await())
-                assertEquals(
+                assertNotEquals(
                     AppText.Resource(dev.ipf.whitenoise.android.R.string.share_import_storage),
                     state.toast?.title,
                 )
@@ -1828,9 +1829,9 @@ class ConversationFileBackedMediaSendTest {
         }
 
     /**
-     * The album and a large document picked together are separate messages of one send, so the document's
-     * snapshot must leave room for the album's upload. When it does not, the document is refused with the
-     * storage notice before anything is queued for it, and the album still sends.
+     * The album and a large document picked together are separate chunks of one collection (#2576). The
+     * document is staged only after the album's upload, so the album sends first and no storage notice is
+     * raised for a copy the album no longer holds.
      */
     @Test
     fun aLargeDocumentCountsTheCopiesTheAlbumStillOwes() =
@@ -1868,7 +1869,7 @@ class ConversationFileBackedMediaSendTest {
                 )
 
                 assertEquals(listOf("clip.mp4"), uploaded.await())
-                assertEquals(
+                assertNotEquals(
                     AppText.Resource(dev.ipf.whitenoise.android.R.string.share_import_storage),
                     state.toast?.title,
                 )
@@ -2148,3 +2149,34 @@ private const val SEND_RESERVE_BYTES = 64L * 1024L * 1024L
 private const val FILE_BATCH_CIPHERTEXT_BYTES = 900L * 1024L * 1024L
 private const val DELETE_POLL_ATTEMPTS = 200
 private const val DELETE_POLL_INTERVAL_MS = 10L
+
+/**
+ * A controller for collection-operation tests: each in-memory upload runs [upload] and returns one reference
+ * per attachment, and each publish runs [publish] with its caption and is accepted pending under its own
+ * canonical id, so several chunks never share a bridge. [disappearingSecs] sets the group's timer.
+ */
+internal fun collectionLifecycleController(
+    state: WhiteNoiseAppState,
+    disappearingSecs: ULong = 0uL,
+    upload: suspend (MediaUploadRequestFfi) -> Unit = {},
+    publish: suspend (String?) -> Unit = {},
+): ConversationController {
+    var published = 0
+    return ConversationController(
+        appState = state,
+        initialGroup = group().copy(disappearingMessageSecs = disappearingSecs),
+        initialMemberSnapshot = memberSnapshot(),
+        groupRosterReader = { _, _ -> authoritativeRoster() },
+        mediaUploader = { _, _, request ->
+            upload(request)
+            acceptedUploadResult(request.attachments.size)
+        },
+        mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
+        mediaPublisher = { _, _, _, caption ->
+            publish(caption)
+            published += 1
+            acceptedPendingSummary().copy(messageIds = listOf("%064x".format(published)))
+        },
+        markdownParser = { emptyMarkdownDocument() },
+    )
+}

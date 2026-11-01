@@ -113,18 +113,20 @@ class ShareFileImporterBudgetTest {
             assertEquals(0, root.listFiles()!!.count { it.extension == "bin" })
         }
 
-    /** Duplicates an eleven-source batch; only unique excess items produce the visible limit outcome. */
-    @Test fun tenItemLimitDeduplicatesAndKeepsValidItemsWithVisibleOverflow() =
+    /** Duplicates a 101-source batch; only unique excess items produce the visible limit outcome. */
+    @Test fun hundredItemLimitDeduplicatesAndKeepsValidItemsWithVisibleOverflow() =
         runBlocking {
+            // A batch ceiling roomy enough that only the 100-item count limit applies.
+            val roomy = ShareImportLimits(imageBytes = 64L, documentBytes = 32L, batchCiphertextBytes = 1_000_000L)
             val importer =
                 ShareFileImporter(
-                    files,
+                    PrivateShareFiles(File(root, "count"), "test.private-share", roomy),
                     { _, _ -> ShareSourceMetadata("file.bin", null, null) },
                     { _, _ -> ByteArrayInputStream(byteArrayOf(1)) },
                 )
-            val uris = (0..10).map { Uri.parse("content://external/$it") }
+            val uris = (0..SHARE_STREAM_MAX_ITEMS).map { Uri.parse("content://external/$it") }
             val result = importer.import(request(uris + uris))
-            assertEquals(10, result.payload.streamUris.size)
+            assertEquals(SHARE_STREAM_MAX_ITEMS, result.payload.streamUris.size)
             assertEquals(listOf(ShareImportError.TooMany), result.payload.importErrors)
         }
 

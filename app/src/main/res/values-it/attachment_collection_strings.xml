@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="attachment_collection_reselect">Selezionali o condividili di nuovo per inviarli.</string>
+    <string name="attachment_collection_progress">Invio allegati: %1$d di %2$d inviati</string>
+    <string name="attachment_collection_blocked">Un messaggio non è stato inviato. Gli allegati successivi attendono finché non lo riprovi o lo salti.</string>
+    <string name="attachment_collection_paused">L\'invio è stato interrotto: %1$d di %2$d inviati.</string>
+    <string name="attachment_collection_skip_failed">Salta non inviati</string>
+    <string name="attachment_collection_resume">Riprendi</string>
+    <string name="attachment_collection_cancel">Annulla invio</string>
+    <string name="attachment_collection_show_items">Mostra elementi</string>
+    <string name="attachment_collection_hide_items">Nascondi elementi</string>
+    <string name="attachment_collection_state_queued">In attesa</string>
+    <string name="attachment_collection_state_preparing">Preparazione</string>
+    <string name="attachment_collection_state_uploading">Caricamento</string>
+    <string name="attachment_collection_state_published">Inviato</string>
+    <string name="attachment_collection_state_failed">Non riuscito</string>
+    <string name="attachment_collection_state_cancelled">Annullato</string>
+    <string name="attachment_collection_state_skipped">Saltato</string>
+    <string name="attachment_collection_item_media">Foto o video %1$d</string>
+    <string name="attachment_collection_item_document">File n. %1$d</string>
+    <plurals name="attachment_collection_limit_result">
+        <item quantity="one">Aggiunti %1$d di %2$d. %3$d allegato non è entrato — il limite è %4$d per invio.</item>
+        <item quantity="other">Aggiunti %1$d di %2$d. %3$d allegati non sono entrati — il limite è %4$d per invio.</item>
+    </plurals>
+    <plurals name="attachment_collection_skipped">
+        <item quantity="one">Impossibile preparare %d allegato, non è stato inviato.</item>
+        <item quantity="other">Impossibile preparare %d allegati, non sono stati inviati.</item>
+    </plurals>
+    <plurals name="attachment_collection_unrecoverable">
+        <item quantity="one">%d allegato non è più leggibile. Selezionalo o condividilo di nuovo per inviarlo.</item>
+        <item quantity="other">%d allegati non sono più leggibili. Selezionali o condividili di nuovo per inviarli.</item>
+    </plurals>
+</resources>

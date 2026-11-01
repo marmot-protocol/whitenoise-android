@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="attachment_collection_reselect">Выберите их или поделитесь ими снова, чтобы отправить.</string>
+    <string name="attachment_collection_progress">Отправка вложений: отправлено %1$d из %2$d</string>
+    <string name="attachment_collection_blocked">Сообщение не отправлено. Следующие вложения ждут, пока вы не повторите или не пропустите его.</string>
+    <string name="attachment_collection_paused">Отправка прервана: отправлено %1$d из %2$d.</string>
+    <string name="attachment_collection_skip_failed">Пропустить неудачные</string>
+    <string name="attachment_collection_resume">Продолжить</string>
+    <string name="attachment_collection_cancel">Отменить отправку</string>
+    <string name="attachment_collection_show_items">Показать элементы</string>
+    <string name="attachment_collection_hide_items">Скрыть элементы</string>
+    <string name="attachment_collection_state_queued">Ожидает</string>
+    <string name="attachment_collection_state_preparing">Подготовка</string>
+    <string name="attachment_collection_state_uploading">Загрузка</string>
+    <string name="attachment_collection_state_published">Отправлено</string>
+    <string name="attachment_collection_state_failed">Ошибка</string>
+    <string name="attachment_collection_state_cancelled">Отменено</string>
+    <string name="attachment_collection_state_skipped">Пропущено</string>
+    <string name="attachment_collection_item_media">Фото или видео %1$d</string>
+    <string name="attachment_collection_item_document">Файл %1$d</string>
+    <plurals name="attachment_collection_limit_result">
+        <item quantity="one">Добавлено %1$d из %2$d. %3$d вложение не поместилось — за раз можно отправить до %4$d.</item>
+        <item quantity="few">Добавлено %1$d из %2$d. %3$d вложения не поместились — за раз можно отправить до %4$d.</item>
+        <item quantity="many">Добавлено %1$d из %2$d. %3$d вложений не поместились — за раз можно отправить до %4$d.</item>
+        <item quantity="other">Добавлено %1$d из %2$d. %3$d вложения не поместились — за раз можно отправить до %4$d.</item>
+    </plurals>
+    <plurals name="attachment_collection_skipped">
+        <item quantity="one">Не удалось подготовить %d вложение, оно не отправлено.</item>
+        <item quantity="few">Не удалось подготовить %d вложения, они не отправлены.</item>
+        <item quantity="many">Не удалось подготовить %d вложений, они не отправлены.</item>
+        <item quantity="other">Не удалось подготовить %d вложения, они не отправлены.</item>
+    </plurals>
+    <plurals name="attachment_collection_unrecoverable">
+        <item quantity="one">%d вложение больше не читается. Выберите его или поделитесь им снова.</item>
+        <item quantity="few">%d вложения больше не читаются. Выберите их или поделитесь ими снова.</item>
+        <item quantity="many">%d вложений больше не читаются. Выберите их или поделитесь ими снова.</item>
+        <item quantity="other">%d вложения больше не читаются. Выберите их или поделитесь ими снова.</item>
+    </plurals>
+</resources>

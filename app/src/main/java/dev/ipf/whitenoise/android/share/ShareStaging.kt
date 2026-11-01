@@ -13,8 +13,11 @@ data class ShareStreamStaging(
     fun isEmpty(): Boolean = mediaUris.isEmpty() && documentUris.isEmpty()
 }
 
-/** Maximum staged media/document URIs per conversation composer shelf. */
-const val SHARE_STREAM_MAX_ITEMS = 10
+/**
+ * Maximum staged media/document URIs per conversation composer shelf: the composer's one combined limit,
+ * shared with every in-app picker (#2576). Private import still applies its own byte ceilings.
+ */
+const val SHARE_STREAM_MAX_ITEMS = dev.ipf.whitenoise.android.state.ATTACHMENT_COLLECTION_MAX_ITEMS
 
 data class CappedShareStreamStaging(
     val accepted: ShareStreamStaging,

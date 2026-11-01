@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="attachment_collection_reselect">Select them or share them again to send them.</string>
+    <string name="attachment_collection_progress">Sending attachments: %1$d of %2$d sent</string>
+    <string name="attachment_collection_blocked">A message failed. Later attachments wait until you retry or skip it.</string>
+    <string name="attachment_collection_paused">Sending was interrupted: %1$d of %2$d sent.</string>
+    <string name="attachment_collection_skip_failed">Skip failed</string>
+    <string name="attachment_collection_resume">Resume</string>
+    <string name="attachment_collection_cancel">Cancel sending</string>
+    <string name="attachment_collection_show_items">Show items</string>
+    <string name="attachment_collection_hide_items">Hide items</string>
+    <string name="attachment_collection_state_queued">Waiting</string>
+    <string name="attachment_collection_state_preparing">Preparing</string>
+    <string name="attachment_collection_state_uploading">Uploading</string>
+    <string name="attachment_collection_state_published">Sent</string>
+    <string name="attachment_collection_state_failed">Failed</string>
+    <string name="attachment_collection_state_cancelled">Cancelled</string>
+    <string name="attachment_collection_state_skipped">Skipped</string>
+    <string name="attachment_collection_item_media">Photo or video %1$d</string>
+    <string name="attachment_collection_item_document">File %1$d</string>
+    <plurals name="attachment_collection_limit_result">
+        <item quantity="one">Added %1$d of %2$d. %3$d attachment didn\'t fit — the limit is %4$d per send.</item>
+        <item quantity="other">Added %1$d of %2$d. %3$d attachments didn\'t fit — the limit is %4$d per send.</item>
+    </plurals>
+    <plurals name="attachment_collection_skipped">
+        <item quantity="one">%d attachment couldn\'t be prepared and wasn\'t sent.</item>
+        <item quantity="other">%d attachments couldn\'t be prepared and weren\'t sent.</item>
+    </plurals>
+    <plurals name="attachment_collection_unrecoverable">
+        <item quantity="one">%d attachment can no longer be read. Select it or share it again to send it.</item>
+        <item quantity="other">%d attachments can no longer be read. Select them or share them again to send them.</item>
+    </plurals>
+</resources>

@@ -28,7 +28,8 @@
     "conversation/reactions": "Reaction configuration/participant lists, chosen emoji, loading/empty and own-reaction actions.",
     "TtsSentenceAccessibility.kt": "Read-aloud sentence chooser, active sentence and overflowing labels.",
     "conversation/ConversationTopBar.kt": "Timer explanation popup, compact windows and large text overflow.",
-    "navigation": "Persistent shell chrome: dictation capsule and registered fixed action footers, including wrapped actions, constrained height and real IME insets."
+    "navigation": "Persistent shell chrome: dictation capsule and registered fixed action footers, including wrapped actions, constrained height and real IME insets.",
+    "conversation/AttachmentCollectionProgress.kt": "Collection send progress: the expanded per-item state list under the composer accessory."
   },
   "exclusions": [
     {
@@ -367,6 +368,21 @@
       "family": "common",
       "policy": "adapter_internal",
       "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "conversation/AttachmentCollectionProgress.kt",
+      "policy": "ordinary",
+      "test_ids": [
+        "MED-045",
         "SCR-001",
         "SCR-002",
         "SCR-003",
@@ -1803,5 +1819,5 @@
       ]
     }
   ],
-  "keyboard_policy": "All shared scroll masks are removed while the software keyboard is visible in the viewport\u2019s own window. Scroll state and fixed actions remain owned by the caller; hiding the keyboard restores continuation cues. Profile-edit, report-message and Add Relay masks remain separately deferred."
+  "keyboard_policy": "All shared scroll masks are removed while the software keyboard is visible in the viewport’s own window. Scroll state and fixed actions remain owned by the caller; hiding the keyboard restores continuation cues. Profile-edit, report-message and Add Relay masks remain separately deferred."
 }

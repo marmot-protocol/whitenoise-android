@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="attachment_collection_reselect">Wähle sie erneut aus oder teile sie noch einmal, um sie zu senden.</string>
+    <string name="attachment_collection_progress">Anhänge werden gesendet: %1$d von %2$d gesendet</string>
+    <string name="attachment_collection_blocked">Eine Nachricht ist fehlgeschlagen. Spätere Anhänge warten, bis du sie erneut sendest oder überspringst.</string>
+    <string name="attachment_collection_paused">Das Senden wurde unterbrochen: %1$d von %2$d gesendet.</string>
+    <string name="attachment_collection_skip_failed">Fehlgeschlagene überspringen</string>
+    <string name="attachment_collection_resume">Fortsetzen</string>
+    <string name="attachment_collection_cancel">Senden abbrechen</string>
+    <string name="attachment_collection_show_items">Elemente anzeigen</string>
+    <string name="attachment_collection_hide_items">Elemente ausblenden</string>
+    <string name="attachment_collection_state_queued">Wartet</string>
+    <string name="attachment_collection_state_preparing">Wird vorbereitet</string>
+    <string name="attachment_collection_state_uploading">Wird hochgeladen</string>
+    <string name="attachment_collection_state_published">Gesendet</string>
+    <string name="attachment_collection_state_failed">Fehlgeschlagen</string>
+    <string name="attachment_collection_state_cancelled">Abgebrochen</string>
+    <string name="attachment_collection_state_skipped">Übersprungen</string>
+    <string name="attachment_collection_item_media">Foto oder Video %1$d</string>
+    <string name="attachment_collection_item_document">Datei %1$d</string>
+    <plurals name="attachment_collection_limit_result">
+        <item quantity="one">%1$d von %2$d hinzugefügt. %3$d Anhang passte nicht mehr — die Grenze liegt bei %4$d pro Sendung.</item>
+        <item quantity="other">%1$d von %2$d hinzugefügt. %3$d Anhänge passten nicht mehr — die Grenze liegt bei %4$d pro Sendung.</item>
+    </plurals>
+    <plurals name="attachment_collection_skipped">
+        <item quantity="one">%d Anhang konnte nicht vorbereitet werden und wurde nicht gesendet.</item>
+        <item quantity="other">%d Anhänge konnten nicht vorbereitet werden und wurden nicht gesendet.</item>
+    </plurals>
+    <plurals name="attachment_collection_unrecoverable">
+        <item quantity="one">%d Anhang kann nicht mehr gelesen werden. Wähle ihn erneut aus oder teile ihn noch einmal.</item>
+        <item quantity="other">%d Anhänge können nicht mehr gelesen werden. Wähle sie erneut aus oder teile sie noch einmal.</item>
+    </plurals>
+</resources>

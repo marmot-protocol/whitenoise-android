@@ -8,11 +8,11 @@
     <string name="share_import_empty">Um arquivo compartilhado está vazio.</string>
     <string name="share_import_file_limit">Um arquivo excede o limite de importação (%1$s para imagens, %2$s para outros arquivos).</string>
     <string name="share_import_batch_limit">Os arquivos excedem o limite total de %1$s.</string>
-    <string name="share_import_count_limit">Apenas os primeiros 10 arquivos podem ser importados.</string>
+    <string name="share_import_count_limit">Apenas os primeiros 100 arquivos podem ser importados.</string>
     <string name="share_import_metadata">Um arquivo tem metadados inválidos ou seu tamanho mudou.</string>
     <string name="share_import_storage">O armazenamento privado está indisponível ou cheio.</string>
     <string name="share_import_interrupted">A importação foi interrompida. Compartilhe os arquivos novamente.</string>
     <string name="share_import_progress">Arquivo %1$d de %2$d: %3$d bytes</string>
     <string name="share_import_rejected_count">Arquivos não importados: %1$d</string>
-    <string name="share_import_recovered_limit">Foram selecionados mais de 10 anexos. Remova os extras antes de enviar.</string>
+    <string name="share_import_recovered_limit">Foram selecionados mais de 100 anexos. Remova os extras antes de enviar.</string>
 </resources>

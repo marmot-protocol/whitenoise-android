@@ -358,10 +358,9 @@ private fun rememberConversationNavigationState(
     return state
 }
 
-// Maximum images per multi-pick. The Android Photo Picker enforces this
-// cap on the system dialog side; 10 keeps the album payload bounded
-// (10 * 1920px JPEG ≈ a few MB encrypted) without feeling artificially low.
-private const val MEDIA_PICKER_MAX_ITEMS = 10
+// One combined limit for every composer intake path, media and documents together (#2576). Sends are
+// split into bounded chunks, so the count no longer bounds a single message's payload.
+private const val MEDIA_PICKER_MAX_ITEMS = dev.ipf.whitenoise.android.state.ATTACHMENT_COLLECTION_MAX_ITEMS
 
 /** Maps recorder failures to localized, privacy-safe user presentation. */
 private fun presentVoiceRecordingFailure(
@@ -1715,6 +1714,7 @@ internal fun ConversationScreen(
             context = context,
             onRevealSent = { revealSentMessage() },
         )
+    val collectionPanels = rememberAttachmentCollectionPanels(appState, controller, mediaSender)
     val clipboard = LocalClipboardManager.current
     val groupTitleCopy = rememberGroupTitleCopy()
     val conversationSearchState = presentationState.searchState.value.copy(isOpen = navigationState.searchOpen)
@@ -1903,15 +1903,8 @@ internal fun ConversationScreen(
             if (staged.documentUris.isNotEmpty()) {
                 pendingDocumentUris = (pendingDocumentUris + staged.documentUris).distinct()
             }
-            if (capped.droppedCount > 0) {
-                val message =
-                    context.resources.getQuantityString(
-                        R.plurals.toast_share_attachments_dropped,
-                        capped.droppedCount,
-                        capped.droppedCount,
-                    )
-                appState.presentText(AppText.Plain(message))
-            }
+            val acceptedCount = staged.mediaUris.size + staged.documentUris.size
+            appState.presentAttachmentAdmission(context, acceptedCount, acceptedCount + capped.droppedCount)
         }
     }
     importedShareEffects()
@@ -1928,7 +1921,7 @@ internal fun ConversationScreen(
     // (returns a one-element list).
     val imagePickerLauncher =
         rememberOriginGuardedResultLauncher(
-            ActivityResultContracts.PickMultipleVisualMedia(maxItems = MEDIA_PICKER_MAX_ITEMS),
+            ActivityResultContracts.PickMultipleVisualMedia(maxItems = remember { photoPickerItemLimit() }),
             attachmentOrigin,
             attachmentOwnerCurrent,
         ) { uris ->
@@ -1940,7 +1933,7 @@ internal fun ConversationScreen(
             val admission =
                 admitComposerAttachments(uris, pendingMediaSlots.size, pendingDocumentUris.size, MEDIA_PICKER_MAX_ITEMS)
             pendingMediaSlots = pendingMediaSlots + admission.accepted.map(::newPendingMediaSlot)
-            appState.presentDroppedAttachments(context, admission.droppedCount)
+            appState.presentAdmission(context, admission)
         }
     val launchCameraCapture =
         rememberConversationCameraCapture(
@@ -1963,7 +1956,7 @@ internal fun ConversationScreen(
                     !appState.signOutInProgress &&
                     !appState.wipeInProgress
             },
-            onRejected = { appState.presentDroppedAttachments(context, 1) },
+            onRejected = { appState.presentAttachmentAdmission(context, acceptedCount = 0, offeredCount = 1) },
         )
 
     // TakePicture needs no permission of its own, but because CAMERA is declared
@@ -2271,15 +2264,11 @@ internal fun ConversationScreen(
             // Append into the document side of the staging shelf rather than
             // sending immediately. The preview sheet renders both lists and
             // a single Send dispatches both decoders into one kind-9 album.
+            // Every occurrence counts, a file picked twice included, so nothing leaves the pick unreported.
             val admission =
-                admitComposerAttachments(
-                    uris.filterNot { it in pendingDocumentUris }.distinct(),
-                    pendingMediaSlots.size,
-                    pendingDocumentUris.size,
-                    MEDIA_PICKER_MAX_ITEMS,
-                )
+                admitComposerAttachments(uris, pendingMediaSlots.size, pendingDocumentUris.size, MEDIA_PICKER_MAX_ITEMS)
             pendingDocumentUris = pendingDocumentUris + admission.accepted
-            appState.presentDroppedAttachments(context, admission.droppedCount)
+            appState.presentAdmission(context, admission)
         }
 
     /** Resolves a message id to its current list index after every leading structural row. */
@@ -4101,30 +4090,35 @@ internal fun ConversationScreen(
                     hasPendingAttachments = pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty(),
                     attachmentsPreparing = mediaDraftState.isPreparing,
                     attachmentContent =
-                        if (pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty()) {
+                        if (pendingMediaSlots.size + pendingDocumentUris.size > 0 || collectionPanels != null) {
                             {
-                                dev.ipf.whitenoise.android.ui.conversation.media.ComposerAttachmentShelf(
-                                    mediaSlots = pendingMediaSlots,
-                                    documentUris = pendingDocumentUris,
-                                    enabled = !attachmentSendClaim.isHeld,
-                                    prepared = mediaDraftState.preparedPreviews(),
-                                    onPreview = { if (!attachmentSendClaim.isHeld) mediaPreviewIndex = it },
-                                    onRemoveMedia = { slot ->
-                                        if (!attachmentSendClaim.isHeld) {
-                                            mediaDraftState.releasePreparedPhoto(slot.id)
-                                            pendingMediaSlots = pendingMediaSlots.filterNot { it.id == slot.id }
-                                        }
-                                    },
-                                    onRemoveDocument = { index ->
-                                        if (!attachmentSendClaim.isHeld) {
-                                            pendingDocumentUris
-                                                .getOrNull(index)
-                                                ?.let(mediaDraftState::releasePreparedDocument)
-                                            pendingDocumentUris =
-                                                pendingDocumentUris.filterIndexed { i, _ -> i != index }
-                                        }
-                                    },
-                                )
+                                collectionPanels?.invoke()
+                                if (pendingMediaSlots.size + pendingDocumentUris.size > 0) {
+                                    dev.ipf.whitenoise.android.ui.conversation.media.ComposerAttachmentShelf(
+                                        mediaSlots = pendingMediaSlots,
+                                        documentUris = pendingDocumentUris,
+                                        enabled = !attachmentSendClaim.isHeld,
+                                        prepared = mediaDraftState.preparedPreviews(),
+                                        onPreview = { if (!attachmentSendClaim.isHeld) mediaPreviewIndex = it },
+                                        onRemoveMedia = { slot ->
+                                            if (!attachmentSendClaim.isHeld) {
+                                                mediaDraftState.releasePreparedPhoto(slot.id)
+                                                pendingMediaSlots = pendingMediaSlots.filterNot { it.id == slot.id }
+                                            }
+                                        },
+                                        onRemoveDocument = { index ->
+                                            if (!attachmentSendClaim.isHeld) {
+                                                val remaining = pendingDocumentUris.filterIndexed { i, _ -> i != index }
+                                                // A second occurrence of the same file keeps its prepared bytes.
+                                                pendingDocumentUris
+                                                    .getOrNull(index)
+                                                    ?.takeIf { it !in remaining }
+                                                    ?.let(mediaDraftState::releasePreparedDocument)
+                                                pendingDocumentUris = remaining
+                                            }
+                                        },
+                                    )
+                                }
                             }
                         } else {
                             null
@@ -4199,7 +4193,7 @@ internal fun ConversationScreen(
                         // One notice carries both outcomes, since a second notice would replace the first.
                         if (admission.droppedCount > 0) {
                             val detail = AppText.Resource(R.string.toast_couldnt_decode_image).takeIf { unreadable }
-                            appState.presentDroppedAttachments(context, admission.droppedCount, detail)
+                            appState.presentAdmission(context, admission, detail)
                         } else if (unreadable) {
                             appState.present(R.string.toast_couldnt_decode_image, copyable = true)
                         }

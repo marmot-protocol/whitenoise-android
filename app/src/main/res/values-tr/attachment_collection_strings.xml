@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="attachment_collection_reselect">Göndermek için yeniden seçin veya yeniden paylaşın.</string>
+    <string name="attachment_collection_progress">Ekler gönderiliyor: %2$d ekten %1$d tanesi gönderildi</string>
+    <string name="attachment_collection_blocked">Bir mesaj gönderilemedi. Sonraki ekler, yeniden deneyene veya atlayana kadar bekler.</string>
+    <string name="attachment_collection_paused">Gönderim kesildi: %2$d ekten %1$d tanesi gönderildi.</string>
+    <string name="attachment_collection_skip_failed">Başarısızları atla</string>
+    <string name="attachment_collection_resume">Devam et</string>
+    <string name="attachment_collection_cancel">Gönderimi iptal et</string>
+    <string name="attachment_collection_show_items">Öğeleri göster</string>
+    <string name="attachment_collection_hide_items">Öğeleri gizle</string>
+    <string name="attachment_collection_state_queued">Bekliyor</string>
+    <string name="attachment_collection_state_preparing">Hazırlanıyor</string>
+    <string name="attachment_collection_state_uploading">Yükleniyor</string>
+    <string name="attachment_collection_state_published">Gönderildi</string>
+    <string name="attachment_collection_state_failed">Başarısız</string>
+    <string name="attachment_collection_state_cancelled">İptal edildi</string>
+    <string name="attachment_collection_state_skipped">Atlandı</string>
+    <string name="attachment_collection_item_media">Fotoğraf veya video %1$d</string>
+    <string name="attachment_collection_item_document">Dosya %1$d</string>
+    <plurals name="attachment_collection_limit_result">
+        <item quantity="one">%2$d ekten %1$d tanesi eklendi. %3$d ek sığmadı — gönderim başına sınır %4$d.</item>
+        <item quantity="other">%2$d ekten %1$d tanesi eklendi. %3$d ek sığmadı — gönderim başına sınır %4$d.</item>
+    </plurals>
+    <plurals name="attachment_collection_skipped">
+        <item quantity="one">%d ek hazırlanamadı ve gönderilmedi.</item>
+        <item quantity="other">%d ek hazırlanamadı ve gönderilmedi.</item>
+    </plurals>
+    <plurals name="attachment_collection_unrecoverable">
+        <item quantity="one">%d ek artık okunamıyor. Göndermek için yeniden seçin veya yeniden paylaşın.</item>
+        <item quantity="other">%d ek artık okunamıyor. Göndermek için yeniden seçin veya yeniden paylaşın.</item>
+    </plurals>
+</resources>

@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.share.ShareStreamStaging
+import dev.ipf.whitenoise.android.state.ATTACHMENT_COLLECTION_MAX_ITEMS
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
@@ -74,22 +75,61 @@ internal fun <T> admitComposerAttachments(
 }
 
 /**
- * Tells the user how many picked attachments did not fit, so no path drops a pick without saying so.
- * [detail] carries a second outcome of the same pick, such as an unreadable image, in the same notice
- * instead of a later notice replacing this one.
+ * Tells the user how many of [offeredCount] picks were added, how many did not fit and what the combined
+ * [limit] is, so no path drops a pick without saying so (#2576). [detail] carries a second outcome of the
+ * same pick, such as an unreadable image, in the same notice instead of a later notice replacing this one.
  */
-internal fun WhiteNoiseAppState.presentDroppedAttachments(
+internal fun WhiteNoiseAppState.presentAttachmentAdmission(
     context: Context,
-    droppedCount: Int,
+    acceptedCount: Int,
+    offeredCount: Int,
+    limit: Int = ATTACHMENT_COLLECTION_MAX_ITEMS,
     detail: AppText? = null,
 ) {
-    if (droppedCount <= 0) return
+    val rejected = offeredCount - acceptedCount
+    if (rejected <= 0) return
     presentText(
         AppText.Plain(
-            context.resources.getQuantityString(R.plurals.toast_share_attachments_dropped, droppedCount, droppedCount),
+            context.resources.getQuantityString(
+                R.plurals.attachment_collection_limit_result,
+                rejected,
+                acceptedCount,
+                offeredCount,
+                rejected,
+                limit,
+            ),
         ),
         detail = detail,
     )
+}
+
+/** The admission's accepted, rejected and limit counts as one notice; nothing is shown when all fit. */
+internal fun <T> WhiteNoiseAppState.presentAdmission(
+    context: Context,
+    admission: ComposerAttachmentAdmission<T>,
+    detail: AppText? = null,
+) = presentAttachmentAdmission(
+    context,
+    admission.accepted.size,
+    admission.accepted.size + admission.droppedCount,
+    detail = detail,
+)
+
+/**
+ * How many items one system photo-picker result may hold: the combined limit, lowered to what the platform
+ * picker accepts where it reports a smaller maximum. Over-limit results are still admitted and reported.
+ */
+@android.annotation.SuppressLint("NewApi") // getPickImagesMaxLimit is guarded by the SDK and extension checks.
+internal fun photoPickerItemLimit(): Int {
+    val platformPicker =
+        android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU ||
+            (
+                android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R &&
+                    android.os.ext.SdkExtensions
+                        .getExtensionVersion(android.os.Build.VERSION_CODES.R) >= 2
+            )
+    val platformLimit = if (platformPicker) android.provider.MediaStore.getPickImagesMaxLimit() else Int.MAX_VALUE
+    return platformLimit.coerceIn(2, ATTACHMENT_COLLECTION_MAX_ITEMS)
 }
 
 /** Adds missing native items without discarding later picks, current occurrence URIs or private ownership. */
