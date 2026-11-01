@@ -98,6 +98,19 @@ class AvatarViewerGestureTest {
         dialog.performTouchInput { doubleClick(center) }
         rule.waitForIdle()
         assertEquals(fittedWidth.toFloat(), stripeWidth().toFloat(), 2f)
+        dialog.performTouchInput { doubleClick(center) }
+        rule.waitForIdle()
+        assertTrue(stripeWidth() > fittedWidth * 2)
+        dialog.performTouchInput {
+            down(center)
+            up()
+            advanceEventTime(60L)
+            down(center)
+            moveTo(center + Offset(1f, 1f), delayMillis = 10L)
+            up()
+        }
+        rule.waitForIdle()
+        assertEquals(fittedWidth.toFloat(), stripeWidth().toFloat(), 2f)
     }
 
     private fun stripeWidth(): Int {

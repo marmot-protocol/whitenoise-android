@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.media
 
 import android.content.Context
+import android.net.NetworkCapabilities
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.WorkInfo
@@ -44,16 +45,36 @@ class BackgroundReceiptPolicyDiagnosticsAndroidTest {
     @Test
     fun registeredWifiObservationExportsOnlyClosedCapabilityBooleans() {
         val facts = backgroundReceiptRegisteredWifiFacts(ApplicationProvider.getApplicationContext<Context>())
-        assertEquals(4, facts.length())
+        assertEquals(5, facts.length())
         val expected =
             setOf(
                 "platform_network_inventory_available",
+                "platform_network_inventory_complete",
                 "platform_registered_wifi_present",
                 "platform_registered_wifi_validated",
                 "platform_registered_wifi_unmetered",
             )
         assertEquals(expected, facts.keys().asSequence().toSet())
         facts.keys().forEach { key -> assertTrue(facts.get(key) is Boolean) }
+    }
+
+    @Test
+    fun disappearingNetworkRetainsOtherWifiCapabilitiesAndMarksTheReadIncomplete() {
+        val wifi =
+            NetworkCapabilities()
+                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+        val facts = backgroundReceiptRegisteredWifiFacts { listOf(null, wifi) }
+        assertTrue(facts.getBoolean("platform_network_inventory_available"))
+        assertFalse(facts.getBoolean("platform_network_inventory_complete"))
+        assertTrue(facts.getBoolean("platform_registered_wifi_present"))
+        assertTrue(facts.getBoolean("platform_registered_wifi_validated"))
+        assertTrue(facts.getBoolean("platform_registered_wifi_unmetered"))
+        val unavailable = backgroundReceiptRegisteredWifiFacts { error("private-network") }
+        assertFalse(unavailable.getBoolean("platform_network_inventory_available"))
+        assertFalse(unavailable.getBoolean("platform_network_inventory_complete"))
+        assertFalse(unavailable.toString().contains("private-network"))
     }
 
     /** Every wait reports its exact case/stage and current closed facts, even when no coroutine frames survive. */

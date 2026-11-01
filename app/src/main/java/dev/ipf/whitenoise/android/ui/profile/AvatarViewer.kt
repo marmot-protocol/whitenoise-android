@@ -76,10 +76,10 @@ import dev.ipf.whitenoise.android.ui.common.AvatarDragDismissResult
 import dev.ipf.whitenoise.android.ui.common.AvatarDragDismissState
 import dev.ipf.whitenoise.android.ui.common.SwipeDismissibleSnackbar
 import dev.ipf.whitenoise.android.ui.common.VIEWER_MIN_SCALE
+import dev.ipf.whitenoise.android.ui.common.ViewerGestureConsumption
 import dev.ipf.whitenoise.android.ui.common.ViewerTransform
 import dev.ipf.whitenoise.android.ui.common.applyAvatarDownwardDrag
 import dev.ipf.whitenoise.android.ui.common.applyViewerTransformGesture
-import dev.ipf.whitenoise.android.ui.common.consumeViewerTransformIfNeeded
 import dev.ipf.whitenoise.android.ui.common.resetViewerTransform
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.common.viewerOneToOneScale
@@ -521,6 +521,7 @@ private fun ZoomableAvatarImage(
                     )
                 }.pointerInput(image, bitmapWidth, bitmapHeight) {
                     awaitEachGesture {
+                        val consumption = ViewerGestureConsumption(viewConfiguration.touchSlop)
                         var gestureTransform: ViewerTransform? = null
                         do {
                             val event = awaitPointerEvent()
@@ -548,7 +549,7 @@ private fun ZoomableAvatarImage(
                             gestureTransform = next
                             if (next.scale != currentScale) latestOnScaleChange(next.scale)
                             if (next.offset != currentOffset) latestOnOffsetChange(next.offset)
-                            event.consumeViewerTransformIfNeeded(pressedCount, zoom, pan)
+                            consumption.consumeIfNeeded(event, pressedCount, pan)
                         } while (true)
                     }
                 }.graphicsLayer(

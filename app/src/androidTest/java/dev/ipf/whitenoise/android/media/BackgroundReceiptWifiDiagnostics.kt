@@ -23,15 +23,19 @@ internal fun fixtureWifiRadioState(firstLine: String): FixtureWifiRadioState =
     }
 
 /** Wi-Fi transport registration is not proof of radio association or selection as the default network. */
-internal fun backgroundReceiptRegisteredWifiFacts(context: Context): JSONObject {
-    val capabilities =
-        runCatching {
-            val manager = checkNotNull(context.getSystemService(ConnectivityManager::class.java))
-            manager.allNetworks.map { checkNotNull(manager.getNetworkCapabilities(it)) }
-        }.getOrNull()
+internal fun backgroundReceiptRegisteredWifiFacts(context: Context): JSONObject =
+    backgroundReceiptRegisteredWifiFacts {
+        val manager = checkNotNull(context.getSystemService(ConnectivityManager::class.java))
+        manager.allNetworks.map { manager.getNetworkCapabilities(it) }
+    }
+
+internal fun backgroundReceiptRegisteredWifiFacts(read: () -> List<NetworkCapabilities?>): JSONObject {
+    val observations = runCatching(read).getOrNull()
+    val capabilities = observations?.filterNotNull()
     val wifi = capabilities?.filter { it.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) }
     return JSONObject()
-        .put("platform_network_inventory_available", capabilities != null)
+        .put("platform_network_inventory_available", observations != null)
+        .put("platform_network_inventory_complete", observations != null && observations.none { it == null })
         .put("platform_registered_wifi_present", wifi?.isNotEmpty() == true)
         .put(
             "platform_registered_wifi_validated",

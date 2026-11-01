@@ -33,9 +33,9 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntSize
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.ViewerGestureConsumption
 import dev.ipf.whitenoise.android.ui.common.ViewerTransform
 import dev.ipf.whitenoise.android.ui.common.applyViewerTransformGesture
-import dev.ipf.whitenoise.android.ui.common.consumeViewerTransformIfNeeded
 import dev.ipf.whitenoise.android.ui.common.resetViewerTransform
 import dev.ipf.whitenoise.android.ui.common.viewerFitGeometry
 import dev.ipf.whitenoise.android.ui.common.viewerOneToOneScale
@@ -133,6 +133,7 @@ internal fun ImageViewerViewport(
             .fillMaxSize()
             .pointerInput(sourceKey) {
                 awaitEachGesture {
+                    val consumption = ViewerGestureConsumption(viewConfiguration.touchSlop)
                     var accumulated: ViewerTransform? = null
                     do {
                         val event = awaitPointerEvent()
@@ -161,7 +162,7 @@ internal fun ImageViewerViewport(
                             accumulated = next
                             if (next.scale != currentScale) latestOnScaleChange(next.scale)
                             if (next.offset != currentOffset) latestOnOffsetChange(next.offset)
-                            event.consumeViewerTransformIfNeeded(pressedCount, zoom, pan)
+                            consumption.consumeIfNeeded(event, pressedCount, pan)
                         }
                     } while (true)
                 }

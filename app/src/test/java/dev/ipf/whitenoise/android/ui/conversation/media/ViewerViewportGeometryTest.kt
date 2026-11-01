@@ -2,12 +2,29 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import androidx.compose.ui.geometry.Offset
 import dev.ipf.whitenoise.android.media.sandbox.MediaImageRegion
+import dev.ipf.whitenoise.android.ui.common.ViewerGestureConsumption
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ViewerViewportGeometryTest {
+    @Test
+    fun singleFingerConsumptionWaitsForSlopAndStaysOwnedAfterCrossing() {
+        val gesture = ViewerGestureConsumption(10f)
+        assertFalse(gesture.shouldConsume(1, Offset(3f, 0f)))
+        assertFalse(gesture.shouldConsume(1, Offset(3f, 0f)))
+        assertFalse(gesture.shouldConsume(1, Offset(4f, 0f)))
+        assertTrue(gesture.shouldConsume(1, Offset(1f, 0f)))
+        assertTrue(gesture.shouldConsume(1, Offset.Zero))
+        assertTrue(gesture.shouldConsume(1, Offset(-11f, 0f)))
+        assertFalse(ViewerGestureConsumption(10f).shouldConsume(1, Offset.Zero))
+        val pinch = ViewerGestureConsumption(10f)
+        assertTrue(pinch.shouldConsume(2, Offset.Zero))
+        assertTrue(pinch.shouldConsume(1, Offset.Zero))
+    }
+
     @Test
     fun invalidGeometryNeverRequestsRasterOrVectorDecoding() {
         val base = ViewerViewportGeometry(400, 400, 4000, 4000, 10f, Offset.Zero)

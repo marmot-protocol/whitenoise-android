@@ -107,6 +107,20 @@ class SharedImageViewerPinchDeviceTest {
             assertEquals(1f, scale)
             assertEquals(Offset.Zero, offset)
         }
+        injectPinchAndAwaitIdle(bounds, localFocal)
+        rule.runOnIdle { assertTrue(scale > 1f) }
+        node.performTouchInput {
+            down(center)
+            up()
+            advanceEventTime(60L)
+            down(center)
+            moveTo(center + Offset(1f, 1f), delayMillis = 10L)
+            up()
+        }
+        rule.runOnIdle {
+            assertEquals(1f, scale)
+            assertEquals(Offset.Zero, offset)
+        }
     }
 
     @Test

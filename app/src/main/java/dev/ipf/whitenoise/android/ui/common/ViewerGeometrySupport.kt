@@ -55,17 +55,27 @@ internal fun fitKnownViewerImage(
     }
 }
 
-/** Stationary one-finger samples belong to tap detection; edge pan attempts still own their input. */
-internal fun shouldConsumeViewerTransform(
-    pressedCount: Int,
-    zoom: Float,
-    pan: Offset,
-): Boolean = pressedCount >= 2 || zoom != 1f || pan != Offset.Zero
-
-internal fun PointerEvent.consumeViewerTransformIfNeeded(
-    pressedCount: Int,
-    zoom: Float,
-    pan: Offset,
+/** Defers single-finger input ownership until slop, then retains it until this gesture ends. */
+internal class ViewerGestureConsumption(
+    private val touchSlop: Float,
 ) {
-    if (shouldConsumeViewerTransform(pressedCount, zoom, pan)) changes.forEach { it.consume() }
+    private var pan = Offset.Zero
+    private var ownsGesture = false
+
+    fun shouldConsume(
+        pressedCount: Int,
+        delta: Offset,
+    ): Boolean {
+        pan += delta
+        ownsGesture = ownsGesture || pressedCount >= 2 || pan.getDistance() > touchSlop
+        return ownsGesture
+    }
+
+    fun consumeIfNeeded(
+        event: PointerEvent,
+        pressedCount: Int,
+        delta: Offset,
+    ) {
+        if (shouldConsume(pressedCount, delta)) event.changes.forEach { it.consume() }
+    }
 }
