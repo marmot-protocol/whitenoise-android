@@ -22,26 +22,6 @@ internal fun acceptedPendingTextAwaitingProjection(
     acceptDisposition == SendAcceptDispositionFfi.ACCEPTED_PENDING &&
         confirmedId !in projectedMessageIds
 
-/**
- * Drives native settlement for an already-durable text intent without issuing another semantic send.
- * A convergence failure leaves the optimistic row pending for a later authoritative projection; cancellation
- * still escapes so account and process lifetimes retain ownership of the suspended work.
- */
-@Suppress("TooGenericExceptionCaught") // Native convergence may surface any non-cancellation gateway failure.
-internal suspend fun runAcceptedPendingTextConvergence(
-    acceptedPending: Boolean,
-    converge: suspend () -> Unit,
-    onFailure: (Throwable) -> Unit = {},
-) {
-    if (!acceptedPending) return
-    try {
-        converge()
-    } catch (throwable: Throwable) {
-        rethrowIfCancellation(throwable)
-        onFailure(throwable)
-    }
-}
-
 data class SuccessfulTextSendReconciliation(
     val confirmedId: String,
     val confirmed: AppMessageRecordFfi,

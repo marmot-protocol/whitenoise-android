@@ -36,6 +36,8 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposer
 import dev.ipf.whitenoise.android.ui.conversation.composer.VoiceRecordingReview
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberReplyReceivedEmoji
+import dev.ipf.whitenoise.android.ui.navigation.ComposerFabEndpoint
+import dev.ipf.whitenoise.android.ui.navigation.composerFabEndpoint
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 
 private val ConversationTopInteractionClearance = 64.dp
@@ -81,7 +83,7 @@ internal fun ConversationBottomBar(
     messageTextCopy: MessageTextCopy,
     onBack: () -> Unit,
     initialDraft: TextFieldValue,
-    onDraftChange: (TextFieldValue) -> Unit,
+    onDraftChange: (TextFieldValue, Boolean) -> Unit,
     composerTextState: ComposerTextState,
     composerAttachmentSheet: ComposerAttachmentSheetState,
     attachmentContent: (@Composable () -> Unit)? = null,
@@ -211,6 +213,7 @@ internal fun ConversationBottomBar(
                                 controller.timeline.firstOrNull { it.record.messageIdHex == id }?.record
                             }
                         ComposerBar(
+                            modifier = Modifier.composerFabEndpoint(ComposerFabEndpoint.Composer),
                             replyingToEmoji =
                                 rememberReplyReceivedEmoji(
                                     controller.replyingTo?.messageIdHex,
@@ -229,7 +232,18 @@ internal fun ConversationBottomBar(
                             onCancelReply = { controller.replyingTo = null },
                             onSend = { text, onAccepted ->
                                 appState.launchMutation {
-                                    appState.sendConversationText(controller, text, onAccepted)
+                                    appState.sendConversationText(controller, text, onAccepted = onAccepted)
+                                }
+                            },
+                            onSendWithPresentation = { text, onAccepted ->
+                                appState.launchMutation {
+                                    var acceptedId: String? = null
+                                    appState.sendConversationText(
+                                        controller = controller,
+                                        text = text,
+                                        onPresentationAccepted = { acceptedId = it },
+                                        onAccepted = { onAccepted(acceptedId) },
+                                    )
                                 }
                             },
                             initialDraft = initialDraft,

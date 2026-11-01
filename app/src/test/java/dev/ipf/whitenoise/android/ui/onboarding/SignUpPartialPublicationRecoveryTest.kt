@@ -50,6 +50,35 @@ class SignUpPartialPublicationRecoveryTest {
             assertEquals(listOf("created"), f.publishedAccounts)
         }
 
+    /** Creation carries the submitted name and about, so the first public profile is never the generated default. */
+    @Test fun creationCarriesTheSubmittedProfileWithoutThePhoto() =
+        runTest {
+            val f = Fixture(this)
+            f.controller.submit(DRAFT.copy(name = "  Alice  ", photo = PHOTO))
+            advanceUntilIdle()
+
+            val initial = f.initialProfiles.single()
+            assertEquals("Alice", initial.name)
+            assertEquals("Alice", initial.displayName)
+            assertEquals("Local about", initial.about)
+            assertEquals(null, initial.picture)
+            assertEquals("https://images.example/avatar.jpg", f.publications.single().picture)
+        }
+
+    /** A retry after failed creation creates with the corrected draft, not the first submission. */
+    @Test fun creationRetryCarriesTheCorrectedProfile() =
+        runTest {
+            val f = Fixture(this)
+            f.createFails = true
+            f.controller.submit(DRAFT)
+            advanceUntilIdle()
+            f.createFails = false
+            f.controller.submit(DRAFT.copy(name = "Corrected"))
+            advanceUntilIdle()
+
+            assertEquals(listOf("Alice", "Corrected"), f.initialProfiles.map { it.name })
+        }
+
     /** A failed photo retry reuses the accepted account, with no metadata publication before upload succeeds. */
     @Test fun failedPhotoRetriesForSameAcceptedIdentity() =
         runTest {
@@ -142,6 +171,23 @@ class SignUpPartialPublicationRecoveryTest {
             assertEquals(listOf("created"), f.finished)
         }
 
+    /** A stalled relay setup fails only publication: the accepted account stays and the form can still exit. */
+    @Test fun setupWaitFailureKeepsAcceptedAccountAndAllowsContinue() =
+        runTest {
+            val f = Fixture(this)
+            f.publishError = IllegalStateException("setup readiness timed out")
+            f.controller.submit(DRAFT)
+            advanceUntilIdle()
+
+            assertEquals(SignUpStage.PublishFailed, f.controller.stage)
+            assertEquals("created", f.controller.acceptedIdentity?.label)
+            f.controller.continueWithoutProfile()
+            assertEquals(SignUpStage.Complete, f.controller.stage)
+            assertEquals(1, f.creations)
+            assertEquals(emptyList<UserProfileMetadataFfi>(), f.publications)
+            assertEquals(listOf("created"), f.finished)
+        }
+
     /** A sign-out gate prevents retries and Continue from publishing or activating any account. */
     @Test fun signOutBlocksPartialRetryAndContinue() =
         runTest {
@@ -173,7 +219,10 @@ class SignUpPartialPublicationRecoveryTest {
             assertEquals("Corrected", f.publications.single().name)
         }
 
-    /** Policy failure after native creation retries the same receipt and never activates it prematurely. */
+    /**
+     * Policy failure after native creation retries the same receipt and never activates it
+     * prematurely; an edited resubmission reaches the later profile save, not another creation.
+     */
     @Test fun policyFailureAfterCreationRetriesWithoutCreatingAnotherIdentity() =
         runTest {
             val f = Fixture(this)
@@ -186,12 +235,16 @@ class SignUpPartialPublicationRecoveryTest {
             assertEquals(1, f.qualifications)
             assertEquals(null, f.controller.acceptedIdentity)
             assertEquals(null, f.owner.accountRef)
+            // The retained receipt keeps Back from abandoning a created identity.
+            assertFalse(f.controller.discardUnsubmitted())
 
             f.qualificationFails = false
-            f.controller.submit(DRAFT)
+            f.controller.submit(DRAFT.copy(name = "Edited"))
             advanceUntilIdle()
 
             assertEquals(1, f.creations)
+            assertEquals(listOf("Alice"), f.initialProfiles.map { it.name })
+            assertEquals("Edited", f.publications.single().name)
             assertEquals(2, f.qualifications)
             assertEquals("created", f.controller.acceptedIdentity?.label)
             assertEquals(SignUpStage.Complete, f.controller.stage)
@@ -207,7 +260,9 @@ class SignUpPartialPublicationRecoveryTest {
         var qualificationFails = false
         var uploadFails = false
         var publishSucceeds = true
+        var publishError: Exception? = null
         var creations = 0
+        val initialProfiles = mutableListOf<UserProfileMetadataFfi>()
         var qualifications = 0
         var beforeCreateReturn: suspend () -> Unit = {}
         var afterUpload: () -> Unit = {}
@@ -222,9 +277,10 @@ class SignUpPartialPublicationRecoveryTest {
                 scope,
                 { owner },
                 { available },
-                create = { captured ->
+                create = { captured, profile ->
                     identityCoordinator.createOrReuse(captured) {
                         creations++
+                        initialProfiles += profile
                         if (createFails) error("create failed")
                         beforeCreateReturn()
                         AccountSummaryFfi("created", "11".repeat(32), true, false, false, true)
@@ -252,6 +308,7 @@ class SignUpPartialPublicationRecoveryTest {
                     "https://images.example/avatar.jpg"
                 },
                 publish = { account, metadata ->
+                    publishError?.let { throw it }
                     publishedAccounts += account
                     publications += metadata
                     afterPublish()

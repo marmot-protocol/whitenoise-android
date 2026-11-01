@@ -1,7 +1,7 @@
 // Read back a Zapstore publication from the relay and CDN.
 //
 //	absent: exit 0 when the relay has no release or asset event for this
-//	        version (safe to retry publication), 3 when it has any.
+//	        version, 3 when it has any. Absence cannot exclude a pending submission.
 //	verify: require signed app, release and asset events that match the
 //	        reviewed candidate, and a CDN blob with the reviewed APK hash.
 //
@@ -12,19 +12,24 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/coder/websocket"
 	"github.com/nbd-wtf/go-nostr"
 )
 
 type expectation struct {
 	Publisher, App, Version, Code, Commit, APKSHA256, CertSHA256, Blossom string
+	ReleaseID                                                             string
+	APKBytes                                                              int64
 }
 
 type receipt struct {
@@ -50,6 +55,9 @@ func main() {
 	flags.StringVar(&want.Commit, "commit", "", "source commit")
 	flags.StringVar(&want.CertSHA256, "cert-sha256", "", "APK signing certificate SHA-256")
 	flags.StringVar(&want.Blossom, "blossom", "", "expected Blossom base URL")
+	flags.StringVar(&want.ReleaseID, "release-id", "", "exact accepted release event ID, if known")
+	flags.Int64Var(&want.APKBytes, "apk-bytes", 0, "reviewed APK size")
+	jsonOutput := flags.Bool("json", false, "emit a public verification receipt")
 	attempts := flags.Int("attempts", 6, "verification attempts, for relay propagation")
 	_ = flags.Parse(os.Args[2:])
 	if *relay == "" || want.Publisher == "" || want.App == "" || want.Version == "" || want.APKSHA256 == "" {
@@ -71,8 +79,8 @@ func main() {
 		return
 	}
 
-	if want.Code == "" || want.Commit == "" || want.CertSHA256 == "" || want.Blossom == "" {
-		fmt.Fprintln(os.Stderr, "error: verify also requires version-code, commit, cert-sha256 and blossom")
+	if want.Code == "" || want.Commit == "" || want.CertSHA256 == "" || want.Blossom == "" || want.APKBytes <= 0 {
+		fmt.Fprintln(os.Stderr, "error: verify also requires version-code, commit, cert-sha256, blossom and apk-bytes")
 		os.Exit(2)
 	}
 	var lastErr error
@@ -82,6 +90,10 @@ func main() {
 		}
 		got, err := verify(*relay, want)
 		if err == nil {
+			if *jsonOutput {
+				_ = json.NewEncoder(os.Stdout).Encode(got)
+				return
+			}
 			fmt.Printf("Verified Zapstore %s: app %s, release %s, asset %s, blob %s\n",
 				want.Version, got.App, got.Release, got.Asset, got.URL)
 			return
@@ -96,12 +108,48 @@ func main() {
 func query(relayURL string, filter nostr.Filter) ([]*nostr.Event, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	relay, err := nostr.RelayConnect(ctx, relayURL)
+	conn, _, err := websocket.Dial(ctx, relayURL, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer relay.Close()
-	return relay.QuerySync(ctx, filter)
+	defer conn.CloseNow()
+	conn.SetReadLimit(2 << 20)
+	payload, _ := json.Marshal([]any{"REQ", "readback", filter})
+	if err := conn.Write(ctx, websocket.MessageText, payload); err != nil {
+		return nil, err
+	}
+	var events []*nostr.Event
+	for {
+		_, raw, err := conn.Read(ctx)
+		if err != nil {
+			return nil, errors.New("relay read ended before EOSE")
+		}
+		var parts []json.RawMessage
+		if json.Unmarshal(raw, &parts) != nil || len(parts) < 2 {
+			return nil, errors.New("invalid relay frame")
+		}
+		var kind, sub string
+		_ = json.Unmarshal(parts[0], &kind)
+		_ = json.Unmarshal(parts[1], &sub)
+		if sub != "readback" {
+			continue
+		}
+		switch kind {
+		case "EOSE":
+			return events, nil
+		case "CLOSED":
+			return nil, errors.New("relay closed readback subscription")
+		case "EVENT":
+			var event nostr.Event
+			if len(parts) != 3 || json.Unmarshal(parts[2], &event) != nil || !filter.Matches(&event) {
+				return nil, errors.New("relay returned an invalid or unrelated event")
+			}
+			events = append(events, &event)
+			if len(events) > 1000 {
+				return nil, errors.New("relay readback exceeded event limit")
+			}
+		}
+	}
 }
 
 func present(relay string, want expectation) (int, error) {
@@ -138,14 +186,20 @@ func verify(relay string, want expectation) (receipt, error) {
 	if err != nil {
 		return receipt{}, err
 	}
-	return got, checkBlob(got.URL, want.APKSHA256)
+	return got, checkBlob(got.URL, want.APKSHA256, want.APKBytes)
 }
 
 func tag(event *nostr.Event, name string) string {
-	if found := event.Tags.Find(name); len(found) > 1 {
-		return found[1]
+	value := ""
+	for _, found := range event.Tags {
+		if len(found) > 1 && found[0] == name {
+			if value != "" {
+				return ""
+			}
+			value = found[1]
+		}
 	}
-	return ""
+	return value
 }
 
 func signedBy(event *nostr.Event, publisher string) bool {
@@ -158,7 +212,7 @@ func signedBy(event *nostr.Event, publisher string) bool {
 func checkEvents(want expectation, apps, releases, assets []*nostr.Event) (receipt, error) {
 	var got receipt
 	for _, app := range apps {
-		if signedBy(app, want.Publisher) && tag(app, "d") == want.App {
+		if app.Kind == 32267 && signedBy(app, want.Publisher) && tag(app, "d") == want.App {
 			got.App = app.ID
 		}
 	}
@@ -167,13 +221,16 @@ func checkEvents(want expectation, apps, releases, assets []*nostr.Event) (recei
 	}
 	var release *nostr.Event
 	for _, candidate := range releases {
-		if signedBy(candidate, want.Publisher) && tag(candidate, "d") == want.App+"@"+want.Version &&
+		if candidate.Kind == 30063 && signedBy(candidate, want.Publisher) && tag(candidate, "d") == want.App+"@"+want.Version &&
 			(release == nil || candidate.CreatedAt > release.CreatedAt) {
 			release = candidate
 		}
 	}
 	if release == nil {
 		return got, errors.New("no signed release event")
+	}
+	if want.ReleaseID != "" && release.ID != want.ReleaseID {
+		return got, errors.New("served release differs from accepted event ID")
 	}
 	if tag(release, "version") != want.Version || tag(release, "i") != want.App {
 		return got, errors.New("release event version or app differs")
@@ -186,25 +243,32 @@ func checkEvents(want expectation, apps, releases, assets []*nostr.Event) (recei
 		}
 	}
 	for _, asset := range assets {
-		if !referenced[asset.ID] || !signedBy(asset, want.Publisher) {
+		if asset.Kind != 3063 || !referenced[asset.ID] || !signedBy(asset, want.Publisher) {
 			continue
 		}
-		expectedURL := want.Blossom + "/" + want.APKSHA256
+		expectedURL := strings.TrimRight(want.Blossom, "/") + "/" + want.APKSHA256
+		actualURL := tag(asset, "url")
+		if actualURL != expectedURL && actualURL != expectedURL+".apk" {
+			return got, errors.New("asset URL differs from the approved CDN hash path")
+		}
 		checks := map[string]string{"i": want.App, "x": want.APKSHA256, "version": want.Version,
-			"version_code": want.Code, "commit": want.Commit, "apk_certificate_hash": want.CertSHA256, "url": expectedURL}
+			"version_code": want.Code, "commit": want.Commit, "apk_certificate_hash": want.CertSHA256}
+		if want.APKBytes > 0 {
+			checks["size"] = fmt.Sprint(want.APKBytes)
+		}
 		for name, value := range checks {
 			if tag(asset, name) != value {
 				return got, fmt.Errorf("asset event %s differs from the reviewed candidate", name)
 			}
 		}
-		got.Asset, got.URL = asset.ID, expectedURL
+		got.Asset, got.URL = asset.ID, actualURL
 		return got, nil
 	}
 	return got, errors.New("release does not reference a signed asset with the reviewed APK hash")
 }
 
-func checkBlob(url, expected string) error {
-	client := &http.Client{Timeout: 5 * time.Minute}
+func checkBlob(url, expected string, size int64) error {
+	client := &http.Client{Timeout: 90 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	response, err := client.Get(url)
 	if err != nil {
 		return err
@@ -214,8 +278,15 @@ func checkBlob(url, expected string) error {
 		return fmt.Errorf("CDN returned HTTP %d", response.StatusCode)
 	}
 	digest := sha256.New()
-	if _, err := io.Copy(digest, response.Body); err != nil {
+	if size <= 0 {
+		return errors.New("reviewed APK size required for blob verification")
+	}
+	n, err := io.Copy(digest, io.LimitReader(response.Body, size+1))
+	if err != nil {
 		return err
+	}
+	if n != size {
+		return errors.New("CDN blob size differs from reviewed APK")
 	}
 	if hex.EncodeToString(digest.Sum(nil)) != expected {
 		return errors.New("CDN blob hash differs from the reviewed APK")

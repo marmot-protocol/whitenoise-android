@@ -138,7 +138,13 @@ internal class TopNoticeSlotState(
     fun presents(
         notice: TransientNotice?,
         scope: ConversationNoticeDestination?,
-    ): Boolean = topNoticeFor(notice, owns, scope) != null || (owns && snackbarHostState?.currentSnackbarData != null)
+    ): Boolean {
+        val snackbar = snackbarHostState?.currentSnackbarData
+        // Empty slots still claim ownership, but their callers do not depend on the claim order.
+        if (notice == null && snackbar == null) return false
+        val owner = owns
+        return topNoticeFor(notice, owner, scope) != null || (owner && snackbar != null)
+    }
 }
 
 /** Claims a top slot for as long as the calling screen stays composed. */

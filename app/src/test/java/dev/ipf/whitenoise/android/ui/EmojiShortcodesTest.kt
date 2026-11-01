@@ -17,6 +17,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EmojiShortcodesTest {
+    /** Notification artwork skips the same code literals and fenced blocks as in-app rendering. */
     @Test
     fun notificationPresentationUsesTheSameLiteralExclusions() {
         assertEquals(
@@ -26,6 +27,21 @@ class EmojiShortcodesTest {
         assertEquals(emptyList<String>(), EmojiShortcodes.presentationShortcodes("```\n:wn:\n```"))
     }
 
+    /** Only the padded Marmot canvas is cropped, and only built-ins have a product name for text-only surfaces. */
+    @Test
+    fun builtinArtworkRegionsAndNames() {
+        val marmot = checkNotNull(EmojiShortcodes.builtinArtworkRegion(R.drawable.builtin_emoji_marmot))
+        assertEquals(11, marmot.left)
+        assertEquals(10, marmot.top)
+        assertEquals(51, marmot.width)
+        assertEquals(51, marmot.height)
+        assertNull(EmojiShortcodes.builtinArtworkRegion(R.drawable.builtin_emoji_wn))
+        assertEquals(R.string.emoji_name_marmot, EmojiShortcodes.builtinName(":marmot:"))
+        assertEquals(R.string.white_noise, EmojiShortcodes.builtinName(":wn:"))
+        assertNull(EmojiShortcodes.builtinName(":party:"))
+    }
+
+    /** A fence closes only on a matching or longer marker, so later shortcodes render again. */
     @Test
     fun closingFenceBoundaries() {
         val fencedBodies =

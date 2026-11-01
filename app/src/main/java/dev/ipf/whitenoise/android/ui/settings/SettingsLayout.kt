@@ -42,6 +42,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCallout
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
+import dev.ipf.whitenoise.android.ui.navigation.floatingDictationFooter
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
@@ -221,16 +222,18 @@ internal fun SettingsBottomAction(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(modifier = modifier, color = color, tonalElevation = tonalElevation) {
-        AdaptiveContent {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .imePadding()
-                        .padding(WhiteNoiseSpacing.PinnedActionInset),
-                content = content,
-            )
+        Box(Modifier.fillMaxWidth().floatingDictationFooter()) {
+            AdaptiveContent {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .imePadding()
+                            .padding(WhiteNoiseSpacing.PinnedActionInset),
+                    content = content,
+                )
+            }
         }
     }
 }

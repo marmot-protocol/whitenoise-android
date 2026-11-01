@@ -14,7 +14,7 @@ name: groups-relays
     direction: DOWN
 - tapOn:
     id: "chat_info.relays"
-- assertVisible: "Relays"
+- assertVisible: "Configured relays"
 - back
 - assertVisible:
     id: "chat_info.list"

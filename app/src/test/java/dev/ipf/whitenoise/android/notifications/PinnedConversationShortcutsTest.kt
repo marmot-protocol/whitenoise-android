@@ -1,13 +1,10 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.content.Context
-import android.content.IntentSender
-import android.content.pm.ShortcutManager
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
 import androidx.core.content.pm.ShortcutInfoCompat
-import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.runBlocking
@@ -49,7 +46,7 @@ class PinnedConversationShortcutsTest {
     /** Unsupported launchers never receive a request. */
     @Test
     fun unsupportedAndStaleOwnerDoNotRequestAPin() {
-        val platform = Platform(context)
+        val platform = PinnedShortcutTestPlatform(context)
         val owner = PinnedConversationShortcuts(context, platform)
         platform.supported = false
         assertEquals(ConversationPinResult.UNSUPPORTED, owner.request(capability, "Friends", null) { true })
@@ -61,7 +58,7 @@ class PinnedConversationShortcutsTest {
     /** Denial and accepted-but-unapproved requests never create an app-owned phantom pinned state. */
     @Test
     fun deniedRequestAndProcessRecreationUseLauncherInventory() {
-        val platform = Platform(context)
+        val platform = PinnedShortcutTestPlatform(context)
         val cap = capability
         platform.accepted = false
         assertEquals(
@@ -98,7 +95,7 @@ class PinnedConversationShortcutsTest {
     /** A pending approval arriving after deletion disables its old ID without touching the recreated pin. */
     @Test
     fun staleCallbackCannotRecreateOrDisableTheNewIncarnation() {
-        val platform = Platform(context)
+        val platform = PinnedShortcutTestPlatform(context)
         val owner = PinnedConversationShortcuts(context, platform)
         val old = capability
         owner.request(old, "Old conversation", null) { true }
@@ -122,7 +119,7 @@ class PinnedConversationShortcutsTest {
     @Test
     fun approvalAfterPrivacyChangeScrubsTheLateShortcut() =
         runBlocking {
-            val platform = Platform(context)
+            val platform = PinnedShortcutTestPlatform(context)
             val owner = PinnedConversationShortcuts(context, platform)
             val cap = capability
             owner.request(cap, "Private group", null) { true }
@@ -139,7 +136,7 @@ class PinnedConversationShortcutsTest {
     /** Rich refresh failure attempts a generic label while preserving the same validated destination intent. */
     @Test
     fun refreshFailureFallsBackToGenericAndKeepsExactRouting() {
-        val platform = Platform(context)
+        val platform = PinnedShortcutTestPlatform(context)
         val owner = PinnedConversationShortcuts(context, platform)
         val cap = capability
         owner.request(cap, "Old label", null) { true }
@@ -162,7 +159,7 @@ class PinnedConversationShortcutsTest {
     /** A bounded projection miss retains current authorized metadata without retargeting another account. */
     @Test
     fun missingProjectionPreservesCurrentPinsAndOtherAccountsAreUntouched() {
-        val platform = Platform(context)
+        val platform = PinnedShortcutTestPlatform(context)
         val owner = PinnedConversationShortcuts(context, platform)
         val first = capability
         val second = requireNotNull(tokens.issue("another-account", GROUP))
@@ -182,7 +179,7 @@ class PinnedConversationShortcutsTest {
     /** A failed rich update cannot scrub a valid omitted pin through the generic fallback batch. */
     @Test
     fun mixedProjectionFailureUpdatesOnlyThePreparedSubset() {
-        val platform = Platform(context)
+        val platform = PinnedShortcutTestPlatform(context)
         val owner = PinnedConversationShortcuts(context, platform)
         val retained = capability
         val visibleGroup = "cd".repeat(16)
@@ -217,7 +214,7 @@ class PinnedConversationShortcutsTest {
     /** Omission does not preserve an authority that was durably revoked before the refresh. */
     @Test
     fun revokedOmittedPinIsScrubbedAndDisabled() {
-        val platform = Platform(context)
+        val platform = PinnedShortcutTestPlatform(context)
         val owner = PinnedConversationShortcuts(context, platform)
         val cap = capability
         owner.request(cap, "Removed", null) { true }
@@ -247,7 +244,7 @@ class PinnedConversationShortcutsTest {
     /** Creates a genuine rich pin, changes the preview epoch without scrubbing inventory, then refreshes no rows. */
     private fun assertOmittedPinScrubbed(reenable: Boolean) =
         runBlocking {
-            val platform = Platform(context)
+            val platform = PinnedShortcutTestPlatform(context)
             val owner = PinnedConversationShortcuts(context, platform)
             val cap = capability
             owner.request(cap, "Private", null) { true }
@@ -270,7 +267,7 @@ class PinnedConversationShortcutsTest {
     /** Previous-process provenance cannot authorize keeping a rich label absent from the current projection. */
     @Test
     fun omittedPinWithPriorSessionProvenanceIsScrubbed() {
-        val platform = Platform(context)
+        val platform = PinnedShortcutTestPlatform(context)
         val owner = PinnedConversationShortcuts(context, platform)
         val cap = capability
         owner.request(cap, "Private", null) { true }
@@ -294,7 +291,7 @@ class PinnedConversationShortcutsTest {
     /** An available projection with no avatar is a real clear, so it must replace the old bitmap. */
     @Test
     fun availableProjectionWithoutAvatarClearsThePreviousPixels() {
-        val platform = Platform(context)
+        val platform = PinnedShortcutTestPlatform(context)
         val owner = PinnedConversationShortcuts(context, platform)
         val cap = capability
         val picture = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.MAGENTA) }
@@ -310,7 +307,7 @@ class PinnedConversationShortcutsTest {
     /** A queued request reads current private pixels at publication rather than retaining its captured picture. */
     @Test
     fun privatePictureClearedBeforeRequestIsNotPublished() {
-        val platform = Platform(context)
+        val platform = PinnedShortcutTestPlatform(context)
         val owner = PinnedConversationShortcuts(context, platform)
         val stale = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.MAGENTA) }
         var current: Bitmap? = stale
@@ -327,7 +324,7 @@ class PinnedConversationShortcutsTest {
      */
     @Test
     fun privatePictureRefreshAndOffWindowClearUseCurrentOwnedPixels() {
-        val platform = Platform(context)
+        val platform = PinnedShortcutTestPlatform(context)
         val owner = PinnedConversationShortcuts(context, platform)
         val privatePicture = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.MAGENTA) }
         val presentation = PinnedConversationPresentation("Peer", contact = "peer", currentAvatar = { privatePicture })
@@ -366,7 +363,7 @@ class PinnedConversationShortcutsTest {
     /** A Clear or replacement while approval waits cannot retain the request's old private photo. */
     @Test
     fun approvalAfterPrivatePictureEditRebuildsOnlyCurrentPixels() {
-        val platform = Platform(context)
+        val platform = PinnedShortcutTestPlatform(context)
         val cap = capability
         val stale = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.MAGENTA) }
         var current: Bitmap? = stale
@@ -400,7 +397,7 @@ class PinnedConversationShortcutsTest {
     /** Replacement before approval is resolved from the current source rather than the captured request bitmap. */
     @Test
     fun approvalAfterPrivatePictureReplacementUsesTheNewPicture() {
-        val platform = Platform(context)
+        val platform = PinnedShortcutTestPlatform(context)
         val cap = capability
         var current = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.MAGENTA) }
         val presentation = PinnedConversationPresentation("Peer", contact = "peer", currentAvatar = { current })
@@ -417,7 +414,7 @@ class PinnedConversationShortcutsTest {
     /** A pin outside the projection stays generic after approval when canonical lookup cannot supply its row. */
     @Test
     fun approvalWithoutCurrentRowCannotRestorePendingPrivatePixels() {
-        val platform = Platform(context)
+        val platform = PinnedShortcutTestPlatform(context)
         val cap = capability
         val stale = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.MAGENTA) }
         val presentation = PinnedConversationPresentation("Peer", stale, "peer")
@@ -435,7 +432,7 @@ class PinnedConversationShortcutsTest {
     /** A group-owned picture has no contact-pixel ownership and does not need a peer-photo approval scrub. */
     @Test
     fun approvalPreservesGroupOwnedPicture() {
-        val platform = Platform(context)
+        val platform = PinnedShortcutTestPlatform(context)
         val cap = capability
         val groupPicture = Bitmap.createBitmap(20, 20, Bitmap.Config.ARGB_8888)
         val owner = PinnedConversationShortcuts(context, platform)
@@ -448,7 +445,7 @@ class PinnedConversationShortcutsTest {
     /** Failed approval scrubbing makes that exact pin unavailable rather than leaving usable old private pixels. */
     @Test
     fun failedApprovalScrubDisablesOnlyTheAffectedPin() {
-        val platform = Platform(context)
+        val platform = PinnedShortcutTestPlatform(context)
         val cap = capability
         val presentation = PinnedConversationPresentation("Peer", contact = "peer")
         val owner = PinnedConversationShortcuts(context, platform)
@@ -462,7 +459,7 @@ class PinnedConversationShortcutsTest {
     /** An older avatar-only refresh cannot overwrite a newer projection after waiting on launcher inventory. */
     @Test
     fun sharedPresentationRevisionRejectsAnOlderRefreshAfterANewerRename() {
-        val platform = Platform(context)
+        val platform = PinnedShortcutTestPlatform(context)
         val owner = PinnedConversationShortcuts(context, platform)
         owner.request(capability, "Original", null) { true }
         platform.approve(platform.requests.single())
@@ -484,7 +481,7 @@ class PinnedConversationShortcutsTest {
     fun privacyDisabledRequestUsesGenericPresentation() =
         runBlocking {
             NotificationPreviewPreferences.setEnabled(context, false) { true }
-            val platform = Platform(context)
+            val platform = PinnedShortcutTestPlatform(context)
             val cap = capability
             val owner = PinnedConversationShortcuts(context, platform)
             owner.request(cap, "Private group", "https://private.example/avatar") { true }
@@ -497,7 +494,7 @@ class PinnedConversationShortcutsTest {
     /** Cached pictures are bounded; subsequent projection refreshes use the current title and pixels. */
     @Test
     fun cachedAvatarsAreBoundedAndRefreshFromTheCurrentProjection() {
-        val platform = Platform(context)
+        val platform = PinnedShortcutTestPlatform(context)
         val owner = PinnedConversationShortcuts(context, platform)
         val cap = capability
         val original = Bitmap.createBitmap(1200, 600, Bitmap.Config.ARGB_8888)
@@ -522,7 +519,7 @@ class PinnedConversationShortcutsTest {
     /** A failed label scrub cannot skip disabling a removed pin, including a repeated late approval. */
     @Test
     fun scrubFailureStillDisablesRemovedPinsAndLateApprovals() {
-        val platform = Platform(context)
+        val platform = PinnedShortcutTestPlatform(context)
         val owner = PinnedConversationShortcuts(context, platform)
         val cap = capability
         owner.request(cap, "Private group", null) { true }
@@ -552,7 +549,7 @@ class PinnedConversationShortcutsTest {
     /** Pending requests do not trigger expensive refresh preparation; only approved pins owned by this account do. */
     @Test
     fun pinPresenceFollowsLauncherApprovalAndAccountOwnership() {
-        val platform = Platform(context)
+        val platform = PinnedShortcutTestPlatform(context)
         val owner = PinnedConversationShortcuts(context, platform)
         assertFalse(owner.hasPinnedConversations(ACCOUNT))
         owner.request(capability, "Friends", null) { true }
@@ -565,7 +562,7 @@ class PinnedConversationShortcutsTest {
     /** Cancellation after inventory acquisition prevents an old refresh from publishing over a newer label. */
     @Test
     fun staleRefreshAfterInventoryReadCannotPublish() {
-        val platform = Platform(context)
+        val platform = PinnedShortcutTestPlatform(context)
         val owner = PinnedConversationShortcuts(context, platform)
         owner.request(capability, "Original", null) { true }
         platform.approve(platform.requests.single())
@@ -588,62 +585,13 @@ class PinnedConversationShortcutsTest {
     /** An action revoked during a launcher read must not issue a late pin request from the IO coroutine. */
     @Test
     fun obsoleteRequestCannotPublishAfterInventoryRead() {
-        val platform = Platform(context)
+        val platform = PinnedShortcutTestPlatform(context)
         val owner = PinnedConversationShortcuts(context, platform)
         var current = true
         platform.afterInventoryRead = { current = false }
         assertEquals(ConversationPinResult.UNAVAILABLE, owner.request(capability, "Obsolete", null) { current })
         assertTrue(platform.requests.isEmpty())
         assertTrue(platform.updates.isEmpty())
-    }
-
-    /** Keeps Android's real pinned flags while scripting approval timing and failed update responses. */
-    private class Platform(
-        private val context: Context,
-    ) : PinnedShortcutPlatform {
-        var supported = true
-        var accepted = true
-        var failNextUpdate = false
-        var inventory = emptyList<ShortcutInfoCompat>()
-        var afterInventoryRead: (() -> Unit)? = null
-        val requests = mutableListOf<ShortcutInfoCompat>()
-        val updates = mutableListOf<List<ShortcutInfoCompat>>()
-        val disabled = mutableListOf<String>()
-
-        override fun supported(): Boolean = supported
-
-        /** Runs the injected inventory-read race hook before returning the fake launcher inventory. */
-        override fun shortcuts(): List<ShortcutInfoCompat> = inventory.also { afterInventoryRead?.invoke() }
-
-        /** Captures launcher requests and their approval callback without implicitly approving a pin. */
-        override fun request(
-            shortcut: ShortcutInfoCompat,
-            callback: IntentSender,
-        ): Boolean {
-            requests += shortcut
-            return accepted
-        }
-
-        /** Applies icon/label replacements only to existing fake launcher entries. */
-        override fun update(shortcuts: List<ShortcutInfoCompat>): Boolean {
-            updates += shortcuts
-            if (failNextUpdate) {
-                failNextUpdate = false
-                error("scripted launcher update failure")
-            }
-            return true
-        }
-
-        /** Retains the launcher item while making its revoked identity unavailable to future taps. */
-        override fun disable(ids: List<String>) {
-            disabled += ids
-        }
-
-        /** Only this explicit fixture approval makes the shortcut appear in Android's pinned inventory. */
-        fun approve(shortcut: ShortcutInfoCompat) {
-            context.getSystemService(ShortcutManager::class.java).requestPinShortcut(shortcut.toShortcutInfo(), null)
-            inventory = ShortcutManagerCompat.getShortcuts(context, ShortcutManagerCompat.FLAG_MATCH_PINNED)
-        }
     }
 
     private companion object {

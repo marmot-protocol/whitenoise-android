@@ -41,6 +41,36 @@ import org.robolectric.annotation.Config
 class NewMessageOwnershipTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** The real account-owned discovery row opens existing setup and preserves the recipient query on Back. */
+    @Test fun agentSettingsReturnsToTheSameNewMessageQuery() {
+        val state = state()
+        var closes = 0
+        composeRule.setContent { WhiteNoiseTheme { NewMessageScreen(state, { closes++ }, {}, { _, _ -> }) } }
+        composeRule.onNodeWithTag("new_message.searchField").performTextReplacement("Agent search")
+        composeRule.onNodeWithTag("new_message.agentSettings").performClick()
+        composeRule.onNodeWithTag("new_message.screen").assertDoesNotExist()
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        composeRule.onNodeWithText(context.getString(R.string.ai_agents)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+        assertEquals("Agent search", query())
+        assertEquals(0, closes)
+        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+        assertEquals(1, closes)
+    }
+
+    /** A captured agent action cannot open settings after the account changes, before recomposition. */
+    @Test fun accountChangeRejectsCapturedAgentSettings() {
+        val state = state()
+        composeRule.setContent { WhiteNoiseTheme { NewMessageScreen(state, {}, {}, { _, _ -> }) } }
+        val action = composeRule.onNodeWithTag("new_message.agentSettings").captureClickCallbackForReplay()
+        composeRule.runOnIdle {
+            state.replaceActiveAccountForTest("second")
+            action()
+        }
+        composeRule.onNodeWithTag("new_message.screen").assertIsDisplayed()
+        composeRule.onNodeWithTag("new_message.agentSettings").assertIsDisplayed()
+    }
+
     /** Changing accounts invalidates an already captured native action in the same frame. */
     @Test fun accountChangeRejectsCapturedNavigation() = capturedAction("account")
 

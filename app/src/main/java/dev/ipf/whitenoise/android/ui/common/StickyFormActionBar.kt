@@ -15,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.navigation.floatingDictationFooter
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
@@ -38,6 +39,7 @@ internal fun StickyFormActionBar(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .floatingDictationFooter()
                     .navigationBarsPadding()
                     .imePadding()
                     .padding(

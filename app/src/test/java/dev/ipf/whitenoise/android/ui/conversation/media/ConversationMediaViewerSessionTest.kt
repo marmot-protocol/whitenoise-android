@@ -17,6 +17,15 @@ class ConversationMediaViewerSessionTest {
             runtimeGeneration = 7,
         )
 
+    /** Each owner generation gets its own thumbnail registry, so a replacement never sees the old registrations. */
+    @Test
+    fun thumbnailRegistrationsCannotCrossOwnerGenerations() {
+        val first = ConversationMediaViewerSessionState(owner)
+        val replacement = ConversationMediaViewerSessionState(owner.copy(runtimeGeneration = 8))
+        assertFalse(first.thumbnails === replacement.thumbnails)
+        assertNull(replacement.thumbnails.find(ConversationMediaViewerAttachmentId("message-a", 0)))
+    }
+
     /** Verifies live metadata and content upgrades refresh a logical attachment without replacing its session. */
     @Test
     fun sameLogicalAttachmentKeepsItsSessionAcrossReferenceUpgrade() {

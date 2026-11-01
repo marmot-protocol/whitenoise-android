@@ -38,6 +38,7 @@ class RemoteInputHistoryApi30Test {
     /** Grants notification permission and creates a clean test channel. */
     @Before
     fun setUp() {
+        ConversationCardPostedRegistry.resetForTests()
         Shadows.shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         manager.cancelAll()
         manager.createNotificationChannel(

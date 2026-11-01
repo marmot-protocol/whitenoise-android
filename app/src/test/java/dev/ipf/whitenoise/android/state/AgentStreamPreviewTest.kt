@@ -279,6 +279,85 @@ class AgentStreamPreviewTest {
         assertEquals("6789", text.toString())
     }
 
+    @Test
+    fun anchoredStreamDisplayPosition_saturatesWithoutWrappingOrder() {
+        val candidate = StreamFinalDisplayPosition(recordedAt = 1uL, timelineOrder = 2uL, afterMessageId = "parent")
+
+        assertEquals(
+            StreamFinalDisplayPosition(recordedAt = 9uL, timelineOrder = ULong.MAX_VALUE, afterMessageId = "parent"),
+            anchoredStreamDisplayPosition(
+                candidate,
+                parentRecordedAt = 9uL,
+                parentTimelineOrder = ULong.MAX_VALUE - 1uL,
+            ),
+        )
+        assertEquals(
+            ULong.MAX_VALUE,
+            anchoredStreamDisplayPosition(
+                candidate,
+                parentRecordedAt = 9uL,
+                parentTimelineOrder = ULong.MAX_VALUE - 2uL,
+            ).timelineOrder,
+        )
+    }
+
+    @Test
+    fun resolvedDurableStreamDisplayPosition_rejectsLaterAndAnchorsEqualCandidate() {
+        val candidate = StreamFinalDisplayPosition(recordedAt = 10uL, timelineOrder = 1uL)
+
+        assertNull(resolvedDurableStreamDisplayPosition(candidate, parentRecordedAt = 9uL, parentTimelineOrder = 3uL))
+        assertEquals(
+            StreamFinalDisplayPosition(recordedAt = 10uL, timelineOrder = 4uL),
+            resolvedDurableStreamDisplayPosition(candidate, parentRecordedAt = 10uL, parentTimelineOrder = 3uL),
+        )
+    }
+
+    @Test
+    fun durableStreamDisplayPositions_rejectsUnrelatedGroupsSendersAndStreams() {
+        val prompt = timelineRecord(id = "prompt", recordedAt = 1uL)
+        val start =
+            timelineRecord(
+                id = "start",
+                recordedAt = 2uL,
+                kind = 1200uL,
+                tags = listOf(MessageTagFfi(listOf("stream", "reply")), MessageTagFfi(listOf("parent", "prompt"))),
+            )
+        val final =
+            timelineRecord(
+                id = "final",
+                recordedAt = 3uL,
+                tags = listOf(MessageTagFfi(listOf("stream", "reply")), MessageTagFfi(listOf("stream-start", "start"))),
+            )
+
+        assertTrue(durableStreamDisplayPositions(listOf(prompt, start.copy(groupIdHex = "other"), final)).isEmpty())
+        listOf(
+            final.copy(groupIdHex = "other"),
+            final.copy(sender = "other"),
+            final.copy(
+                tags = listOf(MessageTagFfi(listOf("stream", "other")), MessageTagFfi(listOf("stream-start", "start"))),
+            ),
+            final.copy(tags = listOf(MessageTagFfi(listOf("stream", "reply")), MessageTagFfi(listOf("stream-start")))),
+        ).forEach { unrelated ->
+            assertEquals(setOf("start"), durableStreamDisplayPositions(listOf(prompt, start, unrelated)).keys)
+        }
+    }
+
+    @Test
+    fun appendCappedAgentStreamPreview_handlesDisabledAndExactLimits() {
+        listOf(0, -1).forEach { limit ->
+            val text = StringBuilder("old")
+            appendCappedAgentStreamPreview(text, "new", maxChars = limit)
+            assertEquals("", text.toString())
+        }
+        val text = StringBuilder("ab")
+        appendCappedAgentStreamPreview(text, "cd", maxChars = 4)
+        assertEquals("abcd", text.toString())
+        appendCappedAgentStreamPreview(text, "", maxChars = 4)
+        assertEquals("abcd", text.toString())
+        appendCappedAgentStreamPreview(text, "WXYZ", maxChars = 4)
+        assertEquals("WXYZ", text.toString())
+    }
+
     private fun timelineMessage(
         id: String,
         recordedAt: ULong,

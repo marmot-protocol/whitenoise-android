@@ -41,7 +41,7 @@ internal class MaestroDictationDraftController {
     private var restoredDispatches = 0
     private val ordinarySends = mutableListOf<String>()
     var delayedAcceptance: (() -> Unit)? = null
-    var initialWriter: ((TextFieldValue) -> Unit)? = null
+    var initialWriter: ((TextFieldValue, Boolean) -> Unit)? = null
     var visibleGroup by mutableStateOf(GROUP)
     var previousDictate: (() -> Unit)? = null
     private var availabilityReads = 0
@@ -194,7 +194,7 @@ internal class MaestroDictationDraftController {
 
     fun rejectOldWriter(expected: String) {
         val before = revision
-        checkNotNull(initialWriter).invoke(TextFieldValue("obsolete writer"))
+        checkNotNull(initialWriter).invoke(TextFieldValue("obsolete writer"), true)
         check(draft.text == expected && revision == before)
     }
 

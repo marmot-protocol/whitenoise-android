@@ -1,0 +1,77 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+  "legacy_sha256": "e0df71d9480301886b78b2b5b641811c49a7923b30014fabd020a73de2e4797e",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "notificationChannelTitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "fun notificationChannelTitle(",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "ConversationNotificationCategoriesList",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "fun ConversationNotificationCategoriesList(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "Conversation polish ui/group/ConversationNotificationCategoryRows.kt fun ConversationNotificationCategoriesList(",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "fun ConversationNotificationCategoriesList(",
+        "test_ids": [
+          "SET-040"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "Summary channel excluded from conversation notification settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "R.string.notification_channel_summary",
+        "test_ids": [
+          "NTF-026"
+        ]
+      },
+      {
+        "surface": "string:notification_scope_custom_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "R.string.notification_scope_custom_chat",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:notification_scope_default_all_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "R.string.notification_scope_default_all_chats",
+        "test_ids": [
+          "GRP-001"
+        ]
+      }
+    ],
+    "string_resources": [
+      {
+        "surface": "Conversation polish ui/group/ConversationNotificationCategoryRows.kt R.string.notification_scope_custom_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "R.string.notification_scope_custom_chat",
+        "test_ids": [
+          "SET-040"
+        ]
+      },
+      {
+        "surface": "Conversation polish ui/group/ConversationNotificationCategoryRows.kt R.string.notification_scope_default_all_chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
+        "anchor": "R.string.notification_scope_default_all_chats",
+        "test_ids": [
+          "SET-040"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -15,7 +15,7 @@ private const val IDENTITY_CONTACT = "contact"
 /**
  * The one conversation identity picture a rich message card shows in its primary image slot (#3311). A direct chat
  * uses the peer's picture, a group its group picture, and either falls back to the same monogram its conversation
- * shortcut draws, so the first card, the long-message text block and later enrichment never disagree.
+ * shortcut draws, so short and long first messages, stacked history and later enrichment never disagree.
  * [contactKey] names the peer of a direct chat, whose account-scoped private picture wins at the final write.
  */
 internal data class NotificationIdentityImage(
@@ -77,8 +77,8 @@ internal fun Notification.recordedIdentityInputs(): Pair<String, String>? =
 
 /**
  * Puts [image] in the card's primary picture slot and records what a final-write refresh needs to redraw it. The
- * conversation template draws it in the conversation circle, and the long-message text block draws it, by design,
- * as its large picture on the right, next to the small system-owned app attribution.
+ * native conversation template draws it in the conversation circle. Android owns the remaining small app
+ * attribution and exact geometry; the app adds no separate trailing image view.
  */
 internal fun NotificationCompat.Builder.setConversationIdentityImage(image: NotificationIdentityImage) =
     setLargeIcon(image.bitmap).addExtras(Bundle().apply { putBundle(EXTRA_IDENTITY_IMAGE, image.refreshInputs()) })

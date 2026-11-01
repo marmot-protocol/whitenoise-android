@@ -60,7 +60,7 @@ internal suspend fun ConversationController.cachedAttachmentPlaintext(
  *
  * The host presentation caches can be empty while MDK still holds verified bytes, for example after the cache was
  * trimmed or for media received while no host copy was written. A result that finishes after an account or session
- * change is rejected.
+ * change is rejected. An asset declaring more than [maxBytes] is refused without being copied into a lease.
  */
 internal suspend fun ConversationController.retainedNativeAttachmentBytes(
     messageIdHex: String,
@@ -76,7 +76,7 @@ internal suspend fun ConversationController.retainedNativeAttachmentBytes(
             attachmentIndex,
             sourceMessageIdHex = nativeAttachmentSourceId(messageIdHex),
         )
-    return appState.readRetainedAttachmentBytes(account, maxBytes) { appState.openNativeAttachment(request) }
+    return appState.readRetainedAttachmentBytes(account, maxBytes) { appState.openNativeAttachment(request, maxBytes) }
 }
 
 /**

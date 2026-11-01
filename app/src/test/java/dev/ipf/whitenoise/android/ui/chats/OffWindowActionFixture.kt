@@ -53,6 +53,9 @@ internal class OffWindowActionFixture(
     var nativeEntered: CountDownLatch? = null
     var releaseNative: CountDownLatch? = null
     var archiveFails = false
+    var loseMuteReadback = false
+    var targetReadUnavailable = false
+    var targetMuteEligible = true
     val state: WhiteNoiseAppState
     val controller: ChatsController
 
@@ -79,11 +82,15 @@ internal class OffWindowActionFixture(
                     listOf(presented(row.get()), presented(retainedRow.get())) + snapshotExtras.map(::presented)
                 },
                 presentedRowByGroup = { account, id ->
-                    check(account == ACTION_ACCOUNT && id == ACTION_TARGET)
+                    check(account == ACTION_ACCOUNT && id in listOf(ACTION_TARGET, ACTION_SURVIVOR))
                     keyedReads++
                     lookupEntered?.complete(Unit)
                     releaseLookup?.await()
-                    presented(row.get())
+                    if (id == ACTION_TARGET && targetReadUnavailable) {
+                        null
+                    } else {
+                        presented(if (id == ACTION_TARGET) row.get() else retainedRow.get())
+                    }
                 },
             )
         controller =
@@ -134,7 +141,7 @@ internal class OffWindowActionFixture(
                     canMarkUnread = true,
                     canPin = true,
                     canUnpin = true,
-                    canMute = true,
+                    canMute = value.groupIdHex != ACTION_TARGET || targetMuteEligible,
                     canUnmute = true,
                     canArchive = true,
                     canRestore = true,
@@ -167,6 +174,7 @@ internal class OffWindowActionFixture(
             calls += "mute:$muted"
             holdNativeCommand()
             row.updateAndGet { it.copy(muted = muted) }
+            if (loseMuteReadback) targetReadUnavailable = true
         }
         return ChatNotificationSettingsFfi(
             accountRef = ACTION_ACCOUNT,

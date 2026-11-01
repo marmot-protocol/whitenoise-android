@@ -1,0 +1,159 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+  "legacy_sha256": "70620868798fe19c93ca948852829529fd17df557a0ada1e101ca71edc9e4101",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "FocusedMessageActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "fun FocusedMessageActions(",
+        "test_ids": [
+          "MSG-004",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "rememberFocusedStackTravel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "fun rememberFocusedStackTravel(",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "Modifier.focusedStackDrag",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "fun Modifier.focusedStackDrag(",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "FocusedMoreReactionsTarget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "fun FocusedMoreReactionsTarget(",
+        "test_ids": [
+          "MSG-004",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "FocusedReactionRail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "fun FocusedReactionRail(",
+        "test_ids": [
+          "MSG-004",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "FocusedReactionTarget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "fun FocusedReactionTarget(",
+        "test_ids": [
+          "MSG-004",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "focusedReactionItemsPerRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "fun focusedReactionItemsPerRow(",
+        "test_ids": [
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "Measured reaction control origin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "onReactionOrigin",
+        "test_ids": [
+          "MSG-041"
+        ]
+      },
+      {
+        "surface": "MeasuredReactionGlyph",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "fun MeasuredReactionGlyph(",
+        "test_ids": [
+          "MSG-041"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:close",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "R.string.close",
+        "test_ids": [
+          "MSG-004",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "string:message_actions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "R.string.message_actions",
+        "test_ids": [
+          "MSG-004",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "string:open_emoji_picker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "R.string.open_emoji_picker",
+        "test_ids": [
+          "MSG-004",
+          "MSG-005"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Every non-action part of the focused-message overlay dismisses it, including the lifted message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "internal fun FocusedMessageActions(",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "Long text and media previews leave a tappable action viewport above the keyboard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "val previewHeightLimit =",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "The lifted message drags and flings through the safe overlay frame and settles inside it",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "internal fun focusedStackTravelRange(",
+        "test_ids": [
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "Scroll boundaries: FocusedMessageActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      },
+      {
+        "surface": "Accessible full reaction picker target",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActions.kt",
+        "anchor": "private fun FocusedMoreReactionsTarget(",
+        "test_ids": [
+          "MSG-041"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

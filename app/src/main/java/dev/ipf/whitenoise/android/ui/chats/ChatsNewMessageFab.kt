@@ -28,6 +28,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ToastMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseContentMaxWidth
+import dev.ipf.whitenoise.android.ui.navigation.ComposerFabEndpoint
+import dev.ipf.whitenoise.android.ui.navigation.composerFabEndpoint
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.settings.RelaysScreen
 import dev.ipf.whitenoise.android.ui.settings.SupportRelayState
@@ -124,6 +126,7 @@ internal fun ChatsNewMessageFabContent(
             Modifier
                 .padding(end = paneInset)
                 .floatingDictationAnchor()
+                .composerFabEndpoint(ComposerFabEndpoint.NewMessage)
                 .performanceTestTag(PerformanceTestTags.NEW_MESSAGE)
         FloatingActionButton(
             onClick = onClick,

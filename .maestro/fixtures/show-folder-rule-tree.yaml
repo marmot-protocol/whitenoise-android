@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+# Quick-compatible rules open in paired controls; the condition tree is composed only under Advanced.
+# Start and finish at the title so callers scroll down toward the tree from a known viewport.
+- scrollUntilVisible:
+    element:
+      id: folder.name
+    direction: UP
+- scrollUntilVisible:
+    element:
+      id: folder.quick.advanced
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: folder.quick.advanced
+- scrollUntilVisible:
+    element:
+      id: folder.name
+    direction: UP

@@ -1,8 +1,16 @@
 package main
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"github.com/coder/websocket"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nbd-wtf/go-nostr"
 )
@@ -88,5 +96,81 @@ func TestReleaseMustReferenceTheAsset(t *testing.T) {
 	}
 	if _, err := checkEvents(want, apps, append(releases, unrelated), assets); err == nil {
 		t.Fatal("newest release without the asset reference verified")
+	}
+}
+
+func TestV2APKPathAndExactAcceptedRelease(t *testing.T) {
+	want, key := fixture(t)
+	apps, releases, assets := publication(t, want, key, map[string]string{"url": want.Blossom + "/" + want.APKSHA256 + ".apk"})
+	want.ReleaseID = releases[0].ID
+	if _, err := checkEvents(want, apps, releases, assets); err != nil {
+		t.Fatal(err)
+	}
+	want.ReleaseID = strings.Repeat("f", 64)
+	if _, err := checkEvents(want, apps, releases, assets); err == nil {
+		t.Fatal("different accepted release verified")
+	}
+	for _, url := range []string{"https://other.example/" + want.APKSHA256 + ".apk", want.Blossom + "/" + want.APKSHA256 + ".apk?redirect=1"} {
+		apps, releases, assets = publication(t, want, key, map[string]string{"url": url})
+		want.ReleaseID = ""
+		if _, err := checkEvents(want, apps, releases, assets); err == nil {
+			t.Fatal("unapproved URL verified")
+		}
+	}
+}
+
+func TestRelayMustFinishWithEOSE(t *testing.T) {
+	for _, frame := range []string{"EOSE", "CLOSED", "disconnect"} {
+		t.Run(frame, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				conn, err := websocket.Accept(w, r, nil)
+				if err != nil {
+					return
+				}
+				defer conn.CloseNow()
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+				defer cancel()
+				if _, _, err := conn.Read(ctx); err != nil {
+					return
+				}
+				if frame == "disconnect" {
+					return
+				}
+				raw, _ := json.Marshal([]any{frame, "readback"})
+				_ = conn.Write(ctx, websocket.MessageText, raw)
+			}))
+			defer server.Close()
+			_, err := query(strings.Replace(server.URL, "http://", "ws://", 1), nostr.Filter{Kinds: []int{3063}})
+			if (err == nil) != (frame == "EOSE") {
+				t.Fatalf("query %s: %v", frame, err)
+			}
+		})
+	}
+}
+
+func TestBlobRequiresExactSizeHashAndNoRedirect(t *testing.T) {
+	data := []byte("reviewed bytes")
+	hash := sha256.Sum256(data)
+	expected := hex.EncodeToString(hash[:])
+	for _, mode := range []string{"match", "oversize", "corrupt", "redirect"} {
+		t.Run(mode, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch mode {
+				case "redirect":
+					http.Redirect(w, r, "https://unapproved.example", 302)
+				case "oversize":
+					_, _ = w.Write(append(data, 'x'))
+				case "corrupt":
+					_, _ = w.Write([]byte(strings.Repeat("x", len(data))))
+				default:
+					_, _ = w.Write(data)
+				}
+			}))
+			defer server.Close()
+			err := checkBlob(server.URL, expected, int64(len(data)))
+			if (err == nil) != (mode == "match") {
+				t.Fatalf("blob %s: %v", mode, err)
+			}
+		})
 	}
 }

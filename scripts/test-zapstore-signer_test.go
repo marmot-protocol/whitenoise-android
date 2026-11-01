@@ -14,6 +14,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/nbd-wtf/go-nostr"
+	"github.com/nbd-wtf/go-nostr/nip19"
 	"github.com/nbd-wtf/go-nostr/nip46"
 )
 
@@ -143,16 +144,9 @@ func TestReconnectMatchesPublisherAndRetainsOriginalURI(t *testing.T) {
 	}))
 	defer server.Close()
 	dir := t.TempDir()
-	stub := "#!/bin/sh\n[ \"$1\" = publish ] && [ \"$2\" = --offline ] || exit 99\ncat <<'PAYLOAD'\n"
-	for _, kind := range []int{3063, 30063, 32267} {
-		event := nostr.Event{Kind: kind, CreatedAt: nostr.Now(), Tags: nostr.Tags{}, Content: "fixture"}
-		if err := event.Sign(key); err != nil {
-			t.Fatal(err)
-		}
-		payload, _ := json.Marshal(event)
-		stub += string(payload) + "\n"
-	}
-	stub += "PAYLOAD\n"
+	npub, _ := nip19.EncodePublicKey(pub)
+	payload, _ := json.Marshal(map[string]any{"ok": true, "operation": "check", "signer": npub})
+	stub := "#!/bin/sh\n[ \"$1\" = --json ] && [ \"$2\" = check ] || exit 99\nprintf '%s\\n' '" + string(payload) + "'\n"
 	binary := filepath.Join(dir, "zsp")
 	if err := os.WriteFile(binary, []byte(stub), 0700); err != nil {
 		t.Fatal(err)
@@ -209,14 +203,14 @@ func TestOfflineFailuresDoNotLeakOrReconnect(t *testing.T) {
 		name, output, want string
 		exit               int
 	}{
-		{"remote error", "private-auth-URL-do-not-print", "offline ZSP signing failed", 1},
-		{"missing kinds", string(payload), "exactly the three expected", 0},
-		{"malformed event", "{not-json", "invalid offline event", 0},
+		{"remote error", "private-auth-URL-do-not-print", "ZSP v2 read-only check failed", 1},
+		{"missing kinds", string(payload), "invalid ZSP v2 check", 0},
+		{"malformed event", "{not-json", "invalid ZSP v2 check", 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
-			// If the harness ever drops --offline, this stub rejects it.
-			stub := "#!/bin/sh\n[ \"$1\" = publish ] && [ \"$2\" = --offline ] || exit 99\n" +
+			// The stub rejects any invocation other than read-only v2 check.
+			stub := "#!/bin/sh\n[ \"$1\" = --json ] && [ \"$2\" = check ] || exit 99\n" +
 				"cat <<'PAYLOAD'\n" + tc.output + "\nPAYLOAD\n"
 			if tc.exit != 0 {
 				stub += "exit 1\n"

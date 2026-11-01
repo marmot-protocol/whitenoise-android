@@ -130,16 +130,21 @@ class NotificationFirstPostIntegrationTest {
             }
         }
 
-    /** A warm presentation cache must satisfy sender identity without another MDK read. */
+    /** A warm cache supplies the sole first sender name under controlled scheduling, without another MDK read. */
     @Test
     fun warmProfilePresentationOwnsTheFirstSenderName() =
         runBlocking {
+            val events = CopyOnWriteArrayList<NotificationFirstPostTimingEvent>()
             val fixture =
                 NotificationBootstrapTestFixture(
                     context = context,
                     notificationUsersHaveDisplayNames = false,
                     localDisplayName = null,
                     onDisplayName = { _, _ -> error("warm profile presentation must avoid a cold MDK read") },
+                    notificationFirstPostTimingObserver = events::add,
+                    notificationDispatcher = Dispatchers.Unconfined,
+                    marmotIoDispatcher = Dispatchers.Unconfined,
+                    emitStartupNotification = false,
                 )
             fixture.appState.applyAccountSwitchProfileSeed(
                 AccountSwitchProfileSeed(
@@ -152,9 +157,18 @@ class NotificationFirstPostIntegrationTest {
             try {
                 withNotificationWriteCount { writes ->
                     fixture.bootstrap()
-                    fixture.awaitNotificationPosted()
+                    fixture.emitNotification()
+                    fixture.awaitNotificationPosted(
+                        advanceMainClock = {
+                            events.any { it.stage == NotificationFirstPostTimingStage.ContentComplete }
+                        },
+                    )
                     delay(NO_ADDITIONAL_WRITE_WINDOW_MS)
 
+                    assertEquals(
+                        "resolved_before_deadline",
+                        events.single { it.stage == NotificationFirstPostTimingStage.ContentComplete }.outcome,
+                    )
                     assertEquals(
                         "Cached Alice",
                         fixture

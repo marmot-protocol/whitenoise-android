@@ -66,4 +66,17 @@
     <string name="smart_folder_always_include">Всегда включать чаты</string>
     <string name="smart_folder_read_help">Всё прочитано не означает, что агент закончил работу.</string>
   <string name="folder_show_when_empty">Показывать пустую папку</string>
+  <string name="smart_folder_quick_start">Использовать быстрые фильтры</string>
+  <string name="smart_folder_quick_hint">Выберите один из двух вариантов, чтобы ограничить список чатов. Нажмите на него ещё раз, чтобы убрать это ограничение. Кнопка «Сохранить» применяет изменения.</string>
+  <string name="smart_folder_quick_accepted">Только принятые чаты. Сброс сохраняет это ограничение; изменить его можно в разделе «Дополнительно».</string>
+  <string name="smart_folder_quick_not_accepted">Принятые чаты: Нет. Сброс сохраняет это ограничение; изменить его можно в разделе «Дополнительно».</string>
+  <string name="smart_folder_quick_reset">Сбросить быстрые фильтры</string>
+  <string name="smart_folder_quick_unread">Непрочитанные</string>
+  <string name="smart_folder_quick_not_muted">Не заглушён</string>
+  <string name="smart_folder_quick_not_pinned">Не закреплён</string>
+  <string name="smart_folder_quick_not_archived">Не в архиве</string>
+  <string name="smart_folder_quick_neutral">Ничего не выбрано</string>
+  <string name="smart_folder_quick_state">%1$s: %2$s</string>
+  <string name="smart_folder_quick_expanded">Развёрнуто</string>
+  <string name="smart_folder_quick_collapsed">Свёрнуто</string>
 </resources>

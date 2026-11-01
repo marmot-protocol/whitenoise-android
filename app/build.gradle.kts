@@ -297,8 +297,8 @@ android {
         applicationId = "dev.ipf.whitenoise.android"
         minSdk = 30
         targetSdk = 36
-        versionCode = 22
-        versionName = "2026.10.14"
+        versionCode = 23
+        versionName = "2026.10.27"
         manifestPlaceholders["appIcon"] = "@mipmap/ic_launcher"
         manifestPlaceholders["appRoundIcon"] = "@mipmap/ic_launcher_round"
 
@@ -310,7 +310,6 @@ android {
         // compile-time false constant. Non-production flavors and debug builds
         // override this below; runtime collection still requires explicit opt-in.
         buildConfigField("boolean", "ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS", "false")
-        buildConfigField("String", "APP_SHORT_SHA", buildShortSha.asBuildConfigString())
         buildConfigField("boolean", "STARTUP_DIAGNOSTICS_ENABLED", "false")
         buildConfigField("String", "MARMOT_SOURCE_SHA", requiredMarmotKitProperty("mdk-sha").asBuildConfigString())
         buildConfigField(
@@ -728,6 +727,19 @@ androidComponents {
             val suffix = if (currentName.endsWith(".apk")) ".apk" else ""
             output.outputFileName.set("$stem-$buildDate-$buildShortSha$suffix")
         }
+    }
+
+    // The commit SHA changes on every push. Kotlin recompiles every reader of
+    // a changed class, and BuildConfig has about fifty; keeping the SHA in its
+    // own generated object limits a new commit to the few files that log it.
+    onVariants { variant ->
+        val generateAppRevision =
+            tasks.register<GenerateAppRevision>(
+                "generate${variant.name.replaceFirstChar(Char::uppercase)}AppRevision",
+            ) {
+                shortSha.set(buildShortSha)
+            }
+        variant.sources.kotlin?.addGeneratedSourceDirectory(generateAppRevision, GenerateAppRevision::outputDirectory)
     }
 
     // Mirror the release-build naming convention onto dev debug APKs during
@@ -1194,9 +1206,13 @@ tasks.withType<Test>().configureEach {
         "--add-opens=java.desktop/java.awt.font=ALL-UNNAMED",
         "--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED",
     )
-    // Resource-backed Robolectric tests retain Android SDK sandboxes across the large unit suite.
-    // Double Gradle's 512 MiB worker default while keeping one bounded, non-parallel process per task.
-    maxHeapSize = "1g"
+    // Resource-backed Robolectric tests retain Android SDK sandboxes across the large unit suite, and
+    // a 1 GiB G1 heap spent much of the run collecting. Full Zapstore suite, six forks, wn-build-server:
+    //   1 GiB G1:                          6m33s, 52.7 CPU-minutes
+    //   2 GiB ParallelGC, two GC threads:   5m12s, 31.2 CPU-minutes (27 GB peak for all forks)
+    // Two GC threads per fork keep collector bursts within the CI CPU budget.
+    maxHeapSize = "2g"
+    jvmArgs("-XX:+UseParallelGC", "-XX:ParallelGCThreads=2")
     // InvariantGateRegistryTest reads the registry from disk, so a registry-only edit must invalidate cached test
     // results (CI restores the build cache) instead of leaving every unit-test variant UP-TO-DATE.
     inputs
@@ -1286,4 +1302,29 @@ listOf("staging", "production").forEach { environment ->
 // Audited upstream vector data for the exact used icon set; no extended icon runtime.
 android.sourceSets.named("main") {
     kotlin.srcDir("src/main/generated/material-icons")
+}
+
+/** Writes `AppRevision.SHORT_SHA`, the source revision diagnostics report for this build. */
+abstract class GenerateAppRevision : DefaultTask() {
+    @get:Input
+    abstract val shortSha: Property<String>
+
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @TaskAction
+    fun generate() {
+        val file = outputDirectory.file("dev/ipf/whitenoise/android/AppRevision.kt").get().asFile
+        file.parentFile.mkdirs()
+        file.writeText(
+            """
+            |package dev.ipf.whitenoise.android
+            |
+            |object AppRevision {
+            |    const val SHORT_SHA: String = "${shortSha.get()}"
+            |}
+            |
+            """.trimMargin(),
+        )
+    }
 }

@@ -46,6 +46,7 @@ class ConversationAnchoringSourceCoverageTest {
         )
     }
 
+    /** Unread jump and follow state reset with the controller, and scroll restore uses the reconciled entry unread. */
     @Test
     fun conversationAnchoringLifecycleFollowsController() {
         val source = conversationScreenSource().readText()
@@ -53,7 +54,7 @@ class ConversationAnchoringSourceCoverageTest {
         val scrollRestoreIndex = source.indexOf("val scrollRestore =")
         val unreadJumpOwner =
             source.substring(
-                source.indexOf("var unreadJumpState by"),
+                source.indexOf("val unreadJump ="),
                 source.indexOf("val scrollCoordinator ="),
             )
 
@@ -66,7 +67,7 @@ class ConversationAnchoringSourceCoverageTest {
                 source.containsAll(
                     "ConversationNavigationState(",
                     "onDispose(state::cancelJobs)",
-                    "var lastFollowedLatestId by mutableStateOf(initialFollowedLatestId)",
+                    "var lastFollowedLatestId: String? = initialFollowedLatestId",
                     "LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored)",
                     "LaunchedEffect(listState, controller)",
                 ),
@@ -100,12 +101,11 @@ class ConversationAnchoringSourceCoverageTest {
         )
     }
 
+    /** The read anchor advances over rows that clear the composer in the reading viewport, not the raw layout. */
     @Test
     fun readAnchorFollowsTheUnobstructedViewport() {
-        val source = conversationScreenSource().readText()
-        val helperIndex = source.indexOf("private fun rememberConversationReadAnchor(")
-        val helper =
-            source.substring(helperIndex, source.indexOf("@OptIn(ExperimentalMaterial3Api::class)", helperIndex))
+        val source = conversationScreenSource().parentFile.resolve("ConversationUnreadTracking.kt").readText()
+        val helper = source.substring(source.indexOf("private fun ConversationReadAnchorEffect("))
 
         assertTrue(
             "the read watermark must ignore rows the composer covers rather than the raw layout",

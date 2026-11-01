@@ -17,7 +17,10 @@ class MainThreadConfinementCoverageTest {
             "cachedMediaPlaintext" to "mediaPlaintextCache.get",
             "cacheMediaPlaintext" to "mediaPlaintextCache.put",
             "cachedMediaThumbnail" to "mediaThumbnailCache.get",
+            "cachedMediaThumbnailEntry" to "mediaThumbnailCache.get",
             "cacheMediaThumbnail" to "mediaThumbnailCache.put",
+            "trimPresentationMemory" to "mediaPlaintextCache.trimToSize",
+            "retainMediaThumbnail" to "mediaThumbnailHolds.getOrPut",
             "removeMediaMemoryCacheEntry" to "mediaPlaintextCache.remove",
             "clearInMemoryMediaCaches" to "mediaPlaintextCache.clear",
         ).forEach { (functionName, mutation) ->
@@ -54,10 +57,12 @@ class MainThreadConfinementCoverageTest {
             "hasCachedAttachment" to listOf("cachedMediaPlaintext"),
             "evictCachedAttachment" to listOf("removeMediaMemoryCacheEntry"),
             "thumbnailFor" to listOf("cachedMediaThumbnail"),
+            "thumbnailEntryFor" to listOf("cachedMediaThumbnailEntry"),
             "cacheThumbnail" to listOf("cacheMediaThumbnail"),
             "handoffOwnMediaCacheOnReconcile" to listOf("cacheUploadedAttachment", "cacheMediaThumbnail"),
         ).forEach { (functionName, guardedCalls) ->
-            val moved = functionName in setOf("hasCachedAttachment", "thumbnailFor", "cacheThumbnail")
+            val moved =
+                functionName in setOf("hasCachedAttachment", "thumbnailFor", "thumbnailEntryFor", "cacheThumbnail")
             val body =
                 if (moved) source.attachmentPresentationFunction(functionName) else source.functionSection(functionName)
             guardedCalls.forEach { guardedCall ->

@@ -64,4 +64,17 @@
     <string name="smart_folder_always_include">Includi sempre le chat</string>
     <string name="smart_folder_read_help">Tutto letto non significa che l’agente abbia finito.</string>
   <string name="folder_show_when_empty">Mostra anche se vuota</string>
+  <string name="smart_folder_quick_start">Usa filtri rapidi</string>
+  <string name="smart_folder_quick_hint">Scegli una delle due opzioni per filtrare le chat. Toccala di nuovo per rimuovere quel vincolo. Salva applica le modifiche.</string>
+  <string name="smart_folder_quick_accepted">Solo chat accettate. Il ripristino mantiene questo ambito; modificalo in Avanzate.</string>
+  <string name="smart_folder_quick_not_accepted">Chat accettate: No. Il ripristino mantiene questo ambito; modificalo in Avanzate.</string>
+  <string name="smart_folder_quick_reset">Ripristina filtri rapidi</string>
+  <string name="smart_folder_quick_unread">Non letti</string>
+  <string name="smart_folder_quick_not_muted">Non silenziata</string>
+  <string name="smart_folder_quick_not_pinned">Non fissata</string>
+  <string name="smart_folder_quick_not_archived">Non archiviata</string>
+  <string name="smart_folder_quick_neutral">Nessuna selezione</string>
+  <string name="smart_folder_quick_state">%1$s: %2$s</string>
+  <string name="smart_folder_quick_expanded">Espanso</string>
+  <string name="smart_folder_quick_collapsed">Compresso</string>
 </resources>

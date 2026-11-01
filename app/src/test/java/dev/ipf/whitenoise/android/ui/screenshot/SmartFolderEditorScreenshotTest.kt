@@ -26,6 +26,8 @@ import dev.ipf.whitenoise.android.ui.settings.ChatFolderEditFormState
 import dev.ipf.whitenoise.android.ui.settings.LegacyFolderRuleControls
 import dev.ipf.whitenoise.android.ui.settings.SmartFolderPanelState
 import dev.ipf.whitenoise.android.ui.settings.SmartFolderRulePanel
+import dev.ipf.whitenoise.android.ui.settings.defaultSmartFolder
+import dev.ipf.whitenoise.android.ui.settings.resetQuickFilters
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
 import org.junit.Test
@@ -39,6 +41,41 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [36], qualifiers = "en-w360dp-h1100dp-mdpi")
 class SmartFolderEditorScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
+
+    /** Quick controls with every row neutral, as left after Reset. */
+    @Test fun quickNeutral() = capture("smart_folder_quick_neutral", quick = true)
+
+    /** Quick controls with mixed selections in the light theme. */
+    @Test fun quickMixedLight() = capture("smart_folder_quick_mixed_light", quick = true, mixed = true)
+
+    /** Quick controls with mixed selections in the dark theme. */
+    @Test fun quickMixedDark() = capture("smart_folder_quick_mixed_dark", quick = true, mixed = true, dark = true)
+
+    /** Quick controls with mixed selections in the AMOLED theme. */
+    @Test fun quickMixedAmoled() =
+        capture(
+            "smart_folder_quick_mixed_amoled",
+            quick = true,
+            mixed = true,
+            dark = true,
+            amoled = true,
+        )
+
+    /** Quick controls with mixed selections in right-to-left layout. */
+    @Test
+    @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h1100dp-mdpi")
+    fun quickRtlLarge() = capture("smart_folder_quick_rtl_large", quick = true, mixed = true, rtl = true)
+
+    /** Quick controls with mixed selections in landscape with large text. */
+    @Test
+    @Config(qualifiers = "en-w640dp-h360dp-mdpi")
+    fun quickLandscapeLarge() =
+        capture(
+            "smart_folder_quick_landscape_large",
+            quick = true,
+            mixed = true,
+            largeText = true,
+        )
 
     @Test fun light() = capture("smart_folder_light")
 
@@ -94,9 +131,12 @@ class SmartFolderEditorScreenshotTest {
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h1100dp-mdpi")
     fun rtlRulesLarge() = capture("smart_folder_rtl_rules_large", rtl = true, rules = true, options = true)
 
+    /** Renders the editor form for one configuration and records it as the [name] baseline. */
     @Suppress("LongMethod") // Render one fixed full form consistently across visual configurations.
     private fun capture(
         name: String,
+        quick: Boolean = false,
+        mixed: Boolean = false,
         dark: Boolean = false,
         amoled: Boolean = false,
         nested: Boolean = false,
@@ -113,34 +153,7 @@ class SmartFolderEditorScreenshotTest {
         var mentionLabel = ""
         val simpleExpanded = name.startsWith("smart_folder_simple_")
         val manual = name == "smart_folder_manual" || simpleExpanded
-        val conditions =
-            listOf(
-                SmartFolderFilter.Condition(
-                    FolderField.PARTICIPANTS,
-                    FolderMode.ANY_OF,
-                    setOf("a".repeat(64)),
-                ),
-                SmartFolderFilter.Condition(FolderField.UNREAD, FolderMode.NONE),
-            )
-        val root =
-            when {
-                empty -> SmartFolderFilter.Group()
-                nested ->
-                    SmartFolderFilter.Group(
-                        children =
-                            conditions +
-                                SmartFolderFilter.Group(
-                                    all = false,
-                                    not = true,
-                                    children =
-                                        listOf(
-                                            SmartFolderFilter.Condition(FolderField.DRAFT),
-                                            SmartFolderFilter.Condition(FolderField.MENTIONS),
-                                        ),
-                                ),
-                    )
-                else -> SmartFolderFilter.Group(children = conditions)
-            }
+        val root = screenshotRules(quick, mixed, empty, nested)
         composeRule.setContent {
             val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
             CompositionLocalProvider(LocalLayoutDirection provides direction) {
@@ -148,7 +161,7 @@ class SmartFolderEditorScreenshotTest {
                     mentionLabel = stringResource(R.string.smart_folder_preset_mentions)
                     ChatFolderEditContent(
                         state =
-                            formState(name, manual, empty),
+                            formState(name, manual, root.children.isEmpty()),
                         onUnreadOnlyChange = {},
                         onIncludeMutedChange = {},
                         onGroupsOnlyChange = {},
@@ -201,6 +214,10 @@ class SmartFolderEditorScreenshotTest {
                 }
             }
         }
+        if (quick) {
+            val target = if (largeText) "folder.quick.TYPE.GROUP" else "folder.quick.UNREAD.PRESENT"
+            composeRule.onNodeWithTag(CHAT_FOLDER_EDIT_CONTENT_TAG).performScrollToNode(hasTestTag(target))
+        }
         prepareCapture(
             CaptureActions(simpleExpanded, rtl, rules, add, scrollToLastFilter, options, replace, dialog),
             mentionLabel,
@@ -212,6 +229,54 @@ class SmartFolderEditorScreenshotTest {
                 else -> composeRule.onRoot()
             }
         target.captureRoboImage("src/test/snapshots/$name.png")
+    }
+
+    /** The rule tree each capture renders, from neutral quick rows to nested groups. */
+    private fun screenshotRules(
+        quick: Boolean,
+        mixed: Boolean,
+        empty: Boolean,
+        nested: Boolean,
+    ): SmartFolderFilter.Group {
+        val conditions =
+            listOf(
+                SmartFolderFilter.Condition(
+                    FolderField.PARTICIPANTS,
+                    FolderMode.ANY_OF,
+                    setOf("a".repeat(64)),
+                ),
+                SmartFolderFilter.Condition(FolderField.UNREAD, FolderMode.NONE),
+            )
+        return when {
+            quick && mixed ->
+                defaultSmartFolder().copy(
+                    children =
+                        defaultSmartFolder().children +
+                            listOf(
+                                SmartFolderFilter.Condition(FolderField.UNREAD),
+                                SmartFolderFilter.Condition(FolderField.DRAFT, FolderMode.NONE),
+                                SmartFolderFilter.Condition(FolderField.MUTED),
+                                SmartFolderFilter.Condition(FolderField.TYPE, FolderMode.GROUP),
+                            ),
+                )
+            quick -> defaultSmartFolder().resetQuickFilters()
+            empty -> SmartFolderFilter.Group()
+            nested ->
+                SmartFolderFilter.Group(
+                    children =
+                        conditions +
+                            SmartFolderFilter.Group(
+                                all = false,
+                                not = true,
+                                children =
+                                    listOf(
+                                        SmartFolderFilter.Condition(FolderField.DRAFT),
+                                        SmartFolderFilter.Condition(FolderField.MENTIONS),
+                                    ),
+                            ),
+                )
+            else -> SmartFolderFilter.Group(children = conditions)
+        }
     }
 
     private fun prepareCapture(

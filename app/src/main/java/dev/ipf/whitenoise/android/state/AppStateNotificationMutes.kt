@@ -93,6 +93,9 @@ internal fun WhiteNoiseAppState.setMemberMutedInGroup(
 internal fun WhiteNoiseAppState.retainMemberMutesForAccounts(accountRefs: Collection<String>) {
     memberMutePreferences.retainAccounts(accountRefs)
     conversationAlertPreferences.retainAccounts(accountRefs)
+    publicJpegPreviewPreferences
+        .retainAccounts(accounts.filter { it.label in accountRefs }.map { it.accountIdHex })
+        .forEach(publicJpegPreviewLoader::clearPixels)
 }
 
 /** Public-profile rename updates only existing Android channel labels for currently signed-in local owners. */

@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.AccountSetupReadinessFfi
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.functionBody
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -45,7 +47,105 @@ class IdentityCreationFlowTest {
         assertTrue(body.contains("val relays = MarmotClient.bootstrapRelays"))
         // NIP-65 gets the account defaults; the bootstrap route and inbox stay on bootstrapRelays.
         assertTrue(body.contains("createIdentity(MarmotClient.accountRelays, relays, relays)"))
+        val initial = "createIdentityWithInitialProfile(profile, MarmotClient.accountRelays, relays, relays)"
+        assertTrue(body.contains(initial))
+        // Creation returns the receipt at local readiness; the publication stage owns the wait.
+        assertFalse(body.functionBody("MarmotInterface.createNamedIdentity").contains("awaitAccountNetworkReady"))
         assertFalse(body.contains("take(1)"))
+    }
+
+    /** The profile save waits for relay setup outside the account lifetime, rechecking the form owner on each read. */
+    @Test
+    fun profileSaveWaitsForReadinessWithoutHoldingTheAccountLifetime() {
+        val adapter = appStateSource("AppProfileSignUp.kt").readText()
+        val publish = adapter.substringAfter("publish = { account, metadata ->").substringBefore("finish =")
+        assertTrue(publish.indexOf("awaitOwnedNetworkReadiness(account)") in 0 until publish.indexOf("publishProfile("))
+        val wait = adapter.functionBody("awaitOwnedNetworkReadiness")
+        assertFalse(wait.contains("withAccountLifetime"))
+        assertTrue(wait.contains("ownerAvailable()"))
+        assertFalse(adapter.functionBody("qualifyOwnedIdentity").contains("awaitAccountNetworkReady"))
+    }
+
+    /** Initial-profile creation returns at local readiness, so signup waits until relay publication completes. */
+    @Test
+    fun initialProfileCreationWaitsForNetworkReadiness() =
+        runTest {
+            val states =
+                ArrayDeque(
+                    listOf(
+                        AccountSetupReadinessFfi.LOCAL_READY,
+                        AccountSetupReadinessFfi.PUBLISHING,
+                        AccountSetupReadinessFfi.NETWORK_READY,
+                    ),
+                )
+            val asked = mutableListOf<String>()
+
+            awaitAccountNetworkReady("created") { ref ->
+                asked += ref
+                states.removeFirst()
+            }
+
+            assertEquals(listOf("created", "created", "created"), asked)
+        }
+
+    /** Recovery is MDK's typed setup failure, never a ready account. */
+    @Test
+    fun recoveryRequiredFailsTheWait() =
+        runTest {
+            val failure =
+                runCatching {
+                    awaitAccountNetworkReady("created") { AccountSetupReadinessFfi.RECOVERY_REQUIRED }
+                }.exceptionOrNull()
+
+            assertTrue(failure is MarmotKitException.AccountSetupRecoveryRequired)
+        }
+
+    /** A stalled publication fails with MDK's typed retry error rather than reporting a ready account. */
+    @Test
+    fun stalledPublicationAsksForRetry() =
+        runTest {
+            val failure =
+                runCatching {
+                    awaitAccountNetworkReady("created", timeoutMillis = 1_000) { AccountSetupReadinessFfi.PUBLISHING }
+                }.exceptionOrNull()
+
+            assertTrue(failure is MarmotKitException.AccountSetupRetryRequired)
+        }
+
+    /** A retry resumes MDK's stopped setup once, only while the first read still shows local or publishing setup. */
+    @Test
+    fun retryResumesStalledSetupOnceBeforePolling() =
+        runTest {
+            val states = ArrayDeque(listOf(AccountSetupReadinessFfi.PUBLISHING, AccountSetupReadinessFfi.NETWORK_READY))
+            var resumes = 0
+
+            awaitAccountNetworkReady("created", resume = { resumes++ }) { states.removeFirst() }
+
+            assertEquals(1, resumes)
+        }
+
+    /** A setup that is already ready, or still initializing, is never restarted. */
+    @Test
+    fun retryDoesNotResumeReadyOrInitializingSetup() =
+        runTest {
+            var resumes = 0
+            awaitAccountNetworkReady("created", resume = { resumes++ }) { AccountSetupReadinessFfi.NETWORK_READY }
+            val initializing =
+                ArrayDeque(listOf(AccountSetupReadinessFfi.INITIALIZING, AccountSetupReadinessFfi.NETWORK_READY))
+            awaitAccountNetworkReady("created", resume = { resumes++ }) { initializing.removeFirst() }
+
+            assertEquals(0, resumes)
+        }
+
+    /** The adapter resumes only after an expired wait, and only through start(), never another creation. */
+    @Test
+    fun adapterResumesThroughStartAfterAnExpiredWait() {
+        val wait = appStateSource("AppProfileSignUp.kt").readText().functionBody("awaitOwnedNetworkReadiness")
+        assertTrue(wait.contains("stalledSetupAccount == account"))
+        assertTrue(wait.contains("start()"))
+        assertTrue(wait.contains("catch (expired: MarmotKitException.AccountSetupRetryRequired)"))
+        assertFalse(wait.contains("createIdentity"))
+        assertFalse(wait.contains("createNamedIdentity"))
     }
 
     @Test

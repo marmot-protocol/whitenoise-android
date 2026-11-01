@@ -27,8 +27,17 @@ internal class ConversationDictationDraftRecovery(
 
     private var receipt: Receipt? = null
 
+    private data class DeferredRestoration(
+        val session: Long,
+        val target: ConversationDictationTarget,
+        val options: Options,
+    )
+
+    private var deferredRestoration: DeferredRestoration? = null
+
     fun reset() {
         receipt = null
+        deferredRestoration = null
     }
 
     fun owns(
@@ -78,6 +87,7 @@ internal class ConversationDictationDraftRecovery(
         target: ConversationDictationTarget,
         transcript: String,
     ) {
+        deferredRestoration = null
         val current = runCatching { read(target.accountRef, target.groupIdHex) }.getOrNull()
         val snapshot = current ?: ConversationDictationDraftSnapshot(TextFieldValue(""), Long.MIN_VALUE)
         receipt =
@@ -97,7 +107,10 @@ internal class ConversationDictationDraftRecovery(
     data class Options(
         val restoreCapturedPrefix: Boolean = false,
         val ownedEmptyRevision: Long? = null,
-    )
+    ) {
+        val restoresOwnedPrefix: Boolean
+            get() = restoreCapturedPrefix && ownedEmptyRevision != null
+    }
 
     private data class Insertion(
         val base: TextFieldValue,
@@ -125,19 +138,23 @@ internal class ConversationDictationDraftRecovery(
     ): Result {
         val text = transcript.trim()
         if (text.isEmpty()) return Result.Unavailable
+        if (deferredRestoration?.let { it.session != session || it.target != target } == true) {
+            deferredRestoration = null
+        }
+        if (options.restoresOwnedPrefix) {
+            deferredRestoration = DeferredRestoration(session, target, options)
+        }
+        // A temporarily unavailable host write must not erase the clear's restoration fence.
+        val pending = deferredRestoration?.takeIf { it.session == session && it.target == target }
+        val effectiveOptions = pending?.options ?: options
         var result = RecoveryAttempt.Retry
         repeat(DICTATION_DRAFT_WRITE_ATTEMPTS) {
-            if (result == RecoveryAttempt.Retry) result = recoverAttempt(session, target, text, options)
+            if (result == RecoveryAttempt.Retry) result = recoverAttempt(session, target, text, effectiveOptions)
         }
-        val outcome =
-            when (result) {
-                RecoveryAttempt.Written -> Result.Written
-                RecoveryAttempt.AlreadyPresent -> Result.AlreadyPresent
-                RecoveryAttempt.Superseded -> Result.Superseded
-                else -> Result.Unavailable
-            }
+        val outcome = result.toResult()
+        if (outcome != Result.Unavailable && pending != null) deferredRestoration = null
         // Preserve historical ownership through failed reads, while protecting uncertain recovery.
-        receipt?.takeIf { it.session == session && it.target == target && it.transcript == text }?.let {
+        receipt?.takeIf { owns(session, target) && it.transcript == text }?.let {
             receipt = it.copy(recoveryUnavailable = outcome == Result.Unavailable)
         }
         return outcome
@@ -149,6 +166,15 @@ internal class ConversationDictationDraftRecovery(
         Superseded,
         Retry,
         Unavailable,
+        ;
+
+        fun toResult(): Result =
+            when (this) {
+                Written -> Result.Written
+                AlreadyPresent -> Result.AlreadyPresent
+                Superseded -> Result.Superseded
+                else -> Result.Unavailable
+            }
     }
 
     private data class RecoveryWrite(

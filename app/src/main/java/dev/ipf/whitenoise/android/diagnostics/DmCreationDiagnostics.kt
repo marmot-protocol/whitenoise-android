@@ -7,6 +7,7 @@ import android.util.Log
 import androidx.compose.runtime.mutableStateMapOf
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MissingKeyPackageReasonFfi
+import dev.ipf.whitenoise.android.AppRevision
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.audio.DictationDiagnosticRecorder
 import dev.ipf.whitenoise.android.audio.DictationDiagnosticStore
@@ -181,7 +182,7 @@ internal object DmCreationDiagnostics {
             DictationDiagnosticRecorder(
                 DictationDiagnosticStore(
                     File(context.noBackupFilesDir, "dm-create-diagnostics"),
-                    BuildConfig.APP_SHORT_SHA,
+                    AppRevision.SHORT_SHA,
                     filePrefix = "dm-create",
                 ),
             )

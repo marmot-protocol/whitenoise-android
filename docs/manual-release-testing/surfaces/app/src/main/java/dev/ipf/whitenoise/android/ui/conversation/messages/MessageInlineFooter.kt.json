@@ -1,0 +1,45 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageInlineFooter.kt",
+  "legacy_sha256": "be6c3fa0d46cb0a2ee28c654fb10f0aa4a498857e0bdeebc20e6da49610c107a",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "BoxScope.MediaFooterOverlay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageInlineFooter.kt",
+        "anchor": "fun BoxScope.MediaFooterOverlay(",
+        "test_ids": [
+          "MSG-001",
+          "MED-003",
+          "MED-007"
+        ]
+      },
+      {
+        "surface": "MediaScrimFooter",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageInlineFooter.kt",
+        "anchor": "fun MediaScrimFooter(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "MessageInlineFooter",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageInlineFooter.kt",
+        "anchor": "fun MessageInlineFooter(",
+        "test_ids": [
+          "MSG-001",
+          "MSG-015"
+        ]
+      },
+      {
+        "surface": "MessageInlineFooterItems",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageInlineFooter.kt",
+        "anchor": "fun MessageInlineFooterItems(",
+        "test_ids": [
+          "MSG-001",
+          "MSG-015"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -134,6 +134,7 @@ class EmojiPickerRecentsBehaviorTest {
         assertEquals(listOf("😀", "👍", "😂"), owner.recents)
     }
 
+    /** Choosing an emoji while configuring quick reactions does not count as using it. */
     @Test
     fun configureQuickReactionPurposeDoesNotRecordUsage() {
         var usedCount = 0
@@ -156,6 +157,7 @@ class EmojiPickerRecentsBehaviorTest {
         assertEquals(0, usedCount)
     }
 
+    /** Built-in recents draw artwork under their readable names and still deliver the literal shortcode. */
     @Test
     fun builtInRecentsRenderArtworkAndDeliverLiteralShortcodes() {
         val picked = mutableListOf<String>()
@@ -171,8 +173,8 @@ class EmojiPickerRecentsBehaviorTest {
             }
         }
         waitForBrowseGrid()
-        composeRule.onNodeWithContentDescription(":marmot:").performClick()
-        composeRule.onNodeWithContentDescription(":wn:").performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.emoji_name_marmot)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.white_noise)).performClick()
         assertEquals(listOf(":marmot:", ":wn:"), picked)
         assertEquals(picked, used)
         composeRule
@@ -200,10 +202,11 @@ class EmojiPickerRecentsBehaviorTest {
         }
         waitForBrowseGrid()
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).performTextInput(":marmot:")
+        val marmot = string(R.string.emoji_name_marmot)
         composeRule.waitUntil(5_000) {
-            composeRule.onAllNodesWithContentDescription(":marmot:").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithContentDescription(marmot).fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithContentDescription(":marmot:").performClick()
+        composeRule.onNodeWithContentDescription(marmot).performClick()
         assertEquals(":marmot:", picked)
         assertEquals(emptyList<String>(), used)
         composeRule
@@ -211,6 +214,7 @@ class EmojiPickerRecentsBehaviorTest {
             .captureRoboImage("src/test/snapshots/emoji_picker_builtin_search.png")
     }
 
+    /** The group-image picker shows no shortcode artwork, under any name, in recents or search. */
     @Test
     fun groupImagePickerExcludesArtworkFromRecentsAndSearch() {
         composeRule.setContent {
@@ -227,9 +231,9 @@ class EmojiPickerRecentsBehaviorTest {
         }
         waitForBrowseGrid()
         composeRule.onNodeWithText("👍").assertIsDisplayed()
-        composeRule.onAllNodesWithContentDescription(":marmot:").assertCountEquals(0)
-        composeRule.onAllNodesWithContentDescription(":wn:").assertCountEquals(0)
-        composeRule.onAllNodesWithContentDescription(":party:").assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription(string(R.string.emoji_name_marmot)).assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription(string(R.string.white_noise)).assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription("party").assertCountEquals(0)
         composeRule.onNodeWithTag(emojiPickerHeaderTestTag(EmojiCategory.Custom)).assertDoesNotExist()
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).performTextInput(":marmot:")
         composeRule.waitUntil(5_000) {

@@ -20,6 +20,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -42,6 +43,23 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en")
 class ComposerSendAcceptanceBoundaryTest {
+    /** Both editor surfaces use one explicit intent revision without changing acceptance ownership rules. */
+    @Test
+    fun sharedComposerUserIntentExcludesSelectionCompositionAndProgrammaticUpdates() {
+        val shared = ComposerTextState(TextFieldValue("original"))
+        shared.updateValueFromUser(TextFieldValue("original", TextRange(1, 4), TextRange(0, 4)))
+        assertEquals(0L, shared.userTextEditRevision)
+        shared.updateValue(TextFieldValue("external share"))
+        assertEquals(0L, shared.userTextEditRevision)
+        val mainComposer = shared
+        val readerComposer = shared
+        mainComposer.updateValueFromUser(TextFieldValue("main edit"))
+        readerComposer.updateValueFromUser(TextFieldValue("reader edit"))
+        assertEquals(2L, shared.userTextEditRevision)
+        shared.clearAccepted(shared.acceptanceToken())
+        assertEquals(2L, shared.userTextEditRevision)
+    }
+
     @get:Rule
     val composeRule = createComposeRule()
 
@@ -63,7 +81,7 @@ class ComposerSendAcceptanceBoundaryTest {
                         onCancelReply = {},
                         onSend = { _, onAccepted -> onAccepted() },
                         initialDraft = TextFieldValue(sentText),
-                        onDraftChange = { persistedDraftChanges += it.text },
+                        onDraftChange = { draftValue, _ -> persistedDraftChanges += draftValue.text },
                         onAfterSend = { afterSendCount += 1 },
                     )
                 }
@@ -125,7 +143,7 @@ class ComposerSendAcceptanceBoundaryTest {
                         onCancelReply = {},
                         onSend = { _, callback -> accepted = callback },
                         initialDraft = value,
-                        onDraftChange = { value = it },
+                        onDraftChange = { draftValue, _ -> value = draftValue },
                     )
                 }
             }

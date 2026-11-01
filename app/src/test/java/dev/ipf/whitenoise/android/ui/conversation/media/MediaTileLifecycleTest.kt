@@ -46,7 +46,6 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -117,7 +116,10 @@ class MediaTileLifecycleTest {
         assertEquals("returning to the foreground started a transfer", 0, fixture.calls.size)
     }
 
-    /** A slow local read must announce opening, never offer to download bytes already in the encrypted cache. */
+    /**
+     * A slow local read must announce opening, never offer to download bytes already in the encrypted cache.
+     * The test releases the read after observing that state so runner delays cannot manufacture a failed read.
+     */
     @Test
     fun retainedImageDoesNotAnnounceDownloadWhileReadingCachedBytes() {
         val reading = CountDownLatch(1)
@@ -126,7 +128,7 @@ class MediaTileLifecycleTest {
         fixture.reopenDisk {
             if (hold.get()) {
                 reading.countDown()
-                check(release.await(10, TimeUnit.SECONDS)) { "Synthetic cache read was not released" }
+                release.await()
             }
         }
         runBlocking(kotlinx.coroutines.Dispatchers.IO) {
@@ -135,6 +137,8 @@ class MediaTileLifecycleTest {
         hold.set(true)
         try {
             show()
+            // Measured decoding starts after layout; Activity.setContent alone does not drive a frame in this harness.
+            composeRule.waitForIdle()
             composeRule.waitUntil(10_000) { reading.count == 0L }
             assertNoDownloadAction()
             composeRule.onNodeWithContentDescription(text(R.string.media_opening)).assertIsDisplayed()

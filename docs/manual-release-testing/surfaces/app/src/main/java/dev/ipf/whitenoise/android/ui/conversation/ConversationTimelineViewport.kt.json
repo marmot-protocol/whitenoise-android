@@ -30,6 +30,14 @@
         "test_ids": [
           "CON-032"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationTimelineViewport.kt",
+        "surface": "Accepted-send landing follows the overlap consumed by the exact measured timeline",
+        "anchor": "fun composerSendProjection(",
+        "test_ids": [
+          "MSG-042"
+        ]
       }
     ]
   },

@@ -1,0 +1,113 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/KeptMessageCard.kt",
+  "legacy_sha256": "bc3078b7649a5eeb13aec05b6c4de479c2feff8f74e36f7965c496d6bfea9d40",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Authored emoji prompt: KeptMessageCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/KeptMessageCard.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "KeptMessageBody",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/KeptMessageCard.kt",
+        "anchor": "fun KeptMessageBody(",
+        "test_ids": [
+          "MSG-001",
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "KeptMessageCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/KeptMessageCard.kt",
+        "anchor": "fun KeptMessageCard(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "KeptMessageCardColumn",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/KeptMessageCard.kt",
+        "anchor": "fun KeptMessageCardColumn(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "KeptMessageCardHeader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/KeptMessageCard.kt",
+        "anchor": "fun KeptMessageCardHeader(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "KeptMessagesOverlay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/KeptMessageCard.kt",
+        "anchor": "fun KeptMessagesOverlay(",
+        "test_ids": [
+          "MSG-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:collapse_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/KeptMessageCard.kt",
+        "anchor": "R.string.collapse_message",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:floating_expand",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/KeptMessageCard.kt",
+        "anchor": "R.string.floating_expand",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:floating_position",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/KeptMessageCard.kt",
+        "anchor": "R.string.floating_position",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:floating_source",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/KeptMessageCard.kt",
+        "anchor": "R.string.floating_source",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:floating_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/KeptMessageCard.kt",
+        "anchor": "R.string.floating_title",
+        "test_ids": [
+          "MSG-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: KeptMessageCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/KeptMessageCard.kt",
+        "anchor": ".fadingVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

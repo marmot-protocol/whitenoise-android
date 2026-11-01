@@ -64,4 +64,17 @@
     <string name="smart_folder_always_include">Always include chats</string>
     <string name="smart_folder_read_help">All read does not mean the agent has finished.</string>
   <string name="folder_show_when_empty">Show when empty</string>
+  <string name="smart_folder_quick_start">Use quick filters</string>
+  <string name="smart_folder_quick_hint">Choose either side to restrict chats. Tap it again to clear that restriction. Save applies your changes.</string>
+  <string name="smart_folder_quick_accepted">Accepted chats only. Reset keeps this scope; edit it in Advanced.</string>
+  <string name="smart_folder_quick_not_accepted">Accepted chats: No. Reset keeps this scope; edit it in Advanced.</string>
+  <string name="smart_folder_quick_reset">Reset quick filters</string>
+  <string name="smart_folder_quick_unread">Unread</string>
+  <string name="smart_folder_quick_not_muted">Not muted</string>
+  <string name="smart_folder_quick_not_pinned">Not pinned</string>
+  <string name="smart_folder_quick_not_archived">Not archived</string>
+  <string name="smart_folder_quick_neutral">None selected</string>
+  <string name="smart_folder_quick_state">%1$s: %2$s</string>
+  <string name="smart_folder_quick_expanded">Expanded</string>
+  <string name="smart_folder_quick_collapsed">Collapsed</string>
 </resources>

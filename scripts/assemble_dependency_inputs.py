@@ -3,6 +3,7 @@
 import argparse
 import json
 from pathlib import Path
+import re
 import shutil
 import xml.etree.ElementTree as ET
 
@@ -42,10 +43,99 @@ def retained_copy(relative, source_root, output):
     return source, destination
 
 
+def capture_passes(capture):
+    """Validate the producer's optional normal pass and union actual consistent observations."""
+    captures = [capture]
+    normal = capture / 'default-capture'
+    if normal.is_symlink() or (normal.exists() and not normal.is_dir()):
+        raise ValueError('Invalid nested normal capture')
+    if normal.exists():
+        if (normal / 'default-capture').exists() or (normal / 'default-capture').is_symlink():
+            raise ValueError('Unsupported nested normal capture')
+        captures.append(normal)
+    first_source, first_inputs = None, None
+    observed = {}
+    for current in captures:
+        source = (current / 'source.txt').read_text().strip()
+        snapshot = json.loads((current / 'source-inputs.json').read_text(), object_pairs_hook=unique_object)
+        if (not re.fullmatch(r'[a-f0-9]{40}', source) or not isinstance(snapshot, dict) or
+                snapshot.get('schema') != 1 or snapshot.get('source_sha') != source):
+            raise ValueError('Wrong-source captured build inputs')
+        if len(captures) > 1:
+            files = snapshot.get('files')
+            if (not isinstance(files, dict) or any(not isinstance(name, str) or not name or
+                    not isinstance(text, str) for name, text in files.items())):
+                raise ValueError('Malformed captured build inputs')
+        if first_source is None:
+            first_source, first_inputs = source, snapshot
+        elif (source, snapshot) != (first_source, first_inputs):
+            raise ValueError('Capture passes differ in source or build inputs')
+        resolution = json.loads((current / 'resolution.json').read_text(), object_pairs_hook=unique_object)
+        if not isinstance(resolution, dict) or resolution.get('schema') != 1 or not isinstance(resolution.get('observations'), list):
+            raise ValueError('Malformed captured resolution coverage')
+        seen = set()
+        for row in resolution['observations']:
+            if (not isinstance(row, dict) or any(not isinstance(row.get(key), str) or not row[key]
+                    for key in ('project', 'scope', 'configuration')) or
+                    not isinstance(row.get('components', []), list) or not isinstance(row.get('unresolved', []), list)):
+                raise ValueError('Malformed captured dependency configuration')
+            if row.get('unresolved'):
+                raise ValueError('Unresolved captured dependency configuration')
+            identity = tuple(row[key] for key in ('project', 'scope', 'configuration'))
+            if identity in seen:
+                raise ValueError('Duplicate captured configuration')
+            seen.add(identity)
+            normalized = dict(row, components=sorted(row.get('components', []),
+                                                    key=lambda value: json.dumps(value, sort_keys=True)),
+                              unresolved=row.get('unresolved', []))
+            if identity in observed and observed[identity] != normalized:
+                raise ValueError('Conflicting captured configuration')
+            observed[identity] = normalized
+    return captures, sorted(' '.join(identity) for identity in observed)
+
+
+def retain_passes(captures, output, evidence_url):
+    """Bind both verbatim passes through the existing retained-evidence validator."""
+    destination = output / 'gradle/dependency-evidence'
+    retained = retain_capture(captures[0], destination, output, evidence_url)
+    if len(captures) == 1:
+        return retained
+    primary = output / retained['path']
+    receipt = json.loads(primary.read_text(), object_pairs_hook=unique_object)
+    for capture in captures[1:]:
+        reference = retain_capture(capture, destination / capture.name, output, evidence_url)
+        additional = json.loads((output / reference['path']).read_text(), object_pairs_hook=unique_object)
+        receipt['files'].update(additional['files'])
+        receipt['files'][reference['path']] = reference['sha256']
+    primary.write_text(json.dumps(receipt, indent=2, sort_keys=True) + '\n')
+    return {'path': retained['path'], 'sha256': sha256(primary)}
+
+
+def validate_capture_artifacts(captures, records, known):
+    """Require independently checked verification bytes for runtime artifacts in every pass."""
+    for capture in captures:
+        runtime = json.loads((capture / 'artifact-evidence.json').read_text(), object_pairs_hook=unique_object)
+        if not isinstance(runtime, dict) or runtime.get('schema') != 1 or not isinstance(runtime.get('artifacts'), list):
+            raise ValueError('Malformed captured runtime evidence')
+        seen = set()
+        for item in runtime['artifacts']:
+            if not isinstance(item, dict):
+                raise ValueError('Malformed captured runtime artifact')
+            key = (item.get('coordinate'), item.get('name'))
+            digest = item.get('sha256')
+            if (not all(isinstance(value, str) and value for value in key) or key in seen or
+                    not isinstance(digest, str) or not re.fullmatch(r'[a-f0-9]{64}', digest)):
+                raise ValueError('Malformed or duplicate captured runtime artifact')
+            seen.add(key)
+            if records.get(key) != digest or known.get(key, {}).get('sha256') != digest:
+                raise ValueError('Captured artifact lacks reviewed verification: ' + '/'.join(key))
+
+
 def assemble(capture, review, output, evidence_url, supplements=(), inputs=None, carry_forward=None):
     """Stage files and provenance for review; never alter the current checkout or approve a supplier."""
     if output.exists():
         raise ValueError('Candidate output must not already exist')
+    captures, coverage = capture_passes(capture)
     reviewed = None
     retained_copies = []
     if carry_forward is not None:
@@ -74,6 +164,7 @@ def assemble(capture, review, output, evidence_url, supplements=(), inputs=None,
         records[key] = item['sha256']
     if any(key not in known or known[key]['sha256'] != sha for key, sha in records.items()):
         raise ValueError('Candidate has unaudited artifact bytes')
+    validate_capture_artifacts(captures, records, known)
     output.mkdir(parents=True)
     (output / 'gradle').mkdir()
     namespace = 'https://schema.gradle.org/dependency-verification'
@@ -102,13 +193,6 @@ def assemble(capture, review, output, evidence_url, supplements=(), inputs=None,
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(inputs / relative, destination)
         files[relative] = sha256(destination)
-    resolution = json.loads((capture / 'resolution.json').read_text(), object_pairs_hook=unique_object)
-    if resolution.get('schema') != 1 or not isinstance(resolution.get('observations'), list):
-        raise ValueError('Malformed captured resolution coverage')
-    if any(row.get('unresolved') for row in resolution['observations']):
-        raise ValueError('Unresolved captured dependency configuration')
-    coverage = sorted(' '.join(row[key] for key in ['project', 'scope', 'configuration'])
-                      for row in resolution['observations'])
     suppliers = {'/'.join(key): known[key]['source'] for key in sorted(records)}
     for key in sorted(records):
         item = known[key]
@@ -126,7 +210,7 @@ def assemble(capture, review, output, evidence_url, supplements=(), inputs=None,
             destination = output / 'gradle' / expected
             destination.parent.mkdir(exist_ok=True)
             shutil.copyfile(payload, destination)
-    retained = retain_capture(capture, output / 'gradle/dependency-evidence', output, evidence_url)
+    retained = retain_passes(captures, output, evidence_url)
     manifest = {'schema': 1, 'reviewed_from': {'repository': 'marmot-protocol/whitenoise-android',
                 'source_sha': (capture / 'source.txt').read_text().strip(), 'evidence': evidence_url,
                 'retained': retained}, 'files': files, 'coverage': coverage, 'suppliers': suppliers}

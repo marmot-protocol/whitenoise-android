@@ -19,10 +19,13 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.GroupMemberDetailsFfi
 import dev.ipf.marmotkit.GroupRosterFfi
+import dev.ipf.marmotkit.LocalSendAcceptanceFfi
 import dev.ipf.marmotkit.LocalSendStatusFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MessageTagFfi
+import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
@@ -47,6 +50,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -65,6 +69,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLooper
+import java.lang.reflect.Proxy
 import java.util.concurrent.TimeUnit
 
 /** Integration boundary for optimistic send state plus the shared relay retry policy (#2016). */
@@ -2005,9 +2010,9 @@ class ConversationSendRetryIntegrationTest {
                 return publishLock {
                     ensureCurrent()
                     onPublish()
-                    throw MarmotKitException.InvalidMediaReference(STALE_EPOCH_DETAILS)
+                    throw staleEpochRejection()
                 }
-            } catch (rejection: MarmotKitException.InvalidMediaReference) {
+            } catch (rejection: MarmotKitException.MediaReferenceStaleEpoch) {
                 last = rejection
             }
         }
@@ -2567,6 +2572,119 @@ class ConversationSendRetryIntegrationTest {
             assertFalse(capability.canDeleteForMe)
         }
 
+    /** Native maintenance cannot delay a later send after fresh admission, readmission or committed retry. */
+    @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Suppress("LongMethod") // Admission histories share the held native boundary and exact projection assertions.
+    fun durableSendsSkipRecoveryWait() =
+        runBlocking {
+            Dispatchers.setMain(UnconfinedTestDispatcher())
+            try {
+                for (history in AdmissionHistory.entries) {
+                    val releaseRecovery = CompletableDeferred<Unit>()
+                    val admitted = linkedMapOf<String, Pair<String, String>>()
+                    val attempts = mutableListOf<String>()
+                    var failure = history.initialFailure
+                    val nativeType = MarmotInterface::class.java
+                    val metadata =
+                        Proxy.newProxyInstance(nativeType.classLoader, arrayOf(nativeType)) { proxy, method, args ->
+                            when (val name = method.name.substringBefore('-')) {
+                                "equals" -> proxy === args?.firstOrNull()
+                                "hashCode" -> System.identityHashCode(proxy)
+                                "toString" -> "durable-send-boundary"
+                                "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
+                                "localSendStatus" -> null
+                                "sendTextWithClientToken" -> {
+                                    attempts += args!![2] as String
+                                    failure?.let {
+                                        failure = null
+                                        throw it
+                                    }
+                                    val token = args[3] as String
+                                    val id = (if (admitted.isEmpty()) "c3" else "c5").repeat(32)
+                                    admitted[token] = id to (args[2] as String)
+                                    LocalSendAcceptanceFfi(token, id)
+                                }
+                                else -> error("Unexpected native call: $name")
+                            }
+                        } as MarmotInterface
+                    val native =
+                        object : MarmotInterface by metadata {
+                            override suspend fun retryGroupConvergence(
+                                accountRef: String,
+                                groupIdHex: String,
+                            ): SendSummaryFfi {
+                                releaseRecovery.await()
+                                return pendingLocalSend()
+                            }
+                        }
+                    val state = appState(initialMarmotRuntime = AppMarmotRuntime("test", native))
+                    val noLines = ByteArray(0)
+                    val ast = MarkdownDocumentFfi(blocks = emptyList(), truncated = false, blankLinesBefore = noLines)
+                    val controller =
+                        ConversationController(
+                            appState = state,
+                            initialGroup = group(),
+                            initialMemberSnapshot = memberSnapshot(),
+                            markdownParser = { ast },
+                            customEmojiReader = { emptyList() },
+                        )
+                    try {
+                        withTimeout(5_000) {
+                            controller.send("first")
+                            if (history != AdmissionHistory.FRESH) {
+                                assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+                                if (history == AdmissionHistory.COMMITTED_UNPUBLISHED) {
+                                    val failed = controller.timeline.single().record
+                                    val committed =
+                                        projectedMessage(failed.recordedAt, null, null, sourceMessageIdHex = null)
+                                            .copy(plaintext = "first")
+                                    applyProjection(controller, committed)
+                                    admitted[failed.messageIdHex] = committed.messageIdHex to "first"
+                                    assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+                                }
+                                controller.retryFailedSend(controller.timeline.single())
+                            }
+                            controller.send("second")
+                        }
+                        assertEquals(history.expectedAttempts, attempts)
+                        assertEquals(listOf("first", "second"), admitted.values.map { it.second })
+                        assertEquals(2, admitted.keys.toSet().size)
+                        // A committed retry hands its optimistic row to the native ID for one drawn frame.
+                        repeat(4) {
+                            ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
+                        }
+                        val pendingStatuses = controller.timeline.map { it.status }
+                        assertEquals(listOf(MessageStatus.Pending, MessageStatus.Pending), pendingStatuses)
+                        admitted.entries.forEachIndexed { index, (token, message) ->
+                            applyProjection(
+                                controller,
+                                projectedMessage((index + 1).toULong(), null, null).copy(
+                                    messageIdHex = message.first,
+                                    sourceMessageIdHex = (if (index == 0) "d4" else "d6").repeat(32),
+                                    clientToken = token,
+                                    plaintext = message.second,
+                                ),
+                            )
+                        }
+                        // Native ID handoff preserves a drawn frame before publishing later projections.
+                        repeat(4) {
+                            ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
+                        }
+                        val publishedRows = controller.timeline
+                        val publishedIds = publishedRows.map { it.record.messageIdHex }.toSet()
+                        assertEquals(admitted.values.map { it.first }.toSet(), publishedIds)
+                        assertEquals(listOf(MessageStatus.Sent, MessageStatus.Sent), publishedRows.map { it.status })
+                    } finally {
+                        releaseRecovery.complete(Unit)
+                        clearAndAwaitConversationTestFixture(controller)
+                    }
+                }
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
+
     @Test
     fun acceptedPendingClearsTheCapturedComposerDraft() =
         runTest {
@@ -2747,13 +2865,15 @@ class ConversationSendRetryIntegrationTest {
     fun acceptedPendingSeparatesOptimisticAndDurableAcceptanceCallbacks() =
         runTest {
             val callbacks = mutableListOf<String>()
-            val controller =
+            lateinit var controller: ConversationController
+            var acceptedPresentationId: String? = null
+            controller =
                 ConversationController(
                     appState = appState(),
                     initialGroup = group(),
                     initialMemberSnapshot = memberSnapshot(),
                     textPublisher = { _, _, _, _ ->
-                        assertEquals(listOf("optimistic"), callbacks)
+                        assertEquals(listOf("presentation", "optimistic"), callbacks)
                         SendSummaryFfi(
                             published = 0u,
                             messageIds = listOf(CONFIRMED_MESSAGE_ID),
@@ -2765,11 +2885,23 @@ class ConversationSendRetryIntegrationTest {
 
             controller.send(
                 text = "hello",
+                onPresentationAccepted = { id ->
+                    assertEquals("The exact row is already published", id, controller.timeline.single().presentationId)
+                    assertEquals(
+                        "hello",
+                        controller.timeline
+                            .single()
+                            .record.plaintext,
+                    )
+                    acceptedPresentationId = id
+                    callbacks += "presentation"
+                },
                 onAccepted = { callbacks += "optimistic" },
                 onDurablyAccepted = { callbacks += "durable" },
             )
 
-            assertEquals(listOf("optimistic", "durable"), callbacks)
+            assertEquals(listOf("presentation", "optimistic", "durable"), callbacks)
+            assertEquals(acceptedPresentationId, controller.timeline.single().presentationId)
             assertEquals(MessageStatus.Pending, controller.timeline.single().status)
         }
 
@@ -3457,24 +3589,36 @@ class ConversationSendRetryIntegrationTest {
         messageEditPublisher = { _, _, _, _ -> error("pending revision must not use a wire edit") },
     )
 
-    private fun appState(additionalAccounts: List<AccountSummaryFfi> = emptyList()) =
-        WhiteNoiseAppState(
-            context = ApplicationProvider.getApplicationContext(),
-            draftStore = DraftStore(TestDraftPersistence()),
-            accountIdHexResolver = { ACCOUNT_ID },
-            accounts =
-                listOf(
-                    AccountSummaryFfi(
-                        label = ACCOUNT_REF,
-                        accountIdHex = ACCOUNT_ID,
-                        localSigning = true,
-                        externalSigning = false,
-                        signedOut = false,
-                        running = true,
-                    ),
-                ) + additionalAccounts,
-            activeAccountRef = ACCOUNT_REF,
-        )
+    private enum class AdmissionHistory(
+        val initialFailure: MarmotKitException?,
+        val expectedAttempts: List<String>,
+    ) {
+        FRESH(null, listOf("first", "second")),
+        READMITTED(MarmotKitException.Publish("signer refused"), listOf("first", "first", "second")),
+        COMMITTED_UNPUBLISHED(MarmotKitException.Publish("signer refused"), listOf("first", "second")),
+    }
+
+    private fun appState(
+        additionalAccounts: List<AccountSummaryFfi> = emptyList(),
+        initialMarmotRuntime: AppMarmotRuntime? = null,
+    ) = WhiteNoiseAppState(
+        context = ApplicationProvider.getApplicationContext(),
+        draftStore = DraftStore(TestDraftPersistence()),
+        accountIdHexResolver = { ACCOUNT_ID },
+        accounts =
+            listOf(
+                AccountSummaryFfi(
+                    label = ACCOUNT_REF,
+                    accountIdHex = ACCOUNT_ID,
+                    localSigning = true,
+                    externalSigning = false,
+                    signedOut = false,
+                    running = true,
+                ),
+            ) + additionalAccounts,
+        activeAccountRef = ACCOUNT_REF,
+        initialMarmotRuntime = initialMarmotRuntime,
+    )
 
     private fun memberSnapshot() =
         GroupMemberSnapshot(

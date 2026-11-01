@@ -145,65 +145,14 @@ class LocalNotificationPresenterDecisionTest {
         assertEquals(emoji, bounded.takeLast(emoji.length))
     }
 
-    /** A message moves to the expandable text block at exactly the threshold, never one code point earlier. */
+    /** The body safety bound still applies independently of the native conversation template. */
     @Test
-    fun expandedStyleBeginsAtExactlyTheThreshold() {
-        val threshold = MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS
-
-        assertFalse(expanded(LongBodies.plain(threshold - 1)))
-        assertTrue(expanded(LongBodies.plain(threshold)))
-        assertTrue(expanded(LongBodies.plain(threshold + 1)))
-    }
-
-    /** The threshold is positive, so a short message keeps the conversation template, and stays under the bound. */
-    @Test
-    fun thresholdStaysPositiveAndBelowTheSafetyBound() {
-        assertTrue(MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS in 1 until MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS)
-        assertFalse(expanded(""))
-        assertFalse(expanded("a"))
-        assertFalse(expanded("Short and ordinary."))
-    }
-
-    /** Right-to-left and zero-width-joiner bodies are measured in code points, not UTF-16 units or glyphs. */
-    @Test
-    fun thresholdCountsCodePointsForRtlAndZwjBodies() {
-        val threshold = MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS
-
-        listOf(LongBodies::rtl, LongBodies::zwj).forEach { body ->
-            assertFalse(expanded(body(threshold - 1)))
-            assertTrue(expanded(body(threshold)))
-        }
-        assertTrue(LongBodies.zwj(threshold - 1).length > threshold)
-    }
-
-    /** Any carried history keeps the conversation template, so no earlier message is ever dropped. */
-    @Test
-    fun carriedHistoryKeepsTheConversationTemplateForAnyBodyLength() {
-        listOf(
-            LongBodies.plain(MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS),
-            LongBodies.atSafetyBound(),
-        ).forEach { body ->
-            assertFalse(expanded(body, carriedMessageCount = 1))
-            assertFalse(expanded(body, carriedMessageCount = CARRIED_NOTIFICATION_MESSAGE_HISTORY_CAP))
-        }
-    }
-
-    /** A redacted card carries no message text, so it never uses the expandable text block. */
-    @Test
-    fun redactedCardNeverUsesTheExpandedTextBlock() {
-        assertFalse(expanded(LongBodies.plain(MIN_EXPANDED_SINGLE_MESSAGE_CODE_POINTS), redactContent = true))
-        assertFalse(expanded(LongBodies.atSafetyBound(), redactContent = true))
-    }
-
-    /** The 1,000 code point bound still cuts an oversized body, and the cut body still takes the text block. */
-    @Test
-    fun safetyBoundStillCutsAnOversizedBodyThatThenQualifies() {
+    fun safetyBoundStillCutsAnOversizedBody() {
         val bounded = boundedNotificationMessageText(LongBodies.pastSafetyBound())
 
         assertEquals(MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS, LongBodies.codePoints(bounded))
         assertEquals(LongBodies.pastSafetyBound().take(MAX_NOTIFICATION_MESSAGE_BODY_CODE_POINTS), bounded)
         assertEquals(LongBodies.atSafetyBound(), boundedNotificationMessageText(LongBodies.atSafetyBound()))
-        assertTrue(expanded(bounded))
     }
 
     /** The per-activity cap counts manifest and other dynamic shortcuts too, so a full set makes room first. */
@@ -423,13 +372,6 @@ class LocalNotificationPresenterDecisionTest {
             formatterReturnedContent = true,
             spec = NotificationChannelSpec.forUpdate(update),
         )
-
-    /** Evaluates the style rule for one body, defaulting to a first message on an unredacted card. */
-    private fun expanded(
-        body: CharSequence,
-        carriedMessageCount: Int = 0,
-        redactContent: Boolean = false,
-    ): Boolean = shouldUseExpandedSingleMessageStyle(body, carriedMessageCount, redactContent)
 
     /** Builds a typed update whose keys derive from the given account and group, as the decision cases expect. */
     private fun update(

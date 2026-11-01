@@ -306,6 +306,30 @@ class AttachmentTransferCoordinatorTest {
             }
         }
 
+    /** A confirmed cache loss settles without automatic work; uncertain probes preserve it and a tap can retry. */
+    @Test
+    fun previouslyAvailableBodyMissingFromCacheRequiresExplicitRetry() =
+        runBlocking {
+            val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+            try {
+                val coordinator = AttachmentTransferCoordinator(scope)
+                val state = coordinator.acquireState("file", initiallyAvailable = true)
+                coordinator.refresh("file") { error("temporarily unreadable") }
+                assertEquals(AttachmentTransferState.Available, state.value)
+                coordinator.refresh("file") { false }
+                assertEquals(AttachmentTransferState.NotRetained, state.value)
+                assertFalse(shouldStartAttachmentDownload(state.value, true, 1uL, mine = false))
+                assertTrue(canRequestAttachmentOpen(state.value, 1uL, mine = false))
+                coordinator.refresh("file") { false }
+                coordinator.refresh("file") { error("temporarily unreadable") }
+                assertEquals(AttachmentTransferState.NotRetained, state.value)
+                coordinator.request("file", load = { byteArrayOf(3) }) { true }.await()
+                assertEquals(AttachmentTransferState.Available, state.value)
+            } finally {
+                scope.cancel()
+            }
+        }
+
     @Test
     fun completedButUnretainedDownloadDoesNotPresentAsCached() =
         runBlocking {

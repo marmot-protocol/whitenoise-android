@@ -166,6 +166,7 @@ internal data class ConversationTailLayout(
     val viewportStartOffsetPx: Int = 0,
     val beforeContentPaddingPx: Int = 0,
     val viewportSizePx: Int = viewportEndOffsetPx - viewportStartOffsetPx,
+    val measuredTailKey: Any? = null,
 ) {
     val isReady: Boolean
         get() =
@@ -268,7 +269,7 @@ internal class ConversationScrollCoordinator(
     private var activeCommand: Job? = null
     private var userGestureInProgress = false
     private val foregroundRestoreLifetime = StalenessGuard()
-    private var foregroundSnapshot: ConversationForegroundSnapshot? = null
+    private var foregroundSnapshot by mutableStateOf<ConversationForegroundSnapshot?>(null)
 
     var mode by mutableStateOf(settledMode)
         private set
@@ -391,8 +392,26 @@ internal class ConversationScrollCoordinator(
         foregroundRestoreInProgress = false
     }
 
+    /** Retires only this resume's snapshot; a late handoff cannot cancel its replacement. */
+    fun cancelForegroundRestore(token: ConversationForegroundRestoreToken) {
+        if (!foregroundRestoreLifetime.isCurrent(token.revision)) return
+        cancelForegroundRestore()
+    }
+
+    /** Typing/focus/navigation also retire an already-started deferred lifecycle writer. */
+    fun cancelForegroundRestoreForUserIntent() {
+        if (!foregroundRestorePending) return
+        cancelForegroundRestore()
+        invalidateActiveCommand()
+        mode = settledMode
+    }
+
+    /** Whether an anchor correction still owns its captured snapshot after live drawing resumes. */
+    internal val foregroundRestorePending: Boolean
+        get() = foregroundSnapshot != null
+
     /**
-     * Opens the draw gate after the bounded settle deadline while keeping the
+     * Opens the freshness draw gate while keeping the
      * captured snapshot, so the next settled geometry can still apply the one
      * deferred correction. User intent, navigation, and disposal discard the
      * retained snapshot through the existing cancellation paths.
@@ -491,7 +510,7 @@ internal class ConversationScrollCoordinator(
 
     /** Reapplies the current history bookmark only while no newer gesture or command owns it. */
     suspend fun reanchorReadingHistory(resolveAnchorIndex: (ConversationScrollAnchor) -> Int?): Boolean {
-        if (foregroundRestoreInProgress) return false
+        if (foregroundRestorePending) return false
         val anchor = readingAnchor
         val canRestore =
             !userGestureInProgress &&
@@ -583,6 +602,7 @@ internal class ConversationScrollCoordinator(
             resultingMode = ConversationScrollMode.FollowingTail,
         ) {
             var previousLayout: ConversationTailLayout? = null
+            var previousTailIndex: Int? = null
             val baselineLayout = captureLayout()
             var baselineRowHeightPx = baselineLayout.lastRowHeightPx
             val baselineBottomGeometry = baselineLayout.bottomGeometry
@@ -612,8 +632,14 @@ internal class ConversationScrollCoordinator(
                     } else {
                         0
                     }
+                val tailIndex = resolveTailIndex()
+                // Preserve the first key-anchor reset and every uncertain or changing measurement.
+                // A repeated correction cannot improve the same measured, already-clear tail.
+                if (currentLayout.needsTailCorrection(previousLayout, tailIndex, previousTailIndex)) {
+                    scrollToTail(tailIndex)
+                }
                 previousLayout = currentLayout
-                scrollToTail(resolveTailIndex())
+                previousTailIndex = tailIndex
                 frame++
                 if (
                     currentLayout.canFinishSettle(
@@ -628,6 +654,19 @@ internal class ConversationScrollCoordinator(
                 }
             }
         }
+    }
+
+    /**
+     * Re-issues the tail scroll while the tail is unmeasured or still under the composer inset, or whenever the
+     * layout or tail index changed since the last frame. An identical, already-clear measurement needs none.
+     */
+    private fun ConversationTailLayout.needsTailCorrection(
+        previous: ConversationTailLayout?,
+        tailIndex: Int,
+        previousTailIndex: Int?,
+    ): Boolean {
+        if (measuredTailKey == null || !tailClearsViewportStart) return true
+        return this != previous || tailIndex != previousTailIndex
     }
 
     /** Preserves reaction geometry; an unready layout or absent prior frame is not stable. */
@@ -679,7 +718,7 @@ internal class ConversationScrollCoordinator(
         operation: suspend ConversationScrollCommandScope.() -> Unit,
     ): Boolean {
         if (reason.supersedesUnreadJump) onExplicitNavigation()
-        if (foregroundRestoreInProgress && reason.defersDuringForegroundRestore) return false
+        if (foregroundRestorePending && reason.defersDuringForegroundRestore) return false
         return runCommand(
             transientMode = ConversationScrollMode.ProgrammaticJump(targetMessageId, reason),
             resultingMode = resultingMode ?: settledMode,

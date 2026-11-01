@@ -61,6 +61,7 @@ jobs:
       precheck: ${{ steps.classify.outputs.precheck }}
       full_matrix: ${{ steps.classify.outputs.full_matrix }}
       ci_mode: ${{ steps.classify.outputs.ci_mode }}
+      tooling_regressions: ${{ steps.classify.outputs.tooling_regressions }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -100,6 +101,7 @@ jobs:
         run: python3 scripts/check_ci_changes.py --event "$CI_EVENT" --base "$BASE_SHA" --head "$HEAD_SHA"
 
   tooling-contracts:
+    needs: changes
     name: Validate tooling and documentation contracts
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -135,10 +137,17 @@ jobs:
           "$RUNNER_TEMP/ci-permissions/bin/python" -m unittest scripts/test_merge_authorization_boundary.py
 
       - name: Test attachment fixture HTTP ledger and cancellation contracts
+        if: needs.changes.outputs.tooling_regressions != 'false'
         run: python3 -m unittest discover -s tools/attachment-fixture -p 'test_*.py'
 
+      # These suites use scripts, workflows and committed fixtures, not changing
+      # production UI source. Unknown inputs and all integrations run them.
       - name: Test Maestro artifact and manual-only execution contracts
-        run: python3 -m unittest scripts/test_maestro_apk.py scripts/test_maestro_suite.py scripts/test_maestro_offline_batches.py scripts/test_maestro_runtime.py scripts/test_maestro_screen_coverage.py scripts/test_maestro_environment.py scripts/test_maestro_host_pressure.py scripts/test_maestro_modal_discovery.py scripts/test_maestro_sdk_image.py
+        if: needs.changes.outputs.tooling_regressions != 'false'
+        run: python3 -m unittest scripts/test_maestro_apk.py scripts/test_maestro_suite.py scripts/test_maestro_offline_batches.py scripts/test_maestro_environment.py scripts/test_maestro_host_pressure.py scripts/test_maestro_sdk_image.py
+
+      - name: Test Maestro production-source and screen contracts
+        run: python3 -m unittest scripts/test_maestro_runtime.py scripts/test_maestro_screen_coverage.py scripts/test_maestro_modal_discovery.py
 
       - name: Validate manual release guide
         env:
@@ -179,6 +188,9 @@ jobs:
 
       - name: Test stale-result recurrence classifier
         run: python3 -m unittest scripts/test_stale_result_recurrence.py
+
+      - name: Test DEX method budget reporting
+        run: python3 -m unittest scripts/test_dex_method_budget.py
 
       - name: Test package-replacement startup reporter
         run: bash .github/scripts/test-package-replacement-startup-report.sh
@@ -232,7 +244,7 @@ jobs:
   offline-zsp:
     needs: changes
     if: needs.changes.outputs.docs_only != 'true'
-    name: Verify real ZSP offline signer contract
+    name: Verify real ZSP v2 publishing contract
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -240,6 +252,7 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ github.sha }}
+
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
@@ -251,11 +264,11 @@ jobs:
       - name: Install fixture APK tooling
         run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
       - name: Rehearse with disposable keys and a loopback signer
-        run: bash scripts/test-zsp-offline.sh
+        run: bash scripts/test-zsp-contract.sh
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: zsp-offline-contract
-          path: build/reports/zsp-offline.json
+          name: zsp-v2-contract
+          path: build/reports/zsp-v2.json
           if-no-files-found: error
           retention-days: 14
 
@@ -378,6 +391,40 @@ jobs:
           app_apk="$(dirname "$metadata")/$output_file"
           bash scripts/verify-baseline-profile.sh "$app_apk"
           printf 'apk=%s\n' "$app_apk" >> "$GITHUB_OUTPUT"
+
+      # benchmarkRelease is unminified D8 output. Its budget warns when a benchmarked
+      # method reaches ART's compile limit but never blocks merges; the shipping R8
+      # budgets fail in the release-runtime lanes.
+      - name: Check benchmark DEX method budget
+        id: dex_budget_benchmark
+        if: matrix.phase == 'baseline'
+        continue-on-error: true
+        env:
+          DEX_BUDGET_APK_PATH: ${{ steps.baseline_apk.outputs.apk }}
+          DEX_BUDGET_SOURCE_SHA: ${{ github.sha }}
+        run: >-
+          python3 scripts/dex_method_budget.py
+          --apk "$DEX_BUDGET_APK_PATH"
+          --variant devZapstoreBenchmarkRelease
+          --source-sha "$DEX_BUDGET_SOURCE_SHA"
+          --report-dir app/build/reports/dex-method-budget
+
+      - name: Warn on benchmark DEX method budget
+        if: ${{ always() && matrix.phase == 'baseline' && steps.dex_budget_benchmark.outcome == 'failure' }}
+        run: >-
+          echo "::warning title=Benchmark DEX method budget::devZapstoreBenchmarkRelease failed its DEX method
+          budget check. See the Check benchmark DEX method budget step log. A budget violation also leaves a
+          step summary and the dex-method-budget-benchmark artifact; an input error leaves only the log. A
+          method at ART's compile limit makes macrobenchmarks measure the interpreter."
+
+      - name: Upload benchmark DEX method report
+        if: ${{ always() && matrix.phase == 'baseline' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: dex-method-budget-benchmark
+          path: app/build/reports/dex-method-budget/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Stage the existing APK for optional Maestro testing
         id: maestro_stage
@@ -815,9 +862,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
-      ORG_GRADLE_PROJECT_ciTestForks: '3'
+      # Two test forks leave room for Gradle on 16 GiB hosted runners.
+      ORG_GRADLE_PROJECT_ciTestForks: '2'
     strategy:
-      # Keep both variants' diagnostics; two isolated 1 GiB workers per runner.
+      # Keep both variants' diagnostics.
       # PRs test Zapstore only; secondary-variant runs Play's flavor-sensitive tests.
       fail-fast: false
       matrix:

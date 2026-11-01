@@ -10,16 +10,28 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.state.MessageStatus
@@ -125,6 +137,131 @@ class MessageInlineFooterScreenshotTest {
             val nodes = composeRule.onAllNodesWithContentDescription(description).fetchSemanticsNodes()
             assertTrue("no node described \"$description\"", nodes.isNotEmpty())
         }
+    }
+
+    /** A focused preview shares the same logical footer geometry as its source message. */
+    @Test
+    fun focusedLatinPreviewInRtlDoesNotOverlapItsFooter() {
+        composeRule.setContent {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                WhiteNoiseTheme(darkTheme = false) {
+                    Box(Modifier.width(220.dp).testTag(ROOT_TAG)) {
+                        FocusedTextMessagePreview(
+                            presentation = messageBubblePresentation(deleted = false, mine = true),
+                            mine = true,
+                            text = "A Latin preview with several wrapped lines of ordinary text.\nHi",
+                            document = null,
+                            time = "12:45",
+                            status = MessageStatus.Sent,
+                            showStatus = true,
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        capture("message_footer_focused_latin_rtl")
+        val bodyNode = composeRule.onNodeWithTag("message-actions-excerpt")
+        val text = bodyNode.fetchSemanticsNode().boundsInRoot
+        val results = mutableListOf<TextLayoutResult>()
+        bodyNode.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
+        val layout = results.single()
+        val time = composeRule.onNodeWithText("12:45", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val status =
+            composeRule.onNodeWithContentDescription("Sent", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val footer =
+            Rect(
+                minOf(time.left, status.left),
+                minOf(time.top, status.top),
+                maxOf(time.right, status.right),
+                maxOf(time.bottom, status.bottom),
+            )
+        val lines =
+            (0 until layout.lineCount).map { line ->
+                Rect(
+                    text.left + layout.getLineLeft(line),
+                    text.top + layout.getLineTop(line),
+                    text.left + layout.getLineRight(line),
+                    text.top + layout.getLineBottom(line),
+                )
+            }
+        println("RTL focused footer: text=$text, footer=$footer, lines=$lines")
+        assertTrue("preview must actually wrap", layout.lineCount > 1)
+        assertTrue(
+            "footer $footer must not intersect rendered preview lines $lines",
+            lines.none { it.overlaps(footer) },
+        )
+    }
+
+    /** The warning follows the terminal timestamp baseline, not a preceding metadata label. */
+    @Test
+    fun warningAlignsWithTheTerminalLineOfMultilineMetadata() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                Surface(modifier = Modifier.width(180.dp).testTag(ROOT_TAG)) {
+                    MessageBubbleMetadataFooter(warning = "Note", color = Color.Black) {
+                        Column {
+                            Text("Edited", style = MaterialTheme.typography.labelSmall)
+                            Text("12:45", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val warning = composeRule.onNodeWithText("Note").fetchSemanticsNode().boundsInRoot
+        val edited = composeRule.onNodeWithText("Edited").fetchSemanticsNode().boundsInRoot
+        val time = composeRule.onNodeWithText("12:45").fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "warning must align to time rather than edited label",
+            kotlin.math.abs(warning.bottom - time.bottom) <= 1f,
+        )
+        assertTrue("warning must follow the preceding metadata row", warning.top >= edited.bottom)
+        capture("message_footer_warning_multiline_metadata")
+    }
+
+    /** Long translated copy and edited metadata wrap without covering the terminal timestamp. */
+    @Test
+    fun longWarningAndEditedLabelStayBoundedAtLargeRtlFonts() {
+        val warning = "Die Zustellung dieser Nachricht konnte noch nicht bestätigt werden"
+        val edited = "Nachträglich bearbeitet"
+        composeRule.setContent {
+            CompositionLocalProvider(
+                LocalDensity provides Density(density = 1f, fontScale = 1.6f),
+                LocalLayoutDirection provides LayoutDirection.Rtl,
+            ) {
+                WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                    Surface(modifier = Modifier.width(180.dp).testTag(ROOT_TAG)) {
+                        Box(Modifier.padding(8.dp)) {
+                            MessageBubbleMetadataFooter(warning = warning, color = Color.White) {
+                                MessageInlineFooter(
+                                    timeText = "12:45",
+                                    color = Color.White,
+                                    showStatus = false,
+                                    status = MessageStatus.Pending,
+                                    editedLabel = edited,
+                                    onEditedClick = {},
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        val root = composeRule.onNodeWithTag(ROOT_TAG).fetchSemanticsNode().boundsInRoot
+        val time = composeRule.onNodeWithText("12:45", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        listOf(warning, edited).forEach { text ->
+            val bounds = composeRule.onNodeWithText(text, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            assertTrue("$text must stay inside the footer", bounds.left >= root.left && bounds.right <= root.right)
+            assertTrue("$text must not extend below the timestamp", bounds.bottom <= time.bottom + 1f)
+            assertTrue(
+                "$text must not intersect the timestamp",
+                bounds.bottom <= time.top || bounds.right <= time.left || bounds.left >= time.right,
+            )
+        }
+        assertTrue("RTL timestamp must remain at the trailing edge", time.left <= root.left + 9f)
+        capture("message_footer_long_warning_large_rtl")
     }
 
     /** Captures the footer colour and its bubble fill for one theme and bubble direction. */

@@ -39,6 +39,7 @@ class LocalNotificationReplyRaceTest {
 
     @Before
     fun setUp() {
+        ConversationCardPostedRegistry.resetForTests()
         Shadows.shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         manager.cancelAll()
         manager.createNotificationChannel(

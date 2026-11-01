@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.toByteArrayWithin
@@ -441,16 +442,92 @@ class MediaDownloadHostRegressionTest {
             failure as AttachmentTooLargeToPresentException
             assertEquals(oversized.size.toLong(), failure.declaredBytes)
             assertEquals(SMALL_BUDGET_BYTES.toLong(), failure.limitBytes)
+            assertEquals("the oversized body was copied before it was refused", 0, fixture.nativeAssetReads.get())
             assertEquals("the rejected lease was not deleted", emptyList<String>(), leaseFileNames())
 
             fixture.state
                 .downloadAttachmentPlaintextSource(request(0), reference(0), AttachmentDownloadPriority.Automatic)
                 .use { source ->
+                    assertTrue("a file-backed read did not get a lease", source.leaseFileForTesting()?.isFile == true)
                     assertEquals(oversized.size.toLong(), source.size)
                     assertArrayEquals(oversized, source.toByteArrayWithin(oversized.size.toLong()))
                 }
+            assertTrue("a file-backed read did not copy the body", fixture.nativeAssetReads.get() > 0)
             assertEquals(emptyList<String>(), leaseFileNames())
             assertEquals(1, fixture.calls.size)
+        }
+
+    /**
+     * Opening a file card whose body MarmotKit already retains refuses an over-budget read from the declared size
+     * alone: no chunk is read, no lease file is written and no transfer starts, while the explicit request is still
+     * settled exactly as for any retained source.
+     */
+    @Test
+    fun alreadyRetainedOversizedBodyIsRefusedWithoutCopyingIt() =
+        runTest(dispatcher) {
+            fixture.retainNatively(0, ByteArray(SMALL_BUDGET_BYTES + 1) { it.toByte() })
+            intents().setInteractive(request(0), interactive = true)
+
+            val failure =
+                runCatching {
+                    fixture.state.downloadAttachmentPlaintext(
+                        request(0),
+                        reference(0),
+                        AttachmentDownloadPriority.Interactive,
+                        maxBytes = SMALL_BUDGET_BYTES.toLong(),
+                    )
+                }.exceptionOrNull()
+
+            assertTrue(
+                "expected a typed too-large failure, got $failure",
+                failure is AttachmentTooLargeToPresentException,
+            )
+            failure as AttachmentTooLargeToPresentException
+            assertEquals(SMALL_BUDGET_BYTES + 1L, failure.declaredBytes)
+            assertEquals(SMALL_BUDGET_BYTES.toLong(), failure.limitBytes)
+            assertEquals("the oversized body was copied before it was refused", 0, fixture.nativeAssetReads.get())
+            assertEquals(emptyList<String>(), leaseFileNames())
+            assertEquals("a retained body started a transfer", 0, fixture.calls.size)
+            assertFalse("the explicit request was left pending", fixture.state.hasInteractive(request(0)))
+        }
+
+    /** Forwarding a retained body over the forward's cap is refused from its declared size, never copied first. */
+    @Test
+    fun forwardOfARetainedBodyOverTheCapIsRefusedWithoutCopyingIt() =
+        runTest(dispatcher) {
+            fixture.retainNatively(0, ByteArray(ConversationController.MEDIA_RETAINED_MAX_BYTES.toInt() + 1))
+
+            val failure =
+                runCatching {
+                    fixture.state.materializeAttachmentPlaintextIsolated(request(0), reference(0))
+                }.exceptionOrNull()
+
+            assertTrue("expected the forward's cap refusal, got $failure", failure is ForwardPayloadTooLargeException)
+            assertEquals("the oversized body was copied before it was refused", 0, fixture.nativeAssetReads.get())
+            assertEquals(emptyList<String>(), leaseFileNames())
+        }
+
+    /** A budgeted native open returns the declared-size refusal, and an unbudgeted one still copies the whole body. */
+    @Test
+    fun nativeOpenOnlyCopiesWhenTheBodyFitsTheCallersBudget() =
+        runTest(dispatcher) {
+            val body = ByteArray(SMALL_BUDGET_BYTES + 1) { (it * 5).toByte() }
+            fixture.retainNatively(0, body)
+
+            fixture.state.openNativeAttachment(request(0), maxBytes = SMALL_BUDGET_BYTES.toLong()).use { refused ->
+                assertTrue("expected a declared-size refusal, got $refused", refused is AttachmentPlaintext.Oversized)
+                assertEquals(body.size.toLong(), refused?.size)
+            }
+            assertEquals(0, fixture.nativeAssetReads.get())
+            assertEquals(emptyList<String>(), leaseFileNames())
+
+            fixture.state.openNativeAttachment(request(0), maxBytes = body.size.toLong()).use { fits ->
+                assertArrayEquals(body, checkNotNull(fits).toByteArrayWithin(body.size.toLong()))
+            }
+            fixture.state.openNativeAttachment(request(0)).use { whole ->
+                assertTrue(checkNotNull(whole).leaseFileForTesting()?.isFile == true)
+            }
+            assertEquals(emptyList<String>(), leaseFileNames())
         }
 
     /** Exactly the caller's budget is still read whole, so the boundary is inclusive. */
@@ -472,6 +549,13 @@ class MediaDownloadHostRegressionTest {
             assertArrayEquals(exact, preview.await())
             assertEquals(emptyList<String>(), leaseFileNames())
         }
+
+    /** The state's durable intent store, where an explicit download request is recorded. */
+    private fun intents(): AttachmentDownloadIntentStore =
+        WhiteNoiseAppState::class.java
+            .getDeclaredField("attachmentDownloadIntents")
+            .apply { isAccessible = true }
+            .get(fixture.state) as AttachmentDownloadIntentStore
 
     /** Names of the native plaintext leases currently on disk, which must be empty between reads. */
     private fun leaseFileNames(): List<String> =

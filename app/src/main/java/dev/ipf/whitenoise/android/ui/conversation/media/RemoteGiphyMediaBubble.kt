@@ -59,24 +59,36 @@ import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ArrowDownward
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.util.Locale
 import kotlin.coroutines.resume
 
-private const val GIPHY_MAX_BODY_BYTES = 5 * 1024 * 1024
+internal const val GIPHY_MAX_BODY_BYTES = 5 * 1024 * 1024
 private const val GIPHY_MEMORY_CACHE_MAX_BYTES = 20L * 1024 * 1024
 private const val GIPHY_CONNECT_TIMEOUT_MILLIS = 10_000
 private const val GIPHY_READ_TIMEOUT_MILLIS = 15_000
 
-/** Process-wide cap shared by GIPHY fetch/decode work to bound animated-media pressure. */
-private val giphyFetchSlots = Semaphore(6)
 private val giphyByteCache = RemoteGiphyByteCache(GIPHY_MEMORY_CACHE_MAX_BYTES)
+
+/** Trims encoded presentation bytes without creating or retiring the shared acquisition controller. */
+internal fun trimRemoteGiphyMemory(trim: dev.ipf.whitenoise.android.media.PresentationMemoryTrim) {
+    giphyByteCache.trimToSize(trim.targetBytes(GIPHY_MEMORY_CACHE_MAX_BYTES))
+}
+
+/** Creates the supervised transport only for an actual row; pure policy/cache reads need no Android dispatcher. */
+private val giphyAcquisition by lazy {
+    RemoteGiphyAcquisition(
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+        cache = giphyByteCache,
+        fetch = ::fetchRemoteGiphyBytes,
+    )
+}
 
 /** The message's existing metadata, placed once inside the GIPHY card footer. */
 internal class GiphyMessageFooter(
@@ -111,6 +123,10 @@ internal class RemoteGiphyByteCache(
         delegate.put(url, bytes)
     }
 
+    /** Drops LRU references without cancelling coalesced downloads or changing the insertion budget. */
+    @Synchronized
+    fun trimToSize(targetBytes: Long): Long = delegate.trimToSize(targetBytes)
+
     /** Removes bytes that no longer decode successfully. */
     @Synchronized
     fun remove(url: String) {
@@ -124,7 +140,20 @@ internal fun shouldLoadRemoteGiphyMedia(
     automaticAllowed: Boolean,
     manualRequest: Boolean,
     cachedAvailable: Boolean = false,
-): Boolean = cachedAvailable || manualRequest || (!automaticDownloadsPaused && automaticAllowed)
+    ownerEligible: Boolean = true,
+): Boolean = ownerEligible && (cachedAvailable || manualRequest || (!automaticDownloadsPaused && automaticAllowed))
+
+/** Reads live consent at slot admission, even before a policy change has recomposed its row. */
+private fun remoteGiphyNetworkAllowed(
+    controller: ConversationController,
+    manualRequest: Boolean,
+): Boolean =
+    shouldLoadRemoteGiphyMedia(
+        automaticDownloadsPaused = controller.appState.automaticAttachmentDownloadsPaused(),
+        automaticAllowed = controller.appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image),
+        manualRequest = manualRequest,
+        ownerEligible = controller.ownsRetainedForegroundPresentation,
+    )
 
 /** Loads and renders one iOS-originated GIPHY envelope through Android's media policy. */
 @Composable
@@ -148,26 +177,41 @@ internal fun RemoteGiphyMediaBubble(
     val cachedBytes = remember(imageRequest?.url, retryToken) { imageRequest?.url?.let(giphyByteCache::get) }
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
     val automaticAllowed = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image)
+    val ownerEligible = controller.ownsRetainedForegroundPresentation
+    val networkAllowed = remoteGiphyNetworkAllowed(controller, manualRequest)
     val shouldLoad =
         shouldLoadRemoteGiphyMedia(
             automaticDownloadsPaused = automaticDownloadsPaused,
             automaticAllowed = automaticAllowed,
             manualRequest = manualRequest,
             cachedAvailable = cachedBytes != null,
+            ownerEligible = ownerEligible,
         )
     val animationSource =
         rememberInlineAnimationSource(identity, appState, controller.boundAccountRef, controller.group.groupIdHex) {
             imageRequest?.url?.let(giphyByteCache::get)
         }
 
-    LaunchedEffect(identity, shouldLoad, retryToken) {
+    LaunchedEffect(identity, shouldLoad, networkAllowed, retryToken) {
         if (!shouldLoad || presentation != null) return@LaunchedEffect
         failed = false
         try {
-            val decoded = fetchAndDecodeRemoteGiphyMedia(media, cachedBytes)
+            val request = imageRequest ?: return@LaunchedEffect
+            val decoded =
+                giphyAcquisition.useBytes(
+                    controller,
+                    request,
+                    mayDownload = { remoteGiphyNetworkAllowed(controller, manualRequest) },
+                ) { bytes ->
+                    decodeOwnedGiphyPresentation(controller, request, bytes)
+                }
             try {
                 currentCoroutineContext().ensureActive()
-                if (decoded == null) failed = true else presentation = decoded
+                when {
+                    !controller.ownsRetainedForegroundPresentation -> decoded?.releaseOwnedPresentation()
+                    decoded == null -> failed = true
+                    else -> presentation = decoded
+                }
             } catch (cancelled: CancellationException) {
                 decoded?.releaseOwnedPresentation()
                 throw cancelled
@@ -359,50 +403,45 @@ private fun RowScope.GiphyMetadataRow(
             onEditedClick = null,
             modifier = Modifier.alignByBaseline(),
             statusContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            allowWrap = false,
         )
     }
 }
 
-/** Decodes cached bytes or fetches one validated rendition with bounded transport and concurrency. */
-@Suppress("ReturnCount") // Each invalid request/fetch stage terminates without passing bytes to the decoder.
-private suspend fun fetchAndDecodeRemoteGiphyMedia(
-    media: RemoteGiphyMedia,
-    cachedBytes: ByteArray?,
+/** Rejects retired owners before decoding and releases any result that finishes after owner retirement. */
+private suspend fun decodeOwnedGiphyPresentation(
+    controller: ConversationController,
+    request: RemoteGiphyMedia.ImageRequest,
+    bytes: ByteArray,
 ): DecodedAttachmentPresentation? {
-    val request = media.imageRequest() ?: return null
-    return giphyFetchSlots.withPermit {
-        val bytes =
-            cachedBytes
-                ?: withContext(Dispatchers.IO) {
-                    suspendCancellableCoroutine<ByteArray?> { continuation ->
-                        val result =
-                            SafeHttpsGet.get(
-                                url = request.url,
-                                maxBodyBytes = GIPHY_MAX_BODY_BYTES,
-                                connectTimeoutMillis = GIPHY_CONNECT_TIMEOUT_MILLIS,
-                                readTimeoutMillis = GIPHY_READ_TIMEOUT_MILLIS,
-                                hostAllowed = { RemoteGiphyMedia.isAllowedMediaUrl(it.toString()) },
-                                contentTypeAllowed = { value ->
-                                    val mime = value?.substringBefore(';')?.trim()?.lowercase(Locale.ROOT)
-                                    mime == request.mediaType || mime == "application/octet-stream"
-                                },
-                                registerCancellation = { cancelRequest ->
-                                    continuation.invokeOnCancellation { cancelRequest() }
-                                },
-                            )
-                        continuation.resume(result)
-                    }
-                } ?: return null
-        val decoded =
-            decodeMessageAttachmentImage(
-                bytes = bytes,
-                mediaType = request.mediaType,
-                staticMaxEdgePx = MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
-            )
-        when {
-            decoded != null && cachedBytes == null -> giphyByteCache.put(request.url, bytes)
-            decoded == null && cachedBytes != null -> giphyByteCache.remove(request.url)
-        }
-        decoded
+    if (!controller.ownsRetainedForegroundPresentation) throw CancellationException("GIPHY owner retired")
+    val result = decodeMessageAttachmentImage(bytes, request.mediaType, MediaPipeline.THUMBNAIL_MAX_EDGE_PX)
+    if (!controller.ownsRetainedForegroundPresentation) {
+        result?.releaseOwnedPresentation()
+        throw CancellationException("GIPHY owner retired during decode")
     }
+    return result
 }
+
+/** Fetches bounded encoded bytes through the existing HTTPS, host, redirect and MIME validation. */
+private suspend fun fetchRemoteGiphyBytes(request: RemoteGiphyMedia.ImageRequest): ByteArray? =
+    withContext(Dispatchers.IO) {
+        suspendCancellableCoroutine { continuation ->
+            val result =
+                SafeHttpsGet.get(
+                    url = request.url,
+                    maxBodyBytes = GIPHY_MAX_BODY_BYTES,
+                    connectTimeoutMillis = GIPHY_CONNECT_TIMEOUT_MILLIS,
+                    readTimeoutMillis = GIPHY_READ_TIMEOUT_MILLIS,
+                    hostAllowed = { RemoteGiphyMedia.isAllowedMediaUrl(it.toString()) },
+                    contentTypeAllowed = { value ->
+                        val mime = value?.substringBefore(';')?.trim()?.lowercase(Locale.ROOT)
+                        mime == request.mediaType || mime == "application/octet-stream"
+                    },
+                    registerCancellation = { cancelRequest ->
+                        continuation.invokeOnCancellation { cancelRequest() }
+                    },
+                )
+            continuation.resume(result)
+        }
+    }

@@ -1,0 +1,34 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationTone.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Permanent named and legacy tone URIs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationTone.kt",
+        "anchor": "enum class NotificationTone(",
+        "test_ids": [
+          "NTF-045"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:notification_tone_ding",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationTone.kt",
+        "anchor": "R.string.notification_tone_ding",
+        "test_ids": [
+          "NTF-045"
+        ]
+      },
+      {
+        "surface": "string:notification_tone_pulse",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationTone.kt",
+        "anchor": "R.string.notification_tone_pulse",
+        "test_ids": [
+          "NTF-045"
+        ]
+      }
+    ]
+  }
+}

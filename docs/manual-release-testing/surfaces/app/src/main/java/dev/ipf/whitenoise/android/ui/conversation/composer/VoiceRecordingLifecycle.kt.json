@@ -1,0 +1,49 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingLifecycle.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "VoiceRecordingLifecycleEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingLifecycle.kt",
+        "anchor": "fun VoiceRecordingLifecycleEffect(",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "voice_recording_limit_warning",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingLifecycle.kt",
+        "anchor": "R.string.voice_recording_limit_warning",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "voice_recording_interrupted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingLifecycle.kt",
+        "anchor": "R.string.voice_recording_interrupted",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "voice_recording_limit_reached",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingLifecycle.kt",
+        "anchor": "R.string.voice_recording_limit_reached",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "rememberVoiceRecordingStopNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingLifecycle.kt",
+        "anchor": "fun rememberVoiceRecordingStopNotice(",
+        "test_ids": [
+          "MED-008"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

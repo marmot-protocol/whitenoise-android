@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.notifications
 
 import androidx.annotation.VisibleForTesting
 import dev.ipf.whitenoise.android.state.StalenessGuard
+import java.util.UUID
 
 internal enum class ConversationCardOp {
     SHOW_NOTIFY,
@@ -243,6 +244,68 @@ internal object ConversationCardPostedRegistry {
     private const val CAPACITY = 256
     private val lock = Any()
     private val postedCards = linkedMapOf<PostedConversationCardKey, PostedCard>()
+    private var untrackedPreviousProcessAllowed = true
+    private val processRevisionPrefix = UUID.randomUUID().toString() + ":"
+
+    /** Starts an independent test process; platform-only fixture cleanup must not retain retirement history. */
+    @VisibleForTesting
+    internal fun resetForTests() {
+        synchronized(lock) {
+            postedCards.clear()
+            untrackedPreviousProcessAllowed = true
+        }
+    }
+
+    /** Opaque identity for one accepted Android payload, independent of dismissal generation and age. */
+    fun newPayloadRevision(): String = processRevisionPrefix + UUID.randomUUID()
+
+    /** A copied payload may rewrite only the exact accepted revision, including after a silent cleanup. */
+    fun isCurrentPayload(
+        tag: String,
+        id: Int,
+        revision: String?,
+    ): Boolean =
+        synchronized(lock) {
+            val snapshot = postedCards[PostedConversationCardKey(tag, id)]?.payload
+            if (snapshot != null) {
+                snapshot.revision == revision
+            } else {
+                untrackedPreviousProcessAllowed && revision?.startsWith(processRevisionPrefix) != true
+            }
+        }
+
+    /**
+     * Stale history can contribute only identities retained in the last accepted payload. This is Android write
+     * metadata, not an unread/deletion authority or a second content store. Missing/evicted current-process
+     * revisions fail closed. Untouched prior-process cards remain eligible until capacity eviction makes their
+     * retirement history unverifiable; after that, untracked history is conservatively dropped for this process.
+     */
+    fun canCarryEntry(
+        tag: String,
+        id: Int,
+        revision: String?,
+        entryId: String?,
+    ): Boolean =
+        synchronized(lock) {
+            val snapshot = postedCards[PostedConversationCardKey(tag, id)]?.payload
+            when {
+                snapshot == null ->
+                    untrackedPreviousProcessAllowed && revision?.startsWith(processRevisionPrefix) != true
+                snapshot.revision == revision -> true
+                else -> entryId != null && entryId in snapshot.entryIds
+            }
+        }
+
+    /** Called under the platform mutation lock before accepting a new write; pending cancellation owns its slot. */
+    fun canAcceptPost(
+        tag: String,
+        id: Int,
+    ): Boolean =
+        synchronized(lock) {
+            PostedConversationCardKey(tag, id) in postedCards ||
+                postedCards.size < CAPACITY ||
+                postedCards.values.any { !it.cancellationPending }
+        }
 
     /** Records an app-side write at its dismissal age so an immediate cleanup can still find it. */
     fun markPosted(
@@ -250,16 +313,23 @@ internal object ConversationCardPostedRegistry {
         notificationId: Int,
         recordedAtMs: Long = System.currentTimeMillis(),
         generationId: String? = null,
+        payload: PayloadSnapshot? = null,
     ) {
         val key = PostedConversationCardKey(notificationTag, notificationId)
         synchronized(lock) {
+            check(canAcceptPost(notificationTag, notificationId)) { "Notification cancellation capacity exhausted" }
             postedCards.remove(key)
-            postedCards[key] = PostedCard(recordedAtMs, generationId)
-            while (postedCards.size > CAPACITY) postedCards.remove(postedCards.keys.first())
+            postedCards[key] =
+                PostedCard(
+                    recordedAtMs,
+                    generationId,
+                    payload?.copy(entryIds = payload.entryIds.toSet()),
+                )
+            trimRecords()
         }
     }
 
-    /** Forgets a write and optionally preserves records newer than [cutoffMs]. */
+    /** Consumes a posted write but retains bounded retirement metadata; newer dismissal ages stay untouched. */
     fun clearPosted(
         notificationTag: String,
         notificationId: Int,
@@ -267,13 +337,53 @@ internal object ConversationCardPostedRegistry {
     ): Boolean {
         val key = PostedConversationCardKey(notificationTag, notificationId)
         return synchronized(lock) {
-            val writtenAtMs = postedCards[key]?.writtenAtMs ?: return@synchronized false
-            if (cutoffMs == null || writtenAtMs <= cutoffMs) {
-                postedCards.remove(key)
+            val record = postedCards[key]?.takeIf { it.posted } ?: return@synchronized false
+            if (cutoffMs == null || record.writtenAtMs <= cutoffMs) {
+                postedCards[key] =
+                    record.copy(
+                        posted = false,
+                        cancellationPending = false,
+                        payload = PayloadSnapshot(newPayloadRevision(), emptySet()),
+                    )
                 true
             } else {
                 false
             }
+        }
+    }
+
+    /**
+     * Retires copied content before attempting cancellation without consuming the obligation to cancel. A visible
+     * legacy card also gets a pending record, so a failed cancel remains retryable after Android omits it.
+     */
+    fun prepareCancellation(
+        tag: String,
+        id: Int,
+        platformHasCard: Boolean,
+    ): Boolean =
+        synchronized(lock) {
+            val key = PostedConversationCardKey(tag, id)
+            val record = postedCards[key]
+            if (record?.posted != true && !platformHasCard) return@synchronized false
+            check(canAcceptPost(tag, id)) { "Notification cancellation capacity exhausted" }
+            postedCards[key] =
+                (record ?: PostedCard(System.currentTimeMillis(), null, null)).copy(
+                    posted = true,
+                    cancellationPending = true,
+                    payload = PayloadSnapshot(newPayloadRevision(), emptySet()),
+                )
+            trimRecords()
+            true
+        }
+
+    /** Evicting a retirement record cannot make its unknown old-process payload eligible again. */
+    private fun trimRecords() {
+        while (postedCards.size > CAPACITY) {
+            val oldest =
+                postedCards.entries.firstOrNull { !it.value.posted && !it.value.cancellationPending }?.key
+                    ?: postedCards.entries.first { !it.value.cancellationPending }.key
+            postedCards.remove(oldest)
+            untrackedPreviousProcessAllowed = false
         }
     }
 
@@ -283,12 +393,21 @@ internal object ConversationCardPostedRegistry {
         id: Int,
     ): String? =
         synchronized(lock) {
-            postedCards[PostedConversationCardKey(tag, id)]?.generationId
+            postedCards[PostedConversationCardKey(tag, id)]?.takeIf { it.posted }?.generationId
         }
 
     private data class PostedCard(
         val writtenAtMs: Long,
         val generationId: String?,
+        val payload: PayloadSnapshot?,
+        val posted: Boolean = true,
+        val cancellationPending: Boolean = false,
+    )
+
+    /** Metadata describing the accepted Android payload; not a second source of message state. */
+    data class PayloadSnapshot(
+        val revision: String,
+        val entryIds: Set<String>,
     )
 
     private data class PostedConversationCardKey(

@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerActionDisc.kt",
+  "legacy_sha256": "2f0dd8d4eba3761d516ff67edb4832ba12b51a5f70ec7c83bd3805f372d8bb1b",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ComposerActionDisc",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerActionDisc.kt",
+        "anchor": "fun ComposerActionDisc(",
+        "test_ids": [
+          "CON-001",
+          "CON-020"
+        ]
+      },
+      {
+        "surface": "Compact primary action target",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerActionDisc.kt",
+        "anchor": "internal fun ComposerActionDisc(",
+        "test_ids": [
+          "CON-030",
+          "CON-035"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

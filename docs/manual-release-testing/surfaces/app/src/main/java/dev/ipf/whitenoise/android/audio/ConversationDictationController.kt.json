@@ -254,6 +254,14 @@
         "test_ids": [
           "DIC-010"
         ]
+      },
+      {
+        "surface": "Involuntary dictation focus interruption preserves original draft and bounded remaining audio without automatic send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "fun interruptForAudioFocusLoss()",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ]
   },

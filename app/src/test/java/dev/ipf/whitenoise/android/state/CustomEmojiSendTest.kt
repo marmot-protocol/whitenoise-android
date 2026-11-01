@@ -236,13 +236,13 @@ class CustomEmojiSendTest {
     fun rejectedReferenceIsReuploadedOnceThenReportedAsAChangedChat() =
         runTest {
             val calls = mutableListOf<Pair<String, List<Any?>>>()
-            val stale = MarmotKitException.InvalidMediaReference(STALE_EPOCH_DETAILS)
+            val stale = staleEpochRejection()
             val recovered = recordingEngine(calls) { n -> if (n == 1) throw stale else sent }
             assertEquals(sent, recovered.send(listOf(artwork("party"))))
             assertEquals(2, calls.count { it.first == "uploadMedia" })
 
             val failing = mutableListOf<Pair<String, List<Any?>>>()
-            val rejection = MarmotKitException.InvalidMediaReference(STALE_EPOCH_DETAILS)
+            val rejection = staleEpochRejection()
             val engine = recordingEngine(failing) { throw rejection }
             val failure = runCatching { engine.send(listOf(artwork("party"))) }.exceptionOrNull()
             assertTrue(failure is EmojiChatChangedException)
@@ -327,16 +327,19 @@ class CustomEmojiSendTest {
             assertEquals(2, calls.count { it.first == "uploadMedia" })
         }
 
-    /** Only an epoch rejection is stale: a locator-policy rejection is not re-uploaded or called a changed chat. */
+    /**
+     * Only MDK's typed epoch rejections are stale: a locator-policy rejection, or an untyped one that merely reads
+     * like an epoch problem, is not re-uploaded or called a changed chat.
+     */
     @Test
     fun onlyEpochRejectionsAreTreatedAsStale() =
         runTest {
-            val stale =
-                MarmotKitException.InvalidMediaReference(
-                    "media reference was encrypted at epoch 3 but the group is at epoch 4; upload it again",
-                )
+            val unsettled = MarmotKitException.MediaReferenceEpochUnsettled(sourceEpoch = 3uL)
+            val untyped = MarmotKitException.InvalidMediaReference("media reference was encrypted at epoch 3")
             val policy = MarmotKitException.InvalidMediaReference("no locator this client may fetch")
-            assertTrue(isStaleMediaReferenceEpoch(stale))
+            assertTrue(isStaleMediaReferenceEpoch(staleEpochRejection()))
+            assertTrue(isStaleMediaReferenceEpoch(IllegalStateException("wrapped", unsettled)))
+            assertFalse(isStaleMediaReferenceEpoch(untyped))
             assertFalse(isStaleMediaReferenceEpoch(policy))
             val calls = mutableListOf<Pair<String, List<Any?>>>()
             val engine = recordingEngine(calls) { throw policy }
@@ -458,6 +461,5 @@ class CustomEmojiSendTest {
     }
 }
 
-/** The text MDK gives an `InvalidMediaReference` for a reference from an earlier epoch. */
-internal const val STALE_EPOCH_DETAILS =
-    "media reference was encrypted at epoch 3 but the group is at epoch 4; upload it again"
+/** MDK's typed refusal of a media reference encrypted at an epoch the group has left. */
+internal fun staleEpochRejection() = MarmotKitException.MediaReferenceStaleEpoch(sourceEpoch = 3uL, currentEpoch = 4uL)

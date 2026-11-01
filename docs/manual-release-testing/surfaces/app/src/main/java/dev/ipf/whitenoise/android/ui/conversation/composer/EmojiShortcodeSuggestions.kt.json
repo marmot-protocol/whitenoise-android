@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiShortcodeSuggestions.kt",
+  "legacy_sha256": "55815a7e0f5fcf0494661a30a5f47cd46cba1a1cd64bd68d2236bfa9b024f997",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "EmojiShortcodeSuggestions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiShortcodeSuggestions.kt",
+        "anchor": "fun EmojiShortcodeSuggestions(",
+        "test_ids": [
+          "MSG-023"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Suggestion viewport preserves composer input and actions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiShortcodeSuggestions.kt",
+        "anchor": "modifier\n                .fillMaxWidth()",
+        "test_ids": [
+          "CON-005"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -47,6 +47,7 @@ import javax.crypto.spec.SecretKeySpec
 /** Real host download/cache plumbing with a controllable, network-free native boundary. */
 internal class MediaDownloadIntegrationFixture(
     accounts: List<AccountSummaryFfi> = emptyList(),
+    preferences: android.content.SharedPreferences? = null,
 ) : AutoCloseable {
     private val root = Files.createTempDirectory("media-host-regression").toFile()
     private val keyProvider = DiskByteCacheKeyProvider { SecretKeySpec(ByteArray(32) { 7 }, "AES") }
@@ -59,6 +60,9 @@ internal class MediaDownloadIntegrationFixture(
     val automaticDemands = AtomicInteger()
     val explicitDemands = AtomicInteger()
     val retryDemands = AtomicInteger()
+
+    /** Chunk reads of retained plaintext, each of which the host writes into a lease file. */
+    val nativeAssetReads = AtomicInteger()
 
     /** Automatic requests still to refuse as policy-blocked, as MDK does before the host's approval lands. */
     val automaticPolicyBlocks = AtomicInteger()
@@ -85,6 +89,7 @@ internal class MediaDownloadIntegrationFixture(
             accountIdHexResolver = { null },
             accounts = accounts,
             activeAccountRef = ACCOUNT,
+            preferences = preferences,
         ).also {
             field("marmotRuntime").set(it, AppMarmotRuntime("test", nativeBoundary()))
             field("diskMediaCache").set(it, disk)
@@ -167,6 +172,7 @@ internal class MediaDownloadIntegrationFixture(
                             ?: AttachmentLocalAssetFfi(null, 0u)
                     }
                 "readAttachmentAsset" -> {
+                    nativeAssetReads.incrementAndGet()
                     val bytes = jobs[args!![1] as String]?.bytes
                     val offset = (args[2] as Number).toLong().toULong()
                     val limit = (args[3] as Number).toInt().toUInt()

@@ -59,7 +59,7 @@ internal class ConversationReverseDragSelectionTest {
     private lateinit var edgeController: ConversationController
     private lateinit var edgeSubscription: ScriptedConversationTimelineSubscription
 
-    /** A stationary top-edge hold must leave index zero and select newly revealed older rows. */
+    /** A top-edge hold selects older rows and settles at the natural oldest boundary before capture. */
     @Test
     fun topEdgeHoldFromNewestRevealsOlderRowsAndExtendsSelection() {
         withScrollableConversation { surface, evidence, ids ->
@@ -68,6 +68,11 @@ internal class ConversationReverseDragSelectionTest {
             holdAtEdge(anchor, top = true)
             val older = evidence.latest()
             assertTrue("top must reveal older rows", older.anchor.listIndex > initial.anchor.listIndex)
+            assertSelectionAtPointer(surface, ids, anchor)
+            repeat(160) {
+                if (evidence.latest().canScrollForward) advanceFrames(1)
+            }
+            assertTrue("capture must reach the oldest loaded window", !evidence.latest().canScrollForward)
             assertSelectionAtPointer(surface, ids, anchor)
             releaseDrag()
             assertRange(surface, ids, anchor)

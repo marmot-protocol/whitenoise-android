@@ -10,6 +10,14 @@
         "test_ids": [
           "SEC-009"
         ]
+      },
+      {
+        "surface": "Exported DM traces carry the build's app source revision",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/diagnostics/DmCreationDiagnostics.kt",
+        "anchor": "AppRevision.SHORT_SHA",
+        "test_ids": [
+          "SEC-009"
+        ]
       }
     ]
   },

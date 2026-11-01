@@ -17,7 +17,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt",
         "anchor": "fun ChatFolderPill(",
         "test_ids": [
-          "FLD-001"
+          "FLD-001",
+          "CHL-002"
         ]
       },
       {
@@ -25,7 +26,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt",
         "anchor": "fun ChatFolderPills(",
         "test_ids": [
-          "FLD-001"
+          "FLD-001",
+          "CHL-002"
         ]
       }
     ],

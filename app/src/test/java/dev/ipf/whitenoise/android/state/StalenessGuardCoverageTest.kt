@@ -158,6 +158,14 @@ class StalenessGuardCoverageTest {
                 // The captured attempt fences account, bind epoch and runtime before applying native roles.
                 "Controllers.kt:departJoinedChat" to
                     listOf("attempt.isCurrent()", "resolveAuthoritativeGroupRoster"),
+                // The captured account/bind/runtime/view owner fences both native ordering and complete UI settlement.
+                "Controllers.kt:movePinnedSelection" to
+                    listOf(
+                        "chatListActionIsCurrent(owner)",
+                        "authoritativePinOrder(owner)",
+                        "val confirmed =",
+                        "applyPinState(ChatPinStateFfi(confirmed))",
+                    ),
                 "Controllers.kt:schedulePendingMemberFetches" to
                     listOf("bindEpoch", "memberCacheEpoch", "memberCacheLifetime.isCurrent"),
                 "Controllers.kt:applyFetchedMemberSnapshot" to
@@ -227,6 +235,11 @@ class StalenessGuardCoverageTest {
                 assertTrue("$path must retain $marker", marker in body)
             }
         }
+
+        assertTrue(
+            "pin movement needs its owner fence after settlement read and before projection",
+            controllers.hasPinMoveSettlementFence(),
+        )
 
         val exemptions =
             mapOf(
@@ -417,6 +430,44 @@ class StalenessGuardCoverageTest {
             "the next helper remains independently auditable",
             "ownerIsCurrent" in source.functionSection("nextHelper"),
         )
+    }
+
+    /** A pre-write guard or the next helper cannot justify this post-read projection. */
+    @Test fun pinMoveSettlementFenceStaysBetweenItsReadAndProjection() {
+        val guard =
+            "if (confirmed == null || !chatListActionIsCurrent(owner)) " +
+                "return ChatListPinMoveResult.UNCONFIRMED"
+        val source =
+            """
+            internal suspend fun movePinnedSelection() {
+                if (!chatListActionIsCurrent(owner)) return
+                setPinnedChatOrder(owner.accountRef, next)
+                val confirmed = authoritativePinOrder(owner)
+                $guard
+                applyPinState(ChatPinStateFfi(confirmed))
+            }
+            """.trimIndent()
+        assertTrue(source.hasPinMoveSettlementFence())
+        assertFalse(source.replace(guard, "").hasPinMoveSettlementFence())
+        val nextHelper = "\ninternal fun nextHelper() { $guard }"
+        assertFalse((source.replace(guard, "") + nextHelper).hasPinMoveSettlementFence())
+        val publish = "applyPinState(ChatPinStateFfi(confirmed))"
+        assertFalse(source.replace("$guard\n    $publish", "$publish\n    $guard").hasPinMoveSettlementFence())
+    }
+
+    private fun String.hasPinMoveSettlementFence(): Boolean {
+        val body = functionSection("movePinnedSelection")
+        val write = body.indexOf("setPinnedChatOrder(owner.accountRef, next)")
+        val read = body.indexOf("val confirmed =", write.coerceAtLeast(0))
+        val publish = body.indexOf("applyPinState(ChatPinStateFfi(confirmed))", read.coerceAtLeast(0))
+        if (write < 0 || read < write || publish < read) return false
+        val guard =
+            Regex(
+                "if\\s*\\(\\s*confirmed\\s*==\\s*null\\s*\\|\\|\\s*" +
+                    "!chatListActionIsCurrent\\(owner\\)\\s*\\)\\s*" +
+                    "return\\s+ChatListPinMoveResult\\.UNCONFIRMED",
+            )
+        return guard.containsMatchIn(body.substring(read, publish))
     }
 
     /** Finds suspended functions that later assign mutable state owned by their class. */

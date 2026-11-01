@@ -18,13 +18,14 @@ legacy_app_id='org.parres.whitenoise'
 
 # shellcheck source=scripts/release-properties.sh
 source "$repo_dir/scripts/release-properties.sh"
-[[ "$(release_property ZSP_VERSION)" == 0.4.17 ]] || { echo 'error: update deletion source pin with ZSP' >&2; exit 1; }
+
 export EXPECTED_PUBLISHER
 EXPECTED_PUBLISHER="$(release_property ZAPSTORE_PUBLISHER_PUBKEY)"
 
 umask 077
 temporary_dir="$(mktemp -d)"
 trap 'rm -rf "$temporary_dir"' EXIT
+# Dependency-only pin, independent of the ZSP CLI (this tool never invokes it).
 git -C "$temporary_dir" init -q source
 git -C "$temporary_dir/source" fetch -q --depth 1 https://github.com/zapstore/zsp.git c50c1ccbf32d7fa6ae00f74990ce2c83f3bac6a1
 git -C "$temporary_dir/source" checkout -q --detach FETCH_HEAD

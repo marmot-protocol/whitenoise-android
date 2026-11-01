@@ -134,7 +134,7 @@ internal fun FontFamilyDialog(
 /** Inert localized sample; inherits the current theme/font/density without applying scale a second time. */
 @Composable
 @Suppress("FunctionNaming")
-private fun FontAppearanceSample(
+internal fun FontAppearanceSample(
     theme: BubbleTheme,
     mineArgb: Long?,
     otherArgb: Long?,

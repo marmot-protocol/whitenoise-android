@@ -192,6 +192,20 @@ class DiagnosticFormatterTest {
         assertEquals("[alice] history notices changed", DiagnosticFormatter.describe(event, legacyShortHexIdentity))
     }
 
+    /** Device-group changes name only the account; the device list and refresh state stay in the runtime. */
+    @Test
+    fun deviceGroupChangesNameOnlyTheAccount() {
+        val devices = MarmotEventFfi.LinkedDevicesChanged(accountIdHex = "private-account", accountLabel = "alice")
+        val overdue =
+            MarmotEventFfi.KeyPackageRefreshOverdueChanged(accountIdHex = "private-account", accountLabel = "alice")
+
+        assertEquals("[alice] linked devices changed", DiagnosticFormatter.describe(devices, legacyShortHexIdentity))
+        assertEquals(
+            "[alice] key package refresh overdue changed",
+            DiagnosticFormatter.describe(overdue, legacyShortHexIdentity),
+        )
+    }
+
     /** Redacts secrets before truncation so long native errors cannot expose their sensitive prefix. */
     @Test
     fun accountErrorsScrubSecretsBeforeTruncating() {

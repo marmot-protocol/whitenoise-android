@@ -1,0 +1,35 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannels.kt",
+  "legacy_sha256": "f1023267d5d0963b2f665051bf1c1cb67803d2f72c196001d815dc7b10102ee3",
+  "categories": {
+    "notification_content_contracts": [
+      {
+        "surface": "Silent group summary channel name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannels.kt",
+        "anchor": "R.string.notification_channel_summary",
+        "test_ids": [
+          "NTF-026"
+        ]
+      },
+      {
+        "surface": "Silent group summary channel description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannels.kt",
+        "anchor": "R.string.notification_channel_summary_description",
+        "test_ids": [
+          "NTF-026"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Default Ding tone for new message channels",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationChannels.kt",
+        "anchor": "setSound(NotificationTone.DING.uri(context)",
+        "test_ids": [
+          "NTF-045"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

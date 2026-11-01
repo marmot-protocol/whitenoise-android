@@ -3,17 +3,16 @@ package dev.ipf.whitenoise.android.ui.group
 import android.content.Context
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsOff
-import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
@@ -44,8 +43,6 @@ import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.RecipientSearch
-import dev.ipf.whitenoise.android.notifications.ConversationAlertPreferences
-import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -54,6 +51,7 @@ import dev.ipf.whitenoise.android.state.GroupMemberSnapshot
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.advanceLocalDeleteTestRuntime
+import dev.ipf.whitenoise.android.ui.conversation.LocalConversationMotionEnabled
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationSurfaceState
 import dev.ipf.whitenoise.android.ui.profile.PROFILE_ADD_TO_GROUPS_CONTENT_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -91,68 +89,6 @@ class GroupDetailsEditNavigationTest {
 
         composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
         composeRule.onNode(hasText(GROUP_NAME) and hasClickAction()).assertIsDisplayed()
-    }
-
-    /** New groups keep All; independent device switches can retain mentions-only and restore All. */
-    @Test
-    fun newGroupStartsWithAllAndCanChooseOnlyMentions() {
-        listOf("whitenoise.chat_mute", "whitenoise.conversation_alerts").forEach { name ->
-            context
-                .getSharedPreferences(name, Context.MODE_PRIVATE)
-                .edit()
-                .clear()
-                .commit()
-        }
-        val fixture = controller(group())
-        val groupId = fixture.controller.group.groupIdHex
-        render(fixture)
-        composeRule
-            .onNodeWithText(context.getString(R.string.sounds_and_notifications))
-            .performScrollTo()
-            .performClick()
-        val messagesTag = "conversation-alert-messages_group"
-        val reactionsTag = "conversation-alert-reactions_v2"
-        composeRule.onNodeWithTag(messagesTag).assertIsOn()
-        composeRule.onNodeWithTag("conversation-alert-mentions").assertIsOn()
-        visualErrors.checkSucceeds {
-            composeRule.onRoot().captureRoboImage("src/test/snapshots/group_notify_new_all.png")
-        }
-        composeRule.onNodeWithTag(messagesTag).performClick()
-        composeRule.waitUntil(5_000) {
-            ConversationAlertPreferences(context)
-                .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.GROUP_MESSAGES) == false &&
-                alertControlReady(messagesTag, ToggleableState.Off)
-        }
-        composeRule.onNodeWithTag(reactionsTag).performClick()
-        composeRule.waitUntil(5_000) {
-            ConversationAlertPreferences(context)
-                .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.REACTIONS) == false &&
-                alertControlReady(reactionsTag, ToggleableState.Off)
-        }
-        composeRule.onNodeWithTag(messagesTag).assertIsOff()
-        composeRule.onNodeWithTag(reactionsTag).assertIsOff()
-        composeRule.onNodeWithTag("conversation-alert-mentions").assertIsOn()
-        visualErrors.checkSucceeds {
-            composeRule.onRoot().captureRoboImage("src/test/snapshots/group_notify_selected_mentions.png")
-        }
-        val restored = ConversationAlertPreferences(context)
-        assertEquals(false, restored.choice(ACCOUNT_REF, groupId, NotificationChannelSpec.GROUP_MESSAGES))
-        assertEquals(false, restored.choice(ACCOUNT_REF, groupId, NotificationChannelSpec.REACTIONS))
-        composeRule.onNodeWithTag(messagesTag).performClick()
-        composeRule.waitUntil(5_000) {
-            ConversationAlertPreferences(context)
-                .choice(ACCOUNT_REF, groupId, NotificationChannelSpec.GROUP_MESSAGES) == true &&
-                alertControlReady(messagesTag, ToggleableState.On)
-        }
-        composeRule.onNodeWithTag(messagesTag).assertIsOn()
-    }
-
-    private fun alertControlReady(
-        tag: String,
-        state: ToggleableState,
-    ): Boolean {
-        val node = composeRule.onNodeWithTag(tag).fetchSemanticsNode().config
-        return !node.contains(SemanticsProperties.Disabled) && node[SemanticsProperties.ToggleableState] == state
     }
 
     /** Unavailable call actions do not occupy the primary action row. */
@@ -219,6 +155,93 @@ class GroupDetailsEditNavigationTest {
         composeRule.onNodeWithTag("chat_info.add_people").assertDoesNotExist()
         composeRule.onNodeWithTag(LARGE_GROUP_INVITE_WARNING_TAG).assertIsDisplayed()
         composeRule.onNodeWithText(context.getString(R.string.add_member)).assertIsDisplayed()
+    }
+
+    /** Auto-open uses only the parent route; later manual entries keep their own movement and Back owner. */
+    @Test
+    fun autoOpenedAddMembersStartsSettledAndManualReentryStillMoves() {
+        val fixture = controller(group(), verifiedRoster = true)
+        val autoOpen = mutableStateOf(true)
+        var exits = 0
+        composeRule.mainClock.autoAdvance = false
+        try {
+            composeRule.setContent {
+                CompositionLocalProvider(LocalConversationMotionEnabled provides true) {
+                    WhiteNoiseTheme {
+                        GroupDetailsScreen(
+                            appState = fixture.appState,
+                            controller = fixture.controller,
+                            onBack = { exits++ },
+                            onLeft = {},
+                            autoOpenAddMember = autoOpen.value,
+                            onAutoOpenAddMemberConsumed = { autoOpen.value = false },
+                        )
+                    }
+                }
+            }
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.mainClock.advanceTimeByFrame()
+            val autoFirst = addMembersTitleLeft()
+            composeRule.mainClock.advanceTimeBy(240)
+            assertEquals("Auto-opened picker must start at its settled position", autoFirst, addMembersTitleLeft(), .5f)
+            assertFalse(autoOpen.value)
+
+            // A real role update retires the automatic picker without disposing this details owner.
+            applyGroupStateWhilePaused(fixture.controller, group(admin = false))
+            composeRule.mainClock.advanceTimeBy(240)
+            composeRule.onNodeWithText(context.getString(R.string.add_member)).assertDoesNotExist()
+            composeRule.onNodeWithTag("chat_info.add_people").assertDoesNotExist()
+            applyGroupStateWhilePaused(fixture.controller, group())
+            composeRule.mainClock.advanceTimeBy(240)
+
+            repeat(2) { assertManualAddMembersEntryMovesAndBackReturnsToDetails() }
+            assertEquals("Manual Back must keep the details route mounted", 0, exits)
+        } finally {
+            composeRule.mainClock.autoAdvance = true
+            fixture.controller.onCleared()
+        }
+    }
+
+    /**
+     * Applies a canonical group update and publishes it to the recomposer. With the main clock paused, a write made
+     * inside `runOnIdle` is otherwise never announced, so the screen would keep composing the previous role.
+     */
+    private fun applyGroupStateWhilePaused(
+        controller: ConversationController,
+        update: AppGroupRecordFfi,
+    ) {
+        composeRule.runOnIdle {
+            controller.applyGroupStateForTest(update)
+            Snapshot.sendApplyNotifications()
+        }
+    }
+
+    /** Returns the left edge of the add-member title in root coordinates, to detect horizontal picker movement. */
+    private fun addMembersTitleLeft(): Float =
+        composeRule
+            .onNodeWithText(context.getString(R.string.add_member))
+            .fetchSemanticsNode()
+            .boundsInRoot.left
+
+    /**
+     * Reads the real picker layer rather than a separate direction or suppression calculation. The scroll runs with
+     * the clock advancing, because Compose refuses scroll actions on a paused clock, and the clock is paused again
+     * before the click so the entry frames stay observable.
+     */
+    private fun assertManualAddMembersEntryMovesAndBackReturnsToDetails() {
+        composeRule.mainClock.autoAdvance = true
+        composeRule.onNodeWithTag("chat_info.add_people").performScrollTo()
+        composeRule.mainClock.autoAdvance = false
+        composeRule.onNodeWithTag("chat_info.add_people").performClick()
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.mainClock.advanceTimeByFrame()
+        val first = addMembersTitleLeft()
+        composeRule.mainClock.advanceTimeBy(240)
+        val settled = addMembersTitleLeft()
+        assertTrue("Manual picker should move in from the forward edge", first > settled + 1f)
+        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+        composeRule.mainClock.advanceTimeBy(240)
+        composeRule.onNode(hasText(GROUP_NAME) and hasClickAction()).assertIsDisplayed()
     }
 
     /** Overview search keeps the conversation callback and the native mute picker is directly reachable. */
@@ -469,18 +492,67 @@ class GroupDetailsEditNavigationTest {
         assertEquals(0f, overviewScrollOffset(), 0f)
     }
 
-    /** The concrete relay destination reads the current native group and preserves overview restoration. */
+    /** The Group relays destination reads the current native group and preserves overview restoration. */
     @Test
     fun relaysDestinationShowsNativeEmptyStateAndReturnsToItsOverview() {
         render(controller(group()))
         composeRule.onNodeWithTag("chat_info.relays").performScrollTo()
+        composeRule.onNodeWithText(context.getString(R.string.group_relays)).assertIsDisplayed()
         val offset = overviewScrollOffset()
         composeRule.onNodeWithTag("chat_info.relays").performClick()
-        composeRule.onNodeWithText(context.getString(R.string.no_relays)).assertIsDisplayed()
+        composeRule.onNodeWithTag(GROUP_RELAYS_EMPTY_TAG).assertIsDisplayed()
+        composeRule.onNodeWithTag(GROUP_RELAYS_ADMIN_TAG).performScrollTo().assertIsDisplayed()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/chat_relays_route_empty_light.png")
         composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
         assertEquals(offset, overviewScrollOffset(), 1f)
         composeRule.onNodeWithTag("chat_info.relays").assertIsDisplayed()
+    }
+
+    /** A member opens the configured route from the record, de-duplicated, with the read-only explanation. */
+    @Test
+    fun memberRelaysDestinationListsTheRecordRoute() {
+        render(controller(group(admin = false, relays = listOf(RELAY_A, "$RELAY_A/", RELAY_B))))
+        composeRule
+            .onNodeWithTag("chat_info.relays")
+            .performScrollTo()
+            .assert(hasText(context.resources.getQuantityString(R.plurals.chat_relay_count, 2, 2)))
+            .performClick()
+        composeRule.onNodeWithText(RELAY_A).assertIsDisplayed()
+        composeRule.onNodeWithText(RELAY_B).assertIsDisplayed()
+        composeRule.onNodeWithTag(GROUP_RELAYS_MEMBER_TAG).performScrollTo().assertIsDisplayed()
+    }
+
+    /** Developer Tools keeps only identifiers, so Group relays is the single place relays are listed. */
+    @Test
+    fun developerToolsNoLongerListsRelays() {
+        render(controller(group(relays = listOf(RELAY_A))))
+        composeRule.onNodeWithTag("chat_info.developer_tools").performScrollTo().performClick()
+        composeRule.onNodeWithText(context.getString(R.string.mls_group_id)).assertIsDisplayed()
+        composeRule.onNodeWithText(RELAY_A).assertDoesNotExist()
+    }
+
+    /** An open Group relays destination closes when another group's controller replaces the current one. */
+    @Test
+    fun switchingGroupsClosesTheRelaysDestination() {
+        val current = mutableStateOf(controller(group(relays = listOf(RELAY_A))))
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                GroupDetailsScreen(
+                    appState = current.value.appState,
+                    controller = current.value.controller,
+                    onBack = {},
+                    onLeft = {},
+                )
+            }
+        }
+        composeRule.onNodeWithTag("chat_info.relays").performScrollTo().performClick()
+        composeRule.onNodeWithText(RELAY_A).assertIsDisplayed()
+        composeRule.runOnIdle {
+            current.value = controller(group(groupId = "group-b", name = "Second group", relays = listOf(RELAY_B)))
+        }
+        composeRule.onNodeWithTag(GROUP_RELAYS_SCREEN_TAG).assertDoesNotExist()
+        composeRule.onNodeWithText(RELAY_A).assertDoesNotExist()
+        composeRule.onNode(hasText("Second group") and hasClickAction()).assertIsDisplayed()
     }
 
     /** Reads the native scrolling container's accessibility range without exposing a production test hook. */
@@ -628,9 +700,11 @@ class GroupDetailsEditNavigationTest {
         onOpenSearch: (() -> Unit)? = null,
         onStartGroupWithPeer: (RecipientSearch.Candidate) -> Unit = {},
         controllerState: androidx.compose.runtime.State<ConversationController>? = null,
+        darkTheme: Boolean = false,
+        amoled: Boolean = false,
     ) {
         composeRule.setContent {
-            WhiteNoiseTheme {
+            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
                 GroupDetailsScreen(
                     appState = testController.appState,
                     controller = controllerState?.value ?: testController.controller,
@@ -895,12 +969,14 @@ private fun controller(
     return GroupDetailsTestController(appState, controller)
 }
 
+/** Builds a native group record fixture with the given identity, role, lifecycle and configured relays. */
 private fun group(
     groupId: String = "group-a",
     name: String = GROUP_NAME,
     admin: Boolean = true,
     pendingConfirmation: Boolean = false,
     disbanded: Boolean = false,
+    relays: List<String> = emptyList(),
 ): AppGroupRecordFfi =
     AppGroupRecordFfi(
         selfMembership = SelfMembershipFfi.MEMBER,
@@ -911,7 +987,7 @@ private fun group(
         name = name,
         description = "",
         admins = if (admin) listOf(SELF_HEX) else listOf("member-b"),
-        relays = emptyList(),
+        relays = relays,
         nostrGroupIdHex = "nostr-$groupId",
         avatarUrl = null,
         avatarDim = null,
@@ -986,7 +1062,7 @@ private fun testAppState(
         },
     )
 
-private data class GroupDetailsTestController(
+internal data class GroupDetailsTestController(
     val appState: WhiteNoiseAppState,
     val controller: ConversationController,
 )
@@ -1003,6 +1079,8 @@ private class GroupDetailsDraftPersistence : DraftPersistence {
 private const val ACCOUNT_REF = "account-a"
 private const val SELF_HEX = "self-a"
 private const val GROUP_NAME = "Weekend hikers"
+private const val RELAY_A = "wss://relay.example.com"
+private const val RELAY_B = "wss://second.example.org"
 
 /** Optional public-identity and native-runtime fixtures for the real details-screen tests. */
 private data class GroupDetailsIdentityFixture(
@@ -1050,3 +1128,6 @@ private fun invokeDetachedReviewClick(action: () -> Boolean) {
         }
     }
 }
+
+/** Reuses the same controller, group and account fixture for independently selected notification tests. */
+internal fun notificationControlsFixture(): GroupDetailsTestController = controller(group())

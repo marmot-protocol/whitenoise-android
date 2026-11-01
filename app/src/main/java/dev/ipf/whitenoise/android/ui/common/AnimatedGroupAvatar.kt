@@ -38,6 +38,8 @@ internal val groupAvatarAnimationPermits = Semaphore(MAX_PLAYING_GROUP_AVATARS)
  * Thumbnail-only admission. Invisible/background/reduced-motion avatars neither read encoded bytes nor
  * hold a decoder. Waiting surfaces retain their static first frame; a free slot admits the next one.
  * The permit covers the original-byte read and the complete mounted animation, not just decoding.
+ * Only one admitted group can play at once. Other admitted groups wait for its actual retirement;
+ * fourth and later visible groups stay static until an existing source owner becomes inactive.
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -46,7 +48,7 @@ internal fun AnimatedGroupAvatarOverlay(
     modifier: Modifier = Modifier,
     maxEdgePx: Int,
     animationsEnabled: Boolean = rememberSystemAnimationsEnabled(),
-    decode: suspend (ByteArray, Int) -> android.graphics.drawable.Drawable? = ::decodeAnimatedGroupThumbnail,
+    decode: (suspend (ByteArray, Int) -> android.graphics.drawable.Drawable?)? = null,
 ) {
     key(animation.key) {
         GroupAvatarPlayback(animation, modifier, maxEdgePx, animationsEnabled, decode)
@@ -61,7 +63,7 @@ private fun GroupAvatarPlayback(
     modifier: Modifier,
     maxEdgePx: Int,
     animationsEnabled: Boolean,
-    decode: suspend (ByteArray, Int) -> android.graphics.drawable.Drawable?,
+    decode: (suspend (ByteArray, Int) -> android.graphics.drawable.Drawable?)?,
 ) {
     val visible = remember { mutableStateOf(false) }
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateFlow
@@ -102,7 +104,9 @@ private fun GroupAvatarPlayback(
                 modifier = Modifier.fillMaxSize(),
                 groupThumbnail = true,
                 animationsEnabled = animationsEnabled,
-                decode = decode,
+                groupDecode = { source, edge, demand ->
+                    if (decode != null) decode(source, edge) else decodeAnimatedGroupThumbnail(source, edge, demand)
+                },
                 onDecodeUnavailable = { unavailable = true },
             )
         }

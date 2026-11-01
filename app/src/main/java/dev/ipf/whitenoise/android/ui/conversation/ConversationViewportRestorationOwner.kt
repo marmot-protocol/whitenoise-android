@@ -176,7 +176,7 @@ internal class ConversationViewportRestorationOwner(
     ) {
         if (!isActive) return
         val changed = reanchorGate.onViewportHeight(height)
-        val canCorrect = presentation.anchored && !presentation.imeIsOpen && !coordinator.foregroundRestoreInProgress
+        val canCorrect = presentation.anchored && !presentation.imeIsOpen && !coordinator.foregroundRestorePending
         if (!changed || !canCorrect) return
         when (coordinator.mode) {
             ConversationScrollMode.FollowingTail ->

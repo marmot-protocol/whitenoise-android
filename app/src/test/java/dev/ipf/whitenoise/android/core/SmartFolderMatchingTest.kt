@@ -19,7 +19,9 @@ import dev.ipf.whitenoise.android.state.SmartFolderCodec
 import dev.ipf.whitenoise.android.state.SmartFolderFilter
 import dev.ipf.whitenoise.android.state.allLoadedFolderChats
 import dev.ipf.whitenoise.android.state.chatFolderSource
+import dev.ipf.whitenoise.android.ui.settings.quickFolderFields
 import dev.ipf.whitenoise.android.ui.settings.smartFolderUnresolvedCount
+import dev.ipf.whitenoise.android.ui.settings.toggleQuickFilter
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -433,6 +435,42 @@ class SmartFolderMatchingTest {
             ),
         )
         assertEquals(FolderTruth.UNKNOWN, matches(condition(FolderField.PENDING_SEND, FolderMode.NONE), row))
+    }
+
+    /** Neither half of any paired filter can match or reject a chat whose facts are not loaded. */
+    @Test fun pairedPositiveAndNegativeFiltersCannotProveMissingFacts() {
+        val unknown = item("unknown").copy(projection = null, selectedPreview = null)
+        quickFolderFields.forEach { field ->
+            val positive = if (field == FolderField.TYPE) FolderMode.DIRECT else FolderMode.PRESENT
+            val negative = if (field == FolderField.TYPE) FolderMode.GROUP else FolderMode.NONE
+            listOf(positive, negative).forEach { mode ->
+                val root = SmartFolderFilter.Group().toggleQuickFilter(field, mode)
+                assertEquals(SmartFolderFilter.Condition(field, mode), root.children.single())
+                assertEquals("${field.name}/${mode.name}", FolderTruth.UNKNOWN, matches(root, unknown))
+            }
+        }
+    }
+
+    /** A rule cleared back to neutral matches nothing automatically but keeps manual inclusions and exclusions. */
+    @Test fun neutralQuickFiltersRetainManualInclusionsAndExactExclusions() {
+        val neutral =
+            SmartFolderFilter
+                .Group()
+                .toggleQuickFilter(FolderField.UNREAD, FolderMode.PRESENT)
+                .toggleQuickFilter(FolderField.UNREAD, FolderMode.PRESENT)
+        assertEquals(FolderTruth.UNKNOWN, matches(neutral, item("automatic")))
+        assertEquals(
+            setOf("manual"),
+            chatFolderChatIds(
+                listOf(item("automatic")),
+                setOf("manual", "excluded"),
+                ChatFolderRule(smartFilter = SmartFolderCodec.encode(neutral)),
+                null,
+                { false },
+                { "Team" },
+                setOf("excluded"),
+            ),
+        )
     }
 
     private fun item(

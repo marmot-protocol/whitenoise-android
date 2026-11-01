@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,6 +12,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
@@ -18,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Assert.assertEquals
@@ -76,7 +79,7 @@ class ConversationTailEntranceTest {
                 .fetchSemanticsNode()
                 .boundsInRoot.bottom
         val startTop = seenTop("m3")
-        assertEquals("the newest row rests on the list's bottom edge", listBottom, startTop + rowHeightPx(), 1f)
+        assertEquals("the newest row rests on the list's bottom edge", listBottom, startTop + rowHeightPx, 1f)
         assertEquals("nothing is shifted while no row enters", 0f, harness.entrance.shiftPx, 0f)
 
         composeRule.runOnUiThread {
@@ -96,7 +99,7 @@ class ConversationTailEntranceTest {
         // every row shifted by that row's height: nothing has visibly moved.
         assertEquals(
             "the frame draws every row shifted by the new row's height",
-            rowHeightPx(),
+            rowHeightPx,
             harness.entrance.shiftPx,
             1f,
         )
@@ -108,8 +111,70 @@ class ConversationTailEntranceTest {
         composeRule.mainClock.advanceTimeBy(1_000)
         composeRule.waitForIdle()
         assertEquals("the shift returns to zero", 0f, harness.entrance.shiftPx, 0f)
-        assertEquals("the entering row settles on the bottom edge", listBottom, seenTop("m4") + rowHeightPx(), 1f)
-        assertEquals("the row above settles one slot up", startTop - rowHeightPx(), seenTop("m3"), 1f)
+        assertEquals("the entering row settles on the bottom edge", listBottom, seenTop("m4") + rowHeightPx, 1f)
+        assertEquals("the row above settles one slot up", startTop - rowHeightPx, seenTop("m3"), 1f)
+    }
+
+    /** A full list keeps the new row off-screen until the tail is pinned; nothing above it may move before then. */
+    @Test
+    fun rowsAboveStayPutUntilTheEnteringRowIsPlacedAtTheTail() {
+        val harness = TailHarness().apply { rows = rows + (1..6).map { "h$it" } }
+        setTailContent(harness, composerPadding = COMPOSER_PADDING)
+        composeRule.mainClock.autoAdvance = false
+        composeRule.waitForIdle()
+        val startTop = seenTop("m3")
+
+        composeRule.runOnUiThread {
+            harness.rows = listOf("m4") + harness.rows
+            harness.latestId = "m4"
+            Snapshot.sendApplyNotifications()
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+        // Reading a position first waits for the frame's layout, which is when the shift would start.
+        assertEquals("the row above is not drawn below its slot", startTop, seenTop("m3"), 1f)
+        assertEquals("no shift starts before the entering row reaches the tail", 0f, harness.entrance.shiftPx, 0f)
+
+        composeRule.runOnIdle {
+            harness.followedId = "m4"
+            harness.listState.requestScrollToItem(0, 0)
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+        assertEquals("the row above is still seen where it was", startTop, seenTop("m3"), 1f)
+        assertEquals("the pinned frame starts the shift", rowHeightPx, harness.entrance.shiftPx, 1f)
+    }
+
+    /** A follow that reaches the tail late still gets its whole entrance; the hold outlasts its fixed delay. */
+    @Test
+    fun aLateTailFollowKeepsTheEnteringRowUntilItsMotionSettles() {
+        val harness = TailHarness().apply { rows = rows + (1..6).map { "h$it" } }
+        setTailContent(harness, composerPadding = COMPOSER_PADDING)
+        composeRule.mainClock.autoAdvance = false
+        composeRule.waitForIdle()
+
+        composeRule.runOnUiThread {
+            harness.rows = listOf("m4") + harness.rows
+            harness.latestId = "m4"
+            Snapshot.sendApplyNotifications()
+        }
+        composeRule.mainClock.advanceTimeBy(LATE_FOLLOW_MILLIS)
+        composeRule.runOnIdle {
+            harness.followedId = "m4"
+            harness.listState.requestScrollToItem(0, 0)
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+        seenTop("m3")
+        assertEquals("the late pin still starts the shift", rowHeightPx, harness.entrance.shiftPx, 1f)
+
+        // Past the fixed 260ms hold, but inside the 180ms motion that began at the pin.
+        composeRule.mainClock.advanceTimeBy(MID_MOTION_MILLIS)
+        seenTop("m3")
+        assertEquals("the entering row stays held mid-motion", "m4", harness.entrance.enteringItemId)
+        assertTrue("the motion is still running", harness.entrance.shiftPx > 0f)
+
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.waitForIdle()
+        assertEquals("the hold ends once the motion settles", null, harness.entrance.enteringItemId)
+        assertEquals("the shift returns to zero", 0f, harness.entrance.shiftPx, 0f)
     }
 
     /**
@@ -131,8 +196,8 @@ class ConversationTailEntranceTest {
             val enteringTop = seenTop("m4")
             assertTrue("the row above must only ever move up", aboveTop <= lastAboveTop + 0.5f)
             assertTrue("the entering row must only ever move up", enteringTop <= lastEnteringTop + 0.5f)
-            assertEquals("both rows move as one", rowHeightPx(), enteringTop - aboveTop, 1f)
-            if (aboveTop < startTop - 1f && aboveTop > startTop - rowHeightPx() + 1f) sawIntermediate = true
+            assertEquals("both rows move as one", rowHeightPx, enteringTop - aboveTop, 1f)
+            if (aboveTop < startTop - 1f && aboveTop > startTop - rowHeightPx + 1f) sawIntermediate = true
             lastAboveTop = aboveTop
             lastEnteringTop = enteringTop
         }
@@ -141,7 +206,10 @@ class ConversationTailEntranceTest {
 
     /** Mutable inputs of the reversed-list harness, driven from the test thread. */
     private class TailHarness {
+        var motionEnabled by mutableStateOf(true)
+        var owner by mutableStateOf("account-a")
         var rows by mutableStateOf(listOf("m3", "m2", "m1"))
+        var claimedId by mutableStateOf<String?>(null)
         var latestId by mutableStateOf("m3")
         var followedId by mutableStateOf<String?>("m3")
         lateinit var listState: LazyListState
@@ -149,7 +217,10 @@ class ConversationTailEntranceTest {
     }
 
     /** Composes a reversed list whose rows carry the entrance motion, resolved from the harness inputs. */
-    private fun setTailContent(harness: TailHarness) {
+    private fun setTailContent(
+        harness: TailHarness,
+        composerPadding: Dp = 0.dp,
+    ) {
         composeRule.setContent {
             harness.listState = rememberLazyListState()
             harness.entrance =
@@ -161,16 +232,23 @@ class ConversationTailEntranceTest {
                     followingTail = true,
                     initialTimelineAnchored = true,
                     rowSpacingPx = 0f,
+                    motionEnabled = harness.motionEnabled,
+                    ownerKey = harness.owner,
+                    tailReached = { harness.listState.firstVisibleItemIndex == 0 },
                 )
+            // The production claim path: one remembered claim source shared with every row's modifier.
+            val claim: () -> String? = remember(harness) { { harness.claimedId } }
+            TailEntranceSendClaim(harness.entrance, claim)
             LazyColumn(
                 state = harness.listState,
                 reverseLayout = true,
+                contentPadding = PaddingValues(bottom = composerPadding),
                 modifier = Modifier.fillMaxWidth().height(LIST_HEIGHT).testTag(LIST_TAG),
             ) {
                 items(harness.rows, key = { it }) { id ->
                     Box(
                         Modifier
-                            .conversationTailEntranceMotion(harness.entrance, id)
+                            .conversationTailEntranceMotion(harness.entrance, id, claim)
                             .fillMaxWidth()
                             .height(ROW_HEIGHT)
                             .background(if (id == "m4") Color(0xFF2E7D32) else Color(0xFF37474F))
@@ -181,6 +259,139 @@ class ConversationTailEntranceTest {
                 }
             }
         }
+    }
+
+    /** Releasing the send claim settles the coordinated paint, without replay or neighbour overlap. */
+    @Test
+    fun retiredSendClaimSettlesItsNeighboursWithoutPaintOverlap() {
+        val harness = TailHarness()
+        setTailContent(harness)
+        composeRule.mainClock.autoAdvance = false
+        composeRule.waitForIdle()
+        appendTailRow(harness, "m4", claimed = true)
+        val claimedTop = seenTop("m4")
+        repeat(2) { composeRule.mainClock.advanceTimeByFrame() }
+        assertTrue("claim release must happen during the real tail shift", harness.entrance.shiftPx > 0f)
+        val aboveBeforeRelease = seenTop("m3")
+        composeRule.runOnIdle { harness.claimedId = null }
+        composeRule.mainClock.advanceTimeByFrame()
+        assertTrue("the retirement precedes the natural tail curve end", harness.entrance.shiftPx > 0f)
+        assertEquals("the previously claimed row stays in its canonical slot", claimedTop, seenTop("m4"), 1f)
+        assertTrue("the row above advances to its final slot", seenTop("m3") < aboveBeforeRelease)
+        assertTrue(
+            "visible whole rows cannot overlap after the claimed ink retires",
+            seenTop("m3") + rowHeightPx <= seenTop("m4") + 1f,
+        )
+        composeRule.mainClock.advanceTimeBy(1_000)
+        assertEquals(null, harness.entrance.claimedEnteringItemId)
+
+        appendTailRow(harness, "m5", claimed = false)
+        repeat(2) { composeRule.mainClock.advanceTimeByFrame() }
+        assertTrue("the next entrance must still move", harness.entrance.shiftPx > 0f)
+        assertTrue("the old claimed row participates in the next entrance", seenTop("m4") > claimedTop - rowHeightPx)
+        assertEquals("the next entering and older row move together", rowHeightPx, seenTop("m5") - seenTop("m4"), 1f)
+    }
+
+    /** A flight accepted a frame before its row publishes still claims that row, so the row never rises under it. */
+    @Test
+    fun flightAcceptedBeforeItsRowPublishesStillClaimsTheEnteringRow() {
+        val harness = TailHarness()
+        setTailContent(harness)
+        composeRule.mainClock.autoAdvance = false
+        composeRule.waitForIdle()
+        val settledTop = seenTop("m3")
+        composeRule.runOnUiThread {
+            harness.claimedId = "m4"
+            Snapshot.sendApplyNotifications()
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+        appendTailRow(harness, "m4", claimed = true)
+        assertTrue("the entrance must actually be shifting", harness.entrance.shiftPx > 0f)
+        assertEquals("m4", harness.entrance.claimedEnteringItemId)
+        assertEquals("the claimed row is drawn in its own slot", settledTop, seenTop("m4"), 1f)
+    }
+
+    /** While a send claim stays on an older row, an unrelated newer row's entrance shifts the claimed row with it. */
+    @Test
+    fun anActiveOlderSendClaimSharesAnUnrelatedNewRowShift() {
+        val harness = TailHarness()
+        setTailContent(harness)
+        composeRule.mainClock.autoAdvance = false
+        composeRule.waitForIdle()
+        appendTailRow(harness, "m4", claimed = true)
+        composeRule.runOnUiThread {
+            // Keep the actual active claim on m4 while a different row becomes newest.
+            harness.rows = listOf("m5") + harness.rows
+            harness.latestId = "m5"
+            Snapshot.sendApplyNotifications()
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.runOnUiThread {
+            harness.followedId = "m5"
+            harness.listState.requestScrollToItem(0, 0)
+            Snapshot.sendApplyNotifications()
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+        assertEquals("m4", harness.claimedId)
+        assertEquals("m5", harness.entrance.enteringItemId)
+        assertTrue("the unrelated entrance is actually shifting", harness.entrance.shiftPx > 0f)
+        repeat(4) {
+            assertEquals("older full-width rows keep their gap", rowHeightPx, seenTop("m4") - seenTop("m3"), 1f)
+            assertEquals("active older claim shares incoming shift", rowHeightPx, seenTop("m5") - seenTop("m4"), 1f)
+            composeRule.mainClock.advanceTimeByFrame()
+        }
+    }
+
+    /** Prepends [id] as the newest row, optionally send-claimed, then follows it to the tail over two frames. */
+    private fun appendTailRow(
+        harness: TailHarness,
+        id: String,
+        claimed: Boolean,
+    ) {
+        composeRule.runOnUiThread {
+            harness.claimedId = id.takeIf { claimed }
+            harness.rows = listOf(id) + harness.rows
+            harness.latestId = id
+            Snapshot.sendApplyNotifications()
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.runOnIdle {
+            harness.followedId = id
+            harness.listState.requestScrollToItem(0, 0)
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+    }
+
+    /**
+     * Disabling motion mid-entrance settles it at once, a new owner with motion back on never resumes it, and rows
+     * kept across the owner change still move with that owner's next entrance.
+     */
+    @Test fun liveMotionDisableSettlesAndOwnerReplacementDropsOldEntrance() {
+        val harness = TailHarness()
+        setTailContent(harness)
+        composeRule.mainClock.autoAdvance = false
+        composeRule.waitForIdle()
+        appendTailRow(harness, "m4", claimed = true)
+        assertTrue("motion disable must interrupt the real tail shift", harness.entrance.shiftPx > 0f)
+        assertEquals("m4", harness.entrance.claimedEnteringItemId)
+        composeRule.runOnIdle { harness.motionEnabled = false }
+        composeRule.mainClock.advanceTimeByFrame()
+        assertEquals(0f, harness.entrance.shiftPx, 0f)
+        assertEquals(null, harness.entrance.enteringItemId)
+        assertEquals(null, harness.entrance.claimedEnteringItemId)
+        composeRule.runOnIdle {
+            harness.followedId = "m4"
+            harness.owner = "account-b"
+            harness.motionEnabled = true
+        }
+        composeRule.mainClock.advanceTimeBy(500)
+        assertEquals(0f, harness.entrance.shiftPx, 0f)
+        assertEquals(null, harness.entrance.enteringItemId)
+
+        appendTailRow(harness, "m5", claimed = false)
+        repeat(2) { composeRule.mainClock.advanceTimeByFrame() }
+        assertTrue("the new owner's entrance must actually be shifting", harness.entrance.shiftPx > 0f)
+        assertEquals("a kept row moves with the new owner's entrance", rowHeightPx, seenTop("m5") - seenTop("m4"), 1f)
     }
 
     /** A row that is not entering never starts the motion, so paging and keyboard tracking stay untouched. */
@@ -242,12 +453,22 @@ class ConversationTailEntranceTest {
             .fetchSemanticsNode()
             .positionInRoot.y
 
-    private fun rowHeightPx(): Float = with(composeRule.density) { ROW_HEIGHT.toPx() }
+    private val rowHeightPx: Float
+        get() = with(composeRule.density) { ROW_HEIGHT.toPx() }
 
     private companion object {
         const val LIST_TAG = "tail-entrance-list"
         const val CAPTURED_FRAME = 4
         val LIST_HEIGHT = 300.dp
         val ROW_HEIGHT = 72.dp
+
+        /** Bottom padding under the composer, where a reversed list lays out rows it has not scrolled to yet. */
+        val COMPOSER_PADDING = 100.dp
+
+        /** A tail follow that lands after the motion's own 180ms would end inside the fixed 260ms hold. */
+        const val LATE_FOLLOW_MILLIS = 150L
+
+        /** From the late pin, past the fixed hold's end but before the 180ms motion settles. */
+        const val MID_MOTION_MILLIS = 130L
     }
 }

@@ -5,11 +5,13 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -55,6 +57,24 @@ internal fun <T> SettingsRouteMotion(
     content: @Composable (T) -> Unit,
 ) {
     if (!contentVisible) return
+    Box(
+        Modifier.fillMaxSize().then(
+            rememberRouteMotionModifier(target, depth, ownerKey, suppressMotion, animationsEnabled),
+        ),
+    ) {
+        content(target)
+    }
+}
+
+/** A single destination draw layer for route hosts with existing early-return rendering. */
+@Composable
+internal fun <T> rememberRouteMotionModifier(
+    target: T,
+    depth: Int,
+    ownerKey: Any?,
+    suppressMotion: Boolean = false,
+    animationsEnabled: Boolean = rememberSystemAnimationsEnabled(),
+): Modifier {
     val history = remember(ownerKey) { SettingsMotionHistory(target, depth) }
     val layoutDirection = LocalLayoutDirection.current
     val logicalDirection =
@@ -74,12 +94,14 @@ internal fun <T> SettingsRouteMotion(
         }
     }
     val travel = with(LocalDensity.current) { 48.dp.toPx() }
-    Box(
-        Modifier.fillMaxSize().graphicsLayer {
+    // Draw the themed backplate outside the translated child layer. Moving a whole opaque page
+    // otherwise exposes the Activity window behind its vacated edge, including in AMOLED mode.
+    val backplate = MaterialTheme.colorScheme.background
+    return Modifier
+        .drawBehind {
+            if (motion && progress.value < 1f) drawRect(backplate)
+        }.graphicsLayer {
             val remaining = if (motion) 1f - progress.value else 0f
             translationX = direction * travel * remaining
-        },
-    ) {
-        content(target)
-    }
+        }
 }

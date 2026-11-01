@@ -43,6 +43,14 @@
         "test_ids": [
           "TTS-001"
         ]
+      },
+      {
+        "surface": "Accepted reaction presentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "localReactionMotion.accept(",
+        "test_ids": [
+          "MSG-041"
+        ]
       }
     ],
     "settings_controls": [
@@ -165,6 +173,22 @@
         "anchor": "boundedIntrinsicWidth(",
         "test_ids": [
           "MSG-006"
+        ]
+      },
+      {
+        "surface": "Existing Markdown text reporter supplies the current send destination",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "val sendSelectableTextLayoutReporter:",
+        "test_ids": [
+          "CON-036"
+        ]
+      },
+      {
+        "surface": "Actual composer text edits remain distinct from unchanged presentation across draft hydration and remount",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "onDraftChange = { value, textChanged ->",
+        "test_ids": [
+          "DIC-011"
         ]
       }
     ],

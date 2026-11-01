@@ -45,6 +45,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsSentenceProjectionSegment
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -52,6 +53,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -83,7 +85,37 @@ class ConversationTimelineUnderlayTest {
     private val sentenceLayouts = ConversationTtsSentenceLayoutRegistry()
     private val speechTarget = ConversationTtsFollowTarget(7L, "19", 0, 1, "review-sentence", 42uL)
 
+    /** Raw consumed padding, not a newer composer callback, owns the accepted row's projection. */
+    @Test
+    fun sendProjectionUsesOnlyItsMeasuredPublicationAndNativePadding() {
+        render()
+        val publication = emptyList<TimelineMessage>()
+        rule.waitForIdle()
+        rule.onNodeWithTag("frame").captureRoboImage(
+            "src/test/snapshots/conversation_send_native_padding_projection.png",
+        )
+        rule.runOnIdle {
+            val consumed = list.layoutInfo.beforeContentPadding - 8
+            val projection = checkNotNull(viewport.composerSendProjection(publication, null))
+            assertEquals(consumed.toFloat(), projection.consumedHeight, 0f)
+            assertNull(viewport.composerSendProjection(publication.toMutableList(), null))
+            assertNull(viewport.composerSendProjection(publication, "absent-accepted-row"))
+            // No native list measure has consumed this callback yet. It must not alter the projection.
+            viewport.onComposerMeasured(200, 64)
+            viewport.onBottomChromeMeasured(200)
+            assertEquals(200, viewport.foregroundHeightPx)
+            assertEquals(
+                consumed.toFloat(),
+                checkNotNull(viewport.composerSendProjection(publication, null)).consumedHeight,
+                0f,
+            )
+            viewport.enabled = false
+            assertNull(viewport.composerSendProjection(publication, null))
+        }
+    }
+
     /** The same row paints into the margin while covered controls are absent and partial-row input remains usable. */
+
     @Test
     fun rowsPaintBehindRoundedComposerButOnlyClearPortionsAcceptInput() {
         foreground = 120

@@ -71,14 +71,18 @@ internal class ShareSourceReader(
                 val stream = PushbackInputStream(opened, SHARE_IMAGE_HEADER_BYTES)
                 input.set(stream)
                 currentCoroutineContext().ensureActive()
-                val fileLimit = sourceLimit(info, readHeader(stream, remaining))
+                val header = readHeader(stream, remaining)
+                val fileLimit = sourceLimit(info, header)
+                val effectiveMime =
+                    dev.ipf.whitenoise.android.media.MediaPipeline
+                        .sniffImageMediaType(header) ?: info.mime
                 val budget = ShareSourceBudget(minOf(remaining, fileLimit), fileLimit <= remaining)
                 val hint = info.size?.takeIf { it > 0 && it <= budget.bytes }
                 val size = stream.use { copyStream(it, file, budget, hint, progress) }
                 currentCoroutineContext().ensureActive()
                 if (size == 0L) throw EmptyShareSource()
                 progress(size, size)
-                CopiedShareSource(name, info.mime, size)
+                CopiedShareSource(name, effectiveMime, size)
             } finally {
                 closer.cancel()
                 runCatching { input.get()?.close() }

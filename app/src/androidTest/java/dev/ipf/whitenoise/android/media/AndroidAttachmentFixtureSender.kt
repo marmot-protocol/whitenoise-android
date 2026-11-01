@@ -96,7 +96,7 @@ internal suspend fun sendAndroidFixtureMedia(
         val published = awaitAndroidFixtureReferences(marmot, sender.label, group, attachments.map { it.fileName })
         val sent =
             if (awaitOwnHostPublication) {
-                withOwnHostPublication(harness, sender.label, group, published)
+                withOwnHostPublication(harness, sender.label, group, published, attachments)
             } else {
                 published
             }
@@ -179,12 +179,16 @@ private suspend fun withOwnHostPublication(
     sender: String,
     group: String,
     published: SentFixtureMessage,
+    attachments: List<PendingAttachment>,
 ): SentFixtureMessage {
     awaitAndroidFixtureProjection(harness.controller, published.messageIdHex)
+    val expectedByName = attachments.associateBy { it.fileName }
     val cached =
-        published.references.indices.map { index ->
-            harness.state.hasHostCachedAttachmentAfterHydration(
+        published.references.mapIndexed { index, reference ->
+            awaitFixtureHostPublication(
+                harness.state,
                 AttachmentTransferRequest(sender, group, published.messageIdHex, index),
+                expectedByName.getValue(requireNotNull(reference.fileName)).plaintextBytes,
             )
         }
     return SentFixtureMessage(published.messageIdHex, published.sourceMessageIdHex, published.references, cached)

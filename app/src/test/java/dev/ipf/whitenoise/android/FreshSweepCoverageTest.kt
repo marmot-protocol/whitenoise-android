@@ -21,6 +21,7 @@ class FreshSweepCoverageTest {
         assertFalse(screen.contains("LaunchedEffect(controller, appState.streamingDebugEnabled)"))
     }
 
+    /** Selection projections are remembered by their real inputs, and names resolve only for the selected set. */
     @Test
     fun conversationSelectionDerivationsAreRememberedByTheirRealInputs() {
         val source = source("ui/conversation/ConversationScreen.kt")
@@ -72,7 +73,7 @@ class FreshSweepCoverageTest {
 
         val actionItemsStart = source.indexOf("private fun rememberConversationBatchSelectionUiState(")
         assertTrue("batch selection UI state helper must exist", actionItemsStart >= 0)
-        val actionItemsEnd = source.indexOf("/**\n * Read anchor", actionItemsStart)
+        val actionItemsEnd = source.indexOf("/** Renders one account-owned conversation", actionItemsStart)
         val actionItemsBlock = source.substring(actionItemsStart, actionItemsEnd)
         assertTrue(
             "profile changes must refresh names for the selected set",
@@ -88,35 +89,53 @@ class FreshSweepCoverageTest {
     fun conversationUnreadDerivationsRebindToTheVisibleController() {
         val source =
             source("ui/conversation/ConversationScreen.kt")
-                .section("val unreadBadgeUi =", "// Reading the raw IME inset")
+                .section("val projectionUnread =", "// Reading the raw IME inset")
                 .replace(Regex("\\s+"), " ")
+        val tracking = source("ui/conversation/ConversationUnreadTracking.kt").replace(Regex("\\s+"), " ")
 
-        // The badge owner is state keyed to the visible controller and chat, and the effect that
-        // feeds it re-runs on every input the count depends on (#2726).
-        val badgeInputs =
+        // The badge owner is state keyed to the visible controller and chat, and the tracking scope that
+        // reconciles it re-runs on every input the count depends on (#2726). The screen holds the owner
+        // without reading it, so a moved read anchor recomposes only the tracking scope.
+        val badgeOwner =
             source
-                .substringAfter("rememberConversationUnreadBadgeCount(")
-                .substringBefore(") // The first composition")
+                .substringAfter("rememberConversationUnreadBadge(")
+                .substringBefore("ConversationUnreadTracking(")
         assertTrue(
             "badge owner must follow the visible controller",
-            "identity = Triple(controller, chat.id" in badgeInputs,
+            "identity = Triple(controller, chat.id" in badgeOwner,
         )
-        val badgeEffectInputs = badgeInputs
-        assertTrue("badge must re-reconcile for the visible controller", "controller" in badgeEffectInputs)
-        assertTrue("read anchor changes must re-reconcile the badge", "readAnchorMessageId" in badgeEffectInputs)
-        assertTrue("projected unread changes must re-reconcile the badge", "projectedUnreadCount" in badgeEffectInputs)
+        assertTrue(
+            "an anchored open must seed from the read anchor",
+            "readAnchorMessageId = readAnchor.value" in badgeOwner,
+        )
+        val badgeEffectInputs =
+            source
+                .substringAfter("ConversationUnreadTracking(")
+                .substringBefore("// Read only by the jump control")
+        assertTrue("badge must re-reconcile for the visible controller", "controller = controller" in badgeEffectInputs)
+        assertTrue("read anchor changes must re-reconcile the badge", "readAnchor = readAnchor" in badgeEffectInputs)
+        assertTrue(
+            "projected unread changes must re-reconcile the badge",
+            "val projectionUnread = projectedUnreadCount" in source &&
+                "projectionUnread = projectionUnread" in badgeEffectInputs,
+        )
         assertTrue(
             "projection availability changes must re-reconcile the badge",
-            "entryProjectionAvailable" in badgeEffectInputs,
+            "projectedUnreadCount.takeIf { entryProjectionAvailable }" in source,
         )
         assertTrue(
             "the window reaching the tail must re-reconcile the badge",
-            "controller.hasMoreAfterTimeline" in badgeEffectInputs,
+            "windowReachesTail = !controller.hasMoreAfterTimeline" in tracking,
+        )
+        assertTrue(
+            "read anchor changes must re-reconcile the badge",
+            "readAnchorMessageId = readAnchorMessageId" in tracking,
         )
         assertTrue(
             "the badge count shown must wait for the first reconciliation and then be the owner's count",
-            source.contains("val badgeReconciled = unreadBadgeUi.reconciled") &&
-                source.contains("val unreadIncomingCount = unreadBadgeUi.count"),
+            source.contains("unreadBadge.value.uiState(initialTimelineAnchored).count") &&
+                tracking.contains("val badgeUi = badge.value.uiState(initialTimelineAnchored)") &&
+                tracking.contains("if (!badgeUi.reconciled) return@LaunchedEffect"),
         )
         assertTrue(
             source.contains(

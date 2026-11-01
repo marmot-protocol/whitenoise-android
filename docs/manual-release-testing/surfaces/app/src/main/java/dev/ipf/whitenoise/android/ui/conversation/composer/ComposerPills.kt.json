@@ -64,6 +64,31 @@
         "test_ids": [
           "CON-013"
         ]
+      },
+      {
+        "surface": "Composer sending identity slot",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "sendingIdentity?.invoke()",
+        "test_ids": [
+          "CON-035"
+        ]
+      },
+      {
+        "surface": "Compact toolbar target spacing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "val leadingControlsWidth =",
+        "test_ids": [
+          "CON-030",
+          "CON-035"
+        ]
+      },
+      {
+        "surface": "Voice recording composer outline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
+        "anchor": "recordingContent?.invoke(this)",
+        "test_ids": [
+          "MED-008"
+        ]
       }
     ],
     "source_coverage": [

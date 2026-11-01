@@ -99,6 +99,29 @@ class AppLockPreferencesTest {
         assertFalse(legacyPrefsFile().exists())
     }
 
+    /** A failed encryption attempt must remain recoverable by later writes and a fresh reader. */
+    @Test
+    fun failedKeyAccessDoesNotPreventALaterTimestampWriteOrFreshStoreRead() {
+        var unavailable = true
+        val store =
+            KeystoreSecureStore(
+                context = context,
+                fileName = SECURE_FILE,
+                keyProvider =
+                    object : SecureStoreKeyProvider {
+                        override fun secretKey(): SecretKey {
+                            if (unavailable) throw java.security.GeneralSecurityException("unavailable")
+                            return key
+                        }
+                    },
+            )
+        AppLockPreferences.writeLastUnlockedAtMillis(context, 100L, store)
+        assertEquals(0L, AppLockPreferences.readLastUnlockedAtMillis(context, store))
+        unavailable = false
+        AppLockPreferences.writeLastUnlockedAtMillis(context, 200L, store)
+        assertEquals(200L, AppLockPreferences.readLastUnlockedAtMillis(context, testStore()))
+    }
+
     private fun testStore(): KeystoreSecureStore =
         KeystoreSecureStore(
             context = context,

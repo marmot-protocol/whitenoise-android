@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.AttachmentTransferSnapshotFfi
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.AttachmentTransferStatusFfi
+import dev.ipf.whitenoise.android.ui.conversation.media.canRequestAttachmentOpen
+import dev.ipf.whitenoise.android.ui.conversation.media.shouldStartAttachmentDownload
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.cancelAndJoin
@@ -10,7 +12,9 @@ import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NativeAttachmentProgressTest {
@@ -156,6 +160,47 @@ class NativeAttachmentProgressTest {
             AttachmentTransferState.Failed,
             attachmentFilePresentationState(AttachmentTransferState.Remote, failed, AttachmentCancellationState.None),
         )
+    }
+
+    /** Resubscribing after a trim must not turn a known missing body into fresh automatic demand. */
+    @Test
+    fun passiveNativeObservationPreservesExplicitRecoveryAfterTrim() {
+        listOf(
+            AttachmentTransferStateFfi.UNAVAILABLE,
+            AttachmentTransferStateFfi.NOT_REQUESTED,
+            AttachmentTransferStateFfi.POLICY_BLOCKED,
+        ).forEach { phase ->
+            val progress = NativeAttachmentProgressReducer().update(status(phase = phase))
+            val displayed =
+                attachmentFilePresentationState(
+                    AttachmentTransferState.NotRetained,
+                    progress,
+                    AttachmentCancellationState.None,
+                )
+            assertEquals(AttachmentTransferState.NotRetained, displayed)
+            assertFalse(shouldStartAttachmentDownload(displayed, true, 1uL, mine = false))
+            assertTrue(canRequestAttachmentOpen(displayed, 1uL, mine = false))
+        }
+    }
+
+    /** Missing host plaintext must not conceal native work or the reason a deliberate retry failed. */
+    @Test
+    fun nativeWorkAndFailuresRemainVisibleAfterTrim() {
+        mapOf(
+            AttachmentTransferStateFfi.DOWNLOADING to AttachmentTransferState.Downloading,
+            AttachmentTransferStateFfi.FAILED to AttachmentTransferState.Failed,
+            AttachmentTransferStateFfi.STORAGE_BLOCKED to AttachmentTransferState.StorageBlocked,
+        ).forEach { (phase, expected) ->
+            val progress = NativeAttachmentProgressReducer().update(status(phase = phase))
+            assertEquals(
+                expected,
+                attachmentFilePresentationState(
+                    AttachmentTransferState.NotRetained,
+                    progress,
+                    AttachmentCancellationState.None,
+                ),
+            )
+        }
     }
 
     /** Every native phase preserves verified availability and cannot bypass an unacknowledged cancellation. */

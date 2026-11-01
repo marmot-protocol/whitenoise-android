@@ -10,6 +10,25 @@
         "test_ids": [
           "SET-039"
         ]
+      },
+      {
+        "surface": "Logical destination navigation motion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsRouteMotion.kt",
+        "anchor": "fun <T> rememberRouteMotionModifier(",
+        "test_ids": [
+          "SET-041",
+          "CON-037"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Translated route backplate draws only during travel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsRouteMotion.kt",
+        "anchor": "val backplate =",
+        "test_ids": [
+          "SET-041"
+        ]
       }
     ]
   },

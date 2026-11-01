@@ -3,7 +3,7 @@ package dev.ipf.whitenoise.android.audio
 import android.content.Context
 import android.os.SystemClock
 import android.util.Log
-import dev.ipf.whitenoise.android.BuildConfig
+import dev.ipf.whitenoise.android.AppRevision
 import java.io.File
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.ExecutionException
@@ -29,7 +29,7 @@ internal object DictationDiagnostics {
             DictationDiagnosticRecorder(
                 DictationDiagnosticStore(
                     File(context.noBackupFilesDir, "dictation-diagnostics"),
-                    BuildConfig.APP_SHORT_SHA,
+                    AppRevision.SHORT_SHA,
                 ),
             )
     }

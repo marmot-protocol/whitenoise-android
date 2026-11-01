@@ -164,8 +164,10 @@ internal class ConversationTtsSentenceLayoutRegistry : ConversationTtsSentenceLa
 
     /** Missing, clipped and recycled geometry always leaves an explicit recovery action. */
     fun needsReveal(target: ConversationTtsFollowTarget?): Boolean {
-        revision
+        // Without a target nothing can need revealing, so rows mounting while nothing is read aloud must not
+        // recompose the readers of this answer.
         if (target == null) return false
+        revision
         return ttsSentenceNeedsReveal(completeSentenceBounds(target), viewportBoundsInWindow)
     }
 }

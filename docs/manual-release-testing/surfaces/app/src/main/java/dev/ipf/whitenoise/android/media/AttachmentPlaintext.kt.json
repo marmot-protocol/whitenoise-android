@@ -1,0 +1,33 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/media/AttachmentPlaintext.kt",
+  "legacy_sha256": "064c2ed79b579df5e371cc7beca6202e1ffa7159fa213ac07988c7d1244d75e8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Bounded presentation read of attachment plaintext",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/AttachmentPlaintext.kt",
+        "anchor": "internal fun AttachmentPlaintext.toByteArrayWithin(",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "Byte-returning attachment reads stay within the caller's budget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/AttachmentPlaintext.kt",
+        "anchor": "internal suspend fun AttachmentPlaintext.readWithin(",
+        "test_ids": [
+          "MED-027"
+        ]
+      },
+      {
+        "surface": "Over-budget retained source refused without materializing its plaintext",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/AttachmentPlaintext.kt",
+        "anchor": "class Oversized internal constructor(",
+        "test_ids": [
+          "MED-027"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

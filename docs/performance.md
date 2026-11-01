@@ -3,7 +3,8 @@
 This toolkit measures the optimized app rather than a debuggable Compose build.
 The Baseline Profile plugin derives two release-like variants from `release`:
 
-- `devZapstoreBenchmarkRelease`: minified, non-debuggable, profileable; used for Macrobenchmark.
+- `devZapstoreBenchmarkRelease`: non-debuggable, profileable, and not minified (plain D8 output; see
+  [DEX method-size budgets](#dex-method-size-budgets)); used for Macrobenchmark.
 - `devZapstoreNonMinifiedRelease`: non-minified, non-debuggable, profileable; used to collect profiles.
 
 Both use the Android debug key and the existing dev application ID
@@ -176,6 +177,16 @@ Accepted-pending responses are
 reported as durable ownership rather than success, with
 `engine_phase_unavailable` making clear that Android cannot see the deeper MDK
 queue, MLS, storage, transport, or acknowledgement phases.
+
+Text admission returns without an Android-triggered convergence pass. MarmotKit
+0.14.0 wakes its durable queue and schedules convergence independently of the
+conversation route. Android leaves the row pending until the authoritative
+publication projection arrives. An automatic `retryGroupConvergence` after each
+acceptance would hold the group commit lock during native network work, blocking
+later admissions; that RPC has a two-minute worker-response deadline before its
+post-command catch-up. Retrying a committed, unpublished text reuses its native
+projection without readmitting it or invoking host convergence. This dependency
+explains a possible minute-scale host wait, not a measured production send duration.
 
 `op=message_forward` follows one forwarding operation from acceptance to its
 terminal state. For each source attachment it emits `forward_source_lookup`
@@ -963,6 +974,86 @@ Outputs land in `app/build/compose-metrics/` and
 `app/build/compose-reports/`. CI publishes them as the
 `compose-compiler-reports` artifact for 14 days.
 
+## DEX method-size budgets
+
+ART's optimizing compiler refuses any method whose `code_item` reaches 16,383
+instructions (16-bit code units) or 16,383 registers: `UINT16_MAX / 4` in
+`Compiler::IsPathologicalCase` (AOSP `art/compiler/compiler.cc`). dex2oat and
+the JIT both skip such a method, so it always runs in the interpreter. Large
+Compose screen functions approach that limit:
+[#3238](https://github.com/marmot-protocol/whitenoise-android/pull/3238) split
+`ConversationScreen` after it crossed it, and
+[#3234](https://github.com/marmot-protocol/whitenoise-android/pull/3234) shrank
+`MessageBubble` before it did.
+
+`scripts/dex_method_budget.py` reads the DEX already packaged in an APK and
+never builds anything. It reports each method's `insns_size` and
+`registers_size`, names residual methods through the R8 mapping from the same
+build (eliding inlined and synthesized frames, as retrace does), and records the
+source commit, APK and DEX SHA-256s, mapping `pg_map_id`, compiler and AGP
+versions and CI run. The mapping's `pg_map_id` must equal the one R8 wrote into
+every DEX, so a map from another build fails. When AGP's `output-metadata.json`
+sits beside the APK, its `variantName` must match `--variant` and it must list
+the APK; without that file the report records the variant as unchecked. Budgets live in
+`config/dex-method-budgets.json`; each entry's `basis` records the commit,
+artifact and largest sizes it was reviewed against.
+
+| Variant | Measured in | Compiler | Budget (code units / registers) | On violation |
+| --- | --- | --- | ---: | --- |
+| `productionZapstoreRelease` | Android Release Runtime Verify, API 36 lane | R8 full mode, obfuscated | 13,106 / 13,106 | Fails the lane after ART verification |
+| `stagingZapstoreRelease` | Android Release Runtime Verify, the shipping ARM64 APK in the Android 17 lane | R8 full mode, obfuscated | 13,106 / 13,106 | Fails the lane after ART verification |
+| `devZapstoreBenchmarkRelease` | Android CI baseline phase, the universal APK the Baseline Profile check reads | D8 only, unminified | 16,382 / 16,382 | Warning annotation only |
+
+The assumptions behind each budget:
+
+- **Shipping budgets are 80% of ART's limit, rounded down.** At review time this
+  left about 1,400 code units of growth above the largest shipping method and
+  kept 3,277 between the budget and the limit, so a failure arrives while a
+  split is still a planned change rather than a fix for interpreted code. Only
+  obfuscated R8 output with its own mapping is accepted. The budget step runs
+  before the emulator but continues on error, so ART verification still runs;
+  the lane's last step then fails. These lanes run on release-input pull
+  requests, `master` pushes, the merge queue, tags and nightly, and they are not
+  required checks. Each variant's budget was reviewed against its own build.
+  Production enables fewer debug-only code paths
+  (`ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS` is false), so its largest method was
+  `ConversationScreen` at 11,130 code units, while staging's `MessageBubble`
+  reached 11,671. Play builds are not budgeted.
+- **`benchmarkRelease` is plain D8 output.** The build type is created without
+  release minification, so it keeps source names, has no mapping, and its large
+  composables are 30–40% larger than the shipping ones. Its sizes never
+  stand in for shipping sizes, and the script refuses to apply a shipping budget
+  to it. Its budget is the largest size ART still compiles: beyond it,
+  macrobenchmarks measure the interpreter rather than compiled code. A
+  violation or input error only adds a warning annotation, so a D8-only size
+  never blocks a merge. At `8342b52` its largest method, `ConversationScreen`,
+  was 615 code units below its budget. The budget cannot be raised; the remedy is
+  splitting the method.
+- **The threshold is ART's as of AOSP main on 2026-10-30.** Re-check it when a
+  new ART release changes the compiler. The parser accepts DEX versions 035–040
+  and fails on any other, including the DEX 041 container format.
+
+When a budget fails, the log names the source method, its residual identity and
+DEX file, and its size against the budget. The JSON and Markdown reports are in
+the lane's report artifact (`dex-method-budget-benchmark` for the benchmark
+check). Prefer splitting the method, using the patterns from the PRs above.
+Raising a shipping budget is a reviewed change to the config: record the new
+measurement in `basis` and justify the margin in the PR.
+
+Measure an APK locally (omit `--mapping` for `devZapstoreBenchmarkRelease`):
+
+```bash
+python3 scripts/dex_method_budget.py \
+  --apk app/build/outputs/apk/stagingZapstore/release/<arm64-v8a APK> \
+  --mapping app/build/outputs/mapping/stagingZapstoreRelease/mapping.txt \
+  --variant stagingZapstoreRelease \
+  --source-sha "$(git rev-parse HEAD)" \
+  --report-dir build/dex-method-budget
+```
+
+Exit status 1 is a budget violation; 2 is a missing, malformed or mismatched
+input.
+
 ## PR measurement table
 
 Use one physical device and unchanged fixture for both runs. Report medians and
@@ -974,3 +1065,53 @@ the benchmark JSON artifact, and link the relevant traces.
 | Open group → members visible | _ms_ | _ms_ | _%_ |
 
 The mention benchmark retains a three-second collection tail after visible read completion so Compose animation and highlight spans can finish. This is not a completion assertion or a latency budget: the report still rejects missing, unfinished, ambiguous or stale landings. Qualified mention frame metrics use tap-to-landing, excluding the highlight and collection tail; `journey_ms` includes collection time.
+
+## Presentation cache trim policy
+
+`WhiteNoiseApplication.onTrimMemory` handles Android's supported visibility
+signals without initializing an unused app state. UI_HIDDEN (20 and intermediate
+levels below 40) trims each image-cache tier to half its configured capacity.
+BACKGROUND (40+) releases its expendable references. On API 33 and earlier,
+running pressure at 5–14 uses the half-budget target and 15–19 uses zero.
+On API 34+, those retired running-pressure signals are ignored. This follows
+[Android's callback contract](https://developer.android.com/reference/android/content/ComponentCallbacks2).
+No `onLowMemory` dependency, extra lifecycle observer or forced GC is required.
+
+Targets are based on capacity, not current occupancy, so repeating a hidden
+callback does not keep halving a warm cache. These are one-shot trims: admitted
+work may finish and publish through its original account fence, and subsequent
+inserts retain their normal bounded budget. Trimming does not restart acquisition
+or cancel its existing shared request. Existing displayed bitmap/source references
+remain valid; no shared bitmap is recycled. Mounted kept cards hold their thumbnail
+keys against trim only, so a later unrelated cache publication cannot blank them.
+Explicit removal/account teardown still wins over those holds, and disposal releases
+the exact hold. Held pixels can keep occupancy above a trim target, while normal
+insertion capacity stays bounded. Cache-only avatar eviction does not publish a
+picture-change signal that would overwrite a launcher shortcut with initials.
+Later shortcut refreshes also distinguish a missing cache entry from a changed
+selection: the launcher stores only an opaque picture-selection digest alongside
+its existing icon. A still-selected owning source that missed before any
+available fallback, and a current privacy epoch, permit an icon-omitting update.
+An actual clear/replacement, account/cache lifetime change or privacy transition
+cannot retain the old photo. Changes to a lower-priority public fallback do not
+revoke an unchanged private-photo selection. No extra decoded-pixel store is
+introduced. A confirmed cache miss for a previously available attachment
+settles as NotRetained, which permits an explicit retry but does not issue a new
+automatic-download demand; an inconclusive probe keeps its prior state.
+
+The coordinated image tiers are L1 attachment bytes/thumbnails, profile/banner
+pixels and profile animation sources, encrypted-group pixels/sources, public JPEG
+pixels and GIPHY bytes. Durable L2/native media, upload/retry payloads, account
+lifetimes, decoder workers, failure cooldowns, playback and small metadata caches
+are outside this expendable image-retention policy. Avatar eviction counters
+include trim removals; byte totals describe retained references, not measured RSS.
+
+Use STB-006 for the controlled return workload. Unit/Compose regressions check
+exact retained bytes, idempotence, shared-request counts, durable disk retention
+and displayed-pixel/account isolation. They do not measure device RSS, GPU frames
+or establish an existing OOM. Record those runtime measurements separately before
+claiming the corresponding performance qualification. The hosted
+`AvatarCacheScrollDeviceTest.presentationTrimAndWarmReturnCounters` records the
+existing cache, frame and process-memory counters on the same synthetic scroll
+workload around repeated application callbacks. Its raw PSS/heap samples are
+measurements, not a forced-GC estimate or a guaranteed process-memory reduction.

@@ -5,8 +5,11 @@ Normal builds never regenerate bindings from a local MDK checkout. Maintainers
 update the reviewed pin in `app/src/main/marmotkit/MARMOT_VERSION` only after
 MDK has published the corresponding release.
 
-The [official 0.14.0 adoption](marmotkit-0.14.0.md) records the current artifact,
-API compatibility and retained-data qualification. The
+The [30 October nightly](marmotkit-nightly-20261030.md) is the current testing-only
+pin; replace it with the formal `marmotkit-v0.15.0` release once MDK publishes one.
+The [official 0.14.0 adoption](marmotkit-0.14.0.md) records the previous artifact,
+API compatibility and retained-data qualification, and is the populated campaign's
+upgrade baseline. The
 [23 October nightly](marmotkit-nightly-20261023.md) and
 [22 October nightly](marmotkit-nightly-20261022.md) remain historical, testing-only
 evidence bound to their exact revisions and 30-day artifact retention.
@@ -63,7 +66,7 @@ execute: no ignored recovery case can satisfy adoption.
 
 The populated campaign builds current master and the candidate with one disposable
 signer and isolated `.mdkqualification` package. It fails closed if master no
-longer pins the reviewed October 23 source `d274dd22`. Dispatch once on the
+longer pins the reviewed 0.14.0 source `3fb4b475`. Dispatch once on the
 candidate branch and reuse a matching active run:
 
 ```bash

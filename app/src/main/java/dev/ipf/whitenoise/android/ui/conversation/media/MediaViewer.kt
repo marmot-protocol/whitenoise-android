@@ -55,12 +55,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -68,7 +67,9 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.offset
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
@@ -350,6 +351,8 @@ internal fun ConversationMediaViewer(
     onGoToMessage: ((MediaViewerPage) -> Unit)? = null,
     forwardActions: MediaViewerForwardActions? = null,
     imageBytes: (suspend (MediaViewerPage) -> ByteArray)? = null,
+    thumbnails: MediaViewerThumbnailRegistry? = null,
+    icons: MediaViewerChromeIcons = rememberMediaViewerChromeIconProvider().value,
 ) {
     val messagePages =
         remember(messageIdHex, attachments, mine, sender, recordedAt) {
@@ -386,6 +389,8 @@ internal fun ConversationMediaViewer(
         onGoToMessage = onGoToMessage,
         forwardActions = forwardActions,
         imageBytes = imageBytes,
+        thumbnails = thumbnails,
+        icons = icons,
     )
 }
 
@@ -408,6 +413,8 @@ internal fun FullScreenMediaViewer(
     onGoToMessage: ((MediaViewerPage) -> Unit)? = null,
     forwardActions: MediaViewerForwardActions? = null,
     imageBytes: (suspend (MediaViewerPage) -> ByteArray)? = null,
+    thumbnails: MediaViewerThumbnailRegistry? = null,
+    icons: MediaViewerChromeIcons = rememberMediaViewerChromeIconProvider().value,
 ) {
     if (pages.isEmpty()) {
         // Defensive — callers shouldn't open an empty viewer, but guard so the
@@ -548,208 +555,258 @@ internal fun FullScreenMediaViewer(
             DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_ABBREV_ALL,
         )
 
+    var closingMotion by remember { mutableStateOf(false) }
+    val openingMotionAttachment =
+        remember {
+            ConversationMediaViewerAttachmentId(
+                pages[startIndex.coerceIn(pages.indices)].messageIdHex,
+                pages[startIndex.coerceIn(pages.indices)].attachmentIndex,
+            )
+        }
+    val dismissWithMotion: () -> Unit = { closingMotion = true }
+
     PlaybackDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = dismissWithMotion,
+        onSourceDismiss = onDismiss,
         properties =
             DialogProperties(
                 usePlatformDefaultWidth = false,
                 decorFitsSystemWindows = false,
             ),
     ) {
-        MediaViewerFrame(
-            senderLabel = appState.displayName(currentPage.sender),
-            recordedAtLabel = currentRecordedAtLabel,
-            currentPosition = currentPageIndex + 1,
-            pageCount = pages.size,
-            actionOwner = currentPage,
-            onGoToMessage =
-                onGoToMessage?.let {
-                    { actionGate.dispatch(currentPage, currentActionOwner()) { latestGoToMessage?.invoke(it) } }
-                },
-            onForwardMessage =
-                forwardActions?.takeIf { it.canForward(currentPage) }?.let {
-                    {
-                        actionGate.dispatch(currentPage, currentActionOwner()) { page ->
-                            if (latestForwardActions?.forward(page) == true) onDismiss()
-                        }
-                    }
-                },
-            onSetGroupPicture =
-                if (canSetViewerGroupPicture(
-                        controller.isDm,
-                        controller.isSelfMember,
-                        controller.isSelfAdmin,
-                        pictureSession.isCurrent(),
-                        currentPage,
-                    )
-                ) {
-                    {
-                        actionGate.dispatch(currentPage, currentActionOwner()) { page ->
-                            scope.launch {
-                                pictureSession.choose(page, read = { selected ->
-                                    val bytes =
-                                        attachmentBytes(
-                                            controller,
-                                            selected.messageIdHex,
-                                            selected.attachmentIndex,
-                                            selected.reference,
-                                            selected.mine,
-                                            maxBytes = IDENTITY_IMAGE_SOURCE_MAX_BYTES.toLong(),
-                                        )
-                                    loadGroupAttachmentCropSource(bytes, selected.reference.mediaType)
-                                }, failure = ::pictureFailure)
+        MediaViewerMotion(
+            registry = thumbnails,
+            opening = openingMotionAttachment,
+            selected =
+                ConversationMediaViewerAttachmentId(
+                    currentPage.messageIdHex,
+                    currentPage.attachmentIndex,
+                ),
+            closing = closingMotion,
+            allowMotion =
+                mediaViewerPlatformMotionAllowed(
+                    MediaReferenceSupport.isVideoMedia(currentReference),
+                    android.os.Build.VERSION.SDK_INT,
+                ) &&
+                    scale == 1f &&
+                    offset == Offset.Zero &&
+                    (
+                        closingMotion ||
+                            openingMotionAttachment ==
+                            ConversationMediaViewerAttachmentId(
+                                currentPage.messageIdHex,
+                                currentPage.attachmentIndex,
+                            )
+                    ),
+            onClosed = onDismiss,
+            selectedSourceEpoch = currentReference.sourceEpoch,
+            attachmentAspectRatio = aspectRatioFromDim(currentReference.dim),
+        ) { motionBodyModifier ->
+            MediaViewerFrame(
+                senderLabel = appState.displayName(currentPage.sender),
+                recordedAtLabel = currentRecordedAtLabel,
+                currentPosition = currentPageIndex + 1,
+                pageCount = pages.size,
+                actionOwner = currentPage,
+                onGoToMessage =
+                    onGoToMessage?.let {
+                        { actionGate.dispatch(currentPage, currentActionOwner()) { latestGoToMessage?.invoke(it) } }
+                    },
+                onForwardMessage =
+                    forwardActions?.takeIf { it.canForward(currentPage) }?.let {
+                        {
+                            actionGate.dispatch(currentPage, currentActionOwner()) { page ->
+                                if (latestForwardActions?.forward(page) == true) onDismiss()
                             }
                         }
-                    }
-                } else {
-                    null
-                },
-            groupPictureBusy = pictureSession.busy,
-            onDismiss = onDismiss,
-            onSave = {
-                val ref = currentReference
-                val attachmentIndex = currentAttachmentIndex
-                val msgId = currentMessageIdHex
-                val owned = currentMine
-                scope.launch {
-                    val outcome =
-                        runCatchingCancellable {
-                            val saved =
-                                if (MediaReferenceSupport.isVideoMedia(ref)) {
-                                    withMaterializedVideoFile(context, controller, msgId, attachmentIndex, ref, owned) {
-                                        withContext(Dispatchers.IO) {
-                                            saveVideoToGallery(context, it, ref.fileName, ref.mediaType)
-                                        }
-                                    }
-                                } else {
-                                    // An explicit Save streams the whole verified image into MediaStore, so it is
-                                    // neither bounded by the preview budget nor read into one array.
-                                    attachmentSource(controller, msgId, attachmentIndex, ref, owned).use { source ->
-                                        withContext(Dispatchers.IO) {
-                                            saveImageToGallery(context, source, ref.fileName, ref.mediaType)
-                                        }
-                                    }
+                    },
+                onSetGroupPicture =
+                    if (canSetViewerGroupPicture(
+                            controller.isDm,
+                            controller.isSelfMember,
+                            controller.isSelfAdmin,
+                            pictureSession.isCurrent(),
+                            currentPage,
+                        )
+                    ) {
+                        {
+                            actionGate.dispatch(currentPage, currentActionOwner()) { page ->
+                                scope.launch {
+                                    pictureSession.choose(page, read = { selected ->
+                                        val bytes =
+                                            attachmentBytes(
+                                                controller,
+                                                selected.messageIdHex,
+                                                selected.attachmentIndex,
+                                                selected.reference,
+                                                selected.mine,
+                                                maxBytes = IDENTITY_IMAGE_SOURCE_MAX_BYTES.toLong(),
+                                            )
+                                        loadGroupAttachmentCropSource(bytes, selected.reference.mediaType)
+                                    }, failure = ::pictureFailure)
                                 }
-                            check(saved) { "MediaStore save returned false" }
+                            }
                         }
-                    snackbarHostState.showSnackbar(
-                        mediaSaveSnackbarVisuals(
-                            context = context,
-                            outcome = outcome,
-                            successTitleRes = R.string.media_saved,
-                            failureTitleRes = R.string.media_save_failed,
-                            operationCode = "MEDIA_VIEWER_SAVE",
-                        ),
-                    )
-                }
-            },
-            onShare = {
-                val request =
-                    MediaViewerShareRequest(
-                        messageIdHex = currentMessageIdHex,
-                        attachmentIndex = currentAttachmentIndex,
-                        reference = currentReference,
-                        mine = currentMine,
-                    )
-                scope.launch {
-                    runCatchingCancellable {
-                        when {
-                            onShareRequest != null -> onShareRequest(request).getOrThrow()
-                            MediaReferenceSupport.isVideoMedia(request.reference) ->
-                                withMaterializedVideoFile(
-                                    context,
-                                    controller,
-                                    request.messageIdHex,
-                                    request.attachmentIndex,
-                                    request.reference,
-                                    request.mine,
-                                ) { file ->
-                                    shareVideo(
+                    } else {
+                        null
+                    },
+                groupPictureBusy = pictureSession.busy,
+                actionsEnabled = !closingMotion,
+                onDismiss = dismissWithMotion,
+                onSave = {
+                    val ref = currentReference
+                    val attachmentIndex = currentAttachmentIndex
+                    val msgId = currentMessageIdHex
+                    val owned = currentMine
+                    scope.launch {
+                        val outcome =
+                            runCatchingCancellable {
+                                val saved =
+                                    if (MediaReferenceSupport.isVideoMedia(ref)) {
+                                        withMaterializedVideoFile(
+                                            context,
+                                            controller,
+                                            msgId,
+                                            attachmentIndex,
+                                            ref,
+                                            owned,
+                                        ) {
+                                            withContext(Dispatchers.IO) {
+                                                saveVideoToGallery(context, it, ref.fileName, ref.mediaType)
+                                            }
+                                        }
+                                    } else {
+                                        // An explicit Save streams the whole verified image into MediaStore, so it is
+                                        // neither bounded by the preview budget nor read into one array.
+                                        attachmentSource(controller, msgId, attachmentIndex, ref, owned).use { source ->
+                                            withContext(Dispatchers.IO) {
+                                                saveImageToGallery(context, source, ref.fileName, ref.mediaType)
+                                            }
+                                        }
+                                    }
+                                check(saved) { "MediaStore save returned false" }
+                            }
+                        snackbarHostState.showSnackbar(
+                            mediaSaveSnackbarVisuals(
+                                context = context,
+                                outcome = outcome,
+                                successTitleRes = R.string.media_saved,
+                                failureTitleRes = R.string.media_save_failed,
+                                operationCode = "MEDIA_VIEWER_SAVE",
+                            ),
+                        )
+                    }
+                },
+                onShare = {
+                    val request =
+                        MediaViewerShareRequest(
+                            messageIdHex = currentMessageIdHex,
+                            attachmentIndex = currentAttachmentIndex,
+                            reference = currentReference,
+                            mine = currentMine,
+                        )
+                    scope.launch {
+                        runCatchingCancellable {
+                            when {
+                                onShareRequest != null -> onShareRequest(request).getOrThrow()
+                                MediaReferenceSupport.isVideoMedia(request.reference) ->
+                                    withMaterializedVideoFile(
                                         context,
-                                        file,
-                                        request.reference.fileName,
-                                        request.reference.mediaType,
-                                    ).getOrThrow()
-                                }
-                            else ->
-                                // An explicit Share stages the whole verified image through the message share cache,
-                                // streamed from its source, so it is never read into one array. Leaving the viewer
-                                // cancels this scope, which stops staging and opens no share sheet.
-                                shareAttachmentExternally(
-                                    context = context,
-                                    attachmentIndex = request.attachmentIndex,
-                                    reference = request.reference,
-                                    chooserTitle = shareChooserTitle,
-                                    isCurrent = { true },
-                                ) {
-                                    attachmentSource(
                                         controller,
                                         request.messageIdHex,
                                         request.attachmentIndex,
                                         request.reference,
                                         request.mine,
-                                    )
-                                }
-                        }
-                    }.onFailure { error ->
-                        if (MediaReferenceSupport.isVideoMedia(request.reference)) {
-                            appState.presentMediaLaunchFailure(
-                                R.string.media_couldnt_open,
-                                "MEDIA_VIEWER_VIDEO_SHARE",
-                                error,
-                            )
-                        } else {
-                            appState.presentMediaLaunchFailure(
-                                R.string.media_couldnt_open,
-                                "MEDIA_VIEWER_IMAGE_SHARE",
-                                error,
-                            )
+                                    ) { file ->
+                                        shareVideo(
+                                            context,
+                                            file,
+                                            request.reference.fileName,
+                                            request.reference.mediaType,
+                                        ).getOrThrow()
+                                    }
+                                else ->
+                                    // Explicit Share stages the verified image through the message cache,
+                                    // streamed from its source, so it is never read into one array. Leaving the viewer
+                                    // cancels this scope, which stops staging and opens no share sheet.
+                                    shareAttachmentExternally(
+                                        context = context,
+                                        attachmentIndex = request.attachmentIndex,
+                                        reference = request.reference,
+                                        chooserTitle = shareChooserTitle,
+                                        isCurrent = { true },
+                                    ) {
+                                        attachmentSource(
+                                            controller,
+                                            request.messageIdHex,
+                                            request.attachmentIndex,
+                                            request.reference,
+                                            request.mine,
+                                        )
+                                    }
+                            }
+                        }.onFailure { error ->
+                            if (MediaReferenceSupport.isVideoMedia(request.reference)) {
+                                appState.presentMediaLaunchFailure(
+                                    R.string.media_couldnt_open,
+                                    "MEDIA_VIEWER_VIDEO_SHARE",
+                                    error,
+                                )
+                            } else {
+                                appState.presentMediaLaunchFailure(
+                                    R.string.media_couldnt_open,
+                                    "MEDIA_VIEWER_IMAGE_SHARE",
+                                    error,
+                                )
+                            }
                         }
                     }
-                }
-            },
-            snackbarHostState = snackbarHostState,
-            chromeVisible = chromeVisible,
-        ) {
-            StableMediaViewerPager(
-                pages = pages,
-                selection = pagerSelection,
-                modifier = Modifier.fillMaxSize(),
-                pagePositionDescription = pagePositionDescription,
-                // Disable pager swipe while the visible page is zoomed in —
-                // otherwise the pan gesture and the pager's swipe both want
-                // the horizontal drag. At scale 1× the pager wins.
-                userScrollEnabled = viewerPagerScrollEnabled(scale),
-            ) { pageDescriptor, isCurrent ->
-                if (MediaReferenceSupport.isVideoMedia(pageDescriptor.reference)) {
-                    VideoViewerPage(
-                        controller = controller,
-                        messageIdHex = pageDescriptor.messageIdHex,
-                        attachmentIndex = pageDescriptor.attachmentIndex,
-                        reference = pageDescriptor.reference,
-                        isCurrent = isCurrent,
-                        mine = pageDescriptor.mine,
-                        onPlayerChanged = onVideoPlayerChanged,
-                        videoFileResolver = videoFileResolver,
-                        // One tap reveals or hides Media3's controls and the viewer chrome together, and they
-                        // time out together while playing, so the frame and time bar are never covered.
-                        onControllerVisibilityChange = { visible -> if (isCurrent) chromeVisible = visible },
-                    )
-                } else {
-                    ViewerPage(
-                        controller = controller,
-                        messageIdHex = pageDescriptor.messageIdHex,
-                        attachmentIndex = pageDescriptor.attachmentIndex,
-                        reference = pageDescriptor.reference,
-                        scale = if (isCurrent) scale else 1f,
-                        offset = if (isCurrent) offset else Offset.Zero,
-                        onScaleChange = { if (isCurrent) scale = it },
-                        onOffsetChange = { if (isCurrent) offset = it },
-                        mine = pageDescriptor.mine,
-                        isCurrent = isCurrent,
-                        onChromeToggle = { if (isCurrent) chromeVisible = !chromeVisible },
-                        imageBytes = imageBytes?.let { loader -> { loader(pageDescriptor) } },
-                    )
+                },
+                snackbarHostState = snackbarHostState,
+                chromeVisible = chromeVisible,
+                bodyModifier = motionBodyModifier,
+                icons = icons,
+            ) {
+                StableMediaViewerPager(
+                    pages = pages,
+                    selection = pagerSelection,
+                    modifier = Modifier.fillMaxSize(),
+                    pagePositionDescription = pagePositionDescription,
+                    // Disable pager swipe while the visible page is zoomed in —
+                    // otherwise the pan gesture and the pager's swipe both want
+                    // the horizontal drag. At scale 1× the pager wins.
+                    userScrollEnabled = viewerPagerScrollEnabled(scale),
+                ) { pageDescriptor, isCurrent ->
+                    if (MediaReferenceSupport.isVideoMedia(pageDescriptor.reference)) {
+                        VideoViewerPage(
+                            controller = controller,
+                            messageIdHex = pageDescriptor.messageIdHex,
+                            attachmentIndex = pageDescriptor.attachmentIndex,
+                            reference = pageDescriptor.reference,
+                            isCurrent = isCurrent,
+                            mine = pageDescriptor.mine,
+                            onPlayerChanged = onVideoPlayerChanged,
+                            videoFileResolver = videoFileResolver,
+                            // One tap reveals or hides Media3's controls and the viewer chrome together, and they
+                            // time out together while playing, so the frame and time bar are never covered.
+                            onControllerVisibilityChange = { visible -> if (isCurrent) chromeVisible = visible },
+                        )
+                    } else {
+                        ViewerPage(
+                            controller = controller,
+                            messageIdHex = pageDescriptor.messageIdHex,
+                            attachmentIndex = pageDescriptor.attachmentIndex,
+                            reference = pageDescriptor.reference,
+                            scale = if (isCurrent) scale else 1f,
+                            offset = if (isCurrent) offset else Offset.Zero,
+                            onScaleChange = { if (isCurrent) scale = it },
+                            onOffsetChange = { if (isCurrent) offset = it },
+                            mine = pageDescriptor.mine,
+                            isCurrent = isCurrent,
+                            onChromeToggle = { if (isCurrent) chromeVisible = !chromeVisible },
+                            imageBytes = imageBytes?.let { loader -> { loader(pageDescriptor) } },
+                        )
+                    }
                 }
             }
         }
@@ -810,11 +867,13 @@ internal fun MediaViewerFrame(
     chromeVisible: Boolean = true,
     onSetGroupPicture: (() -> Unit)? = null,
     groupPictureBusy: Boolean = false,
+    bodyModifier: Modifier = Modifier,
+    actionsEnabled: Boolean = true,
+    icons: MediaViewerChromeIcons = rememberMediaViewerChromeIconProvider().value,
     body: @Composable BoxScope.() -> Unit,
 ) {
     var moreExpanded by remember(actionOwner) { mutableStateOf(false) }
-    var topChromeHeight by remember { mutableStateOf(0.dp) }
-    val density = LocalDensity.current
+    var topChromeHeight by remember { mutableIntStateOf(0) }
     // An open overflow menu keeps its chrome until dismissed, even when a video's controls time out under it.
     val chromeShown = chromeVisible || moreExpanded
     // The viewer's own snackbars sit below its top chrome, like every temporary banner (#3312).
@@ -830,7 +889,7 @@ internal fun MediaViewerFrame(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .onSizeChanged { topChromeHeight = with(density) { it.height.toDp() } }
+                        .onSizeChanged { topChromeHeight = it.height }
                         .testTag(MEDIA_VIEWER_TOP_CHROME_TAG),
                 color = MaterialTheme.colorScheme.background,
                 contentColor = MaterialTheme.colorScheme.onBackground,
@@ -845,9 +904,7 @@ internal fun MediaViewerFrame(
                             .padding(horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
-                        Icon(painterResource(R.drawable.ic_close), contentDescription = stringResource(R.string.close))
-                    }
+                    MediaViewerCloseButton(onDismiss = onDismiss, enabled = actionsEnabled, icon = icons.close)
                     Column(Modifier.weight(1f).padding(horizontal = 8.dp)) {
                         Text(
                             text = senderLabel,
@@ -873,14 +930,18 @@ internal fun MediaViewerFrame(
                         )
                     }
                     Box {
-                        IconButton(onClick = { moreExpanded = true }, modifier = Modifier.size(48.dp)) {
+                        IconButton(
+                            onClick = { moreExpanded = true },
+                            enabled = actionsEnabled,
+                            modifier = Modifier.size(48.dp),
+                        ) {
                             Icon(
-                                painterResource(R.drawable.ic_more_vert),
+                                icons.more,
                                 contentDescription = stringResource(R.string.more_options),
                             )
                         }
                         WhiteNoiseDropdownMenu(
-                            expanded = moreExpanded,
+                            expanded = moreExpanded && actionsEnabled,
                             onDismissRequest = { moreExpanded = false },
                             items =
                                 buildList {
@@ -889,6 +950,7 @@ internal fun MediaViewerFrame(
                                             label = stringResource(R.string.media_save),
                                             icon = R.drawable.ic_download,
                                             onClick = onSave,
+                                            enabled = actionsEnabled,
                                         ),
                                     )
                                     if (onSetGroupPicture != null) {
@@ -897,7 +959,7 @@ internal fun MediaViewerFrame(
                                                 label = stringResource(R.string.media_set_group_picture),
                                                 icon = R.drawable.ic_image,
                                                 onClick = onSetGroupPicture,
-                                                enabled = !groupPictureBusy,
+                                                enabled = actionsEnabled && !groupPictureBusy,
                                             ),
                                         )
                                     }
@@ -907,6 +969,7 @@ internal fun MediaViewerFrame(
                                                 label = stringResource(R.string.shared_content_go_to_message),
                                                 icon = R.drawable.ic_settings_chat_bubble_outline,
                                                 onClick = onGoToMessage,
+                                                enabled = actionsEnabled,
                                             ),
                                         )
                                     }
@@ -925,6 +988,7 @@ internal fun MediaViewerFrame(
                 Modifier
                     .fillMaxSize()
                     .windowInsetsPadding(contentWindowInsets.only(mediaViewerContentInsetSides(chromeShown)))
+                    .then(bodyModifier)
                     .testTag(MEDIA_VIEWER_CONTENT_TAG),
             content = body,
         )
@@ -951,17 +1015,19 @@ internal fun MediaViewerFrame(
                 ) {
                     IconButton(
                         onClick = onShare,
+                        enabled = actionsEnabled,
                         modifier = Modifier.size(48.dp).testTag("conversation.media.viewer.share"),
                     ) {
-                        Icon(painterResource(R.drawable.ic_share), contentDescription = stringResource(R.string.share))
+                        Icon(icons.share, contentDescription = stringResource(R.string.share))
                     }
                     if (onForwardMessage != null) {
                         IconButton(
                             onClick = onForwardMessage,
+                            enabled = actionsEnabled,
                             modifier = Modifier.size(48.dp).testTag("conversation.media.viewer.forward"),
                         ) {
                             Icon(
-                                painterResource(R.drawable.ic_forward),
+                                icons.forward,
                                 contentDescription = stringResource(R.string.media_viewer_forward_message),
                             )
                         }
@@ -996,14 +1062,20 @@ internal fun MediaViewerFrame(
             modifier =
                 Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = if (chromeShown) topChromeHeight else 0.dp)
-                    .windowInsetsPadding(contentWindowInsets.only(snackbarInsetSides)),
+                    .layout { measurable, constraints ->
+                        // Read measured chrome in layout, without recomposing the viewer after its first measure.
+                        val inset = if (chromeShown) topChromeHeight else 0
+                        val placeable = measurable.measure(constraints.offset(vertical = -inset))
+                        layout(placeable.width, constraints.constrainHeight(placeable.height + inset)) {
+                            placeable.placeRelative(0, inset)
+                        }
+                    }.windowInsetsPadding(contentWindowInsets.only(snackbarInsetSides)),
             snackbar = { SwipeDismissibleSnackbar(it) },
         )
     }
 }
 
-/** One page of the media viewer for a message attachment. */
+/** One viewer page; prepares its current decoded still for display before publishing the pixels. */
 @Composable
 internal fun ViewerPage(
     controller: ConversationController,
@@ -1093,6 +1165,10 @@ internal fun ViewerPage(
                     staticMaxEdgePx = MediaPipeline.VIEWER_MAX_EDGE_PX,
                 )
             if (decoded != null) {
+                if (decoded is DecodedAttachmentPresentation.Static) {
+                    // Queue the asynchronous texture upload before the next draw needs these pixels.
+                    decoded.bitmap.prepareToDraw()
+                }
                 presentation = decoded
             } else if (!promoteAnimation) {
                 viewerFailed = true

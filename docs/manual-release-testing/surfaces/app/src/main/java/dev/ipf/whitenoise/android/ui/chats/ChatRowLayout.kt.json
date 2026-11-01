@@ -1,0 +1,62 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowLayout.kt",
+  "legacy_sha256": "d6c943acc1dc1761bc46464880b694c183dd6fe96f5b84e85ad4be1e40e27f97",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Custom emoji authored labels: ChatRowLayout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowLayout.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "ChatRowDeliveryGlyph",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowLayout.kt",
+        "anchor": "fun ChatRowDeliveryGlyph(",
+        "test_ids": [
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "ChatRowLayout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowLayout.kt",
+        "anchor": "fun ChatRowLayout(",
+        "test_ids": [
+          "CHL-001",
+          "CHL-002",
+          "CHL-011"
+        ]
+      },
+      {
+        "surface": "ChatRowSelectionIndicator",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowLayout.kt",
+        "anchor": "fun ChatRowSelectionIndicator(",
+        "test_ids": [
+          "CHL-001",
+          "CHL-002",
+          "CHL-011"
+        ]
+      },
+      {
+        "surface": "ChatRowSupportingMetadata",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowLayout.kt",
+        "anchor": "fun ChatRowSupportingMetadata(",
+        "test_ids": [
+          "CHL-001"
+        ]
+      },
+      {
+        "surface": "ChatRowTextLayout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowLayout.kt",
+        "anchor": "fun ChatRowTextLayout(",
+        "test_ids": [
+          "CHL-002",
+          "CHL-011"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -17,7 +17,7 @@
       {
         "surface": "Optional recovery does not insert persistent dictation or notification-permission controls",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShellNoticeLayout.kt",
-        "anchor": "dictationController.hasDurableSession && dictationController.completionControlsRequired",
+        "anchor": "dictationController.completionControlsRequired",
         "test_ids": [
           "DIC-002"
         ]

@@ -808,12 +808,13 @@
         ]
       },
       {
-        "surface": "An accepted-pending text send settles its chat-list delivery indicator after navigation",
+        "surface": "Native-owned pending text sends settle after navigation without blocking later admission on host recovery",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
-        "anchor": "private suspend fun convergeAcceptedPendingTextSend(",
+        "anchor": "suspend fun send(",
         "test_ids": [
           "CON-004",
-          "CHL-002"
+          "CHL-002",
+          "MSG-017"
         ]
       },
       {
@@ -913,6 +914,14 @@
           "STB-002"
         ],
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "surface": "Same account/runtime retained controller admission",
+        "anchor": "val ownsRetainedForegroundPresentation: Boolean",
+        "test_ids": [
+          "CON-033"
+        ]
       },
       {
         "surface": "A later page reads the cached cards of its new rows before it is applied, so they first show complete",

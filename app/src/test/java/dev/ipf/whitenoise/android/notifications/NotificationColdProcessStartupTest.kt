@@ -39,7 +39,7 @@ class NotificationColdProcessStartupTest {
                 assertNotNull(manager.getNotificationChannel(NotificationChannelSpec.GROUP_MESSAGES.id))
                 assertEquals(
                     1,
-                    manager.activeNotifications.size,
+                    manager.activeNotifications.count { UserEventNotificationGroup.child(it) != null },
                 )
             } finally {
                 manager.activeNotifications.forEach { manager.cancel(it.tag, it.id) }
@@ -50,7 +50,7 @@ class NotificationColdProcessStartupTest {
     private fun waitForNotification(manager: NotificationManager) {
         val deadline = System.nanoTime() + 5_000_000_000L
         while (
-            manager.activeNotifications.isEmpty() &&
+            manager.activeNotifications.none { UserEventNotificationGroup.child(it) != null } &&
             System.nanoTime() < deadline
         ) {
             shadowOf(Looper.getMainLooper()).idle()
