@@ -233,7 +233,7 @@ internal class IsolatedMediaTransport(
     ): Boolean {
         val accepted =
             try {
-                require(response != null && flags == 0)
+                require(response != null && flags and IBinder.FLAG_ONEWAY == 0)
                 require(data.dataSize() <= AutomaticAvIdentity.MAX_BYTES && !data.hasFileDescriptors())
                 data.enforceInterface(AutomaticAvIdentity.DESCRIPTOR)
                 require(

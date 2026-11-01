@@ -93,7 +93,7 @@ class NativeMediaSandboxDeviceTest {
                 data.enforceInterface(NativeSandboxProbe.DESCRIPTOR)
                 val kind = data.readInt()
                 val oneWay = kind == NativeSandboxProbe.TIMED_OUT
-                check(flags == if (oneWay) IBinder.FLAG_ONEWAY else 0)
+                check((flags and IBinder.FLAG_ONEWAY != 0) == oneWay)
                 check(oneWay || reply != null)
                 check(data.readInt() == mode)
                 val count = data.readInt()
@@ -178,7 +178,7 @@ class NativeMediaSandboxDeviceTest {
                 context.bindIsolatedService(
                     Intent(context, NativeMediaSandboxProbeService::class.java),
                     Context.BIND_AUTO_CREATE,
-                    "native-sandbox-${sequence.incrementAndGet()}",
+                    workerInstanceName("native_sandbox", sequence.incrementAndGet()),
                     context.mainExecutor,
                     connection,
                 ),

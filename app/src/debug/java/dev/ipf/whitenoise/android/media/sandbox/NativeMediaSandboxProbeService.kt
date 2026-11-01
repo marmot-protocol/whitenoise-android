@@ -22,7 +22,12 @@ class NativeMediaSandboxProbeService : Service() {
             @Suppress("ReturnCount") // Reject non-isolated, malformed and repeated qualification capabilities.
             override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
                 if (!Process.isIsolated() || code != NativeSandboxProbe.RUN || admitted) return false
-                if (flags != 0 || reply == null || data.dataSize() > NativeSandboxProbe.MAX_BYTES) return false
+                if (flags and IBinder.FLAG_ONEWAY != 0 ||
+                    reply == null ||
+                    data.dataSize() > NativeSandboxProbe.MAX_BYTES
+                ) {
+                    return false
+                }
                 data.enforceInterface(NativeSandboxProbe.DESCRIPTOR)
                 val mode = data.readInt()
                 val callback = data.readStrongBinder() ?: return false

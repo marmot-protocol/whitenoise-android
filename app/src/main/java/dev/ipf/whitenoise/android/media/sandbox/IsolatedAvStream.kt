@@ -147,7 +147,7 @@ internal class IsolatedAvStream private constructor(
                 reply: Parcel?,
                 flags: Int,
             ): Boolean {
-                if (code != AvStreamProtocol.READY || reply == null || flags != 0) return false
+                if (code != AvStreamProtocol.READY || reply == null || flags and IBinder.FLAG_ONEWAY != 0) return false
                 val accepted =
                     try {
                         require(data.dataSize() <= AvStreamProtocol.MAX_REPLY_BYTES && !data.hasFileDescriptors())

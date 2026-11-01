@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.os.Binder
 import android.os.HandlerThread
+import android.os.IBinder
 import android.os.Parcel
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
@@ -134,6 +135,18 @@ class AvStreamPreferredProtocolTest {
         }
     }
 
+    @Test
+    fun readyAcceptsDriverTransportFlagsButRefusesOnewayWithoutCalibratingIdentity() {
+        for (flags in listOf(0x10, 0x10 or IBinder.FLAG_ONEWAY)) {
+            StreamFixture(ready = false).use { fixture ->
+                val accepted = fixture.deliverReady(flags)
+                assertEquals(flags and IBinder.FLAG_ONEWAY == 0, accepted)
+                assertEquals(accepted, fixture.identityCalibrated())
+                assertEquals(accepted, fixture.stream.isolation != null)
+            }
+        }
+    }
+
     private fun readFailure(action: () -> AvStreamFrame): Throwable? {
         val failure = runCatching(action).exceptionOrNull()
         assertTrue("Expected a completed caller RPC failure, not a test deadline", failure is ExecutionException)
@@ -144,6 +157,7 @@ class AvStreamPreferredProtocolTest {
     private class StreamFixture(
         video: Boolean = true,
         audio: Boolean = true,
+        ready: Boolean = true,
     ) : AutoCloseable {
         val selectors = CopyOnWriteArrayList<Int>()
         var values = LongArray(7)
@@ -153,6 +167,12 @@ class AvStreamPreferredProtocolTest {
         private val epoch: Long
         val stream: IsolatedAvStream
         val lifetime: AvStreamLifetime
+        private val uid = android.os.Process.myUid() + 1
+        private val pid = android.os.Process.myPid() + 1
+        private val witness =
+            KernelProcessWitness { _, _ ->
+                throw android.system.ErrnoException("kill", android.system.OsConstants.EPERM)
+            }
 
         init {
             @Suppress("UNCHECKED_CAST")
@@ -169,7 +189,8 @@ class AvStreamPreferredProtocolTest {
             lifetime = field(stream, "lifetime") as AvStreamLifetime
             // This fixture created no AMS binding; preserve normal cleanup without asserting kernel death.
             lifetime.neverBound()
-            setField("readyIdentity", 101 to 201)
+            if (ready) setField("readyIdentity", 101 to 201)
+            setField("processWitness", witness)
             setField("deathRegistered", true)
             setField("endpoint", endpoint())
             assertSame(stream, admissions.reserve(AvStreamLane.Analysis, epoch) { stream })
@@ -205,6 +226,41 @@ class AvStreamPreferredProtocolTest {
                     return true
                 }
             }
+
+        fun identityCalibrated(): Boolean = witness.acceptsCaller(uid, pid)
+
+        fun deliverReady(flags: Int): Boolean {
+            val data = Parcel.obtain()
+            val reply = Parcel.obtain()
+            val identity =
+                org.robolectric.shadows.ShadowBinder.CallingIdentity
+                    .newBuilder()
+                    .setUid(uid)
+                    .setPid(pid)
+                    .setUserHandle(android.os.Process.myUserHandle())
+                    .build()
+            val previous =
+                org.robolectric.shadows.ShadowBinder
+                    .setCallingIdentityForCurrentThread(identity)
+            return try {
+                data.writeInterfaceToken(AvStreamProtocol.READY_DESCRIPTOR)
+                data.writeString(field(stream, "token") as String)
+                data.writeInt(1)
+                data.writeInt(0)
+                data.writeInt(0)
+                data.writeInt(android.system.OsConstants.EACCES)
+                data.writeInt(android.system.OsConstants.EBADF)
+                val accepted =
+                    (field(stream, "readyCallback") as IBinder).transact(AvStreamProtocol.READY, data, reply, flags)
+                if (accepted) assertEquals(1, reply.readInt())
+                accepted
+            } finally {
+                org.robolectric.shadows.ShadowBinder
+                    .setCallingIdentityForCurrentThread(previous)
+                reply.recycle()
+                data.recycle()
+            }
+        }
 
         fun read(selector: Int? = null): AvStreamFrame =
             caller

@@ -1175,6 +1175,48 @@ class MediaBindingRecoveryTest {
         }
     }
 
+    @Test
+    fun driverFlagsPermitSynchronousIdentityWhileOnewayCannotReleaseAnUncalibratedWorker() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
+        context.holdIdentity = true
+        val transport =
+            IsolatedMediaTransport(
+                context,
+                "automatic_av",
+                MediaAvDecodeService::class.java,
+                processWitnessFactory = context::processWitness,
+            )
+        val file = java.io.File.createTempFile("av-identity-flags-", ".bin")
+        val calls = mutableListOf<AutomaticCall>()
+        try {
+            file.writeBytes(byteArrayOf(1))
+            val first = startAutomatic { transport.probe(file, 1, false) }.also { calls += it }
+            val worker = context.next()
+            assertTrue(worker.remote.identityRequested.await(2, TimeUnit.SECONDS))
+            assertFalse(worker.remote.deliverIdentity(0x10 or IBinder.FLAG_ONEWAY))
+            first.join()
+            assertNull(first.result.get())
+            assertEquals(0, worker.remote.requests)
+            worker.remote.dieBinderOnly()
+            context.kernelErrnoOverride = android.system.OsConstants.ESRCH
+            assertAutomaticRequestHeld(transport, file, calls)
+            assertEquals(1, context.bindings.size)
+            assertFalse(transport.isRequestDispatchedForTest())
+            // A late synchronous callback calibrates only cleanup; it never revives the retired request.
+            context.kernelErrnoOverride = null
+            assertFalse(worker.remote.deliverIdentity(0x10))
+            worker.remote.processAlive = false
+            assertTrue(awaitAutomaticRelease(transport))
+            assertEquals(0, worker.remote.requests)
+        } finally {
+            calls.forEach { it.interruptAndJoin() }
+            context.dieAll()
+            transport.close()
+            stopAutomaticObserver(transport)
+            file.delete()
+        }
+    }
+
     private fun assertAutomaticRequestHeld(
         transport: IsolatedMediaTransport,
         file: java.io.File,
@@ -1629,7 +1671,7 @@ class MediaBindingRecoveryTest {
             dieBinderOnly()
         }
 
-        fun deliverIdentity(): Boolean {
+        fun deliverIdentity(transportFlags: Int = 0x10): Boolean {
             val (callback, request) = checkNotNull(heldIdentity)
             val identity =
                 org.robolectric.shadows.ShadowBinder.CallingIdentity
@@ -1642,7 +1684,16 @@ class MediaBindingRecoveryTest {
                 org.robolectric.shadows.ShadowBinder
                     .setCallingIdentityForCurrentThread(identity)
             return try {
-                sendAutomaticAvIdentity(callback, request)
+                val transport =
+                    object : IBinder by callback {
+                        override fun transact(
+                            code: Int,
+                            data: Parcel,
+                            reply: Parcel?,
+                            flags: Int,
+                        ): Boolean = callback.transact(code, data, reply, flags or transportFlags)
+                    }
+                sendAutomaticAvIdentity(transport, request)
             } finally {
                 org.robolectric.shadows.ShadowBinder
                     .setCallingIdentityForCurrentThread(previous)
