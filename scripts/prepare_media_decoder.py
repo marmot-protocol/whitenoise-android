@@ -227,22 +227,26 @@ def audit_elf(path, abi, dynamic):
 
 
 def write_pkg_config(path, dav1d_prefix, version):
-    # FFmpeg only needs these pkg-config queries for its one explicit external library.
+    # Exact queries from pinned FFmpeg's presence probe and dav1d test_pkg_config.
+    require(re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version) and
+            tuple(map(int, version.split("."))) >= (1, 0, 0), "dav1d version below required minimum")
     program = """#!PYTHON
 import sys
-args = sys.argv[1:]
-if not any(value == 'dav1d' or value.startswith('dav1d ') for value in args):
+queries = {
+    ('--version',): 'whitenoise-dav1d-pkg-config-shim 1',
+    ('--exists', '--print-errors', 'dav1d >= 1.0.0'): None,
+    ('--exists', 'dav1d'): None,
+    ('--modversion', 'dav1d'): VERSION,
+    ('--variable=libdir', 'dav1d'): PREFIX + '/lib',
+    ('--variable=includedir', 'dav1d'): PREFIX + '/include',
+    ('--cflags', 'dav1d'): '-I' + PREFIX + '/include',
+    ('--libs', 'dav1d'): '-L' + PREFIX + '/lib -ldav1d -pthread -lm',
+}
+args = tuple(sys.argv[1:])
+if args not in queries:
     sys.exit(1)
-if '--variable=libdir' in args:
-    print(PREFIX + '/lib')
-elif '--modversion' in args:
-    print(VERSION)
-elif '--cflags' in args:
-    print('-I' + PREFIX + '/include')
-elif '--libs' in args:
-    print('-L' + PREFIX + '/lib -ldav1d -lpthread -lm')
-elif '--exists' not in args and not any(value.startswith('--atleast-version') for value in args):
-    sys.exit(1)
+if queries[args] is not None:
+    print(queries[args])
 """.replace("PYTHON", sys.executable).replace("PREFIX", repr(str(dav1d_prefix))).replace("VERSION", repr(version))
     path.write_text(program)
     path.chmod(0o755)

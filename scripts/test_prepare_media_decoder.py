@@ -426,11 +426,43 @@ class NativeBuildTests(unittest.TestCase):
 
     def test_bounded_pkg_config_accepts_only_pinned_dav1d(self):
         script = self.root / "pkg-config"
+        prefix = self.root / "dav1d-install"
+        build.write_pkg_config(script, prefix, "1.5.4")
+        expected = {
+            ("--version",): "whitenoise-dav1d-pkg-config-shim 1\n",
+            ("--exists", "--print-errors", "dav1d >= 1.0.0"): "",
+            ("--exists", "dav1d"): "",
+            ("--modversion", "dav1d"): "1.5.4\n",
+            ("--variable=libdir", "dav1d"): str(prefix) + "/lib\n",
+            ("--variable=includedir", "dav1d"): str(prefix) + "/include\n",
+            ("--cflags", "dav1d"): "-I" + str(prefix) + "/include\n",
+            ("--libs", "dav1d"): "-L" + str(prefix) + "/lib -ldav1d -pthread -lm\n",
+        }
+        for query, stdout in expected.items():
+            with self.subTest(query=query):
+                result = subprocess.run([script, *query], capture_output=True, text=True, check=True)
+                self.assertEqual(stdout, result.stdout)
+
+    def test_bounded_pkg_config_refuses_unknown_queries_libraries_and_constraints(self):
+        script = self.root / "pkg-config"
         build.write_pkg_config(script, self.root / "dav1d-install", "1.5.4")
-        result = subprocess.run([script, "--modversion", "dav1d"], capture_output=True, text=True, check=True)
-        self.assertEqual("1.5.4\n", result.stdout)
-        denied = subprocess.run([script, "--libs", "libnetwork"], capture_output=True)
-        self.assertNotEqual(0, denied.returncode)
+        for query in ([], ["--libs", "libnetwork"], ["--libs", "dav1d", "libnetwork"],
+                      ["--exists", "--print-errors", "dav1d >= 99.0.0"],
+                      ["--exists", "--print-errors", "dav1d arbitrary text"],
+                      ["--variable=unknown", "dav1d"], ["--unknown", "dav1d"],
+                      ["--atleast-version=99", "dav1d"], ["--version", "dav1d"]):
+            with self.subTest(query=query):
+                denied = subprocess.run([script, *query], capture_output=True)
+                self.assertNotEqual(0, denied.returncode)
+                self.assertEqual(b"", denied.stdout)
+
+    def test_bounded_pkg_config_checks_the_advertised_dav1d_minimum(self):
+        for version in ("0.9.9", "1.5.4-custom", "invalid"):
+            with self.subTest(version=version):
+                path = self.root / ("pkg-config-" + version)
+                with self.assertRaisesRegex(ValueError, "dav1d version below required minimum"):
+                    build.write_pkg_config(path, self.root / "dav1d-install", version)
+                self.assertFalse(path.exists())
 
 
 if __name__ == "__main__":
