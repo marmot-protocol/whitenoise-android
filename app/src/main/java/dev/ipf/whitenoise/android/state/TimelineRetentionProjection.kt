@@ -50,9 +50,7 @@ internal fun isDisappearingSendTimeExpiryDeferred(
  * retention event on controller recreation, then a session read anchor can make it reappear after
  * the next send. All other projected row kinds retain their existing expiry behavior.
  */
-internal fun shouldApplyLocalDisappearingExpiry(record: AppMessageRecordFfi): Boolean {
-    return !MessageProjector.isGroupSystem(record)
-}
+internal fun shouldApplyLocalDisappearingExpiry(record: AppMessageRecordFfi) = !MessageProjector.isGroupSystem(record)
 
 /** Applies the row-owned deadline only to ordinary message history. */
 internal fun isTimelineRecordLocallyExpired(
