@@ -774,28 +774,11 @@
         ]
       },
       {
-        "surface": "An off-window read anchor uses the authoritative unread projection instead of counting retained history",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
-        "anchor": "internal fun countUnreadIncoming(",
-        "test_ids": [
-          "CON-003"
-        ]
-      },
-      {
         "surface": "Token-aware text admission safely retries an interrupted runtime call",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "private fun isRetryableTextAdmissionError(",
         "test_ids": [
           "MSG-017"
-        ]
-      },
-      {
-        "surface": "A relay echo that lands before the send call returns replaces the pending bubble instead of joining it",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
-        "anchor": "fun optimisticMessageIdForProjection(",
-        "test_ids": [
-          "CON-004",
-          "CON-005"
         ]
       },
       {
