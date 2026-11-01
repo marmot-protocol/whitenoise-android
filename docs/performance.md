@@ -163,6 +163,28 @@ The phase contains no account, conversation, message identity or content. An abs
 phase can mean a below-threshold gate or inactive diagnostics; it does not prove
 that no candidate was checked.
 
+### Account switching
+
+`op=account_switch` follows one switch to a different account, from the start
+of activation preparation (`elapsed_ms` is measured from it) through local
+preparation, publication and the target chat list's first frame (#3496):
+
+| Phase | Stage |
+| --- | --- |
+| `cached_chat_rows_ready` | The target's local chat rows were read, before publication. A second line follows when the bound controller sees them. |
+| `member_derived_local_ready` / `account_switch_member_derived_deferred` | First-frame member projections were complete, or deferred to the controller. |
+| `account_switch_top_bar_profiles_ready` | Top-bar identities were read, when member seeds are skipped. |
+| `account_switch_persisted_profiles_ready` | Top-bar and direct-peer profile seeds were read. |
+| `account_switch_shortcuts_hidden` | The previous account's Direct Share targets were withdrawn. |
+| `account_switch_published` | The target became the active account. |
+| `account_switch_bind_start` / `account_switch_seed_bound` | The chat-list controller began binding the target, and bound its seeded rows. |
+| `first_local_frame` | The target's local snapshot drew; the trace ends here. |
+
+Row phases carry `count=` rows. Lines carry no account, conversation or
+profile identity. Switching back to the current account, sign-in and first
+activation are not traced. Debug builds also log the same stages to Logcat as
+`account-switch <stage> +<ms>`, so release and debug runs can be compared.
+
 ### Send and attachment diagnosis
 
 `op=text_send` and `op=media_send` follow one process-local operation from the
