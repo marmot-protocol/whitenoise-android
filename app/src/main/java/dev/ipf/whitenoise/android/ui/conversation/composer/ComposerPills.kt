@@ -1257,11 +1257,12 @@ internal fun ComposerPill(
                             accessoryContent()
                         }
                     }
+                    val minimumPillHeight = if (voiceReviewContent == null) ComposerRestingPillMinimumHeight else 96.dp
                     Box(
                         modifier =
                             Modifier
                                 .weight(1f, fill = expansionMode != ComposerExpansionMode.Automatic)
-                                .heightIn(min = if (voiceReviewContent == null) ComposerRestingPillMinimumHeight else 96.dp)
+                                .heightIn(min = minimumPillHeight)
                                 .then(expandedHeightModifier),
                     ) {
                         Box(

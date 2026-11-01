@@ -138,8 +138,8 @@ class ChatOrganizationScreenshotTest {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = dark || amoled, amoled = amoled) {
                 Surface(Modifier.fillMaxSize()) {
-                    Scaffold(floatingActionButton = { ChatsNewMessageFabContent(missing) {} }) { _ ->
-                        Box(Modifier.fillMaxSize())
+                    Scaffold(floatingActionButton = { ChatsNewMessageFabContent(missing) {} }) { innerPadding ->
+                        Box(Modifier.fillMaxSize().padding(innerPadding))
                     }
                 }
             }

@@ -36,7 +36,9 @@ import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.LocalFinishControlMorph
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseContentMaxWidth
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOuterVerticalPadding
-import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerRestingPillHeight
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerResizeStripHeight
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerRestingPillMinimumHeight
+import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerEditorLineHeight
 import dev.ipf.whitenoise.android.ui.navigation.ComposerFabEndpoint
 import dev.ipf.whitenoise.android.ui.navigation.LocalComposerFabHandoff
 import dev.ipf.whitenoise.android.ui.navigation.composerFabSurface
@@ -133,7 +135,9 @@ internal fun ChatsNewMessageFabContent(
         Box(Modifier.size(56.dp))
         return
     }
-    val restingPillHeight = rememberComposerRestingPillHeight()
+    val restingPillHeight =
+        (rememberComposerEditorLineHeight() + ComposerResizeStripHeight + 12.dp)
+            .coerceAtLeast(ComposerRestingPillMinimumHeight)
     // Material's Scaffold reserves16dp below its FAB. Align its center with the actual resting
     // composer row, whose outer padding owns the same navigation inset on the conversation.
     // Keep relay recovery and the existing dictation obstacle at their established placement.

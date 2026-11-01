@@ -113,18 +113,12 @@ internal val ComposerOuterVerticalPadding = 6.dp
 internal val ComposerRestingPillMinimumHeight = 48.dp
 private val ComposerAutomaticEmptyChromeHeight = 36.dp
 
-/** Resting single-line geometry, shared with the chat-list pen placement. */
-@Composable
-internal fun rememberComposerRestingPillHeight(): Dp =
-    (rememberComposerEditorLineHeight() + ComposerResizeStripHeight + 12.dp)
-        .coerceAtLeast(ComposerRestingPillMinimumHeight)
-
 /** How close to an endpoint a release still counts as landing on it rather than resting free. */
 private val ComposerSettleDeadband = 24.dp
 
 /** Measures the same body text line spacing used by the composer editor at the current font scale. */
 @Composable
-private fun rememberComposerEditorLineHeight(): Dp {
+internal fun rememberComposerEditorLineHeight(): Dp {
     val density = LocalDensity.current
     val style = MaterialTheme.typography.bodyLarge
     val measurer = rememberTextMeasurer()

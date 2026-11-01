@@ -215,7 +215,9 @@ class ComposerFabPenMotionTest {
                 Scaffold(
                     contentWindowInsets = WindowInsets.navigationBars,
                     floatingActionButton = { ChatsNewMessageFabContent(missingRelays = false) {} },
-                ) { _ -> Box(Modifier.fillMaxSize()) }
+                ) { innerPadding ->
+                    Box(Modifier.fillMaxSize().padding(innerPadding))
+                }
             }
         }
     }

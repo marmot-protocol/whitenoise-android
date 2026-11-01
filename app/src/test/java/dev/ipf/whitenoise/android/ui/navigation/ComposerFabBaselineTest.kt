@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -18,11 +19,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.ui.chats.ChatsNewMessageFabContent
@@ -36,31 +39,39 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** Compare production endpoints under Material placement, not a duplicate baseline formula. */
 @RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-w360dp-h640dp-mdpi")
 class ComposerFabBaselineTest {
     @get:Rule val rule = createComposeRule()
 
-    @Test fun restingCentersMatch() = assertBaseline()
+    @Test fun restingCentersMatch() = assertBaseline(name = "default")
 
-    @Test fun largeTextRestingCentersMatch() = assertBaseline(fontScale = 2f)
+    @Test fun largeTextRestingCentersMatch() = assertBaseline(name = "large", fontScale = 2f)
 
-    @Test fun largeRtlRestingCentersMatch() = assertBaseline(fontScale = 2f, rtl = true)
+    @Test fun largeRtlRestingCentersMatch() = assertBaseline(name = "large_rtl", fontScale = 2f, rtl = true)
 
-    @Test fun navigationBarRemainsClear() = assertBaseline(navigationBottomPx = 48)
+    @Test fun navigationBarRemainsClear() = assertBaseline(name = "navigation", navigationBottomPx = 48)
 
     @Test
     @Config(sdk = [36], qualifiers = "en-w280dp-h360dp-mdpi")
-    fun shortRtlRestingCentersMatch() = assertBaseline(fontScale = 2f, rtl = true, navigationBottomPx = 24)
+    fun shortRtlRestingCentersMatch() {
+        assertBaseline(name = "short_rtl", fontScale = 2f, rtl = true, navigationBottomPx = 24)
+    }
 
-    @Test fun relayWarningKeepsMaterialGap() = assertBaseline(missingRelays = true, navigationBottomPx = 48)
+    @Test
+    fun relayWarningKeepsMaterialGap() {
+        assertBaseline(name = "relay_warning", missingRelays = true, navigationBottomPx = 48)
+    }
 
     // Keep the endpoint swap and its measured assertions in one stateful fixture; splitting the
     // composition into a second owner would hide which live inset and endpoint each sample uses.
     @Suppress("LongMethod")
     private fun assertBaseline(
+        name: String,
         fontScale: Float = 1f,
         rtl: Boolean = false,
         navigationBottomPx: Int = 0,
@@ -72,8 +83,9 @@ class ComposerFabBaselineTest {
         var actualNavigationBottom = 0
         val anchor = FloatingDictationAnchor()
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val layoutDirection = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
         rule.setContent {
-            CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+            CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
                 WhiteNoiseTheme(fontScale = fontScale) {
                     rootView = LocalView.current.rootView
                     density = LocalDensity.current.density
@@ -92,7 +104,9 @@ class ComposerFabBaselineTest {
                                 Scaffold(
                                     contentWindowInsets = WindowInsets.navigationBars,
                                     floatingActionButton = { ChatsNewMessageFabContent(missingRelays) {} },
-                                ) { _ -> Box(Modifier.fillMaxSize()) }
+                                ) { innerPadding ->
+                                    Box(Modifier.fillMaxSize().padding(innerPadding))
+                                }
                             }
                         }
                     }
@@ -110,11 +124,12 @@ class ComposerFabBaselineTest {
             ViewCompat.dispatchApplyWindowInsets(rootView, insets)
         }
         rule.waitForIdle()
+        rule.onRoot().captureRoboImage("src/test/snapshots/composer_fab_baseline_${name}_fab.png")
         assertEquals("The production inset source must receive the fixture", navigationBottomPx, actualNavigationBottom)
         val description = if (missingRelays) R.string.chats_check_relays else R.string.new_message
         val fab = rule.onNodeWithContentDescription(context.getString(description)).fetchSemanticsNode().boundsInWindow
         val viewport = rule.onNodeWithTag(VIEWPORT).fetchSemanticsNode().boundsInWindow
-        assertTrue("The whole touch target must clear navigation", fab.bottom <= viewport.bottom - actualNavigationBottom + 1)
+        assertTrue("Touch target must clear navigation", fab.bottom <= viewport.bottom - actualNavigationBottom + 1)
         assertTrue(fab.height >= 48 * density)
         val obstacleTop = rule.runOnIdle { requireNotNull(anchor.topInWindow) }
         assertEquals(
@@ -129,7 +144,9 @@ class ComposerFabBaselineTest {
         }
         rule.runOnIdle { composer = true }
         rule.waitForIdle()
-        val pill = rule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG, useUnmergedTree = true).fetchSemanticsNode().boundsInWindow
+        rule.onRoot().captureRoboImage("src/test/snapshots/composer_fab_baseline_${name}_composer.png")
+        val pillNode = rule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG, useUnmergedTree = true)
+        val pill = pillNode.fetchSemanticsNode().boundsInWindow
         assertEquals("Real resting endpoints must share a vertical center", pill.center.y, fab.center.y, 1.1f)
         assertTrue("The original obstacle remains above the visible pen", obstacleTop <= fab.top)
     }
