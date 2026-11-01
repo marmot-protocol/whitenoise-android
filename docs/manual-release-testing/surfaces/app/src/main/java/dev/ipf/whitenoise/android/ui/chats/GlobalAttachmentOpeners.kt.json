@@ -1,0 +1,47 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentOpeners.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "GlobalAttachmentViewerHost",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentOpeners.kt",
+        "anchor": "fun GlobalAttachmentViewerHost(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013",
+          "FIND-017"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:media_couldnt_open",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentOpeners.kt",
+        "anchor": "R.string.media_couldnt_open",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013",
+          "FIND-017"
+        ]
+      },
+      {
+        "surface": "string:shared_media_voice_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentOpeners.kt",
+        "anchor": "R.string.shared_media_voice_failed",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013",
+          "FIND-017"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
