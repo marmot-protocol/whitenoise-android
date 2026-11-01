@@ -52,7 +52,7 @@ internal object GroupSvgRasterizer {
                 val xml = GroupSvgPolicy.validate(bytes)
                 // Defence in depth; the policy already refuses declarations before either parser runs.
                 SVG.setInternalEntitiesEnabled(false)
-                val svg = SVG.getFromString(xml)
+                val svg = xml.byteInputStream(Charsets.UTF_8).use { SVG.getFromInputStream(it) }
                 val viewBox = svg.documentViewBox
                 if (viewBox != null) {
                     require(

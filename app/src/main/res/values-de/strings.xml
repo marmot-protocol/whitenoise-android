@@ -2542,4 +2542,10 @@
     <string name="notification_tone_silent">Lautlos</string>
     <string name="notification_tone_off">Aus</string>
     <string name="notification_tone_default">Standard</string>
+    <string name="media_viewer_fit_image">Bild einpassen</string>
+    <string name="media_viewer_zoom_image">Vergrößern</string>
+    <string name="media_viewer_image_scale">%1$d%% Zoom</string>
+    <string name="media_viewer_actual_size">Originalgröße (1:1)</string>
+    <string name="media_viewer_zoom_out">Verkleinern</string>
+    <string name="media_viewer_toggle_controls">Steuerelemente anzeigen oder ausblenden</string>
 </resources>

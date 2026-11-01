@@ -642,7 +642,7 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         enabled: Boolean,
     ) {
         reportBoundary(ReceiptBoundary.WIFI_COMMAND_START)
-        BackgroundReceiptFixtureSupport.setWifiEnabled(enabled)
+        val command = BackgroundReceiptFixtureSupport.setWifiEnabled(enabled)
         reportBoundary(ReceiptBoundary.WIFI_COMMAND_COMPLETE)
         wifiDisabled = !enabled
         val receiverState = requireNotNull(state)
@@ -650,7 +650,7 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         withBackgroundReceiptPolicyDiagnostics(
             BackgroundReceiptPolicyCase.NetworkHeld,
             BackgroundReceiptPolicyStage.WifiSnapshot,
-            { backgroundReceiptNetworkSnapshot(context, receiverState, receiver.label, enabled) },
+            { backgroundReceiptNetworkSnapshot(context, receiverState, receiver.label, enabled, command) },
         ) {
             BackgroundReceiptFixtureSupport.awaitWifiSnapshot(receiverState, receiver.label, enabled)
         }

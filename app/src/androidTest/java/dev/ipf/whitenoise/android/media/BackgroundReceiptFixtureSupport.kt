@@ -88,8 +88,18 @@ internal object BackgroundReceiptFixtureSupport {
         }
 
     /** Turns the emulator's Wi-Fi on or off; the fixture's loopback servers stay reachable through adb either way. */
-    fun setWifiEnabled(enabled: Boolean) {
+    fun setWifiEnabled(enabled: Boolean): FixtureWifiCommandSnapshot {
         PlatformBackgroundAttachmentProbe.shell("cmd wifi set-wifi-enabled ${if (enabled) "enabled" else "disabled"}")
+        val radio =
+            runCatching {
+                PlatformBackgroundAttachmentProbe
+                    .shell("cmd wifi status")
+                    .lineSequence()
+                    .firstOrNull()
+                    .orEmpty()
+            }.getOrDefault("")
+        // UiAutomation exposes this command's output, not its exit status.
+        return FixtureWifiCommandSnapshot(FixtureWifiCommandResult.Unavailable, fixtureWifiRadioState(radio))
     }
 
     /** Waits until [state]'s network snapshot for [account] matches Wi-Fi being [enabled]. */

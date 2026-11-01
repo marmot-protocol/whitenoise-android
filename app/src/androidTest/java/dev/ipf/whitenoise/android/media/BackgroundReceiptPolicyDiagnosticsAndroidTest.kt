@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.media
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.WorkInfo
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
@@ -25,6 +27,51 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 @PullRequestDeviceSmoke
 class BackgroundReceiptPolicyDiagnosticsAndroidTest {
+    @Test
+    fun wifiShellDiagnosticsRetainOnlyClosedResults() {
+        assertEquals(FixtureWifiRadioState.Enabled, fixtureWifiRadioState("Wifi is enabled"))
+        assertEquals(FixtureWifiRadioState.Disabled, fixtureWifiRadioState("Wifi is disabled"))
+        assertEquals(FixtureWifiRadioState.Unavailable, fixtureWifiRadioState("private-ssid private-bssid"))
+        val summary =
+            FixtureWifiCommandSnapshot(
+                FixtureWifiCommandResult.Unavailable,
+                fixtureWifiRadioState("private-ssid"),
+            ).toString()
+        assertFalse(summary.contains("private-"))
+        assertTrue(summary.contains("Unavailable"))
+    }
+
+    @Test
+    fun registeredWifiObservationExportsOnlyClosedCapabilityBooleans() {
+        val facts = backgroundReceiptRegisteredWifiFacts(ApplicationProvider.getApplicationContext<Context>())
+        assertEquals(5, facts.length())
+        val expected =
+            setOf(
+                "platform_network_inventory_available",
+                "platform_network_inventory_complete",
+                "platform_registered_wifi_present",
+                "platform_registered_wifi_validated",
+                "platform_registered_wifi_unmetered",
+            )
+        assertEquals(expected, facts.keys().asSequence().toSet())
+        facts.keys().forEach { key -> assertTrue(facts.get(key) is Boolean) }
+    }
+
+    @Test
+    fun disappearingNetworkRetainsOtherWifiCapabilitiesAndMarksTheReadIncomplete() {
+        val wifi = FixtureNetworkCapabilities(wifi = true, validated = true, unmetered = true)
+        val facts = backgroundReceiptRegisteredWifiFacts { listOf(null, wifi) }
+        assertTrue(facts.getBoolean("platform_network_inventory_available"))
+        assertFalse(facts.getBoolean("platform_network_inventory_complete"))
+        assertTrue(facts.getBoolean("platform_registered_wifi_present"))
+        assertTrue(facts.getBoolean("platform_registered_wifi_validated"))
+        assertTrue(facts.getBoolean("platform_registered_wifi_unmetered"))
+        val unavailable = backgroundReceiptRegisteredWifiFacts { error("private-network") }
+        assertFalse(unavailable.getBoolean("platform_network_inventory_available"))
+        assertFalse(unavailable.getBoolean("platform_network_inventory_complete"))
+        assertFalse(unavailable.toString().contains("private-network"))
+    }
+
     /** Every wait reports its exact case/stage and current closed facts, even when no coroutine frames survive. */
     @Test
     fun timeoutReportsEachStageAndRethrowsTheOriginalFailure() =

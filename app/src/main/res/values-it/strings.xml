@@ -2525,4 +2525,10 @@
     <string name="notification_tone_silent">Silenzioso</string>
     <string name="notification_tone_off">Disattivato</string>
     <string name="notification_tone_default">Predefinito</string>
+    <string name="media_viewer_fit_image">Adatta immagine</string>
+    <string name="media_viewer_zoom_image">Ingrandisci</string>
+    <string name="media_viewer_image_scale">Zoom %1$d%%</string>
+    <string name="media_viewer_actual_size">Dimensioni reali (1:1)</string>
+    <string name="media_viewer_zoom_out">Riduci</string>
+    <string name="media_viewer_toggle_controls">Mostra o nascondi i controlli</string>
 </resources>

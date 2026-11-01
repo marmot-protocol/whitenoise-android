@@ -79,8 +79,17 @@ internal object GroupSvgPolicy {
     private val identifier = Regex("[A-Za-z_][A-Za-z0-9_.-]{0,127}")
     private val urlFunction = Regex("url\\s*\\(", RegexOption.IGNORE_CASE)
 
-    fun validate(bytes: ByteArray): String {
+    fun validate(bytes: ByteArray): String = validate(bytes, allowViewerText = false)
+
+    /** Viewer-only text is bounded by the same document/geometry/resource policy. */
+    internal fun validateForViewer(bytes: ByteArray): String = validate(bytes, allowViewerText = true)
+
+    private fun validate(
+        bytes: ByteArray,
+        allowViewerText: Boolean,
+    ): String {
         val xml = validatedXml(bytes)
+        val viewerTransforms = if (allowViewerText) ViewerSvgTransformPolicy() else null
         val parser = Xml.newPullParser()
         parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, true)
         parser.setFeature(XmlPullParser.FEATURE_PROCESS_DOCDECL, false)
@@ -96,13 +105,15 @@ internal object GroupSvgPolicy {
             when (parser.eventType) {
                 XmlPullParser.START_TAG -> {
                     require(++count <= MAX_ELEMENTS && parser.depth <= MAX_DEPTH)
-                    require(parser.namespace == SVG_NAMESPACE && parser.name in elements)
+                    requireSupportedElement(parser, allowViewerText)
                     if (!rootSeen) {
                         require(parser.name == "svg" && parser.depth == 1)
                         rootSeen = true
                     } else {
                         require(parser.name != "svg")
                     }
+                    if (allowViewerText) ViewerSvgTextPolicy.validate(parser)
+                    viewerTransforms?.validate(parser)
                     geometryNumbers += validateAttributes(parser, references)
                     require(geometryNumbers <= MAX_GEOMETRY_NUMBERS)
                     registerGradientId(parser, ids, gradients)
@@ -125,6 +136,14 @@ internal object GroupSvgPolicy {
         return xml
     }
 
+    private fun requireSupportedElement(
+        parser: XmlPullParser,
+        allowViewerText: Boolean,
+    ) {
+        val supported = parser.name in elements || (allowViewerText && parser.name in setOf("text", "tspan"))
+        require(parser.namespace == SVG_NAMESPACE && supported)
+    }
+
     private fun validatedXml(bytes: ByteArray): String {
         require(bytes.isNotEmpty() && bytes.size <= MAX_BYTES)
         val xml =
@@ -137,7 +156,7 @@ internal object GroupSvgPolicy {
                 .removePrefix("\uFEFF")
         // Never let either XML parser expand a DTD, including internal or external entities.
         require(!xml.contains("<!DOCTYPE", ignoreCase = true) && !xml.contains("<!ENTITY", ignoreCase = true))
-        return xml
+        return canonicalSvgXml(xml)
     }
 
     private fun registerGradientId(

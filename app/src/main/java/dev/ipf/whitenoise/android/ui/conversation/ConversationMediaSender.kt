@@ -125,6 +125,7 @@ internal class ConversationAttachmentReader(
         uri: android.net.Uri,
         remainingBytes: Long,
     ): ImageAttachmentReadOutcome {
+        readChatSvgAttachment(context, uri, remainingBytes)?.let { return it }
         val quality = appState.mediaQuality
         // Animated images cannot survive JPEG recompression. Preserve their
         // original bytes at every quality setting rather than flattening them.

@@ -129,14 +129,8 @@ class MediaDecodeService : Service() {
             response.putBoolean("success", true)
             return response
         }
-        if (operation == MediaDecodePolicy.INSPECT) {
-            PlatformMediaDecoder.inspect(bytes)?.let { info ->
-                response.putInt("width", info.width)
-                response.putInt("height", info.height)
-                response.putString("mime", info.mime)
-                response.putInt("orientation", info.orientation)
-                response.putBoolean("success", true)
-            }
+        if (operation == MediaDecodePolicy.INSPECT || operation == MediaDecodePolicy.VIEWER_SVG_INSPECT) {
+            writeInspection(bytes, operation, response)
             return response
         }
         val bitmap =
@@ -148,6 +142,12 @@ class MediaDecodeService : Service() {
                         data.getBoolean("oriented"),
                     )
                 MediaDecodePolicy.SVG -> PlatformMediaDecoder.svg(bytes)
+                MediaDecodePolicy.VIEWER_SVG_REGION ->
+                    ViewerSvgDecoder.region(
+                        bytes,
+                        readViewerSvgRegion(data),
+                        data.getInt("edge"),
+                    )
                 MediaDecodePolicy.REGION ->
                     PlatformMediaDecoder.region(
                         bytes,
@@ -163,6 +163,28 @@ class MediaDecodeService : Service() {
             } ?: return response
         bitmap.usePixels(output, data.getInt("edge"), response)
         return response
+    }
+
+    private fun writeInspection(
+        bytes: ByteArray,
+        operation: Int,
+        response: Bundle,
+    ) {
+        val inspection =
+            if (
+                operation == MediaDecodePolicy.VIEWER_SVG_INSPECT
+            ) {
+                ViewerSvgDecoder.inspect(bytes)
+            } else {
+                PlatformMediaDecoder.inspect(bytes)
+            }
+        inspection?.let { info ->
+            response.putInt("width", info.width)
+            response.putInt("height", info.height)
+            response.putString("mime", info.mime)
+            response.putInt("orientation", info.orientation)
+            response.putBoolean("success", true)
+        }
     }
 
     private fun Bitmap.usePixels(

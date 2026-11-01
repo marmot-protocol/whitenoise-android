@@ -506,13 +506,15 @@ internal fun saveImageToGallery(
     source: AttachmentPlaintext,
     fileName: String,
     mediaType: String,
-): Boolean = saveImageToGallery(context, fileName, mediaType, source::copyTo)
+    beforePublish: () -> Unit = {},
+): Boolean = saveImageToGallery(context, fileName, mediaType, beforePublish, source::copyTo)
 
 /** Publishes one gallery image whose bytes [write] produces, with the same pending-entry and naming rules. */
 private fun saveImageToGallery(
     context: android.content.Context,
     fileName: String,
     mediaType: String,
+    beforePublish: () -> Unit = {},
     write: (java.io.OutputStream) -> Unit,
 ): Boolean {
     val resolver = context.contentResolver
@@ -529,6 +531,7 @@ private fun saveImageToGallery(
         resolver = resolver,
         collection = android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
         values = values,
+        beforePublish = beforePublish,
         write = write,
     )
 }
@@ -548,7 +551,8 @@ internal fun saveVideoToGallery(
     source: java.io.File,
     fileName: String,
     mediaType: String,
-): Boolean = source.inputStream().use { saveVideoToGallery(context, it, fileName, mediaType) }
+    beforePublish: () -> Unit = {},
+): Boolean = source.inputStream().use { saveVideoToGallery(context, it, fileName, mediaType, beforePublish) }
 
 /**
  * Streams a decrypted attachment into the public collection appropriate for its MIME type without reading the whole
@@ -563,7 +567,13 @@ internal fun saveAttachmentToMediaStore(
     val normalizedMime = normalizeDocumentMime(mediaType)
     return when {
         normalizedMime.startsWith("image/") -> saveImageToGallery(context, source, fileName, normalizedMime)
-        normalizedMime.startsWith("video/") -> publishVideoToGallery(context, fileName, normalizedMime, source::copyTo)
+        normalizedMime.startsWith("video/") ->
+            publishVideoToGallery(
+                context,
+                fileName,
+                normalizedMime,
+                write = source::copyTo,
+            )
         else -> publishFileToDownloads(context, fileName, normalizedMime, source::copyTo)
     }
 }
@@ -616,8 +626,9 @@ private fun saveVideoToGallery(
     source: java.io.InputStream,
     fileName: String,
     mediaType: String,
+    beforePublish: () -> Unit = {},
 ): Boolean =
-    publishVideoToGallery(context, fileName, mediaType) { output ->
+    publishVideoToGallery(context, fileName, mediaType, beforePublish) { output ->
         source.copyTo(output, DEFAULT_BUFFER_SIZE)
     }
 
@@ -626,6 +637,7 @@ private fun publishVideoToGallery(
     context: android.content.Context,
     fileName: String,
     mediaType: String,
+    beforePublish: () -> Unit = {},
     write: (java.io.OutputStream) -> Unit,
 ): Boolean {
     val resolver = context.contentResolver
@@ -640,6 +652,7 @@ private fun publishVideoToGallery(
         resolver = resolver,
         collection = android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
         values = values,
+        beforePublish = beforePublish,
         write = write,
     )
 }
@@ -648,6 +661,7 @@ private inline fun publishMediaStoreEntry(
     resolver: android.content.ContentResolver,
     collection: Uri,
     values: android.content.ContentValues,
+    beforePublish: () -> Unit = {},
     write: (java.io.OutputStream) -> Unit,
 ): Boolean {
     val uri =
@@ -663,6 +677,7 @@ private inline fun publishMediaStoreEntry(
             output.use(write)
         }
         attachmentSaveStage(AttachmentSaveStage.MEDIASTORE_FINALIZE) {
+            beforePublish()
             values.clear()
             values.put(android.provider.MediaStore.MediaColumns.IS_PENDING, 0)
             requireMediaStoreFinalized(resolver.update(uri, values, null, null))
@@ -738,16 +753,25 @@ internal suspend fun shareVideo(
     source: java.io.File,
     fileName: String,
     mediaType: String,
+    beforeLaunch: () -> Unit = {},
 ): Result<Unit> =
     runCatchingCancellable {
-        val uri =
-            withContext(Dispatchers.IO) {
-                val dir = java.io.File(context.cacheDir, MediaCacheDirs.SHARED).apply { mkdirs() }
-                val file = java.io.File.createTempFile("share_", "_" + MediaPipeline.safeDisplayName(fileName), dir)
-                writeSharedMediaFile(file, source)
-                fileProviderUri(context, file)
-            }
-        launchVideoShare(context, uri, mediaType).getOrThrow()
+        var stagedFile: java.io.File? = null
+        try {
+            val uri =
+                withContext(Dispatchers.IO) {
+                    val dir = java.io.File(context.cacheDir, MediaCacheDirs.SHARED).apply { mkdirs() }
+                    val file = java.io.File.createTempFile("share_", "_" + MediaPipeline.safeDisplayName(fileName), dir)
+                    stagedFile = file
+                    writeSharedMediaFile(file, source)
+                    fileProviderUri(context, file)
+                }
+            beforeLaunch()
+            launchVideoShare(context, uri, mediaType).getOrThrow()
+        } catch (failure: Throwable) {
+            runCatching { stagedFile?.delete() }
+            throw failure
+        }
     }
 
 internal fun launchVideoShare(

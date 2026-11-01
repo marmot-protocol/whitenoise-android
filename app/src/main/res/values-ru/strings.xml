@@ -2599,4 +2599,10 @@
     <string name="notification_tone_silent">Без звука</string>
     <string name="notification_tone_off">Выключено</string>
     <string name="notification_tone_default">По умолчанию</string>
+    <string name="media_viewer_fit_image">Вписать изображение</string>
+    <string name="media_viewer_zoom_image">Увеличить</string>
+    <string name="media_viewer_image_scale">Масштаб: %1$d%%</string>
+    <string name="media_viewer_actual_size">Исходный размер (1:1)</string>
+    <string name="media_viewer_zoom_out">Уменьшить</string>
+    <string name="media_viewer_toggle_controls">Показать или скрыть элементы управления</string>
 </resources>

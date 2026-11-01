@@ -17,12 +17,16 @@ internal fun backgroundReceiptNetworkSnapshot(
     state: WhiteNoiseAppState,
     account: String,
     wifiEnabled: Boolean,
+    command: FixtureWifiCommandSnapshot,
 ): JSONObject {
     val manager = context.getSystemService(ConnectivityManager::class.java)
     val network = manager?.activeNetwork
     val capabilities = manager?.getNetworkCapabilities(network)
     return JSONObject()
         .put("requested_wifi_enabled", wifiEnabled)
+        .put("wifi_command_result", command.result.name)
+        .put("wifi_radio_after_command", command.radioAfterCommand.name)
+        .put("registered_wifi_facts", backgroundReceiptRegisteredWifiFacts(context))
         .put(
             "app_networks",
             JSONArray(

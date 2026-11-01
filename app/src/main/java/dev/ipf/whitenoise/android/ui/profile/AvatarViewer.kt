@@ -76,6 +76,7 @@ import dev.ipf.whitenoise.android.ui.common.AvatarDragDismissResult
 import dev.ipf.whitenoise.android.ui.common.AvatarDragDismissState
 import dev.ipf.whitenoise.android.ui.common.SwipeDismissibleSnackbar
 import dev.ipf.whitenoise.android.ui.common.VIEWER_MIN_SCALE
+import dev.ipf.whitenoise.android.ui.common.ViewerGestureConsumption
 import dev.ipf.whitenoise.android.ui.common.ViewerTransform
 import dev.ipf.whitenoise.android.ui.common.applyAvatarDownwardDrag
 import dev.ipf.whitenoise.android.ui.common.applyViewerTransformGesture
@@ -252,44 +253,47 @@ internal fun rememberAvatarViewerImageState(
     readLocalBytes: (suspend () -> ByteArray?)? = null,
 ): AvatarViewerImageState =
     key(safePictureUrl, picture, readLocalBytes) {
-        val state by produceState<AvatarViewerImageState>(
-            initialValue = picture?.let(AvatarViewerImageState::Local) ?: AvatarViewerImageState.Loading,
-            safePictureUrl,
-            picture,
-        ) {
-            if (readLocalBytes == null && safePictureUrl == null) {
-                value = picture?.let(AvatarViewerImageState::Local) ?: AvatarViewerImageState.Failed
-                return@produceState
-            }
-            val bytes =
-                withContext(Dispatchers.IO) {
-                    runCatchingCancellable {
-                        if (readLocalBytes != null) {
-                            readLocalBytes()
-                        } else {
-                            val result =
-                                AvatarImageLoader.fetchBytes(
-                                    checkNotNull(safePictureUrl),
-                                    AVATAR_VIEWER_MAX_BYTES,
-                                )
-                            (result as? AvatarByteFetchResult.Success)?.bytes
-                        }
-                    }.getOrNull()
+        val state =
+            produceState<AvatarViewerImageState>(
+                initialValue = picture?.let(AvatarViewerImageState::Local) ?: AvatarViewerImageState.Loading,
+                safePictureUrl,
+                picture,
+            ) {
+                if (readLocalBytes == null && safePictureUrl == null) {
+                    value = picture?.let(AvatarViewerImageState::Local) ?: AvatarViewerImageState.Failed
+                    return@produceState
                 }
-            val bitmap =
-                bytes?.let { data ->
-                    withContext(Dispatchers.Default) {
-                        MediaPipeline.decodeSampledBitmap(data, MediaPipeline.VIEWER_MAX_EDGE_PX)
+                val bytes =
+                    withContext(Dispatchers.IO) {
+                        runCatchingCancellable {
+                            if (readLocalBytes != null) {
+                                readLocalBytes()
+                            } else {
+                                val result =
+                                    AvatarImageLoader.fetchBytes(
+                                        checkNotNull(safePictureUrl),
+                                        AVATAR_VIEWER_MAX_BYTES,
+                                    )
+                                (result as? AvatarByteFetchResult.Success)?.bytes
+                            }
+                        }.getOrNull()
                     }
-                }
-            value =
-                if (bytes != null && bitmap != null) {
-                    AvatarViewerImageState.Ready(bytes, bitmap)
-                } else {
-                    picture?.let(AvatarViewerImageState::Local) ?: AvatarViewerImageState.Failed
-                }
+                val bitmap =
+                    bytes?.let { data ->
+                        decodeAvatarViewerBitmap(data)
+                    }
+                value =
+                    if (bytes != null && bitmap != null) {
+                        AvatarViewerImageState.Ready(bytes, bitmap)
+                    } else {
+                        picture?.let(AvatarViewerImageState::Local) ?: AvatarViewerImageState.Failed
+                    }
+            }
+        // This owner exists before Ready publication, even if its parent's next pixel effect never composes.
+        DisposableEffect(state) {
+            onDispose { (state.value as? AvatarViewerImageState.Ready)?.bitmap?.recycle() }
         }
-        state
+        state.value
     }
 
 /** Renders the viewer state: progress, initials, warm local pixels, or the full image (animated for a GIF). */
@@ -517,14 +521,18 @@ private fun ZoomableAvatarImage(
                     )
                 }.pointerInput(image, bitmapWidth, bitmapHeight) {
                     awaitEachGesture {
+                        val consumption = ViewerGestureConsumption(viewConfiguration.touchSlop)
+                        var gestureTransform: ViewerTransform? = null
                         do {
                             val event = awaitPointerEvent()
                             val pressedCount = event.changes.count { it.pressed }
                             if (pressedCount == 0) break
                             val zoom = event.calculateZoom()
                             val pan = event.calculatePan()
-                            val currentScale = latestScale
-                            val currentOffset = latestOffset
+                            val current = gestureTransform ?: ViewerTransform(latestScale, latestOffset)
+                            gestureTransform = current
+                            val currentScale = current.scale
+                            val currentOffset = current.offset
                             val handleAsTransform = pressedCount >= 2 || currentScale > VIEWER_MIN_SCALE
                             if (!handleAsTransform) continue
 
@@ -538,9 +546,10 @@ private fun ZoomableAvatarImage(
                                     imageWidth = bitmapWidth,
                                     imageHeight = bitmapHeight,
                                 )
+                            gestureTransform = next
                             if (next.scale != currentScale) latestOnScaleChange(next.scale)
                             if (next.offset != currentOffset) latestOnOffsetChange(next.offset)
-                            event.changes.forEach { it.consume() }
+                            consumption.consumeIfNeeded(event, pressedCount, pan)
                         } while (true)
                     }
                 }.graphicsLayer(
@@ -618,3 +627,19 @@ internal sealed interface AvatarViewerImageState {
 
 /** The viewer's top control row: 8 dp of padding around 48 dp touch targets. */
 private val AVATAR_VIEWER_TOP_CONTROLS_HEIGHT = 64.dp
+
+/** Reclaims an original preview if cancellation wins before its pixels can enter the viewer state. */
+internal suspend fun decodeAvatarViewerBitmap(
+    bytes: ByteArray,
+    decode: (ByteArray) -> Bitmap? = ::decodeAvatarViewerStill,
+): Bitmap? =
+    dev.ipf.whitenoise.android.media.decodeOwnedMedia(
+        decode = { decode(bytes) },
+        discard = { it.recycle() },
+    )
+
+private fun decodeAvatarViewerStill(bytes: ByteArray): Bitmap? =
+    MediaPipeline.decodeSampledBitmap(
+        bytes,
+        MediaPipeline.VIEWER_MAX_EDGE_PX,
+    )
