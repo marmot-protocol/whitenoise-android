@@ -43,6 +43,8 @@ import androidx.compose.ui.unit.toSize
 internal class MeasuredControlHandoff(
     initialDestination: Any?,
     val morphSurface: Boolean = false,
+    // Composer insets can move during entry; other controls retain the existing settle-on-movement policy.
+    private val followMovingTarget: Boolean = false,
 ) {
     private val live = mutableStateMapOf<Any, Pair<Any, Rect>>()
     private var previous = initialDestination
@@ -52,6 +54,8 @@ internal class MeasuredControlHandoff(
     private val surfaces = mutableStateMapOf<Any, ControlMorphSurface>()
     private var originSurface: ControlMorphSurface? = null
     private var originRadius = 0f
+    private var originDecorationAlpha = 0f
+    private var boundsStartFraction by mutableStateOf(0f)
     private var request: Any? = null
     private var enabled by mutableStateOf(true)
     private var awaitingFrame by mutableStateOf(false)
@@ -67,6 +71,13 @@ internal class MeasuredControlHandoff(
             val from = originRadius
             val to = surfaces[previous]?.radius ?: from
             return from + (to - from) * fraction
+        }
+
+    /** Optional bridge artwork follows the same clock and captures its opacity when reversing. */
+    val renderedDecorationAlpha: Float
+        get() {
+            val to = surfaces[previous]?.decorationAlpha ?: originDecorationAlpha
+            return originDecorationAlpha + (to - originDecorationAlpha) * fraction
         }
 
     /** Retains geometry/artwork only, never an editor, draft or recording session. */
@@ -93,6 +104,9 @@ internal class MeasuredControlHandoff(
         val from = captureOrigin()
         val source = previous
         originRadius = if (active) renderedRadius else surfaces[source]?.radius ?: 0f
+        originDecorationAlpha =
+            if (active) renderedDecorationAlpha else surfaces[source]?.decorationAlpha ?: 0f
+        boundsStartFraction = 0f
         originSurface = surfaces[source]
         previous = destination
         enabled = allowed
@@ -131,7 +145,10 @@ internal class MeasuredControlHandoff(
         get() =
             start?.let { from ->
                 (if (morphSurface) targetBounds ?: end else end)?.let { to ->
-                    lerp(from, to, if (morphSurface) fraction else progress.value)
+                    val remaining = 1f - boundsStartFraction
+                    val boundsFraction =
+                        if (remaining > 0f) ((fraction - boundsStartFraction) / remaining).coerceIn(0f, 1f) else 1f
+                    lerp(from, to, if (morphSurface) boundsFraction else progress.value)
                 }
             }
 
@@ -152,7 +169,15 @@ internal class MeasuredControlHandoff(
         if (positiveSize && finiteOrigin) {
             val movingTarget = active && !awaitingFrame && key == previous
             val moved = live[key]?.second?.let { it != bounds } == true
-            if (movingTarget && moved) finish()
+            if (movingTarget && moved) {
+                if (followMovingTarget && fraction < 1f) {
+                    // Follow composer insets without restarting the clock or jumping to its new placement.
+                    start = renderedBounds
+                    boundsStartFraction = fraction
+                } else {
+                    finish()
+                }
+            }
             live[key] = token to bounds
         } else {
             remove(key, token)
@@ -211,7 +236,11 @@ internal fun rememberMeasuredControlHandoff(
     owner: Any?,
     destination: Any?,
     morphSurface: Boolean = false,
-): MeasuredControlHandoff = remember(owner, morphSurface) { MeasuredControlHandoff(destination, morphSurface) }
+    followMovingTarget: Boolean = false,
+): MeasuredControlHandoff =
+    remember(owner, morphSurface, followMovingTarget) {
+        MeasuredControlHandoff(destination, morphSurface, followMovingTarget)
+    }
 
 /** Measures the actual endpoint without changing its size, focus, hit target or semantics. */
 @Composable
@@ -287,6 +316,7 @@ internal data class ControlMorphSurface(
     val border: Color?,
     val radius: Float,
     val stroke: Float,
+    val decorationAlpha: Float = 0f,
 )
 
 /** Paints one real endpoint's container; content remains unscaled and keeps its existing input owner. */

@@ -14,6 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.unit.dp
@@ -59,8 +60,12 @@ class ControlMorphInterruptionTest {
         Settings.Global.putString(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, oldScale)
     }
 
-    @Test fun reversingAnIntermediateFrameKeepsItsBoundsAndCornerShape() {
-        val state = MeasuredControlHandoff("pen", morphSurface = true)
+    @Test fun reversingAnIntermediateFrameKeepsItsBoundsAndCornerShape() = exerciseIntermediateFrame(false)
+
+    @Test fun movingComposerTargetKeepsTheSameFractionBounds() = exerciseIntermediateFrame(true)
+
+    private fun exerciseIntermediateFrame(retarget: Boolean) {
+        val state = MeasuredControlHandoff("pen", morphSurface = true, followMovingTarget = retarget)
         var destination by mutableStateOf("pen")
         rule.setContent {
             MaterialTheme {
@@ -85,6 +90,7 @@ class ControlMorphInterruptionTest {
                                             24f
                                         },
                                         1f,
+                                        decorationAlpha = if (destination == "pen") 1f else 0f,
                                     ),
                                 ),
                         )
@@ -105,9 +111,17 @@ class ControlMorphInterruptionTest {
             assertTrue(state.active)
             val bounds = state.renderedBounds
             val radius = state.renderedRadius
-            state.prepare("pen", true)
+            val penAlpha = state.renderedDecorationAlpha
+            if (retarget) {
+                val target = requireNotNull(state.targetBounds)
+                state.report("editor", Any(), target.translate(Offset(0f, -72f)))
+                assertTrue(state.active)
+            } else {
+                state.prepare("pen", true)
+            }
             assertEquals(bounds, state.renderedBounds)
             assertEquals(radius, state.renderedRadius, 0f)
+            assertEquals(penAlpha, state.renderedDecorationAlpha, 0f)
             state.finish()
             assertFalse(state.active)
             assertNull(state.renderedBounds)

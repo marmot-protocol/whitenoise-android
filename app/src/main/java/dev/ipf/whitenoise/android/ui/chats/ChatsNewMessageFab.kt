@@ -19,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.painterResource
@@ -165,7 +166,10 @@ internal fun ChatsNewMessageFabContent(
             Icon(
                 painterResource(if (missingRelays) R.drawable.ic_warning else R.drawable.ic_edit),
                 stringResource(if (missingRelays) R.string.chats_check_relays else R.string.new_message),
-                Modifier.size(ChatFabIconSize),
+                Modifier.size(ChatFabIconSize).drawWithContent {
+                    // The shell paints the one moving glyph outside this final FAB's local clip.
+                    if (!morphing) drawContent()
+                },
             )
         }
     }

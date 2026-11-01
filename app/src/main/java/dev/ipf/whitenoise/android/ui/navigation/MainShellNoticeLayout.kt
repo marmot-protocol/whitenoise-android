@@ -60,6 +60,7 @@ internal fun MainShellNoticeLayout(
             handoffOwner to appLockScreenVisible,
             handoffDestination,
             morphSurface = true,
+            followMovingTarget = true,
         )
     CompositionLocalProvider(
         LocalShellPlaybackHost provides playbackHost,
@@ -78,6 +79,7 @@ internal fun MainShellNoticeLayout(
                 MeasuredControlHandoffHost(
                     state = handoff,
                     destination = handoffDestination,
+                    modifier = Modifier.composerFabPenDecoration(handoff),
                     allowed = !appLockScreenVisible && handoffDestination != null,
                 ) {
                     ShellTransientNoticeLayout(
