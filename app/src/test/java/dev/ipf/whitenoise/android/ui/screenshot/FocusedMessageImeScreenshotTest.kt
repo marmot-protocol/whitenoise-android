@@ -70,6 +70,7 @@ class FocusedMessageImeScreenshotTest {
         captureShortFrame(name, 201.dp, dark = false, rtl = true)
     }
 
+    /** Captures a long incoming reply preview with a warning at 2× font, bounded to [height], as baseline [name]. */
     private fun captureShortFrame(
         name: String,
         height: Dp,
