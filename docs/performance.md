@@ -953,6 +953,23 @@ the Baseline Profile so they cannot crowd startup code out of the primary DEX:
   -Pandroid.testInstrumentationRunnerArguments.groupName="$GROUP_NAME"
 ```
 
+Device limits found while regenerating (2026-11-01):
+
+- GrapheneOS leaves `dalvik.vm.usejitprofiles` unset and blocks kernel tracing,
+  so profile dumps come back empty ("Generated Profile is empty") and
+  Macrobenchmark cannot record its Perfetto metrics there. Generate on a stock
+  device or an emulator, and measure on a stock physical device.
+- On a device with a second user, the AGP runner fails with `Invalid userId -2`
+  and copies empty profiles into the source set. Run the generator class with
+  `am instrument -w -r --user 0 -e class
+  dev.ipf.whitenoise.android.benchmark.BaselineProfileGenerator -e groupName
+  "$GROUP_NAME" -e androidx.benchmark.enabledRules BaselineProfile
+  dev.ipf.whitenoise.android.benchmark/androidx.test.runner.AndroidJUnitRunner`,
+  pull `Android/media/dev.ipf.whitenoise.android.benchmark/*-prof.txt`, and merge
+  them: the Startup Profile is the union of the startup journeys' files, the
+  Baseline Profile the union of all four, with each rule's `H`, `S` and `P` flags
+  combined.
+
 The generated profile is merged into and committed from
 `app/src/main/generated/baselineProfiles/`. It is consumed by every supported
 release variant; generation does not run implicitly during ordinary release
