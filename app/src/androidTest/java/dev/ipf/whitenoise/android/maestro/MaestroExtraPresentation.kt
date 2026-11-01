@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 @Suppress("FunctionNaming")
 internal fun MaestroExtraPresentation(fixture: MaestroPresentationFixture) {
     when {
+        fixture.scenario == "extra-composer-sending-identity" -> MaestroSendingIdentityPresentation(fixture)
         fixture.scenario.startsWith("extra-licenses-") -> MaestroLicensesPresentation(fixture)
         fixture.scenario.startsWith("extra-modal-") -> MaestroModalPresentation(fixture)
         fixture.scenario.startsWith("extra-search-") -> MaestroSearchPresentation(fixture)

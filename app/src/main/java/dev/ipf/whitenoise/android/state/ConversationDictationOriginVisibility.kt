@@ -15,3 +15,10 @@ internal fun conversationDictationOriginVisible(
         pendingProfileNpub == null &&
         activeAccountRef.equals(accountRef, ignoreCase = true) &&
         activeGroupIdHex.equals(groupIdHex, ignoreCase = true)
+
+/** App lock defers conditional dictation writes without declaring their original target removed. */
+internal fun writeConversationDictationDraftWhenUnlocked(
+    appLockScreenVisible: Boolean,
+    appUnlockEvaluationPending: Boolean,
+    write: () -> Long?,
+): Long? = if (appLockScreenVisible || appUnlockEvaluationPending) null else write()

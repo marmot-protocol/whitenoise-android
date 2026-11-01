@@ -1,0 +1,72 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
+  "legacy_sha256": "1566947ea3afb6a35668f7a113a67075bd8a1b506170f4d723b6de57ef992c94",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "GroupIdentifierGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
+        "anchor": "fun GroupIdentifierGroup(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "GroupInfoScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
+        "anchor": "fun GroupInfoScreen(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:developer_tools",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
+        "anchor": "R.string.developer_tools",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:group_identifiers",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
+        "anchor": "R.string.group_identifiers",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:mls_group_id",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
+        "anchor": "R.string.mls_group_id",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:nostr_group_id",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
+        "anchor": "R.string.nostr_group_id",
+        "test_ids": [
+          "GRP-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: GroupInfoScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
+        "anchor": ".whiteNoiseVerticalScroll(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
@@ -35,6 +34,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.customActions
@@ -60,6 +60,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.awaitingDelivery
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.MarkdownMessageBody
@@ -98,7 +99,6 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.theme.isAmoledSurfaceTheme
 import dev.ipf.whitenoise.android.ui.ttsSentenceAccessibilityActions
-import kotlin.math.ceil
 
 internal fun ttsBodyIsCollapsed(
     collapseEnabled: Boolean,
@@ -365,6 +365,7 @@ internal fun ColumnScope.BubbleMediaBlocks(
                 showStatus = isFooterOwner && showStatus,
                 status = item.status,
                 footerWarningText = fileFooterWarning.takeIf { isFooterOwner },
+                awaitingDelivery = mine && controller.awaitingDelivery(item),
             )
         }
     }
@@ -560,20 +561,67 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     onExpand: () -> Unit,
     statusContainerColor: Color? = null,
 ) {
-    val inlineFooter: @Composable () -> Unit = {
-        MessageInlineFooter(
-            timeText = rememberedMessageBubbleTime(record.recordedAt),
-            color = timestampColor,
-            showStatus = showStatus,
-            status = item.status,
-            editedLabel = editedLabel,
-            onEditedClick = onEditedClick,
-            showTime = showTimestamp,
-            statusContainerColor = statusContainerColor,
-        )
+    val showOuterMetadata = bodyText != null || (!footerOnVisualMedia && !footerOnPendingVisual)
+    val recoveryInFooter = showTimestamp && showOuterMetadata
+    val failedSendActions: @Composable () -> Unit = {
+        if (mine && item.status == MessageStatus.Failed) {
+            Row(
+                modifier = Modifier.align(Alignment.End),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(
+                    enabled = !textSelectionMode,
+                    onClick = { appState.launchMutation { controller.retryFailedSend(item) } },
+                    modifier = Modifier.size(24.dp),
+                ) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = stringResource(R.string.retry),
+                        tint = timestampColor,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+                IconButton(
+                    enabled = !textSelectionMode,
+                    onClick = { appState.launchMutation { controller.discardFailedSend(item) } },
+                    modifier = Modifier.size(24.dp),
+                ) {
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = stringResource(R.string.discard_failed_message),
+                        tint = timestampColor,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+        }
     }
-    val hasInlineFooter =
-        showTimestamp || showStatus || editedLabel != null
+    val inlineFooter: @Composable () -> Unit = {
+        Column(horizontalAlignment = Alignment.End) {
+            if (recoveryInFooter) failedSendActions()
+            MessageBubbleMetadataFooter(
+                warning = invalidationWarning,
+                color = timestampColor,
+            ) {
+                if (showOuterMetadata) {
+                    MessageInlineFooter(
+                        timeText = rememberedMessageBubbleTime(record.recordedAt),
+                        color = timestampColor,
+                        showStatus = showStatus,
+                        status = item.status,
+                        editedLabel = editedLabel,
+                        onEditedClick = onEditedClick,
+                        showTime = showTimestamp,
+                        statusContainerColor = statusContainerColor,
+                    )
+                }
+            }
+        }
+    }
+    val hasInlineFooter = showTimestamp || showStatus || editedLabel != null || invalidationWarning != null
+    val allowInlineFooter = invalidationWarning == null && !(mine && item.status == MessageStatus.Failed)
+    val layoutDirection = LocalLayoutDirection.current
     var lastLineLayout by
         remember(record.messageIdHex, bodyText) {
             mutableStateOf<TextLayoutResult?>(null)
@@ -590,6 +638,9 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                 deleted = deleted,
                 persistedFailure = persistedFailure,
             )
+        if (!deleted && !persistedFailure && !hasMedia) {
+            PublicJpegMessagePreviews(appState, controller.boundAccountRef, record.messageIdHex, markdownDocument)
+        }
         val renderMarkdownBody = markdownDocument != null
         val eventReferences =
             remember(renderMarkdownBody, markdownDocument, eventCardResolver) {
@@ -824,26 +875,16 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                 hasReplyPreview = replyPreviewPresent,
                 hasMedia = hasMedia,
             )
-        val lastLineWidth =
-            lastLineLayout?.let { layout ->
-                if (layout.lineCount > 0) {
-                    ceil(layout.getLineRight(layout.lineCount - 1)).toInt()
-                } else {
-                    null
-                }
-            }
+        // Read after the body measures: its first onTextLayout already owns the
+        // last-line metrics in this pass, before a recomposition can capture them.
+        val readLastLineWidth: () -> Int? = { lastLineLayout?.bubbleFooterLastLineWidth(layoutDirection) }
         // The inline footer sits on this baseline, so the timestamp and its delivery glyph share the
         // last line's baseline instead of hanging below the text block.
-        val lastLineBaseline =
+        val readLastLineBaseline: () -> Int? = {
             lastLineLayout?.let { layout ->
-                if (layout.lineCount > 0) {
-                    layout.getLineBaseline(layout.lineCount - 1).toInt()
-                } else {
-                    null
-                }
+                if (layout.lineCount > 0) layout.getLineBaseline(layout.lineCount - 1).toInt() else null
             }
-        val footerLastLineWidth = lastLineWidth.takeIf { eventReferences.isEmpty() }
-        val footerLastLineBaseline = lastLineBaseline.takeIf { eventReferences.isEmpty() }
+        }
         if (collapsible && eventReferences.isNotEmpty() && showMessageTextBody) {
             Column(
                 modifier = bodyModifier,
@@ -854,7 +895,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                     readMore = readMoreFooter,
                     footer = {},
                     modifier = Modifier.fillMaxWidth(),
-                    lastLineWidth = lastLineWidth,
+                    lastLineWidth = readLastLineWidth,
                 ) {
                     selectionWrapper(movableMessageTextBody)
                 }
@@ -872,8 +913,9 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                 readMore = readMoreFooter,
                 footer = { if (hasInlineFooter) inlineFooter() },
                 modifier = bodyModifier,
-                lastLineWidth = footerLastLineWidth,
-                lastLineBaseline = footerLastLineBaseline,
+                lastLineWidth = { readLastLineWidth().takeIf { eventReferences.isEmpty() } },
+                lastLineBaseline = { readLastLineBaseline().takeIf { eventReferences.isEmpty() } },
+                allowInline = allowInlineFooter,
             ) {
                 selectableMessageBody()
             }
@@ -881,8 +923,9 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             BubbleFooterLayout(
                 footer = inlineFooter,
                 modifier = bodyModifier,
-                lastLineWidth = footerLastLineWidth,
-                lastLineBaseline = footerLastLineBaseline,
+                lastLineWidth = { readLastLineWidth().takeIf { eventReferences.isEmpty() } },
+                lastLineBaseline = { readLastLineBaseline().takeIf { eventReferences.isEmpty() } },
+                allowInline = allowInlineFooter,
             ) {
                 selectableMessageBody()
             }
@@ -891,48 +934,11 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                 selectableMessageBody()
             }
         }
-    } else if (!footerOnVisualMedia && !footerOnPendingVisual && hasInlineFooter) {
+    } else if (hasInlineFooter && (showOuterMetadata || invalidationWarning != null)) {
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
             inlineFooter()
         }
     }
-    invalidationWarning?.let { warning ->
-        MessageBubbleInvalidationWarning(
-            warning = warning,
-            color = timestampColor,
-            modifier = Modifier.align(Alignment.Start).padding(top = 2.dp),
-        )
-    }
-    if (mine && item.status == MessageStatus.Failed) {
-        Row(
-            modifier = Modifier.align(Alignment.End),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(
-                enabled = !textSelectionMode,
-                onClick = { appState.launchMutation { controller.retryFailedSend(item) } },
-                modifier = Modifier.size(24.dp),
-            ) {
-                Icon(
-                    Icons.Default.Refresh,
-                    contentDescription = stringResource(R.string.retry),
-                    tint = timestampColor,
-                    modifier = Modifier.size(16.dp),
-                )
-            }
-            IconButton(
-                enabled = !textSelectionMode,
-                onClick = { appState.launchMutation { controller.discardFailedSend(item) } },
-                modifier = Modifier.size(24.dp),
-            ) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = stringResource(R.string.discard_failed_message),
-                    tint = timestampColor,
-                    modifier = Modifier.size(16.dp),
-                )
-            }
-        }
-    }
+    // A dedicated file/media clock keeps recovery in the existing parent-level row.
+    if (!recoveryInFooter) failedSendActions()
 }

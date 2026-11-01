@@ -40,6 +40,7 @@ class LocalNotificationDismissalTest {
 
     @Before
     fun setUp() {
+        ConversationCardPostedRegistry.resetForTests()
         manager.cancelAll()
         manager.createNotificationChannel(
             NotificationChannel(TEST_CHANNEL, "Test", NotificationManager.IMPORTANCE_DEFAULT),

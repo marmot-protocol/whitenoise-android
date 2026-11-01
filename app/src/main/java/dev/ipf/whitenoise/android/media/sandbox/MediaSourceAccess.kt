@@ -48,6 +48,9 @@ internal class MediaSourceAccess(
                 }, MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)
             signal.throwIfCanceled()
             if (closed) null else block(signal, source)
+        } catch (failure: java.io.IOException) {
+            // Retirement may close a provider capability while its admitted read is still unwinding.
+            if (closed) null else throw failure
         } finally {
             timer?.cancel(false)
             activeCancellation.compareAndSet(signal, null)
@@ -77,6 +80,10 @@ internal class MediaSourceAccess(
             withProviderDeadline { signal, opened ->
                 resolver.openAssetFileDescriptor(uri, "r", signal)?.use { asset ->
                     opened.set(asset)
+                    // A provider can return after retirement despite cancellation.
+                    if (closed || signal.isCanceled) {
+                        return@use null
+                    }
                     asset.createInputStream().use { source ->
                         withStagedInput({ writer -> copyBoundedSource(source, writer) }) { input ->
                             ParcelFileDescriptor.dup(input.fileDescriptor)
@@ -98,6 +105,9 @@ internal class MediaSourceAccess(
             withProviderDeadline { signal, opened ->
                 resolver.openAssetFileDescriptor(uri, "r", signal)?.use { asset ->
                     opened.set(asset)
+                    if (closed || signal.isCanceled) {
+                        return@use null
+                    }
                     val size = asset.parcelFileDescriptor.statSize
                     val length = if (asset.declaredLength < 0L) size - asset.startOffset else asset.declaredLength
                     if (length > MAX_MEDIA_SOURCE_BYTES || !validMediaRange(size, asset.startOffset, length)) {

@@ -42,7 +42,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -124,7 +123,6 @@ import dev.ipf.whitenoise.android.state.StagedAttachmentSendClaim
 import dev.ipf.whitenoise.android.state.StagedAttachmentSender
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.advanceConversationReadAnchor
 import dev.ipf.whitenoise.android.state.attachmentsFor
 import dev.ipf.whitenoise.android.state.chatCreateOpenConversationTimingStage
 import dev.ipf.whitenoise.android.state.conversationWindowCanReportVisible
@@ -137,7 +135,6 @@ import dev.ipf.whitenoise.android.state.isLoadingPage
 import dev.ipf.whitenoise.android.state.isUserBlocked
 import dev.ipf.whitenoise.android.state.loadMessageAvailability
 import dev.ipf.whitenoise.android.state.loadUntilMessageAvailable
-import dev.ipf.whitenoise.android.state.logUnreadBadgeTransition
 import dev.ipf.whitenoise.android.state.logUnreadCountDivergence
 import dev.ipf.whitenoise.android.state.markComposerReadyForPresentationTiming
 import dev.ipf.whitenoise.android.state.markInboundMessageVisibleForHostPerformance
@@ -145,7 +142,7 @@ import dev.ipf.whitenoise.android.state.markPagingEvent
 import dev.ipf.whitenoise.android.state.markWindowVisibleForPresentationTiming
 import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.state.presentFailure
-import dev.ipf.whitenoise.android.state.reconcileConversationUnreadJump
+import dev.ipf.whitenoise.android.state.reconcile
 import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
@@ -190,9 +187,11 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.rememberAttachmentSta
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerShareRevision
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.composer.rememberConversationMentionPickerState
+import dev.ipf.whitenoise.android.ui.conversation.media.ComposerSendMotionMediaGate
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewer
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOwner
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerSessionHost
+import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerThumbnailHost
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlotListSaver
 import dev.ipf.whitenoise.android.ui.conversation.media.UriListSaver
@@ -204,6 +203,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.presentAttachmentSaveOut
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberConversationCameraCapture
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberConversationMediaViewerSessionState
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberDocumentSaveFallback
+import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerChromeIconProvider
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerForwardActions
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberOriginGuardedResultLauncher
 import dev.ipf.whitenoise.android.ui.conversation.media.removeAcceptedDocumentOccurrences
@@ -238,13 +238,15 @@ import dev.ipf.whitenoise.android.ui.conversation.share.locationGrantAllowsShari
 import dev.ipf.whitenoise.android.ui.conversation.share.readSharedContact
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
+import dev.ipf.whitenoise.android.ui.group.isCurrentGroupMutationOwner
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
-import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTiles
+import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTilesState
 import dev.ipf.whitenoise.android.ui.medialibrary.toConversationViewerPages
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.ui.settings.blockOutcomeMessage
+import dev.ipf.whitenoise.android.ui.settings.rememberRouteMotionModifier
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import kotlinx.coroutines.CancellationException
@@ -272,7 +274,12 @@ private class ConversationNavigationState(
     initialSeedTailAwaitingAuthoritative: Boolean,
     surfaceState: ConversationSurfaceState,
 ) {
-    var lastFollowedLatestId by mutableStateOf(initialFollowedLatestId)
+    /**
+     * Id of the newest row the tail follow has reacted to. Plain bookkeeping on purpose: composition reads it only
+     * to arm the tail entrance in the frame that inserts a row, which a timeline change always recomposes, so the
+     * follow advancing it afterwards must not recompose the whole conversation again.
+     */
+    var lastFollowedLatestId: String? = initialFollowedLatestId
     var seedTailAwaitingAuthoritative by mutableStateOf(initialSeedTailAwaitingAuthoritative)
     var initialTimelineLoadStarted by mutableStateOf(false)
     var initialTimelineBackfillNoProgress by surfaceState.initialTimelineBackfillNoProgress
@@ -362,6 +369,8 @@ private fun presentVoiceRecordingFailure(
     voiceTooShortMessage: String,
 ) {
     when {
+        throwable is dev.ipf.whitenoise.android.audio.VoiceRecordingSaveException ->
+            appState.present(R.string.voice_recording_save_failed)
         throwable is IllegalStateException && throwable.message == "voice recording too short" ->
             appState.present(voiceTooShortMessage)
         throwable.message?.contains("audio is in use", ignoreCase = true) == true ->
@@ -498,82 +507,6 @@ private fun rememberConversationBatchSelectionUiState(
     }
 }
 
-/**
- * Read anchor stored as the message id of the deepest row the user has
- * settled on. The candidate id is a key so an optimistic UUID being replaced
- * in the same list slot still advances the anchor to the confirmed message.
- * A missing durable watermark rebases only at the fully loaded tail; while a
- * newer page exists it may be off-window and must remain monotonic.
- *
- * A row only counts once it clears the composer outright. The transcript rests with the next
- * message showing a sliver above the composer, and taking that sliver as read deducted a message
- * from the unread badge that nobody had seen.
- */
-@Composable
-private fun rememberConversationReadAnchor(
-    controller: ConversationController,
-    entrySessionIdentity: Any,
-    renderedTimeline: List<TimelineMessage>,
-    timelineViewport: ConversationTimelineViewport,
-    trailingRowCount: Int,
-    initialTimelineAnchored: Boolean,
-): MutableState<String?> {
-    val readAnchor = remember(entrySessionIdentity) { mutableStateOf(controller.lastReadMessageId) }
-    val renderedSize = renderedTimeline.size
-    val currentHighestVisibleTimelineIndex by
-        remember(timelineViewport, renderedSize, trailingRowCount) {
-            derivedStateOf {
-                // The reading viewport rather than the raw layout, and within it only a row that
-                // clears the composer outright. Counting a row the composer covers, or one left
-                // showing a sliver above it, clears an unread badge for a message nobody has read.
-                val newest =
-                    timelineViewport.readingLayoutInfo().newestReadRow(
-                        timelineListIndices = trailingRowCount until trailingRowCount + renderedSize,
-                    )
-                if (newest == null || renderedSize == 0) return@derivedStateOf -1
-                // Reversed layout, bottom to top: [maybe bottom error]
-                // [timeline items, newest first][maybe older-loading]
-                // [maybe top error][maybe group recovery][top spacer].
-                // The lowest fully clear index is therefore the newest row actually read.
-                conversationTimelineIndexForListIndex(
-                    listIndex = newest.index,
-                    timelineSize = renderedSize,
-                    trailingRowCount = trailingRowCount,
-                ).coerceIn(0, renderedSize - 1)
-            }
-        }
-    val currentHighestVisibleMessageId =
-        renderedTimeline
-            .getOrNull(currentHighestVisibleTimelineIndex)
-            ?.record
-            ?.messageIdHex
-    LaunchedEffect(
-        controller,
-        initialTimelineAnchored,
-        currentHighestVisibleTimelineIndex,
-        currentHighestVisibleMessageId,
-        controller.lastReadMessageId,
-    ) {
-        val idx =
-            conversationReadAnchorCandidateIndex(
-                initialTimelineAnchored = initialTimelineAnchored,
-                highestVisibleTimelineIndex = currentHighestVisibleTimelineIndex,
-            )
-        if (idx < 0) return@LaunchedEffect
-        readAnchor.value =
-            advanceConversationReadAnchor(
-                timeline = renderedTimeline,
-                currentUiAnchorId = readAnchor.value,
-                durableAnchorId = controller.lastReadMessageId,
-                candidateIndex = idx,
-                canRebaseMissingAnchor =
-                    idx == renderedTimeline.lastIndex &&
-                        !controller.hasMoreAfterTimeline,
-            )
-    }
-    return readAnchor
-}
-
 /** Renders one account-owned conversation and coordinates its route-stable presentation. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -643,6 +576,8 @@ internal fun ConversationScreen(
     }
     productObservationEffect()
     WindowSecureFlag(enabled = !appState.allowChatScreenshotsInChats)
+    // Protected windows and decorative pixels must disappear in the lock-producing frame.
+    if (appState.appLockScreenVisible) return
     // The conversation's own account. Identical to the active account except
     // during a notification-routed early open (#586), while the switch is
     // still landing; conversation-scoped state keys and self-identity follow
@@ -749,10 +684,12 @@ internal fun ConversationScreen(
     val timelineViewport = remember(listState) { ConversationTimelineViewport(listState) }
     val scrollEvidenceSink = LocalConversationScrollEvidenceSink.current
     val ttsQuickTransportViewportLock = rememberTtsQuickTransportViewportLock(listState)
-    var unreadJumpState by
+    // Written from callbacks and reconciled by ConversationUnreadTracking, never read while composing this screen.
+    val unreadJump =
         remember(controller, chat.id, conversationAccountRef, appState.runtimeGeneration) {
             mutableStateOf(ConversationUnreadJumpState())
         }
+    var unreadJumpState by unreadJump
     val scrollCoordinator =
         remember(
             controller,
@@ -1068,14 +1005,14 @@ internal fun ConversationScreen(
     val indicatorItemCount =
         renderedTimeline.size + trailingRowCount + olderHeaderCount +
             inlineTopErrorCount + groupRecoveryCount + (if (hasRetentionHistoryBoundary) 1 else 0) + 1
+    // Held, not read: the tiles rebuild off the main thread after every timeline change, and only an open media
+    // viewer needs them, so their arrival recomposes the viewer rather than the whole conversation.
     val conversationMedia =
-        rememberSharedMediaTiles(
+        rememberSharedMediaTilesState(
             controller = controller,
             appState = appState,
             myAccountId = conversationSelfAccountIdHex,
         )
-    val conversationVisualPages =
-        remember(conversationMedia.visuals) { conversationMedia.visuals.toConversationViewerPages() }
     val renderedTimelineAnchorKeys =
         remember(renderedTimeline) {
             renderedTimeline.map { it.presentationId to it.record.messageIdHex }
@@ -1086,6 +1023,11 @@ internal fun ConversationScreen(
             renderedTimeline.mapNotNull { it.record.retentionExpiresAt?.takeIf { expiry -> expiry > 0uL } }
         }
     val eligibilityNowSeconds = rememberForwardEligibilityNowSeconds(forwardEligibilityExpiries)
+    // The cache revision moves on every attachment download or eviction in any chat, and only forward
+    // eligibility depends on it, which is read for selected messages alone. Reading it only while a
+    // selection exists keeps those bumps from re-running this whole-timeline pass while reading. Entering
+    // and leaving selection each re-key it once, and the reconcile effect below refreshes selected entries.
+    val selectionMediaCacheRevision = if (selectedMessages.isNotEmpty()) mediaCacheRevision else null
     val selectableMessageProjections =
         remember(
             renderedTimeline,
@@ -1096,7 +1038,7 @@ internal fun ConversationScreen(
             // so a promotion/demotion or roster verification is reflected.
             controller.isSelfAdmin,
             controller.canSendMessages,
-            mediaCacheRevision,
+            selectionMediaCacheRevision,
             eligibilityNowSeconds,
         ) {
             renderedTimeline
@@ -1567,15 +1509,11 @@ internal fun ConversationScreen(
         }
     }
     dragInteractionEffect()
-    var readAnchorMessageId by
-        rememberConversationReadAnchor(
-            controller = controller,
-            entrySessionIdentity = entryUnreadSessionIdentity,
-            renderedTimeline = renderedTimeline,
-            timelineViewport = timelineViewport,
-            trailingRowCount = trailingRowCount,
-            initialTimelineAnchored = initialTimelineAnchored,
-        )
+    // The read anchor, badge and unread jump target are written from callbacks and reconciled by
+    // ConversationUnreadTracking, never read while composing this screen: a send moves all three in turn, and
+    // each read here recomposed the whole conversation once more.
+    val readAnchor = remember(entryUnreadSessionIdentity) { mutableStateOf(controller.lastReadMessageId) }
+    var readAnchorMessageId by readAnchor
 
     /** Saves the reading position when the conversation leaves composition or its controller changes. */
     @Composable
@@ -1614,48 +1552,37 @@ internal fun ConversationScreen(
     // One owner for the badge's number (#2726): it follows the loaded rows while the read anchor is
     // among them and holds while paging moves the anchor off screen, so a history page can never
     // switch the count between the rows and the projection or count the loaded window itself.
-    val unreadBadgeUi =
-        rememberConversationUnreadBadgeCount(
+    val projectionUnread = projectedUnreadCount.takeIf { entryProjectionAvailable }
+    val unreadBadge =
+        rememberConversationUnreadBadge(
             identity = Triple(controller, chat.id, entryUnreadSessionIdentity),
             anchored = initialTimelineAnchored,
-            timeline = controller.timeline,
-            readAnchorMessageId = readAnchorMessageId,
-            projectionUnread = projectedUnreadCount.takeIf { entryProjectionAvailable },
-            windowReachesTail = !controller.hasMoreAfterTimeline,
-            onTransition = { before, after ->
-                logUnreadBadgeTransition("DMConversation", before, after, controller.timeline.size)
-            },
-        )
-    // The first composition after anchoring has not reconciled yet; exposing 0 there would retire the
-    // two-stage jump target, so the count and its consumers wait for the first reconciliation.
-    val badgeReconciled = unreadBadgeUi.reconciled
-    val unreadIncomingCount = unreadBadgeUi.count
-
-    /** Reconciles the two-stage unread jump target with the current rows and unread count. */
-    @Composable
-    fun unreadJumpReconcileEffect() {
-        LaunchedEffect(
-            controller,
-            initialTimelineAnchored,
-            renderedTimeline,
-            readAnchorMessageId,
-            badgeReconciled,
-            unreadIncomingCount,
-            nearBottom,
-            unreadJumpState,
-        ) {
-            if (!badgeReconciled) return@LaunchedEffect
-            unreadJumpState =
-                reconcileConversationUnreadJump(
-                    current = unreadJumpState,
-                    timeline = renderedTimeline,
-                    readAnchorMessageId = readAnchorMessageId,
-                    unreadCount = unreadIncomingCount,
-                    nearBottom = nearBottom,
-                )
+        ) { unseeded ->
+            unseeded.reconcile(
+                timeline = controller.timeline,
+                readAnchorMessageId = readAnchor.value,
+                projectionUnread = projectionUnread,
+                windowReachesTail = !controller.hasMoreAfterTimeline,
+            )
         }
-    }
-    unreadJumpReconcileEffect()
+    ConversationUnreadTracking(
+        controller = controller,
+        renderedTimeline = renderedTimeline,
+        timelineViewport = timelineViewport,
+        trailingRowCount = trailingRowCount,
+        initialTimelineAnchored = initialTimelineAnchored,
+        nearBottom = nearBottom,
+        projectionUnread = projectionUnread,
+        readAnchor = readAnchor,
+        badge = unreadBadge,
+        unreadJump = unreadJump,
+    )
+    // Read only by the jump control, which recomposes when the number shown changes rather than whenever the badge
+    // follows a moved read anchor.
+    val unreadIncomingCount by
+        remember(unreadBadge, initialTimelineAnchored) {
+            derivedStateOf { unreadBadge.value.uiState(initialTimelineAnchored).count }
+        }
     // Unread messages (after the read anchor) that mention the active account,
     // oldest first — drives the in-conversation jump-to-mention chip. Mirrors
     // countUnreadIncoming's anchor logic; kind-9 only, matching the engine's
@@ -1754,6 +1681,7 @@ internal fun ConversationScreen(
                                     viewportEndOffsetPx = layoutInfo.viewportEndOffset,
                                     beforeContentPaddingPx = layoutInfo.beforeContentPadding,
                                     viewportSizePx = layoutInfo.viewportSize.height,
+                                    measuredTailKey = tailInfo?.key,
                                 )
                             },
                         )
@@ -1907,6 +1835,10 @@ internal fun ConversationScreen(
                 .PrivateShareFiles(context)
         }
     val exitConversation = {
+        scrollCoordinator.cancelForegroundRestoreForUserIntent()
+        dev.ipf.whitenoise.android.state.WarmResumeTrace.conversationPhase(
+            dev.ipf.whitenoise.android.state.WarmResumeConversationPhase.NavigationRequested,
+        )
         val exitingUris = (pendingMediaSlots.map { it.uri } + pendingDocumentUris).filter(importedShareFiles::owns)
         pendingMediaSlots = pendingMediaSlots.filterNot { importedShareFiles.owns(it.uri) }
         pendingDocumentUris = pendingDocumentUris.filterNot(importedShareFiles::owns)
@@ -1924,6 +1856,12 @@ internal fun ConversationScreen(
         }
         exitConversationRoute()
     }
+
+    // Row callbacks read the latest projections through stable holders. Capturing them directly makes every
+    // visible row's callback new whenever the timeline changes, so one send would re-run every unchanged row.
+    val currentSelectableMessages by rememberUpdatedState(selectableMessages)
+    val currentExitConversation by rememberUpdatedState(exitConversation)
+    val rowExitConversation: () -> Unit = remember { { currentExitConversation() } }
 
     /** Restores and persists the imported-share shelf and stages newly shared items into this chat's draft. */
     @Composable
@@ -2152,6 +2090,17 @@ internal fun ConversationScreen(
         onDispose { voiceReview.release() }
     }
 
+    val voiceRecordingCompletedClip =
+        remember(voiceReview) {
+            mutableStateOf<dev.ipf.whitenoise.android.ui.conversation.composer.VoiceReviewClip?>(null)
+        }
+    val voiceRecordingStopNotice =
+        dev.ipf.whitenoise.android.ui.conversation.composer.rememberVoiceRecordingStopNotice(
+            voiceReview,
+            appState,
+            conversationAccountRef,
+            controller.group.groupIdHex,
+        )
     val voiceRecordingController =
         // Re-key on every captured dependency: chat.id (basic), controller
         // (avoids dispatching through a stale ConversationController when
@@ -2173,7 +2122,10 @@ internal fun ConversationScreen(
                     }
                     granted
                 },
-                onRecordingComplete = { file, durationMs -> voiceReview.offer(file, durationMs) },
+                onRecordingComplete = { file, durationMs ->
+                    voiceRecordingCompletedClip.value =
+                        if (voiceReview.offer(file, durationMs)) voiceReview.clip else null
+                },
                 onError = { throwable ->
                     presentVoiceRecordingFailure(appState, throwable, voiceTooShortMsg)
                 },
@@ -2182,10 +2134,18 @@ internal fun ConversationScreen(
                 // quality state) so a setting change applies to the next clip.
                 bitrateProvider = { appState.mediaQuality.audioBitrateBps },
                 microphoneCaptures = appState.microphoneCaptureCoordinator,
+                onAutomaticStop = { reason ->
+                    val completedClip = voiceRecordingCompletedClip.value
+                    voiceRecordingCompletedClip.value = null
+                    voiceRecordingStopNotice(reason, completedClip)
+                },
             )
         }
+    dev.ipf.whitenoise.android.ui.conversation.composer
+        .VoiceRecordingLifecycleEffect(voiceRecordingController)
     LaunchedEffect(voiceRecordingController.isRecording, voiceReview.clip) {
         if (voiceRecordingController.isRecording) {
+            voiceRecordingCompletedClip.value = null
             voiceReview.discardForNewRecording()
             voiceReviewRecovery.updatePresence(false)
         }
@@ -2950,6 +2910,10 @@ internal fun ConversationScreen(
             onStateChange = ::updateConversationSearch,
         )
         BackHandler(enabled = !conversationSearchState.filterSheetOpen) {
+            scrollCoordinator.cancelForegroundRestoreForUserIntent()
+            dev.ipf.whitenoise.android.state.WarmResumeTrace.conversationPhase(
+                dev.ipf.whitenoise.android.state.WarmResumeConversationPhase.InputReceived,
+            )
             when (
                 conversationBackAction(
                     textSelectionActive = textSelectionMessageId != null,
@@ -3244,6 +3208,21 @@ internal fun ConversationScreen(
     viewportRestorationEffects()
     // Resolved in composition so the row-inserting frame already knows which
     // row is entering; the follow effect below only runs after that frame.
+    val sendMotionRuntime = remember(controller) { appState.runtimeGeneration }
+    val composerSendMotion = remember(controller, chat.id) { ComposerSendMotion() }
+    // One claim source per owner keeps every row's entrance modifier equal across transcript recompositions.
+    val claimedSendPresentation: () -> String? =
+        remember(composerSendMotion) { { composerSendMotion.activePresentationId } }
+    composerSendMotion.readViewport = { presentationId ->
+        timelineViewport.composerSendProjection(timelinePublication, presentationId)
+    }
+    val motionRouteAvailable = !showDetails && !routeTransitionInProgress
+    val motionOwnerCurrent = controller.isCurrentGroupMutationOwner(appState, sendMotionRuntime) && motionRouteAvailable
+    val motionTranscriptVisible = !routePresentationFrozen && transcriptReadyToReveal
+    val surfaceMotionEnabled = rememberConversationMotionEnabled()
+    val conversationMotionEnabled = surfaceMotionEnabled && motionOwnerCurrent && motionTranscriptVisible
+    val reactionViewport = remember(timelineViewport) { { timelineViewport.readingBoundsInWindow ?: Rect.Zero } }
+    val sendMotionEnabled = conversationMotionEnabled && timelineUnderlayEnabled && scrollCoordinator.isFollowingTail
     val tailEntrance =
         rememberConversationTailEntrance(
             latestItemId = latestTimelineItemId,
@@ -3256,7 +3235,12 @@ internal fun ConversationScreen(
                 } == true,
             followingTail = scrollCoordinator.isFollowingTail,
             initialTimelineAnchored = initialTimelineAnchored,
+            motionEnabled = conversationMotionEnabled,
+            ownerKey = controller,
+            // Stable-key anchoring keeps the previous newest row first until the follow scrolls to the new one.
+            tailReached = { listState.firstVisibleItemIndex <= currentTailIndex },
         )
+    TailEntranceSendClaim(tailEntrance, claimedSendPresentation)
 
     /**
      * Follows the tail for membership activity and new rows, keeps viewport structure current and lands route focus
@@ -3347,6 +3331,7 @@ internal fun ConversationScreen(
                             viewportEndOffsetPx = layoutInfo.viewportEndOffset,
                             beforeContentPaddingPx = layoutInfo.beforeContentPadding,
                             viewportSizePx = layoutInfo.viewportSize.height,
+                            measuredTailKey = tailInfo?.key,
                         )
                     },
                 )
@@ -3594,6 +3579,14 @@ internal fun ConversationScreen(
     key(controller, appState.runtimeGeneration) {
         RestoredForwardRequestHost(appState = appState, controller = controller)
     }
+    val detailsRouteMotion =
+        rememberRouteMotionModifier(
+            target = showDetails,
+            depth = if (showDetails) 1 else 0,
+            ownerKey = controller to appState.runtimeGeneration,
+            animationsEnabled = surfaceMotionEnabled,
+            suppressMotion = routeTransitionInProgress || routePresentationFrozen,
+        )
     if (showDetails) {
         /** Shows group details in place of the transcript while they are open. */
         @Composable
@@ -3626,7 +3619,7 @@ internal fun ConversationScreen(
                 onStartGroupWithPeer = onStartGroupWithPeer,
             )
         }
-        groupDetailsRoute()
+        Box(Modifier.fillMaxSize().then(detailsRouteMotion)) { groupDetailsRoute() }
         return
     }
 
@@ -3770,6 +3763,26 @@ internal fun ConversationScreen(
             initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
             externalRevision = composerShareRevision to composerDictationRevision,
         )
+    // Capture the baseline during composition, before either editor can receive an input event.
+    val userTextEditRevisionOnEntry =
+        remember(controller, composerTextState) { composerTextState.userTextEditRevision }
+    LaunchedEffect(controller, composerTextState) {
+        var observedRevision = userTextEditRevisionOnEntry
+        snapshotFlow { composerTextState.userTextEditRevision }.collect { revision ->
+            if (revision != observedRevision) {
+                observedRevision = revision
+                if (scrollCoordinator.foregroundRestorePending) {
+                    scrollCoordinator.cancelForegroundRestoreForUserIntent()
+                    dev.ipf.whitenoise.android.state.WarmResumeTrace.conversationPhase(
+                        dev.ipf.whitenoise.android.state.WarmResumeConversationPhase.InputReceived,
+                    )
+                }
+            }
+        }
+    }
+    LaunchedEffect(controller, controller.editingMessageId, controller.replyingTo, navigationState.searchOpen) {
+        scrollCoordinator.cancelForegroundRestoreForUserIntent()
+    }
     val composerAutoFocusConsumed = remember(chat.id) { mutableStateOf(false) }
 
     // Hoisted from ComposerBar so a tap on the transcript can dismiss the
@@ -3844,1022 +3857,1083 @@ internal fun ConversationScreen(
                 forwardPayloads = batchSelectionUi.forwardPayloads,
             )
     }
-    WhiteNoiseScaffold(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .blur(if (openActionMenuId != null) 24.dp else 0.dp)
-                .dismissTextSelectionOnOutsideTap(
-                    active = textSelectionMessageId != null,
-                    selectedBoundsInWindow = textSelectionBubbleBounds,
-                    onDismiss = ::clearTextSelection,
-                ),
-        // The transcript consumes IME insets; the composer bottom bar is the sole
-        // owner of keyboard padding so the reply-preview chip and input row move
-        // as one cluster (#895, #1109).
-        contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
-        // The transcript's own notice row is this screen's banner slot (#3312).
-        topNoticeSlot = false,
-        topBar = {
-            ConversationHeaderFrame(
-                header = {
-                    ConversationTopBar(
-                        selectionMode = selectionMode,
-                        selectedCount = batchSelectionUi.actionItems.size,
-                        onCloseSelection = {
-                            if (!batchDeleteInFlight) {
-                                batchDeleteRetryState = null
-                                selectedMessages.clear()
-                            }
-                        },
-                        searchOpen = navigationState.searchOpen,
-                        searchQuery = navigationState.searchQuery,
-                        onSearchQueryChange = {
-                            navigationState.searchJob?.cancel()
-                            navigationState.searchJob = null
-                            navigationState.navigateReplyJob?.cancel()
-                            navigationState.targetNavigation.cancel()
-                            navigationState.targetHighlight.clear()
-                            updateConversationSearch { state -> GlobalSearchTransitions.setQuery(state, it) }
-                            navigationState.searchPinnedMatchId = null
-                        },
-                        onClearSearch = {
-                            navigationState.searchJob?.cancel()
-                            navigationState.searchJob = null
-                            navigationState.navigateReplyJob?.cancel()
-                            navigationState.targetNavigation.cancel()
-                            navigationState.targetHighlight.clear()
-                            updateConversationSearch { state -> GlobalSearchTransitions.setQuery(state, "") }
-                            navigationState.searchPinnedMatchId = null
-                        },
-                        onCloseSearch = ::closeSearch,
-                        onSearchAction = { navigateToSearchMatch(forward = true) },
-                        searchFocusRequester = navigationState.searchFocusRequester,
-                        searchFilterAction = {
-                            ChatListSearchFilterAction(
-                                state = conversationSearchState,
-                                conversationScope = true,
-                                onCategory = { category ->
-                                    updateConversationSearch {
-                                        GlobalSearchTransitions.openFilterCategory(it, category)
-                                    }
-                                },
-                                onClearAll = { updateConversationSearch(::clearConversationSearchFilters) },
-                            )
-                        },
-                        searchFilterControls = {
-                            dev.ipf.whitenoise.android.ui.chats.GlobalSearchAttachmentModes(
-                                state = conversationSearchState,
-                                onSelectionChange = { selection ->
-                                    updateConversationSearch { it.copy(contentFilterSelection = selection) }
-                                },
-                            )
-                            GlobalSearchFilterControlsRow(
-                                state = conversationSearchState,
-                                onRemoveFilter = { chip ->
-                                    updateConversationSearch { GlobalSearchTransitions.removeFilter(it, chip) }
-                                },
-                                onClearAll = { updateConversationSearch(::clearConversationSearchFilters) },
-                                folderNames = searchControls.folderNames,
-                                conversationScope =
-                                    conversationSearchState.chatFilters.singleOrNull()?.takeIf {
-                                        canonicalChatListGroupId(it.stableId) == canonicalChatListGroupId(chat.id)
-                                    },
-                                onSearchOtherChats = { updateConversationSearch(::broadenConversationSearch) },
-                            )
-                        },
-                        appState = appState,
-                        controller = controller,
-                        groupTitleCopy = groupTitleCopy,
-                        openedAsDmHint = openedAsDmHint,
-                        firstFrameAvatar = chat.firstFrameAvatar,
-                        freezeRoutePresentation = freezeRoutePresentation,
-                        openDetailsDescription = openDetailsDescription,
-                        onOpenDetails = { showDetails = true },
-                        onBack = exitConversation,
-                        compactHeight = compactHeightConversation,
-                    )
-                },
-                playbackTransport = playbackTransport,
-            )
-        },
-        bottomBar = {
-            ConversationBottomBar(
-                compactHeight = compactHeightConversation,
-                dictationControlsVisible = dictationControlsVisible,
-                selectionMode = selectionMode,
-                selectionActionAvailability =
-                    batchSelectionUi.actionAvailability.let { availability ->
-                        if (batchDeleteInFlight) {
-                            BatchSelectionActionAvailability(
-                                canCopy = false,
-                                canForward = false,
-                                canSave = false,
-                                canReply = false,
-                                canInfo = false,
-                                canDelete = false,
-                            )
-                        } else {
-                            availability.copy(
-                                canSave = availability.canSave && !batchAttachmentSaveInFlight,
-                                canDelete = availability.canDelete && batchDeleteRetryState == null,
-                            )
-                        }
-                    },
-                selectionForwardBlockedReason = batchSelectionUi.forwardBlockedReason,
-                onCopySelection = {
-                    if (batchSelectionUi.copyText.isNotBlank()) {
-                        clipboard.setText(AnnotatedString(batchSelectionUi.copyText))
-                        selectedMessages.clear()
-                    }
-                },
-                onForwardSelection = {
-                    if (batchSelectionUi.forwardPayloads.isNotEmpty()) batchForwardSheetOpen = true
-                },
-                onSaveSelection = {
-                    if (batchSelectionUi.actionAvailability.canSave && !batchAttachmentSaveInFlight) {
-                        batchAttachmentSaveInFlight = true
-                        val selections = orderedBatchSelections(selectedMessages.values)
-                        selectedMessages.clear()
-                        appState.launchMutation {
-                            try {
-                                val summary =
-                                    aggregateMessageAttachmentSaveSummaries(
-                                        selections.map { selection ->
-                                            val record = selection.record
-                                            saveMessageMediaAttachments(
-                                                context = context,
-                                                controller = controller,
-                                                messageIdHex = record.messageIdHex,
-                                                attachments = controller.attachmentsFor(record),
-                                                mine = controller.isMessageMine(record),
-                                                documentSaveFallback = documentSaveFallback,
-                                            )
-                                        },
-                                    )
-                                appState.presentAttachmentSaveOutcome(
-                                    context = context,
-                                    summary = summary,
-                                    conversation =
-                                        controller.boundAccountRef?.let { accountRef ->
-                                            ConversationNoticeDestination(accountRef, controller.group.groupIdHex)
-                                        },
-                                )
-                            } finally {
-                                batchAttachmentSaveInFlight = false
-                            }
-                        }
-                    }
-                },
-                onReplySelection = {
-                    batchSelectionUi.selections.singleOrNull()?.let { selection ->
-                        controller.replyingTo = selection.record
-                        selectedMessages.clear()
-                    }
-                },
-                onInfoSelection = {
-                    batchInfoSelection = batchSelectionUi.selections.singleOrNull()
-                },
-                onDeleteSelection = { showBatchDeleteConfirm = true },
-                batchDeleteRetryState = batchDeleteRetryState,
-                batchDeleteInFlight = batchDeleteInFlight,
-                onRetryBatchDelete = {
-                    batchDeleteRetryState?.let { retryState ->
-                        startBatchDelete(retryState.failedAttempts, retryState)
-                    }
-                },
-                onDismissBatchDeleteFailure = {
-                    if (!batchDeleteInFlight) {
-                        batchDeleteRetryState = null
-                        selectedMessages.clear()
-                    }
-                },
-                onCopyBatchDeleteReport = {
-                    batchDeleteRetryState?.let { retryState ->
-                        clipboard.setText(AnnotatedString(batchDeleteDiagnosticReport(retryState)))
-                    }
-                },
-                searchOpen = navigationState.searchOpen,
-                searchMatchCount = effectiveSearchMatchIds.size,
-                searchActiveIndex = searchActiveIndex,
-                searchScanStatus = searchScanStatus,
-                onPreviousSearchMatch = { navigateToSearchMatch(forward = false) },
-                onNextSearchMatch = { navigateToSearchMatch(forward = true) },
-                onRetrySearchScan = { navigationState.historySearchRetryGeneration += 1 },
-                hasError =
-                    loadFailurePlacement == LoadFailurePlacement.FullScreen ||
-                        navigationState.initialTimelineBackfillNoProgress ||
-                        transcriptPresentationNeedsRetry,
-                composerGate = composerGate,
-                blockedDmUnblockInFlight = blockedDmUnblockInFlight,
-                onUnblockBlockedDm = ::unblockBlockedDm,
-                controller = controller,
-                appState = appState,
-                messageTextCopy = messageTextCopy,
-                onBack = exitConversation,
-                initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
-                onDraftChange =
-                    conversationDictationDraftWriter(
-                        dictation = appState.conversationDictation,
-                        accountRef = draftAccountRef,
-                        groupIdHex = controller.group.groupIdHex,
-                        presentationRevision = composerDictationRevision,
-                        write = { appState.setDraft(draftAccountRef, controller.group.groupIdHex, it) },
+    ComposerSendMotionMediaGate(composerSendMotion, mediaViewerSessionState, sendMotionEnabled)
+    ComposerSendMotionHost(composerSendMotion, surfaceMotionEnabled) {
+        WhiteNoiseScaffold(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .then(detailsRouteMotion)
+                    .blur(if (openActionMenuId != null) 24.dp else 0.dp)
+                    .dismissTextSelectionOnOutsideTap(
+                        active = textSelectionMessageId != null,
+                        selectedBoundsInWindow = textSelectionBubbleBounds,
+                        onDismiss = ::clearTextSelection,
                     ),
-                composerTextState = composerTextState,
-                composerAttachmentSheet = composerAttachmentSheet,
-                hasPendingAttachments = pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty(),
-                attachmentsPreparing = mediaDraftState.isPreparing,
-                attachmentContent =
-                    if (pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty()) {
-                        {
-                            dev.ipf.whitenoise.android.ui.conversation.media.ComposerAttachmentShelf(
-                                mediaSlots = pendingMediaSlots,
-                                documentUris = pendingDocumentUris,
-                                enabled = !attachmentSendClaim.isHeld,
-                                prepared = mediaDraftState.preparedPreviews(),
-                                onPreview = { if (!attachmentSendClaim.isHeld) mediaPreviewIndex = it },
-                                onRemoveMedia = { slot ->
-                                    if (!attachmentSendClaim.isHeld) {
-                                        mediaDraftState.releasePreparedPhoto(slot.id)
-                                        pendingMediaSlots = pendingMediaSlots.filterNot { it.id == slot.id }
-                                    }
-                                },
-                                onRemoveDocument = { index ->
-                                    if (!attachmentSendClaim.isHeld) {
-                                        pendingDocumentUris
-                                            .getOrNull(index)
-                                            ?.let(mediaDraftState::releasePreparedDocument)
-                                        pendingDocumentUris = pendingDocumentUris.filterIndexed { i, _ -> i != index }
-                                    }
-                                },
-                            )
-                        }
-                    } else {
-                        null
-                    },
-                onSendAttachments = { caption, onResult ->
-                    sendStagedAttachmentsWithCaption(
-                        caption,
-                        onResult,
-                        composerTextState.captureCaptionSettlement(caption),
-                    )
-                },
-                onAfterSend = {
-                    acceptedSendRevealedTranscript = true
-                    revealSentMessage()
-                },
-                onPickFromGallery = {
-                    imagePickerLauncher.launch(
-                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
-                    )
-                },
-                onCaptureFromCamera = {
-                    val granted =
-                        ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                            PackageManager.PERMISSION_GRANTED
-                    if (granted) {
-                        launchCameraCapture()
-                    } else {
-                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                    }
-                },
-                onPickDocument = {
-                    documentPickerLauncher.launch(arrayOf("*/*"))
-                },
-                onShareLocation = {
-                    if (hasLocationGrant(Manifest.permission.ACCESS_FINE_LOCATION) ||
-                        hasLocationGrant(Manifest.permission.ACCESS_COARSE_LOCATION)
-                    ) {
-                        locationPickerOpen = true
-                    } else {
-                        locationPermissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION,
-                            ),
-                        )
-                    }
-                },
-                onShareUser = { shareUserPickerOpen = true },
-                onShareContact = {
-                    contactPickerLauncher.launch(Unit)
-                },
-                onCreatePoll =
-                    if (!controller.isDirectConversation) {
-                        { pollCreateOpen = true }
-                    } else {
-                        null
-                    },
-                onPasteImageUris = { uris ->
-                    val openSlots = (MEDIA_PICKER_MAX_ITEMS - pendingMediaSlots.size).coerceAtLeast(0)
-                    val pasteCandidates = uris.take(openSlots)
-                    val localUris =
-                        pasteCandidates.mapNotNull { uri ->
-                            materializeReceiveContentImageUri(context, uri)
-                        }
-                    if (localUris.size < pasteCandidates.size) {
-                        appState.present(R.string.toast_couldnt_decode_image, copyable = true)
-                    }
-                    if (localUris.isNotEmpty()) {
-                        pendingMediaSlots =
-                            appendPendingMediaSlots(pendingMediaSlots, localUris, MEDIA_PICKER_MAX_ITEMS)
-                    }
-                },
-                voiceRecordingController = voiceRecordingController,
-                voiceReview = voiceReview,
-                mentionCandidates = mentionPicker.candidates,
-                mentionPickerEnabled = mentionPicker.enabled,
-                autoFocusOnEnter = justCreated && !freezeRoutePresentation,
-                autoFocusOnDraftRestore =
-                    shouldAutoFocusComposerOnDraftRestore(
-                        snapshot = restoredDraftSnapshot,
-                        dictationRevisionOnEntry = composerDictationRevisionOnEntry,
-                        currentDictationRevision = composerDictationRevision,
-                    ) &&
-                        !freezeRoutePresentation,
-                autoFocusConsumedState = composerAutoFocusConsumed,
-                composerFocus = composerFocus,
-                onComposerFocusChanged = { focused ->
-                    if (focused) composerDismissInProgress = false
-                    if (focused && !composerFocused && !imeIsOpen) {
-                        imeTransitionBookmark = scrollCoordinator.bookmark(currentScrollAnchor())
-                    } else if (!focused && !imeIsOpen) {
-                        imeTransitionBookmark = null
-                    }
-                    composerFocused = focused
-                },
-                onComposerPreImeBack = {
-                    if (composerDismissInProgress) {
-                        exitConversation()
-                    } else {
-                        composerDismissInProgress = true
-                        keyboardController?.hide()
-                    }
-                },
-                composerDismissInProgress = composerDismissInProgress,
-                onBottomInputChanged = { bottomInputRevision++ },
-                onKeyboardRestoreFromCustomInput = { suppressNextImeOpenReanchor.set(true) },
-                onKeyboardRestoreFromCustomInputFailed = { suppressNextImeOpenReanchor.set(false) },
-                recentEmojis = recentEmojiRecentsOwner.recents,
-                onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
-                onTimelineComposerMeasured = timelineViewport::onComposerMeasured,
-                onBottomChromeMeasured = { heightPx ->
-                    timelineViewport.onBottomChromeMeasured(heightPx)
-                    bottomChromeHeightObserver.onMeasured(heightPx)
-                    if (measuredBottomChromeHeightPx != heightPx) {
-                        measuredBottomChromeHeightPx = heightPx
-                    }
-                },
-            )
-        },
-    ) { padding ->
-        CompositionLocalProvider(
-            dev.ipf.whitenoise.android.translation.LocalConversationTranslation provides translationSession,
-            dev.ipf.whitenoise.android.translation.LocalTranslationPreferences provides translationPreferences,
-            LocalPollVotesHost provides pollVotesHost,
-            LocalKeptMessages provides keptMessagesController,
-            // Bubbles mark their own matches while search is open, so a hit is obvious on any
-            // bubble colour rather than only on the one the jump happened to land on.
-            LocalConversationSearchMarking provides
-                navigationState.searchQuery
-                    .takeIf { navigationState.searchOpen && it.isNotBlank() }
-                    ?.let { ConversationSearchMarking(it, effectiveSearchMatchIds.toSet()) },
-        ) {
-            val overlayPadding = timelineViewport.overlayPadding(density, timelineUnderlayEnabled)
-            ConversationTransientNoticeLayout(
-                notice = appState.transientNotice,
-                accountRef = conversationAccountRef,
-                groupIdHex = controller.group.groupIdHex,
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .padding(conversationUnderlayScaffoldPadding(padding, overlayPadding))
-                        // The composer bottomBar owns IME padding; consume here so the
-                        // transcript does not count the keyboard a second time (#895).
-                        .consumeWindowInsets(WindowInsets.ime)
-                        // The scaffold padding above already clears a side cutout or side navigation
-                        // bar, so the banner row inside must not pad for them again (#3312).
-                        .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
-            ) {
-                when {
-                    navigationState.initialTimelineBackfillNoProgress ->
-                        ConversationLoadErrorContent(
-                            error = InitialTimelineBackfillNoProgressError,
-                            onRetry = {
-                                navigationState.initialTimelineBackfillNoProgress = false
-                                navigationState.initialTimelineBackfillRetryGeneration += 1L
-                            },
-                        )
-                    loadFailurePlacement == LoadFailurePlacement.FullScreen ->
-                        ConversationLoadErrorContent(
-                            error = requireNotNull(controller.error),
-                            onRetry = {
-                                scope.launch {
-                                    controller.retryLoadFailure()
-                                    navigationState.focusTargetRetry.retry(
-                                        loadFailurePresent = controller.error != null,
-                                    )
-                                    navigationState.initialTimelineBackfillRetryGeneration += 1L
+            // The transcript consumes IME insets; the composer bottom bar is the sole
+            // owner of keyboard padding so the reply-preview chip and input row move
+            // as one cluster (#895, #1109).
+            contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+            // The transcript's own notice row is this screen's banner slot (#3312).
+            topNoticeSlot = false,
+            topBar = {
+                ConversationHeaderFrame(
+                    header = {
+                        ConversationTopBar(
+                            selectionMode = selectionMode,
+                            selectedCount = batchSelectionUi.actionItems.size,
+                            onCloseSelection = {
+                                if (!batchDeleteInFlight) {
+                                    batchDeleteRetryState = null
+                                    selectedMessages.clear()
                                 }
                             },
-                        )
-                    (controller.group.pendingConfirmation || controller.inviteAcceptanceResolutionPending) &&
-                        !controller.terminalConversationUnavailable &&
-                        renderedTimeline.isEmpty() ->
-                        InvitePreviewPlaceholder(
-                            inviterName = controller.inviteAccount?.let { appState.chatMemberTitle(it) },
-                        )
-                    transcriptPresentationNeedsRetry ->
-                        ConversationLoadErrorContent(
-                            error = controller.rosterBlockReason.transcriptRosterError(),
-                            onRetry = { scope.launch { controller.retryMembers() } },
-                        )
-                    renderedTimeline.isEmpty() &&
-                        notificationOpenRequestId != 0L &&
-                        !controller.terminalConversationUnavailable &&
-                        !transcriptReadyToReveal ->
-                        ConversationInitialLoadingOverlay(
-                            visible = true,
-                            graceMillis = CONVERSATION_ANCHORED_LOADING_GRACE_MILLIS,
-                            routeTransitionInProgress = routeTransitionInProgress,
-                        )
-                    renderedTimeline.isEmpty() && controller.isLoading ->
-                        ConversationInitialLoadingOverlay(
-                            visible = true,
-                            routeTransitionInProgress = routeTransitionInProgress,
-                        )
-                    renderedTimeline.isEmpty() &&
-                        (
-                            controller.groupRecoveryReadFailed ||
-                                controller.groupRecoveryStatus?.hasVisibleRecoveryState() == true
-                        ) ->
-                        Column(modifier = Modifier.fillMaxSize()) {
-                            ConversationGroupRecoveryCard(controller, appState)
-                            ConversationEmptyMessage(conversationEmptyState(controller.group.disappearingMessageSecs))
-                        }
-                    renderedTimeline.isEmpty() &&
-                        controller.pendingMembershipActivity == null &&
-                        !controller.hasMoreBefore &&
-                        !controller.hasMoreAfterTimeline &&
-                        !controller.isLoadingPage &&
-                        !controller.isLoading &&
-                        navigationState.initialTimelineLoadStarted -> {
-                        if (
-                            canInviteFromEmptyGroup(
-                                isSelfMember = controller.isSelfMember,
-                                isSelfAdmin = controller.isSelfAdmin,
-                                membersLoaded = controller.membersLoaded,
-                                memberCount = controller.memberCount,
-                            )
-                        ) {
-                            EmptyGroupConversation(
-                                onAddMembers = {
-                                    openAddMemberOnDetails = true
-                                    showDetails = true
-                                },
-                            )
-                        } else {
-                            ConversationEmptyMessage(conversationEmptyState(controller.group.disappearingMessageSecs))
-                        }
-                    }
-                    else ->
-                        Box(
-                            modifier =
-                                Modifier
-                                    .fillMaxSize()
-                                    .conversationScrollIndicator(
-                                        state = listState,
-                                        viewport = timelineViewport,
-                                        window =
-                                            ConversationScrollIndicatorWindow(
-                                                scrollIndicatorKeys,
-                                                trailingRowCount,
-                                                indicatorItemCount,
-                                                controller,
-                                            ),
-                                        enabled =
-                                            transcriptReadyToReveal &&
-                                                !selectionMode &&
-                                                textSelectionMessageId == null &&
-                                                openActionMenuId == null,
-                                    ),
-                        ) {
-                            val composedTranscriptRows = ConversationTranscriptDrawProbe.composedRows(renderedTimeline)
-                            LazyColumn(
-                                state = listState,
-                                modifier =
-                                    Modifier
-                                        .fillMaxSize()
-                                        .measureConversationTimelinePadding(
-                                            timelineViewport,
-                                            CONVERSATION_TIMELINE_TAIL_GAP,
-                                            overlayPadding,
-                                            timelinePublication,
-                                        ).trackWhiteNoiseHeader(listState)
-                                        .padding(horizontal = 12.dp)
-                                        // Paint, TalkBack exposure, and first-useful-frame
-                                        // reporting share one predicate. An oversized cached
-                                        // final row or unknown notification roster therefore
-                                        // cannot become observable before both owners commit.
-                                        .drawWithContent {
-                                            if (transcriptReadyToReveal) {
-                                                drawContent()
-                                                ConversationTranscriptDrawProbe.drawn(
-                                                    controller,
-                                                    composedTranscriptRows,
-                                                    listState.layoutInfo,
-                                                )
-                                            } else {
-                                                ConversationTranscriptDrawProbe.retire(controller)
-                                            }
-                                        }.graphicsLayer {
-                                            alpha = if (transcriptReadyToReveal) 1f else 0f
-                                        }.semantics {
-                                            if (!transcriptReadyToReveal) hideFromAccessibility()
-                                        }.performanceTestTag(
-                                            PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE,
-                                            enabled = transcriptReadyToReveal && renderedTimeline.isNotEmpty(),
-                                        ).onGloballyPositioned(timelineViewport::onPaintViewportMeasured)
-                                        // Rows dissolve into the bar above, and slide under the
-                                        // composer thinning away to nothing by the bottom of the
-                                        // screen, so the transcript meets its chrome softly
-                                        // instead of being sliced off mid-bubble.
-                                        .transcriptEdgeFade(
-                                            listState = listState,
-                                            composerOverlap = overlayPadding,
-                                        ),
-                                // Bottom-anchored like every established chat
-                                // client: the viewport shrinking under the keyboard
-                                // moves rows up as a layout consequence, so the
-                                // transcript tracks the IME instead of being
-                                // corrected after it settles (#2621).
-                                reverseLayout = true,
-                                verticalArrangement = CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT,
-                                // Content padding owns the final composer interval. Temporary
-                                // notices sit in the top row, so no bottom clearance is added.
-                                // Keeping spacing out of a lazy sentinel leaves the real last
-                                // row as the stable tail anchor.
-                                contentPadding =
-                                    remember(overlayPadding) {
-                                        conversationTimelineContentPadding(overlayPadding)
-                                    },
-                            ) {
-                                // The list is reversed, so the first item emitted
-                                // is laid out against the composer. Emit the newest
-                                // edge first and walk back through history, which
-                                // puts the structural rows last.
-                                conversationLoadErrorItem(
-                                    key = "conversation-load-error-bottom",
-                                    error = controller.error,
-                                    placement = loadFailurePlacement,
-                                    errorEdge = controller.errorEdge,
-                                    targetEdge = ConversationLoadFailureEdge.BOTTOM,
-                                    onRetry = {
-                                        scope.launch {
-                                            controller.retryLoadFailure()
-                                            navigationState.focusTargetRetry.retry(
-                                                loadFailurePresent = controller.error != null,
-                                            )
+                            searchOpen = navigationState.searchOpen,
+                            searchQuery = navigationState.searchQuery,
+                            onSearchQueryChange = {
+                                navigationState.searchJob?.cancel()
+                                navigationState.searchJob = null
+                                navigationState.navigateReplyJob?.cancel()
+                                navigationState.targetNavigation.cancel()
+                                navigationState.targetHighlight.clear()
+                                updateConversationSearch { state -> GlobalSearchTransitions.setQuery(state, it) }
+                                navigationState.searchPinnedMatchId = null
+                            },
+                            onClearSearch = {
+                                navigationState.searchJob?.cancel()
+                                navigationState.searchJob = null
+                                navigationState.navigateReplyJob?.cancel()
+                                navigationState.targetNavigation.cancel()
+                                navigationState.targetHighlight.clear()
+                                updateConversationSearch { state -> GlobalSearchTransitions.setQuery(state, "") }
+                                navigationState.searchPinnedMatchId = null
+                            },
+                            onCloseSearch = ::closeSearch,
+                            onSearchAction = { navigateToSearchMatch(forward = true) },
+                            searchFocusRequester = navigationState.searchFocusRequester,
+                            searchFilterAction = {
+                                ChatListSearchFilterAction(
+                                    state = conversationSearchState,
+                                    conversationScope = true,
+                                    onCategory = { category ->
+                                        updateConversationSearch {
+                                            GlobalSearchTransitions.openFilterCategory(it, category)
                                         }
+                                    },
+                                    onClearAll = { updateConversationSearch(::clearConversationSearchFilters) },
+                                )
+                            },
+                            searchFilterControls = {
+                                dev.ipf.whitenoise.android.ui.chats.GlobalSearchAttachmentModes(
+                                    state = conversationSearchState,
+                                    onSelectionChange = { selection ->
+                                        updateConversationSearch { it.copy(contentFilterSelection = selection) }
                                     },
                                 )
-                                controller.pendingMembershipActivity?.let { activity ->
-                                    item(key = "pending-membership:${activity.id}", contentType = "pendingMembership") {
-                                        PendingGroupMembershipRow(
-                                            activity = activity,
-                                            displayName = { ref ->
-                                                appState.contactNicknameFor(controller.boundAccountRef, ref)
-                                                    ?: appState.networkDisplayName(ref)
-                                            },
-                                            modifier =
-                                                Modifier
-                                                    .timelineReadingExposure(timelineViewport)
-                                                    .membershipVisibleDraw(timelineViewport) {
-                                                        controller.membershipTimings.pendingFrame(activity.id)
-                                                    },
-                                        )
-                                    }
-                                }
-                                itemsIndexed(
-                                    renderedTimelineNewestFirst,
-                                    key = { _, item -> item.presentationId },
-                                    // Pool layouts by category so Compose can reuse
-                                    // structurally similar rows across scroll.
-                                    contentType = { _, item ->
-                                        when {
-                                            MessageProjector.isGroupSystem(item.record) -> "groupSystem"
-                                            MessageProjector.isAgentOperation(item.record) -> "agentOperation"
-                                            else -> "message"
-                                        }
+                                GlobalSearchFilterControlsRow(
+                                    state = conversationSearchState,
+                                    onRemoveFilter = { chip ->
+                                        updateConversationSearch { GlobalSearchTransitions.removeFilter(it, chip) }
                                     },
-                                ) { index, item ->
-                                    val messageId = item.record.messageIdHex
-                                    val membershipFrameModifier =
-                                        if (item.projected?.groupSystem?.systemType in MEMBERSHIP_FRAME_EVENT_TYPES) {
-                                            Modifier.membershipVisibleDraw(timelineViewport) {
-                                                controller.membershipTimings.projectionFrame(messageId)
-                                            }
-                                        } else {
-                                            Modifier
-                                        }
-                                    TimelineRow(
-                                        modifier =
-                                            Modifier
-                                                .timelineReadingExposure(timelineViewport)
-                                                .conversationTailEntranceMotion(tailEntrance, item.presentationId)
-                                                .then(membershipFrameModifier),
-                                        item = item,
-                                        // Newest-first rows: the chronologically
-                                        // older neighbour is the next row emitted.
-                                        older = renderedTimelineNewestFirst.getOrNull(index + 1),
-                                        newer = renderedTimelineNewestFirst.getOrNull(index - 1),
-                                        transcriptLocale = transcriptLocale,
-                                        entryUnreadCount = entryUnreadCount,
-                                        entryUnreadDividerRetired = entryUnreadDividerRetired,
-                                        entryFirstUnreadMessageId = entryFirstUnreadMessageId,
-                                        onMeasured = { id, height ->
-                                            if (navigationState.timelineItemHeightsPx[id] != height) {
-                                                navigationState.timelineItemHeightsPx[id] = height
-                                            }
+                                    onClearAll = { updateConversationSearch(::clearConversationSearchFilters) },
+                                    folderNames = searchControls.folderNames,
+                                    conversationScope =
+                                        conversationSearchState.chatFilters.singleOrNull()?.takeIf {
+                                            canonicalChatListGroupId(it.stableId) == canonicalChatListGroupId(chat.id)
                                         },
-                                        appState = appState,
-                                        controller = controller,
-                                        onOpenConversationMedia = { request -> mediaViewerSessionState.open(request) },
-                                        eventCardResolver = eventCardResolver,
-                                        documentSaveFallback = documentSaveFallback,
-                                        composerTextState = composerTextState,
-                                        highlighted = messageId == navigationState.targetHighlight.highlightedMessageId,
-                                        selectionMode = selectionMode,
-                                        textSelectionMode = textSelectionMessageId == messageId,
-                                        onTextSelectionModeChange = { enabled ->
-                                            if (enabled) {
-                                                ttsFollowHandle.suspendForDirectDrag(
-                                                    appState.ttsController.state.value,
-                                                    appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
-                                                )
-                                                openActionMenuId = null
-                                                textSelectionMessageId = messageId
-                                                textSelectionBubbleBounds = null
-                                            } else if (textSelectionMessageId == messageId) {
-                                                clearTextSelection()
-                                            }
-                                        },
-                                        onTextSelectionBoundsChange = { bounds ->
-                                            if (textSelectionMessageId == messageId) textSelectionBubbleBounds = bounds
-                                        },
-                                        batchSelectable =
-                                            messageId in selectableMessages &&
-                                                batchDeleteRetryState == null &&
-                                                !batchDeleteInFlight,
-                                        selected = selectedMessages.containsKey(messageId),
-                                        onToggleSelection = {
-                                            if (batchDeleteRetryState == null && !batchDeleteInFlight) {
-                                                if (selectedMessages.containsKey(messageId)) {
-                                                    selectedMessages.remove(messageId)
-                                                } else {
-                                                    selectableMessages[messageId]?.let { selectable ->
-                                                        selectedMessages[messageId] = selectable
-                                                    }
-                                                }
-                                            }
-                                        },
-                                        rangeDragActive = dragAnchorTimelineId == item.presentationId,
-                                        onDragSelectionStart = { pointerWindowY ->
-                                            openActionMenuId = null
-                                            clearTextSelection()
-                                            ttsFollowHandle.suspendForDirectDrag(
-                                                state = appState.ttsController.state.value,
-                                                ownsSession =
-                                                    appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
-                                            )
-                                            scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
-                                            controller.onOlderPagingGestureStarted()
-                                            dragAnchorTimelineId = item.presentationId
-                                            dragPointerWindowY = pointerWindowY
-                                        },
-                                        onDragSelection = { pointerWindowY ->
-                                            dragPointerWindowY = pointerWindowY
-                                            updateMessageDragSelection(pointerWindowY)
-                                        },
-                                        onDragSelectionEnd = { finishMessageDrag(clearSelection = false) },
-                                        onDragSelectionCancel = { finishMessageDrag(clearSelection = true) },
-                                        quickReactionEmojis = quickReactionEmojis,
-                                        recentEmojis = recentEmojiRecentsOwner.recents,
-                                        onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
-                                        isActionMenuOpen = openActionMenuId == item.presentationId,
-                                        onActionMenuOpenChange = { open ->
-                                            if (open) clearTextSelection()
-                                            if (open) {
-                                                openActionMenuId = item.presentationId
-                                            } else if (openActionMenuId == item.presentationId) {
-                                                openActionMenuId = null
-                                            }
-                                        },
-                                        onQuickReactionsSave = { saveQuickReactionEmojis(it) },
-                                        onReplyPreviewClick = { navigateToReplyTarget(it) },
-                                        composerGate = composerGate,
-                                        blockedDmUnblockInFlight = blockedDmUnblockInFlight,
-                                        onUnblockBlockedDm = ::unblockBlockedDm,
-                                        onWave =
-                                            if (composerGate == ComposerGate.COMPOSER && canWave()) {
-                                                wave@{ accountIdHex, onAccepted ->
-                                                    if (!canWave()) {
-                                                        return@wave
-                                                    }
-                                                    val npub = appState.npubForDisplay(accountIdHex)
-                                                    if (npub.isBlank()) {
-                                                        appState.present(R.string.send_failed)
-                                                        return@wave
-                                                    }
-                                                    controller.send("👋 @$npub", onAccepted = {
-                                                        onAccepted()
-                                                        acceptedSendRevealedTranscript = true
-                                                        revealSentMessage()
-                                                    })
-                                                }
-                                            } else {
-                                                null
-                                            },
-                                        onReaderSendAccepted = {
-                                            acceptedSendRevealedTranscript = true
-                                            revealSentMessage()
-                                        },
-                                        onBack = exitConversation,
-                                        mentionCandidates = mentionPicker.candidates,
-                                        mentionPickerEnabled = mentionPicker.enabled,
-                                        onBeforeBodyCollapse = {
-                                            // Collapse cancels deferred movement while preserving
-                                            // whether the viewport is following the tail.
-                                            val keepFollowingTail =
-                                                scrollCoordinator.isFollowingTail &&
-                                                    conversationLandingAtNewestEdge(
-                                                        atNaturalTail = timelineViewport.isAtNaturalTail,
-                                                        hasMoreAfter = controller.hasMoreAfterTimeline,
-                                                    )
-                                            currentTimelineListIndex(item.record.messageIdHex)?.let { index ->
-                                                // Preserve a visible top edge; a deep offset into a tall body
-                                                // must not survive after that content has been clipped away.
-                                                val visible =
-                                                    timelineViewport.readingLayoutInfo().visibleItemsInfo.firstOrNull {
-                                                        it.index == index
-                                                    }
-                                                val offset = -(visible?.offset ?: 0).coerceAtLeast(0)
-                                                val anchor =
-                                                    ConversationScrollAnchor(
-                                                        messageId = item.record.messageIdHex,
-                                                        itemId = item.presentationId,
-                                                        listIndex = index,
-                                                        pixelOffset = offset,
-                                                    )
-                                                scrollCoordinator.settleLandingAt(
-                                                    anchor,
-                                                    atNewestEdge = keepFollowingTail,
-                                                )
-                                                if (!keepFollowingTail) {
-                                                    val bookmark = scrollCoordinator.bookmark(anchor)
-                                                    scope.launch {
-                                                        scrollCoordinator.restoreBookmark(
-                                                            bookmark,
-                                                            resolveAnchorIndex = ::resolveScrollAnchorIndex,
-                                                        )
-                                                    }
-                                                }
-                                            } ?: scrollCoordinator.settleLandingAt(
-                                                currentScrollAnchor(),
-                                                atNewestEdge = keepFollowingTail,
-                                            )
-                                        },
-                                        collapseLongMessages = collapseLongMessages,
-                                        ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,
-                                        ttsSentenceLayoutSink = ttsFollowHandle.sentenceLayouts,
-                                        onTtsSentenceSeek = { state ->
-                                            ttsFollowHandle.onSentenceSeek(
-                                                state = state,
-                                                ownsSession =
-                                                    appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
-                                            )
-                                        },
-                                    )
-                                }
-                                if (controller.hasMoreBefore || controller.isLoadingOlder) {
-                                    item(key = "older-messages-loading") {
-                                        Box(
-                                            Modifier.fillMaxWidth().height(40.dp),
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            if (controller.isLoadingOlder) {
-                                                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                                            } else {
-                                                IconButton(onClick = { scope.launch { controller.loadOlder() } }) {
-                                                    Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                if (hasRetentionHistoryBoundary) {
-                                    item(key = "retention-history-boundary") {
-                                        ConversationHistoryBoundary(controller.group.disappearingMessageSecs)
-                                    }
-                                }
-                                conversationLoadErrorItem(
-                                    key = "conversation-load-error-top",
-                                    error = controller.error,
-                                    placement = loadFailurePlacement,
-                                    errorEdge = controller.errorEdge,
-                                    targetEdge = ConversationLoadFailureEdge.TOP,
-                                    onRetry = {
-                                        scope.launch {
-                                            controller.retryLoadFailure()
-                                            navigationState.focusTargetRetry.retry(
-                                                loadFailurePresent = controller.error != null,
-                                            )
-                                        }
-                                    },
+                                    onSearchOtherChats = { updateConversationSearch(::broadenConversationSearch) },
                                 )
-                                if (controller.conversationGroupRecoveryRowVisible()) {
-                                    item(key = "group-recovery") {
-                                        ConversationGroupRecoveryCard(controller, appState)
-                                    }
-                                }
-                                item(key = "top-spacer") { Spacer(Modifier.height(4.dp)) }
+                            },
+                            appState = appState,
+                            controller = controller,
+                            groupTitleCopy = groupTitleCopy,
+                            openedAsDmHint = openedAsDmHint,
+                            firstFrameAvatar = chat.firstFrameAvatar,
+                            freezeRoutePresentation = freezeRoutePresentation,
+                            openDetailsDescription = openDetailsDescription,
+                            onOpenDetails = { showDetails = true },
+                            onBack = exitConversation,
+                            compactHeight = compactHeightConversation,
+                        )
+                    },
+                    playbackTransport = playbackTransport,
+                )
+            },
+            bottomBar = {
+                ConversationBottomBar(
+                    compactHeight = compactHeightConversation,
+                    dictationControlsVisible = dictationControlsVisible,
+                    selectionMode = selectionMode,
+                    selectionActionAvailability =
+                        batchSelectionUi.actionAvailability.let { availability ->
+                            if (batchDeleteInFlight) {
+                                BatchSelectionActionAvailability(
+                                    canCopy = false,
+                                    canForward = false,
+                                    canSave = false,
+                                    canReply = false,
+                                    canInfo = false,
+                                    canDelete = false,
+                                )
+                            } else {
+                                availability.copy(
+                                    canSave = availability.canSave && !batchAttachmentSaveInFlight,
+                                    canDelete = availability.canDelete && batchDeleteRetryState == null,
+                                )
                             }
+                        },
+                    selectionForwardBlockedReason = batchSelectionUi.forwardBlockedReason,
+                    onCopySelection = {
+                        if (batchSelectionUi.copyText.isNotBlank()) {
+                            clipboard.setText(AnnotatedString(batchSelectionUi.copyText))
+                            selectedMessages.clear()
+                        }
+                    },
+                    onForwardSelection = {
+                        if (batchSelectionUi.forwardPayloads.isNotEmpty()) batchForwardSheetOpen = true
+                    },
+                    onSaveSelection = {
+                        if (batchSelectionUi.actionAvailability.canSave && !batchAttachmentSaveInFlight) {
+                            batchAttachmentSaveInFlight = true
+                            val selections = orderedBatchSelections(selectedMessages.values)
+                            selectedMessages.clear()
+                            appState.launchMutation {
+                                try {
+                                    val summary =
+                                        aggregateMessageAttachmentSaveSummaries(
+                                            selections.map { selection ->
+                                                val record = selection.record
+                                                saveMessageMediaAttachments(
+                                                    context = context,
+                                                    controller = controller,
+                                                    messageIdHex = record.messageIdHex,
+                                                    attachments = controller.attachmentsFor(record),
+                                                    mine = controller.isMessageMine(record),
+                                                    documentSaveFallback = documentSaveFallback,
+                                                )
+                                            },
+                                        )
+                                    appState.presentAttachmentSaveOutcome(
+                                        context = context,
+                                        summary = summary,
+                                        conversation =
+                                            controller.boundAccountRef?.let { accountRef ->
+                                                ConversationNoticeDestination(accountRef, controller.group.groupIdHex)
+                                            },
+                                    )
+                                } finally {
+                                    batchAttachmentSaveInFlight = false
+                                }
+                            }
+                        }
+                    },
+                    onReplySelection = {
+                        batchSelectionUi.selections.singleOrNull()?.let { selection ->
+                            controller.replyingTo = selection.record
+                            selectedMessages.clear()
+                        }
+                    },
+                    onInfoSelection = {
+                        batchInfoSelection = batchSelectionUi.selections.singleOrNull()
+                    },
+                    onDeleteSelection = { showBatchDeleteConfirm = true },
+                    batchDeleteRetryState = batchDeleteRetryState,
+                    batchDeleteInFlight = batchDeleteInFlight,
+                    onRetryBatchDelete = {
+                        batchDeleteRetryState?.let { retryState ->
+                            startBatchDelete(retryState.failedAttempts, retryState)
+                        }
+                    },
+                    onDismissBatchDeleteFailure = {
+                        if (!batchDeleteInFlight) {
+                            batchDeleteRetryState = null
+                            selectedMessages.clear()
+                        }
+                    },
+                    onCopyBatchDeleteReport = {
+                        batchDeleteRetryState?.let { retryState ->
+                            clipboard.setText(AnnotatedString(batchDeleteDiagnosticReport(retryState)))
+                        }
+                    },
+                    searchOpen = navigationState.searchOpen,
+                    searchMatchCount = effectiveSearchMatchIds.size,
+                    searchActiveIndex = searchActiveIndex,
+                    searchScanStatus = searchScanStatus,
+                    onPreviousSearchMatch = { navigateToSearchMatch(forward = false) },
+                    onNextSearchMatch = { navigateToSearchMatch(forward = true) },
+                    onRetrySearchScan = { navigationState.historySearchRetryGeneration += 1 },
+                    hasError =
+                        loadFailurePlacement == LoadFailurePlacement.FullScreen ||
+                            navigationState.initialTimelineBackfillNoProgress ||
+                            transcriptPresentationNeedsRetry,
+                    composerGate = composerGate,
+                    blockedDmUnblockInFlight = blockedDmUnblockInFlight,
+                    onUnblockBlockedDm = ::unblockBlockedDm,
+                    controller = controller,
+                    appState = appState,
+                    messageTextCopy = messageTextCopy,
+                    onBack = exitConversation,
+                    initialDraft = restoredDraftSnapshot?.textFieldValue ?: TextFieldValue(""),
+                    onDraftChange =
+                        conversationDictationDraftWriter(
+                            dictation = appState.conversationDictation,
+                            accountRef = draftAccountRef,
+                            groupIdHex = controller.group.groupIdHex,
+                            presentationRevision = composerDictationRevision,
+                            write = { value, textChanged ->
+                                // A local edit is not a newly restored navigation-entry draft.
+                                composerAutoFocusConsumed.value = true
+                                appState.setDraft(draftAccountRef, controller.group.groupIdHex, value, textChanged)
+                            },
+                        ),
+                    composerTextState = composerTextState,
+                    composerAttachmentSheet = composerAttachmentSheet,
+                    hasPendingAttachments = pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty(),
+                    attachmentsPreparing = mediaDraftState.isPreparing,
+                    attachmentContent =
+                        if (pendingMediaSlots.isNotEmpty() || pendingDocumentUris.isNotEmpty()) {
+                            {
+                                dev.ipf.whitenoise.android.ui.conversation.media.ComposerAttachmentShelf(
+                                    mediaSlots = pendingMediaSlots,
+                                    documentUris = pendingDocumentUris,
+                                    enabled = !attachmentSendClaim.isHeld,
+                                    prepared = mediaDraftState.preparedPreviews(),
+                                    onPreview = { if (!attachmentSendClaim.isHeld) mediaPreviewIndex = it },
+                                    onRemoveMedia = { slot ->
+                                        if (!attachmentSendClaim.isHeld) {
+                                            mediaDraftState.releasePreparedPhoto(slot.id)
+                                            pendingMediaSlots = pendingMediaSlots.filterNot { it.id == slot.id }
+                                        }
+                                    },
+                                    onRemoveDocument = { index ->
+                                        if (!attachmentSendClaim.isHeld) {
+                                            pendingDocumentUris
+                                                .getOrNull(index)
+                                                ?.let(mediaDraftState::releasePreparedDocument)
+                                            pendingDocumentUris =
+                                                pendingDocumentUris.filterIndexed { i, _ -> i != index }
+                                        }
+                                    },
+                                )
+                            }
+                        } else {
+                            null
+                        },
+                    onSendAttachments = { caption, onResult ->
+                        sendStagedAttachmentsWithCaption(
+                            caption,
+                            onResult,
+                            composerTextState.captureCaptionSettlement(caption),
+                        )
+                    },
+                    onAfterSend = {
+                        acceptedSendRevealedTranscript = true
+                        revealSentMessage()
+                    },
+                    onPickFromGallery = {
+                        imagePickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo),
+                        )
+                    },
+                    onCaptureFromCamera = {
+                        val granted =
+                            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                                PackageManager.PERMISSION_GRANTED
+                        if (granted) {
+                            launchCameraCapture()
+                        } else {
+                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
+                    },
+                    onPickDocument = {
+                        documentPickerLauncher.launch(arrayOf("*/*"))
+                    },
+                    onShareLocation = {
+                        if (hasLocationGrant(Manifest.permission.ACCESS_FINE_LOCATION) ||
+                            hasLocationGrant(Manifest.permission.ACCESS_COARSE_LOCATION)
+                        ) {
+                            locationPickerOpen = true
+                        } else {
+                            locationPermissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                                ),
+                            )
+                        }
+                    },
+                    onShareUser = { shareUserPickerOpen = true },
+                    onShareContact = {
+                        contactPickerLauncher.launch(Unit)
+                    },
+                    onCreatePoll =
+                        if (!controller.isDirectConversation) {
+                            { pollCreateOpen = true }
+                        } else {
+                            null
+                        },
+                    onPasteImageUris = { uris ->
+                        val openSlots = (MEDIA_PICKER_MAX_ITEMS - pendingMediaSlots.size).coerceAtLeast(0)
+                        val pasteCandidates = uris.take(openSlots)
+                        val localUris =
+                            pasteCandidates.mapNotNull { uri ->
+                                materializeReceiveContentImageUri(context, uri)
+                            }
+                        if (localUris.size < pasteCandidates.size) {
+                            appState.present(R.string.toast_couldnt_decode_image, copyable = true)
+                        }
+                        if (localUris.isNotEmpty()) {
+                            pendingMediaSlots =
+                                appendPendingMediaSlots(pendingMediaSlots, localUris, MEDIA_PICKER_MAX_ITEMS)
+                        }
+                    },
+                    voiceRecordingController = voiceRecordingController,
+                    voiceReview = voiceReview,
+                    mentionCandidates = mentionPicker.candidates,
+                    mentionPickerEnabled = mentionPicker.enabled,
+                    autoFocusOnEnter = justCreated && !freezeRoutePresentation,
+                    autoFocusOnDraftRestore =
+                        shouldAutoFocusComposerOnDraftRestore(
+                            snapshot = restoredDraftSnapshot,
+                            dictationRevisionOnEntry = composerDictationRevisionOnEntry,
+                            currentDictationRevision = composerDictationRevision,
+                        ) &&
+                            !freezeRoutePresentation,
+                    autoFocusConsumedState = composerAutoFocusConsumed,
+                    composerFocus = composerFocus,
+                    onComposerFocusChanged = { focused ->
+                        if (focused) composerDismissInProgress = false
+                        if (focused && !composerFocused && !imeIsOpen) {
+                            imeTransitionBookmark = scrollCoordinator.bookmark(currentScrollAnchor())
+                        } else if (!focused && !imeIsOpen) {
+                            imeTransitionBookmark = null
+                        }
+                        composerFocused = focused
+                    },
+                    onComposerPreImeBack = {
+                        if (composerDismissInProgress) {
+                            exitConversation()
+                        } else {
+                            composerDismissInProgress = true
+                            keyboardController?.hide()
+                        }
+                    },
+                    composerDismissInProgress = composerDismissInProgress,
+                    onBottomInputChanged = { bottomInputRevision++ },
+                    onKeyboardRestoreFromCustomInput = { suppressNextImeOpenReanchor.set(true) },
+                    onKeyboardRestoreFromCustomInputFailed = { suppressNextImeOpenReanchor.set(false) },
+                    recentEmojis = recentEmojiRecentsOwner.recents,
+                    onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
+                    onTimelineComposerMeasured = timelineViewport::onComposerMeasured,
+                    onBottomChromeMeasured = { heightPx ->
+                        timelineViewport.onBottomChromeMeasured(heightPx)
+                        bottomChromeHeightObserver.onMeasured(heightPx)
+                        if (measuredBottomChromeHeightPx != heightPx) {
+                            measuredBottomChromeHeightPx = heightPx
+                        }
+                    },
+                )
+            },
+        ) { padding ->
+            CompositionLocalProvider(
+                dev.ipf.whitenoise.android.translation.LocalConversationTranslation provides translationSession,
+                dev.ipf.whitenoise.android.translation.LocalTranslationPreferences provides translationPreferences,
+                LocalPollVotesHost provides pollVotesHost,
+                LocalKeptMessages provides keptMessagesController,
+                // Bubbles mark their own matches while search is open, so a hit is obvious on any
+                // bubble colour rather than only on the one the jump happened to land on.
+                LocalConversationSearchMarking provides
+                    navigationState.searchQuery
+                        .takeIf { navigationState.searchOpen && it.isNotBlank() }
+                        ?.let { ConversationSearchMarking(it, effectiveSearchMatchIds.toSet()) },
+            ) {
+                val overlayPadding = timelineViewport.overlayPadding(density, timelineUnderlayEnabled)
+                ConversationTransientNoticeLayout(
+                    notice = appState.transientNotice,
+                    accountRef = conversationAccountRef,
+                    groupIdHex = controller.group.groupIdHex,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(conversationUnderlayScaffoldPadding(padding, overlayPadding))
+                            // The composer bottomBar owns IME padding; consume here so the
+                            // transcript does not count the keyboard a second time (#895).
+                            .consumeWindowInsets(WindowInsets.ime)
+                            // The scaffold padding above already clears a side cutout or side navigation
+                            // bar, so the banner row inside must not pad for them again (#3312).
+                            .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
+                ) {
+                    when {
+                        navigationState.initialTimelineBackfillNoProgress ->
+                            ConversationLoadErrorContent(
+                                error = InitialTimelineBackfillNoProgressError,
+                                onRetry = {
+                                    navigationState.initialTimelineBackfillNoProgress = false
+                                    navigationState.initialTimelineBackfillRetryGeneration += 1L
+                                },
+                            )
+                        loadFailurePlacement == LoadFailurePlacement.FullScreen ->
+                            ConversationLoadErrorContent(
+                                error = requireNotNull(controller.error),
+                                onRetry = {
+                                    scope.launch {
+                                        controller.retryLoadFailure()
+                                        navigationState.focusTargetRetry.retry(
+                                            loadFailurePresent = controller.error != null,
+                                        )
+                                        navigationState.initialTimelineBackfillRetryGeneration += 1L
+                                    }
+                                },
+                            )
+                        (controller.group.pendingConfirmation || controller.inviteAcceptanceResolutionPending) &&
+                            !controller.terminalConversationUnavailable &&
+                            renderedTimeline.isEmpty() ->
+                            InvitePreviewPlaceholder(
+                                inviterName = controller.inviteAccount?.let { appState.chatMemberTitle(it) },
+                            )
+                        transcriptPresentationNeedsRetry ->
+                            ConversationLoadErrorContent(
+                                error = controller.rosterBlockReason.transcriptRosterError(),
+                                onRetry = { scope.launch { controller.retryMembers() } },
+                            )
+                        renderedTimeline.isEmpty() &&
+                            notificationOpenRequestId != 0L &&
+                            !controller.terminalConversationUnavailable &&
+                            !transcriptReadyToReveal ->
                             ConversationInitialLoadingOverlay(
-                                visible =
-                                    !transcriptReadyToReveal &&
-                                        !transcriptPresentationNeedsRetry &&
-                                        !seededTailAlignmentRecoveryVisible,
+                                visible = true,
                                 graceMillis = CONVERSATION_ANCHORED_LOADING_GRACE_MILLIS,
                                 routeTransitionInProgress = routeTransitionInProgress,
                             )
-                            ConversationSeededTailAlignmentRecovery(
-                                visible = seededTailAlignmentRecoveryVisible,
-                                onRetry = {
-                                    seededTailAlignmentRecoveryVisible = false
-                                    seededTailAlignmentRetryGeneration++
-                                },
+                        renderedTimeline.isEmpty() && controller.isLoading ->
+                            ConversationInitialLoadingOverlay(
+                                visible = true,
+                                routeTransitionInProgress = routeTransitionInProgress,
                             )
-                            // Day of the topmost visible message, shown only while
-                            // scrolling — the inline separators carry it at rest.
-                            // Confined to its own child so the scroll-backed reads
-                            // (label + isScrollInProgress) recompose only the ribbon,
-                            // not this LazyColumn-hosting Box scope (#375).
-                            if (transcriptReadyToReveal) {
-                                StickyDayRibbon(
-                                    listState = listState,
-                                    labelState = stickyDayLabelState,
+                        renderedTimeline.isEmpty() &&
+                            (
+                                controller.groupRecoveryReadFailed ||
+                                    controller.groupRecoveryStatus?.hasVisibleRecoveryState() == true
+                            ) ->
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                ConversationGroupRecoveryCard(controller, appState)
+                                ConversationEmptyMessage(
+                                    conversationEmptyState(controller.group.disappearingMessageSecs),
                                 )
                             }
-                            if (transcriptReadyToReveal) {
-                                Column(
+                        renderedTimeline.isEmpty() &&
+                            controller.pendingMembershipActivity == null &&
+                            !controller.hasMoreBefore &&
+                            !controller.hasMoreAfterTimeline &&
+                            !controller.isLoadingPage &&
+                            !controller.isLoading &&
+                            navigationState.initialTimelineLoadStarted -> {
+                            if (
+                                canInviteFromEmptyGroup(
+                                    isSelfMember = controller.isSelfMember,
+                                    isSelfAdmin = controller.isSelfAdmin,
+                                    membersLoaded = controller.membersLoaded,
+                                    memberCount = controller.memberCount,
+                                )
+                            ) {
+                                EmptyGroupConversation(
+                                    onAddMembers = {
+                                        openAddMemberOnDetails = true
+                                        showDetails = true
+                                    },
+                                )
+                            } else {
+                                ConversationEmptyMessage(
+                                    conversationEmptyState(controller.group.disappearingMessageSecs),
+                                )
+                            }
+                        }
+                        else ->
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .fillMaxSize()
+                                        .conversationScrollIndicator(
+                                            state = listState,
+                                            viewport = timelineViewport,
+                                            window =
+                                                ConversationScrollIndicatorWindow(
+                                                    scrollIndicatorKeys,
+                                                    trailingRowCount,
+                                                    indicatorItemCount,
+                                                    controller,
+                                                ),
+                                            enabled =
+                                                transcriptReadyToReveal &&
+                                                    !selectionMode &&
+                                                    textSelectionMessageId == null &&
+                                                    openActionMenuId == null,
+                                        ),
+                            ) {
+                                val composedTranscriptRows =
+                                    ConversationTranscriptDrawProbe.composedRows(renderedTimeline)
+                                LazyColumn(
+                                    state = listState,
                                     modifier =
                                         Modifier
-                                            .align(Alignment.BottomEnd)
-                                            .padding(bottom = overlayPadding)
-                                            .padding(12.dp),
-                                    horizontalAlignment = Alignment.End,
-                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                            .fillMaxSize()
+                                            .measureConversationTimelinePadding(
+                                                timelineViewport,
+                                                CONVERSATION_TIMELINE_TAIL_GAP,
+                                                overlayPadding,
+                                                timelinePublication,
+                                            ).trackWhiteNoiseHeader(listState)
+                                            .padding(horizontal = 12.dp)
+                                            // Paint, TalkBack exposure, and first-useful-frame
+                                            // reporting share one predicate. An oversized cached
+                                            // final row or unknown notification roster therefore
+                                            // cannot become observable before both owners commit.
+                                            .drawWithContent {
+                                                if (transcriptReadyToReveal) {
+                                                    drawContent()
+                                                    ConversationTranscriptDrawProbe.drawn(
+                                                        controller,
+                                                        composedTranscriptRows,
+                                                        listState.layoutInfo,
+                                                    )
+                                                } else {
+                                                    ConversationTranscriptDrawProbe.retire(controller)
+                                                }
+                                            }.graphicsLayer {
+                                                alpha = if (transcriptReadyToReveal) 1f else 0f
+                                            }.semantics {
+                                                if (!transcriptReadyToReveal) hideFromAccessibility()
+                                            }.performanceTestTag(
+                                                PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE,
+                                                enabled = transcriptReadyToReveal && renderedTimeline.isNotEmpty(),
+                                            ).onGloballyPositioned(timelineViewport::onPaintViewportMeasured)
+                                            // Rows dissolve into the bar above, and slide under the
+                                            // composer thinning away to nothing by the bottom of the
+                                            // screen, so the transcript meets its chrome softly
+                                            // instead of being sliced off mid-bubble.
+                                            .transcriptEdgeFade(
+                                                listState = listState,
+                                                composerOverlap = overlayPadding,
+                                            ),
+                                    // Bottom-anchored like every established chat
+                                    // client: the viewport shrinking under the keyboard
+                                    // moves rows up as a layout consequence, so the
+                                    // transcript tracks the IME instead of being
+                                    // corrected after it settles (#2621).
+                                    reverseLayout = true,
+                                    verticalArrangement = CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT,
+                                    // Content padding owns the final composer interval. Temporary
+                                    // notices sit in the top row, so no bottom clearance is added.
+                                    // Keeping spacing out of a lazy sentinel leaves the real last
+                                    // row as the stable tail anchor.
+                                    contentPadding =
+                                        remember(overlayPadding) {
+                                            conversationTimelineContentPadding(overlayPadding)
+                                        },
                                 ) {
-                                    // Selection hides these controls; paging progress never covers message rows.
-                                    if (!selectionMode && ttsFollowHandle.showResumeAction) {
-                                        TtsResumeFollowButton(
-                                            onClick = {
-                                                ttsFollowHandle.revealCurrentPassage(
-                                                    appState.ttsController.state.value,
-                                                    appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
+                                    // The list is reversed, so the first item emitted
+                                    // is laid out against the composer. Emit the newest
+                                    // edge first and walk back through history, which
+                                    // puts the structural rows last.
+                                    conversationLoadErrorItem(
+                                        key = "conversation-load-error-bottom",
+                                        error = controller.error,
+                                        placement = loadFailurePlacement,
+                                        errorEdge = controller.errorEdge,
+                                        targetEdge = ConversationLoadFailureEdge.BOTTOM,
+                                        onRetry = {
+                                            scope.launch {
+                                                controller.retryLoadFailure()
+                                                navigationState.focusTargetRetry.retry(
+                                                    loadFailurePresent = controller.error != null,
                                                 )
-                                            },
-                                        )
-                                    }
-                                    // Jump-to-mention chip: tap visits the oldest unread
-                                    // mention and marks it read, so the count steps down.
-                                    val mentionCount = unreadMentionMessageIds.size
-                                    if (!selectionMode && mentionCount > 0) {
-                                        val jumpToMentionLabel = stringResource(R.string.conversation_jump_to_mention)
-                                        Surface(
-                                            shape = CircleShape,
-                                            color = MaterialTheme.colorScheme.tertiaryContainer,
-                                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                                            shadowElevation = 2.dp,
-                                            modifier =
-                                                Modifier
-                                                    .height(34.dp)
-                                                    .performanceTestTag(PerformanceTestTags.JUMP_TO_MENTION)
-                                                    .semantics { contentDescription = jumpToMentionLabel }
-                                                    .clickable { jumpToNextUnreadMention() },
+                                            }
+                                        },
+                                    )
+                                    controller.pendingMembershipActivity?.let { activity ->
+                                        item(
+                                            key = "pending-membership:${activity.id}",
+                                            contentType = "pendingMembership",
                                         ) {
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                                                modifier = Modifier.padding(horizontal = 12.dp),
+                                            PendingGroupMembershipRow(
+                                                activity = activity,
+                                                displayName = { ref ->
+                                                    appState.contactNicknameFor(controller.boundAccountRef, ref)
+                                                        ?: appState.networkDisplayName(ref)
+                                                },
+                                                modifier =
+                                                    Modifier
+                                                        .timelineReadingExposure(timelineViewport)
+                                                        .membershipVisibleDraw(timelineViewport) {
+                                                            controller.membershipTimings.pendingFrame(activity.id)
+                                                        },
+                                            )
+                                        }
+                                    }
+                                    itemsIndexed(
+                                        renderedTimelineNewestFirst,
+                                        key = { _, item -> item.presentationId },
+                                        // Pool layouts by category so Compose can reuse
+                                        // structurally similar rows across scroll.
+                                        contentType = { _, item ->
+                                            when {
+                                                MessageProjector.isGroupSystem(item.record) -> "groupSystem"
+                                                MessageProjector.isAgentOperation(item.record) -> "agentOperation"
+                                                else -> "message"
+                                            }
+                                        },
+                                    ) { index, item ->
+                                        val messageId = item.record.messageIdHex
+                                        val membershipFrameModifier =
+                                            if (
+                                                item.projected?.groupSystem?.systemType in MEMBERSHIP_FRAME_EVENT_TYPES
                                             ) {
-                                                Text("@", style = MaterialTheme.typography.titleMedium)
-                                                Text(
-                                                    if (mentionCount > 99) "99+" else mentionCount.toString(),
-                                                    style = MaterialTheme.typography.labelLarge,
-                                                )
+                                                Modifier.membershipVisibleDraw(timelineViewport) {
+                                                    controller.membershipTimings.projectionFrame(messageId)
+                                                }
+                                            } else {
+                                                Modifier
+                                            }
+                                        MediaViewerThumbnailHost(
+                                            mediaViewerSessionState.thumbnails,
+                                            readingViewport = { timelineViewport.readingBoundsInWindow },
+                                            enabled =
+                                                controller.isCurrentGroupMutationOwner(
+                                                    appState,
+                                                    sendMotionRuntime,
+                                                ),
+                                        ) {
+                                            TimelineRow(
+                                                modifier =
+                                                    Modifier
+                                                        .timelineReadingExposure(timelineViewport)
+                                                        .conversationTailEntranceMotion(
+                                                            tailEntrance,
+                                                            item.presentationId,
+                                                            claimedSendPresentation,
+                                                        ).then(membershipFrameModifier),
+                                                item = item,
+                                                reactionViewport = reactionViewport,
+                                                // Newest-first rows: the chronologically
+                                                // older neighbour is the next row emitted.
+                                                older = renderedTimelineNewestFirst.getOrNull(index + 1),
+                                                newer = renderedTimelineNewestFirst.getOrNull(index - 1),
+                                                transcriptLocale = transcriptLocale,
+                                                entryUnreadCount = entryUnreadCount,
+                                                entryUnreadDividerRetired = entryUnreadDividerRetired,
+                                                entryFirstUnreadMessageId = entryFirstUnreadMessageId,
+                                                onMeasured = { id, height ->
+                                                    if (navigationState.timelineItemHeightsPx[id] != height) {
+                                                        navigationState.timelineItemHeightsPx[id] = height
+                                                    }
+                                                },
+                                                appState = appState,
+                                                controller = controller,
+                                                onOpenConversationMedia = { request ->
+                                                    mediaViewerSessionState.open(request)
+                                                },
+                                                eventCardResolver = eventCardResolver,
+                                                documentSaveFallback = documentSaveFallback,
+                                                composerTextState = composerTextState,
+                                                highlighted =
+                                                    messageId == navigationState.targetHighlight.highlightedMessageId,
+                                                selectionMode = selectionMode,
+                                                textSelectionMode =
+                                                    textSelectionMessageId == messageId,
+                                                onTextSelectionModeChange = { enabled ->
+                                                    if (enabled) {
+                                                        ttsFollowHandle.suspendForDirectDrag(
+                                                            appState.ttsController.state.value,
+                                                            appState.ownsTtsAutoReadSession(
+                                                                controller.group.groupIdHex,
+                                                            ),
+                                                        )
+                                                        openActionMenuId = null
+                                                        textSelectionMessageId = messageId
+                                                        textSelectionBubbleBounds = null
+                                                    } else if (textSelectionMessageId == messageId) {
+                                                        clearTextSelection()
+                                                    }
+                                                },
+                                                onTextSelectionBoundsChange = { bounds ->
+                                                    if (textSelectionMessageId == messageId) {
+                                                        textSelectionBubbleBounds = bounds
+                                                    }
+                                                },
+                                                batchSelectable =
+                                                    messageId in selectableMessages &&
+                                                        batchDeleteRetryState == null &&
+                                                        !batchDeleteInFlight,
+                                                selected = selectedMessages.containsKey(messageId),
+                                                onToggleSelection = {
+                                                    if (batchDeleteRetryState == null && !batchDeleteInFlight) {
+                                                        if (selectedMessages.containsKey(messageId)) {
+                                                            selectedMessages.remove(messageId)
+                                                        } else {
+                                                            currentSelectableMessages[messageId]?.let { selectable ->
+                                                                selectedMessages[messageId] = selectable
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                                rangeDragActive = dragAnchorTimelineId == item.presentationId,
+                                                onDragSelectionStart = { pointerWindowY ->
+                                                    openActionMenuId = null
+                                                    clearTextSelection()
+                                                    ttsFollowHandle.suspendForDirectDrag(
+                                                        state = appState.ttsController.state.value,
+                                                        ownsSession =
+                                                            appState.ownsTtsAutoReadSession(
+                                                                controller.group.groupIdHex,
+                                                            ),
+                                                    )
+                                                    scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
+                                                    controller.onOlderPagingGestureStarted()
+                                                    dragAnchorTimelineId = item.presentationId
+                                                    dragPointerWindowY = pointerWindowY
+                                                },
+                                                onDragSelection = { pointerWindowY ->
+                                                    dragPointerWindowY = pointerWindowY
+                                                    currentMessageDragSelectionUpdater(pointerWindowY)
+                                                },
+                                                onDragSelectionEnd = { finishMessageDrag(clearSelection = false) },
+                                                onDragSelectionCancel = { finishMessageDrag(clearSelection = true) },
+                                                quickReactionEmojis = quickReactionEmojis,
+                                                recentEmojis = recentEmojiRecentsOwner.recents,
+                                                onEmojiUsed = { recentEmojiRecentsOwner.onEmojiUsed(it) },
+                                                isActionMenuOpen = openActionMenuId == item.presentationId,
+                                                onActionMenuOpenChange = { open ->
+                                                    if (open) clearTextSelection()
+                                                    if (open) {
+                                                        openActionMenuId = item.presentationId
+                                                    } else if (openActionMenuId == item.presentationId) {
+                                                        openActionMenuId = null
+                                                    }
+                                                },
+                                                onQuickReactionsSave = { saveQuickReactionEmojis(it) },
+                                                onReplyPreviewClick = { navigateToReplyTarget(it) },
+                                                composerGate = composerGate,
+                                                blockedDmUnblockInFlight = blockedDmUnblockInFlight,
+                                                onUnblockBlockedDm = ::unblockBlockedDm,
+                                                onWave =
+                                                    if (composerGate == ComposerGate.COMPOSER && canWave()) {
+                                                        wave@{ accountIdHex, onAccepted ->
+                                                            if (!canWave()) {
+                                                                return@wave
+                                                            }
+                                                            val npub = appState.npubForDisplay(accountIdHex)
+                                                            if (npub.isBlank()) {
+                                                                appState.present(R.string.send_failed)
+                                                                return@wave
+                                                            }
+                                                            controller.send("👋 @$npub", onAccepted = {
+                                                                onAccepted()
+                                                                acceptedSendRevealedTranscript = true
+                                                                revealSentMessage()
+                                                            })
+                                                        }
+                                                    } else {
+                                                        null
+                                                    },
+                                                onReaderSendAccepted = {
+                                                    acceptedSendRevealedTranscript = true
+                                                    revealSentMessage()
+                                                },
+                                                onBack = rowExitConversation,
+                                                mentionCandidates = mentionPicker.candidates,
+                                                mentionPickerEnabled = mentionPicker.enabled,
+                                                onBeforeBodyCollapse = {
+                                                    scrollCoordinator.cancelForegroundRestoreForUserIntent()
+                                                    // Collapse cancels deferred movement while preserving
+                                                    // whether the viewport is following the tail.
+                                                    val keepFollowingTail =
+                                                        scrollCoordinator.isFollowingTail &&
+                                                            conversationLandingAtNewestEdge(
+                                                                atNaturalTail = timelineViewport.isAtNaturalTail,
+                                                                hasMoreAfter = controller.hasMoreAfterTimeline,
+                                                            )
+                                                    currentTimelineListIndex(item.record.messageIdHex)?.let { index ->
+                                                        // Preserve a visible top edge; a deep offset into a tall body
+                                                        // must not survive after that content has been clipped away.
+                                                        val visible =
+                                                            timelineViewport
+                                                                .readingLayoutInfo()
+                                                                .visibleItemsInfo
+                                                                .firstOrNull {
+                                                                    it.index == index
+                                                                }
+                                                        val offset = -(visible?.offset ?: 0).coerceAtLeast(0)
+                                                        val anchor =
+                                                            ConversationScrollAnchor(
+                                                                messageId = item.record.messageIdHex,
+                                                                itemId = item.presentationId,
+                                                                listIndex = index,
+                                                                pixelOffset = offset,
+                                                            )
+                                                        scrollCoordinator.settleLandingAt(
+                                                            anchor,
+                                                            atNewestEdge = keepFollowingTail,
+                                                        )
+                                                        if (!keepFollowingTail) {
+                                                            val bookmark = scrollCoordinator.bookmark(anchor)
+                                                            scope.launch {
+                                                                scrollCoordinator.restoreBookmark(
+                                                                    bookmark,
+                                                                    resolveAnchorIndex = ::resolveScrollAnchorIndex,
+                                                                )
+                                                            }
+                                                        }
+                                                    } ?: scrollCoordinator.settleLandingAt(
+                                                        currentScrollAnchor(),
+                                                        atNewestEdge = keepFollowingTail,
+                                                    )
+                                                },
+                                                collapseLongMessages = collapseLongMessages,
+                                                ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,
+                                                ttsSentenceLayoutSink = ttsFollowHandle.sentenceLayouts,
+                                                onTtsSentenceSeek = { state ->
+                                                    ttsFollowHandle.onSentenceSeek(
+                                                        state = state,
+                                                        ownsSession =
+                                                            appState.ownsTtsAutoReadSession(
+                                                                controller.group.groupIdHex,
+                                                            ),
+                                                    )
+                                                },
+                                            )
+                                        }
+                                    }
+                                    if (controller.hasMoreBefore || controller.isLoadingOlder) {
+                                        item(key = "older-messages-loading") {
+                                            Box(
+                                                Modifier.fillMaxWidth().height(40.dp),
+                                                contentAlignment = Alignment.Center,
+                                            ) {
+                                                if (controller.isLoadingOlder) {
+                                                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                                                } else {
+                                                    IconButton(onClick = { scope.launch { controller.loadOlder() } }) {
+                                                        Icon(
+                                                            Icons.Default.Refresh,
+                                                            contentDescription = stringResource(R.string.refresh),
+                                                        )
+                                                    }
+                                                }
                                             }
                                         }
                                     }
-                                    if (!selectionMode && !nearBottom) {
-                                        ConversationJumpToNewestButton(
-                                            unreadIncomingCount = unreadIncomingCount,
-                                            onClick = {
-                                                navigationState.cancelJobs()
-                                                navigationState.focusTargetRetry.clear()
-                                                scope.launch {
-                                                    val pendingMessageId = unreadJumpState.pendingMessageId
-                                                    val outcome =
-                                                        scrollCoordinator.jumpToUnreadOrNewest(
-                                                            pendingUnreadMessageId = pendingMessageId,
-                                                            resolveUnreadIndex = {
-                                                                pendingMessageId?.let(::currentTimelineListIndex)
-                                                            },
-                                                            isUnreadTopAligned = {
-                                                                val targetIndex =
-                                                                    pendingMessageId?.let(::currentTimelineListIndex)
-                                                                targetIndex != null &&
-                                                                    isConversationItemTopAligned(
-                                                                        listState,
-                                                                        targetIndex,
-                                                                        timelineViewport = timelineViewport,
-                                                                    )
-                                                            },
-                                                            prepareTail = {
-                                                                loadConversationTimelineToNewest(
-                                                                    hasMoreAfter = { controller.hasMoreAfterTimeline },
-                                                                    loadNewer = controller::loadNewerTimelinePage,
-                                                                    returnToLatest = controller::returnToLatestWindow,
-                                                                )
-                                                            },
-                                                            resolveTailIndex = { currentTailIndex },
-                                                        )
-                                                    when (outcome) {
-                                                        ConversationJumpToNewestOutcome.UnreadStart -> {
-                                                            scrollCoordinator.settleReadingAt(currentScrollAnchor())
-                                                            unreadJumpState = unreadJumpState.suppressCurrentStack()
-                                                        }
-                                                        ConversationJumpToNewestOutcome.Tail -> {
-                                                            unreadJumpState = unreadJumpState.suppressCurrentStack()
-                                                        }
-                                                        ConversationJumpToNewestOutcome.Cancelled -> Unit
-                                                    }
+                                    if (hasRetentionHistoryBoundary) {
+                                        item(key = "retention-history-boundary") {
+                                            ConversationHistoryBoundary(controller.group.disappearingMessageSecs)
+                                        }
+                                    }
+                                    conversationLoadErrorItem(
+                                        key = "conversation-load-error-top",
+                                        error = controller.error,
+                                        placement = loadFailurePlacement,
+                                        errorEdge = controller.errorEdge,
+                                        targetEdge = ConversationLoadFailureEdge.TOP,
+                                        onRetry = {
+                                            scope.launch {
+                                                controller.retryLoadFailure()
+                                                navigationState.focusTargetRetry.retry(
+                                                    loadFailurePresent = controller.error != null,
+                                                )
+                                            }
+                                        },
+                                    )
+                                    if (controller.conversationGroupRecoveryRowVisible()) {
+                                        item(key = "group-recovery") {
+                                            ConversationGroupRecoveryCard(controller, appState)
+                                        }
+                                    }
+                                    item(key = "top-spacer") { Spacer(Modifier.height(4.dp)) }
+                                }
+                                ConversationInitialLoadingOverlay(
+                                    visible =
+                                        !transcriptReadyToReveal &&
+                                            !transcriptPresentationNeedsRetry &&
+                                            !seededTailAlignmentRecoveryVisible,
+                                    graceMillis = CONVERSATION_ANCHORED_LOADING_GRACE_MILLIS,
+                                    routeTransitionInProgress = routeTransitionInProgress,
+                                )
+                                ConversationSeededTailAlignmentRecovery(
+                                    visible = seededTailAlignmentRecoveryVisible,
+                                    onRetry = {
+                                        seededTailAlignmentRecoveryVisible = false
+                                        seededTailAlignmentRetryGeneration++
+                                    },
+                                )
+                                // Day of the topmost visible message, shown only while
+                                // scrolling — the inline separators carry it at rest.
+                                // Confined to its own child so the scroll-backed reads
+                                // (label + isScrollInProgress) recompose only the ribbon,
+                                // not this LazyColumn-hosting Box scope (#375).
+                                if (transcriptReadyToReveal) {
+                                    StickyDayRibbon(
+                                        listState = listState,
+                                        labelState = stickyDayLabelState,
+                                    )
+                                }
+                                if (transcriptReadyToReveal) {
+                                    Column(
+                                        modifier =
+                                            Modifier
+                                                .align(Alignment.BottomEnd)
+                                                .padding(bottom = overlayPadding)
+                                                .padding(12.dp),
+                                        horizontalAlignment = Alignment.End,
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        // Selection hides these controls; paging progress never covers message rows.
+                                        if (!selectionMode && ttsFollowHandle.showResumeAction) {
+                                            TtsResumeFollowButton(
+                                                onClick = {
+                                                    ttsFollowHandle.revealCurrentPassage(
+                                                        appState.ttsController.state.value,
+                                                        appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
+                                                    )
+                                                },
+                                            )
+                                        }
+                                        // Jump-to-mention chip: tap visits the oldest unread
+                                        // mention and marks it read, so the count steps down.
+                                        val mentionCount = unreadMentionMessageIds.size
+                                        if (!selectionMode && mentionCount > 0) {
+                                            val jumpToMentionLabel =
+                                                stringResource(R.string.conversation_jump_to_mention)
+                                            Surface(
+                                                shape = CircleShape,
+                                                color = MaterialTheme.colorScheme.tertiaryContainer,
+                                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                                                shadowElevation = 2.dp,
+                                                modifier =
+                                                    Modifier
+                                                        .height(34.dp)
+                                                        .performanceTestTag(PerformanceTestTags.JUMP_TO_MENTION)
+                                                        .semantics { contentDescription = jumpToMentionLabel }
+                                                        .clickable { jumpToNextUnreadMention() },
+                                            ) {
+                                                Row(
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                                ) {
+                                                    Text("@", style = MaterialTheme.typography.titleMedium)
+                                                    Text(
+                                                        if (mentionCount > 99) "99+" else mentionCount.toString(),
+                                                        style = MaterialTheme.typography.labelLarge,
+                                                    )
                                                 }
-                                            },
-                                        )
+                                            }
+                                        }
+                                        if (!selectionMode && !nearBottom) {
+                                            ConversationJumpToNewestButton(
+                                                unreadIncomingCount = unreadIncomingCount,
+                                                onClick = {
+                                                    navigationState.cancelJobs()
+                                                    navigationState.focusTargetRetry.clear()
+                                                    scope.launch {
+                                                        val pendingMessageId = unreadJumpState.pendingMessageId
+                                                        val outcome =
+                                                            scrollCoordinator.jumpToUnreadOrNewest(
+                                                                pendingUnreadMessageId = pendingMessageId,
+                                                                resolveUnreadIndex = {
+                                                                    pendingMessageId?.let(::currentTimelineListIndex)
+                                                                },
+                                                                isUnreadTopAligned = {
+                                                                    val targetIndex =
+                                                                        pendingMessageId
+                                                                            ?.let(::currentTimelineListIndex)
+                                                                    targetIndex != null &&
+                                                                        isConversationItemTopAligned(
+                                                                            listState,
+                                                                            targetIndex,
+                                                                            timelineViewport = timelineViewport,
+                                                                        )
+                                                                },
+                                                                prepareTail = {
+                                                                    loadConversationTimelineToNewest(
+                                                                        hasMoreAfter = {
+                                                                            controller.hasMoreAfterTimeline
+                                                                        },
+                                                                        loadNewer = controller::loadNewerTimelinePage,
+                                                                        returnToLatest =
+                                                                            controller::returnToLatestWindow,
+                                                                    )
+                                                                },
+                                                                resolveTailIndex = { currentTailIndex },
+                                                            )
+                                                        when (outcome) {
+                                                            ConversationJumpToNewestOutcome.UnreadStart -> {
+                                                                scrollCoordinator.settleReadingAt(currentScrollAnchor())
+                                                                unreadJumpState = unreadJumpState.suppressCurrentStack()
+                                                            }
+                                                            ConversationJumpToNewestOutcome.Tail -> {
+                                                                unreadJumpState = unreadJumpState.suppressCurrentStack()
+                                                            }
+                                                            ConversationJumpToNewestOutcome.Cancelled -> Unit
+                                                        }
+                                                    }
+                                                },
+                                            )
+                                        }
                                     }
                                 }
                             }
-                        }
-                }
-                conversationAccountRef?.let { keptAccountRef ->
-                    val keptEntries =
-                        rememberKeptMessageEntries(keptMessagesController, keptAccountRef) { key ->
-                            controller.timeline.firstOrNull { row ->
-                                key.groupIdHex == controller.group.groupIdHex &&
-                                    row.record.messageIdHex == key.messageIdHex &&
-                                    !MessageProjector.isDeleted(row.record.messageIdHex, controller.deletedMessageIds)
-                            }
-                        }
-                    val youLabel = stringResource(R.string.you)
-                    val keptPresentations =
-                        keptMessagePresentations(
-                            entries = keptEntries,
-                            chatTitle = controller.title,
-                            youLabel = youLabel,
-                            isMine = controller::isMessageMine,
-                            senderName = appState::displayName,
-                            controller = controller,
-                            thumbnailRevision = mediaCacheRevision,
-                        )
-                    KeptMessagesOverlay(
-                        state = KeptMessagesOverlayState(keptEntries, keptMessagesController, keptAccountRef),
-                        composerHeight = overlayPadding,
-                        presentation = { entry -> keptPresentations.getValue(entry.key) },
-                        onOpenMessage = { key -> jumpToKeptMessage(key.messageIdHex) },
-                    )
-                }
-                if (composerAttachmentSheet.isOpen) {
-                    // Transparent scrim over the transcript only — the composer
-                    // stays reachable, so the keyboard and emoji toggles can still
-                    // swap the sheet away directly. Carries a dismiss semantics
-                    // action + label so a screen reader announces (and can trigger)
-                    // this otherwise-invisible touch layer.
-                    val dismissLabel = stringResource(R.string.close)
-                    Box(
-                        Modifier
-                            .matchParentSize()
-                            .pointerInput(composerAttachmentSheet) {
-                                detectTapGestures { composerAttachmentSheet.dismiss() }
-                            }.semantics {
-                                contentDescription = dismissLabel
-                                onClick(label = dismissLabel) {
-                                    composerAttachmentSheet.dismiss()
-                                    true
+                    }
+                    conversationAccountRef?.let { keptAccountRef ->
+                        val keptEntries =
+                            rememberKeptMessageEntries(keptMessagesController, keptAccountRef) { key ->
+                                controller.timeline.firstOrNull { row ->
+                                    key.groupIdHex == controller.group.groupIdHex &&
+                                        row.record.messageIdHex == key.messageIdHex &&
+                                        !MessageProjector.isDeleted(
+                                            row.record.messageIdHex,
+                                            controller.deletedMessageIds,
+                                        )
                                 }
-                            },
-                    )
+                            }
+                        val youLabel = stringResource(R.string.you)
+                        val keptPresentations =
+                            keptMessagePresentations(
+                                entries = keptEntries,
+                                chatTitle = controller.title,
+                                youLabel = youLabel,
+                                isMine = controller::isMessageMine,
+                                senderName = appState::displayName,
+                                controller = controller,
+                                // Without kept cards, a cache bump must not recompose this transcript scope.
+                                thumbnailRevision = if (keptEntries.isEmpty()) 0L else mediaCacheRevision,
+                            )
+                        KeptMessagesOverlay(
+                            state = KeptMessagesOverlayState(keptEntries, keptMessagesController, keptAccountRef),
+                            composerHeight = overlayPadding,
+                            presentation = { entry -> keptPresentations.getValue(entry.key) },
+                            onOpenMessage = { key -> jumpToKeptMessage(key.messageIdHex) },
+                        )
+                    }
+                    if (composerAttachmentSheet.isOpen) {
+                        // Transparent scrim over the transcript only — the composer
+                        // stays reachable, so the keyboard and emoji toggles can still
+                        // swap the sheet away directly. Carries a dismiss semantics
+                        // action + label so a screen reader announces (and can trigger)
+                        // this otherwise-invisible touch layer.
+                        val dismissLabel = stringResource(R.string.close)
+                        Box(
+                            Modifier
+                                .matchParentSize()
+                                .pointerInput(composerAttachmentSheet) {
+                                    detectTapGestures { composerAttachmentSheet.dismiss() }
+                                }.semantics {
+                                    contentDescription = dismissLabel
+                                    onClick(label = dismissLabel) {
+                                        composerAttachmentSheet.dismiss()
+                                        true
+                                    }
+                                },
+                        )
+                    }
                 }
             }
         }
@@ -5016,28 +5090,42 @@ internal fun ConversationScreen(
             onAfterSend = { revealSentMessage() },
         )
 
-        ConversationMediaViewerSessionHost(mediaViewerSessionState) { active ->
-            val request = active.request
-            ConversationMediaViewer(
-                controller = controller,
-                appState = appState,
-                conversationVisualPages = conversationVisualPages,
-                messageIdHex = request.messageIdHex,
-                attachments = request.attachments,
-                tappedAttachmentIndex = request.tappedAttachmentIndex,
-                sender = request.sender,
-                recordedAt = request.recordedAt,
-                mine = request.mine,
-                onDismiss = { mediaViewerSessionState.dismiss(active.sessionId) },
-                forwardActions = mediaViewerForwardActions,
-                onGoToMessage = { page ->
-                    if (mediaViewerSessionState.dismiss(active.sessionId)) scrollToSearchMatch(page.messageIdHex)
-                },
-                selectedAttachment = active.selectedAttachment,
-                onSelectedAttachmentChange = { selected ->
-                    mediaViewerSessionState.selectPage(active.sessionId, selected)
-                },
-            )
+        val mediaOwnerCurrent = controller.isCurrentGroupMutationOwner(appState, sendMotionRuntime)
+        LaunchedEffect(mediaOwnerCurrent) {
+            if (!mediaOwnerCurrent) {
+                mediaViewerSessionState.active?.let { mediaViewerSessionState.dismiss(it.sessionId) }
+            }
+        }
+        val viewerChromeIcons = rememberMediaViewerChromeIconProvider()
+        if (mediaOwnerCurrent) {
+            ConversationMediaViewerSessionHost(mediaViewerSessionState) { active ->
+                val request = active.request
+                val conversationVisuals = conversationMedia.value.visuals
+                val conversationVisualPages =
+                    remember(conversationVisuals) { conversationVisuals.toConversationViewerPages() }
+                ConversationMediaViewer(
+                    controller = controller,
+                    appState = appState,
+                    conversationVisualPages = conversationVisualPages,
+                    messageIdHex = request.messageIdHex,
+                    attachments = request.attachments,
+                    tappedAttachmentIndex = request.tappedAttachmentIndex,
+                    sender = request.sender,
+                    recordedAt = request.recordedAt,
+                    mine = request.mine,
+                    onDismiss = { mediaViewerSessionState.dismiss(active.sessionId) },
+                    thumbnails = mediaViewerSessionState.thumbnails,
+                    icons = viewerChromeIcons.value,
+                    forwardActions = mediaViewerForwardActions,
+                    onGoToMessage = { page ->
+                        if (mediaViewerSessionState.dismiss(active.sessionId)) scrollToSearchMatch(page.messageIdHex)
+                    },
+                    selectedAttachment = active.selectedAttachment,
+                    onSelectedAttachmentChange = { selected ->
+                        mediaViewerSessionState.selectPage(active.sessionId, selected)
+                    },
+                )
+            }
         }
     }
     conversationOverlays()

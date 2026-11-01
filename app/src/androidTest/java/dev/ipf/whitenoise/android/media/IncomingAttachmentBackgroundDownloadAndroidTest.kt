@@ -87,6 +87,14 @@ private enum class ReceiptBoundary {
     RETURN_LOCAL_COMPLETE,
     DISABLED_COMPLETE,
     NETWORK_POLICY_START,
+    WIFI_COMMAND_START,
+    WIFI_COMMAND_COMPLETE,
+    WIFI_SNAPSHOT_WAIT_START,
+    WIFI_SNAPSHOT_CONFIRMED,
+    WIFI_VALIDATION_START,
+    WIFI_VALIDATION_COMPLETE,
+    POLICY_UPDATE_START,
+    POLICY_UPDATE_COMPLETE,
     NETWORK_POLICY_APPLIED,
     WIFI_DISABLE_START,
     WIFI_DISABLED,
@@ -420,20 +428,19 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         requests += request
         HeldAttachmentCancellationProbe.control(blobPort, "/__hold-resumable-acquisition")
         setPolicy(BackgroundReceiptPolicyCase.ProcessStop, receiver, MediaAutoDownloadType.entries.toSet())
-        requireNotNull(state).processNotificationUpdateForTest(receipt(receiver, group, request))
+        val receiverState = requireNotNull(state)
+        val diagnostics = backgroundReceiptProcessStopDiagnostics(receiverState, receiver.label)
+        diagnostics.trace(BackgroundReceiptProcessStopStage.ReceiptProcessing) {
+            receiverState.processNotificationUpdateForTest(receipt(receiver, group, request))
+        }
         val manager = WorkManager.getInstance(context)
         val name = attachmentDownloadWorkName(request)
-        val running =
-            withTimeout(READY_TIMEOUT_MILLIS) {
-                var info: WorkInfo? = null
-                while (info == null) {
-                    val infos = manager.getWorkInfosForUniqueWork(name).get()
-                    info = infos.firstOrNull { it.state == WorkInfo.State.RUNNING }
-                    if (info == null) delay(50L)
-                }
-                info
+        val running = diagnostics.awaitRunningWork(manager, name)
+        diagnostics.trace(BackgroundReceiptProcessStopStage.HeldLedger) {
+            awaitLedger(blobPort, diagnostics::observeLedger) { events ->
+                events.any { it.getString("kind") == "held" }
             }
-        awaitLedger(blobPort) { events -> events.any { it.getString("kind") == "held" } }
+        }
         val job = PlatformInterruptedAttachmentProbe.findScheduledWork(context, running.id.toString())
         HeldAttachmentCancellationProbe.control(blobPort, "/__platform-stop-marker")
         val namespace = if (job.first == null) "" else "-n ${job.first} "
@@ -600,6 +607,7 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         wifiOnly: Set<MediaAutoDownloadType> = emptySet(),
     ) {
         val receiverState = requireNotNull(state)
+        reportBoundary(ReceiptBoundary.POLICY_UPDATE_START)
         withContext(Dispatchers.Main.immediate) {
             MediaAutoDownloadType.entries.forEach { type ->
                 MediaAutoDownloadNetwork.entries.forEach { network ->
@@ -608,6 +616,7 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
                 }
             }
         }
+        reportBoundary(ReceiptBoundary.POLICY_UPDATE_COMPLETE)
         val snapshot = {
             backgroundReceiptPolicySnapshot(
                 receiverState.automaticAttachmentPolicy(receiver.label),
@@ -632,11 +641,25 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         receiver: AccountSummaryFfi,
         enabled: Boolean,
     ) {
+        reportBoundary(ReceiptBoundary.WIFI_COMMAND_START)
         BackgroundReceiptFixtureSupport.setWifiEnabled(enabled)
+        reportBoundary(ReceiptBoundary.WIFI_COMMAND_COMPLETE)
         wifiDisabled = !enabled
         val receiverState = requireNotNull(state)
-        BackgroundReceiptFixtureSupport.awaitWifiSnapshot(receiverState, receiver.label, enabled)
-        if (enabled) awaitValidatedInternet(receiverState)
+        reportBoundary(ReceiptBoundary.WIFI_SNAPSHOT_WAIT_START)
+        withBackgroundReceiptPolicyDiagnostics(
+            BackgroundReceiptPolicyCase.NetworkHeld,
+            BackgroundReceiptPolicyStage.WifiSnapshot,
+            { backgroundReceiptNetworkSnapshot(context, receiverState, receiver.label, enabled) },
+        ) {
+            BackgroundReceiptFixtureSupport.awaitWifiSnapshot(receiverState, receiver.label, enabled)
+        }
+        reportBoundary(ReceiptBoundary.WIFI_SNAPSHOT_CONFIRMED)
+        if (enabled) {
+            reportBoundary(ReceiptBoundary.WIFI_VALIDATION_START)
+            awaitValidatedInternet(receiverState)
+            reportBoundary(ReceiptBoundary.WIFI_VALIDATION_COMPLETE)
+        }
     }
 
     /** Leaves every generated Activity behind Home so the process runs with no visible UI. */

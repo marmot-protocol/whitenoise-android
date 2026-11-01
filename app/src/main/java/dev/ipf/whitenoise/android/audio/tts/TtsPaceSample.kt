@@ -51,27 +51,18 @@ internal data class TtsPaceGapOpener(
 /**
  * How fast the voice actually speaks, measured between two utterance starts.
  *
- * The estimated word marker spends a learned rate open loop, so a systematic
- * error in that rate is a marker that drifts further from the voice the longer
- * a sentence runs. The obvious measurement — the interval from `onStart` to
- * `onDone` of one utterance — is not one. Writing `L` for the interval between
- * `onStart` and audible speech, that interval is `L + audible`, and nothing in
- * this process knows `L`: an engine using the framework's playback path reports
- * `onStart` when its audio item begins, so `L` is near zero, while an engine
- * reporting at synthesis start has an `L` that is larger and, by
- * [TtsEstimatedWordTicker]'s own account, longest while the voice warms up.
- * Deducting a constant for it biases every sample from a given engine the same
- * way, and a rate learned too fast puts the marker AHEAD of the voice, which is
- * the worse of the two failures — a marker that has already moved on cannot be
- * read as nearly there.
+ * The approximate remaining-time display uses a learned rate. Android defines
+ * onStart as soon before playback, not synthesis start. Nevertheless this
+ * controller has no audio playback clock: a start-to-done interval can include
+ * buffering, engine stalls and callback scheduling offsets.
  *
- * The gap between two consecutive `onStart` callbacks does not contain `L`:
+ * For consecutive starts, writing L for the callback-to-audio offset:
  *
  *     start(k+1) − start(k) = audible(k) + seam + (L(k) − L(k+1))
  *
- * and `L` cancels between two utterances of the same warmed engine. It does not
- * cancel when the opener is the first thing that engine spoke, which is exactly
- * the warm-up case, so that gap is refused rather than assumed away.
+ * A stable offset approximately cancels for a warmed engine. This remains an
+ * ETA heuristic, not measured word timing. The first engine utterance is
+ * excluded because startup behavior can differ from later queued utterances.
  *
  * A gap only measures the opener when the opener really played whole and the
  * utterance now starting is the one that was queued behind it. Everything below

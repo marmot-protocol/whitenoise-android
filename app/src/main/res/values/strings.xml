@@ -384,7 +384,15 @@
     <string name="mls_group_id">MLS group ID</string>
     <string name="nostr_group_id">Nostr group ID</string>
     <string name="group_relays">Group relays</string>
-    <string name="group_relays_description">Relays used to exchange messages for this group.</string>
+    <string name="chat_relays">Chat relays</string>
+    <string name="group_relays_intro">These Nostr relays are configured for this chat. They carry its encrypted messages to every member.</string>
+    <string name="group_relays_configured">Configured relays</string>
+    <string name="group_relays_configuration_only">This is the chat’s configured route. It doesn’t show whether each relay is connected right now.</string>
+    <string name="group_relays_empty">No relays are configured for this chat.</string>
+    <string name="group_relays_admin_control_title">Admins control these relays</string>
+    <string name="group_relays_admin_detail">Changing them would move this chat for every member. Editing group relays isn’t available in White Noise yet.</string>
+    <string name="group_relays_member_detail">Only admins can change the relays this chat uses. You can view and copy them here.</string>
+    <string name="group_relay_copy">Copy relay %1$d URL</string>
     <string name="relay_number">Relay %1$d</string>
     <string name="group_id">Group ID</string>
     <string name="relays">Relays</string>
@@ -553,6 +561,8 @@
     <string name="emoji_category_objects" translatable="false">Objects</string>
     <string name="emoji_category_symbols" translatable="false">Symbols</string>
     <string name="emoji_category_flags" translatable="false">Flags</string>
+    <!-- Product name of the bundled :marmot: emoji, shown where its artwork cannot be drawn. -->
+    <string name="emoji_name_marmot" translatable="false">Marmot</string>
     <string name="reply">Reply</string>
     <string name="forward">Forward</string>
     <string name="forward_to">Forward to</string>
@@ -986,7 +996,6 @@
     <string name="toast_encrypted_backup_created">Encrypted backup created</string>
     <string name="toast_couldnt_create_encrypted_backup">Couldn\'t create encrypted backup</string>
     <string name="copy">Copy</string>
-    <string name="no_relays">No relays</string>
     <string name="remove_relay">Remove relay</string>
     <string name="add_relay">Add relay</string>
     <string name="relay_lists_section">Relay lists</string>
@@ -1006,6 +1015,13 @@
     <string name="relay_imported_issue_title">Relay address needs attention</string>
     <string name="relay_imported_issue_detail">An imported relay doesn’t use a secure wss:// address. Remove it or add a secure replacement. Its role assignments were kept.</string>
     <string name="relay_needs_attention">Needs attention</string>
+    <string name="relay_onion_issue_title">Onion relay needs Tor</string>
+    <string name="relay_onion_issue_detail">An imported .onion relay is reachable only through Tor, which White Noise doesn’t connect through itself, so it isn’t used. Editing these lists here publishes them without it.</string>
+    <string name="relay_onion_needs_tor">Needs Tor</string>
+    <string name="relay_onion_add_error">Onion relays are reachable only through Tor, and White Noise doesn’t connect through Tor itself.</string>
+    <string name="relay_unusable_issue_title">Relay address can’t be used</string>
+    <string name="relay_unusable_issue_detail">An imported relay address is malformed or points somewhere White Noise can’t use. Remove it or add a valid wss:// replacement.</string>
+    <string name="relay_unusable_address">Can’t be used</string>
     <string name="profile_relays">Profile relays</string>
     <string name="relays_explanation">Relays let your profile publish information, receive chat invitations, and deliver messages.</string>
     <string name="restore_default_relays">Restore Default Relays</string>
@@ -1431,6 +1447,7 @@
     <string name="toast_couldnt_decode_image">Couldn\'t decode that image</string>
     <string name="toast_couldnt_prepare_image">Couldn\'t download or prepare that image.</string>
     <string name="toast_couldnt_process_video">Couldn\'t process that video</string>
+    <string name="toast_video_metadata_not_removable">Couldn\'t remove private details like location from this video, so it wasn\'t attached.</string>
     <string name="toast_reattach_to_retry_media">Re-attach to retry</string>
     <string name="media_uploading">Uploading…</string>
     <string name="media_upload_failed">Upload failed</string>
@@ -1522,6 +1539,7 @@
     <string name="attachment_type_file">File</string>
     <string name="media_file_too_large">File too large to attach</string>
     <string name="media_file_unreadable">Couldn\'t read this file. Select it again.</string>
+    <string name="media_file_video_metadata_not_removable">Couldn\'t remove private details like location from this video file, so it wasn\'t attached.</string>
     <string name="media_file_empty">Empty files can\'t be sent</string>
     <string name="media_album_too_large">Selection too large to send</string>
     <string name="group_image_search_title">Group image</string>
@@ -1574,7 +1592,7 @@
     <string name="download_enabled">Automatic downloads follow your network rules</string>
     <string name="download_sent_media">Sent media</string>
     <string name="download_quality">Media quality</string>
-    <string name="download_quality_help">Applies to new photos and voice messages. Videos and audio files are sent as-is.</string>
+    <string name="download_quality_help">Applies to new photos and voice messages. Videos and audio files are never re-encoded.</string>
     <string name="download_done">Done</string>
     <string name="download_stop_confirmation">Clear waiting automatic downloads for this profile? Active downloads and downloads you started yourself will continue.</string>
     <string name="media_type_images">Images</string>
@@ -1589,7 +1607,7 @@
     <string name="media_quality_high_subtitle">About 1.5 MB per photo — quality over data cost</string>
     <string name="media_quality_original">Original</string>
     <string name="media_quality_original_subtitle">Full resolution — largest files</string>
-    <string name="media_quality_footer">Photos always have location and device details removed, even at Original. Videos and imported audio keep their original data. Audio bitrate applies only to voice notes you record.</string>
+    <string name="media_quality_footer">Photos always have location and device details removed, even at Original. Videos have location and device tags removed from the file, but subtitles and data inside the video stream are not changed. Imported audio keeps its original data. Audio bitrate applies only to voice notes you record.</string>
     <string name="enter_key_behavior_title">Enter key behavior</string>
     <string name="enter_key_behavior_send">Send message</string>
     <string name="enter_key_behavior_newline">New line</string>
@@ -1616,6 +1634,19 @@
     <string name="voice_message_permission_denied">Microphone permission needed to record</string>
     <string name="voice_message_recording_failed">Couldn\'t record voice message</string>
     <string name="voice_message_microphone_busy">The microphone is in use by another app. Close it there and try again.</string>
+    <string name="transcribe_audio">Transcribe</string>
+    <string name="audio_transcription_title">Audio transcript</string>
+    <string name="audio_transcription_disclosure">Offline Speech to Text will process this recording on your device using its installed speech model. White Noise does not record the microphone or send a message. The generated text may be inaccurate and is cleared when you close it or leave this screen.</string>
+    <string name="audio_transcription_working">Transcribing the recording on this device…</string>
+    <string name="audio_transcription_generated">Generated transcript · not the sender’s text</string>
+    <string name="audio_transcription_android_version">Transcribing recordings requires Android 13 or later.</string>
+    <string name="audio_transcription_provider_missing">Install Offline Speech to Text and set up a speech model to transcribe recordings on this device.</string>
+    <string name="audio_transcription_provider_outdated">Update Offline Speech to Text to version 0.21.0 or later. Earlier builds have not been qualified for recording-only transcription.</string>
+    <string name="audio_transcription_provider_unavailable">Offline Speech to Text could not start. Open it and check that a speech model is ready, then try again.</string>
+    <string name="audio_transcription_permission_denied">Android denied access to the speech service. Check microphone permissions for White Noise and Offline Speech to Text in Android settings. Transcription reads the recording; it does not record your microphone.</string>
+    <string name="audio_transcription_audio_rejected">This recording could not be read or delivered completely. Its audio format or size may not be supported.</string>
+    <string name="audio_transcription_failed">The recording could not be transcribed. Check Offline Speech to Text and try again.</string>
+    <string name="audio_transcription_timeout">Transcription took too long. Check that Offline Speech to Text has a speech model ready, then try again.</string>
     <string name="dictate_text">Dictate text</string>
     <string name="dictation_preparing">Preparing dictation…</string>
     <string name="dictation_checking_service">Checking speech service…</string>
@@ -1638,6 +1669,7 @@
     <string name="dictation_microphone_muted">Microphone access is off</string>
     <string name="dictation_microphone_muted_help">Turn on microphone access in Android privacy settings or Quick Settings, then try dictation again.</string>
     <string name="dictation_microphone_in_use">The microphone is already in use</string>
+    <string name="dictation_interrupted">Dictation interrupted. Review recovered text and any remaining audio before sending.</string>
     <string name="dictation_audio_focus_unavailable">Could not pause other audio. Try again or turn off Pause other audio in Dictation settings.</string>
     <string name="dictation_no_speech">No speech was recognized</string>
     <string name="dictation_network_error">Speech service couldn’t connect</string>
@@ -1673,6 +1705,11 @@
     <string name="voice_message_pause">Pause voice message</string>
     <string name="voice_message_speed">Playback speed %1$s</string>
     <string name="voice_message_failed">Voice message couldn\'t load</string>
+    <string name="voice_recording_save_failed">Recording stopped, but the audio could not be saved. Record again.</string>
+    <string name="voice_recording_stops_in">Stops in %1$s</string>
+    <string name="voice_recording_limit_warning">Recording will stop in 30 seconds at the five-minute limit.</string>
+    <string name="voice_recording_limit_reached">Five-minute recording limit reached. Review your voice note before sending.</string>
+    <string name="voice_recording_interrupted">Recording interrupted. Review the captured audio before sending.</string>
     <string name="voice_message_locked">Locked</string>
     <string name="voice_message_cancel">Cancel voice message</string>
     <string name="reply_you">You</string>
@@ -2311,6 +2348,7 @@
     <string name="new_message_name_or_npub">Name or npub</string>
     <string name="new_message_connect_qr">Connect with QR</string>
     <string name="new_message_invite_friend">Invite a friend</string>
+    <string name="new_message_talk_to_agent">Talk to your agent</string>
     <string name="new_message_people">People</string>
     <string name="new_message_source_chats">People in chats</string>
     <string name="new_message_source_following">Following</string>
@@ -2420,7 +2458,7 @@
     <string name="photo_editor_coordinate_value" translatable="false">%1$s: %2$d%%</string>
     <string name="photo_editor_keep_editing">Keep editing</string>
     <string name="photo_editor_quality_low">Low</string>
-    <string name="photo_editor_quality_explanation">Photos always have location and device details removed. Original keeps the image data where the format allows; other formats are re-encoded. Videos and files are sent unchanged.</string>
+    <string name="photo_editor_quality_explanation">Photos always have location and device details removed. Original keeps the image data where the format allows; other formats are re-encoded. Videos have location and device tags removed from the file without re-encoding, but subtitles and data inside the video stream are not changed. Other files are sent unchanged.</string>
     <string name="photo_editor_original_edited">Edited photos use High quality. The original image is kept for further editing.</string>
     <string name="audit_upload_title">Share group diagnostic logs</string>
     <string name="audit_upload_subtitle">Shares group diagnostic logs for every profile on this device.</string>
@@ -2597,6 +2635,7 @@
     <string name="search_message_content_loading">Searching message content…</string>
     <string name="search_message_content_failed">Couldn’t search message content.</string>
     <string name="avatar_preparation_interrupted">The image update was interrupted. Check the current image before selecting it again.</string>
+    <string name="dictation_waiting_for_unlock">Dictation saved temporarily. Unlock the app to paste it.</string>
     <string name="show_less">Show less</string>
     <string name="font_size_preview">Message preview</string>
     <string name="font_size_sample_received">Let’s meet by the station. Is the afternoon still a good time for you?</string>
@@ -2621,4 +2660,36 @@
     <string name="setup_finding_outcome_unknown">Result unknown</string>
     <string name="setup_finding_outcome_success">Check succeeded</string>
     <string name="setup_finding_outcome_failure">Check failed</string>
+    <string name="public_jpeg_previews_title">Inline image previews</string>
+    <string name="public_jpeg_previews_privacy">Off by default. Direct Blossom JPEG links may reveal your IP address to the image host. Previews use unmetered Wi-Fi and your photo download rules. Ordinary links remain available when off.</string>
+    <string name="public_jpeg_preview_image">Linked JPEG preview</string>
+    <string name="public_jpeg_preview_save_failed">Could not save the image preview setting. Please try again.</string>
+    <string name="appearance_accessibility_preview">Readability preview</string>
+    <string name="appearance_preview_rtl">Preview right-to-left layout</string>
+    <string name="appearance_preview_large_text">Preview larger text</string>
+    <string name="appearance_preview_reset">Reset preview</string>
+    <string name="appearance_preview_limits">Shows how messages look with your current theme, font and text size. These switches change only this preview. Screen readers and magnification can’t be previewed here; try them in your device’s Accessibility settings.</string>
+    <string name="appearance_preview_motion_on">Device animations are on.</string>
+    <string name="appearance_preview_motion_off">Device animations are off, so changes appear without motion.</string>
+    <string name="chat_batch_progress">Processed %1$d of %2$d chats</string>
+    <string name="chat_batch_result">Changed: %1$d\nAlready satisfied: %2$d\nSkipped (unavailable): %3$d\nFailed: %4$d\nNot started: %5$d\nUnconfirmed: %6$d</string>
+    <string name="chat_batch_order_failed">Pinned order is unavailable or changed. Review the current chat list before another move.</string>
+    <string name="chat_batch_order_unchanged">No selected pinned chats can move further. Selected runs move one position while keeping their order.</string>
+    <string name="chat_batch_check_results">Check results</string>
+    <string name="chat_batch_order_unconfirmed">Could not confirm the pinned order. Check the chat list before moving chats again.</string>
+    <string name="notification_tones">White Noise sounds</string>
+    <string name="notification_tone_ding">White Noise Ding</string>
+    <string name="notification_tone_pulse">White Noise Pulse</string>
+    <string name="notification_tone_preview">Tap to preview</string>
+    <string name="notification_tone_stop">Tap to stop preview</string>
+    <string name="notification_tone_preview_failed">Could not play the preview. Try again.</string>
+    <string name="notification_tone_add">Add to Android sounds</string>
+    <string name="notification_tone_add_detail">Make these tones available in Android’s sound picker.</string>
+    <string name="notification_tone_added">Added. Open a category below, then Sound to choose a tone. Some devices list these under My Sounds.</string>
+    <string name="notification_tone_add_failed">Could not add the sounds. Try again or keep your current Android sound.</string>
+    <string name="notification_tone_scope">Previewing or adding sounds does not change your alerts. Choose a sound in Android for each category, conversation or person. Conversations and people explicitly assigned their own sound keep that sound. New message categories use Ding; silent and customized categories stay unchanged. Previews use notification volume and respect Silent mode and Do Not Disturb.</string>
+    <string name="notification_tone_android">Android sound</string>
+    <string name="notification_tone_silent">Silent</string>
+    <string name="notification_tone_off">Off</string>
+    <string name="notification_tone_default">Default</string>
 </resources>

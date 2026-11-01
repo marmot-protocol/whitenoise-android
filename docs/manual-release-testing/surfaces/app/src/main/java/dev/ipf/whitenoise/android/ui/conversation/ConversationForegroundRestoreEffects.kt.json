@@ -37,6 +37,30 @@
         "test_ids": [
           "CON-033"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreEffects.kt",
+        "surface": "Safe retained live frame before asynchronous handoff and IME refinement",
+        "anchor": "canPresentRetainedConversationFrame(",
+        "test_ids": [
+          "CON-033"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreEffects.kt",
+        "surface": "Measured immediate frame and replacement owner admission",
+        "anchor": "ConversationForegroundRestoreBinding.canPresentRetainedFrame(",
+        "test_ids": [
+          "CON-033"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationForegroundRestoreEffects.kt",
+        "surface": "Restoration-only coordinator replacement after the actual resume event",
+        "anchor": "conversationForegroundOwnerHandoffEffect(",
+        "test_ids": [
+          "CON-033"
+        ]
       }
     ]
   },

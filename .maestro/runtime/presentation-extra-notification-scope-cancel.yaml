@@ -3,27 +3,7 @@ name: presentation-extra-notification-scope-cancel
 ---
 - runFlow: ../fixtures/emulator-interruption.yaml
 - assertVisible:
-    id: conversation-sound-scope-messages_group
-- tapOn:
-    id: conversation-sound-scope-messages_group
-- assertVisible:
-    text: Use global default
-- assertVisible:
-    text: Custom for this chat
+    id: conversation-alert-messages_group
 - back
-- assertVisible:
-    id: conversation-sound-scope-messages_group
 - assertNotVisible:
-    text: Custom for this chat
-- tapOn:
-    id: conversation-sound-scope-messages_group
-- assertVisible:
-    text: Use global default
-- assertVisible:
-    text: Custom for this chat
-- back
-- assertVisible:
-    id: conversation-sound-scope-messages_group
-- assertNotVisible:
-    text: Custom for this chat
-- back
+    id: conversation-alert-messages_group

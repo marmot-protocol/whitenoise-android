@@ -7,14 +7,11 @@ package dev.ipf.whitenoise.android.audio.tts
  * supplies timing by calling `SynthesisCallback.rangeStart`. Many engines
  * never do, and some devices ship no range-capable engine at all, so whichever
  * engine the user selected decides whether engine-driven word highlighting is
- * possible. No client-side code can conjure the callback; instead the engine's
- * behaviour is detected so the estimated schedule can stand in exactly when it
- * is needed and yield for the current utterance when a usable real range arrives.
+ * possible. Capability evidence never substitutes for current playback timing.
+ * Engines without usable ranges keep sentence-level highlighting.
  *
- * "Usable" is the right question and is deliberately narrower than "reported":
- * an engine whose ranges cannot be resolved to a whole visible word — because
- * it reports phrase or sub-word granularity — gives the reader nothing, and the
- * estimated schedule standing in for it is the correct outcome.
+ * "Usable" is narrower than "reported": callbacks must resolve to a complete
+ * visible word before they establish word-level timing capability.
  *
  * Two properties are easy to get wrong, and both were:
  *
@@ -29,9 +26,9 @@ package dev.ipf.whitenoise.android.audio.tts
  * stored per engine package, but it is not a property of the package alone: a
  * locale that falls back to another voice, a voice switched inside the same
  * engine, or an engine update can end it. A stored verdict that could never be
- * re-examined would leave the word marker gone for every future session with no
- * path back, so a restored verdict is held until this attachment either
- * confirms it or accumulates enough answerable silence to overturn it.
+ * re-examined could leave diagnostics stale, so a restored verdict is held until
+ * this attachment confirms it or accumulates enough answerable silence to
+ * overturn it. Verdicts affect persistence only, never current word position.
  *
  * Evidence ACCUMULATES across utterances: a run of short messages is just as
  * conclusive as one long one. Requiring a single long utterance would leave a
@@ -60,7 +57,7 @@ internal class TtsRangeCapabilityProbe(
 
     private var sawRangeForCurrentUtterance = false
 
-    /** Native timing takes priority only after this utterance supplies a usable word. */
+    /** Evidence for the active utterance, used only to classify capability diagnostics. */
     val hasUsableRangeForCurrentUtterance: Boolean get() = sawRangeForCurrentUtterance
     private var silentChars = 0
 
@@ -103,9 +100,7 @@ internal class TtsRangeCapabilityProbe(
      * Seeds the verdict persisted for this engine from an earlier session.
      *
      * The verdict is cheap to re-learn but not free for the listener: proving
-     * an engine silent takes ~120 answerable characters, which is the first
-     * message or two of every session after the process was recycled — exactly
-     * where a missing word highlight is most visible. It is restored
+     * an engine silent takes ~120 answerable characters. It is restored
      * unconfirmed, so it still has to hold up.
      */
     fun restore(verdict: Boolean?) {

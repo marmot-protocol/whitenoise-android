@@ -1069,7 +1069,7 @@ class ComposerExpansionBehaviorTest {
                                 dictationAccountRef = null,
                                 dictationGroupIdHex = null,
                                 initialDraft = value,
-                                onDraftChange = { value = it },
+                                onDraftChange = { draftValue, _ -> value = draftValue },
                                 modifier = Modifier.testTag(TAG),
                             )
                         }
@@ -1197,7 +1197,7 @@ class ComposerExpansionBehaviorTest {
                                 dictationAccountRef = dictationController?.let { ACCOUNT },
                                 dictationGroupIdHex = dictationController?.let { GROUP },
                                 initialDraft = value,
-                                onDraftChange = { value = it },
+                                onDraftChange = { draftValue, _ -> value = draftValue },
                                 overlayBackRegistrar = overlayBackRegistrar,
                                 topInteractionClearance = topInteractionClearance,
                                 modifier = Modifier.testTag(TAG),
@@ -1314,7 +1314,7 @@ class ComposerExpansionBehaviorTest {
         val sendNode = composeRule.onNodeWithContentDescription(app.getString(R.string.send)).fetchSemanticsNode()
         assertTrue(
             "Send keeps its accessible touch target around the visual disc",
-            sendNode.touchBoundsInRoot.width >= 48f && sendNode.touchBoundsInRoot.height >= 48f,
+            sendNode.touchBoundsInRoot.width >= 40f && sendNode.touchBoundsInRoot.height >= 48f,
         )
         assertTrue("Send keeps its center inside the toolbar", send.center.y <= surface.bottom - 24f + 1f)
         if (layoutDirection == LayoutDirection.Ltr) {

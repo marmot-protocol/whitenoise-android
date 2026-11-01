@@ -28,27 +28,39 @@ internal suspend fun resolveAttachmentCacheAvailability(
  * Resolves every byte-returning consumer through the same native-aware retained-media owner, then copies at most
  * [maxBytes] of the retained source onto the heap. A larger source is rejected with
  * [dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException] before any array is allocated, and
- * stays retained for the file-backed consumers. The lease is closed whether the copy completes, fails or is
- * cancelled.
+ * stays retained for the file-backed consumers. A native source declaring more than [maxBytes] is refused from
+ * that declaration without being copied into a lease first. The lease is closed whether the copy completes, fails
+ * or is cancelled. [onCacheMiss] admits caller-owned durable work only after every retained source misses.
  */
+@Suppress("LongParameterList") // Byte budget, durable intent and miss-only admission are independent controls.
 internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintext(
     request: AttachmentTransferRequest,
     reference: MediaAttachmentReferenceFfi,
     priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
     persistInteractiveIntent: Boolean = true,
     maxBytes: Long = ATTACHMENT_PRESENTATION_MAX_BYTES,
+    onCacheMiss: suspend () -> Unit = {},
 ): ByteArray =
     downloadAttachmentPlaintextSource(
         request = request,
         reference = reference,
         priority = priority,
         persistInteractiveIntent = persistInteractiveIntent,
+        nativeReadBudget = maxBytes,
+        onCacheMiss = onCacheMiss,
     ).use { source -> source.readWithin(maxBytes) }
 
-/** Returns bounded memory or an owner-private file lease that the caller must close. */
+/**
+ * Returns bounded memory or an owner-private file lease that the caller must close.
+ *
+ * [nativeReadBudget] is set only by byte-returning callers: a MarmotKit-retained source declaring more is returned
+ * as [AttachmentPlaintext.Oversized] instead of a full lease, after the same bookkeeping as any retained source.
+ * [onCacheMiss] precedes acquisition, never a retained read.
+ */
 @Suppress(
     "UnusedParameter",
     "LongMethod",
+    "LongParameterList",
 ) // Cache, acquisition, and telemetry spans intentionally share one retained-source ownership boundary.
 internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
     request: AttachmentTransferRequest,
@@ -56,8 +68,12 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
     priority: AttachmentDownloadPriority = AttachmentDownloadPriority.Interactive,
     persistInteractiveIntent: Boolean = true,
     demandIntent: AttachmentDemandIntent = AttachmentDemandIntent.Join,
+    nativeReadBudget: Long? = null,
+    onCacheMiss: suspend () -> Unit = {},
 ): AttachmentPlaintext {
     val diagnostics = AttachmentFetchDiagnostics.begin(priority)
+    val openNative: suspend (AttachmentTransferRequest) -> AttachmentPlaintext? =
+        { qualified -> openNativeAttachment(qualified, nativeReadBudget) }
     val cacheKey = request.run { mediaCacheKey(accountRef, groupIdHex, messageIdHex, attachmentIndex) }
     promoteQueuedAttachmentAcquisition(cacheKey, priority, demandIntent)
     return diagnostics.recordAttachmentFetchOutcome {
@@ -95,9 +111,10 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
             clearInteractiveIntent = {
                 clearInteractiveAttachmentIntentAfterSuccess(request, priority, persistInteractiveIntent)
             },
-            loadNative = { openNativeAttachment(request) },
+            loadNative = { openNative(request) },
             preferNative = outgoingAttachmentCachePublications.isPending(cacheKey),
             loadMiss = {
+                onCacheMiss()
                 diagnostics?.phase(
                     phase = PerformancePhase.ATTACHMENT_ACQUISITION_START,
                     result = PerformanceResult.PENDING,
@@ -111,6 +128,7 @@ internal suspend fun WhiteNoiseAppState.downloadAttachmentPlaintextSource(
                         persistInteractiveIntent = persistInteractiveIntent,
                         demandIntent = demandIntent,
                         diagnostics = diagnostics,
+                        openNative = openNative,
                     )
                 }
             },
@@ -186,7 +204,10 @@ private fun WhiteNoiseAppState.clearInteractiveAttachmentIntentAfterSuccess(
     }
 }
 
-/** Shares network-path selection, then gives each native consumer an independent plaintext lease. */
+/**
+ * Shares network-path selection, then gives each native consumer an independent plaintext lease through its own
+ * [openNative], so one consumer's read budget never decides what another consumer receives.
+ */
 private suspend fun WhiteNoiseAppState.acquireAttachmentPlaintextSource(
     cacheKey: String,
     request: AttachmentTransferRequest,
@@ -194,6 +215,7 @@ private suspend fun WhiteNoiseAppState.acquireAttachmentPlaintextSource(
     persistInteractiveIntent: Boolean,
     demandIntent: AttachmentDemandIntent,
     diagnostics: AttachmentFetchDiagnostics?,
+    openNative: suspend (AttachmentTransferRequest) -> AttachmentPlaintext?,
 ): AttachmentPlaintext {
     promoteActiveAttachmentAcquisition(cacheKey, request, priority, demandIntent)
     val resolved =
@@ -207,7 +229,7 @@ private suspend fun WhiteNoiseAppState.acquireAttachmentPlaintextSource(
         }.await()
     return materializeAttachmentAcquisition(
         outcome = resolved,
-        openNative = ::openNativeAttachment,
+        openNative = openNative,
         afterSuccess = {
             clearInteractiveAttachmentIntentAfterSuccess(request, priority, persistInteractiveIntent)
         },

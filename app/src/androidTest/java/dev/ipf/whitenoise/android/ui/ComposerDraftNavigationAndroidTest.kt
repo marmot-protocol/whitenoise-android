@@ -35,6 +35,8 @@ import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_DRAFT_TOP_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
+import dev.ipf.whitenoise.android.ui.conversation.composer.rememberComposerTextState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -48,8 +50,36 @@ import org.junit.runner.RunWith
 class ComposerDraftNavigationAndroidTest {
     @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
     private var value by mutableStateOf(TextFieldValue(longDraft, TextRange(longDraft.length)))
+    private lateinit var sharedTextState: ComposerTextState
+    private val userTextEdits: Long
+        get() = sharedTextState.userTextEditRevision
+    private var externalRevision by mutableStateOf(0)
     private var sends = 0
     private var imeAnimationRunning = false
+
+    /** Actual native selection does not retire resume intent; text edits do, external restoration does not. */
+    @Test
+    fun onlyUserTextChangesPublishResumeIntent() {
+        renderWithKeyboard()
+        val field = composeRule.onNode(hasSetTextAction())
+        val baseline = userTextEdits
+        field.performTextInputSelection(TextRange(2, 7))
+        composeRule.waitForIdle()
+        assertEquals(baseline, userTextEdits)
+        field.performTextInput("replacement")
+        composeRule.waitForIdle()
+        assertEquals(baseline + 1, userTextEdits)
+        composeRule.runOnUiThread {
+            value = TextFieldValue("externally restored draft", TextRange(4))
+            externalRevision += 1
+        }
+        composeRule.waitForIdle()
+        assertEquals("external share/dictation revision is not a user edit", 0L, userTextEdits)
+        field.performTextInput("!")
+        composeRule.waitForIdle()
+        assertEquals(1L, userTextEdits)
+        assertEquals(0, sends)
+    }
 
     /** Character/newline edits stay stable at the real IME's height cap; hide/show reflow retains navigation. */
     @Test
@@ -150,7 +180,13 @@ class ComposerDraftNavigationAndroidTest {
                             onPickFromGallery = {},
                             onPickDocument = {},
                             initialDraft = value,
-                            onDraftChange = { value = it },
+                            onDraftChange = { draftValue, _ -> value = draftValue },
+                            textState =
+                                rememberComposerTextState(
+                                    draftKey = "navigation-fixture",
+                                    initialDraft = value,
+                                    externalRevision = externalRevision,
+                                ).also { sharedTextState = it },
                         )
                     }
                 }
@@ -235,6 +271,8 @@ class ComposerDraftNavigationAndroidTest {
         const val FLING_OBSERVATION_MS = 1000L
         const val FLING_STARTUP_FRAMES = 3
         const val TEXT_EDIT_OBSERVATION_FRAMES = 24
-        val longDraft = (1..80).joinToString("\n") { "Synthetic device draft line $it" } + "\na"
+
+        // A trailing separator keeps the real IME from starting a new composing word after the baseline capture.
+        val longDraft = (1..80).joinToString("\n") { "Synthetic device draft line $it" } + "\na "
     }
 }

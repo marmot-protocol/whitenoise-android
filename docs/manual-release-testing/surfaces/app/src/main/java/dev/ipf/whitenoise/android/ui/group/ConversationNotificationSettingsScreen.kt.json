@@ -1,0 +1,159 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+  "legacy_sha256": "79d98ca3a53ca301b8e119c1866e1c1741b91ce656276f16b73e0b9986000e02",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ConversationNotificationSettingsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "fun ConversationNotificationSettingsScreen(",
+        "test_ids": [
+          "GRP-001",
+          "NTF-012"
+        ]
+      },
+      {
+        "surface": "ConversationMuteSettingsSwitch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "fun ConversationMuteSettingsSwitch(",
+        "test_ids": [
+          "NTF-028"
+        ]
+      },
+      {
+        "surface": "LoadedNotificationCategories",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "fun LoadedNotificationCategories(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "NotificationCategoriesLoadingRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "fun NotificationCategoriesLoadingRow(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "NotificationCategoriesSection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "fun NotificationCategoriesSection(",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "Conversation polish ui/group/ConversationNotificationSettingsScreen.kt fun ConversationNotificationSettingsScreen(",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "fun ConversationNotificationSettingsScreen(",
+        "test_ids": [
+          "SET-040"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "Ordinary chat alert pause action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.notification_pause_ordinary_alerts",
+        "test_ids": [
+          "NTF-031",
+          "NTF-028"
+        ]
+      },
+      {
+        "surface": "Chat alert save failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.toast_notification_scope_update_failed",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "Chat alerts ConversationNotificationSettingsScreen.kt notification_alerts_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.notification_alerts_detail",
+        "test_ids": [
+          "NTF-031"
+        ]
+      },
+      {
+        "surface": "string:notification_categories",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.notification_categories",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:notification_categories_loading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.notification_categories_loading",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:notification_mute_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.notification_mute_detail",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:notifications",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.notifications",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:notify_nothing_while_muted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.notify_nothing_while_muted",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:sounds_and_notifications",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.sounds_and_notifications",
+        "test_ids": [
+          "GRP-001"
+        ]
+      },
+      {
+        "surface": "string:vibration_pattern",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.vibration_pattern",
+        "test_ids": [
+          "GRP-001"
+        ]
+      }
+    ],
+    "string_resources": [
+      {
+        "surface": "Conversation polish ui/group/ConversationNotificationSettingsScreen.kt R.string.notification_alert_paused",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.notification_alert_paused",
+        "test_ids": [
+          "SET-040"
+        ]
+      },
+      {
+        "surface": "Conversation polish ui/group/ConversationNotificationSettingsScreen.kt R.string.notification_system_blocked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
+        "anchor": "R.string.notification_system_blocked",
+        "test_ids": [
+          "SET-040"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

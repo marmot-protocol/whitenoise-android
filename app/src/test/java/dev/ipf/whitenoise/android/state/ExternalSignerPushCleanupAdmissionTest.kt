@@ -250,18 +250,18 @@ internal class ExternalSignerPushCleanupAdmissionTest : ExternalSignerSignOutFix
             assertNull(state.activeAccountRef)
         }
 
-    /** The encrypted journal preserves the existing local fallback when no native runtime is available. */
+    /** Durable push-disable intent does not prove native sign-out when the runtime is unavailable. */
     @Test
-    fun committedJournalAllowsLocalFallbackWithoutNativeRuntime() =
+    fun committedJournalRetainsSessionWithoutNativeSignOutAuthority() =
         runBlocking {
             val state = appState()
             WhiteNoiseAppState::class.java
                 .getDeclaredField("marmotRuntime")
                 .apply { isAccessible = true }
                 .set(state, null)
-            assertEquals(SignOutCompletion.RelayCleanupIncomplete, state.signOutActiveAccount())
+            assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
             assertEquals(0, signOutCalls.get())
-            assertNull(state.activeAccountRef)
+            assertEquals(accountRef, state.activeAccountRef)
             assertTrue(PushTokenStore.create(context).pendingDisables().contains(accountRef))
         }
 

@@ -121,6 +121,13 @@ MarmotKit cache retains one writer: the Zapstore suite when it runs. Prechecks a
 bounds read-only daemon lifetime;
 the pinned Gradle setup action stops writable-job daemons before cache cleanup.
 
+Android CI, the fuzz PR gate and the invariant gate run on GitHub-hosted
+`ubuntu-latest` runners for both repository branches and fork pull requests.
+Each job starts from a fresh checkout and restores its Gradle cache through
+the pinned setup action. Unit-test jobs use two forks to fit the hosted
+runner's memory. The path-filtered campaigns (release runtime, reproducible
+build, instrumented tests) and PR screenshots also use GitHub-hosted runners.
+
 `.github/workflows/invariant-gate.yml` runs on every pull request to `master`,
 including description edits, without compiling anything. The checker script runs
 from the base revision, and the pull request's registry is fetched through the API

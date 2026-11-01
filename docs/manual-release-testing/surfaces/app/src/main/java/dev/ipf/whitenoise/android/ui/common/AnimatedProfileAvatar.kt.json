@@ -1,0 +1,46 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedProfileAvatar.kt",
+  "legacy_sha256": "fcc1aa4945638adbd16e5f2346eb9785f74c6f71b72bb51f6a78674c7c6784c8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AnimatedProfileAvatarOverlay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedProfileAvatar.kt",
+        "anchor": "fun AnimatedProfileAvatarOverlay(",
+        "test_ids": [
+          "PRO-006"
+        ]
+      },
+      {
+        "surface": "AnimatedProfileAvatarLayer",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedProfileAvatar.kt",
+        "anchor": "fun AnimatedProfileAvatarLayer(",
+        "test_ids": [
+          "PRO-006",
+          "GRP-035"
+        ]
+      },
+      {
+        "surface": "AnimatedAvatarPixels",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedProfileAvatar.kt",
+        "anchor": "fun AnimatedAvatarPixels(",
+        "test_ids": [
+          "GRP-035",
+          "MED-032"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Bounded current-owner group animation recovery and shared playback admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/AnimatedProfileAvatar.kt",
+        "anchor": "internal fun shouldAnimateProfileAvatar(",
+        "test_ids": [
+          "GRP-035",
+          "MED-032"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

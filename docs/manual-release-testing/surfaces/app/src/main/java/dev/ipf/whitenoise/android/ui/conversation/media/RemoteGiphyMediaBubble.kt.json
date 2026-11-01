@@ -43,6 +43,14 @@
         "test_ids": [
           "MED-021"
         ]
+      },
+      {
+        "surface": "GIPHY shared byte acquisition and owner admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "giphyAcquisition.useBytes(",
+        "test_ids": [
+          "MED-021"
+        ]
       }
     ],
     "settings_controls": [
@@ -84,6 +92,16 @@
         "anchor": "R.string.media_tap_to_retry",
         "test_ids": [
           "MED-021"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Presentation memory trim preserves live images and data",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/RemoteGiphyMediaBubble.kt",
+        "anchor": "internal fun trimRemoteGiphyMemory(",
+        "test_ids": [
+          "STB-006"
         ]
       }
     ]

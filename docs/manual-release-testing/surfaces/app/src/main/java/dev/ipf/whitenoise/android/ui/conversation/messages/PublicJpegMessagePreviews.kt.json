@@ -1,0 +1,35 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/PublicJpegMessagePreviews.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "PublicJpegMessagePreviews",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/PublicJpegMessagePreviews.kt",
+        "anchor": "fun PublicJpegMessagePreviews(",
+        "test_ids": [
+          "MED-040"
+        ]
+      },
+      {
+        "surface": "PublicJpegPreviewImage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/PublicJpegMessagePreviews.kt",
+        "anchor": "fun PublicJpegPreviewImage(",
+        "test_ids": [
+          "MED-040"
+        ]
+      }
+    ],
+    "string_resources": [
+      {
+        "surface": "Conversation polish ui/conversation/messages/PublicJpegMessagePreviews.kt R.string.public_jpeg_preview_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/PublicJpegMessagePreviews.kt",
+        "anchor": "R.string.public_jpeg_preview_image",
+        "test_ids": [
+          "MED-040"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -8,11 +8,22 @@ import re
 import subprocess
 
 
-# Kotlin tests read these documents; their edits require the validating suites.
+# Kotlin test inputs never qualify as docs-only. Their validating consumers
+# run in full integration; selected metadata may use the PR precheck.
 BUILD_INPUT_DOCS = {
     'docs/composer-dictation-device-matrix.md',
     'docs/invariant-gates.md',
 }
+
+# Validated metadata changes affect tests but do not alter build/tool execution.
+# They must never qualify as docs-only; their validators remain unconditional.
+TEST_METADATA = {'docs/invariant-gates.md', 'docs/manual-release-testing-surfaces.json'}
+
+
+def test_metadata_path(path):
+    return (path in TEST_METADATA or
+            (path.startswith('docs/manual-release-testing/surfaces/') and path.endswith('.json')))
+
 
 ROOT_DOCS = {'README.md', 'AGENTS.md', 'CLAUDE.md', 'CONTRIBUTING.md',
              'SECURITY.md', 'CODE_OF_CONDUCT.md', 'CHANGELOG.md'}
@@ -102,7 +113,7 @@ def supplemental_campaigns_diff(raw):
         if (not parts or str(PurePosixPath(path)) != path or path.startswith('/') or '..' in parts or '.' in parts
                 or '\\' in path or any(ord(c) < 32 for c in path)):
             return True
-        ordinary = documentation_path(path)
+        ordinary = documentation_path(path) or test_metadata_path(path)
         if path.startswith('app/src/'):
             # Manifests, assets, native artifacts and generated inputs stay full.
             ordinary |= (len(parts) > 4 and parts[3] == 'java' and
@@ -113,6 +124,20 @@ def supplemental_campaigns_diff(raw):
         if not ordinary:
             return True
     return False
+
+
+def tooling_regressions_diff(raw):
+    """Only defer isolated host suites for known ordinary production changes.
+
+    Scripts/tools/fixtures/build inputs fall through the conservative classifier.
+    Android test fixtures also feed host suites. Source-reading Maestro contract
+    suites are intentionally unconditional in the workflow.
+    """
+    if raw is None or supplemental_campaigns_diff(raw):
+        return True
+    fields = raw.split(b'\0')
+    return any(fields[index].decode('utf-8').startswith('app/src/androidTest/')
+               for index in range(1, len(fields) - 1, 2))
 
 
 def validation_selection(event, configured_mode, labels, raw):
@@ -129,7 +154,9 @@ def validation_selection(event, configured_mode, labels, raw):
     docs = event == 'pull_request' and raw is not None and docs_only_diff(raw) and not full
     return {'ci_mode': mode, 'precheck': str(mode == 'precheck').lower(),
             'full_matrix': str(full).lower(), 'docs_only': str(docs).lower(),
-            'supplemental_campaigns': str(risky).lower()}
+            'supplemental_campaigns': str(risky).lower(),
+            'tooling_regressions': str(event != 'pull_request' or not labels_valid or
+                                       has_full_label or tooling_regressions_diff(raw)).lower()}
 
 
 def main():

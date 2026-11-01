@@ -1,0 +1,168 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "GroupRelaySettingsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+        "anchor": "fun GroupRelaySettingsScreen(",
+        "test_ids": [
+          "GRP-001",
+          "GRP-020",
+          "GRP-036"
+        ]
+      },
+      {
+        "surface": "GroupRelayRows",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+        "anchor": "fun GroupRelayRows(",
+        "test_ids": [
+          "GRP-001",
+          "GRP-020",
+          "GRP-036"
+        ]
+      },
+      {
+        "surface": "GroupRelayRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+        "anchor": "fun GroupRelayRow(",
+        "test_ids": [
+          "GRP-001",
+          "GRP-020",
+          "GRP-036"
+        ]
+      },
+      {
+        "surface": "GroupRelayEmptyRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+        "anchor": "fun GroupRelayEmptyRow(",
+        "test_ids": [
+          "GRP-001",
+          "GRP-020",
+          "GRP-036"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:chat_relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+        "anchor": "R.string.chat_relays",
+        "test_ids": [
+          "GRP-036"
+        ]
+      },
+      {
+        "surface": "string:copied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+        "anchor": "R.string.copied",
+        "test_ids": [
+          "GRP-036"
+        ]
+      },
+      {
+        "surface": "string:group_relay_copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+        "anchor": "R.string.group_relay_copy",
+        "test_ids": [
+          "GRP-036"
+        ]
+      },
+      {
+        "surface": "string:group_relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+        "anchor": "R.string.group_relays",
+        "test_ids": [
+          "GRP-036"
+        ]
+      },
+      {
+        "surface": "string:group_relays_admin_control_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+        "anchor": "R.string.group_relays_admin_control_title",
+        "test_ids": [
+          "GRP-036"
+        ]
+      },
+      {
+        "surface": "string:group_relays_admin_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+        "anchor": "R.string.group_relays_admin_detail",
+        "test_ids": [
+          "GRP-036"
+        ]
+      },
+      {
+        "surface": "string:group_relays_configuration_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+        "anchor": "R.string.group_relays_configuration_only",
+        "test_ids": [
+          "GRP-036"
+        ]
+      },
+      {
+        "surface": "string:group_relays_configured",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+        "anchor": "R.string.group_relays_configured",
+        "test_ids": [
+          "GRP-036"
+        ]
+      },
+      {
+        "surface": "string:group_relays_empty",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+        "anchor": "R.string.group_relays_empty",
+        "test_ids": [
+          "GRP-036"
+        ]
+      },
+      {
+        "surface": "string:group_relays_intro",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+        "anchor": "R.string.group_relays_intro",
+        "test_ids": [
+          "GRP-036"
+        ]
+      },
+      {
+        "surface": "string:group_relays_member_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+        "anchor": "R.string.group_relays_member_detail",
+        "test_ids": [
+          "GRP-036"
+        ]
+      },
+      {
+        "surface": "string:relay_number",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+        "anchor": "R.string.relay_number",
+        "test_ids": [
+          "GRP-036"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Group relay display de-duplication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+        "anchor": "fun groupRelayDisplayList(",
+        "test_ids": [
+          "GRP-036"
+        ]
+      },
+      {
+        "surface": "Scroll boundaries: GroupRelaySettingsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+        "anchor": "SettingsList(",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

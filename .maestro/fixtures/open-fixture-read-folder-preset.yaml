@@ -10,10 +10,12 @@ appId: dev.ipf.whitenoise.android.maestrolab
     id: folder.presetRead
 - tapOn:
     id: folder.presetRead
+- runFlow: show-folder-rule-tree.yaml
 - scrollUntilVisible:
     element:
       id: folder.condition.2
-    direction: UP
+    direction: DOWN
+    centerElement: true
 - assertVisible:
     id: folder.condition.2
 - assertVisible: '^Read status: No unread messages$'

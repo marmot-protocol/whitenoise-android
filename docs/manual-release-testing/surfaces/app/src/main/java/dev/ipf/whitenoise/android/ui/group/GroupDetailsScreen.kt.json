@@ -134,6 +134,14 @@
         "test_ids": [
           "SET-033"
         ]
+      },
+      {
+        "surface": "Logical destination navigation motion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "fun GroupDetailsScreen(",
+        "test_ids": [
+          "CON-037"
+        ]
       }
     ],
     "settings_controls": [
@@ -762,11 +770,12 @@
         ]
       },
       {
-        "surface": "string:relays",
+        "surface": "Group relays row",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.relays",
+        "anchor": "groupRelaysTitleRes(isDm)",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-036"
         ]
       },
       {
@@ -1060,11 +1069,12 @@
         ]
       },
       {
-        "surface": "R.string.relays",
+        "surface": "groupRelaysTitleRes(isDm)",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
-        "anchor": "R.string.relays",
+        "anchor": "groupRelaysTitleRes(isDm)",
         "test_ids": [
-          "GRP-001"
+          "GRP-001",
+          "GRP-036"
         ]
       },
       {

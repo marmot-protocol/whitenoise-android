@@ -111,6 +111,7 @@ class ChatRowLayoutScreenshotTest {
         }
     }
 
+    /** Renders layout states so selection retains timestamps and supporting metadata beside its leading indicator. */
     private fun render(
         darkTheme: Boolean,
         amoled: Boolean,
@@ -152,13 +153,13 @@ class ChatRowLayoutScreenshotTest {
                         )
                         ChatRowFixture(
                             title = "Selected conversation",
-                            preview = "Normal metadata is replaced",
+                            preview = "Normal metadata remains visible",
                             selectionMode = true,
                             selected = true,
                         )
                         ChatRowFixture(
                             title = "Unselected conversation",
-                            preview = "Normal metadata is replaced",
+                            preview = "Normal metadata remains visible",
                             selectionMode = true,
                         )
                     }

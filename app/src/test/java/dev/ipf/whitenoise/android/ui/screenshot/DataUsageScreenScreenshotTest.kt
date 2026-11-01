@@ -3,8 +3,11 @@ package dev.ipf.whitenoise.android.ui.screenshot
 import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -48,6 +51,25 @@ class DataUsageScreenScreenshotTest {
         capture("data_usage_rtl_large_font", darkTheme = false, fontScale = 2f, layoutDirection = LayoutDirection.Rtl)
     }
 
+    @Test
+    fun dataUsagePreviewLight() = capture("data_usage_preview_light", darkTheme = false, preview = true)
+
+    @Test
+    fun dataUsagePreviewDark() = capture("data_usage_preview_dark", darkTheme = true, preview = true)
+
+    @Test
+    fun dataUsagePreviewAmoled() = capture("data_usage_preview_amoled", darkTheme = true, amoled = true, preview = true)
+
+    @Test
+    fun dataUsagePreviewRtlLargeFont() =
+        capture(
+            "data_usage_preview_rtl_large",
+            darkTheme = false,
+            fontScale = 2f,
+            layoutDirection = LayoutDirection.Rtl,
+            preview = true,
+        )
+
     /** Renders the screen for one account on cleared preferences and records the window. */
     private fun capture(
         name: String,
@@ -55,6 +77,7 @@ class DataUsageScreenScreenshotTest {
         amoled: Boolean = false,
         fontScale: Float = 1f,
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
+        preview: Boolean = false,
     ) {
         val appState = testAppState(name)
         composeRule.setContent {
@@ -65,11 +88,21 @@ class DataUsageScreenScreenshotTest {
             }
         }
         composeRule.waitForIdle()
+        if (preview) {
+            composeRule
+                .onNodeWithTag("settings.list")
+                .performScrollToNode(hasTestTag("data_usage.public_jpeg_previews"))
+        }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 
     /** One signed-in account on its own cleared preference file, so the matrix is the shipped default. */
     private fun testAppState(name: String): WhiteNoiseAppState {
+        context
+            .getSharedPreferences("whitenoise.public_jpeg_previews", Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .commit()
         val preferences = context.getSharedPreferences("data-usage-screenshot-$name", Context.MODE_PRIVATE)
         preferences.edit().clear().commit()
         return WhiteNoiseAppState(

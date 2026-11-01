@@ -17,7 +17,8 @@
         "anchor": "fun MediaVoiceBubble(",
         "test_ids": [
           "MED-001",
-          "MED-008"
+          "MED-008",
+          "MED-038"
         ]
       },
       {

@@ -51,7 +51,7 @@ internal class SignUpController(
     private val scope: CoroutineScope,
     private val currentOwner: () -> SignUpOwner,
     private val ownerAvailable: () -> Boolean,
-    private val create: suspend (SignUpOwner) -> AccountSummaryFfi,
+    private val create: suspend (SignUpOwner, UserProfileMetadataFfi) -> AccountSummaryFfi,
     private val hasPendingIdentityReceipt: () -> Boolean,
     private val qualify: suspend (AccountSummaryFfi) -> Unit,
     private val accept: suspend (AccountSummaryFfi, SignUpOwner) -> Boolean,
@@ -172,7 +172,8 @@ internal class SignUpController(
         if (acceptedIdentity != null) return true
         val captured = checkNotNull(owner)
         return if (ownerAvailable() && currentOwner() == captured) {
-            val created = create(captured)
+            // The photo needs an account to upload under, so only the text fields go first.
+            val created = create(captured, checkNotNull(draft).profileMetadata(picture = null))
             qualify(created)
             acceptedIdentity = created
             accept(created, captured)
@@ -195,17 +196,7 @@ internal class SignUpController(
             return
         }
         stage = SignUpStage.Publishing
-        val metadata =
-            UserProfileMetadataFfi(
-                name = submitted.name.trim().ifBlank { null },
-                displayName = submitted.name.trim().ifBlank { null },
-                about = submitted.about.trim().ifBlank { null },
-                picture = uploadedPhotoUrl,
-                banner = null,
-                nip05 = null,
-                lud16 = null,
-            )
-        val published = publish(identity.label, metadata)
+        val published = publish(identity.label, submitted.profileMetadata(uploadedPhotoUrl))
         if (!ownsAcceptedIdentity()) {
             stage = SignUpStage.OwnerChanged
         } else if (published) {
@@ -226,3 +217,15 @@ internal class SignUpController(
         if (succeeded) draft = null
     }
 }
+
+/** The submitted form as public profile metadata; blank fields stay unset. */
+private fun SignUpProfileDraft.profileMetadata(picture: String?) =
+    UserProfileMetadataFfi(
+        name = name.trim().ifBlank { null },
+        displayName = name.trim().ifBlank { null },
+        about = about.trim().ifBlank { null },
+        picture = picture,
+        banner = null,
+        nip05 = null,
+        lud16 = null,
+    )

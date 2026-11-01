@@ -9,12 +9,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties.EditableText
@@ -22,10 +29,13 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -34,6 +44,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
@@ -45,8 +56,9 @@ import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
+import dev.ipf.marmotkit.TimelineMessageChangeFfi
+import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -57,14 +69,19 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.RetainedComposerExpansion
 import dev.ipf.whitenoise.android.state.RetainedComposerExpansionMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.awaitConversationCondition
 import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.notificationChatListRow
 import dev.ipf.whitenoise.android.state.notifiedMessagePreview
+import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
+import dev.ipf.whitenoise.android.state.projectedTimelineMessage
+import dev.ipf.whitenoise.android.state.timelineAppMessage
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_GESTURE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_INDICATOR_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOverlayBackRegistrar
+import dev.ipf.whitenoise.android.ui.conversation.messages.composerSendDestinationTag
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
 import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -74,12 +91,15 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.TimeZone
+import kotlin.math.abs
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -91,6 +111,13 @@ class ConversationComposerExpansionRetentionScreenshotTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val controllers = mutableListOf<ConversationController>()
+    private val originalTimeZone = TimeZone.getDefault()
+
+    /** Pins the default time zone to UTC so message timestamps and date buckets are deterministic. */
+    @Before
+    fun pinMessageTimeZone() {
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+    }
 
     /** A live drag uses its compact minimum; cancellation keeps the original retained owner unchanged. */
     @Test
@@ -186,6 +213,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
     @After
     fun releaseControllers() {
         controllers.forEach { it.onCleared() }
+        TimeZone.setDefault(originalTimeZone)
     }
 
     /**
@@ -233,8 +261,8 @@ class ConversationComposerExpansionRetentionScreenshotTest {
                                     TextFieldValue(
                                         checkNotNull(drafts[destination.accountRef to destination.groupIdHex]),
                                     ),
-                                onDraftChange = {
-                                    appState.setDraft(destination.accountRef, destination.groupIdHex, it)
+                                onDraftChange = { draftValue, _ ->
+                                    appState.setDraft(destination.accountRef, destination.groupIdHex, draftValue)
                                 },
                                 draftKey = destination.groupIdHex,
                                 draftAccountRef = destination.accountRef,
@@ -435,7 +463,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         val retainedHeight = productionComposerPillContentHeight()
 
         composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
-        composeRule.waitUntil(timeoutMillis = 5_000) { publisherStarted.isCompleted }
+        awaitConversationCondition(timeoutMs = 5_000) { publisherStarted.isCompleted }
 
         assertEquals("", productionComposerText())
         assertNull(appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_A, GROUP_A))
@@ -466,6 +494,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
     @Test
     @Suppress("LongMethod")
     fun acceptedSendStaysVisibleWhenBottomInputGrowsNextFrame() {
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
         val publisherStarted = CompletableDeferred<Unit>()
         val releaseSuccess = CompletableDeferred<Unit>()
         val draftStore = DraftStore(InMemoryDraftPersistence())
@@ -496,7 +525,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         composeRule.mainClock.autoAdvance = false
         try {
             composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
-            composeRule.waitUntil(timeoutMillis = 5_000) {
+            awaitConversationCondition(timeoutMs = 5_000) {
                 publisherStarted.isCompleted &&
                     fixture.controller.timeline.any { it.record.plaintext == dictatedDraft }
             }
@@ -548,6 +577,524 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         }
     }
 
+    /** The shipped route must animate the retained viewport, not only a fixed leaf target. */
+    @Test
+    fun expandedAcceptedSendCollapsesGraduallyAndPreservesTheNextDraft() = acceptedSendTrajectory(expanded = true)
+
+    /** A short accepted send flies upward once and lands exactly on its measured bubble frame. */
+    @Test
+    fun shortAcceptedSendHasOneUpwardTrajectoryAndAnExactLanding() = acceptedSendTrajectory(expanded = false)
+
+    /** A short right-to-left send at 2x font scale still flies upward once, without reversing. */
+    @Test
+    fun shortArabicLargeFontAcceptedSendHasOneUpwardTrajectory() = acceptedSendTrajectory(expanded = false, rtl = true)
+
+    /**
+     * Sends a draft through the production route and samples every painted frame of the flight, asserting
+     * upward travel, a stationary landing, an exact handoff and, when [expanded], a gradual composer collapse.
+     */
+    @Suppress("LongMethod") // The actual route binds each measured frame to the accepted identity and final row.
+    private fun acceptedSendTrajectory(expanded: Boolean, rtl: Boolean = false) {
+        val publisherStarted = CompletableDeferred<Unit>()
+        val releaseSuccess = CompletableDeferred<Unit>()
+        val draftStore = DraftStore(InMemoryDraftPersistence())
+        val appState = appState(draftStore)
+        val sentDraft = trajectoryDraft(expanded, rtl)
+        val caseName = trajectoryCaseName(expanded, rtl)
+        val nextDraft = "The next draft stays editable."
+        draftStore.set(ACCOUNT_A, DICTATION_GROUP, TextFieldValue(sentDraft))
+        if (expanded) {
+            appState.composerExpansionStateRetention.update(
+                ACCOUNT_A,
+                DICTATION_GROUP,
+                manualPreference(240f),
+                draftGeneration = appState.composerDraftGeneration(ACCOUNT_A, DICTATION_GROUP),
+            )
+        }
+        // A normal fully read chat-list open includes its cached projection. The
+        // matching authoritative upsert below keeps this peer after sending.
+        val peerPreview =
+            notifiedMessagePreview().copy(
+                messageIdHex = "b4".repeat(32),
+                sender = ACCOUNT_B_ID,
+                plaintext = "Ready when you are.",
+                timelineAt = (DICTATION_TIMESTAMP_MILLIS / 1_000L - 60L).toULong(),
+            )
+        val fixture =
+            productionConversation(
+                appState = appState,
+                accountRef = ACCOUNT_A,
+                groupIdHex = DICTATION_GROUP,
+                initialPreview = peerPreview,
+                clockMillis = { DICTATION_TIMESTAMP_MILLIS },
+            ) { _, _, _, _ ->
+                publisherStarted.complete(Unit)
+                releaseSuccess.await()
+                successfulSendSummary()
+            }
+        // Also seed authoritative history so retiring the preview cannot remove this
+        // peer when a real row is accepted. Both messages share one stable date bucket.
+        val peerRecord =
+            timelineAppMessage(
+                id = peerPreview.messageIdHex,
+                recordedAt = peerPreview.timelineAt,
+            ).copy(groupIdHex = DICTATION_GROUP, sender = peerPreview.sender, plaintext = peerPreview.plaintext)
+        fixture.controller.testApplyLiveTimelineChangesAndRegisterStreams(
+            listOf(
+                TimelineMessageChangeFfi.Upsert(
+                    trigger = TimelineUpdateTriggerFfi.NEW_MESSAGE,
+                    message = checkNotNull(projectedTimelineMessage(peerRecord).projected),
+                ),
+            ),
+        )
+        var observedMotion: ComposerSendMotion? = null
+        val routeSurface = ConversationSurfaceState()
+        composeRule.setContent {
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(fontScale = if (rtl) 2f else 1f) {
+                    ConversationScreen(
+                        appState = appState,
+                        chat = fixture.chat,
+                        controller = fixture.controller,
+                        onBack = {},
+                        surfaceState = routeSurface,
+                        // This existing composable slot is invoked inside the real header/host.
+                        // Observe its presentation owner without adding UI or a production test hook.
+                        playbackTransport = {
+                            val motion = LocalComposerSendMotion.current
+                            SideEffect { observedMotion = motion }
+                        },
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        // Initial transcript admission commits after a real draw, then a queued frame.
+        // Keep auto advancement enabled until that normal route gate has settled.
+        composeRule.onRoot().captureToImage()
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Ready when you are.").assertIsDisplayed()
+        composeRule
+            .onNodeWithTag(messageBubbleRowTestTag(peerRecord.messageIdHex), useUnmergedTree = true)
+            .assertIsDisplayed()
+        composeRule.onRoot().captureToImage()
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            val motion = checkNotNull(observedMotion)
+            assertTrue("The real visible/follow-tail route must admit motion before sending", motion.enabled)
+            assertTrue(
+                "The fully visible expanded editor must support the selected flight",
+                motion.capture(sentDraft) != null,
+            )
+        }
+        val expandedHeight = productionComposerPillContentHeight()
+        if (expanded) assertTrue("Fixture starts manually expanded", expandedHeight > 180f)
+        val frames =
+            if (System.getenv("ANIMATION_CAPTURE_FRAMES") == "1") {
+                java.io.File("build/composer-send-route-$caseName-frames").apply { mkdirs() }
+            } else {
+                null
+            }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/composer_send_route_${caseName}_first.png")
+        frames?.let { composeRule.onRoot().captureRoboImage(java.io.File(it, "frame-000.png").path) }
+        composeRule.mainClock.autoAdvance = false
+        lateinit var acceptedPresentationId: String
+        var acceptedSource: ComposerSendSource? = null
+        val diagnosticFrames = mutableListOf<String>()
+        var firstExposedCanonical: Rect? = null
+        try {
+            composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
+            awaitConversationCondition(timeoutMs = 5_000) { publisherStarted.isCompleted }
+            acceptedPresentationId =
+                composeRule.runOnIdle {
+                    fixture.controller.timeline
+                        .single { it.record.plaintext == sentDraft }
+                        .presentationId
+                }
+            composeRule.runOnIdle {
+                assertEquals(
+                    "Actual controller acceptance must arm the exact row before drawing",
+                    acceptedPresentationId,
+                    checkNotNull(observedMotion).activePresentationId,
+                )
+            }
+            acceptedSource = checkNotNull(observedMotion).flight?.source
+            val captured = checkNotNull(acceptedSource)
+            assertEquals("The traveling patch is exactly the measured editor", captured.editor, captured.surface)
+            assertEquals("Controls do not acquire a traveling outline", 0f, captured.strokeWidth, 0f)
+            assertEquals(0f, captured.topRadius, 0f)
+            assertEquals(0f, captured.bottomRadius, 0f)
+            val pasteBounds = composeRule.onNodeWithTag("composer.paste").fetchSemanticsNode().boundsInWindow
+            assertTrue("Captured accepted text cannot include toolbar pixels", !captured.surface.overlaps(pasteBounds))
+            traceAcceptedGeometry(
+                checkNotNull(observedMotion),
+                acceptedPresentationId,
+                acceptedSource,
+                diagnosticFrames,
+            )
+            val heights = mutableListOf(expandedHeight, productionComposerPillContentHeight())
+            val trajectory = mutableListOf<ComposerSendFlightGeometry>()
+            // The publisher follows model acceptance and the parser IO hop, but a paused
+            // Compose clock leaves EditableText semantics in the previous rendered frame.
+            // Flush exactly one frame before reading the UI, retaining the pre-frame height
+            // above so an immediate viewport snap still fails the gradual-collapse checks.
+            composeRule.mainClock.advanceTimeByFrame()
+            composeRule.waitForIdle()
+            traceAcceptedGeometry(
+                checkNotNull(observedMotion),
+                acceptedPresentationId,
+                acceptedSource,
+                diagnosticFrames,
+            )
+            assertEquals("", productionComposerText())
+            composeRule.runOnIdle {
+                assertTrue(
+                    "The landed row/footer must remain hidden during the initial copy flight",
+                    checkNotNull(observedMotion).presentation(acceptedPresentationId).coversNative,
+                )
+            }
+            heights += productionComposerPillContentHeight()
+            captureTrajectoryFrame(frames, "frame-001.png")
+            repeat(36) { index ->
+                composeRule.mainClock.advanceTimeByFrame()
+                composeRule.waitForIdle()
+                heights += productionComposerPillContentHeight()
+                traceAcceptedGeometry(
+                    checkNotNull(observedMotion),
+                    acceptedPresentationId,
+                    acceptedSource,
+                    diagnosticFrames,
+                )
+                val owner = checkNotNull(observedMotion)
+                composeRule.onNodeWithTag("composer.paste").assertIsDisplayed()
+                if (!owner.presentation(acceptedPresentationId).coversNative) {
+                    val canonical =
+                        composeRule
+                            .onNodeWithTag(
+                                composerSendDestinationTag(acceptedPresentationId),
+                                useUnmergedTree = true,
+                            ).fetchSemanticsNode()
+                            .boundsInWindow
+                    val foreground = checkNotNull(owner.composerCoordinates).boundsInWindow(clipBounds = false)
+                    assertTrue(
+                        "Every exposed native frame clears the actual foreground",
+                        canonical.bottom <= foreground.top + 1f,
+                    )
+                }
+                sampleAcceptedTrajectory(owner, acceptedPresentationId, trajectory, captured)
+                firstExposedCanonical = firstVisibleCanonical(owner, acceptedPresentationId, firstExposedCanonical)
+                captureTrajectoryFrame(frames, "frame-%03d.png".format(index + 2))
+                if (index == 8) {
+                    composeRule.onRoot().captureRoboImage("src/test/snapshots/composer_send_route_${caseName}_mid.png")
+                }
+            }
+            if (expanded) assertExpandedTrajectoryCollapse(heights, expandedHeight)
+            assertTrue("Actual overlay must draw through several measured frames", trajectory.size >= 8)
+            assertTrue(
+                "Accepted object's bottom must travel upward without reversal: $trajectory",
+                trajectory.zipWithNext().all { (before, after) ->
+                    after.bounds.bottom <= before.bounds.bottom + 1f
+                },
+            )
+            val owner = checkNotNull(observedMotion)
+            val occupied = checkNotNull(owner.composerCoordinates).boundsInWindow(clipBounds = false)
+            assertEquals(
+                "Measured empty target must equal this exact settled column",
+                occupied.height,
+                checkNotNull(owner.composerTarget).height,
+                1f,
+            )
+            val actualLanding =
+                composeRule
+                    .onNodeWithTag(
+                        composerSendDestinationTag(acceptedPresentationId),
+                        useUnmergedTree = true,
+                    ).fetchSemanticsNode()
+                    .boundsInWindow
+            assertMotionRectNear(
+                "Last painted copy must hand off without a landing jump",
+                actualLanding,
+                trajectory.last().bounds,
+            )
+            assertEquals("Collapse must be settled at handoff", 0f, trajectory.last().remainingCollapse, 1f)
+            assertMotionRectNear(
+                "The first exposed canonical frame must match the last actually painted copy",
+                checkNotNull(firstExposedCanonical),
+                trajectory.last().bounds,
+            )
+            assertTrue("Handoff must follow the consumed native layout phase", trajectory.last().settled)
+            writeTrajectory(caseName, trajectory)
+            val sent = fixture.controller.timeline.single { it.record.plaintext == sentDraft }
+            val bubble =
+                composeRule
+                    .onNodeWithTag(
+                        messageBubbleRowTestTag(sent.record.messageIdHex),
+                        useUnmergedTree = true,
+                    ).assertIsDisplayed()
+                    .fetchSemanticsNode()
+                    .boundsInRoot
+            val composer = composeRule.onNodeWithTag(COMPOSER_PILL_SURFACE_TAG).fetchSemanticsNode().boundsInRoot
+            assertTrue("The actual tail owner lands above the shrinking input", bubble.bottom <= composer.top)
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/composer_send_route_${caseName}_settled.png")
+            composeRule.onNode(hasSetTextAction()).performTextReplacement(nextDraft)
+        } finally {
+            java.io
+                .File("build/composer-send-diagnostic-$caseName.json")
+                .writeText(diagnosticFrames.joinToString(",\n", "[\n", "\n]"))
+            composeRule.mainClock.autoAdvance = true
+            releaseSuccess.complete(Unit)
+        }
+        composeRule.waitUntil(timeoutMillis = 5_000) {
+            fixture.controller.timeline.any {
+                it.record.messageIdHex == CONFIRMED_MESSAGE_ID && it.status == MessageStatus.Sent
+            }
+        }
+        assertEquals(nextDraft, productionComposerText())
+        val confirmed = fixture.controller.timeline.single { it.record.messageIdHex == CONFIRMED_MESSAGE_ID }
+        assertEquals(
+            "Confirmation must retain the accepted presentation identity",
+            acceptedPresentationId,
+            confirmed.presentationId,
+        )
+        assertEquals(
+            "A confirmation must not insert a replay row",
+            1,
+            fixture.controller.timeline.count {
+                it.record.plaintext == sentDraft
+            },
+        )
+    }
+
+    /** Picks the draft text for a trajectory case: Arabic when [rtl], two lines when [expanded], else one line. */
+    private fun trajectoryDraft(
+        expanded: Boolean,
+        rtl: Boolean,
+    ): String =
+        when {
+            rtl -> "مرحبا"
+            expanded -> "A message ready to fly.\nSmooth corners, steady text."
+            else -> "Ready to fly."
+        }
+
+    /** Names a trajectory case for its snapshot and diagnostic files: expanded, short_rtl_large or short. */
+    private fun trajectoryCaseName(
+        expanded: Boolean,
+        rtl: Boolean,
+    ): String =
+        when {
+            expanded -> "expanded"
+            rtl -> "short_rtl_large"
+            else -> "short"
+        }
+
+    /** Returns [previous] once set, else the destination bounds the first time the native bubble is uncovered. */
+    private fun firstVisibleCanonical(
+        owner: ComposerSendMotion,
+        presentationId: String,
+        previous: Rect?,
+    ): Rect? =
+        previous ?: if (owner.presentation(presentationId).coversNative) {
+            null
+        } else {
+            composeRule
+                .onNodeWithTag(composerSendDestinationTag(presentationId), useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInWindow
+        }
+
+    /** Writes the current root image to [fileName] under [directory], doing nothing when capture is disabled. */
+    private fun captureTrajectoryFrame(
+        directory: java.io.File?,
+        fileName: String,
+    ) {
+        directory?.let { composeRule.onRoot().captureRoboImage(java.io.File(it, fileName).path) }
+    }
+
+    /** Asserts the composer heights shrink from expanded to compact through intermediate frames, with no snap. */
+    private fun assertExpandedTrajectoryCollapse(
+        heights: List<Float>,
+        expandedHeight: Float,
+    ) {
+        val compactHeight = heights.last()
+        assertTrue("Accepted composer must reach its compact viewport", compactHeight < expandedHeight - 80f)
+        assertTrue(
+            "At least one frame must be strictly between expanded and compact",
+            heights.any {
+                it > compactHeight + 4f && it < expandedHeight - 4f
+            },
+        )
+        assertTrue(
+            "No frame may snap most of the expanded viewport away: $heights",
+            heights.zipWithNext().all { (before, after) ->
+                before - after < (expandedHeight - compactHeight) * .65f
+            },
+        )
+    }
+
+    /** Failure-safe observations: these never substitute for an admitted flight or relax a motion assertion. */
+    private fun traceAcceptedGeometry(
+        motion: ComposerSendMotion,
+        presentationId: String,
+        source: ComposerSendSource?,
+        rows: MutableList<String>,
+    ) {
+        composeRule.onRoot().captureToImage()
+        val canonical =
+            composeRule
+                .onAllNodesWithTag(
+                    composerSendDestinationTag(presentationId),
+                    useUnmergedTree = true,
+                ).fetchSemanticsNodes()
+                .singleOrNull()
+                ?.boundsInWindow
+        val text =
+            source?.let {
+                composeRule
+                    .onAllNodesWithText(it.text, useUnmergedTree = true)
+                    .fetchSemanticsNodes()
+                    .singleOrNull()
+                    ?.boundsInWindow
+            }
+        val column = motion.composerCoordinates?.takeIf { it.isAttached }?.boundsInWindow(clipBounds = false)
+        val target = motion.composerTarget
+        val projection = motion.readViewport?.invoke(presentationId)
+        val geometry = motion.lastRenderedGeometry
+
+        /** Formats an optional rect as a JSON array, or `null` when absent. */
+        fun rect(value: Rect?): String =
+            value?.let {
+                "[${it.left},${it.top},${it.right},${it.bottom}]"
+            } ?: "null"
+        val remaining = projection?.consumedHeight?.let { height -> target?.height?.let { height - it } }
+        val corrected = canonical?.let { frame -> remaining?.let { frame.translate(Offset(0f, it)) } }
+        rows += "{\"frame\":${rows.size},\"source\":${rect(source?.surface)}," +
+            "\"sourceColumn\":${rect(source?.composer)},\"column\":${rect(column)}," +
+            "\"canonical\":${rect(canonical)},\"canonicalText\":${rect(text)}," +
+            "\"targetHeight\":${target?.height},\"targetGeneration\":${target?.inputGeneration}," +
+            "\"flightGeneration\":${motion.flight?.inputGeneration},\"remaining\":$remaining," +
+            "\"consumedHeight\":${projection?.consumedHeight},\"viewport\":${rect(projection?.bounds)}," +
+            "\"corrected\":${rect(corrected)},\"active\":${motion.activePresentationId != null}," +
+            "\"hidden\":${motion.presentation(presentationId).coversNative}," +
+            "\"pendingPaint\":${motion.lastRenderedPendingSource != null}," +
+            "\"admitted\":${geometry != null},\"progress\":${geometry?.progress}," +
+            "\"clockMillis\":${composeRule.mainClock.currentTime}," +
+            "\"painted\":${rect(geometry?.bounds)}}"
+    }
+
+    /** Read independent actual nodes and native pixels after forcing the production draw pass. */
+    private fun sampleAcceptedTrajectory(
+        motion: ComposerSendMotion,
+        presentationId: String,
+        frames: MutableList<ComposerSendFlightGeometry>,
+        source: ComposerSendSource,
+    ) {
+        val image = composeRule.onRoot().captureToImage().asAndroidBitmap()
+        val geometry = composeRule.runOnIdle { motion.lastRenderedGeometry } ?: return
+        val canonical =
+            composeRule
+                .onNodeWithTag(
+                    composerSendDestinationTag(presentationId),
+                    useUnmergedTree = true,
+                ).fetchSemanticsNode()
+                .boundsInWindow
+        val composer = checkNotNull(motion.composerCoordinates).boundsInWindow(clipBounds = false)
+        assertMotionRectNear(
+            "Canonical frame must come from the real measured surface",
+            canonical,
+            geometry.canonicalFrame,
+        )
+        assertMotionRectNear("Compensation must use the actual occupied column", composer, geometry.composer)
+        if (frames.isNotEmpty()) {
+            assertMotionRectNear(
+                "Corrected landing must stay stationary as the column shrinks",
+                frames.first().canonicalFrame.translate(Offset(0f, frames.first().remainingCollapse)),
+                canonical.translate(Offset(0f, geometry.remainingCollapse)),
+            )
+        }
+        val rootOrigin =
+            composeRule
+                .onRoot()
+                .fetchSemanticsNode()
+                .boundsInWindow.topLeft
+        val x = (fillSampleWindowX(source, geometry) - rootOrigin.x).toInt()
+        val y = (geometry.bounds.center.y - rootOrigin.y).toInt()
+        assertTrue(
+            "Paint sample must remain inside the captured native frame",
+            x in 0 until image.width && y in 0 until image.height,
+        )
+        val actual = image.getPixel(x, y)
+        val expected = geometry.fill.toArgb()
+        for (shift in listOf(0, 8, 16)) {
+            assertTrue(
+                "Actual native copy interior must contain its emitted fill",
+                abs(
+                    ((actual ushr shift) and 255) -
+                        ((expected ushr shift) and 255),
+                ) <= 2,
+            )
+        }
+        frames += geometry
+    }
+
+    /**
+     * Returns the window x, just inside the moving bubble's trailing edge, that lies clear of both the
+     * source and destination text layouts.
+     */
+    private fun fillSampleWindowX(
+        source: ComposerSendSource,
+        geometry: ComposerSendFlightGeometry,
+    ): Float {
+        val rtl = source.paragraphDirection == androidx.compose.ui.text.style.ResolvedTextDirection.Rtl
+        val edge = if (rtl) geometry.bounds.left + 4f else geometry.bounds.right - 4f
+        val anchorFrom = if (rtl) source.editor.right else source.editor.left
+        val anchorTo = if (rtl) geometry.textTarget.right else geometry.textTarget.left
+        val anchor = anchorFrom + (anchorTo - anchorFrom) * geometry.progress
+        val lines = 0 until source.layout.lineCount
+        val sourceEdge =
+            if (rtl) {
+                anchor - source.layout.size.width + lines.minOf(source.layout::getLineLeft)
+            } else {
+                anchor + lines.maxOf(source.layout::getLineRight)
+            }
+        val targetEdge = if (rtl) anchor - geometry.textTarget.width else anchor + geometry.textTarget.width
+        assertTrue(
+            "Fill sample excludes both text layouts",
+            if (rtl) edge <= minOf(sourceEdge, targetEdge) - 2f else edge >= maxOf(sourceEdge, targetEdge) + 2f,
+        )
+        return edge
+    }
+
+    /** Asserts each edge of [actual] is within one pixel of [expected], reporting [message] on failure. */
+    private fun assertMotionRectNear(
+        message: String,
+        expected: Rect,
+        actual: Rect,
+    ) {
+        assertEquals(message, expected.left, actual.left, 1f)
+        assertEquals(message, expected.top, actual.top, 1f)
+        assertEquals(message, expected.right, actual.right, 1f)
+        assertEquals(message, expected.bottom, actual.bottom, 1f)
+    }
+
+    /** Writes the sampled flight geometry as a JSON array under build/ for offline inspection. */
+    private fun writeTrajectory(
+        name: String,
+        frames: List<ComposerSendFlightGeometry>,
+    ) {
+        val rows =
+            frames.joinToString(",\n") { frame ->
+                "{\"progress\":${frame.progress},\"centerY\":${frame.bounds.center.y}," +
+                    "\"copyBottom\":${frame.bounds.bottom},\"canonicalBottom\":${frame.canonicalFrame.bottom}," +
+                    "\"remainingCollapse\":${frame.remainingCollapse},\"occupiedHeight\":${frame.composer.height}," +
+                    "\"settledTargetHeight\":${frame.settledComposerHeight}}"
+            }
+        java.io.File("build/composer-send-trajectory-$name.json").writeText("[\n$rows\n]")
+    }
+
     /**
      * A durable callback from an older accepted send cannot delete text or
      * full-screen geometry created while that publish was in flight.
@@ -576,7 +1123,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         showProductionConversation(appState, fixture)
 
         composeRule.onNodeWithContentDescription(context.getString(R.string.send)).performClick()
-        composeRule.waitUntil(timeoutMillis = 5_000) { publisherStarted.isCompleted }
+        awaitConversationCondition(timeoutMs = 5_000) { publisherStarted.isCompleted }
         composeRule.onNode(hasSetTextAction()).performTextReplacement(newerDraft)
         composeRule.waitForIdle()
         performAccessibleResizeAction()
@@ -773,7 +1320,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
                 startOnConstruction = false,
                 clockMillis = clockMillis,
                 textPublisher = textPublisher,
-                markdownParser = { EMPTY_MARKDOWN_DOCUMENT },
+                markdownParser = { appState.parseMarkdownOrEmpty(it) },
             ).also { controllers += it }
         controller.markAuthoritativeTimelinePublishedForTest()
         return ProductionConversation(

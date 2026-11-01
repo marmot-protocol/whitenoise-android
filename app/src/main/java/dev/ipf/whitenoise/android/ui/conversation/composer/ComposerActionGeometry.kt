@@ -68,3 +68,5 @@ internal fun Modifier.expandedComposerActionRow(): Modifier =
             placeable.placeRelative(0, 0)
         }
     }
+
+internal val ComposerToolbarSlotWidth = 40.dp

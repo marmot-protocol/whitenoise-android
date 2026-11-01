@@ -1,0 +1,28 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationUnreadTracking.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ConversationUnreadTracking",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationUnreadTracking.kt",
+        "anchor": "fun ConversationUnreadTracking(",
+        "test_ids": [
+          "CON-003",
+          "CON-005",
+          "CON-014"
+        ]
+      },
+      {
+        "surface": "ConversationReadAnchorEffect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationUnreadTracking.kt",
+        "anchor": "fun ConversationReadAnchorEffect(",
+        "test_ids": [
+          "CON-025",
+          "CON-027"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

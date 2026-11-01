@@ -29,8 +29,8 @@ class ActionColorSurfaceCoverageTest {
         )
 
         assertTrue(
-            "Chat unread counts must use the active account token",
-            "actionColors = accountActionColors(appState)" in chatRow,
+            "Chat unread counts must use the represented account token",
+            "actionColors = accountActionColors(appState, accountRef)" in chatRow,
         )
         assertTrue(
             "The active account dot must use its represented account",

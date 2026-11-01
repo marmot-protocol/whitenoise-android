@@ -16,6 +16,7 @@ name: folder-rules-remove-condition
 - assertNotVisible:
     id: folder.condition.2
 - runFlow: ../fixtures/save-and-reopen-smart-folder.yaml
+- runFlow: ../fixtures/show-folder-rule-tree.yaml
 - scrollUntilVisible:
     element:
       id: folder.add.

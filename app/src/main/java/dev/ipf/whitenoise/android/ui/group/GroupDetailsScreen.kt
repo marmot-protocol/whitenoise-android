@@ -122,6 +122,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.media.fileProviderUri
+import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.WrapText
 import dev.ipf.whitenoise.android.ui.icons.filled.Archive
@@ -155,6 +156,7 @@ import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsPanel
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
 import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
+import dev.ipf.whitenoise.android.ui.settings.rememberRouteMotionModifier
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
 import dev.ipf.whitenoise.android.ui.theme.Dimens
@@ -285,6 +287,17 @@ internal fun GroupDetailsScreen(
         val reviewRuntime = remember(controller) { appState.runtimeGeneration }
         val detailsScrollState = key(controller) { rememberScrollState() }
         val membersScrollState = key(controller) { rememberScrollState() }
+        var membersExpanded by remember(controller) { mutableStateOf(false) }
+        var memberSearchOpen by remember(controller) { mutableStateOf(false) }
+        var memberQuery by remember(controller, appState.activeAccountRef) { mutableStateOf("") }
+        var memberSearchRetry by remember(controller) { mutableIntStateOf(0) }
+        val memberResolution =
+            rememberGroupMemberSearchResolution(memberQuery, appState, controller, memberSearchRetry)
+        // Reuse the established account/runtime admission owner for protected route drawing.
+        if (appState.appLockScreenVisible || !controller.isCurrentGroupMutationOwner(appState, reviewRuntime)) {
+            BackHandler { onBack() }
+            return@PreparedGroupAvatarContent
+        }
         var showChatRelays by remember(controller) { mutableStateOf(false) }
         var showEditGroup by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         var showGroupInfo by remember(controller.group.groupIdHex) { mutableStateOf(false) }
@@ -292,6 +305,9 @@ internal fun GroupDetailsScreen(
         var showMuteDurationDialog by remember(controller) { mutableStateOf(false) }
         var showVibrationPatternDialog by remember { mutableStateOf(false) }
         var showDmAddToGroups by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+        var mediaLibraryCategory by remember(controller) { mutableStateOf<SharedContentCategory?>(null) }
+        var showBubbleColors by remember(controller.group.groupIdHex) { mutableStateOf(false) }
+        var showFolderCreate by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         var addingDmPeerToGroups by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         // A requested picker stays closed until the roster is authoritative. This
         // avoids excluding candidates against a stale or empty member snapshot.
@@ -327,13 +343,7 @@ internal fun GroupDetailsScreen(
         var reviewedLargeInviteAdmins by remember(controller, appState.activeAccountRef, appState.runtimeGeneration) {
             mutableStateOf<Set<String>>(emptySet())
         }
-        val addMemberAutoOpened = rememberSaveable(controller.group.groupIdHex) { autoOpenAddMember }
-        var membersExpanded by remember(controller) { mutableStateOf(false) }
-        var memberSearchOpen by remember(controller) { mutableStateOf(false) }
-        var memberQuery by remember(controller, appState.activeAccountRef) { mutableStateOf("") }
-        var memberSearchRetry by remember(controller) { mutableIntStateOf(0) }
-        val memberResolution =
-            rememberGroupMemberSearchResolution(memberQuery, appState, controller, memberSearchRetry)
+        var addMemberAutoOpened by rememberSaveable(controller.group.groupIdHex) { mutableStateOf(autoOpenAddMember) }
         // Sole-admin "Transfer admin first" picker. Surfaced from the blocked
         // leave path and the Admins prompt so a trapped sole admin can hand the
         // role to another member (issue #417).
@@ -408,6 +418,7 @@ internal fun GroupDetailsScreen(
         }
         LaunchedEffect(autoOpenAddMember, canAdministerMembers) {
             if (autoOpenAddMember && canAdministerMembers) {
+                addMemberAutoOpened = true
                 showAddMember = true
                 onAutoOpenAddMemberConsumed()
             }
@@ -470,35 +481,65 @@ internal fun GroupDetailsScreen(
                 dmAccountWideGroups.requestMembers(dmAddableGroupsState.pendingGroupIds)
             }
         }
+        val detailsDestination =
+            when {
+                showDmAddToGroups && dmPeerAccountIdHex != null -> "add-to-groups"
+                mediaLibraryCategory != null -> "media-$mediaLibraryCategory"
+                showBubbleColors -> "bubble-colors"
+                showNotificationSettings -> "notifications"
+                showEditGroup -> "edit"
+                showFolderCreate -> "create-folder"
+                showAddMember && canAdministerMembers -> "add-members"
+                showGroupInfo -> "group-info"
+                membersExpanded && !isDm -> "members"
+                showChatRelays -> "relays"
+                else -> "details"
+            }
+        val detailsMotion =
+            rememberRouteMotionModifier(
+                target = detailsDestination,
+                depth = if (detailsDestination == "details") 0 else 1,
+                ownerKey = controller to appState.runtimeGeneration,
+                suppressMotion = addMemberAutoOpened && detailsDestination == "add-members",
+                animationsEnabled = rememberConversationMotionEnabled(),
+            )
+
+        /** Hosts one details destination in the shared route-motion layer, so early-returning screens slide too. */
+        @Composable
+        fun detailsRoute(content: @Composable () -> Unit) {
+            Box(Modifier.fillMaxSize().then(detailsMotion)) { content() }
+        }
         if (showDmAddToGroups && dmPeerAccountIdHex != null) {
-            ProfileAddToGroupsScreen(
-                appState = appState,
-                target =
-                    RecipientSearch.Candidate(dmPeerAccountIdHex, conversationTitle, dmPeerNpub.orEmpty()),
-                state = dmAddableGroupsState,
-                busy = addingDmPeerToGroups,
-                onClose = { if (!addingDmPeerToGroups) showDmAddToGroups = false },
-                onRetry = {
-                    dmAccountWideGroups.requestMembers(dmAddableGroupsState.pendingGroupIds, retry = true)
-                },
-                onAdd = { groups ->
-                    if (!addingDmPeerToGroups) {
-                        addingDmPeerToGroups = true
-                        appState.launchMutation {
-                            try {
-                                val added =
-                                    appState.inviteProfileToGroups(
-                                        targetRef = dmPeerAccountIdHex,
-                                        targetGroupIds = groups.map { it.group.groupIdHex },
-                                    )
-                                if (added) showDmAddToGroups = false
-                            } finally {
-                                addingDmPeerToGroups = false
+            detailsRoute {
+                ProfileAddToGroupsScreen(
+                    appState = appState,
+                    target =
+                        RecipientSearch.Candidate(dmPeerAccountIdHex, conversationTitle, dmPeerNpub.orEmpty()),
+                    state = dmAddableGroupsState,
+                    busy = addingDmPeerToGroups,
+                    onClose = { if (!addingDmPeerToGroups) showDmAddToGroups = false },
+                    onRetry = {
+                        dmAccountWideGroups.requestMembers(dmAddableGroupsState.pendingGroupIds, retry = true)
+                    },
+                    onAdd = { groups ->
+                        if (!addingDmPeerToGroups) {
+                            addingDmPeerToGroups = true
+                            appState.launchMutation {
+                                try {
+                                    val added =
+                                        appState.inviteProfileToGroups(
+                                            targetRef = dmPeerAccountIdHex,
+                                            targetGroupIds = groups.map { it.group.groupIdHex },
+                                        )
+                                    if (added) showDmAddToGroups = false
+                                } finally {
+                                    addingDmPeerToGroups = false
+                                }
                             }
                         }
-                    }
-                },
-            )
+                    },
+                )
+            }
             return@PreparedGroupAvatarContent
         }
         val canShowEditAction = !isDm && canEdit
@@ -728,8 +769,6 @@ internal fun GroupDetailsScreen(
         }
 
         val sharedMediaTiles = rememberSharedMediaTiles(controller, appState)
-        var mediaLibraryCategory by remember(controller) { mutableStateOf<SharedContentCategory?>(null) }
-        var showBubbleColors by remember(controller.group.groupIdHex) { mutableStateOf(false) }
         val ttsAutoReadPrefs by appState.ttsAutoReadPreferences.state.collectAsState()
         val autoReadOverride =
             remember(ttsAutoReadPrefs, appState.activeAccountRef, controller.group.groupIdHex) {
@@ -751,28 +790,31 @@ internal fun GroupDetailsScreen(
             mutableStateOf<Long?>(null)
         }
         var showFolderPicker by remember(controller.group.groupIdHex) { mutableStateOf(false) }
-        var showFolderCreate by remember(controller.group.groupIdHex) { mutableStateOf(false) }
 
         mediaLibraryCategory?.let { category ->
             BackHandler { mediaLibraryCategory = null }
-            MediaLibraryRoute(
-                tiles = sharedMediaTiles,
-                controller = controller,
-                appState = appState,
-                category = category,
-                onBack = { mediaLibraryCategory = null },
-                onJumpToMessage = onJumpToMessage,
-            )
+            detailsRoute {
+                MediaLibraryRoute(
+                    tiles = sharedMediaTiles,
+                    controller = controller,
+                    appState = appState,
+                    category = category,
+                    onBack = { mediaLibraryCategory = null },
+                    onJumpToMessage = onJumpToMessage,
+                )
+            }
             return@PreparedGroupAvatarContent
         }
 
         if (showBubbleColors) {
             BackHandler { showBubbleColors = false }
-            ChatBubbleColorsScreen(
-                appState = appState,
-                onBack = { showBubbleColors = false },
-                groupIdHex = controller.group.groupIdHex,
-            )
+            detailsRoute {
+                ChatBubbleColorsScreen(
+                    appState = appState,
+                    onBack = { showBubbleColors = false },
+                    groupIdHex = controller.group.groupIdHex,
+                )
+            }
             return@PreparedGroupAvatarContent
         }
 
@@ -804,28 +846,30 @@ internal fun GroupDetailsScreen(
 
         if (showNotificationSettings) {
             BackHandler { showNotificationSettings = false }
-            ConversationNotificationSettingsScreen(
-                appState = appState,
-                groupIdHex = controller.group.groupIdHex,
-                conversationTitle = conversationTitle,
-                conversationAvatarUrl = controller.avatarUrl,
-                isDm = isDm,
-                isMuted = conversationMuted,
-                muteCommandPending = muteCommandPending,
-                muteExpiryMillis = conversationMuteExpiry,
-                notifyForMode = conversationRestoreMode,
-                vibrationPattern = conversationVibrationPattern,
-                onBack = { showNotificationSettings = false },
-                onToggleMute = { turnOn ->
-                    if (turnOn) {
-                        showMuteDurationDialog = true
-                    } else {
-                        // Unmute back to the All/Only-mentions preference the mute hid.
-                        appState.setConversationNotifyMode(controller.group.groupIdHex, conversationRestoreMode)
-                    }
-                },
-                onChooseVibrationPattern = { showVibrationPatternDialog = true },
-            )
+            detailsRoute {
+                ConversationNotificationSettingsScreen(
+                    appState = appState,
+                    groupIdHex = controller.group.groupIdHex,
+                    conversationTitle = conversationTitle,
+                    conversationAvatarUrl = controller.avatarUrl,
+                    isDm = isDm,
+                    isMuted = conversationMuted,
+                    muteCommandPending = muteCommandPending,
+                    muteExpiryMillis = conversationMuteExpiry,
+                    notifyForMode = conversationRestoreMode,
+                    vibrationPattern = conversationVibrationPattern,
+                    onBack = { showNotificationSettings = false },
+                    onToggleMute = { turnOn ->
+                        if (turnOn) {
+                            showMuteDurationDialog = true
+                        } else {
+                            // Unmute back to the All/Only-mentions preference the mute hid.
+                            appState.setConversationNotifyMode(controller.group.groupIdHex, conversationRestoreMode)
+                        }
+                    },
+                    onChooseVibrationPattern = { showVibrationPatternDialog = true },
+                )
+            }
             if (showVibrationPatternDialog) {
                 VibrationPatternDialog(
                     currentPattern = conversationVibrationPattern,
@@ -847,19 +891,23 @@ internal fun GroupDetailsScreen(
         BackHandler { onBack() }
 
         if (showEditGroup) {
-            GroupEditScreen(appState = appState, controller = controller, onBack = { showEditGroup = false })
+            detailsRoute {
+                GroupEditScreen(appState = appState, controller = controller, onBack = { showEditGroup = false })
+            }
             return@PreparedGroupAvatarContent
         }
 
         val folderAccountRef = appState.activeAccountRef
         if (showFolderCreate && folderAccountRef != null) {
-            ChatFolderEditScreen(
-                appState = appState,
-                accountRef = folderAccountRef,
-                folderId = null,
-                onClose = { showFolderCreate = false },
-                initialManualChatIds = setOf(controller.group.groupIdHex.lowercase(Locale.ROOT)),
-            )
+            detailsRoute {
+                ChatFolderEditScreen(
+                    appState = appState,
+                    accountRef = folderAccountRef,
+                    folderId = null,
+                    onClose = { showFolderCreate = false },
+                    initialManualChatIds = setOf(controller.group.groupIdHex.lowercase(Locale.ROOT)),
+                )
+            }
             return@PreparedGroupAvatarContent
         }
 
@@ -894,67 +942,71 @@ internal fun GroupDetailsScreen(
                 }
             }
             val reviewAvatar = rememberConversationGroupAvatar(appState, controller)
-            ContactPickerScreen(
-                reviewGroup =
-                    MemberReviewGroup(
-                        controller.group.groupIdHex,
-                        conversationTitle,
-                        reviewAvatar.pictureUrl,
-                        reviewAvatar.image,
-                        groupAnimation = reviewAvatar.groupAnimation,
-                    ),
-                appState = appState,
-                title = stringResource(R.string.add_member),
-                selected = addSelection,
-                onBack = {
-                    // When auto-opened from the empty-group CTA, Back returns to the
-                    // conversation (via the details onBack) rather than exposing the
-                    // details body the user never intended to see.
-                    if (!adding) {
-                        showLargeGroupInviteConfirmation = false
-                        addSelection.clear()
-                        addAdminSelection.clear()
-                        if (addMemberAutoOpened) onBack() else showAddMember = false
-                    }
-                },
-                onConfirm = confirm@{
-                    if (!canAdministerMembers || !rosterReady) return@confirm
-                    if (inviteProjection?.shouldWarn == true) {
-                        reviewedLargeInviteMembers = addSelection.toList()
-                        reviewedLargeInviteAdmins = addAdminSelection.toSet()
-                        showLargeGroupInviteConfirmation = true
-                    } else {
-                        submitSelectedInvites()
-                    }
-                },
-                confirmIcon = Icons.Default.Check,
-                initialAdminIds = addAdminSelection.toSet(),
-                onInitialAdminChange = { member, admin ->
-                    if (!adding && canAdministerMembers) {
-                        addAdminSelection.removeAll { it.equals(member.accountIdHex, ignoreCase = true) }
-                        val selected =
-                            addSelection.any {
-                                it.accountIdHex.equals(member.accountIdHex, ignoreCase = true)
-                            }
-                        if (admin && selected) {
-                            addAdminSelection.add(member.accountIdHex)
+            detailsRoute {
+                ContactPickerScreen(
+                    reviewGroup =
+                        MemberReviewGroup(
+                            controller.group.groupIdHex,
+                            conversationTitle,
+                            reviewAvatar.pictureUrl,
+                            reviewAvatar.image,
+                            groupAnimation = reviewAvatar.groupAnimation,
+                        ),
+                    appState = appState,
+                    title = stringResource(R.string.add_member),
+                    selected = addSelection,
+                    onBack = {
+                        // When auto-opened from the empty-group CTA, Back returns to the
+                        // conversation (via the details onBack) rather than exposing the
+                        // details body the user never intended to see.
+                        if (!adding) {
+                            showLargeGroupInviteConfirmation = false
+                            addSelection.clear()
+                            addAdminSelection.clear()
+                            if (addMemberAutoOpened) onBack() else showAddMember = false
                         }
-                    }
-                },
-                confirmLabel = stringResource(R.string.add_member),
-                // The picker opens optimistically from the seed, but the commit
-                // needs the authoritative roster: hold the confirm busy until it
-                // lands instead of letting a tap hit the controller's gate silently.
-                busy = adding || controller.mutationInFlight || !rosterReady,
-                autoSelectResolvedIdentifier = true,
-                excludeAccountIdHexes =
-                    (controller.presentedMembers.map { it.memberIdHex } + controller.pendingInviteMemberRefs).toSet(),
-                footer = {
-                    if (inviteProjection?.shouldWarn == true) {
-                        LargeGroupInviteWarningBanner()
-                    }
-                },
-            )
+                    },
+                    onConfirm = confirm@{
+                        if (!canAdministerMembers || !rosterReady) return@confirm
+                        if (inviteProjection?.shouldWarn == true) {
+                            reviewedLargeInviteMembers = addSelection.toList()
+                            reviewedLargeInviteAdmins = addAdminSelection.toSet()
+                            showLargeGroupInviteConfirmation = true
+                        } else {
+                            submitSelectedInvites()
+                        }
+                    },
+                    confirmIcon = Icons.Default.Check,
+                    initialAdminIds = addAdminSelection.toSet(),
+                    onInitialAdminChange = { member, admin ->
+                        if (!adding && canAdministerMembers) {
+                            addAdminSelection.removeAll { it.equals(member.accountIdHex, ignoreCase = true) }
+                            val selected =
+                                addSelection.any {
+                                    it.accountIdHex.equals(member.accountIdHex, ignoreCase = true)
+                                }
+                            if (admin && selected) {
+                                addAdminSelection.add(member.accountIdHex)
+                            }
+                        }
+                    },
+                    confirmLabel = stringResource(R.string.add_member),
+                    // The picker opens optimistically from the seed, but the commit
+                    // needs the authoritative roster: hold the confirm busy until it
+                    // lands instead of letting a tap hit the controller's gate silently.
+                    busy = adding || controller.mutationInFlight || !rosterReady,
+                    autoSelectResolvedIdentifier = true,
+                    excludeAccountIdHexes =
+                        (
+                            controller.presentedMembers.map { it.memberIdHex } + controller.pendingInviteMemberRefs
+                        ).toSet(),
+                    footer = {
+                        if (inviteProjection?.shouldWarn == true) {
+                            LargeGroupInviteWarningBanner()
+                        }
+                    },
+                )
+            }
             if (showLargeGroupInviteConfirmation && inviteProjection?.shouldWarn == true) {
                 val warningTicket = remember { GroupInviteWarningTicket() }
                 val warningMembers = remember(warningTicket) { reviewedLargeInviteMembers.toList() }
@@ -1015,12 +1067,13 @@ internal fun GroupDetailsScreen(
 
         if (showGroupInfo) {
             BackHandler { showGroupInfo = false }
-            GroupInfoScreen(
-                groupIdHex = controller.group.groupIdHex,
-                nostrGroupIdHex = controller.group.nostrGroupIdHex,
-                relays = controller.group.relays,
-                onBack = { showGroupInfo = false },
-            )
+            detailsRoute {
+                GroupInfoScreen(
+                    groupIdHex = controller.group.groupIdHex,
+                    nostrGroupIdHex = controller.group.nostrGroupIdHex,
+                    onBack = { showGroupInfo = false },
+                )
+            }
             return@PreparedGroupAvatarContent
         }
 
@@ -1534,21 +1587,27 @@ internal fun GroupDetailsScreen(
         }
         if (membersExpanded && !isDm) {
             BackHandler { membersExpanded = false }
-            GroupMembersScreen(
-                onBack = { membersExpanded = false },
-                scrollState = membersScrollState,
-                feedback = groupFeedback,
-                content = memberContent,
-            )
+            detailsRoute {
+                GroupMembersScreen(
+                    onBack = { membersExpanded = false },
+                    scrollState = membersScrollState,
+                    feedback = groupFeedback,
+                    content = memberContent,
+                )
+            }
             return@PreparedGroupAvatarContent
         }
         if (showChatRelays) {
             BackHandler { showChatRelays = false }
-            ChatRelaysScreen(
-                relays = controller.group.relays,
-                onBack = { showChatRelays = false },
-                feedback = groupFeedback,
-            )
+            detailsRoute {
+                GroupRelaySettingsScreen(
+                    relays = controller.group.relays,
+                    isDm = isDm,
+                    isAdmin = controller.isSelfAdmin,
+                    onBack = { showChatRelays = false },
+                    feedback = groupFeedback,
+                )
+            }
             return@PreparedGroupAvatarContent
         }
 
@@ -1560,6 +1619,7 @@ internal fun GroupDetailsScreen(
             derivedStateOf { detailsScrollState.value > 0 && headerBottom > 0f && nameBottom <= headerBottom }
         }
         WhiteNoiseScaffold(
+            modifier = detailsMotion,
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             topBar = {
                 TopAppBar(
@@ -1782,7 +1842,10 @@ internal fun GroupDetailsScreen(
                             SettingsLink(
                                 context = rowContext,
                                 title = stringResource(R.string.add_member),
-                                onClick = { showAddMember = true },
+                                onClick = {
+                                    addMemberAutoOpened = false
+                                    showAddMember = true
+                                },
                                 modifier = Modifier.testTag("chat_info.add_people"),
                                 enabled =
                                     memberAdministrationPresentable(
@@ -1888,6 +1951,13 @@ internal fun GroupDetailsScreen(
                             SettingsLink(
                                 context = rowContext,
                                 title = stringResource(R.string.translation_automatic),
+                                leading = {
+                                    Icon(
+                                        painterResource(R.drawable.ic_translate),
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                },
                                 onClick = { showTranslationPicker = true },
                             )
                         }
@@ -2124,17 +2194,13 @@ internal fun GroupDetailsScreen(
                     modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("chat_info.technical"),
                 ) {
                     row("relays") { rowContext ->
+                        val relayCount = groupRelayDisplayList(controller.group.relays).size
                         SettingsLink(
                             context = rowContext,
-                            title = stringResource(R.string.relays),
+                            title = stringResource(groupRelaysTitleRes(isDm)),
                             onClick = { showChatRelays = true },
                             modifier = Modifier.testTag("chat_info.relays"),
-                            subtitle =
-                                pluralStringResource(
-                                    R.plurals.chat_relay_count,
-                                    controller.group.relays.size,
-                                    controller.group.relays.size,
-                                ),
+                            subtitle = pluralStringResource(R.plurals.chat_relay_count, relayCount, relayCount),
                             leading = { Icon(painterResource(R.drawable.ic_tune), contentDescription = null) },
                         )
                     }

@@ -18,6 +18,7 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.notifications.ConversationCardBarrier
 import dev.ipf.whitenoise.android.notifications.ConversationCardOp
 import dev.ipf.whitenoise.android.notifications.ConversationCardPostSynchronizer
+import dev.ipf.whitenoise.android.notifications.ConversationCardPostedRegistry
 import dev.ipf.whitenoise.android.notifications.ConversationCardTestHook
 import dev.ipf.whitenoise.android.notifications.LocalNotificationFormatter
 import dev.ipf.whitenoise.android.notifications.LocalNotificationPresenter
@@ -69,6 +70,7 @@ class NotificationContentRetractionTest {
     /** Grants posting and starts from an empty tray. */
     @Before
     fun setUp() {
+        ConversationCardPostedRegistry.resetForTests()
         shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         manager().cancelAll()
     }
@@ -255,6 +257,105 @@ class NotificationContentRetractionTest {
                 fixture.close()
             }
         }
+
+    /** Remote deletion cannot return through an older Android tray snapshot when the next message arrives. */
+    @Test
+    fun remoteDeletionStaysRetractedWhenThePlatformSnapshotLags() = staleSnapshotAfterRemoval(localHide = false)
+
+    /** Local hide uses the same production retraction and retained-history boundary as remote deletion. */
+    @Test
+    fun localHideStaysRetractedWhenThePlatformSnapshotLags() = staleSnapshotAfterRemoval(localHide = true)
+
+    /** Drives the real event/hide route, then makes Android expose its old A/B payload for C's history read. */
+    private fun staleSnapshotAfterRemoval(localHide: Boolean) =
+        runBlocking {
+            val fixture =
+                NotificationBootstrapTestFixture(
+                    context = context,
+                    groupIdHex = GROUP_ID,
+                    messageIdHex = OLDER_ID,
+                    previewText = "older deleted text",
+                )
+            try {
+                fixture.bootstrap()
+                fixture.awaitNotificationPosted()
+                fixture.awaitRuntimeEventSubscription()
+                fixture.emitUpdate(
+                    fixture.update.copy(
+                        messageIdHex = MESSAGE_ID,
+                        notificationKey = "startup:account-a:$MESSAGE_ID",
+                        previewText = "newer valid text",
+                    ),
+                )
+                withTimeout(AWAIT_TIMEOUT_MS) {
+                    while (activeCardText()?.contains("newer valid text") != true) {
+                        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                        delay(1L)
+                    }
+                }
+                val old =
+                    manager()
+                        .activeNotifications
+                        .single { it.tag == cardKey.tag && it.id == cardKey.id }
+                        .notification
+                removeOlderNotificationEntry(fixture, localHide)
+                withTimeout(AWAIT_TIMEOUT_MS) {
+                    while (activeCardText()?.contains("older deleted text") != false) {
+                        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                        delay(1L)
+                    }
+                }
+                assertTrue(activeCardText().orEmpty().contains("newer valid text"))
+                // Only the platform observation moves backwards; the accepted-write registry remains untouched.
+                manager().notify(cardKey.tag, cardKey.id, old)
+                fixture.emitUpdate(
+                    fixture.update.copy(
+                        messageIdHex = NEWER_ID,
+                        notificationKey = "startup:account-a:$NEWER_ID",
+                        previewText = "fresh valid text",
+                    ),
+                )
+                awaitShownMessage(NEWER_ID)
+                val text = activeCardText().orEmpty()
+                assertTrue(text.contains("newer valid text"))
+                assertTrue(text.contains("fresh valid text"))
+                assertFalse(text.contains("older deleted text"))
+            } finally {
+                fixture.close()
+            }
+        }
+
+    /** Runs the same accepted hide or subscribed deletion event used by both stale-snapshot cases. */
+    private suspend fun removeOlderNotificationEntry(
+        fixture: NotificationBootstrapTestFixture,
+        localHide: Boolean,
+    ) {
+        if (localHide) {
+            val hidden =
+                fixture.runOnMainLooperPumping {
+                    fixture.appState.hideMessageForMe(ACCOUNT_REF, GROUP_ID, OLDER_ID)
+                }
+            assertTrue(hidden)
+        } else {
+            fixture.emitRuntimeEvent(deletion(OLDER_ID))
+        }
+    }
+
+    /** Awaits C's own accepted card identity, rather than unrelated listener or enrichment activity. */
+    private suspend fun awaitShownMessage(messageId: String) {
+        withTimeout(AWAIT_TIMEOUT_MS) {
+            while (manager().activeNotifications.none {
+                    it.tag == cardKey.tag &&
+                        it.id == cardKey.id &&
+                        it.notification.extras
+                            .getString(LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX) == messageId
+                }
+            ) {
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                delay(1L)
+            }
+        }
+    }
 
     /** A deletion that lands after the read-state check but before the first write leaves no card. */
     @Test
@@ -601,7 +702,7 @@ class NotificationContentRetractionTest {
             }
         }
 
-    /** A message posted while reconciliation reads its snapshot is newer than it and stays on the card (#3323). */
+    /** A post survives the captured older snapshot and subsequent reads that include its current projection. */
     @Test
     fun aPostLandingDuringTheReconciliationSnapshotStays() =
         runBlocking {
@@ -609,6 +710,7 @@ class NotificationContentRetractionTest {
             val release = CountDownLatch(1)
             val pageReads = AtomicInteger(0)
             val olderShown = AtomicBoolean(false)
+            val newerProjected = AtomicBoolean(false)
             val fixture =
                 NotificationBootstrapTestFixture(
                     context = context,
@@ -616,11 +718,17 @@ class NotificationContentRetractionTest {
                     messageIdHex = OLDER_ID,
                     emitStartupNotification = false,
                     onTimelineMessages = { _, _ ->
+                        val page =
+                            if (newerProjected.get()) {
+                                listOf(record(OLDER_ID, 10uL), record(MESSAGE_ID, 20uL))
+                            } else {
+                                listOf(record(OLDER_ID, 10uL))
+                            }
                         if (olderShown.get() && pageReads.incrementAndGet() == 1) {
                             snapshotReading.countDown()
-                            check(release.await(5, TimeUnit.SECONDS))
+                            check(release.await(AWAIT_TIMEOUT_MS, TimeUnit.MILLISECONDS))
                         }
-                        TimelinePageFfi(listOf(record(OLDER_ID, 10uL)), false, false)
+                        TimelinePageFfi(page, false, false)
                     },
                 )
             try {
@@ -629,6 +737,7 @@ class NotificationContentRetractionTest {
                 olderShown.set(true)
                 fixture.bootstrap()
                 awaitLatch(snapshotReading)
+                newerProjected.set(true)
                 fixture.emitUpdate(
                     fixture.update.copy(
                         messageIdHex = MESSAGE_ID,
@@ -636,22 +745,55 @@ class NotificationContentRetractionTest {
                         previewText = "newer posted during snapshot",
                     ),
                 )
-                withTimeout(AWAIT_TIMEOUT_MS) {
-                    while (activeCardText()?.contains("newer posted during snapshot") != true) {
-                        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
-                        delay(1L)
-                    }
-                }
+                awaitCardContaining("newer posted during snapshot")
+                val reconciled = observeNextCardReconciliation()
                 release.countDown()
+                awaitLatch(reconciled)
+                assertTrue(activeCardText().orEmpty().contains("newer posted during snapshot"))
+                assertTrue(activeCardText().orEmpty().contains("older valid text"))
                 pumpFor(NO_POST_WINDOW_MS)
 
                 assertTrue(activeCardText().orEmpty().contains("newer posted during snapshot"))
                 assertTrue(activeCardText().orEmpty().contains("older valid text"))
             } finally {
                 release.countDown()
+                ConversationCardPostSynchronizer.testHook = null
                 fixture.close()
             }
         }
+
+    /** Waits until the card includes the required body before releasing the stale native snapshot. */
+    private suspend fun awaitCardContaining(text: String) {
+        withTimeout(AWAIT_TIMEOUT_MS) {
+            while (activeCardText()?.contains(text) != true) {
+                shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1L))
+                delay(1L)
+            }
+        }
+    }
+
+    /** Signals after the next reconciliation finishes mutating this fixture's message card. */
+    private fun observeNextCardReconciliation(): CountDownLatch {
+        val reconciled = CountDownLatch(1)
+        ConversationCardPostSynchronizer.testHook =
+            object : ConversationCardTestHook {
+                /** Ignores writes and other cards so only the targeted reconciliation completes the wait. */
+                override fun onLockReleased(
+                    op: ConversationCardOp,
+                    notificationTag: String,
+                    notificationId: Int,
+                ) {
+                    if (
+                        op == ConversationCardOp.DISMISS_CANCEL &&
+                        notificationTag == cardKey.tag &&
+                        notificationId == cardKey.id
+                    ) {
+                        reconciled.countDown()
+                    }
+                }
+            }
+        return reconciled
+    }
 
     /** A candidate MDK already reports deleted never posts, even before anything in its conversation was read. */
     @Test

@@ -1227,14 +1227,14 @@ internal fun signOutActiveAccount(
         try {
             when (appState.signOutActiveAccount(deleteKeyPackages)) {
                 SignOutCompletion.Complete -> appState.presentTransient(R.string.toast_signed_out)
-                // Local sign-out completed but the engine call
-                // failed or reported relay cleanup failures. This
+                // Native local sign-out is confirmed, but its reply
+                // was lost or reported relay cleanup failures. This
                 // is informational and not copyable (#966); MDK
                 // does not retain a retry queue for the deletions.
                 SignOutCompletion.RelayCleanupIncomplete ->
                     appState.present(R.string.toast_signed_out_relay_cleanup_incomplete)
-                // MDK kept the account active, so the screen and
-                // all account-scoped state remain intact.
+                // Local cleanup is incomplete or unconfirmed. Retain the session unless
+                // durable native signed-out status already required local deactivation.
                 SignOutCompletion.AccountCleanupIncomplete ->
                     appState.present(R.string.toast_couldnt_sign_out)
                 null -> Unit

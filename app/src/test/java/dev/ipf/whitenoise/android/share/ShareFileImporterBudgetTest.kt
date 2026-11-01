@@ -22,11 +22,12 @@ class ShareFileImporterBudgetTest {
     private lateinit var root: File
     private lateinit var files: PrivateShareFiles
     private val source = Uri.parse("content://external/document")
+    private val limits = ShareImportLimits(imageBytes = 64L, documentBytes = 32L, batchCiphertextBytes = 320L)
 
     /** Gives each budget case an empty private store so prior ownership cannot alter available space. */
     @Before fun setup() {
         root = Files.createTempDirectory("private-intake-budget").toFile()
-        files = PrivateShareFiles(root, "test.private-share")
+        files = PrivateShareFiles(root, "test.private-share", limits)
     }
 
     /** Removes sparse and partial fixture files after success or rejection. */
@@ -39,7 +40,7 @@ class ShareFileImporterBudgetTest {
         runBlocking {
             val retained =
                 List(4) { index ->
-                    val size = if (index < 3) PRIVATE_SHARE_MAX_BYTES else 1024L * 1024
+                    val size = if (index < 3) limits.imageBytes else 1L
                     val (uri, file) = files.newFile()
                     java.io.RandomAccessFile(file, "rw").use { it.setLength(size) }
                     files.finish(uri, "retained.png", "image/png", size)
@@ -64,8 +65,8 @@ class ShareFileImporterBudgetTest {
             val retained =
                 List(4) {
                     val (uri, file) = files.newFile()
-                    java.io.RandomAccessFile(file, "rw").use { it.setLength(PRIVATE_SHARE_MAX_BYTES) }
-                    files.finish(uri, "retained.png", "image/png", PRIVATE_SHARE_MAX_BYTES)
+                    java.io.RandomAccessFile(file, "rw").use { it.setLength(limits.imageBytes) }
+                    files.finish(uri, "retained.png", "image/png", limits.imageBytes)
                     uri
                 }
             files.leases.saveShelf("account", "existing", retained)
@@ -79,7 +80,7 @@ class ShareFileImporterBudgetTest {
             assertEquals(listOf(ShareImportError.Storage), imported.payload.importErrors)
             assertTrue(imported.payload.streamUris.isEmpty())
             assertEquals(retained, files.leases.loadShelf("account", "existing"))
-            retained.forEach { assertEquals(PRIVATE_SHARE_MAX_BYTES, files.metadata(it)!!.getLong("size")) }
+            retained.forEach { assertEquals(limits.imageBytes, files.metadata(it)!!.getLong("size")) }
         }
 
     /** Feeds an unbounded stream with a false size hint to verify bounded probing and partial-file cleanup. */
@@ -108,7 +109,7 @@ class ShareFileImporterBudgetTest {
                 )
             val result = importer.import(request(listOf(source)))
             assertEquals(listOf(ShareImportError.FileTooLarge), result.payload.importErrors)
-            assertEquals(PRIVATE_SHARE_DOCUMENT_MAX_BYTES + 1, readBytes)
+            assertEquals(limits.documentBytes + 1, readBytes)
             assertEquals(0, root.listFiles()!!.count { it.extension == "bin" })
         }
 
@@ -127,20 +128,24 @@ class ShareFileImporterBudgetTest {
             assertEquals(listOf(ShareImportError.TooMany), result.payload.importErrors)
         }
 
-    /** Streams files across the cumulative limit and verifies that a later fitting item can still complete. */
+    /**
+     * Streams files and tag overhead across the cumulative limit; a later fitting item can still complete.
+     * Byte accounting is independent of disk speed; the dedicated timeout case verifies the deadline separately.
+     */
     @Test fun exactByteBoundaryAndCumulativeOverflowKeepOnlyCompleteFiles() =
         runBlocking {
-            val sizes = List(3) { PRIVATE_SHARE_MAX_BYTES } + listOf(PRIVATE_SHARE_MAX_BYTES - 1, 2L, 1L)
+            val sizes = List(3) { limits.imageBytes } + listOf(47L, 2L, 1L)
             val importer =
                 ShareFileImporter(
                     files,
                     { _, _ -> ShareSourceMetadata("file", "image/png", null) },
                     { uri, _ -> sizedStream(sizes[uri.lastPathSegment!!.toInt()]) },
+                    timeoutMs = Long.MAX_VALUE,
                 )
             val result = importer.import(request(sizes.indices.map { Uri.parse("content://external/$it") }))
             assertEquals(listOf(ShareImportError.BatchTooLarge), result.payload.importErrors)
             assertEquals(
-                List(3) { PRIVATE_SHARE_MAX_BYTES } + listOf(PRIVATE_SHARE_MAX_BYTES - 1, 1L),
+                List(3) { limits.imageBytes } + listOf(47L, 1L),
                 result.payload.streamUris.map {
                     files.metadata(it)!!.getLong("size")
                 },

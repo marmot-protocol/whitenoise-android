@@ -4,8 +4,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.test.assertIsNotSelected
-import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -68,13 +66,21 @@ class NotificationScopeSettingsScreenshotTest {
     }
 
     @Test
+    fun conversationScopesAmoled() {
+        renderConversation(darkTheme = true, amoled = true)
+        composeRule.onNodeWithTag(CONVERSATION_TAG).captureRoboImage(
+            "src/test/snapshots/notification_conversation_scopes_amoled.png",
+        )
+    }
+
+    @Test
     fun rowsExposeExactScopeAndIndependentOpenAndToggleActions() {
         var opened: NotificationChannelSpec? = null
         var toggled: Pair<NotificationChannelSpec, Boolean>? = null
         renderConversation(
             darkTheme = false,
             onOpen = { opened = it.channel },
-            onScopeChange = { setting, custom -> toggled = setting.channel to custom },
+            onAlertChange = { setting, custom -> toggled = setting.channel to custom },
         )
 
         composeRule
@@ -86,23 +92,20 @@ class NotificationScopeSettingsScreenshotTest {
             opened = null
         }
 
-        composeRule.onNodeWithTag("conversation-sound-scope-${NotificationChannelSpec.REACTIONS.id}").performClick()
-        composeRule.onNodeWithTag("sound-scope-choice-${NotificationChannelSpec.REACTIONS.id}-false").assertIsSelected()
         composeRule
-            .onNodeWithTag("sound-scope-choice-${NotificationChannelSpec.REACTIONS.id}-true")
-            .assertIsNotSelected()
+            .onNodeWithTag("conversation-alert-${NotificationChannelSpec.REACTIONS.id}", useUnmergedTree = true)
             .performClick()
         composeRule.runOnIdle {
             assertEquals(NotificationChannelSpec.REACTIONS to true, toggled)
             assertTrue(opened == null)
         }
-        composeRule.onNodeWithTag("conversation-sound-scope-${NotificationChannelSpec.MENTIONS.id}").performClick()
-        composeRule.onNodeWithTag("sound-scope-choice-${NotificationChannelSpec.MENTIONS.id}-true").assertIsSelected()
         composeRule
-            .onNodeWithTag("sound-scope-choice-${NotificationChannelSpec.MENTIONS.id}-false")
-            .assertIsNotSelected()
+            .onNodeWithTag("conversation-alert-${NotificationChannelSpec.MENTIONS.id}", useUnmergedTree = true)
             .performClick()
-        composeRule.runOnIdle { assertEquals(NotificationChannelSpec.MENTIONS to false, toggled) }
+        composeRule.runOnIdle {
+            assertEquals(NotificationChannelSpec.MENTIONS to false, toggled)
+            assertTrue(opened == null)
+        }
     }
 
     @Test
@@ -151,16 +154,23 @@ class NotificationScopeSettingsScreenshotTest {
 
     private fun renderConversation(
         darkTheme: Boolean,
+        amoled: Boolean = false,
         onOpen: (ConversationNotificationCategorySetting) -> Unit = {},
-        onScopeChange: (ConversationNotificationCategorySetting, Boolean) -> Unit = { _, _ -> },
+        onAlertChange: (ConversationNotificationCategorySetting, Boolean) -> Unit = { _, _ -> },
     ) {
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = darkTheme) {
+            WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
                 Surface(modifier = Modifier.width(360.dp).testTag(CONVERSATION_TAG)) {
                     ConversationNotificationCategoriesList(
                         settings = conversationSettings(),
                         onOpen = onOpen,
-                        onScopeChange = onScopeChange,
+                        onAlertChange = onAlertChange,
+                        alertEnabled =
+                            mapOf(
+                                NotificationChannelSpec.GROUP_MESSAGES to true,
+                                NotificationChannelSpec.MENTIONS to true,
+                                NotificationChannelSpec.REACTIONS to false,
+                            ),
                     )
                 }
             }

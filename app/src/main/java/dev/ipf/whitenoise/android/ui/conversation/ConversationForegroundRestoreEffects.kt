@@ -15,15 +15,21 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.focus.FocusManager
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.SoftwareKeyboardController
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import dev.ipf.whitenoise.android.core.MessageProjector
+import dev.ipf.whitenoise.android.state.AppPhase
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ConversationLoadFailureEdge
+import dev.ipf.whitenoise.android.state.WarmResumeConversationPhase
+import dev.ipf.whitenoise.android.state.WarmResumeTrace
 import dev.ipf.whitenoise.android.state.isLoadingOlder
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
@@ -65,7 +71,7 @@ internal fun ConversationImeReanchorEffect(
             imeTransitionBookmark.value = null
             return@LaunchedEffect
         }
-        if (scrollCoordinator.foregroundRestoreInProgress) return@LaunchedEffect
+        if (scrollCoordinator.foregroundRestorePending) return@LaunchedEffect
         val suppressForCustomInputSwap = suppressNextImeOpenReanchor.getAndSet(false)
         if (!initialTimelineAnchored || suppressForCustomInputSwap) return@LaunchedEffect
         awaitImeInsetAtTarget(
@@ -126,8 +132,19 @@ internal fun ConversationForegroundRestoreEffects(
     timelineViewport: ConversationTimelineViewport? = null,
 ) {
     val foregroundPreDrawSignals = remember(controller) { Channel<Unit>(capacity = Channel.CONFLATED) }
-    var foregroundRestoreToken by remember(controller) { mutableStateOf<ConversationForegroundRestoreToken?>(null) }
+    var foregroundRestore by remember(controller) { mutableStateOf<ConversationForegroundRestoreBinding?>(null) }
     val resumeScrollRestoreCoordinator = remember(controller) { ResumeScrollRestoreCoordinator() }
+    val foregroundFocusIntent = remember(controller) { ConversationForegroundFocusIntent() }
+    LaunchedEffect(controller, composerFocused) {
+        if (
+            foregroundFocusIntent.supersedesRestore(
+                focused = composerFocused,
+                resumed = lifecycleOwner?.lifecycle?.currentState == Lifecycle.State.RESUMED,
+            )
+        ) {
+            scrollCoordinator.cancelForegroundRestoreForUserIntent()
+        }
+    }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val rootView = LocalView.current
@@ -149,7 +166,7 @@ internal fun ConversationForegroundRestoreEffects(
             newValue = {
                 ConversationForegroundGeometry(
                     viewportHeightPx =
-                        (timelineViewport?.readingLayoutInfo() ?: listState.layoutInfo).viewportSize.height,
+                        foregroundTimelineViewportHeight(timelineViewport, listState),
                     imeBottomPx = imeInsets.getBottom(density),
                     bottomChromeHeightPx = bottomChromeHeightObserver.currentHeightPx,
                 )
@@ -164,13 +181,127 @@ internal fun ConversationForegroundRestoreEffects(
                     geometry = currentForegroundGeometryProvider(),
                     imeTargetBottomPx = imeAnimationTargetInsets.getBottom(density),
                     bottomChromeMeasured = bottomChromeHeightObserver.hasMeasurement,
-                    timelineMeasured = timelineViewport?.hasMeasuredTimeline(controller.timeline) ?: true,
+                    timelineMeasured = foregroundTimelineMeasured(timelineViewport, controller),
+                )
+            },
+        )
+    val currentCanPresentRetainedFrame by
+        rememberUpdatedState(
+            newValue = {
+                canPresentRetainedConversationFrame(
+                    anchored = currentInitialTimelineAnchored,
+                    ownsCurrentPresentation = controller.ownsRetainedForegroundPresentation,
+                    appReady = controller.appState.phase == AppPhase.Ready,
+                    lockVisible = controller.appState.appLockScreenVisible,
                 )
             },
         )
     ConversationForegroundDrawGateEffect(
         isBlocked = { scrollCoordinator.foregroundRestoreInProgress },
         onPreDraw = { foregroundPreDrawSignals.trySend(Unit) },
+    )
+    val resumeRestoration: (Boolean, () -> Unit) -> Unit = { restoreFocus, restoreComposer ->
+        foregroundPreDrawSignals.tryReceive()
+        val pausedRestore = foregroundRestore
+        val restore =
+            pausedRestore?.resume(scrollCoordinator) {
+                ConversationForegroundSnapshot(
+                    scrollBookmark = scrollCoordinator.bookmark(currentScrollAnchorProvider()),
+                    geometry = currentForegroundGeometryProvider(),
+                    timelineStructure = currentTimelineStructureProvider(),
+                )
+            }
+        foregroundRestore = restore
+        val restoreToken = restore?.token
+        WarmResumeTrace.conversationPhase(
+            WarmResumeConversationPhase.Resume,
+            imeRequested = restoreToken?.expectedImeVisible == true || restoreFocus,
+            imeObserved = currentForegroundGeometryProvider().imeBottomPx > 0,
+        )
+        val retainedPresentationSafe =
+            ConversationForegroundRestoreBinding.canPresentRetainedFrame(
+                pausedRestore,
+                scrollCoordinator,
+                currentCanPresentRetainedFrame(),
+            )
+        if (restore?.releaseMeasuredFrame(
+                retainedPresentationSafe,
+                currentForegroundSettleStateProvider().timelineMeasured,
+            ) == true
+        ) {
+            WarmResumeTrace.conversationPhase(WarmResumeConversationPhase.RetainedFrameReleased)
+            requestConversationForegroundFrame(rootView)
+        } else if (restoreToken == null) {
+            scrollCoordinator.cancelForegroundRestore()
+        }
+        val pendingLocalTimeline = controller.pendingTimelineAtForeground()
+        resumeScrollRestoreCoordinator.launchResumeWork(scope) {
+            restoreComposer()
+            if (retainedPresentationSafe && restoreToken != null) {
+                var releaseFrameRequested = false
+                val resumedPresentation =
+                    awaitConversationForegroundPresentation(
+                        preDrawSignals = foregroundPreDrawSignals,
+                        currentState = currentForegroundSettleStateProvider,
+                        expectedImeVisible = restoreToken.expectedImeVisible || restoreFocus,
+                        expectedVisibilityTimeoutMillis = FOREGROUND_PRESENTATION_SETTLE_TIMEOUT_MS,
+                        awaitLocalTimeline = {
+                            if (pendingLocalTimeline != null) {
+                                awaitCommittedConversationTimeline(pendingLocalTimeline)
+                                WarmResumeTrace.conversationPhase(WarmResumeConversationPhase.LocalHandoffCommitted)
+                                // Discard a pre-draw from the old composition while local apply was held.
+                                // The next signal measures the post-handoff transcript/chrome together.
+                                foregroundPreDrawSignals.tryReceive()
+                            }
+                        },
+                        // Past the deadline the snapshot stays armed, so the
+                        // wait below still applies one correction when
+                        // geometry finally settles — only user intent,
+                        // navigation, or disposal discards it. Opening the
+                        // gate explicitly invalidates the root because this
+                        // flag was historically read only from onPreDraw and
+                        // could otherwise wait forever for external input.
+                        onSettleDeadlineExpired = {
+                            scrollCoordinator.releaseForegroundRestoreGate(restoreToken)
+                            requestConversationForegroundFrame(rootView)
+                            releaseFrameRequested = true
+                        },
+                    )
+                try {
+                    if (!currentCanPresentRetainedFrame()) {
+                        scrollCoordinator.cancelForegroundRestore(restoreToken)
+                        return@launchResumeWork
+                    }
+                    scrollCoordinator.completeForegroundRestore(
+                        token = restoreToken,
+                        resumedGeometry = resumedPresentation.geometry,
+                        resumedTimelineStructure = currentTimelineStructureProvider(),
+                        resumedScrollAnchor = currentScrollAnchorProvider(),
+                        resolveAnchorIndex = currentScrollAnchorResolver,
+                        resolveTailIndex = { currentTailIndexProvider() },
+                    )
+                } finally {
+                    if (!releaseFrameRequested) requestConversationForegroundFrame(rootView)
+                }
+            } else if (restoreToken != null) {
+                // This pause snapshot was unsafe at resume. Wait for the actual current
+                // handoff/admission or the same bounded fallback, but never apply its old anchor.
+                awaitConversationForegroundAdmission(
+                    preDrawSignals = foregroundPreDrawSignals,
+                    canPresent = currentCanPresentRetainedFrame,
+                    timeoutMillis = FOREGROUND_PRESENTATION_SETTLE_TIMEOUT_MS,
+                    awaitLocalTimeline = { awaitCommittedConversationTimeline(pendingLocalTimeline) },
+                )
+                scrollCoordinator.cancelForegroundRestore(restoreToken)
+                requestConversationForegroundFrame(rootView)
+            }
+        }
+    }
+    conversationForegroundOwnerHandoffEffect(
+        scrollCoordinator,
+        foregroundRestore,
+        lifecycleOwner,
+        onHandoff = { resumeRestoration(false) { } },
     )
     ConversationComposerLifecycleEffect(
         observerKey = controller,
@@ -179,10 +310,13 @@ internal fun ConversationForegroundRestoreEffects(
         searchOpen = searchOpen,
         hasActiveEditOrReplySession = hasActiveEditOrReplySession,
         onPause = {
+            foregroundFocusIntent.pause()
             resumeScrollRestoreCoordinator.cancel()
-            foregroundRestoreToken =
+            foregroundRestore?.cancel()
+            foregroundRestore =
                 if (currentInitialTimelineAnchored) {
-                    scrollCoordinator.beginForegroundRestore(
+                    ConversationForegroundRestoreBinding.begin(
+                        scrollCoordinator,
                         ConversationForegroundSnapshot(
                             scrollBookmark = scrollCoordinator.bookmark(currentScrollAnchorProvider()),
                             geometry = currentForegroundGeometryProvider(),
@@ -195,75 +329,37 @@ internal fun ConversationForegroundRestoreEffects(
                 }
         },
         onResume = { restoreFocus, clearFocus ->
+            foregroundFocusIntent.resume(restoreFocus, clearFocus)
             scope.launch { controller.retryInviteAcceptanceAuthority() }
-            foregroundPreDrawSignals.tryReceive()
-            val restoreToken = foregroundRestoreToken
-            foregroundRestoreToken = null
-            val pendingLocalTimeline = controller.pendingTimelineAtForeground()
-            resumeScrollRestoreCoordinator.launchResumeWork(scope) {
-                when {
-                    restoreFocus -> {
-                        runCatching { composerFocus.requestFocus() }
-                        keyboardController?.show()
-                    }
-                    clearFocus -> {
-                        focusManager.clearFocus(force = true)
-                        keyboardController?.hide()
-                    }
-                }
-                if (currentInitialTimelineAnchored && restoreToken != null) {
-                    var releaseFrameRequested = false
-                    val resumedPresentation =
-                        awaitConversationForegroundPresentation(
-                            preDrawSignals = foregroundPreDrawSignals,
-                            currentState = currentForegroundSettleStateProvider,
-                            expectedImeVisible = restoreToken.expectedImeVisible || restoreFocus,
-                            expectedVisibilityTimeoutMillis = FOREGROUND_PRESENTATION_SETTLE_TIMEOUT_MS,
-                            awaitLocalTimeline = {
-                                if (pendingLocalTimeline != null) {
-                                    awaitCommittedConversationTimeline(pendingLocalTimeline)
-                                    // Discard a pre-draw from the old composition while local apply was held.
-                                    // The next signal measures the post-handoff transcript/chrome together.
-                                    foregroundPreDrawSignals.tryReceive()
-                                }
-                            },
-                            // Past the deadline the snapshot stays armed, so the
-                            // wait below still applies one correction when
-                            // geometry finally settles — only user intent,
-                            // navigation, or disposal discards it. Opening the
-                            // gate explicitly invalidates the root because this
-                            // flag was historically read only from onPreDraw and
-                            // could otherwise wait forever for external input.
-                            onSettleDeadlineExpired = {
-                                scrollCoordinator.releaseForegroundRestoreGate(restoreToken)
-                                requestConversationForegroundFrame(rootView)
-                                releaseFrameRequested = true
-                            },
-                        )
-                    try {
-                        scrollCoordinator.completeForegroundRestore(
-                            token = restoreToken,
-                            resumedGeometry = resumedPresentation.geometry,
-                            resumedTimelineStructure = currentTimelineStructureProvider(),
-                            resumedScrollAnchor = currentScrollAnchorProvider(),
-                            resolveAnchorIndex = currentScrollAnchorResolver,
-                            resolveTailIndex = { currentTailIndexProvider() },
-                        )
-                    } finally {
-                        if (!releaseFrameRequested) requestConversationForegroundFrame(rootView)
-                    }
-                } else {
-                    scrollCoordinator.cancelForegroundRestore()
-                }
+            resumeRestoration(restoreFocus) {
+                restoreConversationComposerFocus(
+                    restoreFocus,
+                    clearFocus,
+                    composerFocus,
+                    keyboardController,
+                    focusManager,
+                )
             }
         },
         onObserverDisposed = {
             resumeScrollRestoreCoordinator.cancel()
-            scrollCoordinator.cancelForegroundRestore()
-            foregroundRestoreToken = null
+            foregroundRestore?.cancel()
+            foregroundRestore = null
         },
     )
 }
+
+/** Reads the measured viewport, falling back to LazyListState before the viewport observer attaches. */
+private fun foregroundTimelineViewportHeight(
+    viewport: ConversationTimelineViewport?,
+    listState: LazyListState,
+): Int = (viewport?.readingLayoutInfo() ?: listState.layoutInfo).viewportSize.height
+
+/** An unattached viewport observer does not add a measurement prerequisite. */
+private fun foregroundTimelineMeasured(
+    viewport: ConversationTimelineViewport?,
+    controller: ConversationController,
+): Boolean = viewport?.hasMeasuredTimeline(controller.timeline) ?: true
 
 /**
  * Snapshots the controller's current transcript row structure.
@@ -288,4 +384,23 @@ internal fun ConversationController.conversationTimelineStructure(): Conversatio
             },
         groupRecoveryCount = if (conversationGroupRecoveryRowVisible()) 1 else 0,
     )
+}
+
+private fun restoreConversationComposerFocus(
+    restoreFocus: Boolean,
+    clearFocus: Boolean,
+    composerFocus: FocusRequester,
+    keyboardController: SoftwareKeyboardController?,
+    focusManager: FocusManager,
+) {
+    when {
+        restoreFocus -> {
+            runCatching { composerFocus.requestFocus() }
+            keyboardController?.show()
+        }
+        clearFocus -> {
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
+        }
+    }
 }

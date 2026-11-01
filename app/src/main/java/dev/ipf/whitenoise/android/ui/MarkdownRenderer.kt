@@ -1619,9 +1619,9 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
                 }
             is MarkdownInlineFfi.Link ->
                 appendMarkdownLink(inline.dest, inline.children, ctx, depth + 1)
-            // No inline image fetches (they'd bypass the encrypted-media
-            // pipeline): the alt text stands in, tappable through to the
-            // image URL when its scheme is allowlisted.
+            // Text rendering never initiates image requests. The conversation-only,
+            // opt-in JPEG decoration has its own bounded admission; every URL remains
+            // tappable here even when previews are disabled, rejected or unavailable.
             is MarkdownInlineFfi.Image ->
                 appendMarkdownLink(inline.dest, inline.alt, ctx, depth + 1)
             is MarkdownInlineFfi.Autolink -> {

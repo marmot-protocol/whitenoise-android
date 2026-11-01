@@ -46,6 +46,15 @@
         "test_ids": [
           "CON-001"
         ]
+      },
+      {
+        "surface": "Compact toolbar target spacing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "val primaryTrailingActionWidth =",
+        "test_ids": [
+          "CON-030",
+          "CON-035"
+        ]
       }
     ],
     "settings_controls": [
@@ -117,6 +126,48 @@
         "anchor": "val showDictationRecovery =",
         "test_ids": [
           "DIC-009"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "surface": "Both composer surfaces publish only direct user text edits through their shared text owner",
+        "anchor": "fun updateValueFromUser(value: TextFieldValue)",
+        "test_ids": [
+          "CON-033"
+        ]
+      },
+      {
+        "surface": "Only an admitted current text flight animates accepted composer collapse",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "fun animateAcceptedCollapse(",
+        "test_ids": [
+          "CON-036"
+        ]
+      },
+      {
+        "surface": "Suggestion viewport preserves composer input and actions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "ComposerContentLayout(",
+        "test_ids": [
+          "CON-005"
+        ]
+      },
+      {
+        "surface": "Actual composer text edits remain distinct from unchanged presentation across draft hydration and remount",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "fun updateValueFromUser(",
+        "test_ids": [
+          "DIC-011"
+        ]
+      }
+    ],
+    "string_resources": [
+      {
+        "surface": "Locked voice recording cancel control",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "R.string.voice_message_cancel",
+        "test_ids": [
+          "CON-030"
         ]
       }
     ]

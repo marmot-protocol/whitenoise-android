@@ -15,6 +15,69 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 internal class ConversationDictationDraftRecoveryTest {
+    /** A rejected host write preserves the earlier clear's payload restoration until it settles. */
+    @Test
+    fun deferredRestorationSurvivesUnavailableWriteWithoutAnEarlierReceipt() {
+        val f = Fixture()
+        f.edit("")
+        val emptied = f.draft.revision
+        f.reject = true
+        assertEquals(
+            ConversationDictationDraftRecovery.Result.Unavailable,
+            f.recovery.recoverWithResult(
+                1L,
+                f.target,
+                "tail",
+                ConversationDictationDraftRecovery.Options(
+                    restoreCapturedPrefix = true,
+                    ownedEmptyRevision = emptied,
+                ),
+            ),
+        )
+        f.reject = false
+        assertTrue(f.recovery.recover(1L, f.target, "tail"))
+        assertEquals("Draft tail", f.draft.value.text)
+        assertTrue(f.recovery.recover(1L, f.target, "tail"))
+        assertEquals(1, f.writes)
+    }
+
+    /** Deferred old-owner restoration cannot replace newer editor content or survive reset/consumption. */
+    @Test
+    fun deferredRestorationRespectsEditsDiscardAndSubmittedConsumption() {
+        for (settlement in listOf("edit", "reset", "submitted", "replacement")) {
+            val f = Fixture()
+            f.edit("")
+            f.reject = true
+            assertEquals(
+                ConversationDictationDraftRecovery.Result.Unavailable,
+                f.recovery.recoverWithResult(
+                    1L,
+                    f.target,
+                    "tail",
+                    ConversationDictationDraftRecovery.Options(true, f.draft.revision),
+                ),
+            )
+            f.reject = false
+            when (settlement) {
+                "edit" -> {
+                    f.edit("New edit")
+                    assertTrue(f.recovery.recover(1L, f.target, "tail"))
+                    assertEquals("New edit Draft tail", f.draft.value.text)
+                }
+                "submitted" -> {
+                    f.recovery.consumeSubmittedTranscript(1L, f.target, "tail")
+                    assertTrue(f.recovery.recover(1L, f.target, "tail next"))
+                    assertEquals("next", f.draft.value.text)
+                }
+                else -> {
+                    if (settlement == "reset") f.recovery.reset()
+                    assertTrue(f.recovery.recover(2L, f.target, "tail"))
+                    assertEquals("tail", f.draft.value.text)
+                }
+            }
+        }
+    }
+
     @Test
     fun submittedPrefixRemainsConsumedAcrossNewEditsAndTailRecovery() {
         for (edited in listOf("", "another message", "Draft first edited")) {

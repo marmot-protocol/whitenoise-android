@@ -14,7 +14,9 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -22,6 +24,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -29,6 +32,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
@@ -52,13 +56,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "w320dp-h640dp-mdpi")
 class ConversationDictationPersistentControlTest {
-    private val transcriptPasteLabel: String
-        get() = ApplicationProvider.getApplicationContext<Context>().getString(R.string.paste_dictation_transcript)
-
     @get:Rule
     val composeRule = createComposeRule()
 
@@ -104,8 +106,9 @@ class ConversationDictationPersistentControlTest {
 
         composeRule.onNodeWithTag(DICTATION_LISTENING_INDICATOR_TAG).assertDoesNotExist()
         composeRule
-            .onNodeWithTag(DICTATION_PROGRESS_TAG)
+            .onNodeWithContentDescription("Send")
             .assertIsDisplayed()
+            .assertHasClickAction()
             .assert(
                 SemanticsMatcher.expectValue(
                     SemanticsProperties.ProgressBarRangeInfo,
@@ -126,11 +129,86 @@ class ConversationDictationPersistentControlTest {
         assertTrue(fixture.controller.state is ConversationDictationState.Processing)
         composeRule.onNodeWithTag(DICTATION_LISTENING_INDICATOR_TAG).assertDoesNotExist()
         val send = composeRule.onNodeWithContentDescription("Send").getUnclippedBoundsInRoot()
-        val progress = composeRule.onNodeWithTag(DICTATION_PROGRESS_TAG).assertIsDisplayed().getUnclippedBoundsInRoot()
+        val progress =
+            composeRule
+                .onNodeWithTag(DICTATION_PROGRESS_TAG, useUnmergedTree = true)
+                .assertIsDisplayed()
+                .getUnclippedBoundsInRoot()
         assertTrue(progress.left >= send.left && progress.right <= send.right)
         assertTrue(progress.top >= send.top && progress.bottom <= send.bottom)
         composeRule.onNodeWithContentDescription(transcriptPasteLabel).assertIsDisplayed()
         composeRule.onNodeWithContentDescription("Pause").assertDoesNotExist()
+    }
+
+    /** Pending processing advertises its selected action while both choices stay usable. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun processingChoiceCanSwitchWithSelectedAccessibleState() {
+        val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        render(fixture, darkTheme = true, amoled = true)
+        composeRule.onNodeWithContentDescription("Send").performClick()
+        composeRule.onNodeWithContentDescription(transcriptPasteLabel).assertIsEnabled()
+        composeRule
+            .onNodeWithContentDescription("Send")
+            .assertIsEnabled()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
+        assertProcessingActionsAccessible("Send")
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_processing_send_editable.png")
+        composeRule.onNodeWithContentDescription(transcriptPasteLabel).performClick()
+        composeRule.onNodeWithContentDescription("Send").assertIsEnabled()
+        composeRule
+            .onNodeWithContentDescription(transcriptPasteLabel)
+            .assertIsEnabled()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
+        assertProcessingActionsAccessible(transcriptPasteLabel)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_processing_paste_editable.png")
+    }
+
+    /** Plain dark keeps the selected Send processing state and both choices readable. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun processingSendPlainDarkKeepsBothChoicesUsable() {
+        val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        render(fixture, darkTheme = true, amoled = false)
+        composeRule.onNodeWithContentDescription("Send").performClick()
+        composeRule.onNodeWithContentDescription(transcriptPasteLabel).assertIsEnabled()
+        composeRule
+            .onNodeWithContentDescription("Send")
+            .assertIsEnabled()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
+        assertProcessingActionsAccessible("Send")
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_processing_send_editable_dark.png")
+    }
+
+    /** Pending processing advertises its selected action while both choices stay usable. */
+    @Test
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun processingChoiceLightLargeRtlKeepsBothChoicesUsable() {
+        val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        render(fixture, fontScale = 2f, rtl = true, darkTheme = false)
+        composeRule.onNodeWithContentDescription("Send").performClick()
+        composeRule.onNodeWithContentDescription(transcriptPasteLabel).assertIsEnabled()
+        composeRule
+            .onNodeWithContentDescription("Send")
+            .assertIsEnabled()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
+        assertProcessingActionsAccessible("Send")
+        composeRule
+            .onRoot()
+            .captureRoboImage("src/test/snapshots/dictation_processing_send_editable_light_large_rtl.png")
+        composeRule.onNodeWithContentDescription(transcriptPasteLabel).performClick()
+        composeRule.onNodeWithContentDescription("Send").assertIsEnabled()
+        composeRule
+            .onNodeWithContentDescription(transcriptPasteLabel)
+            .assertIsEnabled()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
+        assertProcessingActionsAccessible(transcriptPasteLabel)
+        composeRule
+            .onRoot()
+            .captureRoboImage("src/test/snapshots/dictation_processing_paste_editable_light_large_rtl.png")
     }
 
     /** A draft conflict is resolved automatically and never exposes a second edit action. */
@@ -554,7 +632,8 @@ class ConversationDictationPersistentControlTest {
         }
 
     /** The composed editor exposes both intended paste actions without giving them the same accessible name. */
-    @Test fun clipboardAndTranscriptPasteHaveDistinctLocalizedNamesTogether() {
+    @Test
+    fun clipboardAndTranscriptPasteHaveDistinctLocalizedNamesTogether() {
         val fixture = fixture(TextFieldValue())
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -583,118 +662,146 @@ class ConversationDictationPersistentControlTest {
             .assertCountEquals(1)
         composeRule.onNodeWithTag("composer.paste").assertIsDisplayed()
     }
+}
 
-    private fun render(
-        fixture: Fixture,
-        fontScale: Float = 1f,
-        rtl: Boolean = false,
-        displayedState: ConversationDictationState? = null,
-    ) {
-        composeRule.setContent {
-            val density = LocalDensity.current
-            CompositionLocalProvider(
-                LocalDensity provides Density(density.density, fontScale),
-                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+/** Each completion choice is one labelled 48dp action; progress belongs to that action. */
+private fun ConversationDictationPersistentControlTest.assertProcessingActionsAccessible(selectedLabel: String) {
+    listOf("Send", transcriptPasteLabel).forEach { label ->
+        composeRule.onAllNodesWithContentDescription(label).assertCountEquals(1)
+        val action = composeRule.onNodeWithContentDescription(label)
+        action.assertIsEnabled().assertHasClickAction()
+        action.assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, label == selectedLabel))
+        val bounds = action.getUnclippedBoundsInRoot()
+        assertTrue(bounds.right - bounds.left >= 48.dp)
+        assertTrue(bounds.bottom - bounds.top >= 48.dp)
+    }
+    composeRule.onNodeWithContentDescription(selectedLabel).assert(
+        SemanticsMatcher.expectValue(
+            SemanticsProperties.ProgressBarRangeInfo,
+            ProgressBarRangeInfo.Indeterminate,
+        ),
+    )
+}
+
+private fun ConversationDictationPersistentControlTest.render(
+    fixture: Fixture,
+    fontScale: Float = 1f,
+    rtl: Boolean = false,
+    displayedState: ConversationDictationState? = null,
+    darkTheme: Boolean? = null,
+    amoled: Boolean = false,
+) {
+    composeRule.setContent {
+        val density = LocalDensity.current
+        CompositionLocalProvider(
+            LocalDensity provides Density(density.density, fontScale),
+            LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+        ) {
+            WhiteNoiseTheme(
+                darkTheme = darkTheme ?: androidx.compose.foundation.isSystemInDarkTheme(),
+                amoled = amoled,
             ) {
-                WhiteNoiseTheme {
-                    Box(Modifier.width(268.dp).testTag(ROOT_TAG)) {
-                        ConversationDictationPersistentControl(
-                            state = displayedState ?: fixture.controller.state,
-                            controller = fixture.controller,
-                        )
-                    }
+                Box(Modifier.width(268.dp).testTag(ROOT_TAG)) {
+                    ConversationDictationPersistentControl(
+                        state = displayedState ?: fixture.controller.state,
+                        controller = fixture.controller,
+                    )
                 }
             }
         }
     }
+}
 
-    private fun fixture(
-        initial: TextFieldValue,
-        deferActivityReadiness: Boolean = false,
-        deliveryScope: CoroutineScope? = null,
-        send: suspend (ConversationDictationSendRequest) -> Boolean = { false },
-        onDraftRead: () -> Unit = {},
-    ): Fixture {
-        val platform = FakePlatform(deferActivityReadiness)
-        var draft = initial
-        var revision = 0L
-        val controller =
-            ConversationDictationController(
-                platform = platform,
-                readDraft = { _, _ ->
-                    onDraftRead()
-                    ConversationDictationDraftSnapshot(draft, revision)
-                },
-                writeDraft = { _, _, expected, value ->
-                    if (expected != revision) {
-                        null
-                    } else {
-                        draft = value
-                        revision += 1L
-                        revision
-                    }
-                },
-                disclosureAccepted = { true },
-                markDisclosureAccepted = {},
-                targetValidationScope = deliveryScope,
-                sendTranscriptIfOriginUnchanged = send,
-                scheduleTimeout = { _, _ -> ConversationDictationTimeoutHandle {} },
-            )
-        return Fixture(
-            controller = controller,
+private fun fixture(
+    initial: TextFieldValue,
+    deferActivityReadiness: Boolean = false,
+    deliveryScope: CoroutineScope? = null,
+    send: suspend (ConversationDictationSendRequest) -> Boolean = { false },
+    onDraftRead: () -> Unit = {},
+): Fixture {
+    val platform = FakePlatform(deferActivityReadiness)
+    var draft = initial
+    var revision = 0L
+    val controller =
+        ConversationDictationController(
             platform = platform,
-            readDraft = { draft },
-            editDraft = { value ->
-                draft = value
-                revision += 1L
+            readDraft = { _, _ ->
+                onDraftRead()
+                ConversationDictationDraftSnapshot(draft, revision)
             },
+            writeDraft = { _, _, expected, value ->
+                if (expected != revision) {
+                    null
+                } else {
+                    draft = value
+                    revision += 1L
+                    revision
+                }
+            },
+            disclosureAccepted = { true },
+            markDisclosureAccepted = {},
+            targetValidationScope = deliveryScope,
+            sendTranscriptIfOriginUnchanged = send,
+            scheduleTimeout = { _, _ -> ConversationDictationTimeoutHandle {} },
         )
+    return Fixture(
+        controller = controller,
+        platform = platform,
+        readDraft = { draft },
+        editDraft = { value ->
+            draft = value
+            revision += 1L
+        },
+    )
+}
+
+private data class Fixture(
+    val controller: ConversationDictationController,
+    val platform: FakePlatform,
+    private val readDraft: () -> TextFieldValue,
+    private val editDraft: (TextFieldValue) -> Unit,
+) {
+    val draft: TextFieldValue
+        get() = readDraft()
+
+    fun edit(value: TextFieldValue) = editDraft(value)
+}
+
+@Suppress("MaxLineLength")
+private class FakePlatform(
+    private val deferActivityReadiness: Boolean,
+) : ConversationDictationPlatform {
+    lateinit var listener: ConversationDictationRecognitionListener
+
+    override fun hasRecordAudioPermission() = true
+
+    override fun recognitionAvailable() = true
+
+    override fun checkRecognitionActivity(callback: (Boolean) -> Unit): ConversationDictationTimeoutHandle {
+        if (!deferActivityReadiness) callback(true)
+        return ConversationDictationTimeoutHandle {}
     }
 
-    private data class Fixture(
-        val controller: ConversationDictationController,
-        val platform: FakePlatform,
-        private val readDraft: () -> TextFieldValue,
-        private val editDraft: (TextFieldValue) -> Unit,
-    ) {
-        val draft: TextFieldValue
-            get() = readDraft()
+    override fun createSession(
+        // Keep provider completion controllable through the original callback receiver.
+        listener: ConversationDictationRecognitionListener,
+    ): ConversationDictationRecognitionSession {
+        this.listener = listener
+        return object : ConversationDictationRecognitionSession {
+            override fun start() = Unit
 
-        fun edit(value: TextFieldValue) = editDraft(value)
-    }
+            override fun stop() = Unit
 
-    @Suppress("MaxLineLength")
-    private class FakePlatform(
-        private val deferActivityReadiness: Boolean,
-    ) : ConversationDictationPlatform {
-        lateinit var listener: ConversationDictationRecognitionListener
+            override fun cancel() = Unit
 
-        override fun hasRecordAudioPermission() = true
-
-        override fun recognitionAvailable() = true
-
-        override fun checkRecognitionActivity(callback: (Boolean) -> Unit): ConversationDictationTimeoutHandle {
-            if (!deferActivityReadiness) callback(true)
-            return ConversationDictationTimeoutHandle {}
+            override fun destroy() = Unit
         }
-
-        override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession {
-            this.listener = listener
-            return object : ConversationDictationRecognitionSession {
-                override fun start() = Unit
-
-                override fun stop() = Unit
-
-                override fun cancel() = Unit
-
-                override fun destroy() = Unit
-            }
-        }
-    }
-
-    private companion object {
-        const val ACCOUNT = "account"
-        const val GROUP = "group"
-        const val ROOT_TAG = "dictation-strip-test-root"
     }
 }
+
+private val transcriptPasteLabel: String
+    get() = ApplicationProvider.getApplicationContext<Context>().getString(R.string.paste_dictation_transcript)
+
+private const val ACCOUNT = "account"
+private const val GROUP = "group"
+private const val ROOT_TAG = "dictation-strip-test-root"

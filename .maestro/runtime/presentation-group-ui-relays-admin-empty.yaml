@@ -1,0 +1,17 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-group-ui-relays-admin-empty
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Group relays
+- assertVisible:
+    text: No relays are configured for this chat.
+- scrollUntilVisible:
+    element:
+      text: Changing them would move this chat for every member. Editing group relays isn’t available in White Noise yet.
+    direction: DOWN
+- assertVisible:
+    text: Changing them would move this chat for every member. Editing group relays isn’t available in White Noise yet.
+- tapOn: Back
+- assertVisible:
+    id: presentation.complete

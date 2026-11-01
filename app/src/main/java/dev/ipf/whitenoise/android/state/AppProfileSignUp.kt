@@ -5,6 +5,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.onboarding.SignUpController
 import dev.ipf.whitenoise.android.ui.onboarding.SignUpOwner
@@ -37,7 +39,11 @@ internal class AppProfileSignUp(
         return appState.runtimeGeneration == owner.epoch && appState.marmot() === owner.native
     }
 
-    private suspend fun createOwnedIdentity(expectedOwner: SignUpOwner): AccountSummaryFfi {
+    /** Creates under the captured runtime and selection; a form [initialProfile] is the first published profile. */
+    private suspend fun createOwnedIdentity(
+        expectedOwner: SignUpOwner,
+        initialProfile: UserProfileMetadataFfi? = null,
+    ): AccountSummaryFfi {
         val owner = CreatingRuntime(appState.marmot(), appState.runtimeGeneration)
         return appState.withCurrentAccountLifetime {
             val runtimeCurrent = appState.runtimeGeneration == owner.epoch && appState.marmot() === owner.native
@@ -48,7 +54,16 @@ internal class AppProfileSignUp(
             ) {
                 throw kotlinx.coroutines.CancellationException("Creating runtime was replaced")
             }
-            appState.marmotIo { createIdentityWithBootstrapRelays() }.also { creatingRuntimes[it] = owner }
+            val knownAccounts = appState.accounts.mapTo(HashSet(), AccountSummaryFfi::label)
+            val created =
+                appState.marmotIo {
+                    if (initialProfile == null) {
+                        createIdentityWithBootstrapRelays()
+                    } else {
+                        createNamedIdentity(initialProfile)
+                    }
+                }
+            created.requireNewAccount(knownAccounts).also { creatingRuntimes[it] = owner }
         }
     }
 
@@ -83,10 +98,10 @@ internal class AppProfileSignUp(
                     )
                 },
                 ownerAvailable = ::ownerAvailable,
-                create = { owner ->
+                create = { owner, profile ->
                     profileIdentityCoordinator.createOrReuse(owner) {
                         runCatchingCancellable {
-                            createOwnedIdentity(owner)
+                            createOwnedIdentity(owner, profile)
                         }.onFailure {
                             appState.presentFailure(R.string.toast_couldnt_create_identity, "IDENTITY_CREATE", it)
                         }.getOrThrow()
@@ -109,8 +124,15 @@ internal class AppProfileSignUp(
                     }.getOrThrow()
                 },
                 publish = { account, metadata ->
-                    if (appState.activeAccountRef == account && ownerAvailable()) {
-                        appState.publishProfile(metadata)
+                    val owned = { appState.activeAccountRef == account && ownerAvailable() }
+                    if (owned()) {
+                        runCatchingCancellable {
+                            awaitOwnedNetworkReadiness(account)
+                        }.onFailure {
+                            appState.presentFailure(R.string.toast_couldnt_publish_profile, "ACCOUNT_SETUP_WAIT", it)
+                        }.getOrThrow()
+                        // The last readiness read can suspend across an account switch or teardown.
+                        owned() && appState.publishProfile(metadata)
                     } else {
                         false
                     }
@@ -146,6 +168,41 @@ internal class AppProfileSignUp(
         } catch (error: Throwable) {
             rethrowIfCancellation(error)
             appState.presentFailure(R.string.toast_couldnt_create_identity, "IDENTITY_CREATE", error)
+        }
+    }
+
+    /** The account whose last setup wait expired; its next wait first resumes MDK's stalled setup. */
+    private var stalledSetupAccount: String? = null
+
+    /** How long the profile stage waits for relay setup before offering Retry; tests shorten it. */
+    internal var setupWaitTimeoutMillis = ACCOUNT_NETWORK_READY_TIMEOUT_MILLIS
+
+    /**
+     * The profile creation call returns at local readiness while MDK publishes relay lists and the KeyPackage in
+     * the background. Wait for that before the profile save, without holding the account lifetime, and recheck
+     * the form's owner on every read. A failure is a retryable publication stage that keeps the accepted account,
+     * and Continue without profile still leaves the form. After an expired wait, Retry restarts MDK's setup
+     * through `start()`, as the iOS client does. That restart also replaces MDK's product worker and records one
+     * more AppStart telemetry sample, which is not a cold start.
+     */
+    private suspend fun awaitOwnedNetworkReadiness(account: String) {
+        val resume: (suspend () -> Unit)? =
+            if (stalledSetupAccount == account) {
+                { appState.marmotIo { start() } }
+            } else {
+                null
+            }
+        try {
+            awaitAccountNetworkReady(account, setupWaitTimeoutMillis, resume) { ref ->
+                if (appState.activeAccountRef != ref || !ownerAvailable()) {
+                    throw kotlinx.coroutines.CancellationException("Sign-up owner changed")
+                }
+                appState.marmotIo { accountSetupReadiness(ref) }
+            }
+            stalledSetupAccount = null
+        } catch (expired: MarmotKitException.AccountSetupRetryRequired) {
+            stalledSetupAccount = account
+            throw expired
         }
     }
 
@@ -229,4 +286,15 @@ internal class AppProfileSignUp(
             )
         }
     }
+}
+
+/**
+ * MDK coalesces generated creation onto any account whose setup is still unfinished. Never adopt, activate
+ * or rename an account this app already lists as though it were new; iOS guards the same way. An earlier
+ * attempt's half-created account is refused too once the list includes it; MDK finishes it in the background,
+ * and the next attempt after that creates normally.
+ */
+private fun AccountSummaryFfi.requireNewAccount(knownAccounts: Set<String>): AccountSummaryFfi {
+    if (label in knownAccounts) throw MarmotKitException.AccountSetupRetryRequired()
+    return this
 }

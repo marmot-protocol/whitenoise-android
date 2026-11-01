@@ -143,6 +143,11 @@ class VideoTileRetryRaceTest {
             shows(R.string.reply_media_video)
         }
         composeRule.onNodeWithContentDescription(text(R.string.reply_media_video)).assertIsDisplayed()
+        // The tile retires the durable download intent in a coroutine after it shows the file, so wait for that.
+        composeRule.waitUntil(WAIT_MILLIS) {
+            composeRule.waitForIdle()
+            !controller.hasAttachmentDownloadIntent(request.messageIdHex, 0)
+        }
         composeRule.runOnIdle {
             assertEquals("the retry was admitted more than once", 1, fixture.retryDemands.get())
             assertEquals("the retried download opened the video", 0, opens)
@@ -218,6 +223,8 @@ class VideoTileRetryRaceTest {
                 }
             }
         }
+        // A tap while the off-main cache probe is unresolved deliberately starts nothing.
+        composeRule.waitUntil(WAIT_MILLIS) { shows(R.string.media_tap_to_download) }
         tapVideo(album)
         composeRule.waitUntil(WAIT_MILLIS) { resolutions == 1 && shows(R.string.media_tap_to_retry) }
         composeRule.runOnIdle { assertEquals("a download tap opened the video", 0, opens) }
@@ -243,6 +250,11 @@ class VideoTileRetryRaceTest {
 
     private companion object {
         const val TILE_TAG = "video-retry-tile"
-        const val WAIT_MILLIS = 10_000L
+
+        /**
+         * Wall-clock bound for the tile's off-main file work. A cold start on a loaded CI runner timed out at ten
+         * seconds while the same steps take about 0.1 s locally, so a passing run never waits this long.
+         */
+        const val WAIT_MILLIS = 30_000L
     }
 }

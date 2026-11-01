@@ -1,0 +1,18 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationCardPostSynchronizer.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "notification_content_contracts": [
+      {
+        "surface": "Accepted payload revision fences asynchronously stale notification history",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationCardPostSynchronizer.kt",
+        "anchor": "fun canCarryEntry(",
+        "test_ids": [
+          "NTF-043",
+          "NTF-044"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -3,9 +3,11 @@ package dev.ipf.whitenoise.android.ui.chats.newchat
 import android.content.Context
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
@@ -35,6 +37,33 @@ class NewMessagePresentationTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val calls = mutableListOf<String>()
     private val person = RecipientSearch.Candidate("b".repeat(64), "Ada", "npub1ada", isFollowing = true)
+
+    /** Agent discovery has its own action below Invite, and busy creation blocks it. */
+    @Test fun agentDiscoveryIsBelowInviteAndUsesItsOwnCallback() {
+        show()
+        val inviteLabel = context.getString(R.string.new_message_invite_friend)
+        val invite = composeRule.onNodeWithText(inviteLabel).fetchSemanticsNode()
+        val agent = composeRule.onNodeWithTag("new_message.agentSettings").fetchSemanticsNode()
+        org.junit.Assert.assertTrue(agent.boundsInRoot.top >= invite.boundsInRoot.bottom)
+        composeRule.onNodeWithTag("new_message.agentSettings").performClick()
+        assertEquals(listOf("agent"), calls)
+    }
+
+    @Test fun chatCreationDisablesAgentDiscovery() {
+        show(creating = person.accountIdHex)
+        composeRule.onNodeWithTag("new_message.agentSettings").assertIsNotEnabled()
+    }
+
+    /** The agent row becomes available again when its owner finishes invitation sharing. */
+    @Test fun invitationSharingDisablesAgentDiscoveryUntilCompletion() {
+        val sharing = mutableStateOf(true)
+        show(inviteSharing = { sharing.value })
+        composeRule.onNodeWithTag("new_message.agentSettings").assertIsNotEnabled()
+        assertEquals(emptyList<String>(), calls)
+        composeRule.runOnIdle { sharing.value = false }
+        composeRule.onNodeWithTag("new_message.agentSettings").assertIsEnabled().performClick()
+        assertEquals(listOf("agent"), calls)
+    }
 
     /** Target quick links remain present for a nonblank search and invoke their distinct existing owners. */
     @Test fun searchKeepsQuickActionsAvailable() {
@@ -222,6 +251,7 @@ class NewMessagePresentationTest {
         resolving: Boolean = false,
         query: String = "Ada",
         lookupFailed: Boolean = false,
+        inviteSharing: () -> Boolean = { false },
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -245,9 +275,11 @@ class NewMessagePresentationTest {
                         { calls += "person" },
                         { calls += "profile" },
                         {},
+                        agentSettings = { calls += "agent" },
                     ),
                     isValidNpub = { true },
                     identifierLookupFailed = lookupFailed,
+                    inviteShareInProgress = inviteSharing(),
                     addressFallback = identifier && query.contains('@'),
                 )
             }

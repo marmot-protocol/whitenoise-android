@@ -213,6 +213,7 @@ internal class ConversationAttachmentPresentation(
     /**
      * Resolves one attachment's plaintext as an array of at most [maxBytes], which defaults to the presentation
      * budget so a preview cannot allocate an unbounded array, explicit Save and Share name their own budget.
+     * Retained reads do not start transfer jobs; a miss persists interactive work before acquisition begins.
      */
     suspend fun downloadAttachment(
         messageIdHex: String,
@@ -223,14 +224,16 @@ internal class ConversationAttachmentPresentation(
     ): ByteArray {
         val account = accountRef ?: error("no active account")
         val request = attachmentRequest(account, messageIdHex, attachmentIndex)
-        if (priority == AttachmentDownloadPriority.Interactive) {
-            appState.enqueueAttachmentDownload(request, priority)
-        }
         return appState.downloadAttachmentPlaintext(
             request = request,
             reference = reference,
             priority = priority,
             maxBytes = maxBytes,
+            onCacheMiss = {
+                if (priority == AttachmentDownloadPriority.Interactive) {
+                    appState.enqueueAttachmentDownload(request, priority)
+                }
+            },
         )
     }
 
@@ -244,14 +247,37 @@ internal class ConversationAttachmentPresentation(
         return appState.cachedMediaThumbnail(mediaCacheKey(account, messageIdHex, attachmentIndex))
     }
 
+    /** Holds only the cache identity currently displayed by a kept card; no acquisition is admitted. */
+    fun retainThumbnail(
+        messageIdHex: String,
+        attachmentIndex: Int,
+    ): AutoCloseable? {
+        val account = accountRef ?: return null
+        return appState.retainMediaThumbnail(mediaCacheKey(account, messageIdHex, attachmentIndex))
+    }
+
+    /** Returns pixels with their decode ceiling under the same immutable account/group/attachment identity. */
+    fun thumbnailEntryFor(
+        messageIdHex: String,
+        attachmentIndex: Int,
+        requestedMaxEdgePx: Int,
+    ): dev.ipf.whitenoise.android.media.MediaThumbnail? {
+        val account = accountRef ?: return null
+        return appState.cachedMediaThumbnailEntry(
+            mediaCacheKey(account, messageIdHex, attachmentIndex),
+            requestedMaxEdgePx,
+        )
+    }
+
     /** Cache a decoded thumbnail so re-renders / re-entry skip the decode. */
     fun cacheThumbnail(
         messageIdHex: String,
         attachmentIndex: Int,
         bitmap: android.graphics.Bitmap,
+        maxEdgePx: Int,
     ) {
         val account = accountRef ?: return
-        appState.cacheMediaThumbnail(mediaCacheKey(account, messageIdHex, attachmentIndex), bitmap)
+        appState.cacheMediaThumbnail(mediaCacheKey(account, messageIdHex, attachmentIndex), bitmap, maxEdgePx)
     }
 
     private companion object {

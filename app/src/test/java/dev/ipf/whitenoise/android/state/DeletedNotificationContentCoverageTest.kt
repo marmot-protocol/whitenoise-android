@@ -71,6 +71,37 @@ class DeletedNotificationContentCoverageTest {
         )
     }
 
+    /** Tray snapshots may lag app writes: carried history and every live rewrite need accepted-payload proof. */
+    @Test
+    fun stalePlatformPayloadsCannotBypassContentReconciliation() {
+        val presenter = source("notifications/LocalNotificationPresenter.kt")
+        assertTrue(
+            "ConversationCardPostedRegistry.canCarryEntry(" in functionBody(presenter, "existingConversationMessages"),
+        )
+        val liveWrite =
+            presenter
+                .substringAfter("private fun notificationWriteIsLive(")
+                .substringBefore("private fun canPublishPreviewShortcut(")
+        assertTrue("ConversationCardPostedRegistry.isCurrentPayload(" in liveWrite)
+        val reconcile = functionBody(presenter, "reconcileCard")
+        assertTrue("ConversationCardPostedRegistry.latestGeneration(" in reconcile)
+        assertTrue("cancelUnverifiedContentCard(" in reconcile)
+        val cancel = functionBody(presenter, "cancelUnverifiedContentCard")
+        assertTrue("ConversationCardPostedRegistry.clearPosted(" in cancel)
+        assertTrue("cancelNotification(" in cancel)
+        assertTrue("ConversationCardPostedRegistry.prepareCancellation(" in cancel)
+        val cancelIndex = cancel.indexOf("cancelNotification(")
+        assertTrue(cancelIndex < cancel.indexOf("ConversationCardPostedRegistry.clearPosted("))
+        val grouping = source("notifications/NotificationGroupReconciler.kt")
+        assertTrue("canAdoptLegacyPayload(live)" in grouping)
+        assertTrue(
+            "ConversationCardPostedRegistry.isCurrentPayload(" in
+                grouping
+                    .substringAfter("private fun canAdoptLegacyPayload(")
+                    .substringBefore("private fun legacyCardBuilder("),
+        )
+    }
+
     /** Accepted deletions, local hides, read changes and stream opens all reach the reconciliation. */
     @Test
     fun everyRemovalSourceReachesTheRetraction() {

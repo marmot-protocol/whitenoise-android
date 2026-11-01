@@ -193,6 +193,8 @@ internal object DictationDiagnosticSchema {
             "automatic",
             "explicit",
             "SendBlocked",
+            "Interrupted",
+            "audio_focus_lost",
             "PasteIntoDraft",
             "SendOnFinish",
             "Done",

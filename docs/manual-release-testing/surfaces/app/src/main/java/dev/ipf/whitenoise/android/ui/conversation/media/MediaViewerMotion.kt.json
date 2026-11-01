@@ -1,0 +1,91 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Visible thumbnail expansion and selected attachment return continuity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
+        "anchor": "fun MediaViewerMotion(",
+        "test_ids": [
+          "MED-044"
+        ]
+      },
+      {
+        "surface": "Current visible source geometry and root-level actual-fit media overlay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
+        "anchor": "private val LocalMediaReadingViewport",
+        "test_ids": [
+          "MED-044"
+        ]
+      },
+      {
+        "surface": "Epoch-matched crop handoff and older Android video fallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
+        "anchor": "fun mediaViewerPlatformMotionAllowed(",
+        "test_ids": [
+          "MED-044"
+        ]
+      },
+      {
+        "surface": "Fresh single-measurement thumbnail resolution without settled-viewer geometry polling",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
+        "anchor": "internal fun resolve(",
+        "test_ids": [
+          "MED-044"
+        ]
+      },
+      {
+        "surface": "Committed-frame admission and content-owned dialog motion without a duplicate platform animation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
+        "anchor": "rememberMediaViewerEntryFrame(enabled, initialAvailable)",
+        "test_ids": [
+          "MED-044"
+        ]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "MediaViewerMotion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
+        "anchor": "fun MediaViewerMotion(",
+        "test_ids": [
+          "MED-044"
+        ]
+      },
+      {
+        "surface": "MediaViewerThumbnailHost",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
+        "anchor": "fun MediaViewerThumbnailHost(",
+        "test_ids": [
+          "MED-044"
+        ]
+      },
+      {
+        "surface": "Modifier.mediaViewerThumbnail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
+        "anchor": "fun Modifier.mediaViewerThumbnail(",
+        "test_ids": [
+          "MED-044"
+        ]
+      },
+      {
+        "surface": "MediaThumbnailCanvas",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
+        "anchor": "fun MediaThumbnailCanvas(",
+        "test_ids": [
+          "MED-044"
+        ]
+      },
+      {
+        "surface": "MediaMotionVisual",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerMotion.kt",
+        "anchor": "fun MediaMotionVisual(",
+        "test_ids": [
+          "MED-044"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

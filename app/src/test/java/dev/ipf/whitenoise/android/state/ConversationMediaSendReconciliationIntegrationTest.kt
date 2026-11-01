@@ -48,6 +48,10 @@ import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
 import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.TimelineProjector
+import dev.ipf.whitenoise.android.media.DiskByteCache
+import dev.ipf.whitenoise.android.media.DiskByteCacheKeyProvider
+import dev.ipf.whitenoise.android.media.PresentationMemoryTrim
+import dev.ipf.whitenoise.android.media.minimalMp4Header
 import dev.ipf.whitenoise.android.ui.conversation.ConversationMediaSender
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollCoordinator
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollMode
@@ -89,7 +93,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.lang.reflect.Proxy
+import java.nio.file.Files
 import java.time.Duration
+import javax.crypto.spec.SecretKeySpec
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
@@ -751,10 +757,78 @@ class ConversationMediaSendReconciliationThumbnailTest {
         }
 }
 
+/** A projection arriving before upload returns must not leave an own attachment only in trim-eligible L1. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36], qualifiers = "en")
+class ConversationMediaEarlyProjectionCacheTest {
+    /** The authoritative ciphertext tag is applied after the early echo, before retained upload bytes are released. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Suppress("LongMethod") // One ordered upload/echo/trim/reopen sequence owns all temporary resources.
+    @Test
+    fun earlyProjectionRegistersHostCopyWhenUploadReturns() =
+        runTest {
+            Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+            val root = Files.createTempDirectory("early-media-cache").toFile()
+            val keyProvider = DiskByteCacheKeyProvider { SecretKeySpec(ByteArray(32) { 7 }, "AES") }
+            val disk = DiskByteCache(root, 1024L * 1024L, keyProvider)
+            val state = mediaSendReconciliationAppState()
+            WhiteNoiseAppState::class.java
+                .getDeclaredField("diskMediaCache")
+                .apply { isAccessible = true }
+                .set(state, disk)
+            val reference = mediaReference()
+            val bytes = byteArrayOf(1, 2, 3, 4)
+            val key = mediaCacheKey(ACCOUNT_REF, GROUP_ID, CONFIRMED_MESSAGE_ID, 0)
+            lateinit var controller: ConversationController
+            controller =
+                ConversationController(
+                    appState = state,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    groupRosterReader = { _, _ -> authoritativeRoster() },
+                    mediaUploader = { _, _, _ ->
+                        val optimistic = controller.timeline.single()
+                        applyProjection(controller, projectedMediaMessage(optimistic.record.recordedAt, reference))
+                        assertEquals(bytes.toList(), state.cachedMediaPlaintext(key)?.toList())
+                        assertFalse("an untagged echo must not publish durable bytes", disk.contains(key))
+                        uploadResult(reference)
+                    },
+                    mediaPublisher = { _, _, _, _ -> acceptedPendingSummary() },
+                )
+            try {
+                controller.retryMembers()
+                controller.sendAttachments(
+                    listOf(PendingAttachment(bytes, reference.mediaType, reference.fileName)),
+                    "hello",
+                )
+                state.outgoingAttachmentCachePublications.await(key)
+                state.trimPresentationMemory(PresentationMemoryTrim.EMPTY)
+                assertNull(state.cachedMediaPlaintext(key))
+                val reopened = DiskByteCache(root, 1024L * 1024L, keyProvider)
+                val retained = withContext(Dispatchers.IO) { reopened.get(key) }
+                assertEquals(bytes.toList(), retained?.toList())
+                assertEquals(
+                    CONFIRMED_MESSAGE_ID,
+                    controller.timeline
+                        .single()
+                        .record.messageIdHex,
+                )
+                assertTrue(state.activeUploadKeys(ACCOUNT_REF, GROUP_ID).isEmpty())
+            } finally {
+                try {
+                    finishMediaFixture(controller, state)
+                } finally {
+                    root.deleteRecursively()
+                    Dispatchers.resetMain()
+                }
+            }
+        }
+}
+
 /**
  * Joins every fixture-owned IO handoff before resetting Main, including after timeout.
  */
-private suspend fun finishMediaFixture(
+internal suspend fun finishMediaFixture(
     controller: ConversationController,
     state: WhiteNoiseAppState,
 ) = withContext(NonCancellable) {
@@ -1814,7 +1888,10 @@ class ConversationFileBackedMediaSendTest {
         return PendingAttachment(bytes, "image/jpeg", "photo.jpg")
     }
 
-    /** Publishes one sparse provider file of [size] bytes under [name] and returns its content Uri. */
+    /**
+     * Publishes one sparse provider file of [size] bytes under [name] and returns its content Uri. A video starts
+     * with a minimal movie header, so the metadata scrubber accepts it and its media data is the sparse rest.
+     */
     private fun scriptedPick(
         state: WhiteNoiseAppState,
         name: String,
@@ -1822,7 +1899,10 @@ class ConversationFileBackedMediaSendTest {
         size: Long,
     ): android.net.Uri {
         val file = java.io.File(state.appContext.cacheDir, "sender-$name-${System.nanoTime()}")
-        java.io.RandomAccessFile(file, "rw").use { it.setLength(size) }
+        java.io.RandomAccessFile(file, "rw").use { output ->
+            if (mediaType.startsWith("video/")) output.write(minimalMp4Header(size))
+            output.setLength(size)
+        }
         ScriptedPickProvider.picks[name] = ScriptedPick(file, mediaType, size)
         return android.net.Uri.parse("content://$SENDER_PICKS_AUTHORITY/$name")
     }
@@ -1975,6 +2055,35 @@ private fun fileBackedController(
     },
     markdownParser = { emptyMarkdownDocument() },
 )
+
+/**
+ * A controller whose native uploads go to [inMemory] or [fromFiles], so a test in another package can inspect the
+ * exact bytes and files a send hands to MDK. Each upload result is accepted and publication succeeds as in
+ * [fileBackedController].
+ */
+internal fun uploadCapturingController(
+    state: WhiteNoiseAppState,
+    inMemory: suspend (MediaUploadRequestFfi) -> MediaUploadResultFfi,
+    fromFiles: suspend (MediaFileUploadRequestFfi) -> MediaUploadResultFfi,
+) = ConversationController(
+    appState = state,
+    initialGroup = group(),
+    initialMemberSnapshot = memberSnapshot(),
+    groupRosterReader = { _, _ -> authoritativeRoster() },
+    mediaUploader = { _, _, request -> inMemory(request) },
+    mediaFileUploader = { _, _, request, _ -> fromFiles(request) },
+    fileBatchCiphertextBytes = { FILE_BATCH_CIPHERTEXT_BYTES },
+    mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
+    mediaPublisher = { _, _, _, _ -> requireNotNull(uploadResult(mediaReference()).sent) },
+    markdownParser = { emptyMarkdownDocument() },
+)
+
+/** An accepted, not yet published upload result for [count] attachments. */
+internal fun acceptedUploadResult(count: Int) =
+    MediaUploadResultFfi(
+        attachments = List(count) { MediaUploadAttachmentResultFfi(mediaReference(), 4uL) },
+        sent = null,
+    )
 
 /** A video pick already staged to a private snapshot under the app's upload directory. */
 private fun stagedVideo(state: WhiteNoiseAppState): PendingAttachment {

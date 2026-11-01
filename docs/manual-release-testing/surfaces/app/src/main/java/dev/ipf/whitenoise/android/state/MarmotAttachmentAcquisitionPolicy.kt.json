@@ -1,0 +1,35 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/MarmotAttachmentAcquisitionPolicy.kt",
+  "legacy_sha256": "dafe87cd3f7316d310190ce9ac8e1f21ebc4784ffcae1b624d9883e9e3e38dce",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Native automatic attachment acquisition containment",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/MarmotAttachmentAcquisitionPolicy.kt",
+        "anchor": "suspend fun enforceAppOwnedAttachmentAcquisitionPolicy(",
+        "test_ids": [
+          "MED-019"
+        ]
+      },
+      {
+        "surface": "Generated identity relay-list split",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/MarmotAttachmentAcquisitionPolicy.kt",
+        "anchor": "createIdentity(MarmotClient.accountRelays, relays, relays)",
+        "test_ids": [
+          "ONB-003",
+          "ONB-026"
+        ]
+      },
+      {
+        "surface": "Sign Up name and About as the first public profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/MarmotAttachmentAcquisitionPolicy.kt",
+        "anchor": "createIdentityWithInitialProfile(profile, MarmotClient.accountRelays, relays, relays)",
+        "test_ids": [
+          "ONB-003",
+          "ONB-026"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

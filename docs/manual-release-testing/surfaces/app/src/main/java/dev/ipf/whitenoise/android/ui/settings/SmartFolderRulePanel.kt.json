@@ -34,6 +34,14 @@
         "test_ids": [
           "FLD-004"
         ]
+      },
+      {
+        "surface": "SmartFolderAutomaticRules",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+        "anchor": "private fun SmartFolderAutomaticRules(",
+        "test_ids": [
+          "FLD-004"
+        ]
       }
     ],
     "source_coverage": [
@@ -120,6 +128,38 @@
           "SCR-002",
           "SCR-003",
           "SCR-004"
+        ]
+      },
+      {
+        "surface": "Quick filter entry and advanced disclosure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+        "anchor": "R.string.smart_folder_quick_start",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "advanced",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+        "anchor": "R.string.advanced",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_quick_collapsed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+        "anchor": "R.string.smart_folder_quick_collapsed",
+        "test_ids": [
+          "FLD-004"
+        ]
+      },
+      {
+        "surface": "smart_folder_quick_expanded",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SmartFolderRulePanel.kt",
+        "anchor": "R.string.smart_folder_quick_expanded",
+        "test_ids": [
+          "FLD-004"
         ]
       }
     ]

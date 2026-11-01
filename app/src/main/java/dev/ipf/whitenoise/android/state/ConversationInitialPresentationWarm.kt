@@ -4,6 +4,7 @@ import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCacheRead
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardSnapshots
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
@@ -80,12 +81,28 @@ internal class ConversationInitialPresentationWarmCoordinator(
     private var eventCardsSettled = true
     private var ready = false
 
+    // Completes once onReady has run, or when [scope] ends, since no warm or deadline is left then to run it.
+    private val readiness =
+        CompletableDeferred<Unit>().also { done ->
+            scope.coroutineContext[Job]?.invokeOnCompletion { done.complete(Unit) }
+        }
+
     /** Publishes readiness once and cancels every active warm and deadline. */
     private fun markReady() {
         if (ready) return
         ready = true
         listOf(profileJob, eventCardJob, profileDeadline, eventCardDeadline).forEach { it?.cancel() }
         onReady()
+        // Only after onReady, so a caller resumed by it already sees what readiness published.
+        readiness.complete(Unit)
+    }
+
+    /**
+     * Suspends until readiness is published. Once a page is prepared, its budgets bound that wait, and it also ends
+     * with [scope], which takes every warm and deadline that could publish readiness with it.
+     */
+    suspend fun awaitReady() {
+        readiness.await()
     }
 
     /** Publishes readiness once both halves of the current page have settled or run out of budget. */

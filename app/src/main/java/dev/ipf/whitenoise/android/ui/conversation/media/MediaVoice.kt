@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,6 +30,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -526,64 +528,71 @@ internal fun MediaVoiceBubble(
         }
     }
 
-    VoiceAttachmentContent(
-        loading = loading,
-        failed = failed,
-        storageBlocked = failed && storageFailed,
-        startDownload = startDownload,
-        localFileAvailable = localFile != null,
-        isPlaying = isPlayingThis,
-        isPaused = isPausedThis,
-        activePositionMs = activePositionMs,
-        activeDurationMs = activeDurationMs,
-        totalDurationMs = totalDurationMs,
-        progressFraction = progressFraction,
-        outgoing = mine,
-        // The speed pill only makes sense for the clip that owns playback; a
-        // seek needs a known duration to turn the track fraction into a position.
-        playbackSpeed = playback?.speed?.takeIf { isPlayingThis || isPausedThis },
-        onSeek =
-            if ((isPlayingThis || isPausedThis) && activeDurationMs > 0) {
-                { fraction -> presentationRuntime.seekTo(pillKey, (fraction * activeDurationMs).toInt()) }
-            } else {
-                null
+    Column {
+        VoiceAttachmentContent(
+            loading = loading,
+            failed = failed,
+            storageBlocked = failed && storageFailed,
+            startDownload = startDownload,
+            localFileAvailable = localFile != null,
+            isPlaying = isPlayingThis,
+            isPaused = isPausedThis,
+            activePositionMs = activePositionMs,
+            activeDurationMs = activeDurationMs,
+            totalDurationMs = totalDurationMs,
+            progressFraction = progressFraction,
+            outgoing = mine,
+            // The speed pill only makes sense for the clip that owns playback; a
+            // seek needs a known duration to turn the track fraction into a position.
+            playbackSpeed = playback?.speed?.takeIf { isPlayingThis || isPausedThis },
+            onSeek =
+                if ((isPlayingThis || isPausedThis) && activeDurationMs > 0) {
+                    { fraction -> presentationRuntime.seekTo(pillKey, (fraction * activeDurationMs).toInt()) }
+                } else {
+                    null
+                },
+            onCycleSpeed = presentationRuntime::cycleSpeed,
+            onLongPress = onLongPress,
+            transfer = transfer,
+            onRetryTransfer = {
+                controller.retryAttachmentTransfer(
+                    messageIdHex,
+                    attachmentIndex,
+                    onAccepted = { controller.requestAttachmentDownload(messageIdHex, attachmentIndex) },
+                    onFailure = { markFailed(it) },
+                )
             },
-        onCycleSpeed = presentationRuntime::cycleSpeed,
-        onLongPress = onLongPress,
-        transfer = transfer,
-        onRetryTransfer = {
-            controller.retryAttachmentTransfer(
-                messageIdHex,
-                attachmentIndex,
-                onAccepted = { controller.requestAttachmentDownload(messageIdHex, attachmentIndex) },
-                onFailure = { markFailed(it) },
-            )
-        },
-        onActionClick = {
-            when {
-                failed ->
-                    controller.retryAttachmentTransfer(
-                        messageIdHex,
-                        attachmentIndex,
-                        onAccepted = { controller.requestAttachmentDownload(messageIdHex, attachmentIndex) },
-                        onFailure = { markFailed(it) },
-                    )
-                loading || localFile == null ->
-                    controller.requestAttachmentDownload(messageIdHex, attachmentIndex)
-                isPlayingThis -> {
-                    failed = false
-                    presentationRuntime.pause()
-                }
-                else -> {
-                    failed = false
-                    scope.launch {
-                        val readyFile = localFile ?: return@launch
-                        playReadyVoice(readyFile)
+            onActionClick = {
+                when {
+                    failed ->
+                        controller.retryAttachmentTransfer(
+                            messageIdHex,
+                            attachmentIndex,
+                            onAccepted = { controller.requestAttachmentDownload(messageIdHex, attachmentIndex) },
+                            onFailure = { markFailed(it) },
+                        )
+                    loading || localFile == null ->
+                        controller.requestAttachmentDownload(messageIdHex, attachmentIndex)
+                    isPlayingThis -> {
+                        failed = false
+                        presentationRuntime.pause()
+                    }
+                    else -> {
+                        failed = false
+                        scope.launch {
+                            val readyFile = localFile ?: return@launch
+                            playReadyVoice(readyFile)
+                        }
                     }
                 }
+            },
+        )
+        if (!mine) {
+            key(localFile) {
+                ReceivedAudioTranscription(localFile)
             }
-        },
-    )
+        }
+    }
 }
 
 /**

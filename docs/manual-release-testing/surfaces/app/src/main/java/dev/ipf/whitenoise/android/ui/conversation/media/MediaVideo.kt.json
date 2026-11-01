@@ -48,7 +48,8 @@
         "test_ids": [
           "MED-007",
           "MED-017",
-          "MED-033"
+          "MED-033",
+          "MED-041"
         ]
       },
       {
@@ -139,6 +140,22 @@
         "test_ids": [
           "MED-025",
           "MED-037"
+        ]
+      },
+      {
+        "surface": "Attachment video foreground and audio-route pause",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
+        "anchor": "DisposableEffect(exo, lifecycle, autoplayAllowed)",
+        "test_ids": [
+          "MED-041"
+        ]
+      },
+      {
+        "surface": "Visible thumbnail expansion and selected attachment return continuity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
+        "anchor": "fun MediaVideoBubble(",
+        "test_ids": [
+          "MED-044"
         ]
       }
     ]

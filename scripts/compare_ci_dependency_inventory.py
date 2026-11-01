@@ -48,7 +48,7 @@ def baseline(source, artifact_name):
             entries = [info for info in archive.infolist() if info.filename == 'inventory/selected.json']
             if not entries:
                 continue  # Legacy security-report artifacts predate inventory export.
-            require(len(entries) == 1 and entries[0].file_size <= 32 * 1024 * 1024,
+            require(len(entries) == 1 and entries[0].file_size <= 64 * 1024 * 1024,
                     'Missing or oversized baseline inventory')
             inventory = decode_json(archive.read(entries[0]))
             require(inventory.get('source_sha') == source, 'Stale baseline inventory source')

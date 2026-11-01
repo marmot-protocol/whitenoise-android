@@ -1,9 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -30,6 +28,10 @@ import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerO
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsQuickTransportViewportLock
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventCardResolver
+import dev.ipf.whitenoise.android.ui.conversation.reactions.LocalReactionMotion
+import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionMotionRow
+import dev.ipf.whitenoise.android.ui.conversation.reactions.rememberLocalReactionMotion
+import dev.ipf.whitenoise.android.ui.group.isCurrentGroupMutationOwner
 import java.util.Locale
 
 /** Renders one projected timeline item and delegates bubble gestures to the conversation owner. */
@@ -84,9 +86,11 @@ internal fun TimelineRow(
     // Reveals a send accepted from a long message's Read more reader (#3268).
     onReaderSendAccepted: () -> Unit = {},
     onBeforeBodyCollapse: () -> Unit = {},
+    reactionViewport: () -> Rect? = { null },
     modifier: Modifier = Modifier,
 ) = traceConversationUiSection(ConversationUiTrace.ROW) {
-    Column(modifier.fillMaxWidth()) {
+    val reactionMotion = rememberTimelineReactionMotion(item, controller, appState, composerGate, selectionMode)
+    ReactionMotionRow(reactionMotion, modifier, reactionViewport) {
         val daySeparatorLabel =
             remember(older?.record?.recordedAt, item.record.recordedAt, transcriptLocale) {
                 if (older == null || differentDay(older.record.recordedAt, item.record.recordedAt)) {
@@ -220,65 +224,107 @@ internal fun TimelineRow(
             ) {
                 onActionMenuOpenChange(false)
             }
-            // The prototype opens each sender cluster with a 12 dp gap; rows inside a run keep the list spacing,
-            // and a row the unread divider already separated keeps the divider's interval alone.
-            Box(
-                Modifier.padding(
-                    top =
-                        conversationClusterTopGap(
-                            sameSenderAsOlderBubble = sameSenderAsOlderBubble,
-                            followsUnreadDivider = showUnreadDivider,
-                        ),
-                ),
-            ) {
-                key(controller.boundAccountRef, controller.group.groupIdHex, item.presentationId) {
-                    TimelineRowMessageBubble(
-                        messageIdHex = item.record.messageIdHex,
-                        item = item,
-                        controller = controller,
-                        appState = appState,
-                        onOpenConversationMedia = onOpenConversationMedia,
-                        eventCardResolver = eventCardResolver,
-                        documentSaveFallback = documentSaveFallback,
-                        composerTextState = composerTextState,
-                        highlighted = highlighted,
-                        selectionMode = selectionMode,
-                        textSelectionMode = textSelectionMode,
-                        onTextSelectionModeChange = onTextSelectionModeChange,
-                        onTextSelectionBoundsChange = onTextSelectionBoundsChange,
-                        batchSelectable = batchSelectable,
-                        selected = selected,
-                        onToggleSelection = onToggleSelection,
-                        rangeDragActive = rangeDragActive,
-                        onDragSelectionStart = onDragSelectionStart,
-                        onDragSelection = onDragSelection,
-                        onDragSelectionEnd = onDragSelectionEnd,
-                        onDragSelectionCancel = onDragSelectionCancel,
-                        quickReactionEmojis = quickReactionEmojis,
-                        recentEmojis = recentEmojis,
-                        onEmojiUsed = onEmojiUsed,
-                        isActionMenuOpen = isActionMenuOpen,
-                        onActionMenuOpenChange = onActionMenuOpenChange,
-                        onQuickReactionsSave = onQuickReactionsSave,
-                        onReplyPreviewClick = onReplyPreviewClick,
-                        composerGate = composerGate,
-                        blockedDmUnblockInFlight = blockedDmUnblockInFlight,
-                        onUnblockBlockedDm = onUnblockBlockedDm,
-                        onBack = onBack,
-                        mentionCandidates = mentionCandidates,
-                        mentionPickerEnabled = mentionPickerEnabled,
-                        onReaderSendAccepted = onReaderSendAccepted,
-                        onBeforeBodyCollapse = onBeforeBodyCollapse,
-                        showSenderName = senderDecoration.showName,
-                        showSenderAvatar = senderDecoration.showAvatar,
-                        collapseLongMessages = collapseLongMessages,
-                        readOnly = controller.group.pendingConfirmation,
-                        ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,
-                        ttsSentenceLayoutSink = ttsSentenceLayoutSink,
-                        onTtsSentenceSeek = onTtsSentenceSeek,
-                    )
-                }
+            // Sender runs own attribution only; the timeline arrangement owns the outer interval.
+            key(controller.boundAccountRef, controller.group.groupIdHex, item.presentationId) {
+                TimelineRowMessageBubble(
+                    messageIdHex = item.record.messageIdHex,
+                    item = item,
+                    controller = controller,
+                    appState = appState,
+                    onOpenConversationMedia = onOpenConversationMedia,
+                    eventCardResolver = eventCardResolver,
+                    documentSaveFallback = documentSaveFallback,
+                    composerTextState = composerTextState,
+                    highlighted = highlighted,
+                    selectionMode = selectionMode,
+                    textSelectionMode = textSelectionMode,
+                    onTextSelectionModeChange = onTextSelectionModeChange,
+                    onTextSelectionBoundsChange = onTextSelectionBoundsChange,
+                    batchSelectable = batchSelectable,
+                    selected = selected,
+                    onToggleSelection = onToggleSelection,
+                    rangeDragActive = rangeDragActive,
+                    onDragSelectionStart = onDragSelectionStart,
+                    onDragSelection = onDragSelection,
+                    onDragSelectionEnd = onDragSelectionEnd,
+                    onDragSelectionCancel = onDragSelectionCancel,
+                    quickReactionEmojis = quickReactionEmojis,
+                    recentEmojis = recentEmojis,
+                    onEmojiUsed = onEmojiUsed,
+                    isActionMenuOpen = isActionMenuOpen,
+                    onActionMenuOpenChange = onActionMenuOpenChange,
+                    onQuickReactionsSave = onQuickReactionsSave,
+                    onReplyPreviewClick = onReplyPreviewClick,
+                    composerGate = composerGate,
+                    blockedDmUnblockInFlight = blockedDmUnblockInFlight,
+                    onUnblockBlockedDm = onUnblockBlockedDm,
+                    onBack = onBack,
+                    mentionCandidates = mentionCandidates,
+                    mentionPickerEnabled = mentionPickerEnabled,
+                    onReaderSendAccepted = onReaderSendAccepted,
+                    onBeforeBodyCollapse = onBeforeBodyCollapse,
+                    showSenderName = senderDecoration.showName,
+                    showSenderAvatar = senderDecoration.showAvatar,
+                    collapseLongMessages = collapseLongMessages,
+                    readOnly = controller.group.pendingConfirmation,
+                    ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,
+                    ttsSentenceLayoutSink = ttsSentenceLayoutSink,
+                    onTtsSentenceSeek = onTtsSentenceSeek,
+                )
             }
         }
     }
+}
+
+/** Decorative ownership follows the same current targets as the row's existing action dispatch. */
+@Composable
+private fun rememberTimelineReactionMotion(
+    item: TimelineMessage,
+    controller: ConversationController,
+    appState: WhiteNoiseAppState,
+    gate: ComposerGate,
+    selectionMode: Boolean,
+): LocalReactionMotion {
+    val runtime = remember(controller) { appState.runtimeGeneration }
+    val targetAvailable =
+        when {
+            MessageProjector.isGroupSystem(item.record) ->
+                currentGroupSystemReactionTarget(
+                    controller,
+                    GroupSystemReactionOwner(
+                        controller.boundAccountRef,
+                        item.record.groupIdHex,
+                        item.record.messageIdHex,
+                    ),
+                ) != null
+            MessageProjector.isPollKind(item.record.kind) ->
+                currentPollActionTarget(
+                    controller,
+                    PollMessageActionOwner(
+                        controller.boundAccountRef,
+                        item.record.groupIdHex,
+                        item.record.messageIdHex,
+                    ),
+                ) != null
+            else ->
+                item.projected?.deleted != true &&
+                    item.projected?.invalidationStatus == null &&
+                    !MessageProjector.isDeleted(item.record.messageIdHex, controller.deletedMessageIds)
+        }
+    val currentOwner =
+        !appState.appLockScreenVisible &&
+            controller.isCurrentGroupMutationOwner(appState, runtime) &&
+            controller.acceptsConversationActionOwner(controller.boundAccountRef, controller.group.groupIdHex)
+    val readOnly =
+        if (MessageProjector.isGroupSystem(item.record)) {
+            gate != ComposerGate.COMPOSER
+        } else {
+            controller.group.pendingConfirmation
+        }
+    val canReact = !readOnly && !selectionMode
+    val available = targetAvailable && canReact && currentOwner
+    return rememberLocalReactionMotion(
+        controller to item.presentationId,
+        enabled = rememberConversationMotionEnabled() && available,
+    )
 }

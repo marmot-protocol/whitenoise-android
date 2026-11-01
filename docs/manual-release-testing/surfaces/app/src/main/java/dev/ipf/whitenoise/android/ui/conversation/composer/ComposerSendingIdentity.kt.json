@@ -1,0 +1,45 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerSendingIdentity.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ComposerSendingIdentity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerSendingIdentity.kt",
+        "anchor": "fun ComposerSendingIdentity(",
+        "test_ids": [
+          "CON-035"
+        ]
+      },
+      {
+        "surface": "Compact toolbar target spacing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerSendingIdentity.kt",
+        "anchor": "size = sendingIdentityAvatarSize,",
+        "test_ids": [
+          "CON-030",
+          "CON-035"
+        ]
+      },
+      {
+        "surface": "ComposerToolbarTargets",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerSendingIdentity.kt",
+        "anchor": "internal fun ComposerToolbarTargets(",
+        "test_ids": [
+          "CON-030",
+          "CON-035"
+        ]
+      }
+    ],
+    "string_resources": [
+      {
+        "surface": "Sender confirmation label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerSendingIdentity.kt",
+        "anchor": "R.string.share_sending_as",
+        "test_ids": [
+          "CON-035"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

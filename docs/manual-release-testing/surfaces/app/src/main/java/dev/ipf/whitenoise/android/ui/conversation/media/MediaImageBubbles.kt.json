@@ -18,7 +18,8 @@
         "test_ids": [
           "MED-001",
           "MED-003",
-          "MED-026"
+          "MED-026",
+          "MED-042"
         ]
       },
       {
@@ -43,7 +44,8 @@
         "anchor": "fun MediaImageGridTile(",
         "test_ids": [
           "MED-001",
-          "MED-026"
+          "MED-026",
+          "MED-042"
         ]
       },
       {
@@ -51,7 +53,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt",
         "anchor": "fun MediaVisualGridBubble(",
         "test_ids": [
-          "MED-001"
+          "MED-001",
+          "MED-042"
         ]
       },
       {
@@ -79,6 +82,22 @@
         "test_ids": [
           "MED-001",
           "MED-035"
+        ]
+      },
+      {
+        "surface": "Visible thumbnail expansion and selected attachment return continuity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt",
+        "anchor": "fun MediaImageBubble(",
+        "test_ids": [
+          "MED-044"
+        ]
+      },
+      {
+        "surface": "Single-image motion records content inside the tap indication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt",
+        "anchor": "fun MediaImageBubble(",
+        "test_ids": [
+          "MED-044"
         ]
       }
     ]

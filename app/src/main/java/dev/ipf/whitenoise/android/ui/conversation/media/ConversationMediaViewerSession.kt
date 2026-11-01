@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -8,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
+import dev.ipf.whitenoise.android.ui.conversation.ComposerSendMotion
 
 /** Identity boundary that prevents a viewer session from crossing account or conversation generations. */
 internal data class ConversationMediaViewerOwner(
@@ -56,6 +58,8 @@ internal class ConversationMediaViewerSessionState(
 ) {
     var active by mutableStateOf<ConversationMediaViewerActiveSession?>(null)
         private set
+
+    val thumbnails = MediaViewerThumbnailRegistry()
 
     private var nextSessionId = 0L
 
@@ -128,4 +132,19 @@ internal fun ConversationMediaViewerSessionHost(
 ) {
     val active = state.active ?: return
     key(active.sessionId) { content(active) }
+}
+
+/**
+ * Observes modal visibility in its own restart scope rather than invalidating an idle transcript.
+ * Retiring an actual text flight may still update its owner. The guard commits before the next draw.
+ */
+@Suppress("FunctionNaming")
+@Composable
+internal fun ComposerSendMotionMediaGate(
+    motion: ComposerSendMotion,
+    state: ConversationMediaViewerSessionState,
+    enabled: Boolean,
+) {
+    val eligible = enabled && state.active == null
+    SideEffect { motion.enabled = eligible }
 }

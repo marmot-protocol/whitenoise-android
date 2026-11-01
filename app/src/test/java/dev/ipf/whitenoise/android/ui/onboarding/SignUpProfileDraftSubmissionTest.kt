@@ -83,6 +83,7 @@ class SignUpProfileDraftSubmissionTest {
         assertWelcomeSignupReachesCreationAdapter(hasDefaultRoute = true, isVpn = false)
     }
 
+    /** Drives Welcome → Sign Up through the production adapter to one native creation carrying the typed name. */
     private fun assertWelcomeSignupReachesCreationAdapter(
         hasDefaultRoute: Boolean,
         isVpn: Boolean = true,
@@ -96,8 +97,12 @@ class SignUpProfileDraftSubmissionTest {
                 .newProxyInstance(
                     MarmotInterface::class.java.classLoader,
                     arrayOf(MarmotInterface::class.java),
-                ) { _, method, _ ->
-                    check(method.name == "createIdentity") { "Unexpected native call: ${method.name}" }
+                ) { _, method, args ->
+                    check(method.name == "createIdentityWithInitialProfile") {
+                        "Unexpected native call: ${method.name}"
+                    }
+                    // The typed name is the account's first public profile, not a later replacement.
+                    assertEquals("Retained name", (args[0] as UserProfileMetadataFfi).name)
                     creations.incrementAndGet()
                     error("Synthetic creation failure")
                 } as MarmotInterface
@@ -151,7 +156,7 @@ class SignUpProfileDraftSubmissionTest {
                         scope,
                         { owner },
                         { true },
-                        create = { _ ->
+                        create = { _, _ ->
                             creations++
                             AccountSummaryFfi("new", "11".repeat(32), true, false, false, true)
                         },
@@ -205,7 +210,7 @@ class SignUpProfileDraftSubmissionTest {
                         scope,
                         { owner },
                         { true },
-                        create = { _ -> AccountSummaryFfi("new", "11".repeat(32), true, false, false, true) },
+                        create = { _, _ -> AccountSummaryFfi("new", "11".repeat(32), true, false, false, true) },
                         hasPendingIdentityReceipt = { false },
                         qualify = {},
                         accept = { account, old ->
@@ -244,7 +249,7 @@ class SignUpProfileDraftSubmissionTest {
                         scope,
                         { SignUpOwner(1, null) },
                         { true },
-                        create = { _ ->
+                        create = { _, _ ->
                             creations++
                             error("Offline must not create")
                         },

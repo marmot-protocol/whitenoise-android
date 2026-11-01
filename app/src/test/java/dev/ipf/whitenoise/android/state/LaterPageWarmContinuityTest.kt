@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.os.Looper
+import android.os.SystemClock
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.whitenoise.android.core.TimelineProjector
@@ -18,6 +19,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -48,51 +51,66 @@ class LaterPageWarmContinuityTest {
     }
 
     /**
-     * A far jump into a window with a card row: the previous transcript stays while the card is read, then the new
-     * window replaces it in one frame. No frame is blank, the card first composes Loaded, and the landing returns with
-     * its target on screen.
+     * A far jump into a window with a card row, once the conversation is ready: the previous transcript stays while the
+     * card is read, then the new window replaces it in one frame. No frame is blank, the card first composes Loaded,
+     * and the landing returns with its target on screen.
      */
     @Test
     fun farJumpShowsTheJumpedToWindowCompleteWithNoBlankFrame() {
         val read = CountDownLatch(1)
-        val farWindow =
-            timelinePage(
-                timelineRecord(FAR_PLAIN_ID, 1uL, plaintext = "far plain"),
-                timelineRecord(FAR_CARD_ID, 2uL, plaintext = "nostr:$NOTE"),
-                timelineRecord(TARGET_ID, 3uL, plaintext = "the target"),
-            ).copy(hasMoreAfter = true)
-        val fixture =
-            EventCardConversationFixture(
-                composeRule = composeRule,
-                snapshotPage =
-                    timelinePage(
-                        timelineRecord(NEW_A_ID, 100uL, plaintext = "newer a"),
-                        timelineRecord(NEW_B_ID, 101uL, plaintext = "newer b"),
-                    ).copy(hasMoreBefore = true),
-                jumpOutcomes = mutableListOf(ConversationJumpOutcome.Window(TimelinePageOutcome.Advanced(farWindow))),
-                cacheRead = { read.await(READ_BLOCK_SECONDS, TimeUnit.SECONDS) },
-            )
+        val fixture = farJumpConversation(read)
         try {
             fixture.compose()
-            fixture.awaitIdleCondition { fixture.controller.timeline.size == SHOWN.size }
-            val landing = Landing()
-            navigationScope.launch {
-                val availability = fixture.controller.loadMessageAvailability(TARGET_ID)
-                landing.targetShownOnReturn = TARGET_ID in timelineMessageIds(fixture.controller)
-                landing.availability = availability
+            // A later page reads its cards only once the first presentation is ready, and before that the first
+            // page's hold reads them, so the jump waits for readiness to take the path this test is about.
+            fixture.awaitIdleCondition {
+                fixture.controller.hasPreparedInitialPresentation && fixture.controller.timeline.size == SHOWN.size
             }
+            val landing = fixture.launchLanding()
             fixture.awaitIdleCondition { fixture.cacheReads.get() >= 1 }
             assertEquals("the transcript stays during the read", SHOWN, timelineMessageIds(fixture.controller))
 
             read.countDown()
             fixture.awaitIdleCondition { landing.availability != null }
 
-            val far = listOf(FAR_PLAIN_ID, FAR_CARD_ID, TARGET_ID)
+            fixture.assertLandedCompleteOnTheFarWindow(landing)
+        } finally {
+            read.countDown()
+            fixture.close()
+        }
+    }
+
+    /** An early landing cannot claim a row while the initial card read still holds its publication. */
+    @Test
+    fun earlyLandingRemainsRetryableUntilItsInitialCardPageIsPublished() {
+        val read = CountDownLatch(1)
+        val fixture =
+            EventCardConversationFixture(
+                composeRule = composeRule,
+                snapshotPage = timelinePage(timelineRecord(TARGET_ID, 1uL, plaintext = "nostr:$NOTE")),
+                cacheRead = { read.await(READ_BLOCK_SECONDS, TimeUnit.SECONDS) },
+            )
+        try {
+            fixture.compose()
+            fixture.awaitIdleCondition { fixture.cacheReads.get() >= 1 }
+            val landing = Landing()
+            navigationScope.launch {
+                landing.availability = fixture.controller.loadMessageAvailability(TARGET_ID)
+            }
+            fixture.awaitIdleCondition { landing.availability != null }
+            assertEquals(MessageAvailability.RETRYABLE, landing.availability)
+            assertTrue(TARGET_ID !in timelineMessageIds(fixture.controller))
+
+            read.countDown()
+            fixture.awaitIdleCondition {
+                fixture.controller.hasPreparedInitialPresentation && TARGET_ID in timelineMessageIds(fixture.controller)
+            }
+            landing.availability = null
+            navigationScope.launch {
+                landing.availability = fixture.controller.loadMessageAvailability(TARGET_ID)
+            }
+            fixture.awaitIdleCondition { landing.availability != null }
             assertEquals(MessageAvailability.AVAILABLE, landing.availability)
-            assertTrue("the landing returned before its target was shown", landing.targetShownOnReturn)
-            assertEquals(far, timelineMessageIds(fixture.controller))
-            assertEquals(listOf(SHOWN, far), fixture.composedOrders.dropWhile { it != SHOWN })
-            assertEquals(listOf("$LOADED $EVENT_ID"), fixture.composed.map(::describe).distinct())
         } finally {
             read.countDown()
             fixture.close()
@@ -100,9 +118,43 @@ class LaterPageWarmContinuityTest {
     }
 
     /**
-     * The echo of a send without a client token arrives in a live window whose card row is being read. Nothing is
-     * hidden meanwhile: the send is on screen in every frame, as its bubble until the window applies, then as the
-     * settled row.
+     * A far jump that commits before the conversation's first presentation is ready, here held by its profile read:
+     * the jumped-to window is held unpublished for its card like a first page (#2238). The landing waits until that
+     * window is shown, so it never reports a target the reader cannot see, and the window still first composes with
+     * its card Loaded and replaces the transcript in one frame.
+     */
+    @Test
+    fun farJumpBeforeTheConversationIsReadyReturnsOnceItsHeldWindowIsShown() {
+        val read = CountDownLatch(1)
+        val profile = CountDownLatch(1)
+        val fixture = farJumpConversation(read, profileRead = { profile.await(READ_BLOCK_SECONDS, TimeUnit.SECONDS) })
+        try {
+            fixture.compose()
+            fixture.awaitIdleCondition { fixture.controller.timeline.size == SHOWN.size }
+            assertFalse("the profile read holds readiness", fixture.controller.hasPreparedInitialPresentation)
+            val landing = fixture.launchLanding()
+            fixture.awaitIdleCondition {
+                fixture.controller.isHoldingInitialPageForEventCards && fixture.cacheReads.get() >= 1
+            }
+            assertEquals("the transcript stays while the window is held", SHOWN, timelineMessageIds(fixture.controller))
+            assertNull("the landing returned while its window was held", landing.availability)
+
+            read.countDown()
+            profile.countDown()
+            fixture.awaitIdleCondition { landing.availability != null }
+
+            fixture.assertLandedCompleteOnTheFarWindow(landing)
+        } finally {
+            read.countDown()
+            profile.countDown()
+            fixture.close()
+        }
+    }
+
+    /**
+     * Once the conversation is ready, the echo of a send without a client token arrives in a live window whose card row
+     * is being read. Nothing is hidden meanwhile: the send is on screen in every frame, as its bubble until the window
+     * applies, then as the settled row.
      */
     @Test
     fun ownSendStaysVisibleWhileAWindowCarryingItsEchoIsWarming() {
@@ -126,10 +178,26 @@ class LaterPageWarmContinuityTest {
             )
         try {
             fixture.compose()
-            fixture.awaitIdleCondition { PENDING_ID in timelineMessageIds(fixture.controller) }
+            // Ready first, so the live window reads its card before it applies instead of falling under the first
+            // page's hold, or applying unread when readiness lands between that check and its commit.
+            fixture.awaitIdleCondition {
+                val shown = timelineMessageIds(fixture.controller)
+                fixture.controller.hasPreparedInitialPresentation && PENDING_ID in shown
+            }
+            val emittedAt = SystemClock.elapsedRealtime()
             fixture.timelineScript.emitWindow(timelinePage(newest, card, echo))
             fixture.awaitIdleCondition { fixture.drainLiveWindows() && fixture.cacheReads.get() >= 1 }
-            assertTrue(PENDING_ID in timelineMessageIds(fixture.controller))
+            // A bounded card warm can install the echo while its native cache read remains blocked.
+            val rowsDuringRead = timelineMessageIds(fixture.controller)
+            val readPhase =
+                "${fixture.describeState()} latchCount=${read.count} rows=$rowsDuringRead " +
+                    "sinceEmitMs=${SystemClock.elapsedRealtime() - emittedAt}"
+            println("own-send before cache release: $readPhase")
+            assertEquals(
+                "the send needs exactly one representation: $readPhase",
+                1,
+                rowsDuringRead.count { it == PENDING_ID || it == ECHO_ID },
+            )
 
             read.countDown()
             fixture.awaitIdleCondition { FAR_CARD_ID in timelineMessageIds(fixture.controller) }
@@ -199,6 +267,61 @@ class LaterPageWarmContinuityTest {
             read.countDown()
             fixture.close()
         }
+    }
+
+    /**
+     * The conversation [farJumpShowsTheJumpedToWindowCompleteWithNoBlankFrame] and its pre-readiness twin open: two
+     * plain newest rows, and a jump answered with a far window whose middle row names a cached card, read after [read].
+     */
+    private fun farJumpConversation(
+        read: CountDownLatch,
+        profileRead: () -> Unit = {},
+    ): EventCardConversationFixture =
+        EventCardConversationFixture(
+            composeRule = composeRule,
+            snapshotPage =
+                timelinePage(
+                    timelineRecord(NEW_A_ID, 100uL, plaintext = "newer a"),
+                    timelineRecord(NEW_B_ID, 101uL, plaintext = "newer b"),
+                ).copy(hasMoreBefore = true),
+            jumpOutcomes =
+                mutableListOf(
+                    ConversationJumpOutcome.Window(
+                        TimelinePageOutcome.Advanced(
+                            timelinePage(
+                                timelineRecord(FAR_PLAIN_ID, 1uL, plaintext = "far plain"),
+                                timelineRecord(FAR_CARD_ID, 2uL, plaintext = "nostr:$NOTE"),
+                                timelineRecord(TARGET_ID, 3uL, plaintext = "the target"),
+                            ).copy(hasMoreAfter = true),
+                        ),
+                    ),
+                ),
+            cacheRead = { read.await(READ_BLOCK_SECONDS, TimeUnit.SECONDS) },
+            profileRead = profileRead,
+        )
+
+    /** Lands on [TARGET_ID] on the main thread, recording whether it was on screen when the landing returned. */
+    private fun EventCardConversationFixture.launchLanding(): Landing {
+        val landing = Landing()
+        navigationScope.launch {
+            val availability = controller.loadMessageAvailability(TARGET_ID)
+            landing.targetShownOnReturn = TARGET_ID in timelineMessageIds(controller)
+            landing.availability = availability
+        }
+        return landing
+    }
+
+    /**
+     * Asserts the landing returned available with its target on screen, the far window replaced the transcript in one
+     * frame, and its card only ever composed Loaded.
+     */
+    private fun EventCardConversationFixture.assertLandedCompleteOnTheFarWindow(landing: Landing) {
+        val far = listOf(FAR_PLAIN_ID, FAR_CARD_ID, TARGET_ID)
+        assertEquals(MessageAvailability.AVAILABLE, landing.availability)
+        assertTrue("the landing returned before its target was shown", landing.targetShownOnReturn)
+        assertEquals(far, timelineMessageIds(controller))
+        assertEquals(listOf(SHOWN, far), composedOrders.dropWhile { it != SHOWN })
+        assertEquals(listOf("$LOADED $EVENT_ID"), composed.map(::describe).distinct())
     }
 
     /** What a landing saw when it returned, filled in on the main thread. */

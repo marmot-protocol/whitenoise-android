@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.diagnostics
 import android.content.Context
 import android.os.SystemClock
 import android.util.Log
+import dev.ipf.whitenoise.android.AppRevision
 import dev.ipf.whitenoise.android.BuildConfig
 import java.io.File
 import java.util.concurrent.atomic.AtomicLong
@@ -583,7 +584,7 @@ internal object PerformanceDiagnostics {
     private val emitter =
         PerformanceDiagnosticEmitter(
             available = BuildConfig.ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS,
-            appRevision = BuildConfig.APP_SHORT_SHA,
+            appRevision = AppRevision.SHORT_SHA,
             mdkRevision = BuildConfig.MDK_SHORT_SHA,
             nowMs = SystemClock::elapsedRealtime,
             sink = { line ->

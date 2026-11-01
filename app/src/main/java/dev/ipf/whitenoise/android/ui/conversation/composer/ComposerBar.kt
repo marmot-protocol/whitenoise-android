@@ -36,6 +36,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -53,6 +54,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -289,21 +292,42 @@ internal class ComposerTextState(
     initial: TextFieldValue,
 ) {
     private var contentRevision = 0L
+    internal val contentGeneration: Long get() = contentRevision
+
+    /** Direct edits from either composer surface; selection/composition and external restoration do not advance it. */
+    var userTextEditRevision by mutableStateOf(0L)
+        private set
     val valueState: MutableState<TextFieldValue> = mutableStateOf(initial)
     val preEditState: MutableState<TextFieldValue?> = mutableStateOf(null)
 
     /**
      * True from the moment an accepted send empties the field until the pill has applied that
-     * collapse, or until the next content edit. The pill reads it to collapse in the same frame the
-     * text leaves: a tween there would drag the newest bubble, glued to the composer, down with the
-     * shrinking pill. It is one-shot so a later dismiss or refocus of the empty field tweens again.
+     * collapse, or until the next content edit. Non-flight sends snap in the acceptance frame. Only
+     * an actually admitted flight shares its clock with the pill. A later dismiss/refocus tweens again.
      */
     var collapsedBySend by mutableStateOf(false)
         private set
 
+    private var collapseFlight: dev.ipf.whitenoise.android.ui.conversation.ComposerSendFlight? = null
+    private var animatedSendCollapse by mutableStateOf(false)
+
+    /** Associates geometry animation only with this cleared input generation and its admitted flight. */
+    fun animateAcceptedCollapse(flight: dev.ipf.whitenoise.android.ui.conversation.ComposerSendFlight?) {
+        collapseFlight = flight?.takeIf { collapsedBySend && it.inputGeneration == contentRevision }
+        animatedSendCollapse = collapseFlight != null
+    }
+
+    /** An expired/missing destination or retired owner must snap the remaining geometry at any nonzero scale. */
+    fun animatesAcceptedCollapse(flight: dev.ipf.whitenoise.android.ui.conversation.ComposerSendFlight?): Boolean {
+        if (!animatedSendCollapse || flight !== collapseFlight) return false
+        return flight?.inputGeneration == contentRevision
+    }
+
     /** Called by the pill once the send collapse has been applied, so later geometry tweens again. */
     fun consumeSendCollapse() {
         collapsedBySend = false
+        animatedSendCollapse = false
+        collapseFlight = null
     }
 
     /** Captures the exact content generation an asynchronous acceptance may clear. */
@@ -325,14 +349,26 @@ internal class ComposerTextState(
         if (value.text != valueState.value.text) {
             contentRevision += 1L
             collapsedBySend = false
+            animatedSendCollapse = false
+            collapseFlight = null
         }
         valueState.value = value
+    }
+
+    /** Applies an editor-originated value, preserving a shared explicit intent signal across both composer surfaces. */
+    fun updateValueFromUser(value: TextFieldValue): Boolean {
+        val textChanged = value.text != valueState.value.text
+        updateValue(value)
+        if (textChanged) userTextEditRevision += 1L
+        return textChanged
     }
 
     /** Clears an accepted send only while its exact text generation still owns the field. */
     fun clearAccepted(token: ComposerAcceptanceToken): Boolean {
         if (!token.isCurrentFor(this, valueState.value.text, contentRevision)) return false
         updateValue(TextFieldValue(""))
+        animatedSendCollapse = false
+        collapseFlight = null
         collapsedBySend = true
         return true
     }
@@ -380,9 +416,10 @@ internal fun ComposerBar(
     messageTextCopy: MessageTextCopy,
     onCancelReply: () -> Unit,
     onSend: (text: String, onAccepted: () -> Unit) -> Unit,
+    onSendWithPresentation: ((String, (String?) -> Unit) -> Unit)? = null,
     modifier: Modifier = Modifier,
     initialDraft: TextFieldValue = TextFieldValue(""),
-    onDraftChange: (TextFieldValue) -> Unit = {},
+    onDraftChange: (TextFieldValue, Boolean) -> Unit = { _, _ -> },
     draftKey: Any? = null,
     draftAccountRef: String? = null,
     draftGroupIdHex: String? = null,
@@ -881,6 +918,11 @@ internal fun ComposerBar(
     // death during the FFI call can erase a send MDK never accepted (#1216).
     // For an in-place edit the controller short-circuits and never calls
     // onAccepted, so the pre-edit composer is restored instead.
+    val sendMotion = dev.ipf.whitenoise.android.ui.conversation.LocalComposerSendMotion.current
+    SideEffect {
+        val active = sendMotion?.flight
+        if (active != null && active.inputGeneration != textState.contentGeneration) sendMotion.clear()
+    }
     var attachmentSendInFlight by remember(draftKey) { mutableStateOf(false) }
     val submitMessage: () -> Unit = {
         // An IME can commit text and request Send before the next composition.
@@ -905,12 +947,21 @@ internal fun ComposerBar(
             }
         } else if (acceptanceToken.text.isNotBlank()) {
             val sendingEdit = editingMessageId != null
-            onSend(acceptanceToken.text) {
+            val visual = if (!sendingEdit && replyingTo == null) sendMotion?.capture(acceptanceToken.text) else null
+            val accepted: (String?) -> Unit = { presentationId ->
                 if (!sendingEdit) {
                     // onAccepted can land after the user has started typing the
                     // next message (Enter-to-send makes that common). Only the
                     // exact shared content generation may clear the field.
                     if (textState.clearAccepted(acceptanceToken)) {
+                        val admitted = sendMotion?.accept(visual, presentationId, textState.contentGeneration) == true
+                        textState.animateAcceptedCollapse(sendMotion?.flight?.takeIf { admitted })
+                        if (admitted) {
+                            // Retained draft expansion may already have reset inside the acceptance
+                            // callback. Start from the measured old viewport, not the new preference.
+                            composerHeightTransitionStartPx = visibleComposerHeightPx
+                            composerHeightTransitionEpoch += 1
+                        }
                         if (retainedExpansionOwner == null) {
                             publishComposerExpansion(ComposerExpansionState())
                         }
@@ -918,13 +969,18 @@ internal fun ComposerBar(
                     onAfterSend()
                 }
             }
+            if (onSendWithPresentation != null) {
+                onSendWithPresentation(acceptanceToken.text, accepted)
+            } else {
+                onSend(acceptanceToken.text) { accepted(null) }
+            }
         }
     }
 
     /** Updates the active text owner and publishes a draft only when this is not an edit. */
     fun applyComposerFieldValue(value: TextFieldValue) {
-        textState.updateValue(value)
-        if (editingMessageId == null) onDraftChange(value)
+        val textChanged = textState.updateValueFromUser(value)
+        if (editingMessageId == null) onDraftChange(value, textChanged)
     }
 
     /** Deletes the current selection or previous code point and repairs mention tokens before publishing. */
@@ -1062,6 +1118,10 @@ internal fun ComposerBar(
             }
         val expandedControlLayout =
             composerUsesMultilineControls || composerExpansion.mode != ComposerExpansionMode.Automatic
+        val animatedSendCollapse = textState.animatesAcceptedCollapse(sendMotion?.flight)
+        val forceAcceptedGeometrySnap = textState.collapsedBySend && !animatedSendCollapse
+        val renderedMotionGeneration = textState.contentGeneration
+        val renderedMotionValue = textFieldValue
         val transitionTargetHeightPx =
             composerHeightPx(
                 state = composerExpansion,
@@ -1089,17 +1149,25 @@ internal fun ComposerBar(
         LaunchedEffect(
             composerHeightTransitionEpoch,
             transitionTargetHeightPx,
+            forceAcceptedGeometrySnap,
         ) {
-            if (composerHeightTransitionActive) {
+            if (forceAcceptedGeometrySnap) {
+                composerHeightAnimation.snapTo(transitionTargetHeightPx)
+                completedComposerHeightTransitionEpoch = composerHeightTransitionEpoch
+            } else if (composerHeightTransitionActive) {
                 composerHeightAnimation.animateTo(
                     transitionTargetHeightPx,
                     tween(
                         durationMillis =
-                            composerHeightAnimationDurationMillis(
-                                mode = composerExpansion.mode,
-                                dragActive = composerHeightDragActive,
-                                discreteTransitionActive = composerHeightTransitionActive,
-                            ),
+                            if (animatedSendCollapse) {
+                                dev.ipf.whitenoise.android.ui.conversation.COMPOSER_SEND_MOTION_MILLIS
+                            } else {
+                                composerHeightAnimationDurationMillis(
+                                    mode = composerExpansion.mode,
+                                    dragActive = composerHeightDragActive,
+                                    discreteTransitionActive = composerHeightTransitionActive,
+                                )
+                            },
                         easing = FastOutSlowInEasing,
                     ),
                 )
@@ -1114,28 +1182,32 @@ internal fun ComposerBar(
                 base = Modifier.fillMaxWidth(),
             ),
         ) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .then(
-                        when {
-                            composerHeightDragActive -> Modifier.height(resolvedComposerHeight)
-                            composerHeightTransitionActive -> animatedComposerHeightModifier
-                            composerExpansion.mode == ComposerExpansionMode.Automatic ->
-                                Modifier.heightIn(max = automaticComposerCeiling)
-                            else -> Modifier.height(resolvedComposerHeight)
-                        },
-                    ).onSizeChanged { size ->
-                        visibleComposerHeightPx = size.height.toFloat()
-                        if (
-                            composerExpansion.mode == ComposerExpansionMode.Automatic &&
-                            !composerHeightTransitionActive
-                        ) {
-                            automaticComposerHeightPx = size.height.toFloat()
-                        }
-                        onTimelineComposerMeasured(size.height, automaticComposerHeightPx.toInt().coerceAtLeast(0))
-                    }.padding(horizontal = 16.dp, vertical = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ComposerContentLayout(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .then(
+                            when {
+                                composerHeightDragActive -> Modifier.height(resolvedComposerHeight)
+                                composerHeightTransitionActive -> animatedComposerHeightModifier
+                                composerExpansion.mode == ComposerExpansionMode.Automatic ->
+                                    Modifier.heightIn(max = automaticComposerCeiling)
+                                else -> Modifier.height(resolvedComposerHeight)
+                            },
+                        ).onGloballyPositioned { coordinates ->
+                            sendMotion?.composerCoordinates = coordinates
+                        }.onSizeChanged { size ->
+                            visibleComposerHeightPx = size.height.toFloat()
+                            if (
+                                composerExpansion.mode == ComposerExpansionMode.Automatic &&
+                                !composerHeightTransitionActive
+                            ) {
+                                automaticComposerHeightPx = size.height.toFloat()
+                            }
+                            onTimelineComposerMeasured(size.height, automaticComposerHeightPx.toInt().coerceAtLeast(0))
+                        }.padding(horizontal = 16.dp, vertical = 6.dp),
+                fillEditorHeight = composerExpansion.mode != ComposerExpansionMode.Automatic,
+                minimumEditorHeight = with(density) { minimumManualComposerHeightPx.toDp() } - 12.dp,
             ) {
                 val voiceReviewClip = voiceReview?.clip?.takeUnless { voiceRecordingController?.isRecording == true }
                 val accessoryContent: (@Composable () -> Unit)? =
@@ -1230,8 +1302,7 @@ internal fun ComposerBar(
                 // suppresses the one composition between an edit-session change and
                 // its LaunchedEffect prefill, when the field still belongs to the
                 // previous draft or edit target.
-                // Anchored directly above the composer input row, capped at
-                // ~50% of the viewport height.
+                // Suggestions use only the height left after the editor and required status chrome.
                 val composerTextMatchesEditSession = composerTextEditOwnerId == editingMessageId
                 val mentionQuery =
                     if (mentionPickerEnabled && composerTextMatchesEditSession) {
@@ -1258,6 +1329,7 @@ internal fun ComposerBar(
                     }
                 if (openQuery != null) {
                     MentionPicker(
+                        modifier = Modifier.layoutId(COMPOSER_SUGGESTIONS_SLOT),
                         candidates = mentionMatches,
                         onPick = { candidate ->
                             val insertion = MentionComposer.insertMention(textFieldValue.text, openQuery, candidate)
@@ -1278,6 +1350,7 @@ internal fun ComposerBar(
                     composerExpansion.mode == ComposerExpansionMode.Automatic
                 ) {
                     EmojiShortcodeSuggestions(
+                        modifier = Modifier.layoutId(COMPOSER_SUGGESTIONS_SLOT),
                         field = textFieldValue,
                         onPick = { updated ->
                             applyComposerFieldValue(updated)
@@ -1320,27 +1393,24 @@ internal fun ComposerBar(
                     if (dictationActiveInComposer) {
                         0.dp
                     } else if (showMicButton && voiceRecordingController.locked) {
-                        84.dp
+                        ComposerToolbarSlotWidth * 2
                     } else {
-                        40.dp
+                        ComposerToolbarSlotWidth
                     }
                 val trailingControlsWidth = primaryTrailingActionWidth
                 BoxWithConstraints(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .then(
-                                if (composerExpansion.mode == ComposerExpansionMode.Automatic) {
-                                    Modifier.weight(1f, fill = false)
-                                } else {
-                                    Modifier.weight(1f)
-                                },
-                            ),
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     // Keep the field composed and focusable throughout dictation. The
                     // app-owned controls replace only the waveform slot, so an open IME
                     // stays open and a closed IME is never raised implicitly.
                     ComposerPill(
+                        sendingIdentity =
+                            if (appState != null && composerSendingAccount(appState, draftAccountRef) != null) {
+                                { ComposerSendingIdentity(appState, draftAccountRef, draftKey, overlayBackRegistrar) }
+                            } else {
+                                null
+                            },
                         accessoryContent = accessoryContent.takeIf { voiceReviewClip == null },
                         voiceReviewContent =
                             voiceReviewClip?.let { reviewedClip ->
@@ -1349,6 +1419,29 @@ internal fun ComposerBar(
                                         checkNotNull(voiceReview),
                                         reviewedClip,
                                         voiceRecordingController,
+                                    )
+                                }
+                            },
+                        recordingContent =
+                            activeRecordingController?.let { recordingController ->
+                                {
+                                    RecordingStripLeading(
+                                        controller = recordingController,
+                                        modifier =
+                                            Modifier
+                                                .matchParentSize()
+                                                .padding(
+                                                    end =
+                                                        primaryTrailingActionWidth +
+                                                            if (expandedControlLayout) 4.dp else 12.dp,
+                                                ).pointerInput(recordingController) {
+                                                    awaitPointerEventScope {
+                                                        while (true) {
+                                                            val event = awaitPointerEvent()
+                                                            event.changes.forEach { it.consume() }
+                                                        }
+                                                    }
+                                                },
                                     )
                                 }
                             },
@@ -1535,6 +1628,24 @@ internal fun ComposerBar(
                             val estimatePx = heightWithChrome.coerceAtMost(automaticComposerCeilingPx)
                             val estimate = textFieldValue to estimatePx
                             automaticLayoutEstimate = estimate
+                            // An older layout callback cannot label its height with a newly cleared generation.
+                            val matchingMotionInput =
+                                renderedMotionGeneration == textState.contentGeneration &&
+                                    renderedMotionValue == textState.valueState.value
+                            if (renderedMotionValue.text.isEmpty() && matchingMotionInput) {
+                                val settledHeight =
+                                    composerHeightPx(
+                                        ComposerExpansionState(),
+                                        estimatePx,
+                                        minimumRenderedComposerHeightPx,
+                                        maximumComposerHeightPx,
+                                    )
+                                sendMotion?.composerTarget =
+                                    dev.ipf.whitenoise.android.ui.conversation.ComposerSendComposerTarget(
+                                        renderedMotionGeneration,
+                                        settledHeight,
+                                    )
+                            }
                             if (composerExpansion.mode == ComposerExpansionMode.Automatic &&
                                 !composerHeightDragActive &&
                                 !composerHeightTransitionActive
@@ -1550,6 +1661,7 @@ internal fun ComposerBar(
                         multilineControlsSuppressed = compactControlLayout,
                         dismissInProgress = composerDismissInProgress,
                         collapsedBySend = textState.collapsedBySend,
+                        animatedSendCollapse = animatedSendCollapse,
                         onSendCollapseApplied = textState::consumeSendCollapse,
                         modifier =
                             Modifier
@@ -1564,7 +1676,7 @@ internal fun ComposerBar(
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(0.dp),
                         modifier =
                             Modifier
                                 .align(trailingActionAlignment)
@@ -1573,15 +1685,17 @@ internal fun ComposerBar(
                         // This call site stays shared by idle and recording states;
                         // moving it would break the active hold gesture's identity.
                         if (showPrimaryTrailingAction && showMicButton && voiceRecordingController.locked) {
-                            IconButton(
-                                onClick = { voiceRecordingController.cancel() },
-                                modifier = Modifier.size(40.dp),
-                            ) {
-                                Icon(
-                                    Icons.Default.Delete,
-                                    contentDescription = stringResource(R.string.voice_message_cancel),
-                                    tint = MaterialTheme.colorScheme.error,
-                                )
+                            ComposerToolbarTargets {
+                                IconButton(
+                                    onClick = { voiceRecordingController.cancel() },
+                                    modifier = Modifier.width(ComposerToolbarSlotWidth).height(ComposerActionRowHeight),
+                                ) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = stringResource(R.string.voice_message_cancel),
+                                        tint = MaterialTheme.colorScheme.error,
+                                    )
+                                }
                             }
                             ComposerActionDisc(
                                 onClick = { voiceRecordingController.stop() },
@@ -1604,31 +1718,6 @@ internal fun ComposerBar(
                                 icon = R.drawable.ic_arrow_upward,
                             )
                         }
-                    }
-                    if (activeRecordingController != null) {
-                        RecordingStripLeading(
-                            controller = activeRecordingController,
-                            modifier =
-                                Modifier
-                                    .matchParentSize()
-                                    .padding(
-                                        end =
-                                            if (expandedControlLayout) {
-                                                if (voiceRecordingController.locked) 84.dp else 44.dp
-                                            } else if (voiceRecordingController.locked) {
-                                                92.dp
-                                            } else {
-                                                52.dp
-                                            },
-                                    ).pointerInput(activeRecordingController) {
-                                        awaitPointerEventScope {
-                                            while (true) {
-                                                val event = awaitPointerEvent()
-                                                event.changes.forEach { it.consume() }
-                                            }
-                                        }
-                                    },
-                        )
                     }
                 }
             }

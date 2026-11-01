@@ -154,8 +154,10 @@ internal class ConversationDictationCompletionDispatchOwner(
                     conversationDictationDiagnostic("event=send_outcome outcome=rejected_before_transport")
                     val emptied = claim.emptiedRevision
                     dispatchedSessionId = null
-                    claim.emptiedRevision = null
                     claim.restoredRevision = guards.restoreDraft(admissionTarget, emptied)
+                    // A temporarily unavailable host write still owes restoration of this exact clear.
+                    // Retained completion transfers the revision into the existing recovery owner.
+                    if (claim.restoredRevision != null) claim.emptiedRevision = null
                     recovery().updateDispatch(sessionId, target, restoredRevision = claim.restoredRevision)
                 }
             },

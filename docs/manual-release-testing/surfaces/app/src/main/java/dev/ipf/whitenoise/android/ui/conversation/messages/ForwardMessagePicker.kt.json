@@ -109,6 +109,14 @@
           "MSG-010",
           "PRO-008"
         ]
+      },
+      {
+        "surface": "Conversation polish ui/conversation/messages/ForwardMessagePicker.kt fun ForwardTargetRow(",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/ForwardMessagePicker.kt",
+        "anchor": "fun ForwardTargetRow(",
+        "test_ids": [
+          "CON-035"
+        ]
       }
     ],
     "source_coverage": [

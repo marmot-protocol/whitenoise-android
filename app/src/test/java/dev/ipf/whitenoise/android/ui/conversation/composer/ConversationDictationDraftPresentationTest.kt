@@ -77,7 +77,7 @@ class ConversationDictationDraftPresentationTest {
             oldAcceptance = oldEditor.acceptanceToken()
             fixture.failSend()
             // The old input writer and actual ComposerBar acceptance land before the editor redraw.
-            fixture.writers.getValue(0)(TextFieldValue("stale edit"))
+            fixture.writers.getValue(0)(TextFieldValue("stale edit"), true)
             fixture.lateSendAcceptance.invoke()
             assertEquals("", oldEditor.valueState.value.text)
             assertEquals("Draft recognized", fixture.draft.text)
@@ -359,7 +359,7 @@ class ConversationDictationDraftPresentationTest {
         private var elapsedMillis = 0L
         lateinit var editor: ComposerTextState
         lateinit var lateSendAcceptance: () -> Unit
-        val writers = mutableMapOf<Int, (TextFieldValue) -> Unit>()
+        val writers = mutableMapOf<Int, (TextFieldValue, Boolean) -> Unit>()
         val sent = mutableListOf<String>()
         private lateinit var listener: RecognitionListener
         private var recognitionCreated = false
@@ -475,7 +475,10 @@ class ConversationDictationDraftPresentationTest {
             val presentationRevision = controller.completionRevision(ACCOUNT, GROUP)
             val ownerKey = composerDraftOwnerKey(ACCOUNT, GROUP)
             editor = rememberComposerTextState(ownerKey, draft, 0 to presentationRevision)
-            val writer = conversationDictationDraftWriter(controller, ACCOUNT, GROUP, presentationRevision, ::edit)
+            val writer =
+                conversationDictationDraftWriter(controller, ACCOUNT, GROUP, presentationRevision) { value, _ ->
+                    edit(value)
+                }
             writers[presentationRevision] = writer
             WhiteNoiseTheme {
                 Surface(Modifier.width(360.dp).testTag("dictation-composer")) {

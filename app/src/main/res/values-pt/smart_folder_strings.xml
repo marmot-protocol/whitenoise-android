@@ -64,4 +64,17 @@
     <string name="smart_folder_always_include">Sempre incluir conversas</string>
     <string name="smart_folder_read_help">Tudo lido não significa que o agente terminou.</string>
   <string name="folder_show_when_empty">Mostrar quando vazia</string>
+  <string name="smart_folder_quick_start">Usar filtros rápidos</string>
+  <string name="smart_folder_quick_hint">Escolha uma das duas opções para restringir as conversas. Toque novamente para remover essa restrição. Salvar aplica as alterações.</string>
+  <string name="smart_folder_quick_accepted">Apenas conversas aceites. Esta restrição é mantida ao redefinir; altere-a em Avançado.</string>
+  <string name="smart_folder_quick_not_accepted">Conversas aceites: Não. Esta restrição é mantida ao redefinir; altere-a em Avançado.</string>
+  <string name="smart_folder_quick_reset">Redefinir filtros rápidos</string>
+  <string name="smart_folder_quick_unread">Não lidas</string>
+  <string name="smart_folder_quick_not_muted">Não silenciada</string>
+  <string name="smart_folder_quick_not_pinned">Não fixada</string>
+  <string name="smart_folder_quick_not_archived">Não arquivada</string>
+  <string name="smart_folder_quick_neutral">Nenhuma seleção</string>
+  <string name="smart_folder_quick_state">%1$s: %2$s</string>
+  <string name="smart_folder_quick_expanded">Expandido</string>
+  <string name="smart_folder_quick_collapsed">Recolhido</string>
 </resources>

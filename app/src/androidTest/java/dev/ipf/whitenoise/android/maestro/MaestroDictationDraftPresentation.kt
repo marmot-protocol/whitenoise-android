@@ -98,7 +98,7 @@ private fun MaestroRecoveredComposer(
             MaestroDictationDraftController.ACCOUNT,
             state.visibleGroup,
             revision,
-            state::edit,
+            { value, _ -> state.edit(value) },
         )
     SideEffect { if (revision == 0 && state.initialWriter == null) state.initialWriter = writer }
     RememberMaestroPreviousDictate(state)

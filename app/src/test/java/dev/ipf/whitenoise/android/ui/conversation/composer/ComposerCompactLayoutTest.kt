@@ -25,6 +25,8 @@ import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.ui.share.emptyAppState
+import dev.ipf.whitenoise.android.ui.share.testAccount
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -82,6 +84,39 @@ class ComposerCompactLayoutTest {
             .captureRoboImage("src/test/snapshots/composer_compact_resting_large_font_rtl.png")
     }
 
+    @Test fun leadingIconsHaveEvenSpacingWithIdentity() = assertIconSpacing(LayoutDirection.Ltr, true)
+
+    @Test fun leadingIconsHaveEvenSpacingWithIdentityRtl() = assertIconSpacing(LayoutDirection.Rtl, true)
+
+    @Test fun leadingIconsHaveEvenSpacingWithoutIdentity() = assertIconSpacing(LayoutDirection.Ltr, false)
+
+    @Test fun leadingIconsHaveEvenSpacingWithoutIdentityRtl() = assertIconSpacing(LayoutDirection.Rtl, false)
+
+    private fun assertIconSpacing(
+        direction: LayoutDirection,
+        identity: Boolean,
+    ) {
+        render(fontScale = 1f, direction = direction, identity = identity)
+        val controls =
+            buildList {
+                if (identity) {
+                    add(composeRule.onNodeWithTag("composer-sending-identity").fetchSemanticsNode().boundsInRoot)
+                }
+                add(bounds(R.string.attach_options))
+                add(bounds(R.string.open_emoji_picker))
+                add(bounds(R.string.paste_from_clipboard))
+            }
+        if (identity) {
+            val suffix = if (direction == LayoutDirection.Rtl) "rtl" else "ltr"
+            composeRule.onNodeWithTag(ROOT_TAG).captureRoboImage("src/test/snapshots/composer_icon_spacing_$suffix.png")
+        }
+        val sign = if (direction == LayoutDirection.Ltr) 1f else -1f
+        controls.zipWithNext().forEach { (first, second) ->
+            assertEquals("icon centers use the same 40 dp rhythm", 40f, (second.center.x - first.center.x) * sign, 1f)
+            assertTrue("controls retain their 48 dp height", first.height >= 48f && second.height >= 48f)
+        }
+    }
+
     /** One 12 dp inset above and below the measured line, controls and placeholder sharing its center. */
     private fun assertRestingRowCentered(direction: LayoutDirection) {
         val pill = pill()
@@ -124,7 +159,10 @@ class ComposerCompactLayoutTest {
     private fun render(
         fontScale: Float,
         direction: LayoutDirection,
+        identity: Boolean = false,
     ) {
+        val accounts = listOf(testAccount("alice", "aa".repeat(32)), testAccount("bob", "bb".repeat(32)))
+        val state = if (identity) emptyAppState(accounts = accounts, activeAccountRef = "alice") else null
         composeRule.setContent {
             CompositionLocalProvider(
                 LocalDensity provides Density(1f, fontScale),
@@ -134,6 +172,8 @@ class ComposerCompactLayoutTest {
                     Surface {
                         Box(Modifier.width(360.dp).height(600.dp), contentAlignment = Alignment.BottomCenter) {
                             ComposerBar(
+                                appState = state,
+                                draftAccountRef = if (identity) "alice" else null,
                                 replyingTo = null,
                                 messageTextCopy = MessageTextCopy.Default,
                                 onCancelReply = {},

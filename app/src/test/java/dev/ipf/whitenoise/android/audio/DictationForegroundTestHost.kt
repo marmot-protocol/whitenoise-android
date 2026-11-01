@@ -9,6 +9,7 @@ internal class DictationForegroundTestHost(
     scope: CoroutineScope? = null,
     preference: ConversationDictationDeliveryMode = ConversationDictationDeliveryMode.PasteIntoDraft,
     autoReady: Boolean = true,
+    onDispatchClaimed: suspend () -> Unit = {},
 ) : ConversationDictationServiceHost {
     val platform = DictationForegroundTestPlatform()
     var draft = TextFieldValue("")
@@ -39,7 +40,13 @@ internal class DictationForegroundTestHost(
             },
             silenceDeliveryMode = { preference },
             sendTranscriptIfOriginUnchanged = { request ->
-                request.beginDispatch().also { if (it) sent += request.payload }
+                if (!request.beginDispatch()) {
+                    false
+                } else {
+                    sent += request.payload
+                    onDispatchClaimed()
+                    true
+                }
             },
         )
 

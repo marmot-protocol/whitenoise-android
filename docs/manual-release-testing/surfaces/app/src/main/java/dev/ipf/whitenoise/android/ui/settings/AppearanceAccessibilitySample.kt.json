@@ -1,0 +1,85 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceAccessibilitySample.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Local continuity and ownership: AppearanceAccessibilitySample",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceAccessibilitySample.kt",
+        "anchor": "package dev.ipf.whitenoise.android",
+        "test_ids": [
+          "SET-007"
+        ]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "AppearanceAccessibilitySample",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceAccessibilitySample.kt",
+        "anchor": "fun AppearanceAccessibilitySample(",
+        "test_ids": [
+          "SET-007"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.appearance_accessibility_preview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceAccessibilitySample.kt",
+        "anchor": "R.string.appearance_accessibility_preview",
+        "test_ids": [
+          "SET-007"
+        ]
+      },
+      {
+        "surface": "R.string.appearance_preview_large_text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceAccessibilitySample.kt",
+        "anchor": "R.string.appearance_preview_large_text",
+        "test_ids": [
+          "SET-007"
+        ]
+      },
+      {
+        "surface": "R.string.appearance_preview_limits",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceAccessibilitySample.kt",
+        "anchor": "R.string.appearance_preview_limits",
+        "test_ids": [
+          "SET-007"
+        ]
+      },
+      {
+        "surface": "R.string.appearance_preview_motion_off",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceAccessibilitySample.kt",
+        "anchor": "R.string.appearance_preview_motion_off",
+        "test_ids": [
+          "SET-007"
+        ]
+      },
+      {
+        "surface": "R.string.appearance_preview_motion_on",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceAccessibilitySample.kt",
+        "anchor": "R.string.appearance_preview_motion_on",
+        "test_ids": [
+          "SET-007"
+        ]
+      },
+      {
+        "surface": "R.string.appearance_preview_reset",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceAccessibilitySample.kt",
+        "anchor": "R.string.appearance_preview_reset",
+        "test_ids": [
+          "SET-007"
+        ]
+      },
+      {
+        "surface": "R.string.appearance_preview_rtl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceAccessibilitySample.kt",
+        "anchor": "R.string.appearance_preview_rtl",
+        "test_ids": [
+          "SET-007"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

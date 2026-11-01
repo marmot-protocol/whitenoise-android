@@ -284,6 +284,14 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "Folder manager system Back returns to its entry route",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
+        "anchor": "BackHandler(onBack = onBack)",
+        "test_ids": [
+          "FLD-002"
+        ]
       }
     ]
   },

@@ -1,12 +1,15 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import android.content.Context
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -22,7 +25,8 @@ import dev.ipf.whitenoise.android.notifications.ConversationNotificationCategory
 import dev.ipf.whitenoise.android.notifications.ConversationNotificationScope
 import dev.ipf.whitenoise.android.notifications.NotificationChannelSpec
 import dev.ipf.whitenoise.android.ui.group.ConversationNotificationCategoriesList
-import dev.ipf.whitenoise.android.ui.group.ConversationSoundAppearanceSheet
+import dev.ipf.whitenoise.android.ui.settings.SettingsList
+import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -33,7 +37,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** Actual bottom-sheet window and long settings content, without platform preparation timing. */
+/** Actual settings shell and compact category rows, without platform preparation timing. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
@@ -73,15 +77,13 @@ class ConversationSoundAppearanceSheetScreenshotTest {
             .performClick()
         composeRule.runOnIdle { assertEquals(NotificationChannelSpec.AGENT_ACTIVITY, opened) }
         val context = ApplicationProvider.getApplicationContext<Context>()
-        composeRule.onNodeWithContentDescription(context.getString(R.string.close)).performClick()
-        composeRule.onNodeWithTag("sheet.surface").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+        composeRule.onNodeWithTag("conversation-notifications-content").assertDoesNotExist()
     }
 
     private fun capture(name: String) {
-        val surface = composeRule.onNodeWithTag("sheet.surface")
-        val handle = composeRule.onNodeWithTag("sheet.dragHandle", useUnmergedTree = true)
+        val surface = composeRule.onNodeWithTag("conversation-notifications-content")
         visualErrors.checkSucceeds { surface.captureRoboImage("src/test/snapshots/$name.png") }
-        handle.assertIsDisplayed()
     }
 
     private fun render(
@@ -100,12 +102,21 @@ class ConversationSoundAppearanceSheetScreenshotTest {
                 WhiteNoiseTheme(darkTheme = dark, fontScale = fontScale) {
                     Surface(Modifier.fillMaxSize()) {}
                     if (visible.value) {
-                        ConversationSoundAppearanceSheet(onDismiss = { visible.value = false }) {
-                            ConversationNotificationCategoriesList(
-                                settings,
-                                onOpen = onOpen,
-                                onScopeChange = { _, _ -> },
-                            )
+                        SettingsScaffold(
+                            title = stringResource(R.string.sounds_and_notifications),
+                            onBack = { visible.value = false },
+                        ) {
+                            Box(Modifier.fillMaxSize().testTag("conversation-notifications-content")) {
+                                SettingsList {
+                                    item {
+                                        ConversationNotificationCategoriesList(
+                                            settings,
+                                            onOpen = onOpen,
+                                            alertEnabled = settings.take(3).associate { it.channel to true },
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }

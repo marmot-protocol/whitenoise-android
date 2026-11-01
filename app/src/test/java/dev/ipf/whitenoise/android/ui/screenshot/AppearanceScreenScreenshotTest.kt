@@ -4,8 +4,11 @@ import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
@@ -80,6 +83,42 @@ class AppearanceScreenScreenshotTest {
     fun appearanceRtl() {
         render(mode = AppThemeMode.System, darkTheme = false, layoutDirection = LayoutDirection.Rtl)
         capture("rtl")
+    }
+
+    /** The actual local-only sample and its controls remain visible in the light palette. */
+    @Test
+    fun accessibilityPreviewLight() {
+        render(mode = AppThemeMode.System, darkTheme = false)
+        capturePreview("light")
+    }
+
+    /** The dark preview keeps synthetic bubbles separate from its local simulation controls. */
+    @Test
+    fun accessibilityPreviewDark() {
+        render(mode = AppThemeMode.Dark, darkTheme = true)
+        capturePreview("dark")
+    }
+
+    /** AMOLED controls and sample content remain legible at double font size in RTL. */
+    @Test
+    @Config(qualifiers = "en-rUS-w360dp-h2400dp-mdpi")
+    fun accessibilityPreviewAmoledLargeRtl() {
+        render(
+            mode = AppThemeMode.Amoled,
+            darkTheme = true,
+            amoled = true,
+            fontScale = 2f,
+            layoutDirection = LayoutDirection.Rtl,
+        )
+        capturePreview("amoled_large_rtl")
+    }
+
+    /** Lazily compose the whole preview before capturing its production content and simulation controls. */
+    private fun capturePreview(variant: String) {
+        composeRule.onNodeWithTag("settings.list").performScrollToNode(hasTestTag("appearance.accessibility.preview"))
+        composeRule
+            .onNodeWithTag("appearance.accessibility.preview")
+            .captureRoboImage("src/test/snapshots/appearance_accessibility_preview_$variant.png")
     }
 
     /** Compose the production screen with an isolated app state and no-op navigation callbacks. */

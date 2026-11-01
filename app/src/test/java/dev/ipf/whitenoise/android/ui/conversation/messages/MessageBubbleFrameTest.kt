@@ -294,7 +294,7 @@ class MessageBubbleFrameTest {
                             hasReplyPreview = true,
                             hasMedia = false,
                         ),
-                    lastLineWidth = 24,
+                    lastLineWidth = { 24 },
                 ) {
                     Box(Modifier.width(24.dp).height(20.dp))
                 }
@@ -361,7 +361,7 @@ class MessageBubbleFrameTest {
                                     hasReplyPreview = true,
                                     hasMedia = true,
                                 ),
-                            lastLineWidth = 24,
+                            lastLineWidth = { 24 },
                         ) {
                             Box(Modifier.width(24.dp).height(20.dp))
                         }
@@ -478,7 +478,7 @@ class MessageBubbleFrameTest {
                             hasReplyPreview = false,
                             hasMedia = false,
                         ).testTag(NON_REPLY_BODY_TAG),
-                    lastLineWidth = 24,
+                    lastLineWidth = { 24 },
                 ) {
                     Box(Modifier.width(24.dp).height(20.dp))
                 }

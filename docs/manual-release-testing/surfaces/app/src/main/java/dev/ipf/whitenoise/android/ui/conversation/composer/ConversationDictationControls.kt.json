@@ -89,9 +89,33 @@
           "DIC-001",
           "DIC-002"
         ]
+      },
+      {
+        "surface": "ConversationDictationPasteAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "fun ConversationDictationPasteAction(",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "ConversationDictationDraftWriteDeferred",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_waiting_for_unlock",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ],
     "settings_controls": [
+      {
+        "surface": "string:dictation_interrupted",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.dictation_interrupted",
+        "test_ids": [
+          "DIC-002"
+        ]
+      },
       {
         "surface": "string:dictation_send_blocked",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
@@ -203,6 +227,14 @@
         "anchor": "R.string.open_settings",
         "test_ids": [
           "DIC-001",
+          "DIC-002"
+        ]
+      },
+      {
+        "surface": "string:toast_draft_save_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
+        "anchor": "R.string.toast_draft_save_failed",
+        "test_ids": [
           "DIC-002"
         ]
       }

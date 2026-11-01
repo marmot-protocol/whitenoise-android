@@ -16,9 +16,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.AlignmentLine
 import androidx.compose.ui.layout.FirstBaseline
+import androidx.compose.ui.layout.LastBaseline
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
@@ -56,6 +56,7 @@ internal fun BoxScope.MediaFooterOverlay(
             editedLabel = null,
             onEditedClick = null,
             statusContainerColor = Color.Black,
+            allowWrap = false,
         )
     }
 }
@@ -72,6 +73,7 @@ internal fun MessageInlineFooter(
     showTime: Boolean = true,
     modifier: Modifier = Modifier,
     statusContainerColor: Color? = null,
+    allowWrap: Boolean = true,
 ) {
     val baselineIndex = footerBaselineIndex(showTime, editedLabel != null, showStatus)
     Layout(
@@ -90,26 +92,88 @@ internal fun MessageInlineFooter(
         },
     ) { measurables, constraints ->
         val placeables = measurables.map { it.measure(constraints.copy(minWidth = 0, minHeight = 0)) }
-        val gaps = footerItemGaps(placeables.size, FooterItemSpacing)
-        val contentWidth = placeables.sumOf { it.width } + gaps.sum()
-        val width = contentWidth.coerceIn(constraints.minWidth, constraints.maxWidth)
-        val height = (placeables.maxOfOrNull { it.height } ?: 0).coerceIn(constraints.minHeight, constraints.maxHeight)
-        val baselinePlaceable = baselineIndex?.let(placeables::get)
-        val baselineY = baselinePlaceable?.let { (height - it.height) / 2 }
-        val baseline = baselinePlaceable?.get(FirstBaseline) ?: AlignmentLine.Unspecified
-        val alignmentLines =
-            if (baseline == AlignmentLine.Unspecified || baselineY == null) {
-                emptyMap()
+        val gap = FooterItemSpacing.roundToPx()
+        val rows =
+            if (allowWrap || placeables.isEmpty()) {
+                footerItemRows(placeables.map { it.width }, constraints.maxWidth, gap)
             } else {
-                mapOf<AlignmentLine, Int>(FirstBaseline to baselineY + baseline)
+                listOf(placeables.indices.toList())
             }
+        val rowWidths = rows.map { indices -> indices.sumOf { placeables[it].width } + gap * (indices.size - 1) }
+        val rowHeights = rows.map { indices -> indices.maxOf { placeables[it].height } }
+        val width = (rowWidths.maxOrNull() ?: 0).coerceIn(constraints.minWidth, constraints.maxWidth)
+        val height = rowHeights.sum().coerceIn(constraints.minHeight, constraints.maxHeight)
+        val alignmentLines = footerAlignmentLines(placeables, rows, rowHeights, baselineIndex)
         layout(width, height, alignmentLines) {
-            var x = 0
-            placeables.forEachIndexed { index, placeable ->
-                placeable.placeRelative(x, (height - placeable.height) / 2)
-                x += placeable.width + gaps.getOrElse(index) { 0 }
+            var y = 0
+            rows.forEachIndexed { rowIndex, indices ->
+                var x = if (allowWrap) width - rowWidths[rowIndex] else 0
+                indices.forEach { index ->
+                    val placeable = placeables[index]
+                    placeable.placeRelative(x, y + (rowHeights[rowIndex] - placeable.height) / 2)
+                    x += placeable.width + gap
+                }
+                y += rowHeights[rowIndex]
             }
         }
+    }
+}
+
+/** Partition bounded metadata from the timestamp backwards, preserving reading order within rows. */
+internal fun footerItemRows(
+    widths: List<Int>,
+    maxWidth: Int,
+    gap: Int,
+): List<List<Int>> {
+    val rows = mutableListOf<List<Int>>()
+    var row = mutableListOf<Int>()
+    var rowWidth = 0
+    widths.indices.reversed().forEach { index ->
+        val required = widths[index] + if (row.isEmpty()) 0 else gap
+        if (row.isNotEmpty() && rowWidth + required > maxWidth) {
+            rows.add(0, row)
+            row = mutableListOf()
+            rowWidth = 0
+        }
+        row.add(0, index)
+        rowWidth += widths[index] + if (row.size == 1) 0 else gap
+    }
+    if (row.isNotEmpty()) rows.add(0, row)
+    return rows
+}
+
+private fun footerAlignmentLines(
+    placeables: List<Placeable>,
+    rows: List<List<Int>>,
+    rowHeights: List<Int>,
+    baselineIndex: Int?,
+): Map<AlignmentLine, Int> {
+    val baselinePlaceable = baselineIndex?.let(placeables::get)
+    val baselineRow = rows.indexOfFirst { baselineIndex != null && baselineIndex in it }
+    val baselineY =
+        if (baselineRow >= 0 && baselinePlaceable != null) {
+            rowHeights.take(baselineRow).sum() + (rowHeights[baselineRow] - baselinePlaceable.height) / 2
+        } else {
+            null
+        }
+    val baseline =
+        baselinePlaceable?.get(LastBaseline)?.takeIf { it != AlignmentLine.Unspecified }
+            ?: baselinePlaceable?.get(FirstBaseline)
+            ?: AlignmentLine.Unspecified
+    return if (baseline == AlignmentLine.Unspecified || baselineY == null) {
+        emptyMap()
+    } else {
+        val firstRowBaseline =
+            rows.first().firstNotNullOfOrNull { index ->
+                val itemBaseline = placeables[index][FirstBaseline]
+                itemBaseline.takeIf { it != AlignmentLine.Unspecified }?.let {
+                    (rowHeights.first() - placeables[index].height) / 2 + it
+                }
+            } ?: (baselineY + baseline)
+        mapOf<AlignmentLine, Int>(
+            FirstBaseline to firstRowBaseline,
+            LastBaseline to baselineY + baseline,
+        )
     }
 }
 
@@ -155,16 +219,5 @@ private fun footerBaselineIndex(
         hasEditedLabel -> 0
         else -> null
     }
-
-/**
- * The gap that follows each footer item.
- */
-private fun Density.footerItemGaps(
-    itemCount: Int,
-    itemSpacing: Dp,
-): List<Int> {
-    val defaultGap = itemSpacing.roundToPx()
-    return List((itemCount - 1).coerceAtLeast(0)) { defaultGap }
-}
 
 private val FooterItemSpacing = 3.dp

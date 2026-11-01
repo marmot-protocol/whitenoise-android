@@ -473,18 +473,31 @@ object MediaPipeline {
     /**
      * Open an isolated GIF/WebP frame stream. The returned drawable contains owned pixels only.
      * Static, unreadable and unadmitted sources never reach the native animated decoder.
+     * Only bounded group-thumbnail owners opt into interruptible waiting for decorative admission.
      */
     fun decodeAnimatedDrawable(
         bytes: ByteArray,
         maxEdgePx: Int = ANIMATED_IMAGE_MAX_EDGE_PX,
         decorative: Boolean = false,
+        waitForDecorativeAdmission: Boolean = false,
     ): Drawable? {
         if (bytes.isEmpty()) return null
         return decodeAdmittedNativeAnimation(bytes) {
             dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
-                .animation(bytes, maxEdgePx, decorative)
+                .animation(bytes, maxEdgePx, decorative, waitForDecorativeAdmission)
         }
     }
+
+    /** Group recovery alone receives typed startup faults and its lifecycle-owned pending ticket. */
+    internal fun decodeGroupThumbnailAnimation(
+        bytes: ByteArray,
+        maxEdgePx: Int,
+        demand: dev.ipf.whitenoise.android.media.sandbox.AnimationAdmission.GroupDemand?,
+    ): Drawable? =
+        decodeAdmittedNativeAnimation(bytes) {
+            dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                .groupAnimation(bytes, maxEdgePx, demand)
+        }
 
     /**
      * Decode the image at [uri] downscaled so the longer edge is ≈
@@ -1161,16 +1174,22 @@ object MediaPipeline {
         data object TooLarge : VideoReadResult()
 
         data object Failed : VideoReadResult()
+
+        /** The private container metadata could not be removed, so the video must not be attached (#3376). */
+        data object MetadataNotRemovable : VideoReadResult()
     }
 
     /**
-     * Read the picked video URI as-is — no transcoding, matching the
-     * White Noise iOS and desktop behavior. Extracts dimensions
+     * Read the picked video URI without transcoding, matching the White Noise
+     * iOS and desktop behavior, after removing its private container metadata
+     * in place with [VideoMetadataScrubber] (#3376). Extracts dimensions
      * and a thumbhash from the poster frame so receivers paint a blurred
      * preview before the full payload downloads. Returns a typed result so
      * callers can surface "too large" vs "decode failed" as distinct
      * toasts: [VideoReadResult.TooLarge] fires when the source exceeds
-     * [VIDEO_MAX_BYTES] OR the caller's remaining album budget, while
+     * [VIDEO_MAX_BYTES] OR the caller's remaining album budget,
+     * [VideoReadResult.MetadataNotRemovable] when the container is unsupported
+     * or malformed (the original bytes are never returned instead), and
      * [VideoReadResult.Failed] is for I/O / metadata extraction errors.
      */
     fun readVideoForUpload(
@@ -1207,6 +1226,10 @@ object MediaPipeline {
                 null -> return VideoReadResult.Failed
             }
 
+            // Scrubbing precedes the probe and the read, so nothing downstream ever sees the private fields.
+            if (VideoMetadataScrubber.scrub(tmp) !is VideoScrubResult.Scrubbed) {
+                return VideoReadResult.MetadataNotRemovable
+            }
             val metadata = readVideoFileMetadata(tmp) ?: return VideoReadResult.Failed
             val bytes = runCatching { readFileBytesExact(tmp) }.getOrElse { return VideoReadResult.Failed }
             return VideoReadResult.Success(

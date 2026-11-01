@@ -28,6 +28,7 @@ internal data class PinnedConversationPresentation(
     val avatar: Bitmap? = null,
     val contact: String? = null,
     val currentAvatar: (() -> Bitmap?)? = null,
+    val currentPicture: (() -> PinnedConversationPicture)? = null,
 )
 
 /** The platform owns approved pins, including denial, duplicate requests and process recreation. */
@@ -109,7 +110,8 @@ internal class PinnedConversationShortcuts(
                     !platform.supported() -> ConversationPinResult.UNSUPPORTED
                     !stillCurrent() || !tokens.isValid(capability) -> ConversationPinResult.UNAVAILABLE
                     platform.shortcuts().any { it.id == capability.shortcutId && it.isPinned && it.isEnabled } -> {
-                        val current = build(capability, title, avatarUrl, avatar, presentation)
+                        val prior = platform.shortcuts().firstOrNull { it.id == capability.shortcutId }
+                        val current = build(capability, title, avatarUrl, avatar, presentation, prior)
                         if (!stillCurrent() || !tokens.isValid(capability)) {
                             return@synchronized ConversationPinResult.UNAVAILABLE
                         }
@@ -199,8 +201,9 @@ internal class PinnedConversationShortcuts(
                     } else if (presentation == null) {
                         genericNotificationShortcut(context, original)
                     } else {
-                        runCatching { build(capability, presentation.title, null, presentation.avatar, presentation) }
-                            .getOrElse { genericNotificationShortcut(context, original) }
+                        runCatching {
+                            build(capability, presentation.title, null, presentation.avatar, presentation, original)
+                        }.getOrElse { genericNotificationShortcut(context, original) }
                     }
                 }
             val generic = prepared.map { genericNotificationShortcut(context, it) }
@@ -241,12 +244,14 @@ internal class PinnedConversationShortcuts(
     }
 
     /** Builds privacy-checked labels and cached pixels only; it never acquires media or includes message text. */
+    @Suppress("LongParameterList") // Initial requests and updates share the same privacy-checked builder.
     private fun build(
         capability: PinnedConversationCapability,
         title: String,
         avatarUrl: String?,
         avatar: Bitmap?,
         presentation: PinnedConversationPresentation?,
+        original: ShortcutInfoCompat? = null,
     ): ShortcutInfoCompat {
         val privacy = NotificationPreviewPreferences.capture(context)
         val label =
@@ -255,15 +260,21 @@ internal class PinnedConversationShortcuts(
             } else {
                 context.getString(R.string.app_name)
             }
+        val picture =
+            if (privacy.allowed) {
+                currentPicture(presentation, avatar, avatarUrl)
+            } else {
+                PinnedConversationPicture(null)
+            }
+        val priorIdentity = original?.extras?.getString(PICTURE_IDENTITY)
+        val retainIcon =
+            priorIdentity != null &&
+                priorIdentity in picture.missingIdentities &&
+                original != null &&
+                shortcutPreviewAllowed(context, original)
         val icon =
             if (privacy.allowed) {
-                val bitmap =
-                    if (presentation?.currentAvatar != null) {
-                        presentation.currentAvatar.invoke()
-                    } else {
-                        avatar ?: AvatarImageLoader.peekBitmap(avatarUrl)
-                    }
-                notificationConversationIcon(label, capability.shortcutId, bitmap?.let(::boundedPinnedAvatar))
+                notificationConversationIcon(label, capability.shortcutId, picture.bitmap?.let(::boundedPinnedAvatar))
             } else {
                 IconCompat.createWithResource(context, R.drawable.ic_stat_whitenoise)
             }
@@ -271,12 +282,15 @@ internal class PinnedConversationShortcuts(
             checkNotNull(conversationShortcutAccountExtras(capability.accountRef)).apply {
                 stampShortcutPreview(privacy, this)
                 putBoolean(NotificationPreviewPreferences.EXTRA_HIDDEN, !privacy.allowed)
+                val iconIdentity = if (retainIcon) priorIdentity else picture.identity
+                if (iconIdentity != null) putString(PICTURE_IDENTITY, iconIdentity)
             }
         return ShortcutInfoCompat
             .Builder(context, capability.shortcutId)
             .setShortLabel(label.take(MAX_LABEL_LENGTH))
             .setLongLabel(label)
-            .setIcon(icon)
+            // Android preserves its existing icon when an update omits that property.
+            .apply { if (!retainIcon) setIcon(icon) }
             .setIntent(PinnedConversationNavigation.intent(context, capability))
             .setLongLived(true)
             .setExtras(extras)
@@ -285,6 +299,21 @@ internal class PinnedConversationShortcuts(
                 presentation?.contact?.let { stampContactPictureShortcut(shortcut, it, conversationIcon = true) }
             }
     }
+
+    /** Evaluate live selection only at the final privacy-checked write; legacy callers supply pixels directly. */
+    private fun currentPicture(
+        presentation: PinnedConversationPresentation?,
+        avatar: Bitmap?,
+        avatarUrl: String?,
+    ): PinnedConversationPicture =
+        presentation?.currentPicture?.invoke()
+            ?: PinnedConversationPicture(
+                if (presentation?.currentAvatar != null) {
+                    presentation.currentAvatar.invoke()
+                } else {
+                    avatar ?: AvatarImageLoader.peekBitmap(avatarUrl)
+                },
+            )
 
     /** Bound platform icon bytes without acquiring media or mutating the source bitmap. */
     private fun boundedPinnedAvatar(bitmap: Bitmap): Bitmap {
@@ -307,6 +336,7 @@ internal class PinnedConversationShortcuts(
             ?.takeIf { it.shortcutId == shortcut.id }
 
     private companion object {
+        const val PICTURE_IDENTITY = "dev.ipf.whitenoise.PINNED_PICTURE_IDENTITY"
         const val MAX_LABEL_LENGTH = 24
         const val MAX_ICON_EDGE = 192
     }

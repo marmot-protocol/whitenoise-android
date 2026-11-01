@@ -50,12 +50,16 @@ never copied into redacted reports.
 
 Subprocess failures retain their operation, exit status and fixed diagnostic category. Failed emulator instrumentation also reads at most 100 recent crash records with a ten-second bound; reports retain only a matching package crash marker and a fixed exception category. Raw messages and command arguments stay out of artifacts. Recent-buffer diagnostics do not prove attribution to the current invocation and never qualify missing measurements. Physical fixtures retain the failure fields without collecting crash logs.
 
-The `controller-background-receipt` policy waits emit a `background-receipt-policy-timeout` metric before cleanup.
-Its closed `case` and `stage` distinguish host-policy settling from native approval. The snapshot contains only
-allowed/expected/Wi-Fi-only type names, network categories, account state, pause/validation booleans and whether an
-approval revision is applied. An applied revision does not prove approval for the requested type. These are the
-last observed inputs, not a diagnosis of why they failed to settle. Both 15-second deadlines and all assertions
-remain unchanged; the original timeout is rethrown, and the host retains the metric even without source frames.
+The `controller-background-receipt` policy and network waits emit a `background-receipt-policy-timeout` metric before
+cleanup. Its closed `case` (`Initial`, `DisabledType`, `NetworkHeld`, `ProcessStop`) and `stage` (`HostPolicy`,
+`NativeApproval`, `WifiSnapshot`) name the wait that expired. Policy snapshots contain only allowed/expected/Wi-Fi-only
+type names, network categories, account state, pause/validation booleans and whether an approval revision is applied;
+an applied revision does not prove approval for the requested type. A `WifiSnapshot` timeout instead records closed
+transport facts: the app's network mirror beside a fresh platform default-network read (present, Wi-Fi, cellular,
+VPN, internet, validated, unmetered, and whether the default stayed stable during the read). The process-stop
+scenario emits `background-receipt-process-stop` metrics for its `ReceiptProcessing`, `RunningWork` and `HeldLedger`
+stages. These are the last observed inputs, not a diagnosis of why they failed to settle. Deadlines and assertions
+are unchanged; the original timeout is rethrown, and the host retains the metric even without source frames.
 
 The optional `controller` sender mode configures only the generated group's loopback blob endpoint, then uses the shipping `ConversationController.sendAttachments` path without uploader, publisher or accepted-result fakes. Its reference comes from actual native history. The runner requires exact outgoing native lease bytes before and after native runtime reopen with acquisition unavailable; missing controller evidence fails even when transport and budgets pass. This remains a native-runtime lifecycle check, not full Android process restart or manual viewer/installer qualification.
 
@@ -110,6 +114,34 @@ physical devices.
 
 ```bash
 bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Play reference-api30-arm64 controller-media
+```
+
+The `controller-video-metadata` mode qualifies outgoing video metadata removal end to end
+([#3376](https://github.com/marmot-protocol/whitenoise-android/issues/3376)). `VideoMetadataFixtureDeviceTest` hands
+tagged videos to `ConversationMediaSender.sendStagedAttachments` through its production content-URI preparation entry
+points: `content://` documents from the test APK's `GeneratedDocumentProvider` as a visual pick (`video/mp4`, in memory
+and above the 32 MiB in-memory limit), as a Files pick reported as `application/octet-stream` (in memory and above the
+limit), through `ShareFileImporter` and `ShareInboundStager` as an imported share, and as a prepared draft injection of
+a native draft attachment holding unsanitized bytes, visual and Files. The location-positive source is written on the
+emulator by Android's own `MediaMuxer` with `setLocation`, and the others are the committed tagged ffmpeg fixtures.
+Every send really uploads through MDK, and the generated receiver downloads it through the shipping resolver. Each
+received plaintext must equal the production scrubber's output for its source (both SHA-256 digests are reported
+with the source's), carry none of its private strings, location, `com.android.version` key or recording date, and keep
+its size, duration, rotation, dimensions, a decoded first frame and every audio and video sample. An AVI reported as
+`video/x-msvideo` (visual and Files) or as `application/octet-stream` (Files), and the tagged MP4 with one appended
+byte reported as `application/octet-stream` (in memory and staged) must be refused with the existing notice, publish nothing, reach no receiver and leave no
+staged or temporary copy. `video_metadata_checker.py` also requires the fixture ledger to hold exactly one complete
+upload per accepted route, of its ciphertext size, and none of a refused route's.
+
+This lane does not drive the system Photo Picker, Files or share sheet UI, and its draft routes are prepared draft
+injection, not a draft saved, force-stopped and restored from MDK. It records no phone or camera. Every report defers
+those, and MED-043 remains their receipt. On a pull request whose fixture inputs are only this scenario's own files, the lane
+selector sets `attachment_fixture_scope=video-metadata` and the fixture job runs only this mode. Any other fixture
+input, including the shared workflow, selector, run script or this README, and every master push, runs the whole
+campaign, which includes this mode.
+
+```bash
+bash scripts/run-controlled-attachment-fixture.sh emulator-5554 Zapstore ci-api34-x86_64 controller-video-metadata
 ```
 
 The `controller-apk` mode qualifies the received-APK boundary on a disposable emulator. The prepare stage sends five

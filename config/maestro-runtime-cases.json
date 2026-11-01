@@ -2,6 +2,8 @@
   "schema": 1,
   "coverage": "Partial assertions only; permanent manual checklist remains unchecked.",
   "cases": {
+    "presentation-surface-motion-send": {"suite": "presentation", "manual_ids": ["MSG-042"], "assertions": "Controlled measured production send acceptance exposes its actual active overlay owner, then dismisses. Owner presence/lifetime only; painted pixels, motion timing, native delivery and physical performance remain separate.", "postcondition": "presentation-checked", "presentation": "surface-motion-send", "presentation_actions": ["motion-started", "dismiss"], "layer": "production-presentation-ui"},
+    "presentation-surface-motion-reaction": {"suite": "presentation", "manual_ids": ["MSG-041"], "assertions": "Controlled measured production reaction acceptance exposes its actual active overlay owner, then dismisses. Owner presence/lifetime only; painted pixels, motion timing, native delivery and physical performance remain separate.", "postcondition": "presentation-checked", "presentation": "surface-motion-reaction", "presentation_actions": ["motion-started", "dismiss"], "layer": "production-presentation-ui"},
     "settings-appearance": {
       "suite": "settings",
       "manual_ids": [
@@ -319,9 +321,10 @@
     "groups-relays": {
       "suite": "groups",
       "manual_ids": [
-        "GRP-001"
+        "GRP-001",
+        "GRP-036"
       ],
-      "assertions": "Group relay details can be opened and dismissed without editing or publishing relay configuration.",
+      "assertions": "Group relays destination can be opened from chat info and dismissed without editing or publishing relay configuration.",
       "postcondition": "none"
     },
     "creation-message-back": {
@@ -981,10 +984,20 @@
     "chatstate-pin-round-trip": {
       "suite": "chatstate",
       "manual_ids": [
-        "CHL-006"
+        "CHL-006",
+        "CHL-012"
       ],
-      "assertions": "Pin then Unpin restores the initial native row state without changing the peer row.",
+      "assertions": "Select one generated native group and apply silent batch Pin then Unpin. Wait for the opposite action after each native state change; exiting selection offers Pin again. Native verification requires the restored unpinned owner row while the peer row exists and remains unpinned.",
       "postcondition": "chat-unpinned"
+    },
+    "chatstate-folder-exclude": {
+      "suite": "chatstate",
+      "manual_ids": [
+        "CHL-012",
+        "FLD-002"
+      ],
+      "assertions": "Create Maestro saved folder from one selected group, open that folder and exclude the group. The folder-owned result dialog directly asserts Changed 1 and zero other outcomes, then Close; the group is absent from that folder. Native verification separately confirms the saved folder preference. Planned assertions, not execution evidence.",
+      "postcondition": "folder-saved"
     },
     "chatstate-delete-confirm": {
       "suite": "chatstate",
@@ -3429,8 +3442,9 @@
     "presentation-startup-projection-loading":{"suite":"presentation","manual_ids":["INT-012"],"assertions":"Production UI observation only; no host Back or synthetic dismissal counts as production dispatch. Actual startup local-projection branch renders loading or diagnostic recovery and exact Retry/host-exit callback","postcondition":"presentation-observed","presentation":"startup-projection-loading","presentation_actions":[],"layer":"production-presentation-ui"},
     "presentation-startup-projection-retryable":{"suite":"presentation","manual_ids":["INT-012"],"assertions":"Actual startup local-projection branch renders loading or diagnostic recovery and exact Retry/host-exit callback; no database corruption or native recovery completion claim.","postcondition":"presentation-checked","presentation":"startup-projection-retryable","presentation_actions":["retry"],"layer":"production-presentation-ui"},
     "presentation-startup-projection-terminal":{"suite":"presentation","manual_ids":["INT-012"],"assertions":"Production UI observation only; no host Back or synthetic dismissal counts as production dispatch. Actual startup local-projection branch renders loading or diagnostic recovery and exact Retry/host-exit callback","postcondition":"presentation-observed","presentation":"startup-projection-terminal","presentation_actions":[],"layer":"production-presentation-ui"},
-    "presentation-group-ui-info-populated":{"suite":"presentation","manual_ids":["GRP-001","GRP-020","SCR-001","SCR-002","SCR-003","SCR-004"],"assertions":"Actual technical group identifiers and empty/populated relay rows; synthetic values, no native identifier or relay mutation.","postcondition":"presentation-checked","presentation":"group-ui-info-populated","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
-    "presentation-group-ui-info-empty":{"suite":"presentation","manual_ids":["GRP-001","GRP-020","SCR-001","SCR-002","SCR-003","SCR-004"],"assertions":"Actual technical group identifiers and empty/populated relay rows; synthetic values, no native identifier or relay mutation.","postcondition":"presentation-checked","presentation":"group-ui-info-empty","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
+    "presentation-group-ui-info-populated":{"suite":"presentation","manual_ids":["GRP-001","SCR-001","SCR-002","SCR-003","SCR-004"],"assertions":"Actual technical group identifiers without a second relay list; synthetic values, no native identifier mutation.","postcondition":"presentation-checked","presentation":"group-ui-info-populated","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
+    "presentation-group-ui-relays-member-populated":{"suite":"presentation","manual_ids":["GRP-001","GRP-020","GRP-036","SCR-001","SCR-002","SCR-003","SCR-004"],"assertions":"Actual Group relays destination renders a configured relay row and the read-only member explanation; synthetic relay values, no relay dial, publication or route mutation.","postcondition":"presentation-checked","presentation":"group-ui-relays-member-populated","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
+    "presentation-group-ui-relays-admin-empty":{"suite":"presentation","manual_ids":["GRP-001","GRP-020","GRP-036","SCR-001","SCR-002","SCR-003","SCR-004"],"assertions":"Actual Group relays destination renders the empty configured route and the admin editing-unavailable explanation; no relay dial, publication or route mutation.","postcondition":"presentation-checked","presentation":"group-ui-relays-admin-empty","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-group-ui-notify-all":{"suite":"presentation","manual_ids":["GRP-001"],"assertions":"Actual notification mode dialog verifies the selected ALL or MENTIONS_ONLY callback; no notification-channel or native preference mutation.","postcondition":"presentation-checked","presentation":"group-ui-notify-all","presentation_actions":["notify-selected"],"layer":"production-presentation-ui"},
     "presentation-group-ui-notify-mentions":{"suite":"presentation","manual_ids":["GRP-001"],"assertions":"Actual notification mode dialog verifies the selected ALL or MENTIONS_ONLY callback; no notification-channel or native preference mutation.","postcondition":"presentation-checked","presentation":"group-ui-notify-mentions","presentation_actions":["notify-selected"],"layer":"production-presentation-ui"},
     "presentation-group-ui-mute-date":{"suite":"presentation","manual_ids":["GRP-001","SCR-001","SCR-002","SCR-003","SCR-004"],"assertions":"Actual custom mute date/time stages cancel back to the parent, with a fixed clock and no applied mute.","postcondition":"presentation-checked","presentation":"group-ui-mute-date","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
@@ -3516,8 +3530,10 @@
     "presentation-extra-message-footer":{"suite":"presentation","manual_ids":["MED-003","MED-007","MSG-001"],"assertions":"Production UI observation only; no host Back or synthetic dismissal counts as production dispatch. Actual media footer overlays the provided timestamp and outgoing status in its production Box layout.","postcondition":"presentation-observed","presentation":"extra-message-footer","presentation_actions":[],"layer":"production-presentation-ui"},
     "presentation-extra-seed-cancel":{"suite":"presentation","manual_ids":["CON-003","SCR-001","SCR-002","SCR-003","SCR-004","SET-020"],"assertions":"Actual developer seeding dialog mounts the generated native account chat targets and guards Start before selecting a target; Close sends no fixture messages.","postcondition":"presentation-checked","presentation":"extra-seed-cancel","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
     "presentation-extra-wipe-outcome-close":{"suite":"presentation","manual_ids":["ACC-009","ACC-010","ACC-011","ACC-013","ACC-014","ACC-020","ONB-009","SCR-001","SCR-002","SCR-003","SCR-004","SET-001"],"assertions":"Actual wipe partial-failure result displays all reported stages and a failure snapshot; no sign-out, key deletion or account wipe runs.","postcondition":"presentation-checked","presentation":"extra-wipe-outcome-close","presentation_actions":["dismiss"],"layer":"production-presentation-ui"},
-    "presentation-extra-notification-scope-cancel":{"suite":"presentation","manual_ids":["GRP-001","NTF-026","NTF-031"],"assertions":"The production notification-category parent opens, dismisses and reopens both scope options; cancellation requires no scope change or Android-settings callback.","postcondition":"presentation-observed","presentation":"extra-notification-scope-cancel","presentation_actions":[],"layer":"production-presentation-ui"},
-    "presentation-extra-notification-scope-select":{"suite":"presentation","manual_ids":["GRP-001","NTF-026","NTF-031"],"assertions":"Actual notification-category parent opens its scope dialog, verifies default/custom controls and exact selected category. No Android notification channel is modified.","postcondition":"presentation-checked","presentation":"extra-notification-scope-select","presentation_actions":["scope-selected"],"layer":"production-presentation-ui"},
+    "presentation-extra-notification-scope-cancel":{"suite":"presentation","manual_ids":["GRP-001","NTF-026","NTF-031"],"assertions":"The production notification-category controls are visible and Back dismisses the fixture without a delivery change or Android-settings callback.","postcondition":"presentation-observed","presentation":"extra-notification-scope-cancel","presentation_actions":[],"layer":"production-presentation-ui"},
+    "presentation-extra-notification-scope-select": {"suite": "presentation", "manual_ids": ["GRP-001", "NTF-026", "NTF-031"], "assertions": "The production delivery switch enables only the selected category without opening Android settings.", "postcondition": "presentation-checked", "presentation": "extra-notification-scope-select", "presentation_actions": ["delivery-enabled"], "layer": "production-presentation-ui"},
+    "presentation-extra-notification-channel-open": {"suite": "presentation", "manual_ids": ["NTF-031"], "assertions": "The actual category row invokes its prepared Android channel callback while its independent delivery switch is off; no delivery callback is allowed.", "postcondition": "presentation-checked", "presentation": "extra-notification-channel-open", "presentation_actions": ["channel-opened"], "layer": "production-presentation-ui"},
+    "presentation-extra-composer-sending-identity": {"suite": "presentation", "manual_ids": ["CON-035"], "assertions": "The actual composer opens its draft-owner identity popover while another native signing account is active; Back preserves its draft and active account.", "postcondition": "presentation-checked", "presentation": "extra-composer-sending-identity", "presentation_actions": ["identity-checked"], "layer": "production-presentation-ui"},
     "presentation-extra-help-cancel":{"suite":"presentation","manual_ids":["SET-001","SET-018","SET-019","SET-020"],"assertions":"Actual bug-report parent receives a refused browser handoff, opens its recovery dialog, and verifies Cancel/Retry without any external browser launch.","postcondition":"presentation-checked","presentation":"extra-help-cancel","presentation_actions":["open-refused","dismiss"],"layer":"production-presentation-ui"},
     "presentation-extra-help-retry":{"suite":"presentation","manual_ids":["SET-001","SET-018","SET-019","SET-020"],"assertions":"Actual bug-report parent receives a refused browser handoff, opens its recovery dialog, and verifies Cancel/Retry without any external browser launch.","postcondition":"presentation-checked","presentation":"extra-help-retry","presentation_actions":["open-refused","open-refused","dismiss"],"layer":"production-presentation-ui"},
     "presentation-extra-wait-signout":{"suite":"presentation","manual_ids":["ACC-009","ACC-010","ACC-011","ACC-013","ACC-014","ACC-020","ONB-009","SCR-001","SCR-002","SCR-003","SCR-004","SET-001"],"assertions":"Actual non-cancellable sign-out progress window ignores Back and remains visible; observation-only receipt requires zero callbacks. No teardown runs.","postcondition":"presentation-observed","presentation":"extra-wait-signout","presentation_actions":[],"layer":"production-presentation-ui"},
@@ -3778,6 +3794,7 @@
         "contacts-confirmed"
       ],
       "layer": "production-presentation-ui"
-    }
+    },
+    "presentation-audio-transcript-cancel":{"suite":"presentation","manual_ids":["MED-038"],"assertions":"Actual received-audio disclosure and Cancel callback. No decoding, provider, microphone, transcript accuracy or lifecycle qualification is claimed.","postcondition":"presentation-checked","presentation":"audio-transcript-cancel","presentation_actions":["dismiss"],"layer":"production-presentation-ui"}
   }
 }

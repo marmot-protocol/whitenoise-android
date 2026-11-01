@@ -104,17 +104,16 @@ internal fun shortWipeSubject(hex: String): String = if (hex.length <= 12) hex e
 
 /**
  * How a non-destructive sign-out ended (#349, #2132). Android follows the
- * engine's structured local-cleanup verdict: an unfinished teardown keeps the
- * current session active, while a thrown call still uses the established
- * fail-open local sign-out fallback.
+ * engine's structured local-cleanup verdict or an authoritative signed-out observation:
+ * an unfinished or unknown teardown keeps the current session active.
  */
 enum class SignOutCompletion {
     /** Engine sign-out succeeded with no relay cleanup failures. */
     Complete,
 
     /**
-     * The engine call failed outright, or reported per-relay KeyPackage
-     * cleanup failures. The session is still signed out locally, but MDK does
+     * Native local sign-out is confirmed, but its reply was lost or per-relay KeyPackage
+     * cleanup failed. The session is signed out locally, but MDK does
      * not retain a remote-deletion retry queue after this call.
      */
     RelayCleanupIncomplete,
@@ -124,8 +123,8 @@ enum class SignOutCompletion {
 }
 
 /**
- * Map the engine sign-out outcome (null when the FFI call itself failed) to
- * the completion the UI toasts about.
+ * Map the engine sign-out outcome to the completion the UI toasts about.
+ * A null reply may reach this mapper only after native signed-out status is confirmed.
  */
 internal fun signOutCompletion(engineOutcome: SignOutOutcomeFfi?): SignOutCompletion =
     when {

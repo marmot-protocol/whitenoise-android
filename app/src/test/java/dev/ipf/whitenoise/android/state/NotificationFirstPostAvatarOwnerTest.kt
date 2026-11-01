@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import android.graphics.Bitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import dev.ipf.marmotkit.ChatListAvatarFfi
+import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
@@ -61,6 +62,32 @@ class NotificationFirstPostAvatarOwnerTest {
             val snapshot = state.readyNotificationAvatars(fixture.update)
             assertSame(image, snapshot.conversationBitmap(isDm = true))
             assertNull(snapshot.conversationBitmap(isDm = false))
+        } finally {
+            AvatarImageLoader.clear()
+            fixture.close()
+        }
+    }
+
+    /** Hidden sender cache hits are skipped for group messages, while invite imagery keeps its existing source. */
+    @Test
+    fun groupMessageSnapshotDropsTheSenderButInviteSnapshotRetainsIt() {
+        val context = RuntimeEnvironment.getApplication()
+        val url = "https://profiles.example/group-member.png"
+        val fixture = NotificationBootstrapTestFixture(context = context, senderPictureUrl = url, isDm = false)
+        val state =
+            WhiteNoiseAppState(
+                context = context,
+                draftStore = fixture.appState.draftStore,
+                accountIdHexResolver = { null },
+                accounts = emptyList(),
+                activeAccountRef = "account-a",
+            )
+        val image = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        try {
+            AvatarImageLoader.putCached(url, image.asImageBitmap())
+            assertNull(state.readyNotificationAvatars(fixture.update).senderAvatarBitmap)
+            val invite = fixture.update.copy(trigger = NotificationTriggerFfi.GROUP_INVITE)
+            assertSame(image, state.readyNotificationAvatars(invite).senderAvatarBitmap)
         } finally {
             AvatarImageLoader.clear()
             fixture.close()

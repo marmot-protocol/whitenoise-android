@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.os.Process
+import android.os.SystemClock
 import android.util.Log
 import androidx.tracing.Trace
 import dev.ipf.whitenoise.android.BuildConfig
@@ -118,7 +119,7 @@ internal object WarmResumeTrace {
         marker(
             activityToken,
             "rendered-surface-frame",
-            "epoch=$foregroundEpoch surface=${surface.name.lowercase()}",
+            "epoch=$foregroundEpoch surface=${surface.name.lowercase()} uptime_ms=${SystemClock.uptimeMillis()}",
         )
     }
 
@@ -130,14 +131,18 @@ internal object WarmResumeTrace {
     @Synchronized
     internal fun renderedSurfaceFrames(): List<WarmResumeRenderedFrame> = renderedSurfaceFrames.toList()
 
-    private fun marker(
-        activityToken: Int,
-        event: String,
-        fields: String = "",
+    /** Coarse phase ordering only; retained content and owner identities never enter diagnostics. */
+    fun conversationPhase(
+        phase: WarmResumeConversationPhase,
+        imeRequested: Boolean? = null,
+        imeObserved: Boolean? = null,
     ) {
         if (!BuildConfig.DEBUG && !BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS) return
-        val suffix = fields.takeIf(String::isNotEmpty)?.let { " $it" }.orEmpty()
-        Log.i(TAG, "activity=$activityToken event=$event$suffix")
+        Log.i(
+            TAG,
+            "conversation_phase=${phase.name.lowercase()} uptime_ms=${SystemClock.uptimeMillis()} " +
+                "ime_requested=$imeRequested ime_observed=$imeObserved",
+        )
     }
 
     @Synchronized
@@ -155,7 +160,6 @@ internal object WarmResumeTrace {
         val foregroundEpoch: Int,
     )
 
-    private const val TAG = "WNWarmResume"
     private const val TRACE_SECTION = "WhiteNoise.warmResume.firstUsefulFrame"
     private const val MAX_RECORDED_SURFACE_FRAMES = 64
 }
@@ -177,3 +181,25 @@ internal data class WarmResumeRenderedFrame(
     val foregroundEpoch: Int,
     val surface: WarmResumeRenderedSurface,
 )
+
+internal enum class WarmResumeConversationPhase {
+    Resume,
+    RetainedFrameReleased,
+    LocalHandoffCommitted,
+    LocalHandoffSuperseded,
+    InputReceived,
+    NavigationRequested,
+    RootDraw,
+}
+
+private fun marker(
+    activityToken: Int,
+    event: String,
+    fields: String = "",
+) {
+    if (!BuildConfig.DEBUG && !BuildConfig.ENABLE_PERFORMANCE_TEST_SELECTORS) return
+    val suffix = fields.takeIf(String::isNotEmpty)?.let { " $it" }.orEmpty()
+    Log.i(TAG, "activity=$activityToken event=$event$suffix")
+}
+
+private const val TAG = "WNWarmResume"

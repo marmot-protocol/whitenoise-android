@@ -132,7 +132,7 @@ internal class ConversationDictationForegroundServiceTest : ConversationDictatio
         assertFalse(processing.extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE))
         assertTrue(processing.actions.isNullOrEmpty())
         assertNull(processing.bigContentView)
-        assertCompactCompletionButtonsDisabled(service, processing)
+        assertCompactButtonsEnabled(service, processing)
 
         service.onStartCommand(
             actionCommand(service, harness, ConversationDictationForegroundService.ACTION_CANCEL),

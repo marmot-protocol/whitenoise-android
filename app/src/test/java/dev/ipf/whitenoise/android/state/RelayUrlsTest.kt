@@ -384,4 +384,101 @@ class RelayUrlsTest {
             RelayListKind.entries.toList(),
         )
     }
+
+    /** An onion host is an onion relay over ws or wss, never an insecure-transport warning. */
+    @Test
+    fun validOnionHostIsClassifiedAsNeedingTorNotInsecure() {
+        listOf(
+            "ws://$ONION_V3.onion",
+            "WS://${ONION_V3.uppercase()}.ONION/",
+            "ws://$ONION_V3.onion:8080/nostr?x=1",
+            "wss://$ONION_V3.onion",
+            "ws://relay.$ONION_V3.onion.",
+        ).forEach { url ->
+            assertEquals(url, RelayAddressAttention.OnionRequiresTor, relayAddressAttention(url))
+        }
+    }
+
+    /** Ordinary clearnet ws:// keeps the insecure-transport classification; secure wss:// needs nothing. */
+    @Test
+    fun clearnetWebsocketKeepsInsecureTransportWarning() {
+        assertEquals(RelayAddressAttention.InsecureTransport, relayAddressAttention("ws://relay.example.com"))
+        assertEquals(RelayAddressAttention.InsecureTransport, relayAddressAttention(" ws://relay.example.com:7777/x "))
+        assertEquals(RelayAddressAttention.None, relayAddressAttention("wss://relay.example.com"))
+        assertEquals(RelayAddressAttention.None, relayAddressAttention("wss://relay.us.whitenoise.chat"))
+    }
+
+    /** ".onion" in a path, query, fragment, username or a longer suffix does not make a host an onion relay. */
+    @Test
+    fun deceptiveOnionSubstringsAreClassifiedByTheParsedHost() {
+        assertEquals(
+            RelayAddressAttention.InsecureTransport,
+            relayAddressAttention("ws://$ONION_V3.onion.example"),
+        )
+        assertEquals(
+            RelayAddressAttention.InsecureTransport,
+            relayAddressAttention("ws://evil.example/$ONION_V3.onion"),
+        )
+        assertEquals(
+            RelayAddressAttention.InsecureTransport,
+            relayAddressAttention("ws://evil.example/?h=$ONION_V3.onion"),
+        )
+        assertEquals(
+            RelayAddressAttention.InsecureTransport,
+            relayAddressAttention("ws://evil.example#$ONION_V3.onion"),
+        )
+        assertEquals(RelayAddressAttention.Unusable, relayAddressAttention("ws://$ONION_V3.onion@evil.example"))
+        assertEquals(RelayAddressAttention.None, relayAddressAttention("wss://onion.example.com/$ONION_V3.onion"))
+        assertEquals(RelayAddressAttention.InsecureTransport, relayAddressAttention("ws://onion"))
+        assertFalse(isOnionHost("$ONION_V3.onion.example"))
+        assertFalse(isOnionHost("onion"))
+        assertFalse(isOnionHost("myonion"))
+    }
+
+    /** Any `.onion` domain is an onion relay, as in MDK's TorRequired rule, without a v3 address check. */
+    @Test
+    fun anyOnionDomainNeedsTorLikeMdk() {
+        listOf("ws://hidden.onion", "wss://hidden.onion", "wss://Hidden.ONION.", "ws://a.b.onion:9000").forEach { url ->
+            assertEquals(url, RelayAddressAttention.OnionRequiresTor, relayAddressAttention(url))
+        }
+        assertTrue(isOnionHost("$ONION_V3.onion"))
+        assertTrue(isOnionHost("sub.$ONION_V3.onion."))
+    }
+
+    /** Non-relay schemes, private hosts, unsupported ports and malformed text are unusable, not onion or insecure. */
+    @Test
+    fun unsupportedAndMalformedAddressesAreUnusable() {
+        listOf(
+            "http://$ONION_V3.onion",
+            "ws://localhost:7777",
+            "ws://10.0.0.1",
+            "wss://relay.example.com:7777",
+            "wss://user@relay.example.com",
+            "not a url",
+            "",
+        ).forEach { url ->
+            assertEquals(url, RelayAddressAttention.Unusable, relayAddressAttention(url))
+        }
+    }
+
+    /** The onion classification is presentation only: the editor still rejects ws:// onion and publish drops it. */
+    @Test
+    fun onionClassificationDoesNotWidenEditorOrPublishPolicy() {
+        val onion = "ws://$ONION_V3.onion"
+        assertFalse(isAcceptableRelayUrl(onion))
+        assertEquals(emptyList<String>(), normalizeRelayUrls(listOf(onion)))
+        assertEquals(
+            listOf("wss://relay.example.com"),
+            allowedRelayUrlsForPublish(
+                RelayListEditPlan(relays = listOf("wss://relay.example.com", "wss://$ONION_V3.onion")),
+                listOf(
+                    classified("wss://relay.example.com", RelayEndpointPolicyFfi.ALLOWED),
+                    classified("wss://$ONION_V3.onion", RelayEndpointPolicyFfi.UNSAFE),
+                ),
+            ),
+        )
+    }
 }
+
+/** A v3 onion service label, used as a realistic onion host. */
+private const val ONION_V3 = "duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad"

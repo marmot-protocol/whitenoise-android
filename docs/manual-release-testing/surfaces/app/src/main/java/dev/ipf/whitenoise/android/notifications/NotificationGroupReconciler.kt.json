@@ -1,0 +1,34 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationGroupReconciler.kt",
+  "legacy_sha256": "296af0e60dad6d0dace6475d20dade1f3e78a33ffa9813674d0dd31437e6a40b",
+  "categories": {
+    "notification_content_contracts": [
+      {
+        "surface": "notification emoji artifact cleanup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationGroupReconciler.kt",
+        "anchor": "private fun reconcileArtwork(",
+        "test_ids": [
+          "NTF-034",
+          "NTF-030"
+        ]
+      },
+      {
+        "surface": "OS notification group reconciliation and blocked channel/group recovery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationGroupReconciler.kt",
+        "anchor": "internal class NotificationGroupReconciler(",
+        "test_ids": [
+          "NTF-026"
+        ]
+      },
+      {
+        "surface": "Legacy grouping cannot restore a retired notification payload",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationGroupReconciler.kt",
+        "anchor": "private fun canAdoptLegacyPayload(",
+        "test_ids": [
+          "NTF-043"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

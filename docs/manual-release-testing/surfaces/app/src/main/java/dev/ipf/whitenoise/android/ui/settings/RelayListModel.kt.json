@@ -1,0 +1,313 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+  "legacy_sha256": "16d74c5d9532539795007aac8c37e24d7797f6f4f363d4174779491bbe9b8e4c",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "accountRelays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "fun accountRelays(",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "relayListStatusRes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "fun relayListStatusRes(",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "relayListsHelpRes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "fun relayListsHelpRes(",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:inbox",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.inbox",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:nip_65",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.nip_65",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.profile",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_imported_issue_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.relay_imported_issue_detail",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003",
+          "SYS-014"
+        ]
+      },
+      {
+        "surface": "string:relay_imported_issue_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.relay_imported_issue_title",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003",
+          "SYS-014"
+        ]
+      },
+      {
+        "surface": "string:relay_unusable_address",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.relay_unusable_address",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003",
+          "SYS-014"
+        ]
+      },
+      {
+        "surface": "string:relay_unusable_issue_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.relay_unusable_issue_detail",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003",
+          "SYS-014"
+        ]
+      },
+      {
+        "surface": "string:relay_unusable_issue_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.relay_unusable_issue_title",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003",
+          "SYS-014"
+        ]
+      },
+      {
+        "surface": "string:relay_list_missing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.relay_list_missing",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_list_publish_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.relay_list_publish_failed",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_list_published",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.relay_list_published",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_list_publishing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.relay_list_publishing",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_list_refresh_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.relay_list_refresh_failed",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_list_refreshing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.relay_list_refreshing",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_list_status_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.relay_list_status_unavailable",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_lists_missing_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.relay_lists_missing_help",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_lists_published_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.relay_lists_published_help",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_lists_unavailable_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.relay_lists_unavailable_help",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_needs_attention",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.relay_needs_attention",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003",
+          "SYS-014"
+        ]
+      },
+      {
+        "surface": "string:relay_onion_issue_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.relay_onion_issue_detail",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003",
+          "SYS-014"
+        ]
+      },
+      {
+        "surface": "string:relay_onion_issue_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.relay_onion_issue_title",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003",
+          "SYS-014"
+        ]
+      },
+      {
+        "surface": "string:relay_onion_needs_tor",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.relay_onion_needs_tor",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003",
+          "SYS-014"
+        ]
+      },
+      {
+        "surface": "string:relay_role_inbox",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.relay_role_inbox",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_role_inbox_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.relay_role_inbox_help",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_role_profile_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "R.string.relay_role_profile_help",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Imported relay concern callouts and notes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelayListModel.kt",
+        "anchor": "fun RelayAddressAttention.callout(",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003",
+          "SYS-014"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

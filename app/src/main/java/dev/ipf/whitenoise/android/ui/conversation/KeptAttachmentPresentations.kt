@@ -93,6 +93,10 @@ private fun keptAcceptedAttachmentPresentation(
             else -> KeptAttachmentKind.File
         }
     val transfer = controller?.let { rememberKeptAttachmentTransfer(it, message, attachment, thumbnailRevision) }
+    DisposableEffect(controller, message.record.messageIdHex, index) {
+        val hold = controller?.retainThumbnail(message.record.messageIdHex, index)
+        onDispose { hold?.close() }
+    }
     val decodedRevision =
         controller
             ?.appState

@@ -226,12 +226,14 @@ internal class NotificationGroupReconciler(
                                 ?: return@synchronized
                         if (
                             !UserEventNotificationGroup.isChildCandidate(live) ||
-                            UserEventNotificationGroup.child(live) != null
+                            UserEventNotificationGroup.child(live) != null ||
+                            !canAdoptLegacyPayload(live)
                         ) {
                             return@synchronized
                         }
                         val generation =
                             live.notification.extras.getString(EXTRA_GENERATION) ?: UUID.randomUUID().toString()
+                        val revision = ConversationCardPostedRegistry.newPayloadRevision()
                         val builder = legacyCardBuilder(live)
                         val adopted =
                             UserEventNotificationGroup
@@ -249,6 +251,7 @@ internal class NotificationGroupReconciler(
                             } else {
                                 notificationWithoutPreview(context, adopted, silent = true)
                             }
+                        payload.extras.putString(EXTRA_PAYLOAD_REVISION, revision)
                         post(compat, requireNotNull(live.tag), live.id, payload)
                         NotificationGroupWriteVisibility.childWritten(context)
                         ConversationCardPostedRegistry.markPosted(
@@ -256,6 +259,7 @@ internal class NotificationGroupReconciler(
                             live.id,
                             UserEventNotificationGroup.dismissalTime(live),
                             generation,
+                            payload = ConversationCardPostedRegistry.PayloadSnapshot(revision, emptySet()),
                         )
                         changed = true
                     }
@@ -326,3 +330,12 @@ internal class NotificationGroupReconciler(
             }
     }
 }
+
+/** A retired or untrackable legacy payload cannot be republished by grouping while cancellation settles. */
+private fun canAdoptLegacyPayload(live: StatusBarNotification): Boolean =
+    ConversationCardPostedRegistry.canAcceptPost(live.tag.orEmpty(), live.id) &&
+        ConversationCardPostedRegistry.isCurrentPayload(
+            live.tag.orEmpty(),
+            live.id,
+            live.notification.extras.getString(EXTRA_PAYLOAD_REVISION),
+        )

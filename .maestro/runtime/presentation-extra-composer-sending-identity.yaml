@@ -1,0 +1,26 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-extra-composer-sending-identity
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Retained identity draft
+- tapOn:
+    id: composer-sending-identity
+- assertVisible:
+    id: composer-sending-identity-popup
+- assertVisible: Sending as
+- assertVisible:
+    text: Maestro Bob
+    childOf:
+      id: composer-sending-identity-popup
+- assertNotVisible:
+    text: Maestro Alice
+    childOf:
+      id: composer-sending-identity-popup
+- back
+- assertNotVisible:
+    id: composer-sending-identity-popup
+- assertVisible: Retained identity draft
+- tapOn:
+    id: identity-fixture-done
+- assertVisible:
+    id: presentation.complete

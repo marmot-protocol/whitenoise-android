@@ -161,6 +161,14 @@
           "ACC-002",
           "ACC-008"
         ]
+      },
+      {
+        "surface": "Logical destination navigation motion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt",
+        "anchor": "fun ProfileSheet(",
+        "test_ids": [
+          "SET-041"
+        ]
       }
     ],
     "settings_controls": [

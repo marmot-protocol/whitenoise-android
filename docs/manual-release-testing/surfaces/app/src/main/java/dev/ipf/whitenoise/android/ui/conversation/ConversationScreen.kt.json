@@ -14,7 +14,7 @@
       {
         "surface": "Jump-to-newest badge count owner",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "anchor": "rememberConversationUnreadBadgeCount(",
+        "anchor": "rememberConversationUnreadBadge(",
         "test_ids": [
           "CON-003"
         ]
@@ -54,6 +54,30 @@
         "anchor": "attachmentSendClaim.send(",
         "test_ids": [
           "DIC-008"
+        ]
+      },
+      {
+        "surface": "Logical destination navigation motion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "val detailsRouteMotion =",
+        "test_ids": [
+          "CON-037"
+        ]
+      },
+      {
+        "surface": "Foreground voice recording ownership and automatic-stop notices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "VoiceRecordingLifecycleEffect(voiceRecordingController)",
+        "test_ids": [
+          "MED-008"
+        ]
+      },
+      {
+        "surface": "Interrupted recording save failure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "R.string.voice_recording_save_failed",
+        "test_ids": [
+          "MED-008"
         ]
       }
     ],
@@ -109,6 +133,14 @@
       }
     ],
     "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "surface": "Typing and navigation retire deferred geometry",
+        "anchor": "snapshotFlow { composerTextState.userTextEditRevision }",
+        "test_ids": [
+          "CON-033"
+        ]
+      },
       {
         "surface": "Share-owned attachment discard storage recovery",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
@@ -243,6 +275,46 @@
         "anchor": "fun messageDragSelectionEffects()",
         "test_ids": [
           "MSG-004"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "surface": "Message collapse retires deferred foreground correction before viewport settlement",
+        "anchor": "onBeforeBodyCollapse = {",
+        "test_ids": [
+          "CON-033"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "surface": "Local clipboard draft persistence does not consume a new navigation-entry keyboard restore",
+        "anchor": "composerAutoFocusConsumed.value = true",
+        "test_ids": [
+          "CON-013"
+        ]
+      },
+      {
+        "surface": "Media source uses the current clear reading viewport",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "readingViewport = { timelineViewport.readingBoundsInWindow }",
+        "test_ids": [
+          "MED-044"
+        ]
+      },
+      {
+        "surface": "Batch-selection forward eligibility follows attachment downloads while messages are selected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "val selectionMediaCacheRevision",
+        "test_ids": [
+          "MSG-012"
+        ]
+      },
+      {
+        "surface": "Actual composer text edits remain distinct from unchanged presentation across draft hydration and remount",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
+        "anchor": "conversationDictationDraftWriter(",
+        "test_ids": [
+          "DIC-011"
         ]
       }
     ]

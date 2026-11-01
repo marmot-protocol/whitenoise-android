@@ -328,8 +328,8 @@ internal fun notificationAvatarPreWarmTarget(
         senderAccountIdHex =
             update.sender.accountIdHex
                 .trim()
-                .takeIf { it.isNotEmpty() },
-        senderAvatarUrl = ProfileSanitizer.protocolImageUrl(update.sender.pictureUrl),
+                .takeIf { update.isDm && it.isNotEmpty() },
+        senderAvatarUrl = if (update.isDm) ProfileSanitizer.protocolImageUrl(update.sender.pictureUrl) else null,
         resolveGroupAvatar = !update.isDm,
         preWarmRemoteImages = !appLockScreenVisible,
     )

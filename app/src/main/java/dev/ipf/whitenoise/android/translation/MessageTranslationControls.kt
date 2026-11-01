@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -52,18 +53,14 @@ internal fun rememberMessageTranslationSource(
                 ?.takeIf { text.isNotBlank() && text.length <= MAX_TRANSLATION_TEXT }
                 ?.let { TranslationSource(messageId, text, target.orEmpty(), sourceRevision) }
         }
-    LaunchedEffect(
-        source,
-        session,
-        revision,
-        session?.epoch,
-        session?.failure,
-        session?.capacityRevision,
-        automaticEligible,
-    ) {
+    // Session epoch, failure and capacity are watched inside the effect rather than keyed in composition: every
+    // bubble reads this, and one source's removal would otherwise recompose every visible message.
+    LaunchedEffect(source, session, revision, automaticEligible) {
         val enabled = automaticEligible && choice?.enabled == true
-        if (source != null && enabled && OfflineTranslatorLanguageCatalog.supportsTarget(source.target)) {
-            session?.request(source, automatic = true)
+        if (source == null || session == null || !enabled) return@LaunchedEffect
+        if (!OfflineTranslatorLanguageCatalog.supportsTarget(source.target)) return@LaunchedEffect
+        snapshotFlow { Triple(session.epoch, session.failure, session.capacityRevision) }.collect {
+            session.request(source, automatic = true)
         }
     }
     DisposableEffect(source, session) { onDispose { source?.let { session?.remove(it) } } }

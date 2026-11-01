@@ -1,9 +1,15 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -11,6 +17,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -256,6 +263,228 @@ class SmartFolderEditorTest {
             .assertIsDisplayed()
             .performClick()
         composeRule.onNodeWithTag("folder.conditionDone").assertExists()
+    }
+
+    /** Each paired row selects, swaps and clears one condition, and Reset keeps only the accepted-chat scope. */
+    @Test fun pairedControlsReplaceClearAndResetOnlyTheVisiblePredicates() {
+        val initial = defaultSmartFolder()
+        val root = renderPanel(initial)
+        quickFolderFields.forEach { field ->
+            val positive = if (field == FolderField.TYPE) FolderMode.DIRECT else FolderMode.PRESENT
+            val negative = if (field == FolderField.TYPE) FolderMode.GROUP else FolderMode.NONE
+            val positiveTag = "folder.quick.${field.name}.${positive.name}"
+            val negativeTag = "folder.quick.${field.name}.${negative.name}"
+            composeRule.onNodeWithTag(positiveTag).performScrollTo().performClick()
+            assertEquals(positive, root.value!!.quickMode(field))
+            composeRule
+                .onNodeWithTag(positiveTag)
+                .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
+            composeRule.onNodeWithTag(negativeTag).performScrollTo().performClick()
+            assertEquals(negative, root.value!!.quickMode(field))
+            assertEquals(
+                1,
+                root.value!!
+                    .children
+                    .filterIsInstance<SmartFolderFilter.Condition>()
+                    .count { it.field == field },
+            )
+            composeRule.onNodeWithTag(negativeTag).performClick()
+            assertEquals(null, root.value!!.quickMode(field))
+        }
+        composeRule.onNodeWithTag("folder.quick.UNREAD.PRESENT").performScrollTo().performClick()
+        composeRule.onNodeWithTag("folder.quick.reset").performScrollTo().performClick()
+        assertEquals(listOf(SmartFolderFilter.Condition(FolderField.ACCEPTED)), root.value!!.children)
+    }
+
+    /** Both halves of a row announce its whole state, and Advanced announces collapsed then expanded. */
+    @Test fun pairedRowsAnnounceNeutralAndBothSelectionsAndAdvancedExpansion() {
+        renderPanel(SmartFolderFilter.Group())
+        val positive = composeRule.onNodeWithTag("folder.quick.UNREAD.PRESENT")
+        val negative = composeRule.onNodeWithTag("folder.quick.UNREAD.NONE")
+
+        /** Asserts that both halves of the Unread row announce [choice] as the row's state. */
+        fun assertRowState(choice: Int) {
+            val expected =
+                context.getString(
+                    R.string.smart_folder_quick_state,
+                    context.getString(R.string.smart_folder_unread),
+                    context.getString(choice),
+                )
+            positive.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, expected))
+            negative.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, expected))
+        }
+        assertRowState(R.string.smart_folder_quick_neutral)
+        positive.performScrollTo().performClick()
+        assertRowState(R.string.smart_folder_quick_unread)
+        negative.performClick()
+        assertRowState(R.string.smart_folder_no_unread)
+        negative.performClick()
+        assertRowState(R.string.smart_folder_quick_neutral)
+        val advanced = composeRule.onNodeWithTag("folder.quick.advanced")
+        advanced
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.StateDescription,
+                    context.getString(R.string.smart_folder_quick_collapsed),
+                ),
+            ).performScrollTo()
+            .performClick()
+        advanced.assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.StateDescription,
+                context.getString(R.string.smart_folder_quick_expanded),
+            ),
+        )
+    }
+
+    /** Opening Advanced, cancelling a condition edit and closing Advanced leave the draft exactly as it was. */
+    @Test fun switchingAdvancedPresentationAndCancellingAnEditPreservesTheExactDraft() {
+        val initial = defaultSmartFolder().toggleQuickFilter(FolderField.DRAFT, FolderMode.NONE)
+        val root = renderPanel(initial)
+        assertEquals(initial, root.value)
+        composeRule.onNodeWithTag("folder.quick.advanced").performScrollTo().performClick()
+        composeRule.onNodeWithTag("folder.condition.2").performScrollTo().performClick()
+        composeRule.onNodeWithTag("folder.mode").performClick()
+        composeRule.onNodeWithText(context.getString(R.string.smart_folder_has_draft)).performClick()
+        composeRule.onNodeWithText(context.getString(R.string.cancel)).performClick()
+        assertEquals(initial, root.value)
+        composeRule.onNodeWithTag("folder.quick.advanced").performScrollTo().performClick()
+        assertEquals(initial, root.value)
+        composeRule
+            .onNodeWithTag("folder.quick.DRAFT.NONE")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
+    }
+
+    /** Switching legacy rules to quick filters asks first, and cancelling leaves the draft untouched. */
+    @Test fun legacyQuickReplacementCanBeCancelledBeforeAnyDraftChange() {
+        val root = renderPanel(null, legacy = true)
+        composeRule.onNodeWithTag("folder.quick.start").performClick()
+        assertEquals(null, root.value)
+        composeRule.onNodeWithText(context.getString(R.string.cancel)).performClick()
+        assertEquals(null, root.value)
+        composeRule.onNodeWithTag("folder.quick.start").performClick()
+        composeRule.onNodeWithTag("folder.confirmPreset").performClick()
+        assertEquals(defaultSmartFolder(), root.value)
+    }
+
+    /** A nested or negated rule shows only the tree and is never flattened to fit the quick controls. */
+    @Test fun complexRulesHaveNoQuickControlsOrImplicitNormalization() {
+        val nested = SmartFolderFilter.Group(children = listOf(defaultSmartFolder()), not = true)
+        val root = renderPanel(nested)
+        composeRule.onNodeWithTag("folder.quick.UNREAD.PRESENT").assertDoesNotExist()
+        composeRule.onNodeWithTag("folder.quick.advanced").assertDoesNotExist()
+        assertEquals(nested, root.value)
+    }
+
+    /** A quick edit and the expanded Advanced section both survive saved-state restoration. */
+    @Test fun quickDraftAndAdvancedDisclosureSurviveSavedStateRestoration() {
+        val restoration = StateRestorationTester(composeRule)
+        var current: SmartFolderFilter.Group? = null
+        restoration.setContent {
+            var payload by androidx.compose.runtime.saveable.rememberSaveable {
+                mutableStateOf(
+                    dev.ipf.whitenoise.android.state.SmartFolderCodec
+                        .encode(defaultSmartFolder()),
+                )
+            }
+            val tree =
+                dev.ipf.whitenoise.android.state.SmartFolderCodec
+                    .decode(payload)!!
+            current = tree
+            WhiteNoiseTheme {
+                Surface {
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
+                        SmartFolderRulePanel(
+                            SmartFolderPanelState(true, tree),
+                            emptyList(),
+                            { null },
+                            onChange = {
+                                payload =
+                                    dev.ipf.whitenoise.android.state.SmartFolderCodec
+                                        .encode(it)
+                            },
+                            legacyControls = {},
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.onNodeWithTag("folder.quick.UNREAD.NONE").performScrollTo().performClick()
+        val defaults = defaultSmartFolder()
+        val edited =
+            defaults.copy(
+                children = defaults.children + SmartFolderFilter.Condition(FolderField.UNREAD, FolderMode.NONE),
+            )
+        composeRule.runOnIdle { assertEquals(edited, current) }
+        composeRule.onNodeWithTag("folder.quick.advanced").performScrollTo().performClick()
+        restoration.emulateSavedInstanceStateRestore()
+        composeRule.runOnIdle { assertEquals(edited, current) }
+        composeRule.onNodeWithTag("folder.group.").assertExists()
+        composeRule.onNodeWithTag("folder.quick.UNREAD.NONE").assertDoesNotExist()
+    }
+
+    /** Switching to Match any in Advanced removes the quick controls instead of offering a lossy toggle. */
+    @Test fun becomingIncompatibleInAdvancedNeverOffersAFlatteningQuickToggle() {
+        val root = renderPanel(defaultSmartFolder())
+        composeRule.onNodeWithTag("folder.quick.advanced").performScrollTo().performClick()
+        composeRule.onNodeWithTag("folder.match.").performScrollTo().performClick()
+        composeRule.onNodeWithText(context.getString(R.string.smart_folder_any)).performClick()
+        val any = root.value
+        assertFalse(any!!.all)
+        composeRule.onNodeWithTag("folder.quick.advanced").assertDoesNotExist()
+        composeRule.onNodeWithTag("folder.quick.UNREAD.PRESENT").assertDoesNotExist()
+        assertEquals(any, root.value)
+    }
+
+    /** A pending legacy replacement prompt survives rotation and can still be cancelled without a change. */
+    @Test fun pendingLegacyReplacementSurvivesRotationAndCanStillBeCancelled() {
+        val restoration = StateRestorationTester(composeRule)
+        var changes = 0
+        restoration.setContent {
+            WhiteNoiseTheme {
+                Surface {
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
+                        SmartFolderRulePanel(
+                            SmartFolderPanelState(false, null, true),
+                            emptyList(),
+                            { null },
+                            onChange = { changes++ },
+                            legacyControls = {},
+                        )
+                    }
+                }
+            }
+        }
+        composeRule.onNodeWithTag("folder.quick.start").performClick()
+        restoration.emulateSavedInstanceStateRestore()
+        composeRule.onNodeWithTag("folder.confirmPreset").assertExists()
+        composeRule.onNodeWithText(context.getString(R.string.cancel)).performClick()
+        assertEquals(0, changes)
+        composeRule.onNodeWithTag("folder.confirmPreset").assertDoesNotExist()
+    }
+
+    /** Renders the rule panel for [initial] and returns the draft root its edits write to. */
+    private fun renderPanel(
+        initial: SmartFolderFilter.Group?,
+        legacy: Boolean = false,
+    ): MutableState<SmartFolderFilter.Group?> {
+        val state = mutableStateOf(initial)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Surface {
+                    Column(Modifier.verticalScroll(rememberScrollState())) {
+                        SmartFolderRulePanel(
+                            SmartFolderPanelState(state.value != null, state.value, legacy),
+                            emptyList(),
+                            { null },
+                            onChange = { state.value = it },
+                            legacyControls = {},
+                        )
+                    }
+                }
+            }
+        }
+        return state
     }
 
     private fun render(

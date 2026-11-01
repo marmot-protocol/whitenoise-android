@@ -59,6 +59,8 @@ object NotificationChannels {
                 NotificationChannelSpec.GROUP_MESSAGES,
                 NotificationChannelSpec.MENTIONS,
                 -> {
+                    // Android retains existing channels unchanged; only new message channels get our tone.
+                    setSound(NotificationTone.DING.uri(context), NotificationTone.audioAttributes)
                     enableVibration(true)
                     // Single ~150ms pulse instead of the OS-default double-buzz:
                     // a chat message is one event, not two. Applies only to
