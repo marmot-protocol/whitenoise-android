@@ -18,6 +18,19 @@
     <string name="attachment_collection_state_skipped">Skipped</string>
     <string name="attachment_collection_item_media">Photo or video %1$d</string>
     <string name="attachment_collection_item_document">File %1$d</string>
+    <string name="media_collection_selected_count">%1$d of %2$d selected</string>
+    <string name="media_collection_select_all">Select all</string>
+    <string name="media_collection_clear_selection">Clear selection</string>
+    <string name="media_collection_remove_selected">Remove selected</string>
+    <string name="media_collection_move_earlier">Move earlier</string>
+    <string name="media_collection_move_later">Move later</string>
+    <string name="media_collection_show_grid">All items</string>
+    <string name="media_collection_show_single">Preview</string>
+    <string name="media_collection_item_photo">Photo %1$d of %2$d</string>
+    <string name="media_collection_item_video">Video %1$d of %2$d</string>
+    <string name="media_collection_item_document">%1$s, file %2$d of %3$d</string>
+    <string name="media_collection_selected">Selected</string>
+    <string name="media_collection_not_selected">Not selected</string>
     <plurals name="attachment_collection_limit_result">
         <item quantity="one">Added %1$d of %2$d. %3$d attachment didn\'t fit — the limit is %4$d per send.</item>
         <item quantity="other">Added %1$d of %2$d. %3$d attachments didn\'t fit — the limit is %4$d per send.</item>
@@ -29,5 +42,9 @@
     <plurals name="attachment_collection_unrecoverable">
         <item quantity="one">%d attachment can no longer be read. Select it or share it again to send it.</item>
         <item quantity="other">%d attachments can no longer be read. Select them or share them again to send them.</item>
+    </plurals>
+    <plurals name="media_collection_total">
+        <item quantity="one">%d item</item>
+        <item quantity="other">%d items</item>
     </plurals>
 </resources>

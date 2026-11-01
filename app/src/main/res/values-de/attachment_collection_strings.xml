@@ -18,6 +18,19 @@
     <string name="attachment_collection_state_skipped">Übersprungen</string>
     <string name="attachment_collection_item_media">Foto oder Video %1$d</string>
     <string name="attachment_collection_item_document">Datei %1$d</string>
+    <string name="media_collection_selected_count">%1$d von %2$d ausgewählt</string>
+    <string name="media_collection_select_all">Alle auswählen</string>
+    <string name="media_collection_clear_selection">Auswahl aufheben</string>
+    <string name="media_collection_remove_selected">Auswahl entfernen</string>
+    <string name="media_collection_move_earlier">Nach vorne</string>
+    <string name="media_collection_move_later">Nach hinten</string>
+    <string name="media_collection_show_grid">Alle Elemente</string>
+    <string name="media_collection_show_single">Vorschau</string>
+    <string name="media_collection_item_photo">Foto %1$d von %2$d</string>
+    <string name="media_collection_item_video">Video %1$d von %2$d</string>
+    <string name="media_collection_item_document">%1$s, Datei %2$d von %3$d</string>
+    <string name="media_collection_selected">Ausgewählt</string>
+    <string name="media_collection_not_selected">Nicht ausgewählt</string>
     <plurals name="attachment_collection_limit_result">
         <item quantity="one">%1$d von %2$d hinzugefügt. %3$d Anhang passte nicht mehr — die Grenze liegt bei %4$d pro Sendung.</item>
         <item quantity="other">%1$d von %2$d hinzugefügt. %3$d Anhänge passten nicht mehr — die Grenze liegt bei %4$d pro Sendung.</item>
@@ -29,5 +42,9 @@
     <plurals name="attachment_collection_unrecoverable">
         <item quantity="one">%d Anhang kann nicht mehr gelesen werden. Wähle ihn erneut aus oder teile ihn noch einmal.</item>
         <item quantity="other">%d Anhänge können nicht mehr gelesen werden. Wähle sie erneut aus oder teile sie noch einmal.</item>
+    </plurals>
+    <plurals name="media_collection_total">
+        <item quantity="one">%d Element</item>
+        <item quantity="other">%d Elemente</item>
     </plurals>
 </resources>

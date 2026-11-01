@@ -18,6 +18,19 @@
     <string name="attachment_collection_state_skipped">已略過</string>
     <string name="attachment_collection_item_media">相片或影片 %1$d</string>
     <string name="attachment_collection_item_document">檔案 %1$d</string>
+    <string name="media_collection_selected_count">已選取 %1$d / %2$d</string>
+    <string name="media_collection_select_all">全選</string>
+    <string name="media_collection_clear_selection">清除選取</string>
+    <string name="media_collection_remove_selected">移除所選</string>
+    <string name="media_collection_move_earlier">前移</string>
+    <string name="media_collection_move_later">後移</string>
+    <string name="media_collection_show_grid">全部項目</string>
+    <string name="media_collection_show_single">預覽</string>
+    <string name="media_collection_item_photo">相片 %1$d / %2$d</string>
+    <string name="media_collection_item_video">影片 %1$d / %2$d</string>
+    <string name="media_collection_item_document">%1$s，檔案 %2$d / %3$d</string>
+    <string name="media_collection_selected">已選取</string>
+    <string name="media_collection_not_selected">未選取</string>
     <plurals name="attachment_collection_limit_result">
         <item quantity="other">已新增 %2$d 個中的 %1$d 個。有 %3$d 個附件未能加入 — 每次最多傳送 %4$d 個。</item>
     </plurals>
@@ -26,5 +39,8 @@
     </plurals>
     <plurals name="attachment_collection_unrecoverable">
         <item quantity="other">有 %d 個附件已無法讀取。請重新選取或再次分享後傳送。</item>
+    </plurals>
+    <plurals name="media_collection_total">
+        <item quantity="other">%d 項</item>
     </plurals>
 </resources>

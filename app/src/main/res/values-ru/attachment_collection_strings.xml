@@ -18,6 +18,19 @@
     <string name="attachment_collection_state_skipped">Пропущено</string>
     <string name="attachment_collection_item_media">Фото или видео %1$d</string>
     <string name="attachment_collection_item_document">Файл %1$d</string>
+    <string name="media_collection_selected_count">Выбрано %1$d из %2$d</string>
+    <string name="media_collection_select_all">Выбрать все</string>
+    <string name="media_collection_clear_selection">Снять выбор</string>
+    <string name="media_collection_remove_selected">Удалить выбранные</string>
+    <string name="media_collection_move_earlier">Переместить раньше</string>
+    <string name="media_collection_move_later">Переместить позже</string>
+    <string name="media_collection_show_grid">Все элементы</string>
+    <string name="media_collection_show_single">Просмотр</string>
+    <string name="media_collection_item_photo">Фото %1$d из %2$d</string>
+    <string name="media_collection_item_video">Видео %1$d из %2$d</string>
+    <string name="media_collection_item_document">%1$s, файл %2$d из %3$d</string>
+    <string name="media_collection_selected">Выбрано</string>
+    <string name="media_collection_not_selected">Не выбрано</string>
     <plurals name="attachment_collection_limit_result">
         <item quantity="one">Добавлено %1$d из %2$d. %3$d вложение не поместилось — за раз можно отправить до %4$d.</item>
         <item quantity="few">Добавлено %1$d из %2$d. %3$d вложения не поместились — за раз можно отправить до %4$d.</item>
@@ -35,5 +48,11 @@
         <item quantity="few">%d вложения больше не читаются. Выберите их или поделитесь ими снова.</item>
         <item quantity="many">%d вложений больше не читаются. Выберите их или поделитесь ими снова.</item>
         <item quantity="other">%d вложения больше не читаются. Выберите их или поделитесь ими снова.</item>
+    </plurals>
+    <plurals name="media_collection_total">
+        <item quantity="one">%d элемент</item>
+        <item quantity="few">%d элемента</item>
+        <item quantity="many">%d элементов</item>
+        <item quantity="other">%d элемента</item>
     </plurals>
 </resources>

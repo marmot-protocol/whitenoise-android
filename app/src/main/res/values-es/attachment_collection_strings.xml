@@ -18,6 +18,19 @@
     <string name="attachment_collection_state_skipped">Omitido</string>
     <string name="attachment_collection_item_media">Foto o vídeo %1$d</string>
     <string name="attachment_collection_item_document">Archivo %1$d</string>
+    <string name="media_collection_selected_count">%1$d de %2$d seleccionados</string>
+    <string name="media_collection_select_all">Seleccionar todo</string>
+    <string name="media_collection_clear_selection">Borrar selección</string>
+    <string name="media_collection_remove_selected">Quitar seleccionados</string>
+    <string name="media_collection_move_earlier">Mover antes</string>
+    <string name="media_collection_move_later">Mover después</string>
+    <string name="media_collection_show_grid">Todos</string>
+    <string name="media_collection_show_single">Vista previa</string>
+    <string name="media_collection_item_photo">Foto %1$d de %2$d</string>
+    <string name="media_collection_item_video">Vídeo %1$d de %2$d</string>
+    <string name="media_collection_item_document">%1$s, archivo %2$d de %3$d</string>
+    <string name="media_collection_selected">Seleccionado</string>
+    <string name="media_collection_not_selected">No seleccionado</string>
     <plurals name="attachment_collection_limit_result">
         <item quantity="one">Se añadieron %1$d de %2$d. %3$d adjunto no cupo — el límite es %4$d por envío.</item>
         <item quantity="other">Se añadieron %1$d de %2$d. %3$d adjuntos no cupieron — el límite es %4$d por envío.</item>
@@ -29,5 +42,9 @@
     <plurals name="attachment_collection_unrecoverable">
         <item quantity="one">Ya no se puede leer %d adjunto. Vuelve a seleccionarlo o compartirlo para enviarlo.</item>
         <item quantity="other">Ya no se pueden leer %d adjuntos. Vuelve a seleccionarlos o compartirlos para enviarlos.</item>
+    </plurals>
+    <plurals name="media_collection_total">
+        <item quantity="one">%d elemento</item>
+        <item quantity="other">%d elementos</item>
     </plurals>
 </resources>
