@@ -294,7 +294,7 @@ class RawAvControlsTest {
 
     @Test
     fun noisyReceiverReportsItsRealPauseReasonAndLaterUserPlayResetsIt() {
-        val context = RuntimeEnvironment.getApplication<Application>()
+        val context = RuntimeEnvironment.getApplication()
         val player = IsolatedAttachmentPlayer(context, Uri.parse("file:///fixture.mp4"))
         val engine = field(player, "engine") as RawAvPlaybackEngine
         engines += engine

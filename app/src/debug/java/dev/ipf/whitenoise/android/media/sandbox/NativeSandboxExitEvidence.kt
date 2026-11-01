@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.media.sandbox
 /** Matches only bounded root-UID-filtered Zygote output; it never substitutes for observed kernel absence. */
 internal object NativeSandboxExitEvidence {
     const val MAX_BYTES = 65536
+    private const val MILLIS_PER_SECOND = 1000
     private val record =
         Regex(
             """^\s*([0-9]+(?:\.[0-9]+)?)\s+[0-9]+\s+[0-9]+\s+I\s+Zygote\s*:\s*""" +
@@ -16,7 +17,8 @@ internal object NativeSandboxExitEvidence {
         startedAtMs: Long,
         endedAtMs: Long,
     ): Boolean {
-        if (output.length > MAX_BYTES || pid <= 0 || signal <= 0 || startedAtMs > endedAtMs) return false
+        val invalidIdentity = pid <= 0 || signal <= 0
+        if (output.length > MAX_BYTES || invalidIdentity || startedAtMs > endedAtMs) return false
         return output.lineSequence().any { line ->
             val match = record.matchEntire(line)
             val timestamp =
@@ -24,7 +26,7 @@ internal object NativeSandboxExitEvidence {
                     ?.groupValues
                     ?.get(1)
                     ?.toDoubleOrNull()
-                    ?.times(1000)
+                    ?.times(MILLIS_PER_SECOND)
             match != null &&
                 timestamp != null &&
                 timestamp >= startedAtMs &&
