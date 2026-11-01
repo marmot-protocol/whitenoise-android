@@ -205,6 +205,9 @@ def configuration(ndk, abi, lock, build, prefix, dav1d_prefix, pkg_config):
     ]
     if abi in {"x86", "x86_64"}:
         arguments.append("--disable-x86asm")
+    if abi == "x86":
+        # 32-bit inline MMX/CABAC assembly can retain absolute text relocations despite -fPIC.
+        arguments.append("--disable-inline-asm")
     return arguments, flags
 
 

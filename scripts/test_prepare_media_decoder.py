@@ -322,6 +322,20 @@ class NativeBuildTests(unittest.TestCase):
             self.assertIn("-ffile-prefix-map=", flags)
             self.assertEqual(abi in {"x86", "x86_64"}, "--disable-x86asm" in args)
 
+    def test_only_32bit_x86_disables_inline_assembly_for_shared_pic_output(self):
+        for abi in build.ABIS:
+            with self.subTest(abi=abi):
+                args, flags = build.configuration(self.ndk, abi, self.lock, self.root / "build",
+                                                  self.root / "install", self.root / "dav1d",
+                                                  self.root / "pkg-config")
+                self.assertEqual(abi == "x86", "--disable-inline-asm" in args)
+                self.assertEqual(abi in {"x86", "x86_64"}, "--disable-x86asm" in args)
+                self.assertIn("--enable-pic", args)
+                self.assertIn("-fPIC", flags.split())
+                self.assertIn("--disable-shared", args)
+                self.assertIn("--enable-static", args)
+                self.assertIn("--extra-ldflags=-Wl,-z,max-page-size=16384", args)
+
     def test_fake_compiler_beneath_real_build_guards_produces_and_reuses_bound_output(self):
         manifest = self.prepare()
         self.assertEqual(1, len(manifest["artifacts"]))
