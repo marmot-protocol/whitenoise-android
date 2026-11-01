@@ -1,0 +1,140 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentCards.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "GlobalAttachmentCard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentCards.kt",
+        "anchor": "fun GlobalAttachmentCard(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013",
+          "FIND-017"
+        ]
+      },
+      {
+        "surface": "GlobalAttachmentTile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentCards.kt",
+        "anchor": "fun GlobalAttachmentTile(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013",
+          "FIND-017"
+        ]
+      },
+      {
+        "surface": "GlobalAttachmentRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentCards.kt",
+        "anchor": "fun GlobalAttachmentRow(",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013",
+          "FIND-017"
+        ]
+      },
+      {
+        "surface": "Authored emoji prompt: GlobalAttachmentRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentCards.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037",
+          "FIND-017"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:library_sender_in_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentCards.kt",
+        "anchor": "R.string.library_sender_in_chat",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013",
+          "FIND-017"
+        ]
+      },
+      {
+        "surface": "string:library_item_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentCards.kt",
+        "anchor": "R.string.library_item_description",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013",
+          "FIND-017"
+        ]
+      },
+      {
+        "surface": "string:go_to_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentCards.kt",
+        "anchor": "R.string.go_to_message",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013",
+          "FIND-017"
+        ]
+      },
+      {
+        "surface": "string:attachment_type_audio",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentCards.kt",
+        "anchor": "R.string.attachment_type_audio",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013",
+          "FIND-017"
+        ]
+      },
+      {
+        "surface": "string:attachment_type_file",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentCards.kt",
+        "anchor": "R.string.attachment_type_file",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013",
+          "FIND-017"
+        ]
+      },
+      {
+        "surface": "string:attachment_type_video",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentCards.kt",
+        "anchor": "R.string.attachment_type_video",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013",
+          "FIND-017"
+        ]
+      },
+      {
+        "surface": "string:reply_media_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentCards.kt",
+        "anchor": "R.string.reply_media_photo",
+        "test_ids": [
+          "NCH-002",
+          "ACC-017",
+          "FIND-012",
+          "FIND-013",
+          "FIND-017"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

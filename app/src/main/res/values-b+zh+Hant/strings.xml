@@ -109,6 +109,12 @@
     <string name="library_loading">正在載入檔案與媒體…</string>
     <string name="library_empty">找不到檔案或媒體</string>
     <string name="library_source">來自：%1$s · %2$s</string>
+    <string name="library_section_this_week">本週</string>
+    <string name="library_section_this_month">本月</string>
+    <string name="library_sender_in_chat">%1$s · %2$s</string>
+    <string name="library_item_description">%1$s，%2$s，來自 %4$s 中的 %3$s，%5$s</string>
+    <string name="library_load_more_failed">無法載入更多檔案和媒體</string>
+    <string name="library_filters_unsupported">這些篩選條件無法用於瀏覽檔案和媒體</string>
     <string name="chat_list_search_filter_remove">移除篩選：%1$s</string>
     <string name="chat_list_filter_all">全部</string>
     <string name="chat_list_filter_unread">未讀</string>

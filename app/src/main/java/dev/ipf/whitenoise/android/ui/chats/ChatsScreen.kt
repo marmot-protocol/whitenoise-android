@@ -105,7 +105,6 @@ import dev.ipf.whitenoise.android.state.SwipeAction
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.activeAccountMessageCount
 import dev.ipf.whitenoise.android.state.chatFolderSource
-import dev.ipf.whitenoise.android.state.collectGlobalAttachments
 import dev.ipf.whitenoise.android.state.deleteLocalChatsBatch
 import dev.ipf.whitenoise.android.state.hasEarlierChats
 import dev.ipf.whitenoise.android.state.loadEarlierChats
@@ -707,49 +706,40 @@ internal fun ChatsScreen(
     val bodySearchLoading = bodySearchEnabled && bodySearchResult == null
     val bodySearchFailure = bodySearchResult?.error
     // Files-and-media browsing replaces the result list while a mode chip narrows the
-    // search to attachments. It pages the plain timeline, so it runs on its own request
-    // token rather than sharing the body search's.
+    // search to attachments. It pages MDK's account attachment index (#2000): one bounded
+    // native session per query, never a per-chat timeline walk.
     val browsingAttachments = searchOpen && globalSearchState.isBrowsingAttachments()
     val libraryKinds = globalSearchState.contentFilterSelection.selectedKinds
-    val librarySources =
-        remember(scopedSourceList, groupTitleCopy, profileRev) {
-            globalAttachmentSources(appState, scopedSourceList, groupTitleCopy)
+    val libraryChatScoped =
+        globalSearchState.folderFilters.isNotEmpty() ||
+            globalSearchState.chatTypeFilters.isNotEmpty() ||
+            globalSearchState.chatFilters.isNotEmpty()
+    val libraryQuery =
+        remember(libraryChatScoped, scopedSourceList, messageSearchConstraints, libraryKinds, bodySearchKey) {
+            globalAttachmentLibraryQuery(
+                scopedChatIds = scopedSourceList.takeIf { libraryChatScoped }?.map { it.group.groupIdHex },
+                constraints = messageSearchConstraints,
+                kinds = libraryKinds,
+                rawQuery = trimmedQuery,
+            )
         }
-    var libraryRetry by
-        remember(browsingAttachments, bodySearchKey, libraryKinds, controller, appState.runtimeGeneration) {
-            mutableStateOf(0)
-        }
-    val libraryRequest =
-        remember(
-            browsingAttachments,
-            bodySearchKey,
-            libraryKinds,
-            controller,
-            appState.runtimeGeneration,
-            libraryRetry,
-        ) {
-            ChatListBodySearchRequest()
-        }
-    val libraryResult =
-        rememberGlobalSearchLookup(libraryRequest, browsingAttachments, "GLOBAL_ATTACHMENT_SEARCH") {
-            val account = controller.boundAccountRef
-            if (account == null) {
-                error("Search account unavailable")
-            } else {
-                collectGlobalAttachments(
-                    appState = appState,
-                    accountRef = account,
-                    sources = librarySources,
-                    rawQuery = trimmedQuery,
-                    constraints = messageSearchConstraints,
-                    kinds = libraryKinds,
-                )
+    val libraryAccount = controller.boundAccountRef
+    val libraryPager = rememberGlobalAttachmentPager(appState, libraryAccount, libraryQuery, browsingAttachments)
+    val libraryTitles =
+        remember(sourceList, groupTitleCopy, profileRev) {
+            sourceList.associate { item ->
+                val title = chatListItemDisplayTitle(item, appState, groupTitleCopy)
+                item.group.groupIdHex.lowercase() to title
             }
         }
+    val libraryEntries = libraryPager?.state?.entries.orEmpty()
     val libraryItems =
-        libraryResult?.takeIf { it.request === libraryRequest }?.value.orEmpty()
-    val libraryLoading = browsingAttachments && libraryResult?.request !== libraryRequest
-    val libraryFailure = libraryResult?.error
+        remember(libraryEntries, libraryTitles) {
+            val fallback = groupTitleCopy.unavailableConversationTitle
+            libraryEntries.mapNotNull { entry -> entry.toLibraryItem { libraryTitles[it.lowercase()] ?: fallback } }
+        }
+    val libraryLoading = browsingAttachments && !libraryQuery.matchesNothing && libraryPager?.state?.loading != false
+    val libraryContent = GlobalAttachmentLibraryContent(libraryItems, libraryKinds, libraryLoading, libraryPager)
     // Resolve a pasted Nostr identifier in the search field (#344). An npub is
     // validated (and normalized) via the FFI key parser — no network. A NIP-05
     // address shows a loading state, then a `/.well-known/nostr.json` lookup
@@ -2445,28 +2435,14 @@ internal fun ChatsScreen(
                             }
                         }
                         when {
-                            browsingAttachments && libraryFailure != null ->
-                                ErrorContent(
-                                    stringResource(R.string.couldnt_load_chats),
-                                    libraryFailure,
-                                    onRetry = { libraryRetry++ },
-                                )
                             browsingAttachments ->
-                                GlobalAttachmentBrowser(
-                                    items = libraryItems,
-                                    kinds = libraryKinds,
-                                    loading = libraryLoading,
-                                    bottomPadding = 0.dp,
-                                    onOpenMessage = { groupIdHex, messageIdHex ->
-                                        openSearchMessage(groupIdHex, messageIdHex)
-                                    },
-                                    thumbnail = { item ->
-                                        libraryThumbnail(appState, controller.boundAccountRef, item)
-                                    },
-                                    selectionOwner = searchViewport?.selection,
-                                    gridState =
-                                        searchViewport?.attachmentGrid ?: androidx.compose.foundation.lazy.grid
-                                            .rememberLazyGridState(),
+                                GlobalAttachmentLibraryHost(
+                                    appState = appState,
+                                    account = controller.boundAccountRef,
+                                    chats = sourceList,
+                                    library = libraryContent,
+                                    viewport = searchViewport,
+                                    onOpenMessage = ::openSearchMessage,
                                 )
                             unreadOnly &&
                                 unreadReadFailed &&

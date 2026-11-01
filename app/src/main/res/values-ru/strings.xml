@@ -121,6 +121,12 @@
     <string name="library_loading">Загрузка файлов и медиа…</string>
     <string name="library_empty">Файлы и медиа не найдены</string>
     <string name="library_source">Из: %1$s · %2$s</string>
+    <string name="library_section_this_week">На этой неделе</string>
+    <string name="library_section_this_month">В этом месяце</string>
+    <string name="library_sender_in_chat">%1$s в %2$s</string>
+    <string name="library_item_description">%1$s, %2$s, от %3$s в %4$s, %5$s</string>
+    <string name="library_load_more_failed">Не удалось загрузить больше файлов и медиа</string>
+    <string name="library_filters_unsupported">Эти фильтры нельзя использовать для просмотра файлов и медиа</string>
     <string name="chat_list_search_filter_remove">Удалить фильтр: %1$s</string>
     <string name="chat_list_filter_all">Все</string>
     <string name="chat_list_filter_unread">Непрочитанные</string>
