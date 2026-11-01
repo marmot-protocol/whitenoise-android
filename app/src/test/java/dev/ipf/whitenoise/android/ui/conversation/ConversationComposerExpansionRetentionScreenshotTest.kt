@@ -261,8 +261,13 @@ class ConversationComposerExpansionRetentionScreenshotTest {
                                     TextFieldValue(
                                         checkNotNull(drafts[destination.accountRef to destination.groupIdHex]),
                                     ),
-                                onDraftChange = { draftValue, _ ->
-                                    appState.setDraft(destination.accountRef, destination.groupIdHex, draftValue)
+                                onDraftChange = { draftValue, textChanged ->
+                                    appState.setDraft(
+                                        destination.accountRef,
+                                        destination.groupIdHex,
+                                        draftValue,
+                                        textChanged,
+                                    )
                                 },
                                 draftKey = destination.groupIdHex,
                                 draftAccountRef = destination.accountRef,

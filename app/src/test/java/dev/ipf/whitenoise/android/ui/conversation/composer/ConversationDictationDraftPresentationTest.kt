@@ -345,6 +345,47 @@ class ConversationDictationDraftPresentationTest {
         }
     }
 
+    @Test
+    fun presentationOnlyCallbacksPreserveTheCapturedDictationSend() {
+        val fixture = Fixture(dispatchRecognized = true)
+        composeRule.setContent { fixture.RenderComposer() }
+        composeRule.runOnIdle {
+            assertTrue(fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft))
+            val revision = fixture.revision
+            val presentation = fixture.draft.copy(selection = TextRange(0), composition = TextRange(0, 2))
+            val textChanged = fixture.editor.updateValueFromUser(presentation)
+            assertFalse(textChanged)
+            fixture.writers.getValue(0)(presentation, textChanged)
+            assertEquals(presentation, fixture.draft)
+            assertEquals(revision, fixture.revision)
+
+            fixture.controller.send()
+            fixture.result("recognized")
+            assertEquals(listOf("Draft recognized"), fixture.dictationSends)
+            assertEquals("", fixture.draft.text)
+        }
+    }
+
+    @Test
+    fun realEditsRevertedToTheCapturedTextStillFenceDictationSend() {
+        val fixture = Fixture(dispatchRecognized = true)
+        composeRule.setContent { fixture.RenderComposer() }
+        composeRule.runOnIdle {
+            assertTrue(fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft))
+            val revision = fixture.revision
+            val writer = fixture.writers.getValue(0)
+            val changed = TextFieldValue("changed")
+            writer(changed, fixture.editor.updateValueFromUser(changed))
+            val reverted = TextFieldValue("Draft", TextRange(5))
+            writer(reverted, fixture.editor.updateValueFromUser(reverted))
+            assertEquals(revision + 2, fixture.revision)
+
+            fixture.controller.send()
+            fixture.result("recognized")
+            assertTrue(fixture.dictationSends.isEmpty())
+        }
+    }
+
     private class Fixture(
         private val dispatchRecognized: Boolean = false,
         private val allowParking: Boolean = true,
@@ -476,8 +517,8 @@ class ConversationDictationDraftPresentationTest {
             val ownerKey = composerDraftOwnerKey(ACCOUNT, GROUP)
             editor = rememberComposerTextState(ownerKey, draft, 0 to presentationRevision)
             val writer =
-                conversationDictationDraftWriter(controller, ACCOUNT, GROUP, presentationRevision) { value, _ ->
-                    edit(value)
+                conversationDictationDraftWriter(controller, ACCOUNT, GROUP, presentationRevision) { value, changed ->
+                    edit(value, changed)
                 }
             writers[presentationRevision] = writer
             WhiteNoiseTheme {
@@ -533,10 +574,13 @@ class ConversationDictationDraftPresentationTest {
             restarts.toList().also { restarts.clear() }.forEach { it() }
         }
 
-        fun edit(value: TextFieldValue) {
+        fun edit(
+            value: TextFieldValue,
+            textChanged: Boolean = true,
+        ) {
             editorWrites += 1
             draft = value
-            revision += 1
+            if (textChanged) revision += 1
         }
     }
 

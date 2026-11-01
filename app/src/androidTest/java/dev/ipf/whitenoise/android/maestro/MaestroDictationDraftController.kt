@@ -165,9 +165,12 @@ internal class MaestroDictationDraftController {
         }
     }
 
-    fun edit(value: TextFieldValue) {
+    fun edit(
+        value: TextFieldValue,
+        textChanged: Boolean = true,
+    ) {
         draft = value
-        revision += 1
+        if (textChanged) revision += 1
     }
 
     fun recover(retained: Boolean) {
