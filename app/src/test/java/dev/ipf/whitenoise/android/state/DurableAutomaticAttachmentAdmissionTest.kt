@@ -51,8 +51,11 @@ class DurableAutomaticAttachmentAdmissionTest {
     /** Releases only this test's work, files and dispatcher. */
     @After
     fun tearDown() {
-        fixture.close()
-        Dispatchers.resetMain()
+        try {
+            if (::fixture.isInitialized) fixture.closeAndDrain(dispatcher)
+        } finally {
+            Dispatchers.resetMain()
+        }
     }
 
     /** Work queued under an allowing policy that has since turned the type off finishes without a fetch. */

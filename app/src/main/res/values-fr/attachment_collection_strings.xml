@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="attachment_collection_reselect">Sélectionnez-les ou partagez-les à nouveau pour les envoyer.</string>
+    <string name="attachment_collection_progress">Envoi des pièces jointes : %1$d sur %2$d envoyées</string>
+    <string name="attachment_collection_blocked">Un message a échoué. Les pièces jointes suivantes attendent que vous le réessayiez ou l\'ignoriez.</string>
+    <string name="attachment_collection_paused">L\'envoi a été interrompu : %1$d sur %2$d envoyées.</string>
+    <string name="attachment_collection_skip_failed">Ignorer les échecs</string>
+    <string name="attachment_collection_resume">Reprendre</string>
+    <string name="attachment_collection_cancel">Annuler l\'envoi</string>
+    <string name="attachment_collection_show_items">Afficher les éléments</string>
+    <string name="attachment_collection_hide_items">Masquer les éléments</string>
+    <string name="attachment_collection_state_queued">En attente</string>
+    <string name="attachment_collection_state_preparing">Préparation</string>
+    <string name="attachment_collection_state_uploading">Envoi en cours</string>
+    <string name="attachment_collection_state_published">Envoyé</string>
+    <string name="attachment_collection_state_failed">Échec</string>
+    <string name="attachment_collection_state_cancelled">Annulé</string>
+    <string name="attachment_collection_state_skipped">Ignoré</string>
+    <string name="attachment_collection_item_media">Photo ou vidéo %1$d</string>
+    <string name="attachment_collection_item_document">Fichier %1$d</string>
+    <string name="media_collection_selected_count">%1$d sur %2$d sélectionnés</string>
+    <string name="media_collection_select_all">Tout sélectionner</string>
+    <string name="media_collection_clear_selection">Effacer la sélection</string>
+    <string name="media_collection_remove_selected">Retirer la sélection</string>
+    <string name="media_collection_move_earlier">Déplacer avant</string>
+    <string name="media_collection_move_later">Déplacer après</string>
+    <string name="media_collection_show_grid">Tous les éléments</string>
+    <string name="media_collection_show_single">Aperçu</string>
+    <string name="media_collection_item_photo">Photo %1$d sur %2$d</string>
+    <string name="media_collection_item_video">Vidéo %1$d sur %2$d</string>
+    <string name="media_collection_item_document">%1$s, fichier %2$d sur %3$d</string>
+    <string name="media_collection_selected">Sélectionné</string>
+    <string name="media_collection_not_selected">Non sélectionné</string>
+    <plurals name="attachment_collection_limit_result">
+        <item quantity="one">%1$d sur %2$d ajoutés. %3$d pièce jointe n\'a pas pu être ajoutée — la limite est de %4$d par envoi.</item>
+        <item quantity="other">%1$d sur %2$d ajoutés. %3$d pièces jointes n\'ont pas pu être ajoutées — la limite est de %4$d par envoi.</item>
+    </plurals>
+    <plurals name="attachment_collection_skipped">
+        <item quantity="one">%d pièce jointe n\'a pas pu être préparée et n\'a pas été envoyée.</item>
+        <item quantity="other">%d pièces jointes n\'ont pas pu être préparées et n\'ont pas été envoyées.</item>
+    </plurals>
+    <plurals name="attachment_collection_unrecoverable">
+        <item quantity="one">%d pièce jointe n\'est plus lisible. Sélectionnez-la ou partagez-la à nouveau pour l\'envoyer.</item>
+        <item quantity="other">%d pièces jointes ne sont plus lisibles. Sélectionnez-les ou partagez-les à nouveau pour les envoyer.</item>
+    </plurals>
+    <plurals name="media_collection_total">
+        <item quantity="one">%d élément</item>
+        <item quantity="other">%d éléments</item>
+    </plurals>
+</resources>

@@ -9,19 +9,27 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.MediaQuality
@@ -29,9 +37,11 @@ import dev.ipf.whitenoise.android.ui.conversation.media.MediaPreviewContent
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoPreview
 import dev.ipf.whitenoise.android.ui.conversation.media.PreparedPhotoQuality
+import dev.ipf.whitenoise.android.ui.conversation.media.StagedCollectionOrder
 import dev.ipf.whitenoise.android.ui.conversation.media.photoApprovalOutputQuality
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -340,6 +350,140 @@ class MediaPreviewContentTest {
     fun addTileIsAvailableForGrowingTheSelection() {
         renderPreview(listOf(uri(1)))
         composeRule.onNodeWithContentDescription(string(R.string.media_attachment_add_more)).assertIsDisplayed()
+    }
+
+    /** The latest shelf a bulk edit published, in send order. */
+    private var collectionOrder: StagedCollectionOrder? = null
+
+    /** Renders [mediaCount] photos then [documentCount] documents with bulk editing wired to local state. */
+    private fun renderCollection(
+        mediaCount: Int,
+        documentCount: Int,
+    ) {
+        val slots = List(mediaCount) { PendingMediaSlot("slot-$it", uri(it)) }
+        val documents = List(documentCount) { Uri.parse("content://test/doc/report-$it.pdf") }
+        slots.forEach { slot ->
+            shadowOf(app.contentResolver).registerInputStreamSupplier(slot.uri) {
+                ByteArrayInputStream(decodableImageBytes())
+            }
+        }
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true) {
+                var media by remember { mutableStateOf(slots) }
+                var docs by remember { mutableStateOf(documents) }
+                MediaPreviewContent(
+                    mediaSlots = media,
+                    documentUris = docs,
+                    chatTitle = "Test chat",
+                    onClose = {},
+                    onSend = { _, onResult -> onResult(true) },
+                    onRemoveMediaAt = {},
+                    onRemoveDocumentAt = {},
+                    onAddPhotos = {},
+                    onAddDocuments = {},
+                    onCollectionChange = { order ->
+                        collectionOrder = order
+                        media = order.media
+                        docs = order.documents
+                    },
+                )
+            }
+        }
+    }
+
+    /** The selection summary node's current text. */
+    private fun assertCount(
+        selected: Int,
+        total: Int,
+    ) {
+        composeRule
+            .onNodeWithTag("conversation.media.collection.count")
+            .assertTextEquals(string(R.string.media_collection_selected_count, selected, total))
+    }
+
+    /** One hundred mixed items open on a lazily composed grid that shows `selected / total`. */
+    @Test
+    fun hundredMixedItemsOpenOnAVirtualizedGridWithCounts() {
+        renderCollection(mediaCount = 80, documentCount = 20)
+        composeRule.onNodeWithTag("conversation.media.collection.grid").assertIsDisplayed()
+        composeRule
+            .onNodeWithText(app.resources.getQuantityString(R.plurals.media_collection_total, 100, 100))
+            .assertIsDisplayed()
+        assertCount(0, 100)
+        val composed = composeRule.onAllNodesWithTag("conversation.media.collection.cell").fetchSemanticsNodes().size
+        assertTrue("only visible cells compose, got $composed", composed in 1 until 100)
+    }
+
+    /** Select all, clear selection and remove selected act on the whole collection and keep counts honest. */
+    @Test
+    fun bulkSelectClearAndRemoveSelected() {
+        renderCollection(mediaCount = 12, documentCount = 3)
+        composeRule.onNodeWithText(string(R.string.media_collection_select_all)).performClick()
+        assertCount(15, 15)
+        composeRule.onNodeWithText(string(R.string.media_collection_clear_selection)).performClick()
+        assertCount(0, 15)
+        composeRule
+            .onNodeWithContentDescription(string(R.string.media_collection_item_photo, 2, 15))
+            .performTouchInput { longClick() }
+        assertCount(1, 15)
+        composeRule
+            .onNodeWithContentDescription(string(R.string.media_collection_item_photo, 2, 15))
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.StateDescription,
+                    string(R.string.media_collection_selected),
+                ),
+            )
+        composeRule.onNodeWithText(string(R.string.media_collection_remove_selected)).performClick()
+        composeRule.waitForIdle()
+        assertEquals((0 until 12).filter { it != 1 }.map { "slot-$it" }, collectionOrder?.media?.map { it.id })
+        assertCount(0, 14)
+    }
+
+    /** Move later swaps a selected item with its neighbour; it keeps its identity and its selection. */
+    @Test
+    fun moveLaterReordersWithStableIdentity() {
+        renderCollection(mediaCount = 12, documentCount = 0)
+        composeRule
+            .onNodeWithContentDescription(string(R.string.media_collection_item_photo, 1, 12))
+            .performTouchInput { longClick() }
+        composeRule.onNodeWithText(string(R.string.media_collection_move_later)).performClick()
+        composeRule.waitForIdle()
+        assertEquals(listOf("slot-1", "slot-0", "slot-2"), collectionOrder?.media?.take(3)?.map { it.id })
+        assertCount(1, 12)
+        composeRule
+            .onNodeWithContentDescription(string(R.string.media_collection_item_photo, 2, 12))
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
+    }
+
+    /** Documents announce their name and position; every cell offers move actions to accessibility services. */
+    @Test
+    fun cellsCarryTalkBackLabelsAndMoveActions() {
+        renderCollection(mediaCount = 80, documentCount = 20)
+        composeRule.onNodeWithTag("conversation.media.collection.grid").performScrollToIndex(99)
+        composeRule
+            .onNodeWithContentDescription(string(R.string.media_collection_item_document, "report-19.pdf", 100, 100))
+            .assertIsDisplayed()
+            .assert(SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsActions.CustomActions))
+    }
+
+    /** A tap with nothing selected opens the single-item preview at that item; the toggle returns to the grid. */
+    @Test
+    fun tappingACellOpensTheSingleItemPreview() {
+        renderCollection(mediaCount = 12, documentCount = 0)
+        composeRule.onNodeWithContentDescription(string(R.string.media_collection_item_photo, 3, 12)).performClick()
+        composeRule.onNodeWithTag("conversation.media.preview.pager").assertIsDisplayed()
+        composeRule.onNodeWithText(string(R.string.media_collection_show_grid)).performClick()
+        composeRule.onNodeWithTag("conversation.media.collection.grid").assertIsDisplayed()
+    }
+
+    /** At a compact height the grid, its bulk bar and the send bar all still fit on screen. */
+    @Test
+    @Config(qualifiers = "w640dp-h360dp-mdpi")
+    fun compactHeightKeepsGridCountAndSendVisible() {
+        renderCollection(mediaCount = 40, documentCount = 5)
+        composeRule.onNodeWithTag("conversation.media.collection.count").assertIsDisplayed()
+        composeRule.onNodeWithTag("conversation.media.collection.grid").assertIsDisplayed()
     }
 
     private fun imageBytes(color: Int): ByteArray {

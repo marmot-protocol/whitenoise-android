@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="attachment_collection_reselect">Selecione-os ou compartilhe-os de novo para enviá-los.</string>
+    <string name="attachment_collection_progress">Enviando anexos: %1$d de %2$d enviados</string>
+    <string name="attachment_collection_blocked">Uma mensagem falhou. Os próximos anexos aguardam até você tentar de novo ou pulá-la.</string>
+    <string name="attachment_collection_paused">O envio foi interrompido: %1$d de %2$d enviados.</string>
+    <string name="attachment_collection_skip_failed">Pular com falha</string>
+    <string name="attachment_collection_resume">Retomar</string>
+    <string name="attachment_collection_cancel">Cancelar envio</string>
+    <string name="attachment_collection_show_items">Mostrar itens</string>
+    <string name="attachment_collection_hide_items">Ocultar itens</string>
+    <string name="attachment_collection_state_queued">Aguardando</string>
+    <string name="attachment_collection_state_preparing">Preparando</string>
+    <string name="attachment_collection_state_uploading">Enviando</string>
+    <string name="attachment_collection_state_published">Enviado</string>
+    <string name="attachment_collection_state_failed">Falhou</string>
+    <string name="attachment_collection_state_cancelled">Cancelado</string>
+    <string name="attachment_collection_state_skipped">Pulado</string>
+    <string name="attachment_collection_item_media">Foto ou vídeo %1$d</string>
+    <string name="attachment_collection_item_document">Arquivo %1$d</string>
+    <string name="media_collection_selected_count">%1$d de %2$d selecionados</string>
+    <string name="media_collection_select_all">Selecionar tudo</string>
+    <string name="media_collection_clear_selection">Limpar seleção</string>
+    <string name="media_collection_remove_selected">Remover selecionados</string>
+    <string name="media_collection_move_earlier">Mover para antes</string>
+    <string name="media_collection_move_later">Mover para depois</string>
+    <string name="media_collection_show_grid">Todos os itens</string>
+    <string name="media_collection_show_single">Pré-visualizar</string>
+    <string name="media_collection_item_photo">Foto %1$d de %2$d</string>
+    <string name="media_collection_item_video">Vídeo %1$d de %2$d</string>
+    <string name="media_collection_item_document">%1$s, arquivo %2$d de %3$d</string>
+    <string name="media_collection_selected">Selecionado</string>
+    <string name="media_collection_not_selected">Não selecionado</string>
+    <plurals name="attachment_collection_limit_result">
+        <item quantity="one">%1$d de %2$d adicionados. %3$d anexo não coube — o limite é %4$d por envio.</item>
+        <item quantity="other">%1$d de %2$d adicionados. %3$d anexos não couberam — o limite é %4$d por envio.</item>
+    </plurals>
+    <plurals name="attachment_collection_skipped">
+        <item quantity="one">%d anexo não pôde ser preparado e não foi enviado.</item>
+        <item quantity="other">%d anexos não puderam ser preparados e não foram enviados.</item>
+    </plurals>
+    <plurals name="attachment_collection_unrecoverable">
+        <item quantity="one">%d anexo não pode mais ser lido. Selecione-o ou compartilhe-o de novo para enviá-lo.</item>
+        <item quantity="other">%d anexos não podem mais ser lidos. Selecione-os ou compartilhe-os de novo para enviá-los.</item>
+    </plurals>
+    <plurals name="media_collection_total">
+        <item quantity="one">%d elemento</item>
+        <item quantity="other">%d elementos</item>
+    </plurals>
+</resources>

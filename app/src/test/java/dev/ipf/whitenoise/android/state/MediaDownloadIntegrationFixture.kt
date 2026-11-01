@@ -28,12 +28,13 @@ import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.DiskByteCacheKeyProvider
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.selects.select
+import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.io.RandomAccessFile
@@ -441,10 +442,28 @@ internal class MediaDownloadIntegrationFixture(
 
     /** Cancels only fixture-owned work and deletes only its fresh temporary directory. */
     override fun close() {
-        (field("mutationsScope").get(state) as CoroutineScope).cancel()
+        state.mutationsScope.cancel()
         calls.forEach { it.result.cancel() }
         entered.close()
         root.deleteRecursively()
+    }
+
+    /**
+     * Closes, then runs [main] until every cancelled acquisition has finished resuming on it.
+     *
+     * Cancelling a native call wakes its IO worker, which still dispatches the cancelled continuation
+     * back to Main. A test that installed [main] must call this before `Dispatchers.resetMain()`,
+     * otherwise that dispatch races the reset and fails whichever test is running.
+     */
+    fun closeAndDrain(main: TestDispatcher) {
+        val job = checkNotNull(state.mutationsScope.coroutineContext[Job])
+        close()
+        val deadline = System.nanoTime() + DRAIN_TIMEOUT_NANOS
+        while (!job.isCompleted) {
+            check(System.nanoTime() < deadline) { "cancelled attachment work never finished on Main" }
+            main.scheduler.advanceUntilIdle()
+            Thread.sleep(1)
+        }
     }
 
     /** Keeps synthetic drafts in memory and never opens native storage. */
@@ -464,6 +483,7 @@ internal class MediaDownloadIntegrationFixture(
 
     companion object {
         const val ACCOUNT = "synthetic-account"
+        private const val DRAIN_TIMEOUT_NANOS = 10_000_000_000L
         val GROUP = "01".repeat(16)
 
         /** Returns distinct, account-scoped request identities without user content. */

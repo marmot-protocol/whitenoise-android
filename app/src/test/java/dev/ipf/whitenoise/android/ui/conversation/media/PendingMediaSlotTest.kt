@@ -1,9 +1,11 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.net.Uri
+import dev.ipf.whitenoise.android.state.ATTACHMENT_COLLECTION_MAX_ITEMS
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -72,5 +74,37 @@ class PendingMediaSlotTest {
             )
 
         assertEquals(listOf("existing", "new-0"), slots.map { it.id })
+    }
+
+    /** Twelve picks keep source order and twelve distinct stable ids, and a later Add more appends after them. */
+    @Test
+    fun twelvePicksThenAddMoreKeepOrderAndStableIds() {
+        val first = List(12) { Uri.parse("content://test/$it") }
+        val slots = appendPendingMediaSlots(emptyList(), first, ATTACHMENT_COLLECTION_MAX_ITEMS)
+        assertEquals(first, slots.map { it.uri })
+        assertEquals(12, slots.map { it.id }.toSet().size)
+        val more = appendPendingMediaSlots(slots, listOf(first[0], Uri.parse("content://test/new")), 100)
+        assertEquals(slots, more.take(12))
+        assertEquals(listOf(first[0], Uri.parse("content://test/new")), more.drop(12).map { it.uri })
+        assertNotEquals(slots[0].id, more[12].id)
+    }
+
+    /** One hundred occurrences fit the combined limit; the hundred-and-first is not appended. */
+    @Test
+    fun hundredItemsFillTheCombinedLimitInOrder() {
+        val uris = List(101) { Uri.parse("content://test/${it % 7}") }
+        val slots = appendPendingMediaSlots(emptyList(), uris, ATTACHMENT_COLLECTION_MAX_ITEMS)
+        assertEquals(100, slots.size)
+        assertEquals(uris.take(100), slots.map { it.uri })
+        assertEquals(100, slots.map { it.id }.toSet().size)
+    }
+
+    /** One hundred slots, duplicates included, round-trip through saved state with identity and order intact. */
+    @Test
+    fun hundredSlotsRoundTripThroughSavedState() {
+        val slots = List(100) { PendingMediaSlot("slot-$it", Uri.parse("content://test/${it % 3}")) }
+        val tokens = slots.map { it.id to it.uri.toString() }
+        assertEquals(tokens, decodePendingMediaSlotTokens(encodePendingMediaSlotTokens(tokens)))
+        assertTrue(slots.none { it.isLegacyRestore() })
     }
 }

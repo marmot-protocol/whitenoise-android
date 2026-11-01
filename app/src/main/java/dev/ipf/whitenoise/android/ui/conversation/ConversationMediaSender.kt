@@ -74,7 +74,7 @@ internal enum class DocumentReadFailure {
     VIDEO_METADATA,
 }
 
-private val DocumentReadFailure.messageResource: Int
+internal val DocumentReadFailure.messageResource: Int
     get() =
         when (this) {
             DocumentReadFailure.TOO_LARGE -> R.string.media_file_too_large
@@ -588,14 +588,18 @@ internal fun isImageDocumentPick(
  * `fileBackedLimits` and `usableSpace` pass straight to its [ConversationAttachmentReader].
  */
 internal class ConversationMediaSender(
-    private val appState: WhiteNoiseAppState,
-    private val controller: ConversationController,
-    private val context: Context,
+    internal val appState: WhiteNoiseAppState,
+    internal val controller: ConversationController,
+    internal val context: Context,
     fileBackedLimits: () -> FileBackedSendLimits? = ::nativeFileBackedSendLimits,
     usableSpace: (java.io.File) -> Long = ::usableSpaceFor,
-    private val onRevealSent: () -> Unit,
+    internal val onRevealSent: () -> Unit,
 ) {
     private val attachmentReader = ConversationAttachmentReader(appState, context, fileBackedLimits, usableSpace)
+
+    init {
+        bindCollectionSender(this)
+    }
 
     /** Captures the reply before contact serialization can suspend. */
     fun sendSharedContact(contact: SharedContact) {
@@ -686,7 +690,7 @@ internal class ConversationMediaSender(
         }
     }
 
-    private data class PreparedStagedAttachments(
+    internal data class PreparedStagedAttachments(
         val images: List<PendingAttachment>,
         val documents: DocumentReadOutcome,
         val imageOverflowed: Boolean,
@@ -698,7 +702,11 @@ internal class ConversationMediaSender(
             get() = images.isEmpty() && documents.attachments.isEmpty()
     }
 
-    /** Sends the staged images and documents with the caption as one message. */
+    /**
+     * Sends the staged images and documents with the caption. One pick, or any reply, goes as one message;
+     * several picks become a collection operation whose bounded chunks carry the caption on chunk 1 only.
+     */
+    @Suppress("LongMethod") // The collection hand-off precedes the unchanged single-message path.
     fun sendStagedAttachments(
         imageSlots: List<PendingMediaSlot>,
         documentUris: List<android.net.Uri>,
@@ -720,6 +728,19 @@ internal class ConversationMediaSender(
         val pendingDraftClear =
             appState.captureDraftForSend(controller.boundAccountRef, controller.group.groupIdHex)
         val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
+        if (replyTarget == null && imageSlots.size + documentUris.size > 1) {
+            // Several picks become one ordered collection operation, sent as bounded chunks (#2576).
+            val request =
+                CollectionSendRequest(
+                    imageSlots,
+                    documentUris,
+                    trimmedCaption,
+                    preparedImageAttachments,
+                    preparedDocumentAttachments,
+                    pendingDraftClear,
+                )
+            return startCollectionSend(request, completion, onAfterSend)
+        }
         val sourceAccount = appState.accounts.firstOrNull { it.label == controller.boundAccountRef }?.accountIdHex
         val outboundVisibleStartedAtElapsedMs = SystemClock.elapsedRealtime()
         appState.launchMutation {
@@ -840,7 +861,7 @@ internal class ConversationMediaSender(
      * video metadata before anything reuses them, visual drafts by reported type and Files drafts by content. A
      * video that cannot be cleaned is refused, never sent as saved.
      */
-    private suspend fun prepareStagedAttachments(
+    internal suspend fun prepareStagedAttachments(
         imageSlots: List<PendingMediaSlot>,
         documentUris: List<android.net.Uri>,
         preparedImageAttachments: Map<String, PendingAttachment>,
@@ -1020,7 +1041,7 @@ internal class ConversationMediaSender(
     }
 
     /** One reply owns one native draft/album; ordinary sends retain the existing document grouping. */
-    private suspend fun seedPreparedAttachments(
+    internal suspend fun seedPreparedAttachments(
         prepared: PreparedStagedAttachments,
         caption: String?,
         outboundVisibleStartedAtElapsedMs: Long,
@@ -1071,7 +1092,7 @@ internal class ConversationMediaSender(
 }
 
 /** Snapshots now owned by queued sends; each is released when its retained upload ends. */
-private fun adoptedStagedSources(
+internal fun adoptedStagedSources(
     controller: ConversationController,
     seeded: List<ConversationController.QueuedAttachmentSend>,
 ): Set<StagedUploadSource> =
@@ -1135,7 +1156,7 @@ private fun limitAttachmentsToBudget(
 }
 
 /** Completes missing image metadata off the UI thread without replacing existing thumbhashes. */
-private suspend fun addMissingThumbhashes(attachments: List<PendingAttachment>): List<PendingAttachment> =
+internal suspend fun addMissingThumbhashes(attachments: List<PendingAttachment>): List<PendingAttachment> =
     if (attachments.isEmpty()) {
         emptyList()
     } else {

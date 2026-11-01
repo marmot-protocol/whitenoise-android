@@ -35,6 +35,7 @@ internal enum class PerformanceOperation(
     GROUP_MEMBERSHIP_PENDING("group_membership_pending"),
     GROUP_MEMBERSHIP_PROJECTION("group_membership_projection"),
     MESSAGE_FORWARD("message_forward"),
+    ACCOUNT_SWITCH("account_switch"),
 }
 
 /** Source-confirmed triggers accepted by recovery diagnostics. */
@@ -90,6 +91,13 @@ internal enum class PerformancePhase(
     CACHED_CHAT_ROWS_READY("cached_chat_rows_ready"),
     MEMBER_DERIVED_LOCAL_READY("member_derived_local_ready"),
     FIRST_LOCAL_FRAME("first_local_frame"),
+    ACCOUNT_SWITCH_MEMBER_DERIVED_DEFERRED("account_switch_member_derived_deferred"),
+    ACCOUNT_SWITCH_TOP_BAR_PROFILES_READY("account_switch_top_bar_profiles_ready"),
+    ACCOUNT_SWITCH_PERSISTED_PROFILES_READY("account_switch_persisted_profiles_ready"),
+    ACCOUNT_SWITCH_SHORTCUTS_HIDDEN("account_switch_shortcuts_hidden"),
+    ACCOUNT_SWITCH_PUBLISHED("account_switch_published"),
+    ACCOUNT_SWITCH_BIND_START("account_switch_bind_start"),
+    ACCOUNT_SWITCH_SEED_BOUND("account_switch_seed_bound"),
     UNREAD_AGGREGATE_REFRESH("unread_aggregate_refresh", ROUTINE_SPAN_THRESHOLD_MS),
     UNREAD_AGGREGATE_READY("unread_aggregate_ready"),
     SYSTEM_SPLASH_HANDOFF("system_splash_handoff"),

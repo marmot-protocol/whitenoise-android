@@ -1,0 +1,129 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaCollectionGrid.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "MediaCollectionGrid",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaCollectionGrid.kt",
+        "anchor": "fun MediaCollectionGrid(",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "MediaCollectionCell",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaCollectionGrid.kt",
+        "anchor": "fun MediaCollectionCell(",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "MediaCollectionBadge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaCollectionGrid.kt",
+        "anchor": "fun MediaCollectionBadge(",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "MediaCollectionActionBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaCollectionGrid.kt",
+        "anchor": "fun MediaCollectionActionBar(",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.media_collection_clear_selection",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaCollectionGrid.kt",
+        "anchor": "R.string.media_collection_clear_selection",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.media_collection_item_document",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaCollectionGrid.kt",
+        "anchor": "R.string.media_collection_item_document",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.media_collection_item_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaCollectionGrid.kt",
+        "anchor": "R.string.media_collection_item_photo",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.media_collection_item_video",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaCollectionGrid.kt",
+        "anchor": "R.string.media_collection_item_video",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.media_collection_move_earlier",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaCollectionGrid.kt",
+        "anchor": "R.string.media_collection_move_earlier",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.media_collection_move_later",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaCollectionGrid.kt",
+        "anchor": "R.string.media_collection_move_later",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.media_collection_not_selected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaCollectionGrid.kt",
+        "anchor": "R.string.media_collection_not_selected",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.media_collection_remove_selected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaCollectionGrid.kt",
+        "anchor": "R.string.media_collection_remove_selected",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.media_collection_select_all",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaCollectionGrid.kt",
+        "anchor": "R.string.media_collection_select_all",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.media_collection_selected",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaCollectionGrid.kt",
+        "anchor": "R.string.media_collection_selected",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.media_collection_selected_count",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaCollectionGrid.kt",
+        "anchor": "R.string.media_collection_selected_count",
+        "test_ids": [
+          "MED-045"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

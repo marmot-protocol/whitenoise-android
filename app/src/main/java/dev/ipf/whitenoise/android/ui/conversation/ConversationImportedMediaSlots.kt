@@ -1,7 +1,12 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import android.content.Context
 import android.net.Uri
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.share.ShareStreamStaging
+import dev.ipf.whitenoise.android.state.ATTACHMENT_COLLECTION_MAX_ITEMS
+import dev.ipf.whitenoise.android.state.AppText
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.media.appendPendingMediaSlots
 
@@ -48,12 +53,84 @@ internal fun importedComposerExceedsLimit(
     return media.any { owns(it.uri) } || documents.any(owns)
 }
 
-/** Adds unique picks within remaining capacity without truncating an already recovered overflowing shelf. */
-internal fun appendRecoveredDocuments(
-    current: List<Uri>,
-    added: List<Uri>,
+/** The leading part of a pick that fits the composer's combined limit, and how many items did not fit. */
+internal data class ComposerAttachmentAdmission<T>(
+    val accepted: List<T>,
+    val droppedCount: Int,
+)
+
+/**
+ * Keeps the first [added] items, in order, that fit beside [mediaCount] staged media and [documentCount]
+ * staged documents under one combined [maxItems] limit (#2576). Already staged items are never trimmed,
+ * even when a recovered shelf is over the limit, and every item that does not fit is counted.
+ */
+internal fun <T> admitComposerAttachments(
+    added: List<T>,
+    mediaCount: Int,
+    documentCount: Int,
     maxItems: Int,
-): List<Uri> = current + added.filterNot { it in current }.distinct().take((maxItems - current.size).coerceAtLeast(0))
+): ComposerAttachmentAdmission<T> {
+    val accepted = added.take((maxItems - mediaCount - documentCount).coerceAtLeast(0))
+    return ComposerAttachmentAdmission(accepted, added.size - accepted.size)
+}
+
+/**
+ * Tells the user how many of [offeredCount] picks were added, how many did not fit and what the combined
+ * [limit] is, so no path drops a pick without saying so (#2576). [detail] carries a second outcome of the
+ * same pick, such as an unreadable image, in the same notice instead of a later notice replacing this one.
+ */
+internal fun WhiteNoiseAppState.presentAttachmentAdmission(
+    context: Context,
+    acceptedCount: Int,
+    offeredCount: Int,
+    limit: Int = ATTACHMENT_COLLECTION_MAX_ITEMS,
+    detail: AppText? = null,
+) {
+    val rejected = offeredCount - acceptedCount
+    if (rejected <= 0) return
+    presentText(
+        AppText.Plain(
+            context.resources.getQuantityString(
+                R.plurals.attachment_collection_limit_result,
+                rejected,
+                acceptedCount,
+                offeredCount,
+                rejected,
+                limit,
+            ),
+        ),
+        detail = detail,
+    )
+}
+
+/** The admission's accepted, rejected and limit counts as one notice; nothing is shown when all fit. */
+internal fun <T> WhiteNoiseAppState.presentAdmission(
+    context: Context,
+    admission: ComposerAttachmentAdmission<T>,
+    detail: AppText? = null,
+) = presentAttachmentAdmission(
+    context,
+    admission.accepted.size,
+    admission.accepted.size + admission.droppedCount,
+    detail = detail,
+)
+
+/**
+ * How many items one system photo-picker result may hold: the combined limit, lowered to what the platform
+ * picker accepts where it reports a smaller maximum. Over-limit results are still admitted and reported.
+ */
+@android.annotation.SuppressLint("NewApi") // getPickImagesMaxLimit is guarded by the SDK and extension checks.
+internal fun photoPickerItemLimit(): Int {
+    val platformPicker =
+        android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU ||
+            (
+                android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R &&
+                    android.os.ext.SdkExtensions
+                        .getExtensionVersion(android.os.Build.VERSION_CODES.R) >= 2
+            )
+    val platformLimit = if (platformPicker) android.provider.MediaStore.getPickImagesMaxLimit() else Int.MAX_VALUE
+    return platformLimit.coerceIn(2, ATTACHMENT_COLLECTION_MAX_ITEMS)
+}
 
 /** Adds missing native items without discarding later picks, current occurrence URIs or private ownership. */
 internal fun mergeRestoredComposerAttachments(
