@@ -65,10 +65,13 @@ class CachedAttachmentPlaintextBoundedReadTest {
     @After
     fun tearDown() {
         try {
-            fixture.closeAndDrain(dispatcher)
+            if (::fixture.isInitialized) fixture.closeAndDrain(dispatcher)
         } finally {
-            cacheRoot.deleteRecursively()
-            Dispatchers.resetMain()
+            try {
+                if (::cacheRoot.isInitialized) cacheRoot.deleteRecursively()
+            } finally {
+                Dispatchers.resetMain()
+            }
         }
     }
 

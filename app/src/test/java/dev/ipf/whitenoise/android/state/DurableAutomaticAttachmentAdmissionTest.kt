@@ -52,7 +52,7 @@ class DurableAutomaticAttachmentAdmissionTest {
     @After
     fun tearDown() {
         try {
-            fixture.closeAndDrain(dispatcher)
+            if (::fixture.isInitialized) fixture.closeAndDrain(dispatcher)
         } finally {
             Dispatchers.resetMain()
         }
