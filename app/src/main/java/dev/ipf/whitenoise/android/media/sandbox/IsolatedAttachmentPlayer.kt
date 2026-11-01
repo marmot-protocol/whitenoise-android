@@ -59,7 +59,7 @@ internal class IsolatedAttachmentPlayer(
         return State
             .Builder()
             .setAvailableCommands(commands)
-            .setPlayWhenReady(current.playWhenReady, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)
+            .setPlayWhenReady(current.playWhenReady, current.playWhenReadyChangeReason)
             .setPlaybackState(
                 when (current.status) {
                     RawAvPlaybackEngine.Status.Idle -> Player.STATE_IDLE

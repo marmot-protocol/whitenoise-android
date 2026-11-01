@@ -1,12 +1,14 @@
 package dev.ipf.whitenoise.android.media.sandbox
 
 import android.app.Application
+import android.content.Intent
 import android.graphics.Bitmap
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Looper
 import androidx.media3.common.PlaybackParameters
+import androidx.media3.common.Player
 import com.google.common.util.concurrent.SettableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -288,6 +290,64 @@ class RawAvControlsTest {
         } finally {
             player.release()
         }
+    }
+
+    @Test
+    fun noisyReceiverReportsItsRealPauseReasonAndLaterUserPlayResetsIt() {
+        val context = RuntimeEnvironment.getApplication<Application>()
+        val player = IsolatedAttachmentPlayer(context, Uri.parse("file:///fixture.mp4"))
+        val engine = field(player, "engine") as RawAvPlaybackEngine
+        engines += engine
+        seedActiveOutput(engine, FakeSink())
+        val changes = mutableListOf<Pair<Boolean, Int>>()
+        try {
+            player.prepare()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertTrue(player.playWhenReady)
+            player.addListener(
+                object : Player.Listener {
+                    override fun onPlayWhenReadyChanged(
+                        playWhenReady: Boolean,
+                        reason: Int,
+                    ) {
+                        changes += playWhenReady to reason
+                    }
+                },
+            )
+            (field(engine, "focus") as RawAvAudioFocus).started()
+            context.sendBroadcast(Intent(AudioManager.ACTION_AUDIO_BECOMING_NOISY))
+            shadowOf(Looper.getMainLooper()).idle()
+            assertFalse(player.playWhenReady)
+            assertEquals(listOf(false to Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY), changes)
+            // A lifecycle pause following the same noisy transition must not overwrite its pending reason.
+            engine.setPlaying(false)
+            assertEquals(
+                Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY,
+                engine.snapshot().playWhenReadyChangeReason,
+            )
+            player.play()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(true to Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST, changes.last())
+            player.pause()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(false to Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST, changes.last())
+        } finally {
+            player.release()
+        }
+    }
+
+    @Test
+    fun focusLossReportsFocusReasonWithoutBecomingNoisyOrUserPause() {
+        val engine = newEngine()
+        seedActiveOutput(engine, FakeSink())
+        val method = engine.javaClass.getDeclaredMethod("focusChanged", Int::class.javaPrimitiveType)
+        method.isAccessible = true
+        method.invoke(engine, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
+        assertFalse(engine.snapshot().playWhenReady)
+        assertEquals(Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS, engine.snapshot().playWhenReadyChangeReason)
+        method.invoke(engine, AudioManager.AUDIOFOCUS_GAIN)
+        assertTrue(engine.snapshot().playWhenReady)
+        assertEquals(Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS, engine.snapshot().playWhenReadyChangeReason)
     }
 
     @Test

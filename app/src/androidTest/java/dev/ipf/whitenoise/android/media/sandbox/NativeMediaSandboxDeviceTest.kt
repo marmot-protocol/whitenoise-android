@@ -256,31 +256,36 @@ class NativeMediaSandboxDeviceTest {
             }
             SystemClock.sleep(20)
         }
-        if (signal == OsConstants.SIGSYS && hasFatalSyscallSignal(pid, startedAtMs)) return
+        if (hasZygoteSignalExit(pid, signal, startedAtMs)) return
         throw AssertionError("No platform exit reason for the exact qualification worker")
     }
 
-    /** libc's fatal line is emitted by the exact disposable PID, unlike debuggerd's later tombstone. */
-    private fun hasFatalSyscallSignal(
+    /** Zygote reports waitpid's exact signal; root-UID filtering excludes app-authored lookalike tags. */
+    private fun hasZygoteSignalExit(
         pid: Int,
+        signal: Int,
         startedAtMs: Long,
     ): Boolean {
         require(pid > 0 && pid != Process.myPid())
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
-        val descriptor = automation.executeShellCommand("logcat -d -b crash -b main --pid=$pid -v epoch")
+        val command = "logcat -d -b main --uid=0 -v epoch -s Zygote:I '*:S'"
+        val descriptor = automation.executeShellCommand(command)
         return android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { input ->
-            val bytes = ByteArray(8192)
+            val bytes = ByteArray(NativeSandboxExitEvidence.MAX_BYTES + 1)
             var used = 0
             while (used < bytes.size) {
                 val count = input.read(bytes, used, bytes.size - used)
                 if (count <= 0) break
                 used += count
             }
-            val signal = Regex("Fatal signal\\s+31\\s+\\(SIGSYS\\)")
-            String(bytes, 0, used, Charsets.UTF_8).lineSequence().any { line ->
-                val time = line.trimStart().substringBefore(' ').toDoubleOrNull()
-                time != null && time * 1000 >= startedAtMs && signal.containsMatchIn(line)
-            }
+            if (used > NativeSandboxExitEvidence.MAX_BYTES) return@use false
+            NativeSandboxExitEvidence.matches(
+                String(bytes, 0, used, Charsets.UTF_8),
+                pid,
+                signal,
+                startedAtMs,
+                System.currentTimeMillis(),
+            )
         }
     }
 

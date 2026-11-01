@@ -9,6 +9,7 @@ import android.media.AudioManager
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import androidx.media3.common.Player
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.SettableFuture
 import kotlinx.coroutines.CancellationException
@@ -48,6 +49,7 @@ internal class RawAvPlaybackEngine(
         val status: Status,
         val prepared: Boolean,
         val playWhenReady: Boolean,
+        val playWhenReadyChangeReason: Int,
         val positionMs: Long,
         val durationMs: Long,
         val speed: Float,
@@ -90,6 +92,7 @@ internal class RawAvPlaybackEngine(
     private var status = Status.Idle
     private var headerReady = false
     private var playIntent = false
+    private var playWhenReadyChangeReason = Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST
     private var released = false
     private var activation = 0L
     private var revision = 0L
@@ -137,7 +140,7 @@ internal class RawAvPlaybackEngine(
             this.context,
             { synchronized(lock) { current() } },
             ::focusChanged,
-            { pause(false) },
+            { reason -> pause(false, reason) },
             !externalAudioFocus,
         )
 
@@ -152,6 +155,7 @@ internal class RawAvPlaybackEngine(
                 status,
                 headerReady,
                 playIntent,
+                playWhenReadyChangeReason,
                 positionUsLocked() / 1000,
                 durationUs / 1000,
                 speed,
@@ -302,10 +306,13 @@ internal class RawAvPlaybackEngine(
 
     /** Focus is acquired before a prior player is asked to surrender. */
     @Suppress("ReturnCount") // Pause, denied focus and retired ownership are independent early refusals.
-    fun setPlaying(playing: Boolean): Boolean {
+    fun setPlaying(
+        playing: Boolean,
+        reason: Int = Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST,
+    ): Boolean {
         check(Looper.myLooper() == Looper.getMainLooper())
         if (!playing) {
-            pause(false)
+            pause(false, reason)
             return true
         }
         synchronized(lock) {
@@ -336,6 +343,7 @@ internal class RawAvPlaybackEngine(
             error = null
             ducked = false
             playIntent = true
+            playWhenReadyChangeReason = reason
             activation++
             revision++
             status = Status.Buffering
@@ -349,19 +357,28 @@ internal class RawAvPlaybackEngine(
         return true
     }
 
-    private fun pause(retainFocus: Boolean) {
+    private fun pause(
+        retainFocus: Boolean,
+        reason: Int = Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST,
+    ) {
         var clockRefusal: RawOutputFailure? = null
         val expectedActivation =
             synchronized(lock) {
-                val position = runCatching { positionUsLocked() }
-                pausedUs = position.getOrDefault(pausedUs)
-                position.exceptionOrNull()?.let { clockRefusal = RawOutputFailure("Raw audio clock unavailable", it) }
-                targetUs = pausedUs
-                playIntent = false
-                pendingSeek?.cancel(false)
-                pendingSeek = null
-                activation++
-                revision++
+                if (playIntent) {
+                    val position = runCatching { positionUsLocked() }
+                    pausedUs = position.getOrDefault(pausedUs)
+                    position.exceptionOrNull()?.let {
+                        clockRefusal = RawOutputFailure("Raw audio clock unavailable", it)
+                    }
+                    targetUs = pausedUs
+                    playWhenReadyChangeReason = reason
+                    playIntent = false
+                    pendingSeek?.cancel(false)
+                    pendingSeek = null
+                    activation++
+                    revision++
+                }
+                // Repeated paused commands preserve the admitted poster/seek, but still surrender focus below.
                 resumeOnGain = retainFocus
                 if (headerReady && status != Status.Ended) status = Status.Ready
                 notifyChanged()
@@ -723,12 +740,14 @@ internal class RawAvPlaybackEngine(
 
     private fun focusChanged(change: Int) {
         when (change) {
-            AudioManager.AUDIOFOCUS_LOSS -> pause(false)
-            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> pause(true)
+            AudioManager.AUDIOFOCUS_LOSS -> pause(false, Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS)
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> pause(true, Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS)
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> applyDucking(true)
             AudioManager.AUDIOFOCUS_GAIN -> {
                 val resume = synchronized(lock) { resumeOnGain }
-                if (applyDucking(false) && resume) setPlaying(true)
+                if (applyDucking(false) && resume) {
+                    setPlaying(true, Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS)
+                }
             }
         }
     }

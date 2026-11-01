@@ -9,6 +9,7 @@ import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
+import androidx.media3.common.Player
 import dev.ipf.whitenoise.android.audio.AudioFocusOwner
 
 /** Platform focus/route callbacks retain the exact playback owner's generation. */
@@ -16,7 +17,7 @@ internal class RawAvAudioFocus(
     private val context: Context,
     private val alive: () -> Boolean,
     private val onChange: (Int) -> Unit,
-    private val onPause: () -> Unit,
+    private val onPause: (Int) -> Unit,
     private val routeOwner: Boolean,
 ) {
     private val main = Handler(Looper.getMainLooper())
@@ -29,7 +30,9 @@ internal class RawAvAudioFocus(
                 context: Context,
                 intent: Intent,
             ) {
-                if (intent.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY && alive()) onPause()
+                if (intent.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY && alive()) {
+                    onPause(Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_BECOMING_NOISY)
+                }
             }
         }
 
@@ -40,7 +43,11 @@ internal class RawAvAudioFocus(
             attributes,
             AudioManager.AUDIOFOCUS_GAIN,
             onFocusChange = { change -> main.post { if (alive() && token == request) onChange(change) } },
-            onOwnerSurrender = { main.post { if (alive() && token == request) onPause() } },
+            onOwnerSurrender = {
+                main.post {
+                    if (alive() && token == request) onPause(Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS)
+                }
+            },
         )
     }
 
