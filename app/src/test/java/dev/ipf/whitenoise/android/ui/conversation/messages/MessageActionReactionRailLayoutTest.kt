@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -12,6 +13,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -171,6 +174,27 @@ class MessageActionReactionRailLayoutTest {
         composeRule
             .onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG::wn:")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("White Noise")))
+    }
+
+    /** The rail draws built-in slots read back from saved preferences, each announced once by name (#3292). */
+    @Test
+    fun builtInSlotsReloadedFromPreferencesShowOnTheRail() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        RecentEmojiPreferences.saveQuickReactions(context, listOf(":marmot:", ":wn:") + SIX_CHOICES.take(4))
+        try {
+            renderReactionMenu(1f, LayoutDirection.Ltr, RecentEmojiPreferences.loadQuickReactions(context))
+
+            composeRule
+                .onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG::marmot:")
+                .assertIsDisplayed()
+                .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Marmot")))
+            composeRule
+                .onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG::wn:")
+                .assertIsDisplayed()
+                .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("White Noise")))
+        } finally {
+            RecentEmojiPreferences.resetQuickReactions(context)
+        }
     }
 
     /** Renders the given distinct choices and asserts each one, and the full picker, is inside the popup. */

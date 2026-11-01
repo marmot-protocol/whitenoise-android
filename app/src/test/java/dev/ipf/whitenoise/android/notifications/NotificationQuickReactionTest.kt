@@ -57,6 +57,55 @@ class NotificationQuickReactionTest {
         assertEquals(listOf("❤️", "👍", "👎", "😂", "😮", "😢"), RecentEmojiPreferences.loadQuickReactions(context))
     }
 
+    /**
+     * Built-in Marmot and White Noise slots survive saving and reloading, and the notification offers their exact
+     * shortcodes, so the receiver's allowlist and the sent reaction keep the canonical value (#3292).
+     */
+    @Test
+    fun builtInShortcodeSlotsPersistAndKeepTheirExactNotificationIdentity() {
+        val configured = listOf(":marmot:", "👍", ":wn:", "❤️", "😂", "😮")
+
+        assertEquals(configured, RecentEmojiPreferences.saveQuickReactions(context, configured))
+        assertEquals(configured, RecentEmojiPreferences.loadQuickReactions(context))
+        assertEquals(configured, notificationQuickReactionChoices(context))
+    }
+
+    /** A built-in shortcode chip reacts with its exact code, while the same text typed into Reply stays a reply. */
+    @Test
+    fun builtInShortcodeChipRoutesToItsExactReaction() {
+        val remoteInput = RemoteInput.Builder(NotificationActions.KEY_TEXT_REPLY).build()
+        val allowed = listOf(":marmot:", ":wn:", "👍")
+
+        /** A Reply intent carrying [value] as if SystemUI returned it from [source]. */
+        fun delivered(
+            value: String,
+            source: Int,
+        ) = Intent().also { intent ->
+            NotificationActions.applyToIntent(
+                intent,
+                NotificationActionKind.REPLY,
+                actionTarget(),
+                acceptsInlineReactionChoices = true,
+            )
+            RemoteInput.addResultsToIntent(
+                arrayOf(remoteInput),
+                intent,
+                Bundle().apply { putCharSequence(NotificationActions.KEY_TEXT_REPLY, value) },
+            )
+            RemoteInput.setResultsSource(intent, source)
+        }
+
+        val marmot = delivered(":marmot:", RemoteInput.SOURCE_CHOICE)
+        val typed = delivered(":marmot:", RemoteInput.SOURCE_FREE_FORM_INPUT)
+
+        assertEquals(NotificationActionKind.REACT, NotificationActions.parse(marmot)?.kind)
+        assertEquals(":marmot:", notificationReactionChoice(marmot, allowed))
+        assertEquals(":wn:", notificationReactionChoice(delivered(":wn:", RemoteInput.SOURCE_CHOICE), allowed))
+        assertEquals(NotificationActionKind.REPLY, NotificationActions.parse(typed)?.kind)
+        assertNull(notificationReactionChoice(typed, allowed))
+        assertNull(notificationReactionChoice(delivered(":party_parrot:", RemoteInput.SOURCE_CHOICE), allowed))
+    }
+
     @Test
     fun quickReactionChoicesDropBlankOversizedAndDuplicateFavourites() {
         val stored = listOf("🥳", "   ", "😀".repeat(33), "🔥", "🥳")
