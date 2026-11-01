@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.media
 
 import android.content.Context
-import android.net.NetworkCapabilities
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.WorkInfo
@@ -60,11 +59,7 @@ class BackgroundReceiptPolicyDiagnosticsAndroidTest {
 
     @Test
     fun disappearingNetworkRetainsOtherWifiCapabilitiesAndMarksTheReadIncomplete() {
-        val wifi =
-            NetworkCapabilities()
-                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)
+        val wifi = FixtureNetworkCapabilities(wifi = true, validated = true, unmetered = true)
         val facts = backgroundReceiptRegisteredWifiFacts { listOf(null, wifi) }
         assertTrue(facts.getBoolean("platform_network_inventory_available"))
         assertFalse(facts.getBoolean("platform_network_inventory_complete"))

@@ -17,6 +17,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AppGroupEncryptedMediaComponentFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
@@ -42,6 +44,10 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventImagePane
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -193,9 +199,59 @@ class ConversationMediaViewerProductionPathTest {
         composeRule.waitUntil(10_000) { calls.get() == 2 }
     }
 
+    @Test
+    fun viewerImageWorkWaitsForForegroundAndRetainsItsAnimationAcrossBackgrounding() {
+        val lifecycle = ViewerPageTestLifecycleOwner(Lifecycle.State.CREATED)
+        val drawables = java.util.concurrent.CopyOnWriteArrayList<ViewerTestAnimation>()
+        val calls =
+            java.util.concurrent.atomic
+                .AtomicInteger()
+        val reads =
+            java.util.concurrent.atomic
+                .AtomicInteger()
+        renderAnimationFixture(drawables, calls, lifecycle, { reads.incrementAndGet() }) { true }
+        composeRule.runOnIdle {
+            assertEquals(0, reads.get())
+            assertEquals(0, calls.get())
+            lifecycle.lifecycle.currentState = Lifecycle.State.RESUMED
+        }
+        composeRule.waitUntil(10_000) { calls.get() == 1 }
+        composeRule.runOnIdle {
+            assertEquals(1, reads.get())
+            lifecycle.lifecycle.currentState = Lifecycle.State.CREATED
+        }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            assertEquals(1, reads.get())
+            lifecycle.lifecycle.currentState = Lifecycle.State.RESUMED
+        }
+        composeRule.waitUntil(10_000) { reads.get() == 2 }
+        val sourceWorkCompleted =
+            java.util.concurrent.atomic
+                .AtomicBoolean()
+        val probeOwner = Job()
+        val completionProbe =
+            CoroutineScope(Dispatchers.Default + probeOwner).launch {
+                // The byte read happens inside this lane; reacquiring it joins the resumed source preparation.
+                withViewerImageWork { sourceWorkCompleted.set(true) }
+            }
+        try {
+            composeRule.waitUntil(10_000) { sourceWorkCompleted.get() && completionProbe.isCompleted }
+            composeRule.runOnIdle {
+                assertEquals(1, calls.get())
+                assertEquals(1, drawables.size)
+            }
+        } finally {
+            probeOwner.cancel()
+            composeRule.waitUntil(10_000) { probeOwner.isCompleted }
+        }
+    }
+
     private fun renderAnimationFixture(
         drawables: java.util.concurrent.CopyOnWriteArrayList<ViewerTestAnimation>,
         calls: java.util.concurrent.atomic.AtomicInteger,
+        lifecycle: ViewerPageTestLifecycleOwner = ViewerPageTestLifecycleOwner(),
+        onRead: () -> Unit = {},
         visible: () -> Boolean,
     ) {
         val fixture = fixture(DIRECT_MESSAGE_ID)
@@ -213,7 +269,10 @@ class ConversationMediaViewerProductionPathTest {
         )
         composeRule.setContent {
             WhiteNoiseTheme {
-                CompositionLocalProvider(LocalSystemAnimationsEnabled provides true) {
+                CompositionLocalProvider(
+                    LocalSystemAnimationsEnabled provides true,
+                    LocalLifecycleOwner provides lifecycle,
+                ) {
                     ViewerPage(
                         controller = fixture.controller,
                         messageIdHex = DIRECT_MESSAGE_ID,
@@ -226,7 +285,10 @@ class ConversationMediaViewerProductionPathTest {
                         mine = false,
                         isCurrent = visible(),
                         onChromeToggle = {},
-                        imageBytes = { twoFrameGif() },
+                        imageBytes = {
+                            onRead()
+                            twoFrameGif()
+                        },
                     )
                 }
             }
