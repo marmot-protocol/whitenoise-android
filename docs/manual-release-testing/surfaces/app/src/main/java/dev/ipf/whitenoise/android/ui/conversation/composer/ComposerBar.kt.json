@@ -151,6 +151,14 @@
         "test_ids": [
           "CON-005"
         ]
+      },
+      {
+        "surface": "Resting composer and pen vertical baseline",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "package dev.ipf.whitenoise.android",
+        "test_ids": [
+          "NCH-008"
+        ]
       }
     ],
     "string_resources": [

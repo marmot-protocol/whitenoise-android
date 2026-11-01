@@ -2,9 +2,13 @@ package dev.ipf.whitenoise.android.ui.navigation
 
 import android.content.Context
 import android.provider.Settings
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -24,7 +28,10 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -32,7 +39,6 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
@@ -93,7 +99,7 @@ class ComposerFabHandoffScreenshotTest {
         Settings.Global.putString(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, previousScale)
     }
 
-    /** Both directions retain one real endpoint and a privacy-safe moving outline in light mode. */
+    /** Both directions retain one real endpoint and a privacy-safe container morph in light mode. */
     @Test
     fun composerRoundTripLight() = captureRoundTrip("light", dark = false)
 
@@ -132,7 +138,21 @@ class ComposerFabHandoffScreenshotTest {
                         ) {
                             handoff = LocalComposerFabHandoff.current
                             SideEffect { committedDestination = destination }
-                            Endpoints()
+                            val route =
+                                updateTransition(
+                                    if (destination == ComposerFabEndpoint.Composer) "chat" else null,
+                                    label = "fixture route",
+                                )
+                            ConversationRouteAnimatedContent(
+                                transition = route,
+                                routeForwardDirection = 1,
+                                suppressMotion = false,
+                                contentKey = { it ?: "list" },
+                            ) { chat ->
+                                Endpoints(
+                                    if (chat != null) ComposerFabEndpoint.Composer else ComposerFabEndpoint.NewMessage,
+                                )
+                            }
                         }
                     }
                 }
@@ -146,9 +166,9 @@ class ComposerFabHandoffScreenshotTest {
 
     /** Only the current endpoint is mounted; the composer retains its own text and selection. */
     @Composable
-    private fun Endpoints() {
+    private fun Endpoints(endpoint: ComposerFabEndpoint) {
         Box(Modifier.fillMaxSize()) {
-            if (destination == ComposerFabEndpoint.Composer) {
+            if (endpoint == ComposerFabEndpoint.Composer) {
                 ComposerBar(
                     replyingTo = null,
                     messageTextCopy = MessageTextCopy.Default,
@@ -159,12 +179,14 @@ class ComposerFabHandoffScreenshotTest {
                     modifier =
                         Modifier
                             .align(Alignment.BottomCenter)
-                            .composerFabEndpoint(ComposerFabEndpoint.Composer)
                             .testTag(COMPOSER_TAG),
                 )
             } else {
-                Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
-                    ChatsNewMessageFabContent(missingRelays = false) {}
+                Scaffold(
+                    contentWindowInsets = WindowInsets.navigationBars,
+                    floatingActionButton = { ChatsNewMessageFabContent(missingRelays = false) {} },
+                ) { innerPadding ->
+                    Box(Modifier.fillMaxSize().padding(innerPadding))
                 }
             }
         }
@@ -196,14 +218,16 @@ class ComposerFabHandoffScreenshotTest {
         assertInterpolating(source, end)
         val middle = pixels()
         capture("${direction}_mid_$variant")
-        rule.mainClock.advanceTimeBy(144)
+        // Placement admission and the first animation sample precede the 200 ms morph.
+        // Keep first/midpoint clocks exact, then allow two presentation frames for final retirement.
+        rule.mainClock.advanceTimeBy(176)
         rule.waitForIdle()
-        assertEquals(start + 240L, rule.mainClock.currentTime)
+        assertEquals(start + 272L, rule.mainClock.currentTime)
         assertCurrentEndpoint(target)
         rule.runOnIdle { assertNull(handoff?.renderedBounds) }
         val settled = pixels()
         capture("${direction}_settled_$variant")
-        assertFalse("The outline must change actual pixels before retiring", middle.contentEquals(settled))
+        assertFalse("The container morph must change actual pixels before retiring", middle.contentEquals(settled))
         assertEquals(TextFieldValue(PRIVATE_DRAFT, selection = TextRange(4)), draft)
     }
 
@@ -224,7 +248,9 @@ class ComposerFabHandoffScreenshotTest {
                 .fetchSemanticsNode()
                 .boundsInWindow
         } else {
-            rule.onNodeWithTag(COMPOSER_TAG).assertDoesNotExist()
+            // AnimatedContent may retain an empty measured placeholder, but never an editor or action.
+            val outgoingComposer = hasTestTag(COMPOSER_TAG) or hasAnyAncestor(hasTestTag(COMPOSER_TAG))
+            rule.onAllNodes(outgoingComposer and (hasSetTextAction() or hasClickAction())).assertCountEquals(0)
             rule.onNodeWithText(PRIVATE_DRAFT, substring = true).assertDoesNotExist()
             fab
                 .assertIsDisplayed()

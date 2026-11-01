@@ -8,17 +8,42 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/ComposerFabEndpoint.kt",
         "anchor": "package dev.ipf.whitenoise.android",
         "test_ids": [
-          "NCH-001"
+          "NCH-001",
+          "NCH-008"
+        ]
+      },
+      {
+        "surface": "Measured control morph ownership and presentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/ComposerFabEndpoint.kt",
+        "anchor": "package dev.ipf.whitenoise.android",
+        "test_ids": [
+          "NCH-008"
         ]
       }
     ],
     "composable_surfaces": [
       {
-        "surface": "Modifier.composerFabEndpoint",
+        "surface": "Modifier.composerFabSurface",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/ComposerFabEndpoint.kt",
-        "anchor": "fun Modifier.composerFabEndpoint(",
+        "anchor": "fun Modifier.composerFabSurface(",
         "test_ids": [
-          "NCH-001"
+          "NCH-008"
+        ]
+      },
+      {
+        "surface": "Modifier.conversationRouteBodyMotion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/ComposerFabEndpoint.kt",
+        "anchor": "fun Modifier.conversationRouteBodyMotion(",
+        "test_ids": [
+          "NCH-008"
+        ]
+      },
+      {
+        "surface": "Modifier.composerFabPenDecoration",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/ComposerFabEndpoint.kt",
+        "anchor": "fun Modifier.composerFabPenDecoration(",
+        "test_ids": [
+          "NCH-008"
         ]
       }
     ]
