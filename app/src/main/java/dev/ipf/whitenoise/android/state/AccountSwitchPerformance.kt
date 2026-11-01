@@ -24,7 +24,7 @@ internal fun accountSwitchPerformancePhase(stage: String): PerformancePhase? =
     }
 
 /**
- * Records one account-switch stage as elapsed time since activation preparation began, with an optional
+ * Records one account-switch stage as elapsed time since the switch was requested, with an optional
  * row count. It carries no account identifier, and nothing is emitted unless a WNPerf diagnostic session
  * began [trace].
  */
