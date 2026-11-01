@@ -118,6 +118,55 @@ class ToolWheelTests(unittest.TestCase):
             self.assertEqual([], list((root / "tools").iterdir()))
 
 
+class MesonLauncherTests(unittest.TestCase):
+    def test_persistent_launcher_isolates_initial_and_repeated_invocation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            tools = root / "tools"
+            module = tools / "mesonbuild"
+            module.mkdir(parents=True)
+            (module / "__init__.py").write_text("")
+            (module / "mesonmain.py").write_text(
+                "import json,sys\ndef main():\n print(json.dumps([sys.flags.isolated,"
+                "sys.dont_write_bytecode,sys.argv[0],sys.argv[1:]]));return 0\n")
+            poison = root / "poison"
+            poison.mkdir()
+            (poison / "sitecustomize.py").write_text("raise RuntimeError('poison sitecustomize')\n")
+            (poison / "mesonbuild.py").write_text("raise RuntimeError('poison mesonbuild')\n")
+            launcher = build.write_meson_launcher(tools)
+            self.assertFalse(launcher.name.endswith(".py"))
+            self.assertEqual(0o755, launcher.stat().st_mode & 0o777)
+            with patch.dict(os.environ, {"PYTHONPATH": str(poison), "PYTHONHOME": str(poison)}):
+                for arguments in (["setup"], ["--internal", "vcstagger"], ["--internal", "regenerate"]):
+                    result = subprocess.run([launcher, *arguments], cwd=poison, check=True,
+                                            capture_output=True, text=True, timeout=15)
+                    self.assertEqual([1, True, str(launcher), arguments], json.loads(result.stdout))
+            self.assertEqual([], list(root.rglob("__pycache__")))
+            with self.assertRaises(FileExistsError):
+                build.write_meson_launcher(tools)
+
+    def test_missing_pinned_modules_refuse_before_creating_launcher(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            tools = Path(temporary)
+            with self.assertRaisesRegex(ValueError, "pinned Meson module missing"):
+                build.write_meson_launcher(tools)
+            self.assertFalse((tools / "meson-pinned").exists())
+
+    def test_deleted_pinned_module_cannot_fall_back_to_poisoned_environment(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            tools = Path(temporary)
+            module = tools / "mesonbuild"
+            module.mkdir()
+            (module / "__init__.py").write_text("")
+            entrypoint = module / "mesonmain.py"
+            entrypoint.write_text("def main(): return 0\n")
+            launcher = build.write_meson_launcher(tools)
+            entrypoint.unlink()
+            with patch.dict(os.environ, {"PYTHONPATH": str(tools)}):
+                result = subprocess.run([launcher, "--version"], capture_output=True, timeout=15)
+            self.assertNotEqual(0, result.returncode)
+
+
 class NativeBuildTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory()
@@ -133,7 +182,7 @@ class NativeBuildTests(unittest.TestCase):
         self.data = {
             "ffmpeg": archive("ffmpeg-9.0.2", {"configure": b"#!/bin/sh\nexit 99\n"}),
             "dav1d": archive("dav1d-1.5.4", {"meson.build": b"# fixture\n"}),
-            "meson": wheel({"mesonbuild/__init__.py": b""}),
+            "meson": wheel({"mesonbuild/__init__.py": b"", "mesonbuild/mesonmain.py": b"# synthetic module\n"}),
             "ninja": wheel({"ninja-1.13.2.data/scripts/ninja": b"synthetic executable"}),
         }
         self.lock = {"schema": 1, "ndk": "29.0.14206865", "api": 30, "source_date_epoch": 1789687190}
@@ -175,6 +224,9 @@ class NativeBuildTests(unittest.TestCase):
         self.assertEqual("1789687190", env["SOURCE_DATE_EPOCH"])
         self.assertEqual("C", env["LC_ALL"])
         self.assertTrue(env["NINJA"].endswith("/tools/ninja-1.13.2.data/scripts/ninja"))
+        if "setup" in command:
+            self.assertTrue(command[0].endswith("/tools/meson-pinned"))
+            self.assertEqual(" -IB", Path(command[0]).read_text().splitlines()[0][-4:])
         if "-C" in command:
             self.assertEqual(command[0], env["NINJA"])
         if command[0].endswith("/configure"):

@@ -144,6 +144,28 @@ def extract_tools(wheels, destination):
     return binaries[0]
 
 
+def write_meson_launcher(tools):
+    # A persistent non-.py entrypoint keeps Meson's internal/regen command executable.
+    for name in ("__init__.py", "mesonmain.py"):
+        require((tools / "mesonbuild" / name).is_file(), "pinned Meson module missing")
+    launcher = tools / "meson-pinned"
+    program = "#!" + sys.executable + " -IB\n" + """import sys
+from pathlib import Path
+if not sys.flags.isolated or not sys.dont_write_bytecode:
+    raise RuntimeError('isolated pinned Meson launcher required')
+directory = Path(__file__).resolve().parent
+sys.path.insert(0, str(directory))
+from mesonbuild import mesonmain
+if Path(mesonmain.__file__).resolve() != directory / 'mesonbuild/mesonmain.py':
+    raise RuntimeError('pinned Meson module missing')
+sys.exit(mesonmain.main())
+"""
+    with launcher.open("x") as output:
+        output.write(program)
+    launcher.chmod(0o755)
+    return launcher
+
+
 def toolchain(ndk, abi, lock):
     require(abi in ABIS, "unsupported Android ABI")
     require(ndk.is_dir() and not ndk.is_symlink(), "real pinned NDK directory required")
@@ -263,8 +285,7 @@ def build_abi(ndk, abi, lock, sources, tools, output, jobs, command=run):
                if key not in {"CFLAGS", "CXXFLAGS", "CPPFLAGS", "LDFLAGS", "PKG_CONFIG_PATH", "PYTHONPATH", "PYTHONHOME"}}
         env.update(SOURCE_DATE_EPOCH=str(lock["source_date_epoch"]), LC_ALL="C", TZ="UTC", ZERO_AR_DATE="1",
                    NINJA=str(tools / NINJA_RELATIVE_PATH), PKG_CONFIG_LIBDIR=str(dav1d_install / "lib/pkgconfig"))
-        meson = [sys.executable, "-I", "-c",
-                 "import sys;sys.path.insert(0," + repr(str(tools)) + ");from mesonbuild.mesonmain import main;sys.exit(main())"]
+        meson = [tools / "meson-pinned"]
         dav1d_build = work / "dav1d-build"
         command(meson + ["setup", str(dav1d_build), str(dav1d), "--cross-file=" + str(cross),
                          "--prefix=" + str(dav1d_install), "--libdir=lib", "--wrap-mode=nodownload",
@@ -329,6 +350,7 @@ def prepare(ndk, output, abis, *, jobs=2, opener=urllib.request.urlopen, command
         tools = output / "tools"
         require(not tools.exists(), "unfinished decoder build requires inspection")
         extract_tools([inputs["meson"], inputs["ninja"]], tools)
+        write_meson_launcher(tools)
         built = [build_abi(ndk, abi, lock, inputs, tools, output, jobs, command) for abi in abis]
         manifest = {"schema": 1, "cache_key": key, "lock_sha256": sha(NATIVE / "lock.json"),
                     "wrapper_sha256": sha(NATIVE / "media_decoder.cpp"), "build_script_sha256": sha(__file__),
