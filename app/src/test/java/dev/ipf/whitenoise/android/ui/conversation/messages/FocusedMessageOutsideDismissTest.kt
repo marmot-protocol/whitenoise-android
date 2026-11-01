@@ -82,7 +82,8 @@ class FocusedMessageOutsideDismissTest {
         var reactions = 0
         render(onDismiss = { dismissals += 1 }, onReact = { reactions += 1 })
 
-        composeRule.onNodeWithText(QUICK_REACTION).performClick()
+        // The rail target carries the reaction's name, its glyph adds no semantics of its own (#3292).
+        composeRule.onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG:$QUICK_REACTION").performClick()
 
         assertEquals("the reaction must register", 1, reactions)
         assertEquals("the reaction must not also dismiss", 0, dismissals)

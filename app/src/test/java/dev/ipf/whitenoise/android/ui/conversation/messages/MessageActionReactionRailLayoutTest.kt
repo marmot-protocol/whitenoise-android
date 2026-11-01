@@ -3,6 +3,9 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -155,6 +158,19 @@ class MessageActionReactionRailLayoutTest {
         assertEquals(3, focusedReactionItemsPerRow(itemCount = 9, availableWidth = 320.dp, targetSize = 62.dp))
         assertEquals(1, focusedReactionItemsPerRow(itemCount = 1, availableWidth = 320.dp))
         assertEquals(1, focusedReactionItemsPerRow(itemCount = 3, availableWidth = 0.dp))
+    }
+
+    /** A built-in artwork target announces its readable name once, not again through its glyph (#3292). */
+    @Test
+    fun builtInArtworkTargetAnnouncesItsNameOnce() {
+        renderReactionMenu(1f, LayoutDirection.Ltr, listOf(":marmot:", ":wn:") + SIX_CHOICES.take(4))
+
+        composeRule
+            .onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG::marmot:")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Marmot")))
+        composeRule
+            .onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG::wn:")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("White Noise")))
     }
 
     /** Renders the given distinct choices and asserts each one, and the full picker, is inside the popup. */
