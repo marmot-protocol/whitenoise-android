@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.navigation
 
 import android.os.Handler
 import android.os.Looper
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertCountEquals
@@ -50,6 +51,7 @@ class NotificationRouteTimelinePresentationFixtureTest : NotificationRouteTimeli
         val mounted = mutableStateOf(true)
         val reports = CopyOnWriteArrayList<Boolean>()
         fixture.appState.setAppInForeground(true)
+        var primaryFailure: Throwable? = null
         try {
             awaitConversationCondition {
                 fixture.controller.hasPublishedAuthoritativeTimeline && !fixture.controller.isLoading
@@ -80,14 +82,55 @@ class NotificationRouteTimelinePresentationFixtureTest : NotificationRouteTimeli
             timeline.emitWindow(timelinePage(timelineRecord(ConversationTimelineTestIds.MESSAGE_B, 2uL)))
             awaitCondition { fixture.controller.timeline.size == 1 && reports.lastOrNull() == true }
             composeRule.onNodeWithText("body-${ConversationTimelineTestIds.MESSAGE_B}").assertIsDisplayed()
+        } catch (failure: Throwable) {
+            primaryFailure = failure
+            throw failure
         } finally {
+            cleanupOrdinaryEmptyConversation(harness, fixture, mounted, scripted, primaryFailure)
+        }
+    }
+
+    /** Keeps the original failure while recording every teardown stage and synthetic subscription state. */
+    private fun cleanupOrdinaryEmptyConversation(
+        harness: DirectNotificationConversationHarness,
+        fixture: DirectNotificationConversationFixture,
+        mounted: MutableState<Boolean>,
+        scripted: ScriptedConversationLiveSubscriptions,
+        primaryFailure: Throwable?,
+    ) {
+        var failure = primaryFailure
+
+        fun captureCleanup(block: () -> Unit) {
             try {
-                harness.dispose(fixture, mounted)
-            } finally {
-                fixture.appState.setActiveConversationFromUi(null, null)
-                awaitOpenedTimelineSubscriptionsClosed(scripted)
+                block()
+            } catch (cleanupFailure: Throwable) {
+                val first = failure
+                if (first == null) {
+                    failure = cleanupFailure
+                } else if (first !== cleanupFailure) {
+                    first.addSuppressed(cleanupFailure)
+                }
             }
         }
+        captureCleanup { harness.dispose(fixture, mounted) }
+        captureCleanup { fixture.appState.setActiveConversationFromUi(null, null) }
+        captureCleanup {
+            try {
+                awaitOpenedTimelineSubscriptionsClosed(scripted)
+            } catch (cleanupFailure: Throwable) {
+                throw AssertionError(
+                    "ordinary empty route cleanup: opens=${scripted.timelineSubscriptionOpenCount} " +
+                        "events=${scripted.timelineScripts.map { it.lifecycleEventOrder }} " +
+                        "closes=${scripted.timelineScripts.map { it.closeCallCount }} " +
+                        "handleInstalled=${fixture.controller.timelineSubscription != null} " +
+                        "nativeCallLocked=${fixture.controller.timelineSubscriptionActiveCallMutex.isLocked} " +
+                        "published=${fixture.controller.hasPublishedAuthoritativeTimeline} " +
+                        "loading=${fixture.controller.isLoading}",
+                    cleanupFailure,
+                )
+            }
+        }
+        if (primaryFailure == null) failure?.let { throw it }
     }
 
     /** A fresh request on the retained ready screen must publish its own visibility report. */
