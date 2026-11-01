@@ -54,12 +54,19 @@ class RetainedAttachmentDownloadAdmissionTest {
         preferences.interactiveWrites.clear()
     }
 
-    /** Releases only the synthetic owner's work and cache. */
+    /**
+     * Releases only the synthetic owner's work and cache, draining cancelled work before resetting Main.
+     *
+     * Tolerates a partial [setUp], so its original failure is the one reported.
+     */
     @After
     fun tearDown() {
-        presentation.dispose()
-        fixture.close()
-        Dispatchers.resetMain()
+        try {
+            if (::presentation.isInitialized) presentation.dispose()
+            if (::fixture.isInitialized) fixture.closeAndDrain(dispatcher)
+        } finally {
+            Dispatchers.resetMain()
+        }
     }
 
     /** A ready thumbnail's retained bytes do not start and immediately retire a download job on viewer entry. */
