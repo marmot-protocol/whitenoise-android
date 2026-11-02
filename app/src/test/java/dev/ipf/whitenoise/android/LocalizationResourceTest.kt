@@ -1106,6 +1106,9 @@ class LocalizationResourceTest {
             setOf(
                 // Two translated labels joined by locale-independent punctuation.
                 "developer_work_status",
+                // Read-aloud minutes and seconds, each already translated, joined by a space
+                // where a locale needs no word such as "and".
+                "tts_bar_spoken_minutes_seconds",
                 // Folder state joins two translated labels with locale-specific punctuation.
                 "smart_folder_quick_state",
                 // "Audio" is the established media label in German, Spanish, French and Italian.
