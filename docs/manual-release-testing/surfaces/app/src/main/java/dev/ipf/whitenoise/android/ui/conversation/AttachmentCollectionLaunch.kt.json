@@ -18,6 +18,14 @@
         "test_ids": [
           "MED-045"
         ]
+      },
+      {
+        "surface": "R.string.error_try_again",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionLaunch.kt",
+        "anchor": "R.string.error_try_again",
+        "test_ids": [
+          "MED-045"
+        ]
       }
     ]
   },
