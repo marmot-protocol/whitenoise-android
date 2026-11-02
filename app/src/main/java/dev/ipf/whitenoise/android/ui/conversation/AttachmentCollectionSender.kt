@@ -205,7 +205,13 @@ internal class AttachmentCollectionSender(
                     .withChunkToken(chunk.id, queued.tempId, now)
                     .withChunkState(chunk.id, CollectionChunkState.UPLOADING, CollectionItemState.UPLOADING, now)
             }
-        if (recorded == null) return appState.withdrawUnrecorded(current.controller, queued, run.operationId, chunk.id)
+        // A cancel, pause or discard that landed while the send was being seeded leaves the chunk without this
+        // token, so the send is withdrawn before any upload, as is one whose token the journal could not hold.
+        val owned = recorded?.chunks?.firstOrNull { it.id == chunk.id }
+        if (owned?.state != CollectionChunkState.UPLOADING || owned.clientToken != queued.tempId) {
+            val storageFailed = recorded == null && registry.operations.value[run.operationId] != null
+            return appState.withdrawUnrecorded(current.controller, queued, run.operationId, chunk.id, storageFailed)
+        }
         run.release(chunk.itemIds, operation.items.filter { it.id in chunk.itemIds }.map { Uri.parse(it.uri) })
         if (!run.revealed) {
             run.revealed = true
@@ -375,16 +381,19 @@ internal class AttachmentCollectionSender(
 }
 
 /**
- * Withdraws a queued chunk whose token the journal could not record, before any upload: a restart could not
- * tell whether MDK took it. The chunk fails, so the user can retry it once storage is writable again.
+ * Withdraws a queued chunk that must not upload, before any upload. When [storageFailed], the journal could not
+ * record its token, so a restart could not tell whether MDK took it: the chunk fails, so the user can retry it
+ * once storage is writable again. Otherwise the chunk was cancelled or its operation ended, and nothing is shown.
  */
 private suspend fun dev.ipf.whitenoise.android.state.WhiteNoiseAppState.withdrawUnrecorded(
     controller: ConversationController,
     queued: ConversationController.QueuedAttachmentSend,
     operationId: String,
     chunkId: String,
+    storageFailed: Boolean,
 ) {
     controller.deleteMessage(queued.optimistic, presentFailure = false, optimisticKeyOverride = queued.key)
+    if (!storageFailed) return
     val registry = attachmentCollections
     withContext(Dispatchers.IO) {
         registry.update(operationId) {
