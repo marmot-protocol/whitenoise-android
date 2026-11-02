@@ -203,7 +203,7 @@ class MessageBubbleCustomReplyScreenshotTest : MessageBubbleFileAttachmentFixtur
     @Suppress("LongMethod") // Exercises the real MessageBubble interaction and layout contract.
     private fun FileMessage(
         item: TimelineMessage,
-        showSenderAvatar: Boolean = false,
+        showSenderName: Boolean = false,
         selectionMode: Boolean = false,
         selected: Boolean = false,
     ) {
@@ -238,7 +238,7 @@ class MessageBubbleCustomReplyScreenshotTest : MessageBubbleFileAttachmentFixtur
             onDeclineInvite = {},
             mentionCandidates = emptyList(),
             mentionPickerEnabled = false,
-            showSenderAvatar = showSenderAvatar,
+            showSenderName = showSenderName,
             parseMarkdown = ::markdown,
         )
     }

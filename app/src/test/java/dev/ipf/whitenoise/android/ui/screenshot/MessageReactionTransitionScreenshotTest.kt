@@ -32,10 +32,10 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.core.ReactionTally
-import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleBottomAlignmentLine
+import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_SENDER_AVATAR_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleFrame
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageReactionSummary
-import dev.ipf.whitenoise.android.ui.conversation.messages.MessageSenderAvatarSlot
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageSenderLabel
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -113,7 +113,7 @@ class MessageReactionTransitionScreenshotTest {
             }
         }
         composeRule.waitForIdle()
-        val avatarTop = nodeTop("A")
+        val avatarTop = avatarTopInRoot()
         val bubbleTextTop = nodeTop("Can you review the file?")
         composeRule
             .onNodeWithTag(GALLERY_TAG)
@@ -216,12 +216,18 @@ class MessageReactionTransitionScreenshotTest {
             .boundsInRoot
             .top
 
+    private fun avatarTopInRoot(): Float =
+        composeRule
+            .onNodeWithTag(MESSAGE_SENDER_AVATAR_TAG, useUnmergedTree = true)
+            .fetchSemanticsNode()
+            .boundsInRoot.top
+
     /** Asserts anchoring. */
     private fun assertAnchoring(
         avatarTop: Float,
         bubbleTextTop: Float,
     ) {
-        assertEquals(avatarTop, nodeTop("A"), POSITION_TOLERANCE)
+        assertEquals(avatarTop, avatarTopInRoot(), POSITION_TOLERANCE)
         assertEquals(bubbleTextTop, nodeTop("Can you review the file?"), POSITION_TOLERANCE)
     }
 
@@ -230,7 +236,6 @@ class MessageReactionTransitionScreenshotTest {
         val showReactionSummary = tallies.isNotEmpty()
         val visibilityState = remember { MutableTransitionState(showReactionSummary) }
         visibilityState.targetState = showReactionSummary
-        val reactionHostPresent = visibilityState.currentState || visibilityState.targetState
         Surface(modifier = Modifier.width(360.dp).testTag(GALLERY_TAG)) {
             Column(
                 modifier = Modifier.padding(16.dp),
@@ -241,26 +246,10 @@ class MessageReactionTransitionScreenshotTest {
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    MessageSenderAvatarSlot(
-                        showSenderAvatar = true,
-                        title = "Alex",
-                        seed = "alex",
-                        pictureUrl = null,
-                        enabled = true,
-                        alignToBubbleBottom = reactionHostPresent,
-                        onClick = {},
-                    )
                     Column(
                         modifier =
                             Modifier
-                                .widthIn(max = 220.dp)
-                                .then(
-                                    if (reactionHostPresent) {
-                                        Modifier.alignBy(MessageBubbleBottomAlignmentLine)
-                                    } else {
-                                        Modifier
-                                    },
-                                ),
+                                .widthIn(max = 220.dp),
                         horizontalAlignment = Alignment.Start,
                     ) {
                         ReactionBubble(text = "Can you review the file?", mine = false)
@@ -288,6 +277,7 @@ class MessageReactionTransitionScreenshotTest {
             mentionedSelf = false,
             mentionedYouLabel = "Mentioned you",
         ) {
+            if (!mine) MessageSenderLabel("Alex", "alex", null, null)
             Text(text = text, style = MaterialTheme.typography.bodyLarge)
         }
     }

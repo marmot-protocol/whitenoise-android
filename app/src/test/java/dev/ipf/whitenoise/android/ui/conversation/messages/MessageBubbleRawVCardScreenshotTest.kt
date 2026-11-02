@@ -161,7 +161,6 @@ class MessageBubbleRawVCardScreenshotTest : MessageBubbleFileAttachmentFixtures(
             onDeclineInvite = {},
             mentionCandidates = emptyList(),
             mentionPickerEnabled = false,
-            showSenderAvatar = false,
             parseMarkdown = ::markdown,
         )
     }

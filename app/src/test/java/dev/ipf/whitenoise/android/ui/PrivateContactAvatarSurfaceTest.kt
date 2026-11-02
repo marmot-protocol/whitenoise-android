@@ -19,7 +19,8 @@ import dev.ipf.whitenoise.android.state.ContactPictureChange
 import dev.ipf.whitenoise.android.state.ContactPictureStore
 import dev.ipf.whitenoise.android.state.contactPicturePng
 import dev.ipf.whitenoise.android.ui.common.Avatar
-import dev.ipf.whitenoise.android.ui.conversation.messages.MessageSenderAvatarSlot
+import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_SENDER_AVATAR_TAG
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageSenderLabel
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -63,14 +64,18 @@ class PrivateContactAvatarSurfaceTest {
         composeRule.setContent {
             WhiteNoiseTheme {
                 Row(Modifier.testTag("sender-slot")) {
-                    MessageSenderAvatarSlot(true, "Maya", "contact", source, true, false, {}, public)
+                    MessageSenderLabel("Maya", "contact", source, public)
                 }
             }
         }
 
         /** Samples the centre of the actual rendered avatar surface rather than its source bitmap. */
         fun pixel(): Int {
-            val bitmap = composeRule.onNodeWithTag("sender-slot").captureToImage().asAndroidBitmap()
+            val bitmap =
+                composeRule
+                    .onNodeWithTag(MESSAGE_SENDER_AVATAR_TAG, useUnmergedTree = true)
+                    .captureToImage()
+                    .asAndroidBitmap()
             return bitmap.getPixel(bitmap.width / 2, bitmap.height / 2)
         }
         assertEquals(Color.BLUE, pixel())
@@ -103,7 +108,7 @@ class PrivateContactAvatarSurfaceTest {
                 Column {
                     Box(Modifier.testTag("identity")) { Avatar("Maya", "contact", 64.dp, source, public) }
                     Row(Modifier.testTag("sender-slot")) {
-                        MessageSenderAvatarSlot(true, "Maya", "contact", source, true, false, {}, public)
+                        MessageSenderLabel("Maya", "contact", source, public)
                     }
                 }
             }
@@ -111,7 +116,19 @@ class PrivateContactAvatarSurfaceTest {
 
         /** Samples the centre of the actual rendered avatar surface rather than its source bitmap. */
         fun pixel(tag: String = "identity"): Int {
-            val image = composeRule.onNodeWithTag(tag).captureToImage().asAndroidBitmap()
+            val image =
+                composeRule
+                    .onNodeWithTag(
+                        if (tag ==
+                            "sender-slot"
+                        ) {
+                            MESSAGE_SENDER_AVATAR_TAG
+                        } else {
+                            tag
+                        },
+                        useUnmergedTree = true,
+                    ).captureToImage()
+                    .asAndroidBitmap()
             return image.getPixel(image.width / 2, image.height / 2)
         }
         assertEquals(Color.RED, pixel())

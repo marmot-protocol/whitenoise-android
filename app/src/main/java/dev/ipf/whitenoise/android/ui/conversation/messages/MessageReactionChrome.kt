@@ -6,16 +6,10 @@ import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -24,69 +18,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.HorizontalAlignmentLine
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.core.ReactionTally
-import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionPillRow
 import kotlin.math.roundToInt
-
-internal val MessageBubbleBottomAlignmentLine = HorizontalAlignmentLine { old, new -> minOf(old, new) }
-
-/** Sender avatar slot beside incoming bubbles, shown at the end of a sender run. */
-@Composable
-internal fun RowScope.MessageSenderAvatarSlot(
-    showSenderAvatar: Boolean,
-    title: String,
-    seed: String,
-    pictureUrl: String?,
-    enabled: Boolean,
-    alignToBubbleBottom: Boolean,
-    onClick: () -> Unit,
-    // Decoded bytes MarmotKit stores for the sender (0.10.1); when present the URL is not fetched.
-    picture: ImageBitmap? = null,
-) {
-    val avatarAlignment =
-        if (alignToBubbleBottom) {
-            Modifier.alignBy { it.measuredHeight }
-        } else {
-            Modifier.align(Alignment.Bottom)
-        }
-    Box(
-        modifier =
-            Modifier
-                .size(30.dp)
-                .then(avatarAlignment),
-    ) {
-        if (showSenderAvatar) {
-            Box(
-                modifier =
-                    Modifier
-                        .clip(CircleShape)
-                        .clickable(enabled = enabled, onClick = onClick),
-            ) {
-                Avatar(
-                    title = title,
-                    seed = seed,
-                    size = 30.dp,
-                    pictureUrl =
-                        pictureUrl.takeIf {
-                            picture == null ||
-                                dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
-                                    .isPrivate(it)
-                        },
-                    picture = picture,
-                )
-            }
-        }
-    }
-    Spacer(Modifier.width(6.dp))
-}
 
 /** Reaction summary chips under a bubble. */
 @Composable
@@ -193,7 +131,6 @@ private fun ColumnScope.reactionHostModifier(
             layout(
                 width = placeable.width,
                 height = height,
-                alignmentLines = mapOf(MessageBubbleBottomAlignmentLine to 0),
             ) {
                 placeable.place(0, -overlap)
             }

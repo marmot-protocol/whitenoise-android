@@ -116,7 +116,6 @@ class MessageBubbleEditedMarkdownBehaviorTest {
                     mentionCandidates = emptyList(),
                     mentionPickerEnabled = false,
                     showSenderName = false,
-                    showSenderAvatar = false,
                     collapseLongMessages = false,
                     readOnly = false,
                     parseMarkdown = { editedDocument },
@@ -217,7 +216,6 @@ class MessageBubbleEditedMarkdownBehaviorTest {
                     mentionCandidates = emptyList(),
                     mentionPickerEnabled = false,
                     showSenderName = false,
-                    showSenderAvatar = false,
                     collapseLongMessages = false,
                     readOnly = false,
                     parseMarkdown = { text ->

@@ -47,6 +47,23 @@ class MessageBubbleLayoutTest {
     }
 
     @Test
+    fun incomingGroupTextRecoversBothGuttersButKeepsSelectionSpace() {
+        assertEquals(400.dp, messageBubbleTextColumnMaxWidth(400.dp, 0.dp, true))
+        assertEquals(360.dp, messageBubbleTextColumnMaxWidth(400.dp, 40.dp, true))
+        assertEquals(352.dp, messageBubbleTextColumnMaxWidth(400.dp, 0.dp, false))
+        assertEquals(320.dp, messageBubbleTextColumnMaxWidth(400.dp, 80.dp, false))
+        assertEquals(0.dp, messageBubbleTextColumnMaxWidth(20.dp, 40.dp, true))
+    }
+
+    @Test
+    fun incomingGroupRichCardsKeepTheirExistingWidthContract() {
+        assertEquals(312.dp, messageBubbleRichColumnMaxWidth(400.dp, 0.dp, true))
+        assertEquals(312.dp, messageBubbleRichColumnMaxWidth(400.dp, 40.dp, true))
+        assertEquals(352.dp, messageBubbleRichColumnMaxWidth(400.dp, 0.dp, false))
+        assertEquals(0.dp, messageBubbleRichColumnMaxWidth(20.dp, 40.dp, true))
+    }
+
+    @Test
     fun fileCardsUseTheAvailableBubbleWidth() {
         assertEquals(
             392.dp,

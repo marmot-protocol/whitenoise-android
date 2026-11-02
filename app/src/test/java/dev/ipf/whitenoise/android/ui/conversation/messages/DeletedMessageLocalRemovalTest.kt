@@ -404,7 +404,6 @@ class DeletedMessageLocalRemovalTest {
                             mentionCandidates = emptyList(),
                             mentionPickerEnabled = false,
                             showSenderName = false,
-                            showSenderAvatar = false,
                             collapseLongMessages = false,
                             readOnly = false,
                         )
@@ -484,7 +483,6 @@ class DeletedMessageLocalRemovalTest {
                         mentionCandidates = emptyList(),
                         mentionPickerEnabled = false,
                         showSenderName = false,
-                        showSenderAvatar = false,
                         collapseLongMessages = collapseLongMessages,
                         readOnly = false,
                     )

@@ -37,10 +37,9 @@ import dev.ipf.whitenoise.android.translation.LocalConversationTranslation
 import dev.ipf.whitenoise.android.translation.MessageTranslationRendition
 import dev.ipf.whitenoise.android.translation.TranslationRendition
 import dev.ipf.whitenoise.android.translation.TranslationSource
-import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleBottomAlignmentLine
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubbleFrame
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageReactionSummary
-import dev.ipf.whitenoise.android.ui.conversation.messages.MessageSenderAvatarSlot
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageSenderLabel
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubblePresentation
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.awaitCancellation
@@ -178,7 +177,7 @@ class MessageReactionAlignmentScreenshotTest {
         }
     }
 
-    /** Keep the incoming avatar, bubble-bottom alignment and inactive translation in the production order. */
+    /** Keep the inline sender identity, reaction host and inactive translation in the production order. */
     @Composable
     private fun IncomingReactionExample() {
         Text("Incoming", style = MaterialTheme.typography.labelMedium)
@@ -186,17 +185,8 @@ class MessageReactionAlignmentScreenshotTest {
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            MessageSenderAvatarSlot(
-                showSenderAvatar = true,
-                title = "Alex",
-                seed = "alex",
-                pictureUrl = null,
-                enabled = true,
-                alignToBubbleBottom = true,
-                onClick = {},
-            )
             Column(
-                modifier = Modifier.widthIn(max = 220.dp).alignBy(MessageBubbleBottomAlignmentLine),
+                modifier = Modifier.widthIn(max = 220.dp),
                 horizontalAlignment = Alignment.Start,
             ) {
                 ReactionBubble(text = "Can you review the file?", mine = false)
@@ -244,6 +234,7 @@ class MessageReactionAlignmentScreenshotTest {
             mentionedSelf = false,
             mentionedYouLabel = "Mentioned you",
         ) {
+            if (!mine) MessageSenderLabel("Alex", "alex", null, null)
             Text(text = text, style = MaterialTheme.typography.bodyLarge)
         }
     }

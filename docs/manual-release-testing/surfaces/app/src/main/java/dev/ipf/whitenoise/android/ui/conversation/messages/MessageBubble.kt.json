@@ -6,9 +6,10 @@
       {
         "surface": "Custom emoji authored labels: MessageBubble",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
-        "anchor": "EmojiLabel(",
+        "anchor": "MessageSenderLabel(",
         "test_ids": [
-          "MSG-037"
+          "MSG-037",
+          "MSG-045"
         ]
       },
       {

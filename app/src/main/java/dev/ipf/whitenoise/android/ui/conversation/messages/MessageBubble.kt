@@ -66,7 +66,6 @@ import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
@@ -118,7 +117,6 @@ import dev.ipf.whitenoise.android.state.reportsFor
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.state.ttsStartFailureMessage
 import dev.ipf.whitenoise.android.state.usesDirectTranscriptChrome
-import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.LocalReceivedEmoji
 import dev.ipf.whitenoise.android.ui.TtsSentenceLayoutReporter
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicWidth
@@ -376,7 +374,6 @@ internal fun MessageBubble(
     onReaderSendAccepted: () -> Unit = {},
     onBeforeBodyCollapse: () -> Unit = {},
     showSenderName: Boolean = false,
-    showSenderAvatar: Boolean = false,
     collapseLongMessages: Boolean = true,
     readOnly: Boolean = false,
     ttsHighlightPassage: TtsPassage? = null,
@@ -920,11 +917,23 @@ internal fun MessageBubble(
             )
         }
     val forwardPayload = (forwardEligibility as? ForwardEligibility.Eligible)?.payload
-    val reserveSenderAvatarSlot =
+    val incomingGroupMessage =
         GroupProjector.shouldShowTranscriptSenderAvatar(
             isDm = controller.usesDirectTranscriptChrome,
             mine = mine,
         )
+    val senderPicture =
+        if (showSenderName) {
+            rememberDurableAvatar(
+                appState,
+                controller.window.frame
+                    ?.identities
+                    ?.get(record.sender)
+                    ?.avatarAsset,
+            )
+        } else {
+            null
+        }
     val tallies = controller.reactions[record.messageIdHex].orEmpty()
     val reactionTallies = if (deleted) emptyList() else tallies
     val showReactionSummary = reactionTallies.isNotEmpty()
@@ -933,7 +942,6 @@ internal fun MessageBubble(
             MutableTransitionState(showReactionSummary)
         }
     reactionVisibilityState.targetState = showReactionSummary
-    val reactionHostPresent = reactionVisibilityState.currentState || reactionVisibilityState.targetState
     val messageShareScope = rememberCoroutineScope()
     val ttsLinkTapCoordinator =
         remember(record.messageIdHex, messageShareScope, appState, controller.group.groupIdHex) {
@@ -1552,17 +1560,14 @@ internal fun MessageBubble(
             },
     ) {
         val selectionGutterWidth = if (selectionMode) messageBubbleSelectionGutterWidth else 0.dp
-        val senderAvatarSlotWidth = if (reserveSenderAvatarSlot) MessageBubbleSenderAvatarSlotWidth else 0.dp
+        val richColumnMaxWidth =
+            messageBubbleRichColumnMaxWidth(maxWidth, selectionGutterWidth, incomingGroupMessage)
         val bubbleColumnMaxWidth =
-            messageBubbleColumnMaxWidth(
-                containerWidth = maxWidth,
-                selectionGutterWidth = selectionGutterWidth,
-                senderAvatarSlotWidth = senderAvatarSlotWidth,
-            )
+            messageBubbleTextColumnMaxWidth(maxWidth, selectionGutterWidth, incomingGroupMessage)
         val bubbleColumnMinWidth =
             messageBubbleColumnMinWidth(
                 hasGeneralFileCard = hasGeneralFileCard,
-                maxWidth = bubbleColumnMaxWidth,
+                maxWidth = richColumnMaxWidth,
             )
         val longPressBlockedBySelection = selectionMode && !rangeDragActive
         val replySwipeUnavailable = deleted || actionsReadOnly || textSelectionMode || selectionMode
@@ -1847,49 +1852,20 @@ internal fun MessageBubble(
                 // stays at the row's leading edge for both message directions.
                 if (mine) Spacer(Modifier.weight(1f))
             }
-            if (reserveSenderAvatarSlot) {
-                MessageSenderAvatarSlot(
-                    showSenderAvatar = showSenderAvatar,
-                    title = appState.displayName(record.sender),
-                    seed = record.sender,
-                    pictureUrl = appState.contactAvatarSource(record.sender),
-                    picture =
-                        if (showSenderAvatar) {
-                            rememberDurableAvatar(
-                                appState,
-                                controller.window.frame
-                                    ?.identities
-                                    ?.get(record.sender)
-                                    ?.avatarAsset,
-                            )
-                        } else {
-                            null
-                        },
-                    enabled = !textSelectionMode,
-                    alignToBubbleBottom = reactionHostPresent,
-                    onClick = { appState.presentProfile(appState.npub(record.sender)) },
-                )
-            }
             Column(
                 // Swipe-to-reply translates this whole visual column — bubble or
                 // media surface plus its attached reaction summary — as one unit,
                 // while the stationary parent Row keeps gesture and hitbox
                 // ownership (#204). Applying the offset here, and only here,
                 // keeps every bubble variant from double-applying it and keeps
-                // the sender avatar and selection gutter at rest. The placement
+                // the selection gutter at rest. The placement
                 // lambda shifts drawing without invalidating measurement, so
                 // row alignment and width strategy are unaffected mid-drag.
                 modifier =
                     Modifier
                         .widthIn(min = bubbleColumnMinWidth, max = bubbleColumnMaxWidth)
                         .testTag(messageBubbleColumnTestTag(record.messageIdHex))
-                        .then(
-                            if (reserveSenderAvatarSlot && reactionHostPresent) {
-                                Modifier.alignBy(MessageBubbleBottomAlignmentLine)
-                            } else {
-                                Modifier
-                            },
-                        ).absoluteOffset { IntOffset((replySwipe.displayedDistance * swipeDirection).roundToInt(), 0) }
+                        .absoluteOffset { IntOffset((replySwipe.displayedDistance * swipeDirection).roundToInt(), 0) }
                         .onGloballyPositioned {
                             if (replySwipe.atRest) replySwipe.bubbleBoundsInRoot = it.boundsInRoot()
                         },
@@ -2277,10 +2253,11 @@ internal fun MessageBubble(
                  */
                 val senderNameLabel: @Composable (insideBubble: Boolean) -> Unit = { insideBubble ->
                     if (showSenderName) {
-                        EmojiLabel(
-                            appState.displayName(record.sender),
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.SemiBold,
+                        MessageSenderLabel(
+                            title = appState.displayName(record.sender),
+                            seed = record.sender,
+                            pictureUrl = appState.contactAvatarSource(record.sender),
+                            picture = senderPicture,
                             color =
                                 if (insideBubble) {
                                     bubbleContentColor
@@ -2427,7 +2404,7 @@ internal fun MessageBubble(
                     }
                 if (visiblePoll != null) {
                     Column(
-                        Modifier.fillMaxWidth().then(actionAnchorBoundsModifier),
+                        Modifier.widthIn(max = richColumnMaxWidth).fillMaxWidth().then(actionAnchorBoundsModifier),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         senderNameLabel(false)
@@ -2470,6 +2447,7 @@ internal fun MessageBubble(
                         // The swipe translation lives on the enclosing bubble
                         // column so the reaction summary moves too; applying it
                         // here as well would double-shift media messages.
+                        modifier = Modifier.widthIn(max = richColumnMaxWidth),
                         horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
@@ -2927,8 +2905,21 @@ internal fun MessageBubble(
                             } else {
                                 null
                             }
+                        val previewSenderIdentity: @Composable (Boolean) -> Unit = { insideBubble ->
+                            if (showSenderName) {
+                                MessageSenderLabel(
+                                    title = appState.displayName(record.sender),
+                                    seed = record.sender,
+                                    pictureUrl = appState.contactAvatarSource(record.sender),
+                                    picture = senderPicture,
+                                    color = if (insideBubble) bubbleContentColor else groupAuthorColor(record.sender),
+                                    modifier = Modifier.testTag("message-actions-sender-identity"),
+                                )
+                            }
+                        }
                         if (visiblePoll != null || (hasMedia && !bodyOrWarningInsideBubble)) {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                previewSenderIdentity(false)
                                 replyPreview?.let { preview ->
                                     ReplyPreviewCard(
                                         appState = appState,
@@ -2981,7 +2972,12 @@ internal fun MessageBubble(
                                 time = rememberedMessageBubbleTime(record.recordedAt),
                                 status = item.status,
                                 showStatus = showOutgoingStatus,
-                                senderName = appState.displayName(record.sender).takeIf { showSenderName },
+                                senderIdentity =
+                                    if (showSenderName) {
+                                        { previewSenderIdentity(!hasMedia) }
+                                    } else {
+                                        null
+                                    },
                                 mentionDisplayName = appState::mentionDisplayName,
                                 media = mediaPreview,
                                 footerContent = previewFooter,

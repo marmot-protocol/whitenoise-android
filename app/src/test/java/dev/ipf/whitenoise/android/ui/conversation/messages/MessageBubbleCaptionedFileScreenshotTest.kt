@@ -122,7 +122,7 @@ class MessageBubbleCaptionedFileScreenshotTest : MessageBubbleFileAttachmentFixt
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     FileMessage(sent)
-                    FileMessage(received, showSenderAvatar = true)
+                    FileMessage(received, showSenderName = true)
                 }
             }
         }
@@ -213,7 +213,7 @@ class MessageBubbleCaptionedFileScreenshotTest : MessageBubbleFileAttachmentFixt
     @Suppress("LongMethod") // Exercises the real MessageBubble interaction and layout contract.
     private fun FileMessage(
         item: TimelineMessage,
-        showSenderAvatar: Boolean = false,
+        showSenderName: Boolean = false,
     ) {
         MessageBubble(
             item = item,
@@ -246,7 +246,7 @@ class MessageBubbleCaptionedFileScreenshotTest : MessageBubbleFileAttachmentFixt
             onDeclineInvite = {},
             mentionCandidates = emptyList(),
             mentionPickerEnabled = false,
-            showSenderAvatar = showSenderAvatar,
+            showSenderName = showSenderName,
             parseMarkdown = ::markdown,
         )
     }

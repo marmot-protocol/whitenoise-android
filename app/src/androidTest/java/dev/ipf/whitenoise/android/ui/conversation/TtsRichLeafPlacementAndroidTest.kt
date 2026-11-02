@@ -317,7 +317,6 @@ class TtsRichLeafPlacementAndroidTest {
             mentionCandidates = emptyList(),
             mentionPickerEnabled = false,
             showSenderName = false,
-            showSenderAvatar = false,
             collapseLongMessages = false,
             readOnly = false,
             parseMarkdown = { item.record.contentTokens },

@@ -43,11 +43,11 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
+import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_SENDER_AVATAR_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -120,14 +120,14 @@ class TimelineRowTwoMemberGroupChromeTest {
             }
         }
 
-        composeRule.onNodeWithText(senderName, useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithText(senderName, substring = true, useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithText(senderInitials, useUnmergedTree = true).assertDoesNotExist()
         val initialTextLeft = messageTextLeft()
 
         composeRule.runOnIdle { runBlocking { controller.retryMembers() } }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText(senderName, useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithText(senderName, substring = true, useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithText(senderInitials, useUnmergedTree = true).assertDoesNotExist()
         val directTextLeft = messageTextLeft()
         assertEquals("refresh must not shift the two-member transcript", initialTextLeft, directTextLeft, 0.5f)
@@ -135,9 +135,14 @@ class TimelineRowTwoMemberGroupChromeTest {
         composeRule.runOnIdle { runBlocking { controller.retryMembers() } }
         composeRule.waitForIdle()
 
-        composeRule.onNodeWithText(senderName, useUnmergedTree = true).assertExists()
-        composeRule.onNodeWithText(senderInitials, useUnmergedTree = true).assertExists()
-        assertTrue("three-member transcript must restore the sender-avatar gutter", messageTextLeft() > directTextLeft)
+        composeRule.onNodeWithText(senderName, substring = true, useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag(MESSAGE_SENDER_AVATAR_TAG, useUnmergedTree = true).assertExists()
+        assertEquals(
+            "group identity must not restore a standalone avatar gutter",
+            directTextLeft,
+            messageTextLeft(),
+            0.5f,
+        )
     }
 
     @Test

@@ -33,6 +33,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.FirstBaseline
+import androidx.compose.ui.layout.HorizontalAlignmentLine
 import androidx.compose.ui.layout.LastBaseline
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.LookaheadScope
@@ -43,6 +44,9 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+
+/** Fixture-local custom line keeps the original alignment-query trigger after UI avatar-lane removal. */
+private val ReuseFixtureBottomAlignmentLine = HorizontalAlignmentLine { old, new -> minOf(old, new) }
 
 /** Ports AndroidX fd550bed793's reuse regression and the production Row alignment trigger. */
 abstract class ComposeRectListReuseFixture {
@@ -122,12 +126,12 @@ abstract class ComposeRectListReuseFixture {
         if (rowAlignment) {
             Row {
                 Box(Modifier.size(4.dp).alignBy { it.measuredHeight })
-                Column(Modifier.alignBy(MessageBubbleBottomAlignmentLine)) {
+                Column(Modifier.alignBy(ReuseFixtureBottomAlignmentLine)) {
                     leaf()
                     Box(
                         Modifier.layout { measurable, constraints ->
                             val placeable = measurable.measure(constraints)
-                            layout(placeable.width, 0, mapOf(MessageBubbleBottomAlignmentLine to 0)) {
+                            layout(placeable.width, 0, mapOf(ReuseFixtureBottomAlignmentLine to 0)) {
                                 placeable.place(0, 0)
                             }
                         },

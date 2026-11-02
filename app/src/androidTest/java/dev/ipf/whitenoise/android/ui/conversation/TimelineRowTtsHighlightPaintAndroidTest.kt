@@ -286,7 +286,6 @@ class TimelineRowTtsHighlightPaintAndroidTest {
             mentionCandidates = emptyList(),
             mentionPickerEnabled = false,
             showSenderName = false,
-            showSenderAvatar = false,
             collapseLongMessages = collapseLongMessages,
             readOnly = false,
             parseMarkdown = { item.record.contentTokens },

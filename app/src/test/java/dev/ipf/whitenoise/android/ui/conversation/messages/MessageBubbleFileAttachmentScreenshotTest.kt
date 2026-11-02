@@ -500,7 +500,7 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
                 FileMessage(gallery.largeFont)
             }
             Column(Modifier.width(300.dp)) {
-                FileMessage(gallery.constrained, showSenderAvatar = true)
+                FileMessage(gallery.constrained, showSenderName = true)
             }
             FileMessage(gallery.multiple)
             FileMessage(gallery.pending)
@@ -714,7 +714,7 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
     @Suppress("LongMethod") // Exercises the real MessageBubble interaction and layout contract.
     private fun FileMessage(
         item: TimelineMessage,
-        showSenderAvatar: Boolean = false,
+        showSenderName: Boolean = false,
         selectionMode: Boolean = false,
         selected: Boolean = false,
     ) {
@@ -749,7 +749,7 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
             onDeclineInvite = {},
             mentionCandidates = emptyList(),
             mentionPickerEnabled = false,
-            showSenderAvatar = showSenderAvatar,
+            showSenderName = showSenderName,
             parseMarkdown = ::markdown,
         )
     }

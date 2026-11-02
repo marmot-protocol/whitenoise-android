@@ -56,7 +56,6 @@ internal class PaintTimelineRow(
             mentionCandidates = emptyList(),
             mentionPickerEnabled = false,
             showSenderName = false,
-            showSenderAvatar = false,
             collapseLongMessages = collapseLongMessages,
             readOnly = false,
             ttsSentenceLayoutSink = sentenceLayouts,

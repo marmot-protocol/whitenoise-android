@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessagePreview.kt",
         "anchor": "EmojiLabel(",
         "test_ids": [
-          "MSG-037"
+          "MSG-037",
+          "MSG-045"
         ]
       },
       {
@@ -33,7 +34,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessagePreview.kt",
         "anchor": "private fun FocusedTextBudgetLayout(",
         "test_ids": [
-          "MSG-044"
+          "MSG-044",
+          "MSG-045"
         ]
       },
       {
@@ -44,7 +46,8 @@
           "MSG-004",
           "MSG-009",
           "MSG-015",
-          "MSG-044"
+          "MSG-044",
+          "MSG-045"
         ]
       }
     ],

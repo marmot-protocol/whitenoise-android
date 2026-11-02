@@ -397,7 +397,6 @@ class MessageBubbleMetadataFooterScreenshotTest : MessageBubbleFileAttachmentFix
             onDeclineInvite = {},
             mentionCandidates = emptyList(),
             mentionPickerEnabled = false,
-            showSenderAvatar = false,
             parseMarkdown = { source -> if (hydrateMarkdown) markdown(source) else markdown("") },
         )
     }

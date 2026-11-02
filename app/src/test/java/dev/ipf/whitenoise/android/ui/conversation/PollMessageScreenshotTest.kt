@@ -176,6 +176,12 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
                     .onNodeWithTag("poll-preview-footer", useUnmergedTree = true)
                     .fetchSemanticsNode()
                     .boundsInRoot
+            val identity =
+                composeRule
+                    .onNodeWithTag("message-actions-sender-identity", useUnmergedTree = true)
+                    .fetchSemanticsNode()
+                    .boundsInRoot
+            assertTrue("the production poll preview retains its outside sender identity", identity.bottom <= card.top)
             assertTrue("Preview footer must remain inside the card", footer.bottom <= card.bottom - 8f)
             assertEquals("Preview footer must follow trailing alignment", 12f, card.right - footer.right, 1f)
         } else {

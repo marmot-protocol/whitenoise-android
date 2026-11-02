@@ -264,7 +264,6 @@ internal fun TimelineRow(
                     onReaderSendAccepted = onReaderSendAccepted,
                     onBeforeBodyCollapse = onBeforeBodyCollapse,
                     showSenderName = senderDecoration.showName,
-                    showSenderAvatar = senderDecoration.showAvatar,
                     collapseLongMessages = collapseLongMessages,
                     readOnly = controller.group.pendingConfirmation,
                     ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,

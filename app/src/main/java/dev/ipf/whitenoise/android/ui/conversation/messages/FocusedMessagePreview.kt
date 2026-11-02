@@ -157,6 +157,7 @@ internal fun FocusedTextMessagePreview(
     mentionedSelf: Boolean = false,
     mentionedYouLabel: String = "",
     footerContent: (@Composable () -> Unit)? = null,
+    senderIdentity: (@Composable () -> Unit)? = null,
 ) {
     val timestampRevision =
         rememberTimestampRevision(remember(document) { document?.let(::markdownDocumentTimestamps).orEmpty() })
@@ -185,7 +186,7 @@ internal fun FocusedTextMessagePreview(
         }
     val excerptStyle = MaterialTheme.typography.bodyLarge
     val sender: (@Composable () -> Unit)? =
-        senderName?.let { name -> { EmojiLabel(name, style = MaterialTheme.typography.labelMedium) } }
+        senderIdentity ?: senderName?.let { name -> { EmojiLabel(name, style = MaterialTheme.typography.labelMedium) } }
     val main: @Composable (Boolean) -> Unit = { compact ->
         BubbleFooterLayout(
             footer = footer,
@@ -235,6 +236,7 @@ internal fun FocusedTextMessagePreview(
                 horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
+                sender?.invoke()
                 if (!compact) reply?.invoke()
                 MediaCaptionFrame(
                     presentation = presentation,
@@ -255,10 +257,7 @@ internal fun FocusedTextMessagePreview(
                             media()
                         }
                     },
-                ) {
-                    sender?.invoke()
-                    main(compact)
-                }
+                ) { main(compact) }
             }
         }
     }
@@ -329,7 +328,8 @@ private class ExcerptAboveWarningPolicy(
  * Fits a focused text preview to the height it is given from measured content, not a fixed threshold
  * (issue #3532). The minimum is the [main] body's minimum intrinsic height: one excerpt line, any warning
  * and the timestamp/status footer. The [sender] label is kept only while the minimum still fits with it,
- * and the [quote] only while it fits whole above that. The main body then takes the remaining height,
+ * and the [quote] only while it fits whole with that. The sender identity leads the quote, and the main
+ * body takes the remaining height,
  * where the excerpt shortens to whole lines. Without a height bound everything is shown. Each part is
  * composed once, so nothing is measured twice or duplicated in semantics.
  */
@@ -367,8 +367,8 @@ private object FocusedTextBudgetPolicy : MultiContentMeasurePolicy {
             width.coerceIn(constraints.minWidth, constraints.maxWidth),
             height.coerceIn(constraints.minHeight, constraints.maxHeight),
         ) {
-            quote.placeables.forEach { it.placeRelative(0, 0) }
-            sender.placeables.forEach { it.placeRelative(0, quote.height) }
+            sender.placeables.forEach { it.placeRelative(0, 0) }
+            quote.placeables.forEach { it.placeRelative(0, sender.height) }
             mains.forEach { it.placeRelative(0, top) }
         }
     }

@@ -149,7 +149,6 @@ class LocationMessageBubbleScreenshotTest : MessageBubbleFileAttachmentFixtures(
             onDeclineInvite = {},
             mentionCandidates = emptyList(),
             mentionPickerEnabled = false,
-            showSenderAvatar = false,
             parseMarkdown = ::markdown,
         )
     }

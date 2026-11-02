@@ -165,7 +165,6 @@ class OwnFileDeliveryGateTest : MessageBubbleFileAttachmentFixtures() {
             onDeclineInvite = {},
             mentionCandidates = emptyList(),
             mentionPickerEnabled = false,
-            showSenderAvatar = false,
             parseMarkdown = ::markdown,
         )
     }
