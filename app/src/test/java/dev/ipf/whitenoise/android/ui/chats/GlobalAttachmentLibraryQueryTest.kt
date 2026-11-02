@@ -95,4 +95,20 @@ class GlobalAttachmentLibraryQueryTest {
         assertEquals("Design review", item?.chatTitle)
         assertEquals("photo-3.png", item?.label)
     }
+
+    /** A return resumes the recorded extent only for the same query; any other query starts from the head. */
+    @Test
+    fun extentResumesOnlyTheSameQuery() {
+        val photos = GlobalAttachmentLibraryQuery(groups = null, kinds = setOf(GlobalSearchContentKind.IMAGES_VIDEO))
+        val files = photos.copy(kinds = setOf(GlobalSearchContentKind.FILES_DOCUMENTS))
+        val extent = GlobalAttachmentLibraryExtent()
+        assertEquals(0, extent.resumeCount(photos))
+
+        extent.record(photos, 120)
+
+        assertEquals(120, extent.resumeCount(photos.copy()))
+        assertEquals(0, extent.resumeCount(files))
+        extent.record(files, 30)
+        assertEquals(0, extent.resumeCount(photos))
+    }
 }

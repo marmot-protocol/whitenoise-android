@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.chats
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.lifecycle.Lifecycle
@@ -88,6 +89,27 @@ internal data class GlobalAttachmentLibraryQuery(
     }
 }
 
+/**
+ * How far the library had read for one query in this account's search session. A session reopened for
+ * the same query rereads this many rows before it shows the grid, so Back lands where the user left.
+ */
+internal class GlobalAttachmentLibraryExtent {
+    private var query: GlobalAttachmentLibraryQuery? = null
+    private var loaded = 0
+
+    /** Records the rows a settled session holds for [query]. */
+    fun record(
+        query: GlobalAttachmentLibraryQuery,
+        loaded: Int,
+    ) {
+        this.query = query
+        this.loaded = loaded
+    }
+
+    /** The rows to reread for [query]: the recorded count for the same query, otherwise none. */
+    fun resumeCount(query: GlobalAttachmentLibraryQuery): Int = if (query == this.query) loaded else 0
+}
+
 /** What the search screen hands the library: its listed items, view kinds and native session. */
 internal data class GlobalAttachmentLibraryContent(
     val items: List<GlobalAttachmentItem>,
@@ -158,7 +180,8 @@ internal fun AccountAttachmentEntryFfi.toLibraryItem(chatTitle: (String) -> Stri
 /**
  * Opens one library session for [query] while the screen is started, and closes it with every native
  * handle on stop, query change, account switch or runtime replacement. Projection updates for the
- * account and the earliest retention deadline the pages reported both trigger a change probe.
+ * account and the earliest retention deadline the pages reported both trigger a change probe. With an
+ * [extent], a reopened session for the same query first rereads as many rows as the last one held.
  */
 @Composable
 internal fun rememberGlobalAttachmentPager(
@@ -166,6 +189,7 @@ internal fun rememberGlobalAttachmentPager(
     account: String?,
     query: GlobalAttachmentLibraryQuery,
     enabled: Boolean = true,
+    extent: GlobalAttachmentLibraryExtent? = null,
 ): AccountAttachmentPager? {
     val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
     val active = account?.takeIf { enabled && it == appState.activeAccountRef }
@@ -190,9 +214,12 @@ internal fun rememberGlobalAttachmentPager(
                     },
                 admits = query::admits,
                 isCurrent = { appState.runtimeGeneration == generation && appState.activeAccountRef == active },
+                resumeCount = extent?.resumeCount(query) ?: 0,
             )
         }
     DisposableEffect(pager) { onDispose { pager.close() } }
+    val settled = pager.state.takeIf { it.initialized && !it.resuming }
+    SideEffect { if (settled != null) extent?.record(query, settled.entries.size) }
     val wakeups = remember(pager) { Channel<Unit>(Channel.CONFLATED) }
     LaunchedEffect(pager, appState.runtimeMirrors.blocks.users) { wakeups.send(Unit) }
     LaunchedEffect(pager) {

@@ -21,6 +21,9 @@ internal class AccountAttachmentFixture(
     var failNext = false
     var invalidQuery = false
     var expiries: List<ULong?> = emptyList()
+
+    /** Runs before each page read, with the zero-based call number, so a test can observe or fail mid-batch. */
+    var beforePage: (Int) -> Unit = {}
     val cursors = mutableListOf<FakeAccountCursor>()
     val versions = mutableListOf<FakeAccountVersion>()
 
@@ -28,6 +31,7 @@ internal class AccountAttachmentFixture(
     @Suppress("ReturnCount") // Failure, refusal and a stale cursor each answer before paging.
     override suspend fun page(cursor: AccountAttachmentCursor?): AccountAttachmentPageReadFfi {
         val call = calls++
+        beforePage(call)
         if (failNext) {
             failNext = false
             error("fixture failure")

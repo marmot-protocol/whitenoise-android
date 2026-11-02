@@ -65,7 +65,7 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
         assertTrue(
             "library pages come from the account pager",
-            "rememberGlobalAttachmentPager(appState, libraryAccount, libraryQuery, browsingAttachments)" in source,
+            "rememberGlobalAttachmentPager(" in source && "searchViewport?.libraryExtent," in source,
         )
         assertTrue(
             "failed lookups cannot expire return focus as settled data",

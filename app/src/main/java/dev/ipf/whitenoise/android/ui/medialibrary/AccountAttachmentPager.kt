@@ -46,6 +46,8 @@ internal enum class AccountAttachmentFailure {
 /**
  * Transient rendering state. Only admitted entries are kept; the native cursor and version decide
  * pagination and validity. [nextExpiry] is the earliest retention deadline the loaded pages reported.
+ * [resuming] holds while a returning session rereads the rows an earlier session had loaded, so the
+ * screen can wait for all of them before restoring its scroll position.
  */
 internal data class AccountAttachmentState(
     val entries: List<AccountAttachmentEntryFfi> = emptyList(),
@@ -54,6 +56,7 @@ internal data class AccountAttachmentState(
     val hasMore: Boolean = false,
     val initialized: Boolean = false,
     val nextExpiry: ULong? = null,
+    val resuming: Boolean = false,
 )
 
 /**
@@ -62,14 +65,17 @@ internal data class AccountAttachmentState(
  * continuation, since a selective filter can return empty pages that are not exhaustion. The first
  * page's version stays the baseline: additions reload from the head as far as the old tail, and a
  * destructive change discards every loaded row. Closing fences late callbacks and releases handles
- * once any in-flight read returns.
+ * once any in-flight read returns. A session for a query the user is returning to starts with
+ * [resumeCount], the rows the earlier session had loaded, and rereads that far from the head; it keeps
+ * no native handle from the earlier session.
  */
 internal class AccountAttachmentPager(
     private val reader: AccountAttachmentReader,
     private val admits: (AccountAttachmentEntryFfi) -> Boolean,
+    resumeCount: Int = 0,
     private val isCurrent: () -> Boolean = { true },
 ) : AutoCloseable {
-    var state by mutableStateOf(AccountAttachmentState())
+    var state by mutableStateOf(AccountAttachmentState(resuming = resumeCount > 0))
         private set
 
     private val mutex = Mutex()
@@ -78,7 +84,7 @@ internal class AccountAttachmentPager(
     private var closed = false
     private var busy = false
     private var restoreThrough: Triple<String, String, UInt>? = null
-    private var restoreCount = 0
+    private var restoreCount = resumeCount.coerceAtLeast(0)
     private var retryProbe = false
 
     /** Probes the change token, rebuilding the loaded range after native additions or invalidation. */
@@ -135,6 +141,7 @@ internal class AccountAttachmentPager(
                 restoreCount = 0
             }
         } while (restoreThrough != null || restoreCount > 0)
+        if (state.resuming) state = state.copy(resuming = false)
     }
 
     /** Reads up to the batch's page budget, stopping early once enough rows were admitted. */
@@ -220,7 +227,8 @@ internal class AccountAttachmentPager(
         mutex.withLock {
             if (closed || !isCurrent()) return@withLock
             val fail = { failure: AccountAttachmentFailure ->
-                if (!closed && isCurrent()) state = state.copy(loading = false, failure = failure)
+                // A failed resume shows the rows it did read, with the retry that continues it.
+                if (!closed && isCurrent()) state = state.copy(loading = false, failure = failure, resuming = false)
             }
             busy = true
             state = state.copy(loading = true, failure = null)

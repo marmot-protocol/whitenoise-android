@@ -194,6 +194,59 @@ class AccountAttachmentPagerTest {
             pager.close()
         }
 
+    /** A returning session rereads as far as the last one had loaded, holding its rows back until it gets there. */
+    @Test
+    fun resumeRereadsThePreviousExtentBeforeSettling() =
+        runTest {
+            val source = AccountAttachmentFixture((499 downTo 0).map { accountEntry(it) }, size = 40)
+            val pager = AccountAttachmentPager(source, everything, resumeCount = 150)
+            val resumingDuringReads = mutableListOf<Boolean>()
+            source.beforePage = { resumingDuringReads += pager.state.resuming }
+            assertTrue(pager.state.resuming)
+
+            pager.refresh()
+
+            assertEquals(listOf(true, true, true, true), resumingDuringReads)
+            assertFalse(pager.state.resuming)
+            assertEquals((499 downTo 340).map { "message-$it" }, pager.state.entries.map { it.entry.messageIdHex })
+            assertTrue(pager.state.hasMore)
+            pager.close()
+        }
+
+    /** A resume past the end of a shrunken history stops at the end instead of waiting. */
+    @Test
+    fun resumeStopsWhereTheHistoryEnds() =
+        runTest {
+            val source = AccountAttachmentFixture((59 downTo 0).map { accountEntry(it) }, size = 40)
+            val pager = AccountAttachmentPager(source, everything, resumeCount = 150)
+
+            pager.refresh()
+
+            assertFalse(pager.state.resuming)
+            assertFalse(pager.state.hasMore)
+            assertEquals(60, pager.state.entries.size)
+            pager.close()
+        }
+
+    /** A failed resume shows the rows it read, and Retry carries on to the previous extent. */
+    @Test
+    fun failedResumeShowsItsRowsAndRetryContinues() =
+        runTest {
+            val source = AccountAttachmentFixture((499 downTo 0).map { accountEntry(it) }, size = 40)
+            val pager = AccountAttachmentPager(source, everything, resumeCount = 150)
+            source.beforePage = { call -> if (call == 2) source.failNext = true }
+
+            pager.refresh()
+            assertEquals(AccountAttachmentFailure.READ, pager.state.failure)
+            assertFalse(pager.state.resuming)
+            assertEquals(80, pager.state.entries.size)
+
+            pager.loadMore()
+            assertNull(pager.state.failure)
+            assertEquals((499 downTo 340).map { "message-$it" }, pager.state.entries.map { it.entry.messageIdHex })
+            pager.close()
+        }
+
     /** A closed or superseded owner ignores late reads and keeps no rows. */
     @Test
     fun closedOwnerIgnoresLaterReads() =

@@ -724,7 +724,14 @@ internal fun ChatsScreen(
             )
         }
     val libraryAccount = controller.boundAccountRef
-    val libraryPager = rememberGlobalAttachmentPager(appState, libraryAccount, libraryQuery, browsingAttachments)
+    val libraryPager =
+        rememberGlobalAttachmentPager(
+            appState,
+            libraryAccount,
+            libraryQuery,
+            browsingAttachments,
+            searchViewport?.libraryExtent,
+        )
     val libraryTitles =
         remember(sourceList, groupTitleCopy, profileRev) {
             sourceList.associate { item ->
@@ -732,7 +739,13 @@ internal fun ChatsScreen(
                 item.group.groupIdHex.lowercase() to title
             }
         }
-    val libraryEntries = libraryPager?.state?.entries.orEmpty()
+    // A returning session holds its rows back until it has reread as far as before, so the grid keeps its place.
+    val libraryEntries =
+        libraryPager
+            ?.state
+            ?.takeUnless { it.resuming }
+            ?.entries
+            .orEmpty()
     val libraryItems =
         remember(libraryEntries, libraryTitles) {
             val fallback = groupTitleCopy.unavailableConversationTitle
