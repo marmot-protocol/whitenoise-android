@@ -5,6 +5,7 @@ package dev.ipf.whitenoise.android.ui.chats
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,6 +28,7 @@ import dev.ipf.whitenoise.android.state.voicePlaybackSource
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.conversation.media.AttachmentOpener
 import dev.ipf.whitenoise.android.ui.conversation.media.FullScreenMediaViewer
+import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerGallery
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeDocumentFile
 import dev.ipf.whitenoise.android.ui.conversation.media.materializeVoiceAttachment
@@ -37,7 +39,42 @@ import dev.ipf.whitenoise.android.ui.medialibrary.presentLibraryFileOpenOutcome
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
-/** One open full-screen viewer: the chat's pages from the current results and where to start. */
+/**
+ * The viewer gallery for a tap on [tapped]: every listed photo and video with a reference, in result order
+ * and across chats, except items of chats [knowsChat] rejects. Null when the tapped item is not among them.
+ */
+internal fun libraryViewerGallery(
+    items: List<GlobalAttachmentItem>,
+    tapped: GlobalAttachmentItem,
+    knowsChat: (String) -> Boolean,
+    page: (GlobalAttachmentItem) -> MediaViewerPage,
+): MediaViewerGallery? {
+    val visual =
+        items.filter {
+            it.reference != null &&
+                globalAttachmentPresentation(it.mediaType) == GlobalAttachmentPresentation.VISUAL &&
+                knowsChat(it.groupIdHex)
+        }
+    val start = visual.indexOfFirst { it.slotKey() == tapped.slotKey() }
+    return if (start >= 0) MediaViewerGallery(visual.map(page), start) else null
+}
+
+/** The open viewer's pages whose item the library still lists, in their original order. */
+internal fun libraryViewerLivePages(
+    pages: List<MediaViewerPage>,
+    items: List<GlobalAttachmentItem>,
+): List<MediaViewerPage> {
+    val listed = items.mapTo(HashSet()) { it.slotKey() }
+    return pages.filter { "${it.groupIdHex}/${it.messageIdHex}/${it.attachmentIndex}" in listed }
+}
+
+/** An item's identity across the account: its chat, message and slot. */
+private fun GlobalAttachmentItem.slotKey(): String = "$groupIdHex/$messageIdHex/$attachmentIndex"
+
+/**
+ * One open full-screen viewer: every listed photo and video the library can open, across chats, and where
+ * to start. [controller] is the tapped item's chat, which owns the viewer's actions.
+ */
 internal data class GlobalAttachmentViewerRequest(
     val controller: ConversationController,
     val pages: List<MediaViewerPage>,
@@ -47,8 +84,8 @@ internal data class GlobalAttachmentViewerRequest(
 /**
  * Opens library items through the conversation pipelines a chat already uses (#2000). Each chat gets one
  * non-started conversation controller, created on first use and released with the library session, so a
- * tap downloads only the item it names: photos and videos open the viewer over that chat's listed visual
- * items, files download on the first tap and open on the next, and audio plays through the shared player.
+ * tap downloads only the item it names: photos and videos open the viewer over the listed visual items of
+ * every chat, files download on the first tap and open on the next, and audio plays through the shared player.
  */
 internal class GlobalAttachmentOpener(
     private val appState: WhiteNoiseAppState,
@@ -93,24 +130,27 @@ internal class GlobalAttachmentOpener(
         viewer = null
     }
 
-    /** Pages through the chat's listed photos and videos, starting at the tapped one. */
+    /**
+     * Pages through the listed photos and videos in result order, across chats, starting at the tapped one.
+     * Items from a chat the library cannot name are left out, since no controller can read them.
+     */
     private fun showViewer(
         item: GlobalAttachmentItem,
         controller: ConversationController,
     ) {
-        val pages =
-            items
-                .filter {
-                    it.groupIdHex == item.groupIdHex &&
-                        it.reference != null &&
-                        globalAttachmentPresentation(it.mediaType) == GlobalAttachmentPresentation.VISUAL
-                }.map { it.viewerPage() }
-        val start =
-            pages.indexOfFirst { page ->
-                page.messageIdHex == item.messageIdHex && page.attachmentIndex == item.attachmentIndex
-            }
-        if (start >= 0) viewer = GlobalAttachmentViewerRequest(controller, pages, start)
+        val gallery = libraryViewerGallery(items, item, ::knowsChat) { it.viewerPage() }
+        if (gallery != null) viewer = GlobalAttachmentViewerRequest(controller, gallery.pages, gallery.startIndex)
     }
+
+    /** The page's own chat controller, or the tapped chat's once the opener has closed. */
+    fun pageController(
+        page: MediaViewerPage,
+        fallback: ConversationController,
+    ): ConversationController = page.groupIdHex?.let(::controllerFor) ?: fallback
+
+    /** True when the chat list names the chat, so a controller can be created for it. */
+    private fun knowsChat(groupIdHex: String): Boolean =
+        controllers.containsKey(groupIdHex) || chats.any { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
 
     /** A file not on the device yet is downloaded by the first tap and opened by the next, as in a chat. */
     @Suppress("ReturnCount") // A missing reference, a first-tap download and a failed open each end the tap.
@@ -181,6 +221,7 @@ internal class GlobalAttachmentOpener(
             mine = mine(),
             sender = sender,
             recordedAt = timelineAt,
+            groupIdHex = groupIdHex,
         )
 
     /** Releases every per-chat controller; a closed opener ignores later taps and late results. */
@@ -218,23 +259,41 @@ internal fun rememberGlobalAttachmentOpener(
     return opener
 }
 
-/** The full-screen viewer for a library tap, with Go to Message leaving for the item's chat. */
+/**
+ * The full-screen viewer for a library tap, with Go to Message leaving for the shown item's chat. Once the
+ * library settles, pages whose item it no longer lists (deleted, expired or hidden since the tap) leave the
+ * viewer, and a viewer left with none closes with a notice. While the library rereads, the pages stay as
+ * they were, so an unrelated change cannot close it.
+ */
 @Composable
 internal fun GlobalAttachmentViewerHost(
     opener: GlobalAttachmentOpener,
     appState: WhiteNoiseAppState,
+    items: List<GlobalAttachmentItem>,
+    loading: Boolean,
     onGoToMessage: (groupIdHex: String, messageIdHex: String) -> Unit,
 ) {
     val request = opener.viewer ?: return
+    // The last settled pages, kept while the library rereads; a plain holder, since it never drives recomposition.
+    val retained = remember(request) { arrayOf(request.pages) }
+    val pages = if (loading) retained[0] else libraryViewerLivePages(request.pages, items).also { retained[0] = it }
+    if (pages.isEmpty()) {
+        LaunchedEffect(request) {
+            appState.present(R.string.toast_original_message_unavailable)
+            opener.dismissViewer()
+        }
+        return
+    }
     FullScreenMediaViewer(
         controller = request.controller,
         appState = appState,
-        pages = request.pages,
-        startIndex = request.startIndex,
+        pages = pages,
+        startIndex = request.startIndex.coerceAtMost(pages.lastIndex),
         onDismiss = opener::dismissViewer,
         onGoToMessage = { page ->
             opener.dismissViewer()
-            onGoToMessage(request.controller.group.groupIdHex, page.messageIdHex)
+            onGoToMessage(page.groupIdHex ?: request.controller.group.groupIdHex, page.messageIdHex)
         },
+        pageController = { page -> opener.pageController(page, request.controller) },
     )
 }

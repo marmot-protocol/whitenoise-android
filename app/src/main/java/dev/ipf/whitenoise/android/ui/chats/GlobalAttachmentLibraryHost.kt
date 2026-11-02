@@ -57,5 +57,7 @@ internal fun GlobalAttachmentLibraryHost(
         selectionOwner = viewport?.selection,
         gridState = viewport?.attachmentGrid ?: rememberLazyGridState(),
     )
-    opener?.let { GlobalAttachmentViewerHost(it, appState, onGoToMessage = onOpenMessage) }
+    opener?.let {
+        GlobalAttachmentViewerHost(it, appState, library.items, library.loading, onGoToMessage = onOpenMessage)
+    }
 }
