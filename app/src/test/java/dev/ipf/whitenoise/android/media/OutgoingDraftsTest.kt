@@ -134,6 +134,16 @@ class OutgoingDraftsTest {
         assertEquals(listOf("draft-2"), retired)
     }
 
+    /** A send of its own draft never ends the current draft, even when one of its picks already belongs to it. */
+    @Test
+    fun aSendOfItsOwnDraftNeverEndsTheCurrentOne() {
+        val drafts = drafts()
+        drafts.retain(setOf("composer"))
+        val send = drafts.beginSend(listOf("composer", "resumed"), ownDraft = true)
+        assertEquals(setOf("draft-1", "draft-2"), send)
+        assertEquals("draft-1", drafts.draftOf("later"))
+    }
+
     private companion object {
         const val DOCUMENT = "content://picker/document"
     }

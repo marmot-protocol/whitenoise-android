@@ -48,7 +48,14 @@ internal class CollectionRun(
     preparedDocuments: Map<Uri, PendingAttachment> = emptyMap(),
     val draftClear: DraftSendClearToken? = null,
     val onFirstSeeded: () -> Unit = {},
+    private val pickScope: String? = null,
 ) {
+    /**
+     * The pick an item's slot id or document URI is drafted under: unchanged for a send from the composer, scoped to
+     * the operation for a resumed one, so the same document staged in the composer never shares its draft.
+     */
+    fun pickKey(raw: String): String = pickScope?.let { collectionPickKey(it, raw) } ?: raw
+
     private val images = java.util.concurrent.ConcurrentHashMap(preparedImages)
     private val documents = java.util.concurrent.ConcurrentHashMap(preparedDocuments)
 
@@ -264,6 +271,7 @@ internal class AttachmentCollectionSender(
                             listOfNotNull(run.preparedDocument(uri)?.let { uri to it }).toMap(),
                         allowFileBacked = true,
                         staging = FileBackedSendStaging { staged += it },
+                        pickKey = run::pickKey,
                     )
                 val attachment = (prepared.images + prepared.documents.attachments).singleOrNull()
                 val bytes = attachment?.inMemoryBytes?.size?.toLong() ?: 0L
@@ -444,6 +452,43 @@ internal fun dev.ipf.whitenoise.android.state.WhiteNoiseAppState.presentSkippedA
 
 /** The controller's optimistic key for a queued send whose MDK token is [token]. */
 internal fun collectionChunkKey(token: String): String = "msg:$token"
+
+/**
+ * Drives a resumed [operation] to its end. Its items are drafted under picks scoped to the operation and decode in
+ * a draft of their own, never in the composer's, even when the composer holds the same document; that draft stays
+ * open until the operation stops running here.
+ */
+internal suspend fun ConversationMediaSender.driveResumedCollection(
+    operation: AttachmentCollectionOperation,
+    sessionEpoch: Long,
+    lease: PrivateShareSendLease?,
+    original: ConversationMediaSender,
+) {
+    val run =
+        CollectionRun(
+            operation.id,
+            operation.accountRef,
+            operation.groupIdHex,
+            sessionEpoch,
+            caption = null,
+            pickScope = operation.id,
+        )
+    val picks = operation.items.map { run.pickKey(if (it.kind == CollectionItemKind.MEDIA) it.id else it.uri) }
+    val send = controller.beginOutgoingSend(picks, ownDraft = true)
+    try {
+        AttachmentCollectionSender {
+            latestCollectionSender(operation.accountRef, operation.groupIdHex) ?: original
+        }.drive(run, lease)
+    } finally {
+        controller.endOutgoingSend(send)
+    }
+}
+
+/** A resumed operation's own pick for one item, which no composer slot id or document URI can equal. */
+internal fun collectionPickKey(
+    operationId: String,
+    raw: String,
+): String = "collection:$operationId:$raw"
 
 /** The message that best explains why one prepared pick produced nothing, or did not fit the chunk. */
 private fun ConversationMediaSender.PreparedStagedAttachments.refusalMessage(fitIssue: Boolean): Int =

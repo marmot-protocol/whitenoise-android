@@ -98,7 +98,10 @@ policy: a draft's picks share it, a send or an empty composer ends it, a pick
 made during a send starts the next one, a pick keeps its draft for its late work
 after it left, and an ended draft retires once its sends have ended and its
 picks have left the composer. `PhotoDraftStagerTest` checks that staging keeps
-its pick's draft when the composer changes while the source is being read. `SharedOutgoingWorkerTest`
+its pick's draft when the composer changes while the source is being read.
+`ResumedCollectionDraftTest` stages the same document in a populated composer
+and a resumed collection and checks that they decode in separate drafts while
+the composer's draft goes on unchanged. `SharedOutgoingWorkerTest`
 drives that through the controller and the draft state on an isolated test lane:
 removing one pick keeps the draft's worker, while an emptied draft's worker
 retires and the next draft's pick reaches a fresh one, and a pick made during a

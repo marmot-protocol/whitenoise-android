@@ -1004,8 +1004,10 @@ pick that was sent or removed, such as a preparation that resumes after the
 composer was emptied and another pick was made, decodes in its own draft. The
 stager also fixes a pick's domain before its first suspension. A document picked
 again after it left the composer joins the draft it enters. A collection send
-keeps its draft open until it stops running, and one resumed after the process
-restarted puts its items in a draft of their own, never the composer's. An ended
+keeps its draft open until it stops running. One resumed after the process
+restarted drafts its items under picks scoped to its operation, in a draft of
+their own, so even the same document staged in the composer never shares or
+ends the composer's draft. An ended
 draft gains no pick, and a draft identity is random.
 `OutgoingDraftRegistry` is the only caller of `MediaTrustDomain.outgoing` in
 production, and `PictureDomainCoverageTest` fails on any other call or

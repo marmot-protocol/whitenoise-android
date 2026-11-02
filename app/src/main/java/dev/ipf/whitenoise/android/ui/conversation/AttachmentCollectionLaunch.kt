@@ -296,17 +296,7 @@ internal fun ConversationMediaSender.resumeCollection(
                 return@launchMutation appState.present(R.string.share_import_storage)
             }
         if (skipped > 0) appState.presentSkippedAttachments(skipped, R.string.attachment_collection_reselect)
-        val run = CollectionRun(operationId, resumed.accountRef, resumed.groupIdHex, sessionEpoch, caption = null)
-        // Items this process never staged, as after a restart, decode in a draft of their own, not the composer's.
-        val picks = resumed.items.map { if (it.kind == CollectionItemKind.MEDIA) it.id else it.uri }
-        val send = controller.beginOutgoingSend(picks, ownDraft = true)
-        try {
-            AttachmentCollectionSender {
-                latestCollectionSender(resumed.accountRef, resumed.groupIdHex) ?: original
-            }.drive(run, lease)
-        } finally {
-            controller.endOutgoingSend(send)
-        }
+        driveResumedCollection(resumed, sessionEpoch, lease, original)
     }
 }
 

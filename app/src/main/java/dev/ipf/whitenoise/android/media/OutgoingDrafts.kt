@@ -43,7 +43,8 @@ internal class OutgoingDrafts(
     /**
      * Starts a send of [picks]. Each keeps the draft it joined, and the current draft ends, so a pick made from now on
      * starts a new one. With [ownDraft], picks that joined no draft yet join a new draft of their own and the current
-     * draft is left as it is, as for a send resumed after the process restarted. Returns the drafts the send decodes
+     * draft is never ended, as for a send resumed after the process restarted, whose picks the caller scopes so they
+     * never equal a composer pick. Returns the drafts the send decodes
      * in, for [endSend] once the send's own decodes are done.
      */
     fun beginSend(
@@ -57,7 +58,8 @@ internal class OutgoingDrafts(
                     if (own != null) joined.getOrPut(pick) { own } else joinLocked(pick)
                 }
             drafts.forEach { draft -> runningSends[draft] = (runningSends[draft] ?: 0) + 1 }
-            if (current in drafts) startDraftLocked()
+            // A send of its own draft leaves the composer's current draft running.
+            if (!ownDraft && current in drafts) startDraftLocked()
             drafts
         }
 
