@@ -280,13 +280,16 @@ internal class AccountAttachmentPager(
         if (closed || !isCurrent()) throw CancellationException("Attachment library owner ended")
     }
 
-    /** Drops rows, cursor and baseline; a refreshed head is never appended to old pages. */
+    /**
+     * Drops rows, cursor and baseline; a refreshed head is never appended to old pages. The batch sequence
+     * carries on, so a reread that ends on the same count still relaunches the screen's paging.
+     */
     private fun clearCollection() {
         cursor?.close()
         cursor = null
         baseline?.close()
         baseline = null
-        work = AccountAttachmentState()
+        work = AccountAttachmentState(batches = work.batches)
     }
 
     /** Releases all handles exactly once, after any in-flight borrower has returned. */
