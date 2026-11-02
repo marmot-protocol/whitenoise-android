@@ -113,6 +113,12 @@
     <string name="library_loading">Caricamento di file e contenuti multimediali…</string>
     <string name="library_empty">Nessun file o contenuto multimediale trovato</string>
     <string name="library_source">Da: %1$s · %2$s</string>
+    <string name="library_section_this_week">Questa settimana</string>
+    <string name="library_section_this_month">Questo mese</string>
+    <string name="library_sender_in_chat">%1$s nella chat %2$s</string>
+    <string name="library_item_description">%1$s, %2$s, da %3$s in %4$s, %5$s</string>
+    <string name="library_load_more_failed">Impossibile caricare altri file e contenuti multimediali</string>
+    <string name="library_filters_unsupported">Questi filtri non possono essere usati per sfogliare file e contenuti multimediali</string>
     <string name="chat_list_search_filter_remove">Rimuovi filtro: %1$s</string>
     <string name="chat_list_filter_all">Tutti</string>
     <string name="chat_list_filter_unread">Non letti</string>
@@ -2520,6 +2526,8 @@
     <string name="notification_tone_added">Aggiunti. Apri una categoria qui sotto, poi Suono per scegliere un tono. Alcuni dispositivi li elencano in I miei suoni.</string>
     <string name="notification_tone_add_failed">Impossibile aggiungere i suoni. Riprova o mantieni il suono Android attuale.</string>
     <string name="notification_tone_scope">Ascoltare o aggiungere suoni non modifica gli avvisi. Scegli un suono in Android per ogni categoria, conversazione o persona. Le conversazioni e le persone a cui è stato assegnato esplicitamente un suono mantengono quel suono. Le nuove categorie di messaggi usano Ding; le categorie silenziose e personalizzate restano invariate. Le anteprime usano il volume delle notifiche e rispettano la modalità silenziosa e Non disturbare.</string>
+    <string name="notification_quiet_during_spoken_audio">Silenzioso durante i podcast</string>
+    <string name="notification_quiet_during_spoken_audio_detail">I messaggi arrivano senza suono né vibrazione mentre un\'altra app riproduce un podcast o un audiolibro, così la riproduzione continua. Le menzioni avvisano comunque.</string>
     <string name="notification_tone_android">Suono Android</string>
     <string name="notification_tone_silent">Silenzioso</string>
     <string name="notification_tone_off">Disattivato</string>

@@ -113,6 +113,12 @@
     <string name="library_loading">Dosyalar ve medya yükleniyor…</string>
     <string name="library_empty">Dosya veya medya bulunamadı</string>
     <string name="library_source">Kaynak: %1$s · %2$s</string>
+    <string name="library_section_this_week">Bu hafta</string>
+    <string name="library_section_this_month">Bu ay</string>
+    <string name="library_sender_in_chat">%1$s, %2$s</string>
+    <string name="library_item_description">%1$s, %2$s, %3$s tarafından %4$s içinde, %5$s</string>
+    <string name="library_load_more_failed">Daha fazla dosya ve medya yüklenemedi</string>
+    <string name="library_filters_unsupported">Bu filtreler dosya ve medyaya göz atmak için kullanılamaz</string>
     <string name="chat_list_search_filter_remove">Filtreyi kaldır: %1$s</string>
     <string name="chat_list_filter_all">Tümü</string>
     <string name="chat_list_filter_unread">Okunmamış</string>
@@ -2518,6 +2524,8 @@
     <string name="notification_tone_added">Eklendi. Bir ton seçmek için aşağıdan bir kategoriyi, ardından Ses seçeneğini açın. Bazı cihazlarda bu tonlar Seslerim altında listelenir.</string>
     <string name="notification_tone_add_failed">Sesler eklenemedi. Tekrar deneyin veya mevcut Android sesinizi koruyun.</string>
     <string name="notification_tone_scope">Sesleri önizlemek veya eklemek uyarılarınızı değiştirmez. Android’de her kategori, sohbet veya kişi için bir ses seçin. Kendi sesi açıkça atanmış sohbetler ve kişiler bu sesi korur. Yeni mesaj kategorileri Ding kullanır; sessiz ve özelleştirilmiş kategoriler değişmez. Önizlemeler bildirim ses düzeyini kullanır, Sessiz ve Rahatsız Etmeyin modlarına uyar.</string>
+    <string name="notification_quiet_during_spoken_audio">Podcast sırasında sessiz</string>
+    <string name="notification_quiet_during_spoken_audio_detail">Başka bir uygulama podcast veya sesli kitap çalarken mesajlar ses ve titreşim olmadan gelir, böylece çalma devam eder. Bahsedilmeler yine bildirilir.</string>
     <string name="notification_tone_android">Android sesi</string>
     <string name="notification_tone_silent">Sessiz</string>
     <string name="notification_tone_off">Kapalı</string>
