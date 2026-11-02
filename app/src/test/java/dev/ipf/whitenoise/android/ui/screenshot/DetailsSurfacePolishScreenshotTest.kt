@@ -265,6 +265,7 @@ class DetailsSurfacePolishScreenshotTest {
             },
         )
 
+    /** Builds the running local-signing self account summary. */
     private fun account() =
         AccountSummaryFfi(
             label = ACCOUNT_REF,
@@ -273,6 +274,7 @@ class DetailsSurfacePolishScreenshotTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private fun group(admin: Boolean) =

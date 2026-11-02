@@ -1509,6 +1509,7 @@ class NotificationTargetTest {
         assertEquals(NotificationNavStep.MissingConversation, step)
     }
 
+    /** A left, removed or device-removed membership makes an invite unavailable despite a pending confirmation. */
     @Test
     fun inviteAuthoritativeGroupAvailability_terminalMembershipDominatesStalePendingConfirmation() {
         assertFalse(
@@ -1521,6 +1522,12 @@ class NotificationTargetTest {
             inviteAuthoritativeGroupAvailable(
                 pendingConfirmation = true,
                 selfMembership = SelfMembershipFfi.REMOVED,
+            ),
+        )
+        assertFalse(
+            inviteAuthoritativeGroupAvailable(
+                pendingConfirmation = true,
+                selfMembership = SelfMembershipFfi.DEVICE_REMOVED,
             ),
         )
     }
@@ -1713,6 +1720,7 @@ class NotificationTargetTest {
 
     // ---- helpers ------------------------------------------------------------
 
+    /** Builds a notification update for the given account, group, message, trigger and DM flag. */
     private fun update(
         accountRef: String = "acct-a",
         groupIdHex: String = "group-1",
@@ -1739,5 +1747,6 @@ class NotificationTargetTest {
             reactedToPreview = null,
             timestampMs = 0L,
             isFromSelf = false,
+            sticker = null,
         )
 }

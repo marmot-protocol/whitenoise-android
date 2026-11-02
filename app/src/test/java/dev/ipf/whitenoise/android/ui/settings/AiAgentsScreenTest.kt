@@ -385,6 +385,7 @@ class AiAgentsScreenTest {
         return appState
     }
 
+    /** Builds the running, locally signing test account summary. */
     private fun activeAccount() =
         AccountSummaryFfi(
             label = ACCOUNT_REF,
@@ -393,6 +394,7 @@ class AiAgentsScreenTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private fun seedNpub(

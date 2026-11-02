@@ -503,6 +503,7 @@ class OptimisticMessageReconciliationTest {
         assertEquals(setOf("m98", "m99", "temp-pending"), messageById.keys)
     }
 
+    /** A projected mention still pairs with its optimistic bubble even though the engine added a p-tag. */
     @Test
     fun mentionProjectionMatchesOptimisticDespiteEngineAddedPTag() {
         // #619: the engine derives a NIP-27 ["p", hex] tag from an @npub1… mention
@@ -530,10 +531,12 @@ class OptimisticMessageReconciliationTest {
                 retentionExpiresAt = null,
                 recordedAt = 1uL,
                 receivedAt = 1uL,
+                sticker = null,
             )
         assertEquals("temp-id", optimisticMessageIdForProjection(listOf(pending), projected))
     }
 
+    /** Builds a pending optimistic media message whose plaintext is the 📎 filename placeholder. */
     private fun mediaPending(
         id: String,
         filename: String,
@@ -565,11 +568,13 @@ class OptimisticMessageReconciliationTest {
                     retentionExpiresAt = null,
                     recordedAt = 1uL,
                     receivedAt = 1uL,
+                    sticker = null,
                 ),
             status = MessageStatus.Pending,
             timelineOrder = 1uL,
         )
 
+    /** Builds a sent media message with an empty plaintext body. */
     private fun mediaSent(
         id: String,
         filename: String,
@@ -601,11 +606,13 @@ class OptimisticMessageReconciliationTest {
                     retentionExpiresAt = null,
                     recordedAt = 1uL,
                     receivedAt = 1uL,
+                    sticker = null,
                 ),
             status = MessageStatus.Sent,
             timelineOrder = 1uL,
         )
 
+    /** Builds a projected kind-9 media record carrying a PDF imeta tag. */
     private fun mediaProjection(id: String): AppMessageRecordFfi =
         AppMessageRecordFfi(
             messageIdHex = id,
@@ -631,6 +638,7 @@ class OptimisticMessageReconciliationTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
+            sticker = null,
         )
 
     /** A projected timeline row for the given identity, text and tags, with every other field neutral. */
@@ -678,6 +686,8 @@ class OptimisticMessageReconciliationTest {
             sourceEpoch = null,
             retentionSeconds = null,
             retentionExpiresAt = null,
+            sticker = null,
+            importedFrom = null,
         )
 
     private fun timelineMessage(
@@ -694,6 +704,7 @@ class OptimisticMessageReconciliationTest {
             timelineOrder = timelineOrder,
         )
 
+    /** Builds a plain kind-9 message record with the given id, text, timestamp, direction and sender. */
     private fun message(
         id: String,
         plaintext: String = "hello",
@@ -720,5 +731,6 @@ class OptimisticMessageReconciliationTest {
             retentionExpiresAt = null,
             recordedAt = recordedAt,
             receivedAt = recordedAt,
+            sticker = null,
         )
 }

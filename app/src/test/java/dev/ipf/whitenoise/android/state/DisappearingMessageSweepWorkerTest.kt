@@ -185,6 +185,7 @@ class DisappearingMessageSweepWorkerTest {
             externalSigning = externalSigning,
             signedOut = signedOut,
             running = !signedOut,
+            unlinked = false,
         )
 
     /** Injects account and sweep seams while preserving the worker's real WorkManager entry point. */

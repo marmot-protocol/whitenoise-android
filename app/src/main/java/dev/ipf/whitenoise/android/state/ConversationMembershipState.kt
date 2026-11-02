@@ -9,15 +9,18 @@ import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.GroupProjector
 
 /**
- * Whether the engine's authoritative self-membership says the local account is
- * no longer in the group: [SelfMembershipFfi.REMOVED] (evicted) or
- * [SelfMembershipFfi.LEFT] (voluntary departure). Both are terminal non-member
- * states; [SelfMembershipFfi.MEMBER] is the only membership-preserving value.
+ * Whether the engine's authoritative self-membership says this device no longer
+ * holds the group: [SelfMembershipFfi.REMOVED] (evicted), [SelfMembershipFfi.LEFT]
+ * (voluntary departure) or [SelfMembershipFfi.DEVICE_REMOVED] (this device's leaf
+ * was removed while the account stays in through another of its devices). All
+ * three are terminal for this device's copy, which takes no sends; only
+ * [SelfMembershipFfi.MEMBER] preserves membership. `DEVICE_REMOVED` is not an
+ * eviction, so eviction notices still read [SelfMembershipFfi.REMOVED] alone.
  */
 internal fun SelfMembershipFfi.isNonMember(): Boolean =
     when (this) {
-        SelfMembershipFfi.REMOVED, SelfMembershipFfi.LEFT -> true
-        else -> false
+        SelfMembershipFfi.REMOVED, SelfMembershipFfi.LEFT, SelfMembershipFfi.DEVICE_REMOVED -> true
+        SelfMembershipFfi.MEMBER -> false
     }
 
 /**

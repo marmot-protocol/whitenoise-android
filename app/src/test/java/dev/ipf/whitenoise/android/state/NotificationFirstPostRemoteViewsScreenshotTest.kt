@@ -119,7 +119,7 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
                 context = context,
                 previewText = preview,
                 isDm = isDm,
-                accounts = listOf(AccountSummaryFfi("account-a", "self", true, false, false, true)),
+                accounts = listOf(AccountSummaryFfi("account-a", "self", true, false, false, true, false)),
                 notificationUsersHaveDisplayNames = false,
                 localDisplayName = null,
                 senderPictureUrl = AVATAR_URL.takeIf { cachedAvatar },

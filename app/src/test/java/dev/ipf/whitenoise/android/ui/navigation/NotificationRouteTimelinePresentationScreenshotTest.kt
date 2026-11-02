@@ -793,6 +793,7 @@ abstract class NotificationRouteTimelinePresentationFixture {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                     AccountSummaryFfi(
                         label = TARGET_ACCOUNT,
@@ -801,6 +802,7 @@ abstract class NotificationRouteTimelinePresentationFixture {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ConversationTimelineTestIds.ACCOUNT_REF,
@@ -1106,6 +1108,7 @@ abstract class NotificationRouteTimelinePresentationFixture {
         reactedToPreview = null,
         timestampMs = 1_982L,
         isFromSelf = false,
+        sticker = null,
     )
 
     /** Adds a fixture controller once using ownership identity rather than value equality. */

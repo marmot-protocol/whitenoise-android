@@ -1275,6 +1275,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         externalSigning = false,
         signedOut = false,
         running = true,
+        unlinked = false,
     )
 
     /** Keeps fixture text long enough to surface resize semantics. */

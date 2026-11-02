@@ -137,13 +137,24 @@ class QuarantinedGroupsProjectionIntegrationTest {
             }
         } as MarmotInterface
 
+    /** Builds an app state with the given account active. */
     private fun projectionAppState(account: String) =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext<Context>(),
             draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
             accountIdHexResolver = { ConversationTimelineTestIds.ACCOUNT_ID },
             accounts =
-                listOf(AccountSummaryFfi(account, ConversationTimelineTestIds.ACCOUNT_ID, true, false, false, true)),
+                listOf(
+                    AccountSummaryFfi(
+                        account,
+                        ConversationTimelineTestIds.ACCOUNT_ID,
+                        true,
+                        false,
+                        false,
+                        true,
+                        false,
+                    ),
+                ),
             activeAccountRef = account,
         )
 

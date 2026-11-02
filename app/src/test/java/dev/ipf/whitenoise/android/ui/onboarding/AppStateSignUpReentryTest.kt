@@ -49,7 +49,7 @@ class AppStateSignUpReentryTest {
     @Suppress("LongMethod", "CyclomaticComplexMethod") // Single native callback/re-entry scenario.
     @Test
     fun resumedBootstrapKeepsAcceptedProfileAttemptVisibleUntilExplicitRetry() {
-        val created = AccountSummaryFfi("created", "11".repeat(32), true, false, false, true)
+        val created = AccountSummaryFfi("created", "11".repeat(32), true, false, false, true, false)
         val creations = AtomicInteger()
         val uploads = AtomicInteger()
         val publications = AtomicInteger()
@@ -218,7 +218,7 @@ class AppStateSignUpReentryTest {
         val controller: SignUpController
 
         init {
-            val created = AccountSummaryFfi("created", "11".repeat(32), true, false, false, true)
+            val created = AccountSummaryFfi("created", "11".repeat(32), true, false, false, true, false)
             val native =
                 Proxy.newProxyInstance(
                     MarmotInterface::class.java.classLoader,

@@ -39,6 +39,7 @@ class ConversationBubbleSenderRunTest {
         )
     }
 
+    /** Builds a received timeline message from alice with the given kind and timestamp. */
     private fun timelineMessage(
         id: String,
         kind: ULong,
@@ -66,6 +67,7 @@ class ConversationBubbleSenderRunTest {
                     retentionExpiresAt = null,
                     recordedAt = recordedAt,
                     receivedAt = recordedAt,
+                    sticker = null,
                 ),
             status = MessageStatus.Received,
             timelineOrder = recordedAt,

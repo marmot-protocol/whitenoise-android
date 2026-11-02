@@ -473,6 +473,7 @@ class CanAcceptReactionTest {
         retentionExpiresAt = null,
         recordedAt = recordedAt,
         receivedAt = recordedAt,
+        sticker = null,
     )
 
     private companion object {

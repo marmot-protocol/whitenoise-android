@@ -211,6 +211,7 @@ internal fun supportTestAccount(
                     externalSigning = false,
                     signedOut = false,
                     running = true,
+                    unlinked = false,
                 ),
             ),
         activeAccountRef = label,

@@ -601,6 +601,7 @@ class LocalNotificationPolicyTest {
         reactedToPreview = null,
         timestampMs = 1234,
         isFromSelf = isFromSelf,
+        sticker = null,
     )
 
     private fun user(

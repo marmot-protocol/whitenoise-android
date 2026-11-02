@@ -232,6 +232,7 @@ class TtsSpeakFromHereTest {
             status = MessageStatus.Received,
         )
 
+    /** Builds a received message from alice whose body is its own id. */
     private fun message(id: String): AppMessageRecordFfi =
         AppMessageRecordFfi(
             messageIdHex = id,
@@ -252,5 +253,6 @@ class TtsSpeakFromHereTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
+            sticker = null,
         )
 }

@@ -422,6 +422,7 @@ class ChatFolderEditScreenTest {
             activeAccountRef = ACCOUNT_REF,
         )
 
+    /** Builds the running local-signing active account summary. */
     private fun activeAccount() =
         AccountSummaryFfi(
             label = ACCOUNT_REF,
@@ -430,6 +431,7 @@ class ChatFolderEditScreenTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private class InMemoryDraftPersistence : DraftPersistence {

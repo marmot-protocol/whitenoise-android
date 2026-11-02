@@ -1077,6 +1077,7 @@ class ConversationSendRetryIntegrationTest {
             }
         }
 
+    /** An edit failing after an account switch keeps the newer draft and the editor, with no toast shown. */
     @Test
     @OptIn(ExperimentalCoroutinesApi::class)
     fun lateNativeEditFailureAfterAccountSwitchPreservesTheNewerDraftWithoutFeedback() =
@@ -1089,7 +1090,7 @@ class ConversationSendRetryIntegrationTest {
                 appState(
                     additionalAccounts =
                         listOf(
-                            AccountSummaryFfi("bob", "b".repeat(64), true, false, false, true),
+                            AccountSummaryFfi("bob", "b".repeat(64), true, false, false, true, false),
                         ),
                 )
             val controller =
@@ -3716,6 +3717,7 @@ class ConversationSendRetryIntegrationTest {
         COMMITTED_UNPUBLISHED(MarmotKitException.Publish("signer refused"), listOf("first", "second")),
     }
 
+    /** Builds an app state with the test account active, plus any additional accounts and an optional runtime. */
     private fun appState(
         additionalAccounts: List<AccountSummaryFfi> = emptyList(),
         initialMarmotRuntime: AppMarmotRuntime? = null,
@@ -3732,6 +3734,7 @@ class ConversationSendRetryIntegrationTest {
                     externalSigning = false,
                     signedOut = false,
                     running = true,
+                    unlinked = false,
                 ),
             ) + additionalAccounts,
         activeAccountRef = ACCOUNT_REF,
@@ -3818,6 +3821,7 @@ class ConversationSendRetryIntegrationTest {
         viaWelcomeMessageIdHex = null,
     )
 
+    /** Builds the retry group's chat list row as an active member with a last-message preview. */
     private fun chatListRow() =
         ChatListRowFfi(
             selfMembership = SelfMembershipFfi.MEMBER,
@@ -3852,6 +3856,7 @@ class ConversationSendRetryIntegrationTest {
                     attachmentCount = 0u,
                     groupSystem = null,
                     deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                    sticker = null,
                 ),
             unreadCount = 0uL,
             hasUnread = false,
@@ -3874,6 +3879,7 @@ class ConversationSendRetryIntegrationTest {
             disbandRequest = null,
         )
 
+    /** Builds the confirmed sent timeline record with the given recording time and retention fields. */
     private fun projectedMessage(
         recordedAt: ULong,
         retentionSeconds: ULong?,
@@ -3914,6 +3920,8 @@ class ConversationSendRetryIntegrationTest {
         sourceEpoch = null,
         retentionSeconds = retentionSeconds,
         retentionExpiresAt = retentionExpiresAt,
+        sticker = null,
+        importedFrom = null,
     )
 
     /** Creates the density-independent manual-height record used by send lifecycle assertions. */

@@ -117,6 +117,7 @@ class RetentionOptimisticMessageHandoffTest {
             retentionAtSendSeconds = retentionAtSendSeconds,
         )
 
+    /** Builds a sent text message record with the given id. */
     private fun message(id: String): AppMessageRecordFfi =
         AppMessageRecordFfi(
             messageIdHex = id,
@@ -137,5 +138,6 @@ class RetentionOptimisticMessageHandoffTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
+            sticker = null,
         )
 }

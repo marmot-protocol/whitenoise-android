@@ -257,6 +257,7 @@ class WhiteNoiseAppStateReaderSpeechTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     )
                 },
             activeAccountRef = "account-a",

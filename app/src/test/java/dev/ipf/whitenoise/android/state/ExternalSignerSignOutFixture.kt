@@ -62,6 +62,8 @@ internal abstract class ExternalSignerSignOutFixture {
             keyPackagesDeleted = 1u,
             keyPackageFailures = emptyList(),
             localCleanup = LocalCleanupReportFfi(completed = true, reason = null),
+            groupsLeftToSiblings = 0u,
+            siblingsNotReached = false,
         )
     protected var engineWiped = false
     protected var additionalAccounts: List<AccountSummaryFfi> = emptyList()
@@ -88,6 +90,7 @@ internal abstract class ExternalSignerSignOutFixture {
         externalSigning = true,
         signedOut = signedOut,
         running = running,
+        unlinked = false,
     )
 
     @Suppress("UNCHECKED_CAST")

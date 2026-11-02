@@ -921,6 +921,7 @@ class IncomingAttachmentAutoDownloadTest {
                         retentionExpiresAt = null,
                         recordedAt = System.currentTimeMillis().toULong() / 1_000uL,
                         receivedAt = System.currentTimeMillis().toULong() / 1_000uL,
+                        sticker = null,
                     ),
             ),
         )
@@ -1018,6 +1019,7 @@ class IncomingAttachmentAutoDownloadTest {
         externalSigning = false,
         signedOut = signedOut,
         running = !signedOut,
+        unlinked = false,
     )
 
     /** One target slot with its MDK category and the policy row it should land in. */

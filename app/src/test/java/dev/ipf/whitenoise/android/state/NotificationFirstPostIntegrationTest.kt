@@ -242,6 +242,7 @@ class NotificationFirstPostIntegrationTest {
                                 externalSigning = false,
                                 signedOut = false,
                                 running = true,
+                                unlinked = false,
                             ),
                         ),
                 )
@@ -768,6 +769,8 @@ class NotificationFirstPostIntegrationTest {
             sourceEpoch = null,
             retentionSeconds = null,
             retentionExpiresAt = null,
+            sticker = null,
+            importedFrom = null,
         )
 
     /** Creates one history record used by captionless-media fallback detection. */
@@ -786,6 +789,7 @@ class NotificationFirstPostIntegrationTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
+            sticker = null,
         )
 
     /** Returns a valid Markdown document with no visible content. */

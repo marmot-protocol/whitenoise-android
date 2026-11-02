@@ -104,6 +104,7 @@ class TimelineMarkdownHydrationTest {
             assertEquals(listOf("published", "hydrating", "hydrated"), events)
         }
 
+    /** Builds a sent timeline record from alice with the given id and body. */
     private fun timelineRecord(
         messageIdHex: String,
         plaintext: String,
@@ -143,5 +144,7 @@ class TimelineMarkdownHydrationTest {
             sourceEpoch = null,
             retentionSeconds = null,
             retentionExpiresAt = null,
+            sticker = null,
+            importedFrom = null,
         )
 }

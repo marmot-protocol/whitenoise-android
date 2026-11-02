@@ -162,8 +162,8 @@ class AccountActivationRuntimeFenceTest {
                 context = RuntimeEnvironment.getApplication(),
                 accounts =
                     listOf(
-                        AccountSummaryFfi("self", "11".repeat(32), true, false, false, true),
-                        AccountSummaryFfi("other", "22".repeat(32), true, false, false, true),
+                        AccountSummaryFfi("self", "11".repeat(32), true, false, false, true, false),
+                        AccountSummaryFfi("other", "22".repeat(32), true, false, false, true, false),
                     ),
                 emitStartupNotification = false,
                 onNotificationSettings = { account ->
@@ -201,7 +201,7 @@ class AccountActivationRuntimeFenceTest {
         onPrivacyRuntimeConfig: (() -> Unit)? = null,
     ) = NotificationBootstrapTestFixture(
         context = RuntimeEnvironment.getApplication(),
-        accounts = listOf(AccountSummaryFfi("self", "11".repeat(32), true, false, false, true)),
+        accounts = listOf(AccountSummaryFfi("self", "11".repeat(32), true, false, false, true, false)),
         emitStartupNotification = false,
         onPrivacyRuntimeConfig = onPrivacyRuntimeConfig,
         onNotificationSettings = { accountRef ->

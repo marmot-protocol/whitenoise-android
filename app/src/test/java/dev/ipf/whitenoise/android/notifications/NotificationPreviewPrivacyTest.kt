@@ -492,6 +492,7 @@ class NotificationPreviewPrivacyTest {
         }
     }
 
+    /** Builds a new-message notification update carrying private group and sender names. */
     private fun update() =
         NotificationUpdateFfi(
             notificationKey = "key",
@@ -512,5 +513,6 @@ class NotificationPreviewPrivacyTest {
             reactedToPreview = null,
             timestampMs = 1000L,
             isFromSelf = false,
+            sticker = null,
         )
 }

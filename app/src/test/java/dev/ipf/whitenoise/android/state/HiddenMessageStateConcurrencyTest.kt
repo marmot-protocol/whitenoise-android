@@ -128,6 +128,7 @@ class HiddenMessageStateConcurrencyTest {
             )
         }
 
+    /** Builds an app state with one account, backed by the given preferences. */
     private fun appState(preferences: SharedPreferences) =
         WhiteNoiseAppState(
             context = context,
@@ -142,6 +143,7 @@ class HiddenMessageStateConcurrencyTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,

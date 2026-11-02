@@ -485,6 +485,7 @@ private fun shellAccount() =
         externalSigning = false,
         signedOut = false,
         running = true,
+        unlinked = false,
     )
 
 /** A media-capable local group for the production conversation controller. */

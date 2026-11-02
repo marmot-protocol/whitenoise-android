@@ -62,6 +62,7 @@ private fun initialSeedStatus(deliveryState: ChatListMessageDeliveryStateFfi): M
         ChatListMessageDeliveryStateFfi.FAILED -> null
     }
 
+/** Seeds a first-frame timeline message from a chat-list preview, or returns null when it cannot be rendered. */
 private fun ChatListMessagePreviewFfi.toInitialTimelineMessage(groupIdHex: String): TimelineMessage? {
     val status = initialSeedStatus(deliveryState)
     if (status == null || !isRenderableInitialSeed(groupIdHex)) return null
@@ -80,6 +81,7 @@ private fun ChatListMessagePreviewFfi.toInitialTimelineMessage(groupIdHex: Strin
             retentionExpiresAt = null,
             recordedAt = timelineAt,
             receivedAt = timelineAt,
+            sticker = sticker,
         )
     return TimelineMessage(
         id = "msg:$messageIdHex",

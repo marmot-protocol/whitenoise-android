@@ -672,6 +672,7 @@ class LocalNotificationFormatterTest {
             shortNpub = shortNpub,
         )
 
+    /** Builds a notification update with configurable trigger, sender, preview, reaction and DM or mention flags. */
     private fun update(
         trigger: NotificationTriggerFfi,
         notificationKey: String = "message:account:message",
@@ -705,6 +706,7 @@ class LocalNotificationFormatterTest {
         isFromSelf = isFromSelf,
         reactionEmoji = reactionEmoji,
         reactedToPreview = reactedToPreview,
+        sticker = null,
     )
 
     private fun user(

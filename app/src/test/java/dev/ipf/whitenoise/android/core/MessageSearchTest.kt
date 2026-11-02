@@ -91,6 +91,7 @@ class MessageSearchTest {
         assertEquals(-1, MessageSearch.resolveCursor(emptyList(), pinnedMatchId = "m1"))
     }
 
+    /** Builds an app message record with configurable id, direction, sender, text, kind, tags and time. */
     private fun message(
         id: String = "m",
         direction: String = "received",
@@ -113,6 +114,7 @@ class MessageSearchTest {
         retentionExpiresAt = null,
         recordedAt = at.toULong(),
         receivedAt = at.toULong(),
+        sticker = null,
     )
 
     private fun withDefaultLocale(

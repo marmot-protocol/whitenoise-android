@@ -122,7 +122,7 @@ private class InitialRecoveryFixture(
             context = ApplicationProvider.getApplicationContext(),
             draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
             accountIdHexResolver = { "startup-fixture-id" },
-            accounts = listOf(AccountSummaryFfi(account, "startup-fixture-id", true, false, false, true)),
+            accounts = listOf(AccountSummaryFfi(account, "startup-fixture-id", true, false, false, true, false)),
             activeAccountRef = account,
         ).also { it.liveSubscriptionOverrides.chatList = subscriptions }
     val controller = ChatsController(appState, account, { Long.MAX_VALUE }) { _, _ -> emptyList() }

@@ -118,6 +118,7 @@ internal fun profile(
     lud16 = null,
 )
 
+/** Builds a running, locally signing account summary with the given label and id. */
 internal fun testAccount(
     label: String,
     accountIdHex: String,
@@ -128,6 +129,7 @@ internal fun testAccount(
     externalSigning = false,
     signedOut = false,
     running = true,
+    unlinked = false,
 )
 
 internal fun member(

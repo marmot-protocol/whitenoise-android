@@ -174,5 +174,6 @@ class DisappearingReadAnchorTest {
             retentionExpiresAt = null,
             recordedAt = timelineAt,
             receivedAt = timelineAt,
+            sticker = null,
         )
 }

@@ -118,5 +118,6 @@ class ComposerAcceptedCollapseTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
+            sticker = null,
         )
 }

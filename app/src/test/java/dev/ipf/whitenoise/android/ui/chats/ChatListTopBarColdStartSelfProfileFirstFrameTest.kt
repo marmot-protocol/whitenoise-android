@@ -60,7 +60,7 @@ class ChatListTopBarColdStartSelfProfileFirstFrameTest {
         val fixture =
             NotificationBootstrapTestFixture(
                 context = context,
-                accounts = listOf(AccountSummaryFfi("self", SELF, true, false, false, true)),
+                accounts = listOf(AccountSummaryFfi("self", SELF, true, false, false, true, false)),
                 emitStartupNotification = false,
                 onUserProfile = {
                     localReadStarted.countDown()

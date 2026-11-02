@@ -235,6 +235,7 @@ class ConversationSendFirstFrameTest {
             SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo),
         )
 
+    /** Builds an app state with a single running, locally signing active account. */
     private fun appState() =
         WhiteNoiseAppState(
             context = context,
@@ -249,6 +250,7 @@ class ConversationSendFirstFrameTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,

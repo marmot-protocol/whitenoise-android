@@ -438,6 +438,7 @@ class AccountSwitchFirstFrameTest {
             profileRefreshRequest = {},
         ).also { it.updateQuickAccountSwitching(true) }
 
+    /** Returns the running target account the switch lands on. */
     private fun activeAccount() =
         AccountSummaryFfi(
             label = TARGET_ACCOUNT,
@@ -446,8 +447,10 @@ class AccountSwitchFirstFrameTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
+    /** Builds a running local-signing account summary with the given label and id. */
     private fun account(
         label: String,
         id: String,
@@ -458,6 +461,7 @@ class AccountSwitchFirstFrameTest {
         externalSigning = false,
         signedOut = false,
         running = true,
+        unlinked = false,
     )
 
     private fun profile(

@@ -233,6 +233,7 @@ class TimelineRowTtsReuseBehaviorTest {
             status = MessageStatus.Received,
         )
 
+    /** Builds a received kind-9 plain-text record that text-to-speech can read aloud. */
     private fun speakableRecord(
         messageIdHex: String,
         plaintext: String,
@@ -250,6 +251,7 @@ class TimelineRowTtsReuseBehaviorTest {
         retentionExpiresAt = null,
         recordedAt = 1uL,
         receivedAt = 1uL,
+        sticker = null,
     )
 
     private fun plainTextDocument(text: String) =
@@ -295,6 +297,7 @@ class TimelineRowTtsReuseBehaviorTest {
                 ),
         )
 
+    /** Builds an app state with a single running, locally signing active account. */
     private fun appState() =
         WhiteNoiseAppState(
             context = context,
@@ -309,6 +312,7 @@ class TimelineRowTtsReuseBehaviorTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,

@@ -251,7 +251,18 @@ class ShareConnectGalleryRouteTest {
                 context = context,
                 draftStore = DraftStore.forContext(context),
                 accountIdHexResolver = { null },
-                accounts = listOf(AccountSummaryFfi("gallery-screen", "ab".repeat(32), true, false, false, true)),
+                accounts =
+                    listOf(
+                        AccountSummaryFfi(
+                            "gallery-screen",
+                            "ab".repeat(32),
+                            true,
+                            false,
+                            false,
+                            true,
+                            false,
+                        ),
+                    ),
                 activeAccountRef = "gallery-screen",
                 preferences = context.getSharedPreferences("gallery-route-${UUID.randomUUID()}", Context.MODE_PRIVATE),
                 initialMarmotRuntime = AppMarmotRuntime(rootPath = "test", marmot = native),

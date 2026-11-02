@@ -31,7 +31,7 @@ class PendingSetupStartupReadinessTest {
                     context = RuntimeEnvironment.getApplication(),
                     accounts =
                         listOf(
-                            AccountSummaryFfi(SETUP_TEST_ACCOUNT, SETUP_TEST_ACCOUNT, true, false, false, false),
+                            AccountSummaryFfi(SETUP_TEST_ACCOUNT, SETUP_TEST_ACCOUNT, true, false, false, false, false),
                         ),
                     emitStartupNotification = false,
                     onOnboardingSnapshot = { snapshot.get() },

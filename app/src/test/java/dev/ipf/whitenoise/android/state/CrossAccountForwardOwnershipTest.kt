@@ -138,6 +138,7 @@ class CrossAccountForwardOwnershipTest {
         externalSigning = false,
         signedOut = false,
         running = true,
+        unlinked = false,
     )
 
     /** Builds an app state wired to the scripted engine proxy. */

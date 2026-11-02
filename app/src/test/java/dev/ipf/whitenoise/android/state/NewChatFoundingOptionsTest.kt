@@ -20,6 +20,7 @@ import java.lang.reflect.Proxy
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class NewChatFoundingOptionsTest {
+    /** A direct chat is created with the account's saved disappearing-message default and no description or image. */
     @Test
     fun directChatUsesCapturedAccountDefaultInFoundingOptions() =
         runTest {
@@ -56,7 +57,7 @@ class NewChatFoundingOptionsTest {
                     context = context,
                     draftStore = DraftStore(NewChatFoundingOptionsDraftPersistence),
                     accountIdHexResolver = { null },
-                    accounts = listOf(AccountSummaryFfi("alice", "aa".repeat(32), true, false, false, true)),
+                    accounts = listOf(AccountSummaryFfi("alice", "aa".repeat(32), true, false, false, true, false)),
                     activeAccountRef = "alice",
                     initialMarmotRuntime = runtime,
                     marmotRuntimeFactory = { runtime },
@@ -130,6 +131,7 @@ class NewChatFoundingOptionsTest {
             assertEquals(604_800L, state.defaultDisappearingMessagesSeconds("alice"))
         }
 
+    /** Builds an app state for the given account whose runtime records every group-creation call. */
     private fun recordingState(
         context: Context,
         preferences: android.content.SharedPreferences,
@@ -161,7 +163,7 @@ class NewChatFoundingOptionsTest {
         val runtime = AppMarmotRuntime(rootPath = "test", marmot = marmot)
         val accounts =
             listOf("alice", "bob").mapIndexed { index, label ->
-                AccountSummaryFfi(label, (if (index == 0) "aa" else "bb").repeat(32), true, false, false, true)
+                AccountSummaryFfi(label, (if (index == 0) "aa" else "bb").repeat(32), true, false, false, true, false)
             }
         return WhiteNoiseAppState(
             context = context,

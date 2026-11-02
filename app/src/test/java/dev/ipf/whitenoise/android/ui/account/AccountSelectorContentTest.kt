@@ -165,6 +165,7 @@ class AccountSelectorContentTest {
     /** Maps the fixture account identifier to its visible title. */
     private fun displayName(id: String): String = id.removePrefix("hex-").replaceFirstChar { it.uppercase() }
 
+    /** Builds a running local-signing account summary with a hex id derived from the label. */
     private fun account(label: String): AccountSummaryFfi =
         AccountSummaryFfi(
             label = label,
@@ -173,5 +174,6 @@ class AccountSelectorContentTest {
             signedOut = false,
             running = true,
             externalSigning = false,
+            unlinked = false,
         )
 }

@@ -442,7 +442,7 @@ class PlaybackTransportOwnershipTest {
             context = appContext,
             draftStore = DraftStore(DiscardedDrafts),
             accountIdHexResolver = { null },
-            accounts = listOf(AccountSummaryFfi("personal", "id-a", true, false, false, true)),
+            accounts = listOf(AccountSummaryFfi("personal", "id-a", true, false, false, true, false)),
             activeAccountRef = "personal",
             preferences = context.getSharedPreferences("playback-ownership", Context.MODE_PRIVATE),
         )

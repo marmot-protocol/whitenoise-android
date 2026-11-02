@@ -46,8 +46,8 @@ class QuickAccountSwitchingTopBarNativeTest {
                 context,
                 accounts =
                     listOf(
-                        AccountSummaryFfi("a", "aa".repeat(32), true, false, false, true),
-                        AccountSummaryFfi("b", "bb".repeat(32), true, false, false, true),
+                        AccountSummaryFfi("a", "aa".repeat(32), true, false, false, true, false),
+                        AccountSummaryFfi("b", "bb".repeat(32), true, false, false, true, false),
                     ),
                 emitStartupNotification = false,
                 onDisplayName = { _, accountId -> if (accountId == "bb".repeat(32)) "Bea" else "Alice" },

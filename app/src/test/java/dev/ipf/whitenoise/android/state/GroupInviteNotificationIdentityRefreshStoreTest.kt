@@ -282,5 +282,6 @@ class GroupInviteNotificationIdentityRefreshStoreTest {
         reactedToPreview = null,
         timestampMs = 1L,
         isFromSelf = false,
+        sticker = null,
     )
 }

@@ -318,6 +318,7 @@ class AccountUnreadTest {
             local = false,
         )
 
+    /** Builds a running, locally signing account summary with the given label and id. */
     private fun account(
         label: String,
         accountIdHex: String,
@@ -328,6 +329,7 @@ class AccountUnreadTest {
         externalSigning = false,
         signedOut = false,
         running = true,
+        unlinked = false,
     )
 
     private fun confirmedValue(unreadCount: ULong) =

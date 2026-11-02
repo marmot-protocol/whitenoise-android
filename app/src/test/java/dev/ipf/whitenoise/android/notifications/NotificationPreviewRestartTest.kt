@@ -136,6 +136,7 @@ class NotificationPreviewRestartTest {
         }
     }
 
+    /** Builds a new-message notification update whose names and preview are private text. */
     private fun update() =
         NotificationUpdateFfi(
             notificationKey = "key",
@@ -156,5 +157,6 @@ class NotificationPreviewRestartTest {
             reactedToPreview = null,
             timestampMs = 1000L,
             isFromSelf = false,
+            sticker = null,
         )
 }

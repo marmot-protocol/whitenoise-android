@@ -140,7 +140,7 @@ class NotificationRevocationTest {
         val owner =
             NotificationBootstrapTestFixture(
                 context = app,
-                accounts = listOf(AccountSummaryFfi(ACCOUNT, "a".repeat(64), true, false, false, true)),
+                accounts = listOf(AccountSummaryFfi(ACCOUNT, "a".repeat(64), true, false, false, true, false)),
                 initialNotificationSettings = NotificationSettingsFfi(ACCOUNT, "a".repeat(64), local, push),
                 emitStartupNotification = false,
                 nativePushCapabilityResolver = { NativePushCapability.Available },

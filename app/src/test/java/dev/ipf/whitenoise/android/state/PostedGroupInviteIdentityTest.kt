@@ -64,6 +64,7 @@ class PostedGroupInviteIdentityTest {
         )
     }
 
+    /** Builds a DM invite notification update from Alice with the given trigger. */
     private fun update(trigger: NotificationTriggerFfi) =
         NotificationUpdateFfi(
             notificationKey = "invite:account-a:group-a",
@@ -84,5 +85,6 @@ class PostedGroupInviteIdentityTest {
             reactedToPreview = null,
             timestampMs = 1L,
             isFromSelf = false,
+            sticker = null,
         )
 }

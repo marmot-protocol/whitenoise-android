@@ -33,6 +33,7 @@ class RecordedAtOverrideTest {
         assertSame(record, record.withRecordedAtOverride(null))
     }
 
+    /** Builds a sent message record recorded at the given time. */
     private fun record(recordedAt: ULong): AppMessageRecordFfi =
         AppMessageRecordFfi(
             messageIdHex = "message-1",
@@ -53,5 +54,6 @@ class RecordedAtOverrideTest {
             retentionExpiresAt = null,
             recordedAt = recordedAt,
             receivedAt = recordedAt,
+            sticker = null,
         )
 }

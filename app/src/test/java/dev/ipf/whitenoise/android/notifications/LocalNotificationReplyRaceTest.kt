@@ -794,6 +794,7 @@ class LocalNotificationReplyRaceTest {
 
     private fun conversationKey() = LocalNotificationFormatter.conversationDismissalKey(ACCOUNT, GROUP)
 
+    /** Builds a new-message notification update with the given id, preview and timestamp. */
     private fun messageUpdate(
         messageIdHex: String,
         previewText: String,
@@ -817,6 +818,7 @@ class LocalNotificationReplyRaceTest {
         reactedToPreview = null,
         timestampMs = timestampMs,
         isFromSelf = false,
+        sticker = null,
     )
 
     /** Builds the stable opaque-invite fixture shared by dismissal race tests. */
@@ -840,6 +842,7 @@ class LocalNotificationReplyRaceTest {
             reactedToPreview = null,
             timestampMs = 1_000L,
             isFromSelf = false,
+            sticker = null,
         )
 
     /** Builds a keyed MessagingStyle card so rename races can identify the sender without text matching. */

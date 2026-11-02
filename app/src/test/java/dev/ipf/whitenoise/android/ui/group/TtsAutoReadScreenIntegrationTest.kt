@@ -134,6 +134,7 @@ class TtsAutoReadScreenIntegrationTest {
             activeAccountRef = activeAccountRef,
         )
 
+    /** Builds a running local-signing account summary with the given label and id. */
     private fun accountSummary(
         label: String,
         accountIdHex: String,
@@ -144,6 +145,7 @@ class TtsAutoReadScreenIntegrationTest {
         externalSigning = false,
         signedOut = false,
         running = true,
+        unlinked = false,
     )
 
     private object InMemoryDraftPersistence : DraftPersistence {

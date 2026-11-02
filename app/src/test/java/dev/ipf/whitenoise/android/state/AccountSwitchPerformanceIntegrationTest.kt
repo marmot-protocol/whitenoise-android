@@ -177,6 +177,7 @@ class AccountSwitchPerformanceIntegrationTest {
             }
         }
 
+    /** Builds a running local-signing account summary with the given label and id. */
     private fun account(
         label: String,
         id: String,
@@ -187,6 +188,7 @@ class AccountSwitchPerformanceIntegrationTest {
         externalSigning = false,
         signedOut = false,
         running = true,
+        unlinked = false,
     )
 
     private fun namedRow(index: Int) =

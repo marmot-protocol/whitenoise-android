@@ -143,6 +143,7 @@ class InboundShareAccountOwnershipTest {
         )
     }
 
+    /** Builds an account summary that is running unless marked signed out. */
     private fun account(
         label: String,
         accountIdHex: String,
@@ -154,6 +155,7 @@ class InboundShareAccountOwnershipTest {
         externalSigning = false,
         signedOut = signedOut,
         running = !signedOut,
+        unlinked = false,
     )
 
     private class InMemoryDraftPersistence : DraftPersistence {

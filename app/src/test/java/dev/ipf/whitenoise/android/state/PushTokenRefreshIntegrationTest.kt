@@ -109,8 +109,8 @@ class PushTokenRefreshIntegrationTest {
                     context = context,
                     accounts =
                         listOf(
-                            AccountSummaryFfi("account-a", "id-a", true, false, false, true),
-                            AccountSummaryFfi("account-b", "id-b", true, false, false, true),
+                            AccountSummaryFfi("account-a", "id-a", true, false, false, true, false),
+                            AccountSummaryFfi("account-b", "id-b", true, false, false, true, false),
                         ),
                     initialNotificationSettings = NotificationSettingsFfi("account-a", "id-a", true, true),
                     emitStartupNotification = false,
@@ -574,12 +574,13 @@ class PushTokenRefreshIntegrationTest {
         }
     }
 
+    /** Builds a notification bootstrap fixture with native push availability and the given FCM token reader. */
     private fun fixture(
         available: Boolean = true,
         reader: suspend () -> String?,
     ) = NotificationBootstrapTestFixture(
         context = context,
-        accounts = listOf(AccountSummaryFfi("account-a", "account-id", true, false, false, true)),
+        accounts = listOf(AccountSummaryFfi("account-a", "account-id", true, false, false, true, false)),
         initialNotificationSettings = NotificationSettingsFfi("account-a", "account-id", true, true),
         nativePushFallbackPlatform = RecordingNativePushFallbackPlatform(context),
         pushServerConfigProvider = { PushServerConfig("0".repeat(64), null) },

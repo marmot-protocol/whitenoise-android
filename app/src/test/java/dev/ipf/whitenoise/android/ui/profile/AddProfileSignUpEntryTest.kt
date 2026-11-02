@@ -57,9 +57,9 @@ import java.util.concurrent.atomic.AtomicInteger
 class AddProfileSignUpEntryTest {
     @get:Rule val composeRule = createAndroidComposeRule<ComponentActivity>()
     private val context = ApplicationProvider.getApplicationContext<Context>()
-    private val alice = AccountSummaryFfi("alice", "11".repeat(32), true, false, false, true)
-    private val carol = AccountSummaryFfi("carol", "33".repeat(32), true, false, false, true)
-    private val bob = AccountSummaryFfi("bob", "22".repeat(32), true, false, false, true)
+    private val alice = AccountSummaryFfi("alice", "11".repeat(32), true, false, false, true, false)
+    private val carol = AccountSummaryFfi("carol", "33".repeat(32), true, false, false, true, false)
+    private val bob = AccountSummaryFfi("bob", "22".repeat(32), true, false, false, true, false)
     private val creates = AtomicInteger()
     private val publishes = AtomicInteger()
     private val createRelease = CountDownLatch(1)

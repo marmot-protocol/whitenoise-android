@@ -359,6 +359,7 @@ class GroupStateMemberRefreshGateTest {
             assertEquals(GroupRosterLoadState.INCONSISTENT, controller.memberRosterState)
         }
 
+    /** A transition from member to removed or left is detected as self-removal, while other updates are not. */
     @Test
     fun selfRemovalTransitionIsDetectedImmediately() {
         val previous = group(selfMembership = SelfMembershipFfi.MEMBER)
@@ -371,6 +372,17 @@ class GroupStateMemberRefreshGateTest {
         assertFalse(groupStateUpdateRemovesSelf(previous, previous.copy(name = "Renamed")))
     }
 
+    /** A removed device copy keeps the account in the roster, since another of its devices stays a member. */
+    @Test
+    fun deviceRemovalIsNotTreatedAsTheAccountLeavingTheRoster() {
+        val previous = group(selfMembership = SelfMembershipFfi.MEMBER)
+        val deviceRemoved = previous.copy(selfMembership = SelfMembershipFfi.DEVICE_REMOVED)
+
+        assertTrue(deviceRemoved.selfMembership.isNonMember())
+        assertFalse(groupStateUpdateRemovesSelf(previous, deviceRemoved))
+    }
+
+    /** Builds an app state with alice as the single active account. */
     private fun appState() =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext(),
@@ -385,6 +397,7 @@ class GroupStateMemberRefreshGateTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = "alice",

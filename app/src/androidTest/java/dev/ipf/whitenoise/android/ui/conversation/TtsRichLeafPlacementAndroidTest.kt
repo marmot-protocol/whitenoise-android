@@ -327,6 +327,7 @@ class TtsRichLeafPlacementAndroidTest {
     private fun timelineMessage(record: AppMessageRecordFfi) =
         TimelineMessage(id = "msg:${record.messageIdHex}", record = record, status = MessageStatus.Received)
 
+    /** Builds a received message record with the given plaintext and markdown document. */
     private fun speakableRecord(
         plaintext: String,
         document: MarkdownDocumentFfi,
@@ -344,8 +345,10 @@ class TtsRichLeafPlacementAndroidTest {
         retentionExpiresAt = null,
         recordedAt = 1uL,
         receivedAt = 1uL,
+        sticker = null,
     )
 
+    /** Builds an app state with one running local-signing account. */
     private fun appState() =
         WhiteNoiseAppState(
             context = context,
@@ -360,6 +363,7 @@ class TtsRichLeafPlacementAndroidTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,

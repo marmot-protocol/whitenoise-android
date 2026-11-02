@@ -67,6 +67,8 @@ internal fun inviteFailureDetail(
             } ?: AppText.Resource(R.string.error_invalid_key_package)
         is MarmotKitException.InvalidIdentity -> AppText.Resource(R.string.error_invalid_identity_reference)
         is MarmotKitException.GroupHydrationPending -> AppText.Resource(R.string.toast_chat_still_loading)
+        // A full disk refuses the change before anything is written; freeing space makes Retry worthwhile.
+        is MarmotKitException.StorageFull -> AppText.Resource(R.string.error_storage_full)
         else -> AppText.Resource(fallbackResource)
     }
 

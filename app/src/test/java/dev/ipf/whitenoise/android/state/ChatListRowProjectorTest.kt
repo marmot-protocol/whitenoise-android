@@ -195,6 +195,7 @@ class ChatListRowProjectorTest {
             attachmentCount = 0u,
             groupSystem = null,
             deliveryState = ChatListMessageDeliveryStateFfi.DELIVERED,
+            sticker = null,
         )
 
     /** Builds a stable group row with the supplied last-message preview and no unread or archive state. */
