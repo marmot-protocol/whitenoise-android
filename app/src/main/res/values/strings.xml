@@ -2687,6 +2687,8 @@
     <string name="notification_tone_added">Added. Open a category below, then Sound to choose a tone. Some devices list these under My Sounds.</string>
     <string name="notification_tone_add_failed">Could not add the sounds. Try again or keep your current Android sound.</string>
     <string name="notification_tone_scope">Previewing or adding sounds does not change your alerts. Choose a sound in Android for each category, conversation or person. Conversations and people explicitly assigned their own sound keep that sound. New message categories use Ding; silent and customized categories stay unchanged. Previews use notification volume and respect Silent mode and Do Not Disturb.</string>
+    <string name="notification_quiet_during_spoken_audio">Quiet during podcasts</string>
+    <string name="notification_quiet_during_spoken_audio_detail">Messages arrive without sound or vibration while another app plays a podcast or audiobook, so it keeps playing. Mentions still alert.</string>
     <string name="notification_tone_android">Android sound</string>
     <string name="notification_tone_silent">Silent</string>
     <string name="notification_tone_off">Off</string>

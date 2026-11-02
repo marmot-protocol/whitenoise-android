@@ -20,7 +20,8 @@ internal enum class MessageAlertChannelKind(
  * White Noise plays no alert sound of its own: the OS notification service plays whatever the selected
  * channel is configured to, which is why [ALERT_POLICY] is always `os_channel`. The line carries only the
  * route, the channel's role and its user-owned audio configuration, whether this write may alert, and
- * whether other media was playing — no content, account, chat or channel id, and no media metadata.
+ * whether other media, and speech in particular, was playing — no content, account, chat or channel id,
+ * and no media metadata.
  */
 internal data class MessageAlertDiagnostic(
     val route: NotificationChannelSpec,
@@ -30,13 +31,15 @@ internal data class MessageAlertDiagnostic(
     val channelSound: Boolean?,
     val channelVibration: Boolean?,
     val otherMediaActive: Boolean?,
+    val spokenAudioPlaying: Boolean? = null,
 ) {
     /** Renders the fixed-vocabulary log line; unknown values print as `unknown`. */
     fun line(): String =
         "alert_path route=${route.id} channel=${channelKind.label} policy=$ALERT_POLICY " +
             "silent_write=$silentWrite importance=${channelImportance ?: UNKNOWN} " +
             "channel_sound=${onOff(channelSound)} channel_vibration=${onOff(channelVibration)} " +
-            "other_media=${otherMediaActive?.let { if (it) "active" else "idle" } ?: UNKNOWN}"
+            "other_media=${otherMediaActive?.let { if (it) "active" else "idle" } ?: UNKNOWN} " +
+            "spoken_audio=${spokenAudioPlaying?.let { if (it) "playing" else "idle" } ?: UNKNOWN}"
 
     companion object {
         /** The only alert policy this build has: the OS channel owns sound, vibration and focus. */
@@ -81,8 +84,9 @@ internal fun messageAlertDiagnostic(
         runCatching {
             context.getSystemService(NotificationManager::class.java)?.getNotificationChannel(channelId)
         }.getOrNull()
-    val mediaActive =
-        runCatching { context.getSystemService(AudioManager::class.java)?.isMusicActive }.getOrNull()
+    val audio = runCatching { context.getSystemService(AudioManager::class.java) }.getOrNull()
+    val mediaActive = runCatching { audio?.isMusicActive }.getOrNull()
+    val speech = runCatching { audio?.activePlaybackConfigurations?.any(::isPlayingSpeech) }.getOrNull()
     return MessageAlertDiagnostic(
         route = route,
         channelKind = messageAlertChannelKind(route, channelId, existingCardChannel),
@@ -91,5 +95,6 @@ internal fun messageAlertDiagnostic(
         channelSound = channel?.let { it.sound != null },
         channelVibration = channel?.shouldVibrate(),
         otherMediaActive = mediaActive,
+        spokenAudioPlaying = speech?.let { mediaActive == true && it },
     )
 }

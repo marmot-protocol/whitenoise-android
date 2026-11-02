@@ -33,6 +33,7 @@ class LocalNotificationPresenterAlertBudgetTest {
     private var now = 1_700_000_000_000L
     private var elapsed = 0L
     private val catchUpWindow = NotificationCatchUpWindow(clock = { elapsed })
+    private var speaking = false
     private lateinit var presenter: LocalNotificationPresenter
 
     /** Grants the permission, pins the clock and records every write instead of consulting the shade. */
@@ -46,6 +47,7 @@ class LocalNotificationPresenterAlertBudgetTest {
                 groupReconciliation = {},
                 nowMillis = { now },
                 alertBudget = NotificationAlertBudget(catchUpWindow),
+                spokenAudioPlaying = { speaking },
                 notificationPoster = { notificationManager, tag, id, notification ->
                     if (rejectNextWrite) {
                         rejectNextWrite = false
@@ -146,5 +148,30 @@ class LocalNotificationPresenterAlertBudgetTest {
 
             assertEquals(1, posted.size)
             assertFalse(posted.single().isOnlyAlertOnce())
+        }
+
+    /** Over speech a message card is written silently and a mention rings; once speech stops, cards ring. */
+    @Test
+    fun spokenAudioWritesMessagesSilentlyButMentionsRing() =
+        runBlocking {
+            speaking = true
+            assertTrue(
+                presenter.show(alertBudgetUpdate(messageIdHex = "during", timestampMs = now), shortNpub = { it }),
+            )
+            now += NOTIFICATION_ALERT_BURST_WINDOW_MS
+            assertTrue(
+                presenter.show(
+                    alertBudgetUpdate(messageIdHex = "mention", timestampMs = now, isMention = true),
+                    shortNpub = { it },
+                ),
+            )
+            speaking = false
+            now += NOTIFICATION_ALERT_BURST_WINDOW_MS
+            assertTrue(
+                presenter.show(alertBudgetUpdate(messageIdHex = "after", timestampMs = now), shortNpub = { it }),
+            )
+
+            assertEquals(3, posted.size)
+            assertEquals(listOf(true, false, false), posted.map { it.isOnlyAlertOnce() })
         }
 }

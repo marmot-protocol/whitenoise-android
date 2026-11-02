@@ -1,0 +1,52 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SpokenAudioAlertControl.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "SpokenAudioAlertControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SpokenAudioAlertControl.kt",
+        "anchor": "fun SpokenAudioAlertControl(",
+        "test_ids": [
+          "NTF-046"
+        ]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "SpokenAudioAlertControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SpokenAudioAlertControl.kt",
+        "anchor": "fun SpokenAudioAlertControl(",
+        "test_ids": [
+          "NTF-046"
+        ]
+      },
+      {
+        "surface": "SpokenAudioAlertSwitch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SpokenAudioAlertControl.kt",
+        "anchor": "fun SpokenAudioAlertSwitch(",
+        "test_ids": [
+          "NTF-046"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:notification_quiet_during_spoken_audio",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SpokenAudioAlertControl.kt",
+        "anchor": "R.string.notification_quiet_during_spoken_audio",
+        "test_ids": [
+          "NTF-046"
+        ]
+      },
+      {
+        "surface": "string:notification_quiet_during_spoken_audio_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SpokenAudioAlertControl.kt",
+        "anchor": "R.string.notification_quiet_during_spoken_audio_detail",
+        "test_ids": [
+          "NTF-046"
+        ]
+      }
+    ]
+  }
+}

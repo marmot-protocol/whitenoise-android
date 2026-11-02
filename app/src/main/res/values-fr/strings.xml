@@ -2520,6 +2520,8 @@
     <string name="notification_tone_added">Ajoutés. Ouvrez une catégorie ci-dessous, puis Son pour choisir un son. Certains appareils les affichent sous Mes sons.</string>
     <string name="notification_tone_add_failed">Impossible d’ajouter les sons. Réessayez ou conservez votre son Android actuel.</string>
     <string name="notification_tone_scope">Écouter ou ajouter des sons ne modifie pas vos alertes. Choisissez un son dans Android pour chaque catégorie, conversation ou personne. Les conversations et les personnes auxquelles un son propre a été explicitement attribué conservent ce son. Les nouvelles catégories de messages utilisent Ding ; les catégories silencieuses ou personnalisées restent inchangées. Les aperçus utilisent le volume des notifications et respectent le mode silencieux et Ne pas déranger.</string>
+    <string name="notification_quiet_during_spoken_audio">Discret pendant les podcasts</string>
+    <string name="notification_quiet_during_spoken_audio_detail">Les messages arrivent sans son ni vibration pendant qu\'une autre app lit un podcast ou un livre audio, pour que la lecture continue. Les mentions vous alertent toujours.</string>
     <string name="notification_tone_android">Son Android</string>
     <string name="notification_tone_silent">Silencieux</string>
     <string name="notification_tone_off">Désactivé</string>

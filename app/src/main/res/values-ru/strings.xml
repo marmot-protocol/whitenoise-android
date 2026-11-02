@@ -2592,6 +2592,8 @@
     <string name="notification_tone_added">Добавлено. Откройте категорию ниже, затем «Звук», чтобы выбрать мелодию. На некоторых устройствах они находятся в разделе «Мои звуки».</string>
     <string name="notification_tone_add_failed">Не удалось добавить звуки. Попробуйте ещё раз или сохраните текущий звук Android.</string>
     <string name="notification_tone_scope">Прослушивание и добавление звуков не меняет ваши оповещения. Выберите звук в Android для каждой категории, беседы или человека. Беседы и люди с явно назначенным собственным звуком сохраняют этот звук. Новые категории сообщений используют Ding; беззвучные и настроенные категории не изменяются. При прослушивании используется громкость уведомлений с учётом беззвучного режима и режима «Не беспокоить».</string>
+    <string name="notification_quiet_during_spoken_audio">Тихо во время подкастов</string>
+    <string name="notification_quiet_during_spoken_audio_detail">Сообщения приходят без звука и вибрации, пока другое приложение воспроизводит подкаст или аудиокнигу, чтобы воспроизведение не прерывалось. Упоминания по-прежнему оповещают.</string>
     <string name="notification_tone_android">Звук Android</string>
     <string name="notification_tone_silent">Без звука</string>
     <string name="notification_tone_off">Выключено</string>
