@@ -18,8 +18,10 @@ import dev.ipf.whitenoise.android.state.PlannedCollectionItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentCollections
 import dev.ipf.whitenoise.android.state.cancelUnaccepted
+import dev.ipf.whitenoise.android.state.claimCollectionResume
 import dev.ipf.whitenoise.android.state.collectionDocumentIds
 import dev.ipf.whitenoise.android.state.planAttachmentChunks
+import dev.ipf.whitenoise.android.state.releaseCollectionResume
 import dev.ipf.whitenoise.android.state.replanned
 import dev.ipf.whitenoise.android.state.resumedWithout
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
@@ -239,7 +241,7 @@ internal fun ConversationMediaSender.resumeCollection(operationId: String) {
     val registry = appState.attachmentCollections
     val paused = registry.operations.value[operationId]?.takeIf { it.paused } ?: return
     // Claimed before the first suspension, so a second tap cannot start a second runner for the same chunks.
-    if (!registry.claimResume(operationId)) return
+    if (!claimCollectionResume(operationId)) return
     val sessionEpoch = appState.mediaUploadSessionEpoch()
     val original = this
     appState.launchMutation {
@@ -267,12 +269,17 @@ internal fun ConversationMediaSender.resumeCollection(operationId: String) {
                     }
                 }
             } finally {
-                registry.releaseResume(operationId)
+                releaseCollectionResume(operationId)
             }
         val resumed = updated ?: return@launchMutation
-        if (skipped > 0) appState.presentSkippedAttachments(skipped, R.string.attachment_collection_reselect)
+        val sourceAccount = appState.accounts.firstOrNull { it.label == resumed.accountRef }?.accountIdHex
         val lease =
-            acquireStagedSources(context, resumed.items.map { Uri.parse(it.uri) }, null).getOrNull()
+            acquireStagedSources(context, resumed.items.map { Uri.parse(it.uri) }, sourceAccount).getOrElse {
+                // Unleased private sources could be cleaned up mid-read, so the operation waits paused instead.
+                registry.update(operationId) { op -> op.copy(paused = true, updatedAtMs = registry.now()) }
+                return@launchMutation appState.present(R.string.share_import_storage)
+            }
+        if (skipped > 0) appState.presentSkippedAttachments(skipped, R.string.attachment_collection_reselect)
         val run = CollectionRun(operationId, resumed.accountRef, resumed.groupIdHex, sessionEpoch, caption = null)
         AttachmentCollectionSender {
             latestCollectionSender(resumed.accountRef, resumed.groupIdHex) ?: original

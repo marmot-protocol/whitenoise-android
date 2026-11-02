@@ -196,4 +196,30 @@ class AttachmentCollectionPlanTest {
         assertEquals(CollectionChunkState.ACCEPTED, applied.chunks[0].state)
         assertEquals(changed.chunks[1], applied.chunks[1])
     }
+
+    /** An item skipped while its chunk was prepared stays skipped when the rest of that chunk is accepted. */
+    @Test
+    fun acceptanceLeavesSkippedItemsSkipped() {
+        val planned = media(3, 10L)
+        val base =
+            AttachmentCollectionOperation(
+                id = "op",
+                accountRef = "a",
+                groupIdHex = "g",
+                items = planned.map { CollectionItem(it.id, "content://m/${it.id}", it.kind) },
+                chunks = planAttachmentChunks("op", planned),
+                createdAtMs = 0L,
+                updatedAtMs = 0L,
+            )
+        val chunk = base.chunks.single()
+        val accepted =
+            base
+                .skipItems(setOf("m1"), 1L)
+                .withChunkState(chunk.id, CollectionChunkState.ACCEPTED, CollectionItemState.PUBLISHED, 2L)
+        assertEquals(
+            listOf(CollectionItemState.PUBLISHED, CollectionItemState.SKIPPED, CollectionItemState.PUBLISHED),
+            accepted.items.map { it.state },
+        )
+        assertEquals(2, accepted.published)
+    }
 }

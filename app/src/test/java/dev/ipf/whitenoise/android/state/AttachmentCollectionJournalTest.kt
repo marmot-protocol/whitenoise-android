@@ -129,21 +129,38 @@ class AttachmentCollectionJournalTest {
             it.withChunkState(it.chunks[0].id, CollectionChunkState.ACCEPTED, CollectionItemState.PUBLISHED, now)
         }
         assertNull(registry.operations.value[operation.id])
+        awaitAttachmentCollectionJournal()
         assertTrue(folder.root.walkTopDown().none { it.isFile })
         val second = operation(id = "second")
         registry.start(second)
         registry.discard(second.id)
+        awaitAttachmentCollectionJournal()
         assertTrue(folder.root.walkTopDown().none { it.isFile })
     }
 
     /** A second Resume of the same operation is refused until the first one ends its claim. */
     @Test
     fun resumeClaimAdmitsOneResumeAtATime() {
+        assertTrue(claimCollectionResume("claim-op"))
+        assertFalse(claimCollectionResume("claim-op"))
+        assertTrue(claimCollectionResume("claim-other"))
+        releaseCollectionResume("claim-op")
+        assertTrue(claimCollectionResume("claim-op"))
+        releaseCollectionResume("claim-op")
+        releaseCollectionResume("claim-other")
+    }
+
+    /** A write queued before a discard can never land after it, so a discarded record stays deleted. */
+    @Test
+    fun discardAfterAnUpdateLeavesNoRecord() {
         val registry = AttachmentCollectionRegistry(journal(), clock = { now })
-        assertTrue(registry.claimResume("op"))
-        assertFalse(registry.claimResume("op"))
-        assertTrue(registry.claimResume("other"))
-        registry.releaseResume("op")
-        assertTrue(registry.claimResume("op"))
+        val operation = operation(count = 3)
+        assertTrue(registry.start(operation))
+        repeat(20) { round ->
+            registry.update(operation.id) { it.copy(updatedAtMs = round.toLong()) }
+        }
+        registry.discard(operation.id)
+        awaitAttachmentCollectionJournal()
+        assertTrue(folder.root.walkTopDown().none { it.isFile })
     }
 }

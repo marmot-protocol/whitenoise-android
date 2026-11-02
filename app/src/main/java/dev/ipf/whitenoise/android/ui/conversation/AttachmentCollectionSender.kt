@@ -199,12 +199,7 @@ internal class AttachmentCollectionSender(
             }
             return
         }
-        val recorded =
-            persist(run, durable = true) { op, now ->
-                op
-                    .withChunkToken(chunk.id, queued.tempId, now)
-                    .withChunkState(chunk.id, CollectionChunkState.UPLOADING, CollectionItemState.UPLOADING, now)
-            }
+        val recorded = registry.recordChunkToken(run.operationId, chunk.id, queued.tempId)
         // A cancel, pause or discard that landed while the send was being seeded leaves the chunk without this
         // token, so the send is withdrawn before any upload, as is one whose token the journal could not hold.
         val owned = recorded?.chunks?.firstOrNull { it.id == chunk.id }
@@ -246,27 +241,41 @@ internal class AttachmentCollectionSender(
         var reason: Int? = null
         var inMemoryBytes = 0L
         val staged = ConcurrentLinkedQueue<StagedUploadSource>()
-        chunk.itemIds.mapNotNull { id -> operation.items.firstOrNull { it.id == id } }.forEach { item ->
-            val uri = Uri.parse(item.uri)
-            val media = item.kind == CollectionItemKind.MEDIA
-            val prepared =
-                sender.prepareStagedAttachments(
-                    imageSlots = if (media) listOf(PendingMediaSlot(item.id, uri)) else emptyList(),
-                    documentUris = if (media) emptyList() else listOf(uri),
-                    preparedImageAttachments = listOfNotNull(run.preparedImage(item.id)?.let { item.id to it }).toMap(),
-                    preparedDocumentAttachments = listOfNotNull(run.preparedDocument(uri)?.let { uri to it }).toMap(),
-                    allowFileBacked = true,
-                    staging = FileBackedSendStaging { staged += it },
-                )
-            val attachment = (prepared.images + prepared.documents.attachments).singleOrNull()
-            val bytes = attachment?.inMemoryBytes?.size?.toLong() ?: 0L
-            if (attachment == null || inMemoryBytes + bytes > ConversationController.MEDIA_RETAINED_MAX_BYTES) {
-                skipped += item.id
-                reason = reason ?: prepared.refusalMessage(attachment != null)
-            } else {
-                inMemoryBytes += bytes
-                if (media) images += attachment else documents += attachment
+        // An item already skipped stays in its chunk's membership but is never read or sent again.
+        val pending =
+            chunk.itemIds.mapNotNull { id -> operation.items.firstOrNull { it.id == id } }.filterNot {
+                it.state.isSettled
             }
+        var completed = false
+        try {
+            pending.forEach { item ->
+                val uri = Uri.parse(item.uri)
+                val media = item.kind == CollectionItemKind.MEDIA
+                val prepared =
+                    sender.prepareStagedAttachments(
+                        imageSlots = if (media) listOf(PendingMediaSlot(item.id, uri)) else emptyList(),
+                        documentUris = if (media) emptyList() else listOf(uri),
+                        preparedImageAttachments =
+                            listOfNotNull(run.preparedImage(item.id)?.let { item.id to it }).toMap(),
+                        preparedDocumentAttachments =
+                            listOfNotNull(run.preparedDocument(uri)?.let { uri to it }).toMap(),
+                        allowFileBacked = true,
+                        staging = FileBackedSendStaging { staged += it },
+                    )
+                val attachment = (prepared.images + prepared.documents.attachments).singleOrNull()
+                val bytes = attachment?.inMemoryBytes?.size?.toLong() ?: 0L
+                if (attachment == null || inMemoryBytes + bytes > ConversationController.MEDIA_RETAINED_MAX_BYTES) {
+                    skipped += item.id
+                    reason = reason ?: prepared.refusalMessage(attachment != null)
+                } else {
+                    inMemoryBytes += bytes
+                    if (media) images += attachment else documents += attachment
+                }
+            }
+            completed = true
+        } finally {
+            // Copies made before a failure or cancellation have no owner yet, so they are released here.
+            if (!completed) withContext(NonCancellable) { releaseUnadoptedStagedSources(staged.toList(), emptySet()) }
         }
         return PreparedChunk(images, addMissingThumbhashes(documents), skipped, reason, staged.toList())
     }
@@ -366,18 +375,13 @@ internal class AttachmentCollectionSender(
             appState.mediaUploadSessionEpoch(),
         )
 
-    /**
-     * Applies [transform] with the journal write off the main thread. When [durable], null means the result was
-     * not recorded and not applied, so the caller must not act on it.
-     */
-    private suspend fun persist(
+    /** Applies [transform] to the run's operation; its journal write is queued off the main thread. */
+    private fun persist(
         run: CollectionRun,
-        durable: Boolean = false,
         transform: (AttachmentCollectionOperation, Long) -> AttachmentCollectionOperation,
-    ): AttachmentCollectionOperation? =
-        withContext(Dispatchers.IO) {
-            registry.update(run.operationId, durable) { transform(it, registry.now()) }
-        }
+    ) {
+        registry.update(run.operationId) { transform(it, registry.now()) }
+    }
 }
 
 /**
@@ -402,6 +406,19 @@ private suspend fun dev.ipf.whitenoise.android.state.WhiteNoiseAppState.withdraw
     }
     present(R.string.share_import_storage)
 }
+
+/** Records [token] on [chunkId] and moves it to uploading, waiting until the journal holds both. */
+private suspend fun AttachmentCollectionRegistry.recordChunkToken(
+    operationId: String,
+    chunkId: String,
+    token: String,
+): AttachmentCollectionOperation? =
+    updateDurably(operationId) { op ->
+        val now = now()
+        op
+            .withChunkToken(chunkId, token, now)
+            .withChunkState(chunkId, CollectionChunkState.UPLOADING, CollectionItemState.UPLOADING, now)
+    }
 
 /** Whether [chunkId] may still be queued: its operation is live, not cancelled or paused, and still on it. */
 private fun AttachmentCollectionRegistry.stillPreparing(

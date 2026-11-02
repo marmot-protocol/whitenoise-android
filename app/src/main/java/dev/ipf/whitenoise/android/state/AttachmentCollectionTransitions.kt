@@ -3,7 +3,8 @@ package dev.ipf.whitenoise.android.state
 /**
  * Moves one chunk and its unsettled items to [chunkState] and [itemState]. A settled chunk keeps its state,
  * except that acceptance always wins: MDK may accept a chunk whose cancellation came too late, and that chunk
- * is sent, not cancelled. Published items therefore never move again and progress never runs backwards.
+ * is sent, not cancelled. An item skipped during preparation was never part of the sent message, so even
+ * acceptance leaves it skipped. Published items never move again and progress never runs backwards.
  */
 internal fun AttachmentCollectionOperation.withChunkState(
     chunkId: String,
@@ -22,7 +23,8 @@ internal fun AttachmentCollectionOperation.withChunkState(
         chunks = chunks.map { if (it.id == chunkId) it.copy(state = chunkState) else it },
         items =
             items.map { item ->
-                val movable = item.state != CollectionItemState.PUBLISHED && (accepting || !item.state.isSettled)
+                val final = item.state == CollectionItemState.PUBLISHED || item.state == CollectionItemState.SKIPPED
+                val movable = !final && (accepting || !item.state.isSettled)
                 if (item.id in ids && movable) item.copy(state = itemState) else item
             },
         updatedAtMs = nowMs,

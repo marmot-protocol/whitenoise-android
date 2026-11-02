@@ -111,6 +111,7 @@ class AttachmentCollectionOperationLifecycleIntegrationTest {
         val journalFiles: List<File>
             get() =
                 File(state.appContext.noBackupFilesDir, "attachment_collections")
+                    .also { awaitAttachmentCollectionJournal() }
                     .walkTopDown()
                     .filter { it.isFile }
                     .toList()

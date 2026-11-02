@@ -20,6 +20,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -42,6 +43,8 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.attachmentCollections
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 private val ITEM_LIST_MAX_HEIGHT = 240.dp
 private val SHOW_ITEMS = R.string.attachment_collection_show_items
@@ -77,14 +80,21 @@ internal fun rememberAttachmentCollectionPanels(
             appState.restoreCollectionOperations(account, groupIdHex, readable = { canReadCollectionUri(context, it) })
         }
     }
-    val operations by appState.attachmentCollections.operations.collectAsState()
-    val shown =
-        operations.values
+    // The caller only learns whether a panel exists, so a progress change recomposes just the panels.
+    val operations = appState.attachmentCollections.operations
+    val visible = { all: Map<String, AttachmentCollectionOperation> ->
+        all.values
             .filter { it.accountRef == account && it.groupIdHex == groupIdHex && it.needsPanel() }
             .sortedBy { it.createdAtMs }
-    if (shown.isEmpty()) return null
+    }
+    val anyShown by
+        remember(operations, account, groupIdHex) {
+            operations.map { visible(it).isNotEmpty() }.distinctUntilChanged()
+        }.collectAsState(initial = visible(operations.value).isNotEmpty())
+    if (!anyShown) return null
     return {
-        shown.forEach { operation ->
+        val current by operations.collectAsState()
+        visible(current).forEach { operation ->
             AttachmentCollectionProgress(
                 operation = operation,
                 actions =
