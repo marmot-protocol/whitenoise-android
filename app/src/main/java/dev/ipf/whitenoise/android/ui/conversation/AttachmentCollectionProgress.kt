@@ -87,10 +87,11 @@ internal fun rememberAttachmentCollectionPanels(
             .filter { it.accountRef == account && it.groupIdHex == groupIdHex && it.needsPanel() }
             .sortedBy { it.createdAtMs }
     }
-    val anyShown by
+    val presence =
         remember(operations, account, groupIdHex) {
-            operations.map { visible(it).isNotEmpty() }.distinctUntilChanged()
-        }.collectAsState(initial = visible(operations.value).isNotEmpty())
+            operations.map { visible(it).isNotEmpty() }.distinctUntilChanged() to visible(operations.value).isNotEmpty()
+        }
+    val anyShown by presence.first.collectAsState(initial = presence.second)
     if (!anyShown) return null
     return {
         val current by operations.collectAsState()
