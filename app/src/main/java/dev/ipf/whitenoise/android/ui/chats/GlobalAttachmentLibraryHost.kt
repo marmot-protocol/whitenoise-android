@@ -57,7 +57,9 @@ internal fun GlobalAttachmentLibraryHost(
         selectionOwner = viewport?.selection,
         gridState = viewport?.attachmentGrid ?: rememberLazyGridState(),
     )
+    // A failed read may leave only part of a reread range, so the viewer keeps its pages until Retry settles it.
+    val viewerLoading = library.loading || failure != null
     opener?.let {
-        GlobalAttachmentViewerHost(it, appState, library.items, library.loading, onGoToMessage = onOpenMessage)
+        GlobalAttachmentViewerHost(it, appState, library.items, viewerLoading, onGoToMessage = onOpenMessage)
     }
 }

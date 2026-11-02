@@ -732,9 +732,12 @@ internal fun ChatsScreen(
             browsingAttachments,
             searchViewport?.libraryExtent,
         )
+    // The account index spans archived chats too, so the library names and opens them as well.
+    val libraryChats =
+        remember(controller.items, controller.archivedItems) { controller.items + controller.archivedItems }
     val libraryTitles =
-        remember(sourceList, groupTitleCopy, profileRev) {
-            sourceList.associate { item ->
+        remember(libraryChats, groupTitleCopy, profileRev) {
+            libraryChats.associate { item ->
                 val title = chatListItemDisplayTitle(item, appState, groupTitleCopy)
                 item.group.groupIdHex.lowercase() to title
             }
@@ -986,14 +989,15 @@ internal fun ChatsScreen(
     /** The head a chat created through New Message returns against, preferring the one held when it opened. */
     fun newChatFlowReturnHead(): ChatListReturnHead? = newChatFlowOriginHead ?: visibleReturnHead()
 
-    /** Opens the chat a search result came from, focused on that result's message. */
+    /** Opens the chat a search result came from, among [chats], focused on that result's message. */
     fun openSearchMessage(
         groupIdHex: String,
         messageIdHex: String,
+        chats: List<ChatListItem> = sourceList,
     ) {
         val canonical = canonicalChatListGroupId(groupIdHex)
         val item =
-            sourceList.firstOrNull { canonicalChatListGroupId(it.group.groupIdHex) == canonical }
+            chats.firstOrNull { canonicalChatListGroupId(it.group.groupIdHex) == canonical }
                 ?: run {
                     appState.present(R.string.toast_original_message_unavailable)
                     return
@@ -2452,10 +2456,12 @@ internal fun ChatsScreen(
                                 GlobalAttachmentLibraryHost(
                                     appState = appState,
                                     account = controller.boundAccountRef,
-                                    chats = sourceList,
+                                    chats = libraryChats,
                                     library = libraryContent,
                                     viewport = searchViewport,
-                                    onOpenMessage = ::openSearchMessage,
+                                    onOpenMessage = { group, message ->
+                                        openSearchMessage(group, message, libraryChats)
+                                    },
                                 )
                             unreadOnly &&
                                 unreadReadFailed &&

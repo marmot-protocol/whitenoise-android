@@ -68,6 +68,11 @@ class ChatsScreenSelectionActionsCoverageTest {
             "rememberGlobalAttachmentPager(" in source && "searchViewport?.libraryExtent," in source,
         )
         assertTrue(
+            "the library names and opens archived chats, which the account index includes",
+            "controller.items + controller.archivedItems }" in source &&
+                "openSearchMessage(group, message, libraryChats)" in source,
+        )
+        assertTrue(
             "failed lookups cannot expire return focus as settled data",
             "&& bodySearchFailure == null" in source,
         )

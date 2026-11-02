@@ -17,6 +17,7 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performScrollToKey
@@ -123,6 +124,39 @@ class GlobalAttachmentLibraryNavigationTest {
         composeRule.waitForIdle()
 
         assertEquals(listOf(focused), opened)
+    }
+
+    /**
+     * A selective filter whose bounded batch admitted nothing keeps reading while the history has more,
+     * showing progress instead of "no results", and stops once the history ends.
+     */
+    @Test
+    fun emptyBatchWithMoreHistoryKeepsReading() {
+        var reads = 0
+        var paging by mutableStateOf(GlobalAttachmentPaging())
+        paging = GlobalAttachmentPaging(hasMore = true, onLoadMore = { reads++ })
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                GlobalAttachmentBrowser(
+                    items = emptyList(),
+                    kinds = setOf(GlobalSearchContentKind.FILES_DOCUMENTS),
+                    loading = false,
+                    bottomPadding =
+                        androidx.compose.ui.unit
+                            .Dp(0f),
+                    actions = GlobalAttachmentCardActions(),
+                    paging = paging,
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(GLOBAL_LIBRARY_LOADING_TAG).assertIsDisplayed()
+        assertEquals(1, reads)
+
+        paging = GlobalAttachmentPaging(hasMore = false, onLoadMore = { reads++ })
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("No files or media found").assertIsDisplayed()
+        assertEquals(1, reads)
     }
 
     /** The browser at a fixed day in UTC, recording opens and View in chat. */

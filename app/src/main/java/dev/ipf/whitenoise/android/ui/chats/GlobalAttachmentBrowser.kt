@@ -129,9 +129,16 @@ internal fun GlobalAttachmentBrowser(
             !gridState.isScrollInProgress &&
             gridState.layoutInfo.visibleItemsInfo.any { it.key == globalLibraryItemTag(item) }
     }
+    // A selective filter can end a bounded batch with no rows and more history left. The grid's paging
+    // effect is not composed then, so the empty view keeps reading until a row arrives or the history ends.
+    val readingOn = items.isEmpty() && paging.hasMore && !paging.failed
+    val currentPaging by rememberUpdatedState(paging)
+    LaunchedEffect(readingOn, loading) {
+        if (readingOn && !loading) currentPaging.onLoadMore()
+    }
     Column(modifier.fillMaxSize().testTag(GLOBAL_LIBRARY_TAG)) {
         when {
-            items.isEmpty() && loading -> LibraryLoading()
+            items.isEmpty() && (loading || readingOn) -> LibraryLoading()
             items.isEmpty() -> LibraryEmpty(paging)
             else ->
                 GlobalAttachmentGrid(
