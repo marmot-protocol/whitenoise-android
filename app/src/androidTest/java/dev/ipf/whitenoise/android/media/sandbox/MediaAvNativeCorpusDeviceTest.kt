@@ -10,6 +10,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -65,8 +66,20 @@ class MediaAvNativeCorpusDeviceTest {
         }
     }
 
+    @Test
+    fun silentAudioReturnsNoWaveformFromFreshRestrictedWorker() {
+        // This unchanged video contains decoded silent AAC; silence has no normalized waveform.
+        // Use one fresh path once: repeated null results can come from the refusal cache.
+        withFixture("original-video.mp4", verifiedVideoFixture()) { source ->
+            val previous = IsolatedMediaDecoder.lastAvIsolation
+            assertNull(IsolatedMediaDecoder.waveform(source))
+            restricted(previous)
+        }
+    }
+
     private fun withFixture(
         name: String,
+        verifiedBytes: ByteArray? = null,
         checkOutput: (File) -> Unit,
     ) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -79,8 +92,12 @@ class MediaAvNativeCorpusDeviceTest {
             check(canary.createNewFile()) { "Another fixture owns the private canary" }
             ownsCanary = true
             canary.writeText("synthetic-native-corpus-canary")
-            instrumentation.context.assets.open("native-av-corpus/$name").use { input ->
-                source.outputStream().use { output -> input.copyTo(output) }
+            if (verifiedBytes == null) {
+                instrumentation.context.assets.open("native-av-corpus/$name").use { input ->
+                    source.outputStream().use { output -> input.copyTo(output) }
+                }
+            } else {
+                source.writeBytes(verifiedBytes)
             }
             checkOutput(source)
         } finally {

@@ -22,7 +22,7 @@ import java.util.UUID
 @RunWith(AndroidJUnit4::class)
 @MediaContainmentAcceptance
 class MediaAvPerformanceDeviceTest {
-    @Test(timeout = 600_000) // One finite 88-observation campaign; other device cases keep the runner default.
+    @Test(timeout = 600_000) // One finite 85-observation campaign; other device cases keep the runner default.
     fun measureProductionCostsOnUnchangedCorpus() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val staged = mutableListOf<PerformanceInput>()
@@ -40,14 +40,14 @@ class MediaAvPerformanceDeviceTest {
                 for (input in staged) {
                     repeat(3) { iteration ->
                         campaign.automatic(input, iteration, false)
-                        if (!input.video || input.name == "original-video.mp4") {
+                        if (!input.video) {
                             campaign.automatic(input, iteration, true)
                         }
                         campaign.stream(input, iteration, false)
                     }
                     campaign.stream(input, 0, true) // Sampling overhead is excluded from all throughput rows.
                 }
-                report.complete(88, campaign.failures.size)
+                report.complete(85, campaign.failures.size)
                 check(campaign.failures.isEmpty()) { campaign.failures.joinToString("\n") }
             }
         } catch (failure: Throwable) {
