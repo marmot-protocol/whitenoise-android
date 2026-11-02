@@ -19,6 +19,14 @@
           "MED-019",
           "SET-021"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/diagnostics/PerformanceDiagnostics.kt",
+        "surface": "Account-switch diagnostic vocabulary",
+        "anchor": "ACCOUNT_SWITCH(\"account_switch\")",
+        "test_ids": [
+          "SET-021"
+        ]
       }
     ]
   },
