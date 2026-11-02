@@ -98,7 +98,8 @@ object DiagnosticFormatter {
             is MarmotEventFfi.KeyPackageRefreshOverdueChanged ->
                 "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] key package refresh overdue changed"
             // The device-group events below carry only the account — their state is re-read from the
-            // runtime, never copied here. MDK emits them only once device groups leave their test gate.
+            // runtime, never copied here. This MDK build holds them back: device groups sit behind their test
+            // gate, and recovery status waits for MDK's recovery runner to own its debt.
             is MarmotEventFfi.UnrecognizedSignInsChanged ->
                 "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] unrecognized sign-ins changed"
             is MarmotEventFfi.CompromiseWarningChanged ->

@@ -51,6 +51,10 @@ workflow builder `2854335c6e29f6bf236b1f986c62c1b9ab31114c`.
 The generated Kotlin diff against the October 30 nightly adds 21 public types and
 27 methods, for device linking, sign-in checks, compromise warnings, chat history
 import, account recovery status and Sonar-compatible stickers. Nothing is removed.
+Three existing methods keep their Kotlin signatures but change UniFFI checksums:
+`renameLinkedDevice` (13212 → 29221), `sendCustomEvent` (15542 → 38503, now
+refusing device-group kinds, mdk#2757) and `signOutAndWipe` (18691 → 12994,
+returning the extended `WipeOutcomeFfi`).
 Counts advance from 391/378/5 to **412 types / 405 checksums / 5 helpers**. The
 staged API signature SHA-256 is
 `16e01b4374946ce5a7d74eb3c814a64158a0d5534fa57157ab0930a5c979f72c`; hosted
