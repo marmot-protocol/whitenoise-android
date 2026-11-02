@@ -782,6 +782,16 @@
         ]
       },
       {
+        "surface": "Text admission and durable acceptance progress independently of Markdown hydration and styled preview publication; reverse hydration completion preserves send order and final styled tokens, while cancellation wins only before admission",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "suspend fun send(",
+        "test_ids": [
+          "CON-005",
+          "MSG-002",
+          "MSG-019"
+        ]
+      },
+      {
         "surface": "An optimistically published chat-list preview carries no deletion evidence for the message just sent",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "private fun sentPreview(",
