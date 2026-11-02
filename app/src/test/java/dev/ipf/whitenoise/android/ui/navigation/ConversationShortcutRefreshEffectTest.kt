@@ -39,7 +39,7 @@ class ConversationShortcutRefreshEffectTest {
                 owner = this,
                 accountRef = "personal",
                 ready = true,
-                targetRevision = targets.intValue.toLong(),
+                targetRevision = { targets.intValue.toLong() },
                 profileRevision = profile.intValue,
                 publish = { publications += title.value },
                 refreshPins = {
@@ -72,6 +72,34 @@ class ConversationShortcutRefreshEffectTest {
         assertEquals(3, publications.size)
     }
 
+    /**
+     * A projection revision republishes from inside the effect without recomposing its caller. The revision advances
+     * several times per sent message, and the caller is the whole app shell.
+     */
+    @Test
+    fun revisionChangesRepublishWithoutRecomposingTheCaller() {
+        val targets = mutableIntStateOf(0)
+        var callerCompositions = 0
+        var publications = 0
+        composeRule.setContent {
+            callerCompositions += 1
+            ConversationShortcutRefreshEffect(
+                owner = this,
+                accountRef = "personal",
+                ready = true,
+                targetRevision = { targets.intValue.toLong() },
+                profileRevision = 0,
+                publish = { publications += 1 },
+                refreshPins = {},
+            )
+        }
+        awaitPublication { publications == 1 }
+        val settled = callerCompositions
+        composeRule.runOnIdle { targets.intValue += 1 }
+        awaitPublication { publications == 2 }
+        assertEquals(settled, callerCompositions)
+    }
+
     /** An unavailable account cancels queued publication and pin refresh, and disposal ends all observation. */
     @Test
     fun unavailableAndDisposedOwnersCannotPublish() {
@@ -81,7 +109,7 @@ class ConversationShortcutRefreshEffectTest {
         var pinRefreshes = 0
         composeRule.setContent {
             if (mounted.value) {
-                ConversationShortcutRefreshEffect(this, "personal", ready.value, 0, 0, { publications += 1 }) {
+                ConversationShortcutRefreshEffect(this, "personal", ready.value, { 0L }, 0, { publications += 1 }) {
                     pinRefreshes += 1
                 }
             }

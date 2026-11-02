@@ -63,6 +63,31 @@
           "MED-003",
           "MED-030"
         ]
+      },
+      {
+        "surface": "Unprocessable video send feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.toast_couldnt_process_video",
+        "test_ids": [
+          "MED-007",
+          "MED-043"
+        ]
+      },
+      {
+        "surface": "Video private metadata refusal feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.toast_video_metadata_not_removable",
+        "test_ids": [
+          "MED-043"
+        ]
+      },
+      {
+        "surface": "Video document private metadata refusal feedback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt",
+        "anchor": "R.string.media_file_video_metadata_not_removable",
+        "test_ids": [
+          "MED-043"
+        ]
       }
     ]
   },

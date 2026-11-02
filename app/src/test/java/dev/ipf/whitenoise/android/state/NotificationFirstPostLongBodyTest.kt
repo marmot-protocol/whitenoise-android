@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Notification
 import android.app.NotificationManager
 import android.graphics.Bitmap
+import androidx.core.app.NotificationCompat
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
@@ -68,9 +69,9 @@ class NotificationFirstPostLongBodyTest {
             assertEquals(body, posted)
         }
 
-    /** #3311: the text block posted for a resolved long direct-chat body keeps the conversation identity image. */
+    /** #3311: a resolved long direct-chat body keeps its complete text and conversation identity image. */
     @Test
-    fun longBodyTextBlockKeepsTheConversationIdentityImage() =
+    fun longBodyConversationKeepsTheConversationIdentityImage() =
         runBlocking {
             val context = RuntimeEnvironment.getApplication()
             Shadows.shadowOf(context).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
@@ -94,7 +95,15 @@ class NotificationFirstPostLongBodyTest {
                 manager.activeNotifications
                     .single { it.notification.flags and Notification.FLAG_GROUP_SUMMARY == 0 }
                     .notification
-            assertEquals(body, card.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString())
+            val style = checkNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(card))
+            assertEquals(
+                body,
+                style.messages
+                    .single()
+                    .text
+                    .toString(),
+            )
+            assertEquals(body, card.extras.getCharSequence(Notification.EXTRA_TEXT)?.toString())
             assertNotNull(card.getLargeIcon())
         }
 

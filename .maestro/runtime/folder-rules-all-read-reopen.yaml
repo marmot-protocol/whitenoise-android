@@ -3,6 +3,7 @@ name: folder-rules-all-read-reopen
 ---
 - runFlow: ../fixtures/open-fixture-read-folder-preset.yaml
 - runFlow: ../fixtures/save-and-reopen-smart-folder.yaml
+- runFlow: ../fixtures/show-folder-rule-tree.yaml
 - scrollUntilVisible:
     element:
       id: folder.condition.2

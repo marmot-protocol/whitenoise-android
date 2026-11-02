@@ -1,0 +1,28 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleFooter.kt",
+  "legacy_sha256": "4030024cc90bec764260be911c3956052218a266f041bb09ed0956fcaab9653d",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "BubbleCollapsibleFooterLayout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleFooter.kt",
+        "anchor": "fun BubbleCollapsibleFooterLayout(",
+        "test_ids": [
+          "MSG-001",
+          "MSG-002",
+          "MSG-015"
+        ]
+      },
+      {
+        "surface": "BubbleFooterLayout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleFooter.kt",
+        "anchor": "fun BubbleFooterLayout(",
+        "test_ids": [
+          "MSG-001",
+          "MSG-015"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

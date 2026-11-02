@@ -1,0 +1,40 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatUnreadBadgeMotion.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Local continuity and ownership: ChatUnreadBadgeMotion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatUnreadBadgeMotion.kt",
+        "anchor": "package dev.ipf.whitenoise.android",
+        "test_ids": [
+          "CHL-002",
+          "CHL-033"
+        ]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "ChatUnreadBadgeMotion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatUnreadBadgeMotion.kt",
+        "anchor": "fun ChatUnreadBadgeMotion(",
+        "test_ids": [
+          "CHL-002",
+          "CHL-033"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.chat_row_marked_unread",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatUnreadBadgeMotion.kt",
+        "anchor": "R.string.chat_row_marked_unread",
+        "test_ids": [
+          "CHL-002",
+          "CHL-033"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

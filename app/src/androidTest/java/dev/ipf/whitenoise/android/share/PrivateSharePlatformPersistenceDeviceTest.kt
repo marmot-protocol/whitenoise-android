@@ -77,6 +77,31 @@ class PrivateSharePlatformPersistenceDeviceTest {
         }
     }
 
+    /** A document above the old universal 64 MiB gate remains readable through the real private provider. */
+    @Test
+    fun largePrivateDocumentProviderSurvivesRepositoryRecreation() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val files = PrivateShareFiles(context)
+        val (uri, file) = files.newFile()
+        val size = 64L * 1024L * 1024L + 1L
+        try {
+            java.io.RandomAccessFile(file, "rw").use {
+                it.setLength(size)
+                it.write(byteArrayOf(80, 75, 3, 4))
+            }
+            files.finish(uri, "large.zip", "application/zip", size)
+            assertEquals(size, PrivateShareFiles(context).metadata(uri)!!.getLong("size"))
+            assertEquals("application/zip", context.contentResolver.getType(uri))
+            context.contentResolver.openInputStream(uri)!!.use { input ->
+                val prefix = ByteArray(4)
+                assertEquals(4, input.read(prefix))
+                assertArrayEquals(byteArrayOf(80, 75, 3, 4), prefix)
+            }
+        } finally {
+            files.delete(uri)
+        }
+    }
+
     /** Recreates the encrypted store and verifies the process-interruption marker survives. */
     @Test
     fun encryptedInterruptionMarkerSurvivesStoreRecreation() {

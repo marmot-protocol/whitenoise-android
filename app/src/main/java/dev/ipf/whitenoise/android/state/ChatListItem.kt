@@ -15,13 +15,11 @@ import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.marmotkit.SelectedChatPreviewFfi
 import dev.ipf.whitenoise.android.core.EMPTY_MARKDOWN_DOCUMENT
 import dev.ipf.whitenoise.android.core.GroupProjector
-import dev.ipf.whitenoise.android.core.GroupSystemEvents
 import dev.ipf.whitenoise.android.core.GroupSystemPreviewNames
 import dev.ipf.whitenoise.android.core.MediaPreviewFallback
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
-import dev.ipf.whitenoise.android.core.RemoteGiphyMedia
 import java.util.Locale
 
 enum class ChatListAvatarSource {
@@ -38,6 +36,7 @@ data class ChatListAvatarSeed(
     val accountRef: String? = null,
     // staleness-exempt: captured loader lifetime, not an independent counter owner.
     val cacheLifetime: Long? = null,
+    val animationClassification: Boolean? = null,
 )
 
 /** A peer projection stands for a two-person conversation. */
@@ -395,35 +394,24 @@ data class ChatListItem(
         empty: String = "No messages yet",
         groupSystemNames: GroupSystemPreviewNames? = null,
     ): String {
-        val preview = projection?.lastMessage ?: return MessageProjector.previewText(latest, copy, empty)
-        return when {
-            preview.deleted -> copy.deleted
-            MessageProjector.isPollKind(preview.kind) -> copy.poll
-            preview.kind == 1200uL -> preview.plaintext.ifBlank { copy.agentStreamStarted }
-            // Kind-1009 edits are an in-place mutation of an existing
-            // message body; they must not bump the chat-list preview to
-            // "edit content" nor reorder the conversation. The original
-            // [latest] message stays projected — drop this row's edit
-            // payload from the preview text path.
-            preview.kind == 1009uL -> MessageProjector.previewText(latest, copy, empty)
-            // Before the generic plaintext arm: a kind-1210 last message would
-            // otherwise leak its raw JSON content into the chat list.
-            MessageProjector.isGroupSystemKind(preview.kind) ->
-                GroupSystemEvents.previewText(
-                    plaintext = preview.plaintext,
-                    copy = copy.groupSystem,
-                    structured = preview.groupSystem,
-                    names = groupSystemNames,
-                )
-            MessageProjector.isChatKind(preview.kind) && RemoteGiphyMedia.isEnvelopeText(preview.plaintext) ->
-                copy.giphyMedia
-            preview.plaintext.isNotBlank() -> preview.plaintext
-            // The engine's typed attachment projection beats the app-side
-            // fallback, which derives from tags and optimistic state.
-            preview.attachmentKind != null ->
-                copy.attachmentLabel(requireNotNull(preview.attachmentKind), preview.attachmentCount)
-            resolvedMediaPreviewFallback != null -> resolvedMediaPreviewFallback.text(copy)
-            else -> MessageProjector.previewText(latest, copy, copy.message)
-        }
+        val preview = projection?.lastMessage
+        return projectedChatListPreviewText(
+            preview =
+                preview?.let {
+                    ChatListPreviewInput(
+                        it.plaintext,
+                        it.kind,
+                        it.deleted,
+                        it.attachmentKind,
+                        it.attachmentCount,
+                        it.groupSystem,
+                    )
+                },
+            copy = copy,
+            empty = empty,
+            groupSystemNames = groupSystemNames,
+            mediaFallback = resolvedMediaPreviewFallback,
+            latestFallback = { fallback -> MessageProjector.previewText(latest, copy, fallback) },
+        )
     }
 }

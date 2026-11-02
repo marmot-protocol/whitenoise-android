@@ -31,6 +31,8 @@ on:
       - 'config/compose-stability.conf'
       - 'scripts/release*'
       - 'scripts/verify-release-runtime.sh'
+      - 'scripts/dex_method_budget.py'
+      - 'config/dex-method-budgets.json'
       - 'scripts/verify_notice_resources.py'
       - 'scripts/generate_local_notices.py'
       - 'scripts/retain_dependency_evidence.py'
@@ -158,6 +160,22 @@ jobs:
           fi
           printf 'path=%s\n' "${matches[0]}" >> "$GITHUB_OUTPUT"
 
+      # Measure the exact optimized DEX before the emulator starts. A failure is
+      # reported by the job's last step, so ART verification below still runs.
+      - name: Enforce post-R8 DEX method budgets
+        id: dex_budget
+        continue-on-error: true
+        env:
+          DEX_BUDGET_APK_PATH: ${{ steps.apk.outputs.path }}
+          DEX_BUDGET_SOURCE_SHA: ${{ github.sha }}
+        run: >-
+          python3 scripts/dex_method_budget.py
+          --apk "$DEX_BUDGET_APK_PATH"
+          --mapping app/build/outputs/mapping/productionZapstoreRelease/mapping.txt
+          --variant productionZapstoreRelease
+          --source-sha "$DEX_BUDGET_SOURCE_SHA"
+          --report-dir app/build/reports/release-runtime-verify
+
       # Inspect the optimized APK already built above; no extra compile or matrix.
       - name: Verify packaged open source notices
         env:
@@ -191,6 +209,12 @@ jobs:
           path: app/build/reports/release-runtime-verify/
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Fail on post-R8 DEX method budget
+        if: ${{ always() && steps.dex_budget.outcome == 'failure' }}
+        run: |
+          echo 'The post-R8 DEX method budget failed; see "Enforce post-R8 DEX method budgets".' >&2
+          exit 1
 
   verify-staging-android17:
     name: Verify staging APK on Android 17 ART
@@ -339,6 +363,22 @@ jobs:
               | tee -a "$report_dir/arm64-dex-sha256.txt"
           done
 
+      # Budget the shipping ARM64 artifact, whose DEX the step above proved identical.
+      # A failure is reported by the job's last step, so ART verification still runs.
+      - name: Enforce post-R8 DEX method budgets
+        id: dex_budget
+        continue-on-error: true
+        env:
+          DEX_BUDGET_APK_PATH: ${{ steps.apks.outputs.arm64_v8a_path }}
+          DEX_BUDGET_SOURCE_SHA: ${{ github.sha }}
+        run: >-
+          python3 scripts/dex_method_budget.py
+          --apk "$DEX_BUDGET_APK_PATH"
+          --mapping app/build/outputs/mapping/stagingZapstoreRelease/mapping.txt
+          --variant stagingZapstoreRelease
+          --source-sha "$DEX_BUDGET_SOURCE_SHA"
+          --report-dir app/build/reports/release-runtime-verify
+
       # GitHub's runner image currently ships an avdmanager that writes
       # target=android-0 for minor-versioned packages such as android-37.0.
       - name: Update SDK cmdline-tools for API 37
@@ -424,6 +464,12 @@ jobs:
           path: app/build/reports/release-runtime-verify/
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Fail on post-R8 DEX method budget
+        if: ${{ always() && steps.dex_budget.outcome == 'failure' }}
+        run: |
+          echo 'The post-R8 DEX method budget failed; see "Enforce post-R8 DEX method budgets".' >&2
+          exit 1
 
   verify:
     name: Verify minified APK on ART

@@ -357,9 +357,14 @@ internal suspend fun WhiteNoiseAppState.materializeAttachmentPlaintextIsolated(
             }.plaintext
 }
 
-/** Copies MarmotKit's verified retained plaintext for one attachment into a private buffer, or null when absent. */
-private suspend fun WhiteNoiseAppState.retainedForwardPlaintext(request: AttachmentTransferRequest): ByteArray? =
-    readRetainedForwardPlaintext { openNativeAttachment(request) }
+/**
+ * Copies MarmotKit's verified retained plaintext for one attachment into a private buffer, or null when absent. The
+ * open carries the forward's cap, so an attachment declaring more is refused without being copied into a lease.
+ */
+private suspend fun WhiteNoiseAppState.retainedForwardPlaintext(request: AttachmentTransferRequest): ByteArray? {
+    val maxBytes = ConversationController.MEDIA_RETAINED_MAX_BYTES
+    return readRetainedForwardPlaintext(maxBytes) { openNativeAttachment(request, maxBytes) }
+}
 
 /**
  * Copies an opened retained lease into a private buffer of at most [maxBytes] on the IO dispatcher and closes it on

@@ -141,6 +141,23 @@ on:
       - 'scripts/media-latency.init.gradle'
       - 'app/build.gradle.kts'
       - 'app/src/androidTest/AndroidManifest.xml'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/chats/ChatListContinuityAndroidTest.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderFadeFrameProbe.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderArrival.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPills.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEdgeFade.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowLayout.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowSelectionStrip.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatUnreadBadgeMotion.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/AppNavigationTest.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/navigation/NavigationControlAndroidTest.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/settings/FolderDragAndroidTest.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/settings/ChatFolderDragOwnerAndroidTest.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FolderDragState.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/settings/FolderDragPlacements.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt'
       - 'app/src/main/AndroidManifest.xml'
       - 'app/src/main/java/dev/ipf/whitenoise/android/share/OutboundShare.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MessageOutboundShare.kt'
@@ -201,11 +218,38 @@ on:
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/AnimationSourceAdmissionDeviceTest.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/media/sandbox/**'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/sandbox/**'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt'
+      # Rendered-size thumbnail allocation must be measured through the real isolated Android codec.
+      - 'app/src/main/java/dev/ipf/whitenoise/android/media/MediaThumbnail.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/ThumbnailDecodeRequest.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaImageBubbles.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/MediaThumbnailDecodeDeviceTest.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/AttachmentFixturePublicationDeviceTest.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/FixtureHostPublication.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentVideoPauseAndroidTest.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/ConversationVideoRotationAndroidTest.kt'
       # The viewer controls device test asserts real decoded frames and Media3 control geometry on CI's emulator.
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerVideoControlsAndroidTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerVideoDeviceFixture.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewerFrameProbe.kt'
       - 'app/src/androidTest/assets/edge-*.mp4.b64'
+      # Outgoing video metadata removal is qualified through Android's own retriever and extractor (#3376).
+      - 'app/src/main/java/dev/ipf/whitenoise/android/media/VideoMetadataScrubber.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/media/VideoScrubStore.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/media/IsoBmffMetadataScrubber.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/media/IsoBoxEditor.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/media/IsoSampleZeroing.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/media/MatroskaMetadataScrubber.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/VideoMetadataScrubberDeviceTest.kt'
+      - 'app/src/androidTest/assets/video-metadata/**'
+      # The focused attachment-fixture scenario sends tagged videos through the sender and receives them (#3376).
+      - 'app/src/main/java/dev/ipf/whitenoise/android/media/VideoContentClassifier.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/media/UncleanableContainerStreams.kt'
+      - 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoMetadataRemoval.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoMetadataFixtureDeviceTest.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoMetadataFixtureEvidence.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/GeneratedVideoDocuments.java'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/GeneratedDocumentProvider.java'
       - 'cryptoBenchmark/**'
       - 'settings.gradle.kts'
       - 'app/src/main/java/dev/ipf/whitenoise/android/core/nostr/NostrEvent.kt'
@@ -231,7 +275,9 @@ on:
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/MatrixAttachmentProbe.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/IncomingAttachmentBackgroundDownloadAndroidTest.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptFixtureSupport.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptNetworkDiagnostics.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptPolicyDiagnostics.kt'
+      - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptProcessStopDiagnostics.kt'
       - 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/BackgroundReceiptPolicyDiagnosticsAndroidTest.kt'
       - 'app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentPlaintextResolver.kt'
       # Receipt scheduling and durable admission (#3308) are proven by the background receipt fixture.
@@ -266,6 +312,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       attachment_fixture: ${{ steps.select.outputs.attachment_fixture }}
+      attachment_fixture_scope: ${{ steps.select.outputs.attachment_fixture_scope }}
       connected: ${{ steps.select.outputs.connected }}
     steps:
       - name: Checkout
@@ -306,6 +353,9 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        env:
+          # A PR whose fixture inputs are only the video-metadata scenario's runs that scenario alone.
+          FIXTURE_SCOPE: ${{ needs.changes.outputs.attachment_fixture_scope }}
         with:
           api-level: 34
           target: google_apis
@@ -313,21 +363,22 @@ jobs:
           disable-animations: true
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: |
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-resume
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-resume-changed
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-unknown-length
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-background
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-lock
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-automatic-resume
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-phases
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-media
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-tile-transfer
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-background-receipt
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-apk
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-matrix unshaped,quick
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-apk-recreation
-            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-forward
+            [ "$FIXTURE_SCOPE" = video-metadata ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64
+            [ "$FIXTURE_SCOPE" = video-metadata ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-resume
+            [ "$FIXTURE_SCOPE" = video-metadata ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-resume-changed
+            [ "$FIXTURE_SCOPE" = video-metadata ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-unknown-length
+            [ "$FIXTURE_SCOPE" = video-metadata ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-background
+            [ "$FIXTURE_SCOPE" = video-metadata ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-lock
+            [ "$FIXTURE_SCOPE" = video-metadata ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-automatic-resume
+            [ "$FIXTURE_SCOPE" = video-metadata ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-phases
+            [ "$FIXTURE_SCOPE" = video-metadata ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-media
+            [ "$FIXTURE_SCOPE" = video-metadata ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-tile-transfer
+            [ "$FIXTURE_SCOPE" = video-metadata ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-background-receipt
+            [ "$FIXTURE_SCOPE" = video-metadata ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-apk
+            [ "$FIXTURE_SCOPE" = video-metadata ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-matrix unshaped,quick
+            [ "$FIXTURE_SCOPE" = video-metadata ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-apk-recreation
+            [ "$FIXTURE_SCOPE" = video-metadata ] || bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-forward
+            bash scripts/run-controlled-attachment-fixture.sh emulator-5554 "${{ matrix.distribution }}" ci-api34-x86_64 controller-video-metadata
       - name: Preserve redacted ledger and measurements on success or failure
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

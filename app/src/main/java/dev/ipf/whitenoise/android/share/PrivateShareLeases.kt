@@ -11,6 +11,7 @@ internal class PrivateShareLeases(
     private val owns: (Uri) -> Boolean,
     private val metadata: (Uri) -> JSONObject?,
     private val delete: (Uri) -> Unit,
+    private val limits: () -> ShareImportLimits = { LEGACY_SHARE_IMPORT_LIMITS },
 ) {
     /** One recoverable shelf per explicitly selected account/chat. Calls run on I/O. */
     fun saveShelf(
@@ -20,7 +21,7 @@ internal class PrivateShareLeases(
     ) = synchronized(privateShareLock) {
         val shelf = privateShareLeaseFile(root, "shelf", "$account $group")
         val previous = loadShelf(account, group)
-        val owned = capPrivateShareShelf(uris, metadata)
+        val owned = capPrivateShareShelf(uris, metadata, limits())
         if (owned.isEmpty()) {
             if (shelf.exists() && !shelf.delete()) throw IOException("Cannot release private share shelf")
         } else {
@@ -58,8 +59,11 @@ internal class PrivateShareLeases(
                 readPrivateShareJson(privateShareLeaseFile(root, "shelf", "$account $group"))
                     ?: return@synchronized emptyList()
             val rows = json.optJSONArray("uris") ?: return@synchronized emptyList()
-            List(rows.length().coerceAtMost(MAX_PENDING_SHARE_URIS)) { Uri.parse(rows.optString(it)) }
-                .filter { metadata(it) != null }
+            capPrivateShareShelf(
+                List(rows.length().coerceAtMost(MAX_PENDING_SHARE_URIS)) { Uri.parse(rows.optString(it)) },
+                metadata,
+                limits(),
+            )
         }
 
     /**

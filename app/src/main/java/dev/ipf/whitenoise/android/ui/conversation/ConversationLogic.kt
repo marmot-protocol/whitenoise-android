@@ -123,10 +123,15 @@ internal fun conversationScrollRestoreListIndex(
     }
 }
 
+/**
+ * One visual pick's read: the prepared [attachment], or why there is none. [videoMetadataRefused] marks a video whose
+ * private metadata could not be removed, which is refused rather than sent with its original bytes (#3376).
+ */
 internal data class ImageAttachmentReadOutcome(
     val attachment: PendingAttachment?,
     val overflowed: Boolean = false,
     val storageUnavailable: Boolean = false,
+    val videoMetadataRefused: Boolean = false,
 )
 
 // Start the next 50-row history page halfway through the current page. Four rows was too little

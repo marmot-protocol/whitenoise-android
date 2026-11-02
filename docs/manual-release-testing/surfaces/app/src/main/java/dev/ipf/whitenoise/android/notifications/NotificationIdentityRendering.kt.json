@@ -1,0 +1,24 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationIdentityRendering.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "notification_content_contracts": [
+      {
+        "surface": "stable conversation monogram and identity picture rendering",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationIdentityRendering.kt",
+        "anchor": "fun notificationConversationIcon(",
+        "test_ids": [
+          "NTF-042"
+        ]
+      },
+      {
+        "surface": "group sender identity retains its notification image policy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationIdentityRendering.kt",
+        "anchor": "fun notificationSenderPerson(",
+        "test_ids": [
+          "NTF-042"
+        ]
+      }
+    ]
+  }
+}

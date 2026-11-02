@@ -1,0 +1,45 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ComposerSendMotion.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Accepted composer text presentation continuity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ComposerSendMotion.kt",
+        "anchor": "class ComposerSendMotion",
+        "test_ids": [
+          "MSG-042",
+          "MED-044"
+        ]
+      },
+      {
+        "surface": "Canonical visible send ink and horizontal keyboard spacing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ComposerSendMotion.kt",
+        "anchor": "val canonical = text.trimEnd(' ')",
+        "test_ids": [
+          "CON-036"
+        ]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "ComposerSendMotionHost",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ComposerSendMotion.kt",
+        "anchor": "fun ComposerSendMotionHost(",
+        "test_ids": [
+          "MSG-042"
+        ]
+      },
+      {
+        "surface": "Overlay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ComposerSendMotion.kt",
+        "anchor": "fun Overlay(",
+        "test_ids": [
+          "MSG-042",
+          "MED-044"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

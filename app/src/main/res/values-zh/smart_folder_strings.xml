@@ -63,4 +63,17 @@
     <string name="smart_folder_always_include">始终包含聊天</string>
     <string name="smart_folder_read_help">全部已读并不表示代理已完成工作。</string>
   <string name="folder_show_when_empty">空文件夹仍显示</string>
+  <string name="smart_folder_quick_start">使用快捷筛选</string>
+  <string name="smart_folder_quick_hint">选择其中一项来限制聊天范围。再次点按该项可清除此限制。保存后应用更改。</string>
+  <string name="smart_folder_quick_accepted">仅限已接受的聊天。重置会保留此范围；可在高级中编辑。</string>
+  <string name="smart_folder_quick_not_accepted">已接受的聊天：否。重置会保留此范围；可在高级中编辑。</string>
+  <string name="smart_folder_quick_reset">重置快捷筛选</string>
+  <string name="smart_folder_quick_unread">未读</string>
+  <string name="smart_folder_quick_not_muted">未静音</string>
+  <string name="smart_folder_quick_not_pinned">未置顶</string>
+  <string name="smart_folder_quick_not_archived">未归档</string>
+  <string name="smart_folder_quick_neutral">未选择任何项</string>
+  <string name="smart_folder_quick_state">%1$s：%2$s</string>
+  <string name="smart_folder_quick_expanded">已展开</string>
+  <string name="smart_folder_quick_collapsed">已收起</string>
 </resources>

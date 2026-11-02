@@ -51,13 +51,13 @@ internal fun MaestroStatePresentation(fixture: MaestroPresentationFixture) {
                     ),
                 onDismiss = { fixture.finish("dismiss") },
             )
-        else -> NotificationScopePresentation(fixture)
+        else -> NotificationDeliveryPresentation(fixture)
     }
 }
 
 @Composable
 @Suppress("FunctionNaming")
-private fun NotificationScopePresentation(fixture: MaestroPresentationFixture) {
+private fun NotificationDeliveryPresentation(fixture: MaestroPresentationFixture) {
     val setting =
         ConversationNotificationCategorySetting(
             channel = NotificationChannelSpec.GROUP_MESSAGES,
@@ -67,10 +67,14 @@ private fun NotificationScopePresentation(fixture: MaestroPresentationFixture) {
         )
     ConversationNotificationCategoriesList(
         settings = listOf(setting),
-        onOpen = { error("Scope test must not open Android settings") },
-        onScopeChange = { selected, custom ->
-            check(selected == setting && custom)
-            fixture.finish("scope-selected")
+        onOpen = { selected ->
+            check(fixture.scenario == "extra-notification-channel-open" && selected == setting)
+            fixture.finish("channel-opened")
+        },
+        alertEnabled = mapOf(setting.channel to false),
+        onAlertChange = { selected, enabled ->
+            check(selected == setting && enabled)
+            fixture.finish("delivery-enabled")
         },
     )
 }

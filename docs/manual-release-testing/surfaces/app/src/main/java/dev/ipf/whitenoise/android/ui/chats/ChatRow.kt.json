@@ -93,9 +93,10 @@
       {
         "surface": "Chat row resolves the membership preview subject's name",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
-        "anchor": "GroupSystemPreviewNames(activeAccountIdHex, appState::chatMemberTitle)",
+        "anchor": "GroupSystemPreviewNames(activeAccountIdHex)",
         "test_ids": [
-          "CHL-020"
+          "CHL-020",
+          "CON-035"
         ]
       }
     ],

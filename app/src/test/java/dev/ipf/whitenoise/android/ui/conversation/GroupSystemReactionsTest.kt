@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -18,6 +19,7 @@ import dev.ipf.marmotkit.GroupSystemEventProvenanceFfi
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_ACTION_REACTION_TEST_TAG
+import dev.ipf.whitenoise.android.ui.conversation.reactions.LocalReactionMotion
 import dev.ipf.whitenoise.android.ui.conversation.reactions.REACTION_PILL_TEST_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -53,6 +55,34 @@ class GroupSystemReactionsTest : GroupSystemReactionTestFixtures() {
     /** Releases controller-owned coroutines after every test. */
     @After fun clearController() {
         pollController.onCleared()
+    }
+
+    /** An early-rejected quick choice cannot lend its old geometry to a later ordinary reaction. */
+    @Test
+    fun rejectedQuickDispatchDoesNotLeakOriginIntoLaterAcceptance() {
+        val item = activity()
+        retain(item)
+        val owner = GroupSystemReactionOwner("personal", item.record.groupIdHex, item.record.messageIdHex)
+        val motion = LocalReactionMotion()
+        var blocked = true
+        val origins = mutableListOf<Rect?>()
+        val actions =
+            GroupSystemRowActions(pollController, pollState, owner, { blocked }, { item }) { emoji, added, origin ->
+                origins += origin
+                motion.accept(emoji, added, origin)
+            }
+        motion.choose("👍", Rect(10f, 20f, 38f, 48f))
+        actions.react("👍", motion.takeOrigin("👍"))
+        assertNull(motion.takeOrigin("👍"))
+        settle()
+        assertTrue(origins.isEmpty())
+        assertTrue(recordedCalls().none { it.first == "reactToMessage" })
+        blocked = false
+        actions.react("👍")
+        settle()
+        composeRule.waitUntil(5_000) { origins.isNotEmpty() }
+        assertEquals(listOf<Rect?>(null), origins)
+        assertNull(motion.effect?.origin)
     }
 
     /** Semantic long press exposes only the activity's supported menu actions. */

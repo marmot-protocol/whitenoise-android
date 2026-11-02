@@ -13,19 +13,12 @@ name: alerts-chat-sounds-rotation
       text: Sounds & notifications
     direction: DOWN
 - tapOn: Sounds & notifications
-- scrollUntilVisible:
-    element:
-      id: conversation-sound-appearance-open
-    direction: DOWN
-- tapOn:
-    id: conversation-sound-appearance-open
 - assertVisible:
-    id: conversation-sound-appearance-content
+    id: conversation-alert-messages_group
 - setOrientation: LANDSCAPE_LEFT
 - assertVisible:
-    id: conversation-sound-appearance-content
+    id: conversation-alert-messages_group
 - setOrientation: PORTRAIT
 - back
-- assertNotVisible:
-    id: conversation-sound-appearance-content
-- assertVisible: Sounds & notifications
+- assertVisible:
+    id: chat_info.list

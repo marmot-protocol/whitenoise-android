@@ -4,13 +4,6 @@ package dev.ipf.whitenoise.android.ui.profile
 
 import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -125,6 +118,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
+import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
 import dev.ipf.whitenoise.android.ui.group.GroupMemberMenuAction
 import dev.ipf.whitenoise.android.ui.group.groupMemberMenuActions
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -132,6 +126,7 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Add
 import dev.ipf.whitenoise.android.ui.icons.filled.Shield
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
+import dev.ipf.whitenoise.android.ui.settings.SettingsRouteMotion
 import dev.ipf.whitenoise.android.ui.settings.SettingsRowContext
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
 import dev.ipf.whitenoise.android.ui.settings.SettingsSection
@@ -424,13 +419,24 @@ private fun ProfileSheetAdminActionRow(
 /** Moderation glyph box; the busy indicator matches the icon so the row never reflows. */
 private val ProfileAdminGlyphSize = 24.dp
 
-private enum class ProfileSheetPage {
+internal enum class ProfileSheetPage {
     PROFILE,
     GROUPS_IN_COMMON,
     NOTIFICATIONS,
     ADD_TO_GROUPS,
     MAKE_ADMIN,
 }
+
+/** The Add picker can be entered from either the profile root or its shared-groups page. */
+internal fun profileSheetPageDepth(
+    page: ProfileSheetPage,
+    pickerParent: ProfileSheetPage,
+): Int =
+    when (page) {
+        ProfileSheetPage.PROFILE -> 0
+        ProfileSheetPage.ADD_TO_GROUPS -> if (pickerParent == ProfileSheetPage.GROUPS_IN_COMMON) 2 else 1
+        else -> 1
+    }
 
 /** User Profile page for an npub: identity, about, shared groups and the message action. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -482,7 +488,7 @@ internal fun ProfileSheet(
     ) {
         if (!owner.canAct()) currentDismiss()
     }
-    if (!owner.canAct()) return
+    if (!owner.canAct() || appState.appLockScreenVisible) return
     // Seed the identity synchronously so the first composed frame already has
     // the content it will settle on. ModalBottomSheet animates toward its
     // measured height, so rows that resolve a frame later — about, NIP-05,
@@ -1019,127 +1025,122 @@ internal fun ProfileSheet(
                 }
             }
         }
-        AnimatedContent(
-            targetState = if (hex == null) ProfileSheetPage.PROFILE else page,
-            transitionSpec = {
-                val transition =
-                    if (targetState != ProfileSheetPage.PROFILE) {
-                        (slideInHorizontally { it / 4 } + fadeIn()) togetherWith
-                            (slideOutHorizontally { -it / 4 } + fadeOut())
-                    } else {
-                        (slideInHorizontally { -it / 4 } + fadeIn()) togetherWith
-                            (slideOutHorizontally { it / 4 } + fadeOut())
-                    }
-                transition.using(SizeTransform(clip = false))
-            },
-            label = "profile-group-picker",
-            modifier = Modifier.fillMaxSize().testTag(PROFILE_SHEET_HOST_TAG),
-        ) { targetPage ->
-            when (targetPage) {
-                ProfileSheetPage.ADD_TO_GROUPS -> {
-                    val recipientHex = hex
-                    if (recipientHex != null) {
-                        ProfileAddToGroupsScreen(
-                            target = RecipientSearch.Candidate(recipientHex, displayTitle, npub),
-                            appState = appState,
-                            state = addableGroupsState,
-                            busy = addingToGroups,
-                            onClose = { if (!addingToGroups) page = pickerParent },
-                            onRetry = {
-                                accountWideGroups.requestMembers(addableGroupsState.pendingGroupIds, retry = true)
-                            },
-                            onAdd = ::addProfileToGroups,
-                        )
-                    }
-                }
-                ProfileSheetPage.MAKE_ADMIN ->
-                    SettingsScaffold(
-                        title = stringResource(R.string.person_promote_groups),
-                        onBack = { if (!promotingAdmin) page = ProfileSheetPage.PROFILE },
-                    ) {
-                        Box(Modifier.fillMaxSize().fadingVerticalScroll(rememberScrollState())) {
-                            ProfileMakeAdminContent(
+        val motionPage = if (hex == null) ProfileSheetPage.PROFILE else page
+        Box(Modifier.fillMaxSize().testTag(PROFILE_SHEET_HOST_TAG)) {
+            SettingsRouteMotion(
+                target = motionPage,
+                depth = profileSheetPageDepth(motionPage, pickerParent),
+                ownerKey = owner,
+                contentVisible = owner.canAct() && !appState.appLockScreenVisible,
+                animationsEnabled = rememberConversationMotionEnabled(),
+            ) { targetPage ->
+                when (targetPage) {
+                    ProfileSheetPage.ADD_TO_GROUPS -> {
+                        val recipientHex = hex
+                        if (recipientHex != null) {
+                            ProfileAddToGroupsScreen(
+                                target = RecipientSearch.Candidate(recipientHex, displayTitle, npub),
                                 appState = appState,
-                                targetName = displayTitle,
-                                target = RecipientSearch.Candidate(hex.orEmpty(), displayTitle, npub),
-                                state = promotableGroupsState,
-                                busy = promotingAdmin,
-                                onClose = { if (!promotingAdmin) page = ProfileSheetPage.PROFILE },
+                                state = addableGroupsState,
+                                busy = addingToGroups,
+                                onClose = { if (!addingToGroups) page = pickerParent },
                                 onRetry = {
-                                    accountWideGroups.requestMembers(
-                                        promotableGroupsState.pendingGroupIds,
-                                        retry = true,
-                                    )
+                                    accountWideGroups.requestMembers(addableGroupsState.pendingGroupIds, retry = true)
                                 },
-                                onPromote = ::makeProfileAdmin,
+                                onAdd = ::addProfileToGroups,
                             )
                         }
                     }
-                ProfileSheetPage.GROUPS_IN_COMMON ->
-                    PreparedGroupAvatarContent(
-                        appState,
-                        shared.groups.take(VISIBLE_GROUP_AVATAR_LIMIT).mapNotNull { it.selectedAvatarAsset },
-                    ) {
-                        PersonGroupsMembershipContent(
-                            appState = appState,
-                            account = accountAtOpen,
-                            personHex = hex,
-                            personName = displayTitle,
-                            groups = shared.groups,
-                            ownerIsCurrent = { owner.canAct() && page == ProfileSheetPage.GROUPS_IN_COMMON },
-                            onFeedback = { if (owner.canAct()) feedback = it },
-                            onMembershipChanged = {
-                                if (owner.canAct()) accountWideGroups.refreshAfterMembershipChange()
-                            },
-                            rows = sharedRows,
-                            unresolved = shared.incomplete,
-                            onBack = { page = ProfileSheetPage.PROFILE },
-                            onOpen = { id ->
-                                if (owner.canAct()) {
-                                    appState
-                                        .personSharedGroupsForProfile(hex, accountWideGroups.current())
-                                        .groups
-                                        .firstOrNull { it.group.groupIdHex == id }
-                                        ?.let { item -> owner.leave { onOpenGroup(item, false) } }
-                                }
-                            },
-                            onAdd = {
-                                if (owner.canAct()) {
-                                    pickerParent = ProfileSheetPage.GROUPS_IN_COMMON
-                                    page = ProfileSheetPage.ADD_TO_GROUPS
-                                }
-                            },
-                            onRetry = {
-                                if (owner.canAct()) {
-                                    accountWideGroups.requestMembers(shared.unresolvedGroupIds, retry = true)
-                                }
-                            },
-                            avatar = { id -> sharedItems[id]?.let { rememberChatListGroupAvatar(appState, it).image } },
-                            groupAnimation = { id ->
-                                sharedItems[id]?.let { rememberChatListGroupAvatar(appState, it).groupAnimation }
-                            },
-                        )
-                    }
-                ProfileSheetPage.NOTIFICATIONS -> {
-                    val author = hex
-                    if (accountAtOpen != null && author != null && !targetIsSelf) {
-                        key(notificationEntry) {
-                            val entry = notificationEntry
-                            ProfileNotificationOverrideRoot(
-                                appState.profileNotificationOverrides,
-                                accountAtOpen,
-                                author,
-                                displayTitle,
-                                ownerIsCurrent = {
-                                    val sameEntry = notificationEntry === entry
-                                    owner.canAct() && page == ProfileSheetPage.NOTIFICATIONS && sameEntry
+                    ProfileSheetPage.MAKE_ADMIN ->
+                        SettingsScaffold(
+                            title = stringResource(R.string.person_promote_groups),
+                            onBack = { if (!promotingAdmin) page = ProfileSheetPage.PROFILE },
+                        ) {
+                            Box(Modifier.fillMaxSize().fadingVerticalScroll(rememberScrollState())) {
+                                ProfileMakeAdminContent(
+                                    appState = appState,
+                                    targetName = displayTitle,
+                                    target = RecipientSearch.Candidate(hex.orEmpty(), displayTitle, npub),
+                                    state = promotableGroupsState,
+                                    busy = promotingAdmin,
+                                    onClose = { if (!promotingAdmin) page = ProfileSheetPage.PROFILE },
+                                    onRetry = {
+                                        accountWideGroups.requestMembers(
+                                            promotableGroupsState.pendingGroupIds,
+                                            retry = true,
+                                        )
+                                    },
+                                    onPromote = ::makeProfileAdmin,
+                                )
+                            }
+                        }
+                    ProfileSheetPage.GROUPS_IN_COMMON ->
+                        PreparedGroupAvatarContent(
+                            appState,
+                            shared.groups.take(VISIBLE_GROUP_AVATAR_LIMIT).mapNotNull { it.selectedAvatarAsset },
+                        ) {
+                            PersonGroupsMembershipContent(
+                                appState = appState,
+                                account = accountAtOpen,
+                                personHex = hex,
+                                personName = displayTitle,
+                                groups = shared.groups,
+                                ownerIsCurrent = { owner.canAct() && page == ProfileSheetPage.GROUPS_IN_COMMON },
+                                onFeedback = { if (owner.canAct()) feedback = it },
+                                onMembershipChanged = {
+                                    if (owner.canAct()) accountWideGroups.refreshAfterMembershipChange()
                                 },
+                                rows = sharedRows,
+                                unresolved = shared.incomplete,
                                 onBack = { page = ProfileSheetPage.PROFILE },
+                                onOpen = { id ->
+                                    if (owner.canAct()) {
+                                        appState
+                                            .personSharedGroupsForProfile(hex, accountWideGroups.current())
+                                            .groups
+                                            .firstOrNull { it.group.groupIdHex == id }
+                                            ?.let { item -> owner.leave { onOpenGroup(item, false) } }
+                                    }
+                                },
+                                onAdd = {
+                                    if (owner.canAct()) {
+                                        pickerParent = ProfileSheetPage.GROUPS_IN_COMMON
+                                        page = ProfileSheetPage.ADD_TO_GROUPS
+                                    }
+                                },
+                                onRetry = {
+                                    if (owner.canAct()) {
+                                        accountWideGroups.requestMembers(shared.unresolvedGroupIds, retry = true)
+                                    }
+                                },
+                                avatar =
+                                    { id -> sharedItems[id]?.let { rememberChatListGroupAvatar(appState, it).image } },
+                                groupAnimation = { id ->
+                                    sharedItems[id]?.let { rememberChatListGroupAvatar(appState, it).groupAnimation }
+                                },
                             )
                         }
+                    ProfileSheetPage.NOTIFICATIONS -> {
+                        val author = hex
+                        if (accountAtOpen != null && author != null && !targetIsSelf) {
+                            key(notificationEntry) {
+                                val entry = notificationEntry
+                                ProfileNotificationOverrideRoot(
+                                    appState.profileNotificationOverrides,
+                                    accountAtOpen,
+                                    author,
+                                    displayTitle,
+                                    ownerIsCurrent = {
+                                        val sameEntry = notificationEntry === entry
+                                        owner.canAct() && page == ProfileSheetPage.NOTIFICATIONS && sameEntry
+                                    },
+                                    onBack = { page = ProfileSheetPage.PROFILE },
+                                )
+                            }
+                        }
                     }
+                    ProfileSheetPage.PROFILE -> profileContent()
                 }
-                ProfileSheetPage.PROFILE -> profileContent()
             }
         }
     }

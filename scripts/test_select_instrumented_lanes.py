@@ -8,24 +8,37 @@ from unittest.mock import patch
 
 from scripts.check_fuzz_pr_triggers import pr_paths
 from scripts.select_instrumented_lanes import (
-    FIXTURE_ONLY, FIXTURE_SHARED, WORKFLOW, changed_paths, matches, select,
+    BOTH, FIXTURE_DISPATCH, FIXTURE_ONLY, FIXTURE_SHARED, VIDEO_METADATA_FIXTURE_ONLY, VIDEO_METADATA_SHARED, WORKFLOW,
+    changed_paths, matches, output_value, select,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
 TRIGGERS = pr_paths((ROOT / WORKFLOW).read_text())
 MEDIA_TEST = 'app/src/androidTest/java/dev/ipf/whitenoise/android/media/'
+UI_MEDIA_TEST = 'app/src/androidTest/java/dev/ipf/whitenoise/android/ui/conversation/media/'
+SCRUBBER = 'app/src/main/java/dev/ipf/whitenoise/android/media/VideoMetadataScrubber.kt'
+CLASSIFIER = 'app/src/main/java/dev/ipf/whitenoise/android/media/VideoContentClassifier.kt'
+VIDEO_RUNNER = 'tools/attachment-fixture/video_metadata_runner.py'
+VIDEO_TEST = UI_MEDIA_TEST + 'VideoMetadataFixtureDeviceTest.kt'
+FULL = {'attachment_fixture': True, 'attachment_fixture_scope': 'full', 'connected': True}
 
 
 class SelectInstrumentedLanesTest(unittest.TestCase):
     def test_every_selector_pattern_starts_the_workflow(self):
+        """Every path the selector classifies also starts the workflow, or the selector could never see it."""
         for pattern in FIXTURE_ONLY + FIXTURE_SHARED:
             with self.subTest(pattern=pattern):
                 self.assertIn(pattern, TRIGGERS)
+        # A file under a listed directory starts the workflow through that directory's own pattern.
+        for pattern in VIDEO_METADATA_FIXTURE_ONLY + VIDEO_METADATA_SHARED + FIXTURE_DISPATCH:
+            with self.subTest(pattern=pattern):
+                self.assertTrue(pattern in TRIGGERS or ('*' not in pattern and matches(pattern, TRIGGERS)))
 
     def test_fixture_only_inputs_are_not_pull_request_smoke_tests(self):
-        for pattern in FIXTURE_ONLY:
+        """A fixture-only test input never carries the annotation the connected PR run selects."""
+        for pattern in FIXTURE_ONLY + VIDEO_METADATA_FIXTURE_ONLY:
             path = ROOT / pattern
-            if path.suffix == '.kt':
+            if path.suffix in ('.kt', '.java'):
                 with self.subTest(pattern=pattern):
                     self.assertNotIn('PullRequestDeviceSmoke', path.read_text())
 
@@ -38,22 +51,24 @@ class SelectInstrumentedLanesTest(unittest.TestCase):
         self.assertFalse(matches('app/build.gradle.kts.bak', ['app/build.gradle.kts']))
 
     def test_fixture_only_change_skips_connected_lane(self):
+        """Shared fixture probes and tools run the whole fixture campaign without the connected emulator."""
         lanes = select('pull_request', [MEDIA_TEST + 'ControlledAttachmentProbe.kt',
                                         'tools/attachment-fixture/apk_checker.py'], TRIGGERS)
-        self.assertEqual(lanes, {'attachment_fixture': True, 'connected': False})
+        self.assertEqual(lanes, {'attachment_fixture': True, 'attachment_fixture_scope': 'full', 'connected': False})
 
     def test_smoke_input_change_skips_fixture_lane(self):
+        """Connected-only inputs boot no fixture emulator and select no fixture scope."""
         lanes = select('pull_request', [
             'app/src/main/java/dev/ipf/whitenoise/android/ui/common/ScrollEdgeFade.kt',
             'app/src/main/java/dev/ipf/whitenoise/android/ui/Unrelated.kt'], TRIGGERS)
-        self.assertEqual(lanes, {'attachment_fixture': False, 'connected': True})
+        self.assertEqual(lanes, {'attachment_fixture': False, 'attachment_fixture_scope': '', 'connected': True})
 
     def test_shared_build_inputs_run_both(self):
+        """Build and workflow inputs run both lanes and the whole fixture campaign."""
         for path in ['app/build.gradle.kts', 'gradle/libs.versions.toml', WORKFLOW,
                      'app/src/main/marmotkit/MARMOT_VERSION']:
             with self.subTest(path=path):
-                self.assertEqual(select('pull_request', [path], TRIGGERS),
-                                 {'attachment_fixture': True, 'connected': True})
+                self.assertEqual(select('pull_request', [path], TRIGGERS), FULL)
 
     def test_network_wait_registry_alone_runs_the_fixture(self):
         """A change limited to the network-wait registry starts the workflow and selects the receipt fixture."""
@@ -67,18 +82,94 @@ class SelectInstrumentedLanesTest(unittest.TestCase):
         contract = MEDIA_TEST + 'BackgroundReceiptPolicyDiagnosticsAndroidTest.kt'
         self.assertTrue(matches(helper, TRIGGERS))
         self.assertTrue(matches(contract, TRIGGERS))
-        self.assertEqual(select('pull_request', [helper], TRIGGERS),
-                         {'attachment_fixture': True, 'connected': True})
+        self.assertEqual(select('pull_request', [helper], TRIGGERS), FULL)
         self.assertEqual(select('pull_request', [contract], TRIGGERS),
-                         {'attachment_fixture': False, 'connected': True})
+                         {'attachment_fixture': False, 'attachment_fixture_scope': '', 'connected': True})
+
+    def test_receipt_diagnostics_alone_run_the_controlled_fixture(self):
+        """Network diagnostics run only the fixture; process-stop diagnostics also run their connected contract."""
+        network = MEDIA_TEST + 'BackgroundReceiptNetworkDiagnostics.kt'
+        process_stop = MEDIA_TEST + 'BackgroundReceiptProcessStopDiagnostics.kt'
+        self.assertTrue(matches(network, TRIGGERS))
+        self.assertTrue(matches(process_stop, TRIGGERS))
+        self.assertEqual(select('pull_request', [network], TRIGGERS),
+                         {'attachment_fixture': True, 'attachment_fixture_scope': 'full', 'connected': False})
+        self.assertEqual(select('pull_request', [process_stop], TRIGGERS), FULL)
 
     def test_unrelated_files_beside_fixture_inputs_do_not_start_connected(self):
+        """The fixture run script on its own runs the whole campaign, and unrelated files start nothing more."""
         lanes = select('pull_request', ['README.md', 'app/src/main/java/Other.kt',
                                         'scripts/run-controlled-attachment-fixture.sh'], TRIGGERS)
-        self.assertEqual(lanes, {'attachment_fixture': True, 'connected': False})
+        self.assertEqual(lanes, {'attachment_fixture': True, 'attachment_fixture_scope': 'full', 'connected': False})
+
+    def test_video_metadata_inputs_alone_run_only_the_focused_scenario(self):
+        """Routing, fixture and provider changes run the video-metadata scenario and boot no connected emulator."""
+        removal = 'app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/VideoMetadataRemoval.kt'
+        paths = [CLASSIFIER, removal, VIDEO_RUNNER, VIDEO_TEST, UI_MEDIA_TEST + 'GeneratedDocumentProvider.java']
+        for path in paths:
+            with self.subTest(path=path):
+                self.assertEqual(select('pull_request', [path], TRIGGERS),
+                                 {'attachment_fixture': True, 'attachment_fixture_scope': 'video-metadata',
+                                  'connected': False})
+
+    def test_scrubber_inputs_run_the_focused_scenario_and_the_platform_proof(self):
+        """The production scrubber and its fixtures feed both the scenario and the connected platform proof."""
+        for path in [SCRUBBER, 'app/src/androidTest/assets/video-metadata/mp4-tagged.mp4.b64']:
+            with self.subTest(path=path):
+                self.assertEqual(select('pull_request', [path], TRIGGERS),
+                                 {'attachment_fixture': True, 'attachment_fixture_scope': 'video-metadata',
+                                  'connected': True})
+
+    def test_dispatch_plumbing_beside_video_metadata_inputs_runs_the_whole_campaign(self):
+        """Shared plumbing runs every scenario even beside video files, because no merge-queue run follows the PR."""
+        for plumbing in FIXTURE_DISPATCH:
+            for video in [VIDEO_RUNNER, VIDEO_TEST, CLASSIFIER, SCRUBBER,
+                          'app/src/main/java/dev/ipf/whitenoise/android/media/IsoBoxEditor.kt']:
+                with self.subTest(plumbing=plumbing, video=video):
+                    lanes = select('pull_request', [plumbing, video], TRIGGERS)
+                    self.assertEqual('full', lanes['attachment_fixture_scope'])
+                    self.assertTrue(lanes['attachment_fixture'])
+
+    def test_dispatch_plumbing_alone_or_any_other_fixture_input_runs_the_whole_campaign(self):
+        """Plumbing on its own, or any input another scenario reads, keeps the whole campaign."""
+        cases = [['scripts/run-controlled-attachment-fixture.sh'], [WORKFLOW],
+                 [SCRUBBER, 'app/src/main/java/dev/ipf/whitenoise/android/media/MediaPipeline.kt'],
+                 [VIDEO_RUNNER, 'tools/attachment-fixture/media_lifecycle_runner.py'],
+                 [VIDEO_TEST, MEDIA_TEST + 'FixtureSession.kt'],
+                 [CLASSIFIER, 'app/build.gradle.kts']]
+        for paths in cases:
+            with self.subTest(paths=paths):
+                self.assertEqual('full', select('pull_request', paths, TRIGGERS)['attachment_fixture_scope'])
+
+    def test_the_fixture_job_runs_only_the_focused_mode_for_a_focused_scope(self):
+        """Every other mode is skipped for the video-metadata scope, and the focused mode runs in every scope."""
+        workflow = (ROOT / WORKFLOW).read_text()
+        selector = workflow.split('  changes:\n', 1)[1].split('\n  attachment-fixture:\n', 1)[0]
+        self.assertIn('attachment_fixture_scope: ${{ steps.select.outputs.attachment_fixture_scope }}', selector)
+        job = workflow.split('\n  attachment-fixture:\n', 1)[1].split('\n  instrumented:\n', 1)[0]
+        self.assertIn('FIXTURE_SCOPE: ${{ needs.changes.outputs.attachment_fixture_scope }}', job)
+        modes = [line.strip() for line in job.splitlines() if 'run-controlled-attachment-fixture.sh' in line]
+        focused = [line for line in modes if line.endswith(' controller-video-metadata')]
+        self.assertEqual(1, len(focused))
+        self.assertTrue(focused[0].startswith('bash scripts/run-controlled-attachment-fixture.sh '))
+        others = [line for line in modes if line not in focused]
+        self.assertGreater(len(others), 10)
+        for line in others:
+            with self.subTest(line=line):
+                self.assertTrue(line.startswith('[ "$FIXTURE_SCOPE" = video-metadata ] || bash '))
+        script = (ROOT / 'scripts/run-controlled-attachment-fixture.sh').read_text()
+        self.assertIn('controller-video-metadata) ;;', script)
+        self.assertIn('tools/attachment-fixture/video_metadata_runner.py', script)
+
+    def test_outputs_write_booleans_and_the_scope_name(self):
+        """GitHub reads lanes as true or false and the scope by its name, with no scope for no fixture lane."""
+        self.assertEqual(['true', 'false', 'video-metadata', ''],
+                         [output_value(True), output_value(False), output_value('video-metadata'), output_value('')])
+        self.assertEqual('full', BOTH['attachment_fixture_scope'])
 
     def test_missing_evidence_and_other_events_run_both(self):
-        both = {'attachment_fixture': True, 'connected': True}
+        """Any other event, or a diff that cannot be read or matched, runs everything."""
+        both = FULL
         for event in ['push', 'workflow_dispatch', 'merge_group', 'schedule']:
             self.assertEqual(select(event, ['README.md'], TRIGGERS), both)
         self.assertEqual(select('pull_request', None, TRIGGERS), both)

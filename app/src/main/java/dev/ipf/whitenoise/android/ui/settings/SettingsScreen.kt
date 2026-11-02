@@ -189,7 +189,7 @@ internal enum class SettingsHomeRow(
     AiAgents(
         SettingsHomeSection.AppPreferences,
         R.string.ai_agents,
-        R.drawable.ic_settings_person_add,
+        R.drawable.ic_ai_agents,
         "ai_agents",
         SettingsDetail.AiAgents,
     ),

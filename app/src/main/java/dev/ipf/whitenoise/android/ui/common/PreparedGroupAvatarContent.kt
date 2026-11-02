@@ -168,7 +168,11 @@ private class RetainedAvatarWindow(
         if (current == null || accountRef == null || current.cacheKey(accountRef) != asset.cacheKey(accountRef)) return
         val previous = retained.firstOrNull { sameSelection(it.asset, asset) }
         if (previous?.asset == asset && previous.image === image) return
-        retained = retained.filterNot { sameSelection(it.asset, asset) } + PreparedAvatarImage(asset.copy(), image)
+        val classification =
+            AvatarImageLoader.cachedAnimationClassification(checkNotNull(asset.cacheKey(accountRef)))
+                ?: previous?.takeIf { it.asset.contentRevision == asset.contentRevision }?.animationClassification
+        retained = retained.filterNot { sameSelection(it.asset, asset) } +
+            PreparedAvatarImage(asset.copy(), image, classification)
     }
 
     /** Seeds only the revision these pixels actually depict; revision fallback remains a separate lookup. */
@@ -223,7 +227,13 @@ private fun rememberPreparedGroupAvatarPixels(
             .take(VISIBLE_GROUP_AVATAR_LIMIT)
             .toList()
     val preparation = rememberAvatarPixelPreparation(appState, selected, accountRef, lifetime, surfaceIdentity)
-    return PreparedGroupAvatarPixels(accountRef, appState.runtimeGeneration, lifetime, preparation.images)
+    return PreparedGroupAvatarPixels(
+        accountRef,
+        appState.runtimeGeneration,
+        lifetime,
+        preparation.images,
+        preparation.frames.values.toList(),
+    )
 }
 
 /** The bounded local decode stage is canceled and discarded with its immutable owner/asset keys. */
@@ -241,7 +251,14 @@ private fun rememberAvatarPixelPreparation(
             selected
                 .mapNotNull { asset ->
                     val imageKey = accountRef?.let(asset::cacheKey) ?: return@mapNotNull null
-                    AvatarImageLoader.cachedImage(imageKey)?.let { imageKey to it }
+                    AvatarImageLoader.cachedImage(imageKey)?.let {
+                        imageKey to
+                            PreparedAvatarImage(
+                                asset.copy(),
+                                it,
+                                AvatarImageLoader.cachedAnimationClassification(imageKey),
+                            )
+                    }
                 }.toMap()
         produceState(
             initialValue = AvatarPixelPreparation(cached, accountRef == null || cached.size == selected.size),
@@ -252,7 +269,14 @@ private fun rememberAvatarPixelPreparation(
                 for (asset in selected) {
                     val imageKey = checkNotNull(asset.cacheKey(checkNotNull(accountRef)))
                     if (imageKey !in images) {
-                        appState.durableAvatar(asset, accountRef, acquireMissing = false)?.let { images[imageKey] = it }
+                        appState.durableAvatar(asset, accountRef, acquireMissing = false)?.let {
+                            images[imageKey] =
+                                PreparedAvatarImage(
+                                    asset.copy(),
+                                    it,
+                                    AvatarImageLoader.cachedAnimationClassification(imageKey),
+                                )
+                        }
                     }
                 }
             }
@@ -262,9 +286,11 @@ private fun rememberAvatarPixelPreparation(
 }
 
 private data class AvatarPixelPreparation(
-    val images: Map<String, ImageBitmap>,
+    val frames: Map<String, PreparedAvatarImage>,
     val ready: Boolean,
-)
+) {
+    val images: Map<String, ImageBitmap> get() = frames.mapValues { it.value.image }
+}
 
 internal const val VISIBLE_GROUP_AVATAR_LIMIT = 16
 

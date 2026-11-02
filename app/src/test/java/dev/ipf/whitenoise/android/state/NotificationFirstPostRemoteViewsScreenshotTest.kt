@@ -86,18 +86,38 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
     @Test
     fun cachedGroupAvatarRendersOnTheFirstPlatformCard() = captureFirstPost(cachedAvatar = true, isDm = false)
 
+    /** Pins the long first message to the same native template and identity slot as short messages. */
+    @Test
+    fun longFirstMessageRendersInTheConversationTemplate() = captureFirstPost(cachedAvatar = true, longBody = true)
+
+    /** Pins the group picture rather than a member picture for the long first group message. */
+    @Test
+    fun longFirstGroupMessageRendersInTheConversationTemplate() =
+        captureFirstPost(
+            cachedAvatar = true,
+            isDm = false,
+            longBody = true,
+        )
+
     /** Exercises the same typed first-post path for ready-image and intentional-monogram rendering. */
     private fun captureFirstPost(
         cachedAvatar: Boolean,
         isDm: Boolean = true,
+        longBody: Boolean = false,
     ) = runBlocking {
         val writes = AtomicInteger(0)
         val events = CopyOnWriteArrayList<NotificationFirstPostTimingEvent>()
         ConversationCardPostSynchronizer.testHook = writeCounter(writes)
+        val preview =
+            if (longBody) {
+                "Resolved first draw " + "Long message text. ".repeat(30).trim()
+            } else {
+                "**Resolved first draw**"
+            }
         val fixture =
             NotificationBootstrapTestFixture(
                 context = context,
-                previewText = "**Resolved first draw**",
+                previewText = preview,
                 isDm = isDm,
                 accounts = listOf(AccountSummaryFfi("account-a", "self", true, false, false, true)),
                 notificationUsersHaveDisplayNames = false,
@@ -127,18 +147,11 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
                         chats = attachReadyGroup(fixture)
                     }
                 }
-            if (!isDm) assertTrue("Group image must be in the first payload", notification.getLargeIcon() != null)
-            val body = notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
-            assertEquals("Resolved first draw", body)
-            assertFalse(body.contains("**"))
-
-            val card = renderPlatformTemplate(notification)
-            val visibleText = card.descendantText()
-            assertTrue(visibleText.any { "Alice" in it })
-            assertTrue(visibleText.any { "Resolved first draw" in it })
-            assertFalse(visibleText.any(YEAR_OFFSET::containsMatchIn))
+            val card = assertFirstPostTemplate(notification, preview, isDm)
             card.captureRoboImage(
                 when {
+                    longBody && !isDm -> LONG_GROUP_SNAPSHOT_PATH
+                    longBody -> LONG_DM_SNAPSHOT_PATH
                     !isDm -> GROUP_AVATAR_SNAPSHOT_PATH
                     cachedAvatar -> AVATAR_SNAPSHOT_PATH
                     else -> SNAPSHOT_PATH
@@ -149,6 +162,25 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
             chats?.onCleared()
             fixture.close()
         }
+    }
+
+    /** Checks the resolved payload and visible sender/body before capturing the platform template. */
+    private fun assertFirstPostTemplate(
+        notification: Notification,
+        preview: String,
+        isDm: Boolean,
+    ): View {
+        if (!isDm) assertTrue("Group image must be in the first payload", notification.getLargeIcon() != null)
+        val body = notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
+        assertEquals(preview.replace("**", ""), body)
+        assertFalse(body.contains("**"))
+
+        val card = renderPlatformTemplate(notification)
+        val visibleText = card.descendantText()
+        assertTrue(visibleText.any { "Alice" in it })
+        assertTrue(visibleText.any { "Resolved first draw" in it })
+        assertFalse(visibleText.any(YEAR_OFFSET::containsMatchIn))
+        return card
     }
 
     /** Supplies a real owner-bound group projection with its decoded avatar already cached. */
@@ -285,6 +317,8 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
          * requests and on master. Matches the fixture's own await deadline.
          */
         const val WRITE_AWAIT_TIMEOUT_MS = 60_000L
+        const val LONG_DM_SNAPSHOT_PATH = "src/test/snapshots/notification_first_post_long_dm_api30.png"
+        const val LONG_GROUP_SNAPSHOT_PATH = "src/test/snapshots/notification_first_post_long_group_api30.png"
         const val SNAPSHOT_PATH = "src/test/snapshots/notification_first_post_remote_views_api30.png"
         const val AVATAR_SNAPSHOT_PATH = "src/test/snapshots/notification_first_post_cached_avatar_api30.png"
         const val GROUP_AVATAR_SNAPSHOT_PATH = "src/test/snapshots/notification_first_post_group_avatar_api30.png"

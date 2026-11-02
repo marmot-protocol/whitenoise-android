@@ -102,7 +102,7 @@ class LocalNotificationEnrichmentRaceTest {
             runBlocking {
                 presenter.show(
                     messageUpdate(),
-                    senderAvatarUrl = "https://example.com/alice.png",
+                    conversationAvatarUrl = "https://example.com/general.png",
                     shortNpub = { "npub1test" },
                 )
             },
@@ -184,7 +184,11 @@ class LocalNotificationEnrichmentRaceTest {
 
         assertTrue(
             runBlocking {
-                presenter.show(messageUpdate(), senderAvatarUrl = "https://example.com/alice.png", shortNpub = { "n" })
+                presenter.show(
+                    messageUpdate(),
+                    conversationAvatarUrl = "https://example.com/general.png",
+                    shortNpub = { "n" },
+                )
             },
         )
         assertTrue(enrichmentReadyToWrite.await(5, TimeUnit.SECONDS))

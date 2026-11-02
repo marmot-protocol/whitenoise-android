@@ -1,0 +1,59 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/LocalReactionMotion.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Accepted local reaction motion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/LocalReactionMotion.kt",
+        "anchor": "rememberLocalReactionMotion(",
+        "test_ids": [
+          "MSG-041"
+        ]
+      },
+      {
+        "surface": "Modifier.localReactionOverlay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/LocalReactionMotion.kt",
+        "anchor": "internal fun Modifier.localReactionOverlay(",
+        "test_ids": [
+          "MSG-041"
+        ]
+      },
+      {
+        "surface": "Modifier.localReactionTarget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/LocalReactionMotion.kt",
+        "anchor": "internal fun Modifier.localReactionTarget(",
+        "test_ids": [
+          "MSG-041"
+        ]
+      },
+      {
+        "surface": "Modifier.reactionSourceBounds",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/LocalReactionMotion.kt",
+        "anchor": "internal fun Modifier.reactionSourceBounds(",
+        "test_ids": [
+          "MSG-041"
+        ]
+      },
+      {
+        "surface": "ReactionMotionRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/LocalReactionMotion.kt",
+        "anchor": "fun ReactionMotionRow(",
+        "test_ids": [
+          "MSG-041"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "One row owner with standalone component fallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/LocalReactionMotion.kt",
+        "anchor": "internal val LocalRowReactionMotion",
+        "test_ids": [
+          "MSG-041"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

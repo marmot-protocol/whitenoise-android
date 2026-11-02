@@ -6,8 +6,9 @@ import androidx.compose.ui.text.input.TextFieldValue
 internal class ConversationDictationCompletionOwner(
     private val readDraft: (String, String) -> ConversationDictationDraftSnapshot,
     private val writeDraft: (String, String, Long, TextFieldValue) -> Long?,
+    private val completionWrite: ((String, String, Long, TextFieldValue) -> ConversationDictationDraftWrite)? = null,
 ) {
-    internal enum class PasteResult { Accepted, Retained, Abandoned }
+    internal enum class PasteResult { Accepted, Retained, DeferredByHost, Superseded, Abandoned }
 
     internal data class DraftOperation(
         val sessionId: Long,
@@ -17,6 +18,51 @@ internal class ConversationDictationCompletionOwner(
         val currentSessionId: () -> Long?,
         val validate: () -> ConversationDictationTargetValidation,
     )
+
+    private data class DeferredWrite(
+        val operation: DraftOperation,
+        val revision: Long,
+        val value: TextFieldValue,
+    )
+
+    private var deferredWrite: DeferredWrite? = null
+
+    /** Retries the exact refused host operation; later editor revisions are never rebased or appended. */
+    fun retryDeferred(
+        sessionId: Long,
+        target: ConversationDictationTarget,
+    ): PasteResult =
+        try {
+            val pending = deferredWrite
+            when {
+                pending == null -> PasteResult.Retained
+                pending.operation.sessionId != sessionId ||
+                    pending.operation.target != target ||
+                    pending.operation.currentSessionId() != sessionId -> PasteResult.Abandoned
+                else -> retryCapturedDraft(pending)
+            }
+        } catch (_: Throwable) {
+            // Keep the captured text without rebasing or making a second recovery write.
+            PasteResult.Retained
+        }
+
+    private fun retryCapturedDraft(pending: DeferredWrite): PasteResult =
+        when (pending.operation.validate()) {
+            ConversationDictationTargetValidation.Indeterminate -> PasteResult.DeferredByHost
+            ConversationDictationTargetValidation.DefinitelyRemoved -> PasteResult.Retained
+            ConversationDictationTargetValidation.Available -> {
+                val target = pending.operation.target
+                if (readDraft(target.accountRef, target.groupIdHex).revision != pending.revision) {
+                    PasteResult.Superseded
+                } else {
+                    when (writeCompletionDraft(pending.operation, pending.revision, pending.value)) {
+                        is ConversationDictationDraftWrite.Written -> PasteResult.Accepted
+                        ConversationDictationDraftWrite.DeferredByHost -> PasteResult.DeferredByHost
+                        ConversationDictationDraftWrite.Refused -> PasteResult.Retained
+                    }
+                }
+            }
+        }
 
     var draftRecovery = ConversationDictationDraftRecovery(readDraft, writeDraft)
         private set
@@ -39,6 +85,7 @@ internal class ConversationDictationCompletionOwner(
 
     /** Recognition teardown retires validation and an unadmitted send. */
     fun reset() {
+        deferredWrite = null
         validation.reset()
         dispatch.reset()
         transcript = ""
@@ -62,18 +109,40 @@ internal class ConversationDictationCompletionOwner(
                     is ConversationDictationMerge.Applied -> {
                         val accepted =
                             try {
-                                writeDraft(target.accountRef, target.groupIdHex, current.revision, merge.value)
+                                writeCompletionDraft(operation, current.revision, merge.value)
                             } catch (_: Throwable) {
                                 result = PasteResult.Retained
                                 null
                             }
-                        if (accepted != null) result = PasteResult.Accepted
+                        when (accepted) {
+                            is ConversationDictationDraftWrite.Written -> result = PasteResult.Accepted
+                            ConversationDictationDraftWrite.DeferredByHost -> result = PasteResult.DeferredByHost
+                            else -> Unit
+                        }
                     }
                     ConversationDictationMerge.NeedsAppendFallback -> result = appendLatest(operation)
                 }
             }
         }
         return result ?: appendLatest(operation)
+    }
+
+    private fun writeCompletionDraft(
+        operation: DraftOperation,
+        revision: Long,
+        value: TextFieldValue,
+    ): ConversationDictationDraftWrite {
+        val target = operation.target
+        val result =
+            completionWrite?.invoke(target.accountRef, target.groupIdHex, revision, value)
+                ?: writeDraft(target.accountRef, target.groupIdHex, revision, value)
+                    ?.let(ConversationDictationDraftWrite::Written)
+                ?: ConversationDictationDraftWrite.Refused
+        if (result == ConversationDictationDraftWrite.DeferredByHost) {
+            deferredWrite = DeferredWrite(operation, revision, value)
+        }
+        if (result is ConversationDictationDraftWrite.Written) deferredWrite = null
+        return result
     }
 
     fun appendLatest(operation: DraftOperation): PasteResult {
@@ -91,13 +160,15 @@ internal class ConversationDictationCompletionOwner(
                 val merged = appendConversationDictationTranscript(current.value, text)
                 val accepted =
                     try {
-                        writeDraft(target.accountRef, target.groupIdHex, current.revision, merged)
+                        writeCompletionDraft(operation, current.revision, merged)
                     } catch (_: Throwable) {
                         result = PasteResult.Retained
                         null
                     }
-                if (accepted != null) {
-                    result = PasteResult.Accepted
+                when (accepted) {
+                    is ConversationDictationDraftWrite.Written -> result = PasteResult.Accepted
+                    ConversationDictationDraftWrite.DeferredByHost -> result = PasteResult.DeferredByHost
+                    else -> Unit
                 }
             }
         }

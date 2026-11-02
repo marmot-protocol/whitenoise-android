@@ -45,6 +45,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
@@ -478,7 +481,13 @@ internal fun MediaVideoGridTile(
                     bitmap = poster,
                     contentDescription = stringResource(R.string.reply_media_video),
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier =
+                        Modifier.fillMaxSize().mediaViewerThumbnail(
+                            messageIdHex,
+                            attachmentIndex,
+                            reference.sourceEpoch,
+                            gridTile = true,
+                        ),
                 )
             thumbhashImage != null ->
                 Image(
@@ -980,7 +989,12 @@ internal fun MediaVideoBubble(
                         bitmap = poster,
                         contentDescription = stringResource(R.string.reply_media_video),
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize(),
+                        modifier =
+                            Modifier.fillMaxSize().mediaViewerThumbnail(
+                                messageIdHex,
+                                attachmentIndex,
+                                reference.sourceEpoch,
+                            ),
                     )
                 thumbhashImage != null ->
                     Image(
@@ -1478,7 +1492,9 @@ private fun videoAttachmentExtension(reference: MediaAttachmentReferenceFfi): St
  * state so swiping to a sibling page doesn't carry zoom across, and disposing
  * the page recycles the multi-MB native bitmap instead of leaning on GC. The
  * pager precomposes one page either side by default, so transfer and playback
- * are gated on [isCurrent] to avoid concurrent downloads and decoders.
+ * are gated on [isCurrent] to avoid concurrent downloads and decoders. Lifecycle STOP
+ * and noisy audio routes pause playback; pending or replaced files retain pause intent so
+ * foreground return cannot start audio without a new page selection or an explicit Play action.
  */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
@@ -1494,11 +1510,26 @@ internal fun VideoViewerPage(
     onControllerVisibilityChange: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
     val scope = rememberCoroutineScope()
     val latestReference by rememberUpdatedState(reference)
     val latestOnPlayerChanged by rememberUpdatedState(onPlayerChanged)
     val latestOnControllerVisibilityChange by rememberUpdatedState(onControllerVisibilityChange)
     val contentKey = videoAttachmentContentKey(messageIdHex, attachmentIndex, reference)
+    // Remember STOP even while the file is pending and background recomposition is suspended.
+    // A deliberate new page/open gets fresh admission; foreground return alone never rearms it.
+    val autoplayAllowed =
+        remember(contentKey, isCurrent, lifecycle) {
+            mutableStateOf(lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
+        }
+    DisposableEffect(autoplayAllowed, lifecycle) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_STOP) autoplayAllowed.value = false
+            }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
     val playbackRecoveryJob =
         remember(contentKey) {
             mutableStateOf<Job?>(null)
@@ -1608,6 +1639,7 @@ internal fun VideoViewerPage(
                 .build()
                 .apply {
                     setAudioAttributes(videoPlaybackAudioAttributes, true)
+                    setHandleAudioBecomingNoisy(true)
                     addListener(
                         object : androidx.media3.common.Player.Listener {
                             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
@@ -1647,6 +1679,31 @@ internal fun VideoViewerPage(
             exo.release()
         }
     }
+    // Pause the mounted player on Home or screen lock. START intentionally does not resume it:
+    // only the user's play action may resume after a stop or a disconnected audio route.
+    DisposableEffect(exo, lifecycle, autoplayAllowed) {
+        val pauseListener =
+            object : androidx.media3.common.Player.Listener {
+                /** Carries a pause or subsequent explicit Play across replacement of the same attachment's file. */
+                override fun onPlayWhenReadyChanged(
+                    playWhenReady: Boolean,
+                    reason: Int,
+                ) {
+                    autoplayAllowed.value = playWhenReady
+                }
+            }
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_STOP) exo.pause()
+            }
+        exo.addListener(pauseListener)
+        lifecycle.addObserver(observer)
+        if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) exo.pause()
+        onDispose {
+            exo.removeListener(pauseListener)
+            lifecycle.removeObserver(observer)
+        }
+    }
     // The player reopens its file to seek or replay, so the cache holds it for as long as this page plays it.
     HoldCacheFileWhileComposed(file)
     // Only the current page owns a decoder or audio focus. HorizontalPager
@@ -1657,7 +1714,8 @@ internal fun VideoViewerPage(
         if (isCurrent) {
             VoicePlaybackController.pause()
             exo.prepare()
-            exo.playWhenReady = true
+            // Materialization may finish after STOP, before this player has observed any lifecycle event.
+            exo.playWhenReady = autoplayAllowed.value && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
         } else {
             exo.playWhenReady = false
             exo.stop()
@@ -1666,6 +1724,7 @@ internal fun VideoViewerPage(
     androidx.compose.ui.viewinterop.AndroidView(
         modifier = Modifier.fillMaxSize().background(Color.Black),
         factory = { ctx -> viewerPlayerView(ctx, exo) { visible -> latestOnControllerVisibilityChange(visible) } },
+        update = { playerView -> playerView.player = exo },
         onRelease = { playerView -> playerView.player = null },
     )
 }

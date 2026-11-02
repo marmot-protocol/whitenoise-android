@@ -6,9 +6,15 @@ name: folder-rules-match-any-reopen
     element:
       id: folder.match.
     direction: UP
+    centerElement: true
 - tapOn:
     id: folder.match.
 - tapOn: Match any
+- scrollUntilVisible:
+    element:
+      id: folder.match.
+    direction: UP
+    centerElement: true
 - assertVisible:
     id: folder.match.
     containsChild:

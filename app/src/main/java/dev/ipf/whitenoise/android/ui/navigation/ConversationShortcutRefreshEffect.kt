@@ -15,20 +15,24 @@ import kotlinx.coroutines.delay
  * Coalesces projection and decoded-avatar changes without loading any media or retaining a second snapshot.
  * Projection changes republish Direct Share and pins together; decoded pixels only touch the pins, so a chat
  * list decoding its avatars cannot re-issue the whole Direct Share inventory once per image.
+ *
+ * [targetRevision] is read here rather than by the caller. It advances with every chat-list projection, several
+ * times per sent message, so a caller reading it would recompose its whole body each time instead of this effect.
  */
 @Composable
 internal fun ConversationShortcutRefreshEffect(
     owner: Any,
     accountRef: String?,
     ready: Boolean,
-    targetRevision: Long,
+    targetRevision: () -> Long,
     profileRevision: Any,
     publish: () -> Unit,
     refreshPins: () -> Unit,
 ) {
     val latestPublish by rememberUpdatedState(publish)
     val latestRefreshPins by rememberUpdatedState(refreshPins)
-    LaunchedEffect(owner, accountRef, ready, targetRevision, profileRevision) {
+    val revision = targetRevision()
+    LaunchedEffect(owner, accountRef, ready, revision, profileRevision) {
         if (ready && accountRef != null) {
             delay(SHORTCUT_REFRESH_COALESCE_MILLIS)
             latestPublish()

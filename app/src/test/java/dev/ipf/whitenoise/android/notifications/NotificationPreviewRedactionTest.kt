@@ -30,6 +30,7 @@ class NotificationPreviewRedactionTest {
 
     @Before
     fun setup() {
+        ConversationCardPostedRegistry.resetForTests()
         Shadows.shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
         NotificationGroupReconciler.shared(context).close()
         manager.cancelAll()

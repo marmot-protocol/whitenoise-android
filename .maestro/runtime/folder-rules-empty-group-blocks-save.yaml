@@ -31,6 +31,7 @@ name: folder-rules-empty-group-blocks-save
     id: folder.save
     enabled: true
 - runFlow: ../fixtures/save-and-reopen-smart-folder.yaml
+- runFlow: ../fixtures/show-folder-rule-tree.yaml
 - scrollUntilVisible:
     element:
       id: folder.condition.2

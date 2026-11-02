@@ -69,6 +69,7 @@ object NotificationActions {
         if (acceptsInlineReactionChoices) intent.putExtra(EXTRA_INLINE_REACTION_CHOICES, true)
     }
 
+    /** The action an intent carries, reading a Reply that returned a chosen chip as a reaction. */
     fun parse(intent: Intent?): NotificationAction? {
         intent ?: return null
         val parsedKind = kindForAction(intent.action) ?: return null
@@ -92,9 +93,10 @@ object NotificationActions {
         )
     }
 
-    // Notifications posted by the previous app version carried a direct emoji
-    // action. Keep those cards functional across an in-place app update while
-    // still subjecting the value to the current allowlist in the receiver.
+    /**
+     * The direct value carried by cards from earlier app versions: the old emoji action and the expanded
+     * image choices. Both keep working across an in-place update, still subject to the receiver's allowlist.
+     */
     internal fun legacyReaction(intent: Intent): String? =
         normalizeNotificationReaction(
             intent.getStringExtra(LEGACY_EXTRA_REACTION),

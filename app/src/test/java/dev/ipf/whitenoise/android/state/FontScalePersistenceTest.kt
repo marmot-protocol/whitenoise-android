@@ -5,17 +5,23 @@ import android.content.SharedPreferences
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.HostPerformanceOutcomeFfi
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.job
 import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
+import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -40,11 +46,42 @@ class FontScalePersistenceTest {
     }
 
     @After fun tearDownMain() {
-        states.forEach { it.mutationsScope.cancel() }
+        // runTest drives Main's paused scheduler while background cancellation finishes.
+        runTest {
+            states.forEach { it.mutationsScope.cancel() }
+            states.map { it.mutationsScope.coroutineContext.job }.joinAll()
+        }
         Dispatchers.resetMain()
     }
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
+
+    @Test
+    fun teardownWaitsForCancellation() {
+        val state = state(context.getSharedPreferences("font-teardown", Context.MODE_PRIVATE))
+        var cleanedUp = false
+        val job =
+            state.mutationsScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                try {
+                    awaitCancellation()
+                } finally {
+                    withContext(NonCancellable + Dispatchers.Default) {
+                        withContext(Dispatchers.Main) {
+                            delay(1)
+                            cleanedUp = true
+                        }
+                    }
+                }
+            }
+
+        try {
+            tearDownMain()
+            assertTrue(job.isCompleted)
+            assertTrue(cleanedUp)
+        } finally {
+            setUpMain()
+        }
+    }
 
     @Test
     fun rapidSelectionsPersistTheLastStepAndRestoreOnReopen() =

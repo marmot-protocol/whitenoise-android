@@ -162,6 +162,46 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListBatchDialog.kt",
+      "symbol": "ChatListBatchDialog",
+      "bindings": [
+        {
+          "case": "chatstate-folder-exclude",
+          "selector": {
+            "text": "Changed: 1\nAlready satisfied: 0\nSkipped \\(unavailable\\): 0\nFailed: 0\nNot started: 0\nUnconfirmed: 0"
+          },
+          "scope": "Production captured-selection folder exclusion after creating a folder with the selected generated group. Exact successful counts and Close are directly asserted; removing that row from the folder does not dismiss the result. Native postcondition separately verifies the saved folder preference; UI absence verifies exclusion. Planned assertions, not an execution receipt.",
+          "entry_assertion": {
+            "text": "Changed: 1\nAlready satisfied: 0\nSkipped \\(unavailable\\): 0\nFailed: 0\nNot started: 0\nUnconfirmed: 0"
+          },
+          "opened_by": {
+            "text": "Exclude from this folder"
+          }
+        }
+      ],
+      "remaining": "Running progress, multiple or mixed-state targets, satisfied/unavailable/failed/not-started/unconfirmed outcomes, Check results, failed-only Retry, account/runtime retirement, source-filter replacement, translated/narrow/RTL large-text layout and physical-device interactions require separate execution evidence. This binding does not qualify those paths or full release proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListBatchDialog.kt",
+      "symbol": "ChatListBatchStatusDialog",
+      "bindings": [
+        {
+          "case": "chatstate-folder-exclude",
+          "selector": {
+            "text": "Changed: 1\nAlready satisfied: 0\nSkipped \\(unavailable\\): 0\nFailed: 0\nNot started: 0\nUnconfirmed: 0"
+          },
+          "scope": "Production captured-selection folder exclusion after creating a folder with the selected generated group. Exact successful counts and Close are directly asserted; removing that row from the folder does not dismiss the result. Native postcondition separately verifies the saved folder preference; UI absence verifies exclusion. Planned assertions, not an execution receipt.",
+          "entry_assertion": {
+            "text": "Changed: 1\nAlready satisfied: 0\nSkipped \\(unavailable\\): 0\nFailed: 0\nNot started: 0\nUnconfirmed: 0"
+          },
+          "opened_by": {
+            "text": "Exclude from this folder"
+          }
+        }
+      ],
+      "remaining": "Running progress, multiple or mixed-state targets, satisfied/unavailable/failed/not-started/unconfirmed outcomes, Check results, failed-only Retry, account/runtime retirement, source-filter replacement, translated/narrow/RTL large-text layout and physical-device interactions require separate execution evidence. This binding does not qualify those paths or full release proof."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderPickerSheet.kt",
       "symbol": "ChatFolderPickerSheet",
       "bindings": [
@@ -1066,6 +1106,26 @@
           }
         }
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerSendingIdentity.kt",
+      "symbol": "ComposerSendingIdentity",
+      "bindings": [
+        {
+          "case": "presentation-extra-composer-sending-identity",
+          "selector": {
+            "text": "Sending as"
+          },
+          "scope": "Actual composer opens the nonactive native draft owner popover; Back retains its draft and active account. Does not certify keyboard or account-switch lifecycle execution.",
+          "entry_assertion": {
+            "id": "composer-sending-identity-popup"
+          },
+          "opened_by": {
+            "id": "composer-sending-identity"
+          }
+        }
+      ],
+      "remaining": "Exact-source campaign execution, keyboard continuity and owner-switch lifecycle remain separate qualification."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationControls.kt",
@@ -1987,38 +2047,6 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationCategoryRows.kt",
-      "symbol": "NotificationSoundScopeDialog",
-      "bindings": [
-        {
-          "case": "presentation-extra-notification-scope-cancel",
-          "selector": {
-            "text": "Custom for this chat"
-          },
-          "scope": "notification-category parent opens its scope dialog, verifies default/custom controls and exact selected category. No Android notification channel is modified.",
-          "entry_assertion": {
-            "text": "Custom for this chat"
-          },
-          "opened_by": {
-            "id": "conversation-sound-scope-messages_group"
-          }
-        },
-        {
-          "case": "presentation-extra-notification-scope-select",
-          "selector": {
-            "text": "Custom for this chat"
-          },
-          "scope": "notification-category parent opens its scope dialog, verifies default/custom controls and exact selected category. No Android notification channel is modified.",
-          "entry_assertion": {
-            "text": "Custom for this chat"
-          },
-          "opened_by": {
-            "id": "conversation-sound-scope-messages_group"
-          }
-        }
-      ]
-    },
-    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationNotificationSettingsScreen.kt",
       "symbol": "ConversationNotificationSettingsScreen",
       "bindings": [
@@ -2077,25 +2105,6 @@
           },
           "entry_assertion": {
             "text": "Choose a pattern for new messages in this chat[.] Preview plays once[.]"
-          }
-        }
-      ]
-    },
-    {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/ConversationSoundAppearanceSheet.kt",
-      "symbol": "ConversationSoundAppearanceSheet",
-      "bindings": [
-        {
-          "case": "alerts-chat-sounds-back",
-          "selector": {
-            "id": "conversation-sound-appearance-content"
-          },
-          "scope": "chat notification drawer content, app navigation and Back.",
-          "entry_assertion": {
-            "id": "conversation-sound-appearance-content"
-          },
-          "opened_by": {
-            "id": "conversation-sound-appearance-open"
           }
         }
       ]
@@ -2289,15 +2298,29 @@
       ]
     },
     {
-      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupInfoScreen.kt",
-      "symbol": "ChatRelaysScreen",
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupRelaySettingsScreen.kt",
+      "symbol": "GroupRelaySettingsScreen",
       "bindings": [
         {
           "case": "groups-relays",
           "selector": {
-            "text": "Relays"
+            "text": "Configured relays"
           },
-          "scope": "group relay destination reached from chat info and backed out."
+          "scope": "Group relays destination reached from chat info for a native fixture group and backed out; no route mutation."
+        },
+        {
+          "case": "presentation-group-ui-relays-member-populated",
+          "selector": {
+            "text": "Only admins can change the relays this chat uses. You can view and copy them here."
+          },
+          "scope": "configured relay row and read-only member explanation; synthetic relay values, no dial or route mutation."
+        },
+        {
+          "case": "presentation-group-ui-relays-admin-empty",
+          "selector": {
+            "text": "No relays are configured for this chat."
+          },
+          "scope": "empty configured route with the admin editing-unavailable explanation; no dial or route mutation."
         }
       ]
     },
@@ -2310,14 +2333,7 @@
           "selector": {
             "text": "MLS group ID"
           },
-          "scope": "technical group identifiers and empty/populated relay rows; synthetic values, no native identifier or relay mutation."
-        },
-        {
-          "case": "presentation-group-ui-info-empty",
-          "selector": {
-            "text": "MLS group ID"
-          },
-          "scope": "technical group identifiers and empty/populated relay rows; synthetic values, no native identifier or relay mutation."
+          "scope": "technical group identifiers only; relays moved to Group relays; synthetic values, no native identifier mutation."
         }
       ]
     },
@@ -5988,6 +6004,51 @@
         }
       ],
       "remaining": "All-family selection and persistence, preview typography and independent scrolling, font/RTL/AMOLED layout, lifecycle and accessibility remain separately qualified. The native short-window regressions do not grant executed Maestro or physical proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ComposerSendMotion.kt",
+      "symbol": "Overlay",
+      "bindings": [
+        {
+          "case": "presentation-surface-motion-send",
+          "selector": {
+            "id": "conversation.send.motion.active"
+          },
+          "scope": "Tag emitted inside the actual production owner during controlled measured acceptance; mount/dismiss ownership only. No painted-pixel, timing or performance claim."
+        }
+      ],
+      "remaining": "Pixel fidelity and motion timing are separate native screenshot/feature qualification; device execution not yet established."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/reactions/LocalReactionMotion.kt",
+      "symbol": "Modifier.localReactionOverlay",
+      "bindings": [
+        {
+          "case": "presentation-surface-motion-reaction",
+          "selector": {
+            "id": "conversation.reaction.motion.active"
+          },
+          "scope": "Tag emitted inside the actual production owner during controlled measured acceptance; mount/dismiss ownership only. No painted-pixel, timing or performance claim."
+        }
+      ],
+      "remaining": "Pixel fidelity and motion timing are separate native screenshot/feature qualification; device execution not yet established."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AudioTranscription.kt",
+      "symbol": "AudioTranscriptDialog",
+      "bindings": [
+        {
+          "case": "presentation-audio-transcript-cancel",
+          "selector": {
+            "text": "Audio transcript"
+          },
+          "scope": "Production confirmation dialog disclosure and Cancel dispatch only; full received-audio provider/lifecycle behavior remains MED-038/MED-039.",
+          "entry_assertion": {
+            "text": "Audio transcript"
+          },
+          "visible_on_entry": true
+        }
+      ]
     }
   ]
 }

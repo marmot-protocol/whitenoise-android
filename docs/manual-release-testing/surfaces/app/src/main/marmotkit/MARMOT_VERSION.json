@@ -4,9 +4,9 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "Official MarmotKit 0.14.0 from 3fb4b475: verified archive/API; hosted populated October23 upgrade and cold reopen of already migrated schema/key format, retained identity/history/media/avatars/pending upload, Forever/removal/salts and recovery; no physical testing or downgrade; retain expiring nightly baseline",
+        "surface": "Testing-only MarmotKit October 30 nightly from f7178f0e: verified archive/API; typed stale-epoch media errors keep emoji and forward re-uploads; one-way migrations 0117-0134 over the 0.14.0 baseline need the hosted populated upgrade, cold restart, pending upload and recovery; no downgrade",
         "source": "app/src/main/marmotkit/MARMOT_VERSION",
-        "anchor": "artifact-id=0.14.0",
+        "anchor": "artifact-id=0.15.0-nightly.20261030",
         "test_ids": [
           "INT-010",
           "INT-003",

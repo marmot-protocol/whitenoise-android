@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** Identity-scoped presentation intent; an older completion must not retire a replacement. */
 internal class OptimisticArchiveIntent(
@@ -44,26 +45,48 @@ internal class ChatListArchiveActions(
     ): Int = commit(account, begin(groupIds, archived, epoch), archived, notify)
 
     /** Uses resolved off-window rows while preserving distinct admission and committed-completion fences. */
+    @Suppress("LongParameterList") // Preserve archive arguments plus optional per-target progress observers.
     suspend fun setArchivedRows(
         account: String,
         epoch: Long,
         resolved: ResolvedArchiveRows,
         archived: Boolean,
         notify: Boolean,
+        onAttempted: (String) -> Unit = {},
+        onSettled: (String, Boolean) -> Unit = { _, _ -> },
+        stepTimeoutMillis: Long? = null,
+        onTimedOut: (String) -> Unit = {},
+        notifyFailures: Boolean = true,
     ): Int {
         val intents = beginRows(resolved.rows, archived, epoch, resolved.isCurrent, resolved.completionIsCurrent)
-        return commit(account, intents, archived, notify)
+        return commit(
+            account,
+            intents,
+            archived,
+            notify,
+            onAttempted,
+            onSettled,
+            stepTimeoutMillis,
+            onTimedOut,
+            notifyFailures,
+        )
     }
 
     /**
      * Settles each overlay by identity after its native attempt; cancellation also retires unstarted overlays.
      * Errors and success feedback remain scoped to a current presentation, independently of committed work.
      */
+    @Suppress("LongParameterList") // The same archive owner carries optional attempt and settlement observers.
     private suspend fun commit(
         account: String,
         intents: List<Pair<String, OptimisticArchiveIntent>>,
         archived: Boolean,
         notify: Boolean,
+        onAttempted: (String) -> Unit = {},
+        onSettled: (String, Boolean) -> Unit = { _, _ -> },
+        stepTimeoutMillis: Long? = null,
+        onTimedOut: (String) -> Unit = {},
+        notifyFailures: Boolean = true,
     ): Int {
         if (intents.isEmpty()) return 0
         var succeeded = 0
@@ -71,12 +94,23 @@ internal class ChatListArchiveActions(
             intents.forEach { (groupIdHex, intent) ->
                 val applied =
                     runCatchingCancellable {
-                        updateGroup(account, groupIdHex, archived, intent)
+                        if (ownsIntent(groupIdHex, intent)) {
+                            onAttempted(groupIdHex)
+                            val updated =
+                                withArchiveDeadline(stepTimeoutMillis) {
+                                    updateGroup(account, groupIdHex, archived, intent)
+                                }
+                            if (updated == null) onTimedOut(groupIdHex)
+                            updated == true
+                        } else {
+                            false
+                        }
                     }.onFailure { error ->
-                        if (isCurrent(intent.bindEpoch) && intent.ownerIsCurrent()) onFailure(error)
+                        if (notifyFailures && isCurrent(intent.bindEpoch) && intent.ownerIsCurrent()) onFailure(error)
                     }.getOrDefault(false)
                 if (applied) succeeded += 1
                 finish(groupIdHex, intent)
+                onSettled(groupIdHex, applied)
             }
         } finally {
             // Cancellation retires unstarted overlays without rolling back native work.
@@ -167,4 +201,13 @@ internal class ChatListArchiveActions(
     fun clear() {
         intentsByGroup.clear()
     }
+}
+
+/** Bounds one native attempt; a timeout stays uncertain for explicit read-only recovery. */
+private suspend fun withArchiveDeadline(
+    timeoutMillis: Long?,
+    update: suspend () -> Boolean,
+): Boolean? {
+    if (timeoutMillis == null) return update()
+    return withTimeoutOrNull(timeoutMillis) { update() }
 }

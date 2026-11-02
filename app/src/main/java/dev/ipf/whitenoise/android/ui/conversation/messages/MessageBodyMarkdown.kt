@@ -6,7 +6,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.whitenoise.android.ui.parseMarkdownOrEmptyDocument
 import kotlinx.coroutines.ensureActive
 import kotlin.coroutines.coroutineContext
@@ -85,4 +87,13 @@ internal fun rememberMessageMarkdownDocumentForDisplayedBody(
         fallbackDocument = parsed.takeIf { it.blocks.isNotEmpty() }
     }
     return authoritativeDocument ?: fallbackDocument
+}
+
+/** Only one ordinary text leaf can share the accepted composer's actual ink geometry. */
+internal fun isSinglePlainSendParagraph(document: MarkdownDocumentFfi): Boolean {
+    if (document.truncated || document.blankLinesBefore.any { it.toInt() != 0 }) return false
+    val paragraph = document.blocks.singleOrNull() as? MarkdownBlockFfi.Paragraph
+    return paragraph?.inlines?.all {
+        it is MarkdownInlineFfi.Text || it == MarkdownInlineFfi.SoftBreak || it == MarkdownInlineFfi.HardBreak
+    } == true
 }

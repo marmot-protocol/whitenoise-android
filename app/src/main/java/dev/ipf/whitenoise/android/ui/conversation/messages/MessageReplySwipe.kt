@@ -179,10 +179,12 @@ internal fun BoxScope.MessageReplySwipeGlyph(
     physicalDirection: Int = if (LocalLayoutDirection.current == LayoutDirection.Ltr) 1 else -1,
     action: SwipeAction = SwipeAction.Reply,
 ) {
+    // Nothing is drawn at rest, so return before reading bounds that move with every list and entrance frame.
+    if (state.displayedDistance <= 0f) return
     val rowBounds = state.rowBoundsInRoot
     val bubbleBounds = state.bubbleBoundsInRoot
+    if (rowBounds == null || bubbleBounds == null) return
     val progress = state.progress
-    if (rowBounds == null || bubbleBounds == null || state.displayedDistance <= 0f) return
     val layoutDirection = LocalLayoutDirection.current
     val directionMultiplier = physicalDirection.toFloat()
     val density = LocalDensity.current

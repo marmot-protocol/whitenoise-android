@@ -1,0 +1,49 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppProfileSignUp.kt",
+  "legacy_sha256": "e8d7906530d6ddb22d74f7bd16af98028d34211787d6a431ecbeebeccbe45bf9",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "R.string.toast_couldnt_create_identity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppProfileSignUp.kt",
+        "anchor": "R.string.toast_couldnt_create_identity",
+        "test_ids": [
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "Sign Up native feedback: toast_couldnt_upload_profile_image",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppProfileSignUp.kt",
+        "anchor": "R.string.toast_couldnt_upload_profile_image",
+        "test_ids": [
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "R.string.toast_identity_created",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppProfileSignUp.kt",
+        "anchor": "R.string.toast_identity_created",
+        "test_ids": [
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "Sign Up waits for relay setup before the profile save",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppProfileSignUp.kt",
+        "anchor": "awaitOwnedNetworkReadiness(account)",
+        "test_ids": [
+          "ONB-003"
+        ]
+      },
+      {
+        "surface": "Sign Up relay-setup wait failure: toast_couldnt_publish_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppProfileSignUp.kt",
+        "anchor": "R.string.toast_couldnt_publish_profile",
+        "test_ids": [
+          "ONB-003"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

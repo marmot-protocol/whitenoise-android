@@ -37,6 +37,57 @@ import java.util.concurrent.atomic.AtomicInteger
 class KeptMediaLiveStateTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Trim preserves visible kept pixels through unrelated publications; disposal and explicit removal still win. */
+    @Test
+    fun trimCannotBlankTheKeptCardOrRetainItAfterDisposal() {
+        val surface = surface("image/png")
+        val bitmap = Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888)
+        val cacheKey = mediaCacheKey(SWIPE_TEST_ACCOUNT_REF, SWIPE_TEST_GROUP_ID, SWIPE_TEST_MESSAGE_ID, 0)
+        surface.controller.cacheThumbnail(SWIPE_TEST_MESSAGE_ID, 0, bitmap)
+        val mounted = androidx.compose.runtime.mutableStateOf(true)
+        var presentation: KeptMessagePresentation? = null
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                if (mounted.value) {
+                    KeptMediaTestHost(
+                        surface.item,
+                        conversation = surface.controller,
+                        onPresentation = { presentation = it },
+                    )
+                }
+            }
+        }
+        composeRule.runOnIdle {
+            surface.appState.trimPresentationMemory(dev.ipf.whitenoise.android.media.PresentationMemoryTrim.EMPTY)
+            surface.appState.cacheMediaThumbnail("unrelated", Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888))
+        }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            assertSame(
+                bitmap,
+                presentation!!
+                    .attachments
+                    .single()
+                    .thumbnail
+                    ?.asAndroidBitmap(),
+            )
+            surface.appState.removeMediaMemoryCacheEntry(cacheKey)
+        }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            assertNull(presentation!!.attachments.single().thumbnail)
+            surface.controller.cacheThumbnail(SWIPE_TEST_MESSAGE_ID, 0, bitmap)
+        }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { mounted.value = false }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            surface.appState.trimPresentationMemory(dev.ipf.whitenoise.android.media.PresentationMemoryTrim.EMPTY)
+            assertNull(surface.appState.cachedMediaThumbnail(cacheKey))
+            assertFalse(bitmap.isRecycled)
+        }
+    }
+
     /** Decoding can publish after plaintext hydration; no unrelated cache mutation is necessary. */
     @Test
     fun lateThumbnailPublicationUpdatesTheVisibleCard() {

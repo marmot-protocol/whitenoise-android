@@ -1,16 +1,20 @@
 package dev.ipf.whitenoise.android.ui.settings
 
-import androidx.compose.foundation.border
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -20,10 +24,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LocalPinnableContainer
 import androidx.compose.ui.layout.PinnableContainer
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import kotlin.math.roundToInt
 
 /** A drag previews movement locally; only dropping a surviving folder commits a reorder. */
@@ -34,38 +41,81 @@ internal class FolderDragState(
     var folderId: String? by mutableStateOf(null)
         private set
     private var center by mutableFloatStateOf(0f)
-    private var initialOffset = 0
     private var height = 0
-    private var scrolled by mutableFloatStateOf(0f)
+    private var pinned: PinnableContainer.PinnedHandle? = null
+    private var sourceIds = emptyList<String>()
+    private var expectedIds = emptyList<String>()
+    val placements = FolderDragPlacements(list)
+    private var releasePositions = emptyMap<String, Float>()
+    private var releaseFraction by mutableFloatStateOf(0f)
+    var releasing by mutableStateOf(false)
+        private set
+    var releaseGeneration by mutableIntStateOf(0)
+        private set
     val targetId by derivedStateOf { target(ids()) }
 
-    fun start(id: String) {
+    /** Captures authoritative geometry and pins the held row through release, including rejected offscreen saves. */
+    fun start(
+        id: String,
+        pinnable: PinnableContainer? = null,
+    ) {
         if (folderId != null) return
         val item = list.layoutInfo.visibleItemsInfo.firstOrNull { it.key == id } ?: return
-        center = item.offset + item.size / 2f
-        initialOffset = item.offset
+        pinned = pinnable?.pin()
+        releaseGeneration++
+        sourceIds = ids().toList()
+        center = (placements.top(id) ?: item.offset.toFloat()) + item.size / 2f
         height = item.size
-        scrolled = 0f
         folderId = id
     }
 
+    /** Pointer deltas stay in viewport coordinates while each row reports its actual lazy-list placement. */
     fun drag(distance: Float) {
+        if (releasing) return
         center += distance
     }
 
+    /** Ownership/order invalidation retires every transient coordinate without writing the store. */
     fun cancel() {
         folderId = null
+        releasing = false
+        releasePositions = emptyMap()
+        placements.clearTranslations()
+        pinned?.release()
+        pinned = null
     }
 
-    fun translation(id: String): Float {
-        if (id != folderId) return 0f
-        return center - initialOffset + scrolled - height / 2f
+    /** The dragged row follows the finger; siblings leave a measured insertion-sized gap. */
+    fun translation(id: String): Float =
+        when {
+            folderId == null -> 0f
+            releasing -> releaseTranslation(id)
+            id == folderId -> center - (placements.top(id) ?: center - height / 2f) - height / 2f
+            else -> siblingTranslation(id)
+        }
+
+    /** A surviving measured row settles from the captured release frame to its authoritative position. */
+    private fun releaseTranslation(id: String): Float {
+        val position = releasePositions[id]
+        val placedTop = placements.top(id)
+        return if (position != null && placedTop != null) (position - placedTop) * (1f - releaseFraction) else 0f
     }
 
-    fun recordScroll(distance: Float) {
-        scrolled += distance
+    /** Only siblings between the source and insertion target move by the grabbed row's measured footprint. */
+    private fun siblingTranslation(id: String): Float {
+        val current = ids()
+        val from = current.indexOf(folderId)
+        val to = current.indexOf(targetId)
+        val index = current.indexOf(id)
+        val displacement = (height + list.layoutInfo.mainAxisItemSpacing).toFloat()
+        return when {
+            from < to && index > from && index <= to -> -displacement
+            to >= 0 && to < from && index >= to && index < from -> displacement
+            else -> 0f
+        }
     }
 
+    /** Original layout slots remain stable while sibling draw offsets animate around the gap. */
     fun target(ids: List<String>): String? {
         if (folderId == null) return null
         return list.layoutInfo.visibleItemsInfo
@@ -74,19 +124,48 @@ internal class FolderDragState(
             ?.key as? String
     }
 
+    /** Commits the previewed insertion once, retaining the visible frame until the store responds. */
     fun drop(
         ids: List<String>,
         onMove: (String, Int) -> Unit,
     ) {
-        val id = folderId
+        val id = folderId ?: return
         val from = ids.indexOf(id)
         val to = ids.indexOf(target(ids))
-        cancel()
-        val validMove = from >= 0 && to >= 0 && from != to
-        if (id != null && validMove) onMove(id, to - from)
+        val missingEndpoint = from < 0 || to < 0
+        if (releasing || ids != sourceIds || missingEndpoint) return cancel()
+        releasePositions = placements.capture(ids)
+        expectedIds = ids.toMutableList().apply { add(to, removeAt(from)) }
+        releaseFraction = 0f
+        releasing = true
+        releaseGeneration++
+        if (from != to) onMove(id, to - from)
     }
 
+    /** Accept only our saved reorder; an external mutation cannot inherit stale drag coordinates. */
+    fun orderChanged(current: List<String>) {
+        if (folderId == null) return
+        if (current != sourceIds && (!releasing || current != expectedIds)) cancel()
+    }
+
+    /**
+     * Reads the authoritative layout after the synchronous store callback. A rejected save leaves
+     * the old order in place and animates back there, without claiming the preview was persisted.
+     */
+    suspend fun settle(enabled: Boolean) {
+        if (!releasing) return
+        val generation = releaseGeneration
+        withFrameNanos { }
+        if (!releasing) return
+        Animatable(0f).animateTo(1f, if (enabled) tween(RELEASE_MILLIS) else snap()) {
+            if (generation == releaseGeneration) releaseFraction = value
+        }
+        if (generation == releaseGeneration) cancel()
+    }
+
+    /** Bounds auto-scroll to the current viewport; release never keeps scrolling the list. */
     fun edgeScroll(edge: Float): Float {
+        if (releasing) return 0f
         val info = list.layoutInfo
         return when {
             center < info.viewportStartOffset + edge -> -SCROLL_PER_FRAME
@@ -97,6 +176,7 @@ internal class FolderDragState(
 
     private companion object {
         const val SCROLL_PER_FRAME = 12f
+        const val RELEASE_MILLIS = 180
     }
 }
 
@@ -109,12 +189,14 @@ internal fun rememberFolderDrag(
     val latestIds by rememberUpdatedState(ids)
     val drag = remember(list) { FolderDragState(list) { latestIds } }
     val edge = with(LocalDensity.current) { 48.dp.toPx() }
-    LaunchedEffect(ids) { drag.cancel() }
+    val enabled = rememberSystemAnimationsEnabled()
+    LaunchedEffect(ids) { drag.orderChanged(ids) }
+    LaunchedEffect(drag.releaseGeneration, enabled) { drag.settle(enabled) }
     LaunchedEffect(drag.folderId) {
         while (drag.folderId != null) {
             withFrameNanos { }
             val distance = drag.edgeScroll(edge)
-            if (distance != 0f) drag.recordScroll(list.scrollBy(distance))
+            if (distance != 0f) list.scrollBy(distance)
         }
     }
     return drag
@@ -132,45 +214,42 @@ internal fun Modifier.folderDragHandle(
     val latestMove by rememberUpdatedState(onMove)
     val pinnable = LocalPinnableContainer.current
     return pointerInput(id, drag) {
-        var pinned: PinnableContainer.PinnedHandle? = null
         try {
             detectDragGestures(
-                onDragStart = {
-                    pinned = pinnable?.pin()
-                    drag.start(id)
-                },
-                onDragEnd = {
-                    if (drag.folderId == id) drag.drop(latestIds, latestMove)
-                    pinned?.release()
-                    pinned = null
-                },
-                onDragCancel = {
-                    if (drag.folderId == id) drag.cancel()
-                    pinned?.release()
-                    pinned = null
-                },
+                onDragStart = { drag.start(id, pinnable) },
+                onDragEnd = { if (drag.folderId == id) drag.drop(latestIds, latestMove) },
+                onDragCancel = { if (drag.folderId == id) drag.cancel() },
             ) { change, amount ->
                 change.consume()
                 if (drag.folderId == id) drag.drag(amount.y)
             }
         } finally {
-            pinned?.release()
             if (drag.folderId == id) drag.cancel()
         }
     }
 }
 
-/** Lift the moving row above its peers and outline its current drop target. */
+/** Siblings animate around an insertion gap; the grabbed row and release frame remain exact. */
 @Composable
 internal fun folderDragRowModifier(
     id: String,
     drag: FolderDragState,
-    target: String?,
 ): Modifier {
+    val enabled = rememberSystemAnimationsEnabled()
     val moving = drag.folderId == id
-    val highlight = target == id && !moving
+    val siblingOffset by
+        animateFloatAsState(
+            targetValue = if (moving || drag.releasing) 0f else drag.translation(id),
+            animationSpec = if (enabled) tween(120) else snap(),
+            label = "folder insertion gap",
+        )
+    DisposableEffect(id, drag) { onDispose { drag.placements.forget(id) } }
     return Modifier
         .zIndex(if (moving) 1f else 0f)
-        .offset { IntOffset(0, drag.translation(id).roundToInt()) }
-        .then(if (highlight) Modifier.border(2.dp, MaterialTheme.colorScheme.primary) else Modifier)
+        .onPlaced { drag.placements.record(id, it.positionInParent().y) }
+        .offset {
+            val translation = if (moving || drag.releasing) drag.translation(id) else siblingOffset
+            drag.placements.recordTranslation(id, translation)
+            IntOffset(0, translation.roundToInt())
+        }
 }

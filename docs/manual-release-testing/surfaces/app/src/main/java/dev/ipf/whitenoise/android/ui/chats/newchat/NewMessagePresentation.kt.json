@@ -19,7 +19,8 @@
           "NCH-001",
           "NCH-002",
           "ACC-003",
-          "ACC-017"
+          "ACC-017",
+          "NCH-007"
         ]
       },
       {
@@ -30,7 +31,8 @@
           "NCH-001",
           "NCH-002",
           "ACC-003",
-          "ACC-017"
+          "ACC-017",
+          "NCH-007"
         ]
       },
       {
@@ -258,6 +260,14 @@
           "NCH-002",
           "ACC-003",
           "ACC-017"
+        ]
+      },
+      {
+        "surface": "setting:new_message_talk_to_agent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePresentation.kt",
+        "anchor": "R.string.new_message_talk_to_agent",
+        "test_ids": [
+          "NCH-007"
         ]
       }
     ],

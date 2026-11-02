@@ -228,6 +228,14 @@ internal abstract class ExternalSignerSignOutFixture {
                 .set(state, AppMarmotRuntime(rootPath = "test", marmot = marmot))
         }
 
+    /** Seed a ready screen through the existing private setter without expanding production visibility. */
+    protected fun markReady(state: WhiteNoiseAppState) {
+        WhiteNoiseAppState::class.java
+            .getDeclaredMethod("setPhase", AppPhase::class.java)
+            .apply { isAccessible = true }
+            .invoke(state, AppPhase.Ready)
+    }
+
     /** Models encrypted cleanup reads failing before and after native admission. */
     protected fun unavailablePushStore(beforeRead: () -> Unit = {}): PushTokenStore {
         val original = context.getSharedPreferences("sign-out-unavailable-push", Context.MODE_PRIVATE)

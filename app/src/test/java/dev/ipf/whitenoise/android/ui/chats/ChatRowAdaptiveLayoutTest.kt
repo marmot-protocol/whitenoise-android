@@ -151,15 +151,16 @@ class ChatRowAdaptiveLayoutTest {
         assertTrue(metadataBounds.right <= previewBounds.left)
     }
 
+    /** Selection adds its leading strip while retaining both existing metadata rows at their measured positions. */
     @Test
-    fun selectionModeReplacesTimestampAndSupportingMetadata() {
+    fun selectionModePreservesTimestampAndSupportingMetadata() {
         render(
             showMetadata = true,
             selectionMode = true,
         )
 
-        composeRule.onNodeWithText(nowText).assertDoesNotExist()
-        composeRule.onNodeWithTag(METADATA_TAG, useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithText(nowText).assertExists()
+        composeRule.onNodeWithTag(METADATA_TAG, useUnmergedTree = true).assertExists()
         composeRule
             .onNodeWithTag(CHAT_ROW_SELECTION_INDICATOR_TAG, useUnmergedTree = true)
             .assertExists()
@@ -195,6 +196,26 @@ class ChatRowAdaptiveLayoutTest {
 
         assertTrue(titleBounds.right <= timestampBounds.left)
         assertTrue(previewBounds.right <= metadataBounds.left)
+    }
+
+    /** Selection consumes leading space without pushing the measured trailing columns outside an RTL row. */
+    @Test
+    fun selectedRtlRowAtDoubleTextScaleRetainsBothTrailingColumns() {
+        render(
+            layoutDirection = LayoutDirection.Rtl,
+            showMetadata = true,
+            selectionMode = true,
+            fontScale = 2f,
+        )
+        val row = composeRule.onNodeWithTag(ROW_TAG, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val title = composeRule.onNodeWithText(TITLE, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val timestamp = composeRule.onNodeWithText(nowText, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val preview = composeRule.onNodeWithTag(PREVIEW_TAG, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val metadata = composeRule.onNodeWithTag(METADATA_TAG, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue(timestamp.width > 0f && metadata.width > 0f)
+        assertTrue(timestamp.left >= row.left && timestamp.right <= title.left)
+        assertTrue(metadata.left >= row.left && metadata.right <= preview.left)
+        assertTrue(title.right <= row.right && preview.right <= row.right)
     }
 
     private fun render(

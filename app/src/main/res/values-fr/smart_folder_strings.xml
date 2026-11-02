@@ -64,4 +64,17 @@
     <string name="smart_folder_always_include">Toujours inclure des discussions</string>
     <string name="smart_folder_read_help">Tout lu ne signifie pas que l’agent a terminé.</string>
   <string name="folder_show_when_empty">Afficher même vide</string>
+  <string name="smart_folder_quick_start">Utiliser les filtres rapides</string>
+  <string name="smart_folder_quick_hint">Choisissez une des deux options pour restreindre les discussions. Touchez-la à nouveau pour supprimer cette restriction. Enregistrer applique vos modifications.</string>
+  <string name="smart_folder_quick_accepted">Discussions acceptées uniquement. Cette restriction est conservée lors de la réinitialisation ; modifiez-la dans Avancé.</string>
+  <string name="smart_folder_quick_not_accepted">Discussions acceptées : Non. Cette restriction est conservée lors de la réinitialisation ; modifiez-la dans Avancé.</string>
+  <string name="smart_folder_quick_reset">Réinitialiser les filtres rapides</string>
+  <string name="smart_folder_quick_unread">Non lus</string>
+  <string name="smart_folder_quick_not_muted">Pas en sourdine</string>
+  <string name="smart_folder_quick_not_pinned">Non épinglée</string>
+  <string name="smart_folder_quick_not_archived">Non archivée</string>
+  <string name="smart_folder_quick_neutral">Aucune sélection</string>
+  <string name="smart_folder_quick_state">%1$s: %2$s</string>
+  <string name="smart_folder_quick_expanded">Développé</string>
+  <string name="smart_folder_quick_collapsed">Réduit</string>
 </resources>

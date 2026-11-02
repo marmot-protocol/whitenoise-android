@@ -25,6 +25,8 @@ RAW_ALLOWED = {
     # The profile-host relay confirmation test does not exercise this sheet's real IME geometry.
     ('settings/RelaysScreen.kt', 'verticalScroll'),
     ('common/WhiteNoiseScaffold.kt', 'verticalScroll'),
+    # Fixed footer chrome shares scrolling with a sibling dictation capsule; neither is masked content.
+    ('navigation/FloatingDictationAnchor.kt', 'verticalScroll'),
 }
 RAW = {'verticalScroll', 'LazyColumn', 'LazyVerticalGrid'}
 

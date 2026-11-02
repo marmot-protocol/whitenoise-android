@@ -362,12 +362,13 @@ class MessageBubbleFileAttachmentScreenshotTest : MessageBubbleFileAttachmentFix
         assertNodeInsideCard(failedCardTag, text = CONFIRMED_FAILED_TIME)
         assertDescriptionInsideCard(failedCardTag, description = "Send failed")
 
-        // Below the card, the caption's warning and time keep separate rows, as a text bubble's do.
+        // The caption owns one terminal footer; the file card must not duplicate it.
         val warningBounds =
             composeRule.onNodeWithText(DELIVERY_NOT_CONFIRMED, useUnmergedTree = true).getUnclippedBoundsInRoot()
         val timestampBounds =
             composeRule.onNodeWithText(CAPTIONED_UNCONFIRMED_TIME, useUnmergedTree = true).getUnclippedBoundsInRoot()
-        assertTrue(warningBounds.bottom <= timestampBounds.top || timestampBounds.bottom <= warningBounds.top)
+        assertTrue(warningBounds.bottom <= timestampBounds.bottom)
+        assertTrue(warningBounds.bottom <= timestampBounds.top || warningBounds.right <= timestampBounds.left)
     }
 
     private data class FooterMatrixFixtures(

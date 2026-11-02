@@ -56,6 +56,7 @@ class AttachmentPolicyStartupOrderingTest {
         val adapter = source("AppProfileSignUp.kt").readText()
         val create = adapter.functionBody("createOwnedIdentity")
         assertOrdered(create, "withCurrentAccountLifetime", "createIdentityWithBootstrapRelays()")
+        assertOrdered(create, "withCurrentAccountLifetime", "createNamedIdentity(initialProfile)")
         val qualify = adapter.functionBody("qualifyOwnedIdentity")
         assertOrdered(qualify, "ownsCreatingRuntime(summary)", "enforceAppOwnedAttachmentAcquisitionPolicy")
         val direct = adapter.functionBody("createIdentityWithoutProfile")

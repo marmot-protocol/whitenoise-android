@@ -65,7 +65,7 @@ class LocalNotificationEnrichmentLifetimeTest {
             assertTrue(
                 presenter.show(
                     alertBudgetUpdate("first", 1_000),
-                    senderAvatarUrl = "https://example.com/fixture.png",
+                    conversationAvatarUrl = "https://example.com/general.png",
                     shortNpub = { "npub1fixture" },
                 ),
             )
@@ -117,7 +117,7 @@ class LocalNotificationEnrichmentLifetimeTest {
             assertTrue(
                 presenter.show(
                     alertBudgetUpdate("first", 1_000),
-                    senderAvatarUrl = "https://example.com/fixture.png",
+                    conversationAvatarUrl = "https://example.com/general.png",
                     isPostStillAllowed = isPostAllowed::get,
                     shortNpub = { "npub1fixture" },
                 ),
@@ -173,7 +173,7 @@ class LocalNotificationEnrichmentLifetimeTest {
             assertTrue(
                 presenter.show(
                     alertBudgetUpdate("first", 1_000),
-                    senderAvatarUrl = "https://example.com/fixture.png",
+                    conversationAvatarUrl = "https://example.com/general.png",
                     shortNpub = { "npub1fixture" },
                 ),
             )

@@ -14,6 +14,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -36,6 +37,7 @@ internal class ConversationTimelineViewport(
     private val listState: LazyListState,
 ) {
     private var measuredTimelinePublication: List<TimelineMessage>? = null
+    private var measuredNativeLayout: LazyListLayoutInfo? = null
 
     /** A committed controller page is presentable only after its matching composition has measured. */
     fun hasMeasuredTimeline(publication: List<TimelineMessage>): Boolean = measuredTimelinePublication === publication
@@ -43,6 +45,8 @@ internal class ConversationTimelineViewport(
     /** Acknowledges the immutable publication captured by the completed native list measure. */
     fun onTimelineMeasured(publication: List<TimelineMessage>) {
         measuredTimelinePublication = publication
+        // Capture the completed native object without subscribing this outer measure to its publication.
+        measuredNativeLayout = Snapshot.withoutReadObservation { listState.layoutInfo }
     }
 
     var enabled by mutableStateOf(false)
@@ -97,8 +101,33 @@ internal class ConversationTimelineViewport(
         measuredPadding = basePx.coerceAtLeast(0) to overlapPx.coerceAtLeast(0)
     }
 
+    /** Projects only padding consumed by the same completed native measure as this accepted row. */
+    fun composerSendProjection(
+        publication: List<TimelineMessage>,
+        presentationId: String?,
+    ): ComposerSendViewportProjection? {
+        val native = listState.layoutInfo
+        val sameMeasure = enabled && hasMeasuredTimeline(publication) && native === measuredNativeLayout
+        val acceptedRow =
+            presentationId == null ||
+                publication.lastOrNull()?.presentationId == presentationId ||
+                publication.any { it.presentationId == presentationId }
+        val (base, measuredOverlap) = measuredPadding
+        val consumed = native.beforeContentPadding - base
+        val validOverlap = consumed in 0..measuredOverlap
+        return paintBoundsInWindow?.takeIf { sameMeasure && acceptedRow && validOverlap }?.let {
+            ComposerSendViewportProjection(it, consumed.toFloat())
+        }
+    }
+
     /** Returns the clear measured height consumed by native centering, tail, selection and speech owners. */
-    fun readingHeightPx(): Int = readingLayoutInfo().viewportSize.height
+    fun readingHeightPx(): Int {
+        val native = listState.layoutInfo
+        val (base, overlap) = measuredPadding
+        val laidOutOverlap = (native.beforeContentPadding - base).coerceIn(0, overlap)
+        // Geometry-only callers do not need a projected list or a filtered copy of every visible row.
+        return native.viewportSize.height - laidOutOverlap.coerceIn(0, native.viewportSize.height)
+    }
 
     /** Native newest-edge clamp, independent of a requested reading-start offset. */
     val isAtNaturalTail: Boolean

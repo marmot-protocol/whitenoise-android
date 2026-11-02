@@ -3,6 +3,7 @@ name: folder-rules-replace-saved-confirm
 ---
 - runFlow: ../fixtures/open-fixture-read-folder-preset.yaml
 - runFlow: ../fixtures/save-and-reopen-smart-folder.yaml
+- runFlow: ../fixtures/show-folder-rule-tree.yaml
 - scrollUntilVisible:
     element:
       id: folder.presets
@@ -25,6 +26,7 @@ name: folder-rules-replace-saved-confirm
     id: folder.condition.2
 - assertVisible: ^Has unread mentions$
 - runFlow: ../fixtures/save-and-reopen-smart-folder.yaml
+- runFlow: ../fixtures/show-folder-rule-tree.yaml
 - scrollUntilVisible:
     element:
       id: folder.condition.2

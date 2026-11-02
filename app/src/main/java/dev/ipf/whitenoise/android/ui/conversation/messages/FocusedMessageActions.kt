@@ -84,7 +84,9 @@ import androidx.compose.ui.window.PopupPositionProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiGlyph
+import dev.ipf.whitenoise.android.ui.conversation.reactions.reactionSourceBounds
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
+import dev.ipf.whitenoise.android.ui.emojiPlainLabel
 import dev.ipf.whitenoise.android.ui.theme.Typography
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.outlineSelectionColor
@@ -276,6 +278,7 @@ internal fun FocusedMessageActions(
     previewReady: Boolean,
     preview: (@Composable () -> Unit)?,
     onReact: (String) -> Unit,
+    onReactionOrigin: ((String, androidx.compose.ui.geometry.Rect) -> Unit)? = null,
     onMoreReactions: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -376,6 +379,7 @@ internal fun FocusedMessageActions(
                         sizing = reactionSizing,
                         selectedReactions = selectedReactions,
                         onReact = onReact,
+                        onReactionOrigin = onReactionOrigin,
                         onMoreReactions = onMoreReactions,
                     )
                 }
@@ -543,12 +547,14 @@ internal data class FocusedReactionSizing(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("LongParameterList")
 private fun FocusedReactionRail(
     quickReactions: List<String>,
     sizing: FocusedReactionSizing,
     selectedReactions: Set<String>,
     onReact: (String) -> Unit,
     onMoreReactions: () -> Unit,
+    onReactionOrigin: ((String, androidx.compose.ui.geometry.Rect) -> Unit)? = null,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth().testTag(FOCUSED_REACTION_RAIL_TEST_TAG),
@@ -577,12 +583,17 @@ private fun FocusedReactionRail(
                         Modifier.weight(1f, fill = false).widthIn(max = sizing.target * 2).fillMaxWidth()
                     }
                 quickReactions.forEach { emoji ->
+                    var reactionBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
                     FocusedReactionTarget(
                         emoji = emoji,
                         selected = emoji in selectedReactions,
                         sizing = sizing,
                         modifier = cell,
-                        onClick = { onReact(emoji) },
+                        onGlyphBounds = { reactionBounds = it },
+                        onClick = {
+                            reactionBounds?.let { onReactionOrigin?.invoke(emoji, it) }
+                            onReact(emoji)
+                        },
                     )
                 }
                 FocusedMoreReactionsTarget(sizing = sizing, modifier = cell, onClick = onMoreReactions)
@@ -593,15 +604,18 @@ private fun FocusedReactionRail(
 
 /** One quick-reaction emoji target, as wide as its share of the row and [sizing]'s target tall. */
 @Composable
+@Suppress("LongParameterList")
 private fun FocusedReactionTarget(
     emoji: String,
     selected: Boolean,
     sizing: FocusedReactionSizing,
     modifier: Modifier,
+    onGlyphBounds: (androidx.compose.ui.geometry.Rect) -> Unit = {},
     onClick: () -> Unit,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
+    val description = emojiPlainLabel(emoji)
     Box(
         modifier =
             modifier
@@ -613,7 +627,7 @@ private fun FocusedReactionTarget(
                     onClick = onClick,
                 ).semantics {
                     this.selected = selected
-                    contentDescription = emoji
+                    contentDescription = description
                 }.testTag("$MESSAGE_ACTION_REACTION_TEST_TAG:$emoji"),
         contentAlignment = Alignment.Center,
     ) {
@@ -642,14 +656,37 @@ private fun FocusedReactionTarget(
                     },
             ) {
                 Box(contentAlignment = Alignment.Center) {
-                    EmojiGlyph(emoji, size = sizing.emoji)
+                    MeasuredReactionGlyph(emoji, sizing.emoji, onGlyphBounds)
                 }
             }
         }
     }
 }
 
-/** The target that opens the full emoji picker, sized like the reaction targets beside it. */
+/** Bundled/custom artwork keeps existing feedback; only already-rendered system glyphs fly. */
+@Composable
+private fun MeasuredReactionGlyph(
+    emoji: String,
+    size: Dp,
+    onBounds: (androidx.compose.ui.geometry.Rect) -> Unit,
+) {
+    val systemGlyph =
+        dev.ipf.whitenoise.android.ui.EmojiShortcodes.art(
+            emoji,
+            dev.ipf.whitenoise.android.ui.LocalCustomEmoji.current,
+            emptyMap(),
+        ) == null
+    EmojiGlyph(
+        emoji,
+        size = size,
+        modifier =
+            Modifier.reactionSourceBounds { bounds ->
+                onBounds(if (systemGlyph) bounds else androidx.compose.ui.geometry.Rect.Zero)
+            },
+    )
+}
+
+/** Opens the full emoji picker, sized like the reaction targets beside it. */
 @Composable
 private fun FocusedMoreReactionsTarget(
     sizing: FocusedReactionSizing,

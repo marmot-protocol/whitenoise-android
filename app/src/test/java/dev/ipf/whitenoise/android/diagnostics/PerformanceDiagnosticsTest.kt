@@ -459,7 +459,6 @@ class PerformanceDiagnosticBuildGateTest {
         val debug = gradle.substringAfter("debug {").substringBefore("release {")
 
         assertTrue(defaultConfig.contains("ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS\", \"false"))
-        assertTrue(defaultConfig.contains("APP_SHORT_SHA\", buildShortSha.asBuildConfigString()"))
         assertFalse(production.contains("ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS\", \"true"))
         assertTrue(dev.contains("ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS\", \"true"))
         assertTrue(preview.contains("ENABLE_LOCAL_PERFORMANCE_DIAGNOSTICS\", \"true"))

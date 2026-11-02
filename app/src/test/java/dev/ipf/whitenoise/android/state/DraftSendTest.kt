@@ -74,6 +74,43 @@ class DraftSendTest {
             assertEquals(listOf("selectedMessageDraft", "sendMediaAttachments"), mismatched.calls)
         }
 
+    /** A draft whose media references MDK refuses, stale or unsettled epoch included, falls back to a direct send. */
+    @Test
+    fun refusedMediaReferencesFallBackToDirectSend() =
+        runBlocking {
+            for (refusal in listOf(
+                MarmotKitException.InvalidMediaReference("synthetic"),
+                MarmotKitException.MediaReferenceStaleEpoch(sourceEpoch = 3uL, currentEpoch = 4uL),
+                MarmotKitException.MediaReferenceEpochUnsettled(sourceEpoch = 3uL),
+            )) {
+                val draft = content("cap", attachments = listOf(jpeg("a.jpg")))
+                val engine = ScriptedEngine(draft = draft, draftSendFailure = refusal)
+                engine.marmot.sendComposerMedia("acct", "group", listOf(reference("a.jpg", "image/jpeg")), "cap")
+                assertEquals(
+                    listOf("selectedMessageDraft", "sendMessageDraft", "sendMediaAttachments"),
+                    engine.calls,
+                )
+            }
+        }
+
+    /** Any other draft-send failure reaches the caller instead of being retried as a direct send. */
+    @Test
+    fun otherDraftSendFailuresPropagate() =
+        runBlocking {
+            val engine =
+                ScriptedEngine(
+                    draft = content("cap", attachments = listOf(jpeg("a.jpg"))),
+                    draftSendFailure = MarmotKitException.MediaUnfetchable("synthetic"),
+                )
+            val failure =
+                runCatching {
+                    engine.marmot.sendComposerMedia("acct", "group", listOf(reference("a.jpg", "image/jpeg")), "cap")
+                }.exceptionOrNull()
+
+            assertTrue(failure is MarmotKitException.MediaUnfetchable)
+            assertFalse("sendMediaAttachments" in engine.calls)
+        }
+
     /** Tokenized retries fail closed when their draft is missing instead of publishing a duplicate. */
     @Test
     fun tokenizedMediaRetryNeverFallsBackToUnkeyedSend() =
@@ -118,6 +155,7 @@ private class ScriptedEngine private constructor() : Marmot(NoPointer) {
     // Allocated without a constructor, so every field is assigned in [invoke] rather than by an initialiser.
     private var draft: SelectedMessageDraftContentFfi? = null
     private var conflictOnSave = false
+    private var draftSendFailure: MarmotKitException? = null
     lateinit var calls: MutableList<String>
     var savedContent: String? = null
     private lateinit var revision: MessageDraftRevisionFfi
@@ -179,7 +217,13 @@ private class ScriptedEngine private constructor() : Marmot(NoPointer) {
         accountRef: String,
         revision: MessageDraftRevisionFfi,
         attachments: List<MediaAttachmentReferenceFfi>,
-    ): SendSummaryFfi = record("sendMessageDraft")
+    ): SendSummaryFfi {
+        draftSendFailure?.let {
+            calls += "sendMessageDraft"
+            throw it
+        }
+        return record("sendMessageDraft")
+    }
 
     override suspend fun sendText(
         accountRef: String,
@@ -216,10 +260,12 @@ private class ScriptedEngine private constructor() : Marmot(NoPointer) {
         operator fun invoke(
             draft: SelectedMessageDraftContentFfi?,
             conflictOnSave: Boolean = false,
+            draftSendFailure: MarmotKitException? = null,
         ): ScriptedEngine =
             nativeStub(ScriptedEngine::class.java).apply {
                 this.draft = draft
                 this.conflictOnSave = conflictOnSave
+                this.draftSendFailure = draftSendFailure
                 this.calls = mutableListOf()
                 this.revision = nativeStub(MessageDraftRevisionFfi::class.java)
             }

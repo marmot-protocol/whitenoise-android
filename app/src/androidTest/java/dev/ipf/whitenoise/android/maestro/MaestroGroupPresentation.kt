@@ -12,6 +12,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoisePickerItem
 import dev.ipf.whitenoise.android.ui.group.DisappearingMessagesPickerDialog
 import dev.ipf.whitenoise.android.ui.group.GroupEmojiImagePickerSheet
 import dev.ipf.whitenoise.android.ui.group.GroupInfoScreen
+import dev.ipf.whitenoise.android.ui.group.GroupRelaySettingsScreen
 import dev.ipf.whitenoise.android.ui.group.ImageSearchSheet
 import dev.ipf.whitenoise.android.ui.group.MuteDurationDialog
 import dev.ipf.whitenoise.android.ui.group.NotifyForDialog
@@ -28,8 +29,14 @@ internal fun MaestroGroupPresentation(fixture: MaestroPresentationFixture) {
             GroupInfoScreen(
                 groupIdHex = "11".repeat(32),
                 nostrGroupIdHex = "22".repeat(32),
+                onBack = { fixture.finish("dismiss") },
+            )
+        fixture.scenario.startsWith("group-ui-relays-") ->
+            GroupRelaySettingsScreen(
                 relays =
                     if (fixture.scenario.endsWith("empty")) emptyList() else listOf("wss://fixture.example.invalid"),
+                isDm = false,
+                isAdmin = fixture.scenario.contains("-admin-"),
                 onBack = { fixture.finish("dismiss") },
             )
         fixture.scenario.startsWith("group-ui-notify-") ->

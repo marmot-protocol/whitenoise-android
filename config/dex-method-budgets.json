@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "variants": {
+    "productionZapstoreRelease": {
+      "kind": "shipping",
+      "max_insns_code_units": 13106,
+      "max_registers": 13106,
+      "basis": {
+        "source_sha": "b5781c3b04aa7a3bb7abd4235db062d499299bdf",
+        "artifact": "productionZapstoreRelease x86_64 APK from release-runtime run 41103811774 (this PR merged into master d86bdf508), R8 9.4.24, map id c97a02e4cc3ba0a3",
+        "largest_insns_code_units": 11130,
+        "largest_registers": 273
+      }
+    },
+    "stagingZapstoreRelease": {
+      "kind": "shipping",
+      "max_insns_code_units": 13106,
+      "max_registers": 13106,
+      "basis": {
+        "source_sha": "8342b521687aa1454e4a0e4beba97656b8f43d89",
+        "artifact": "stagingZapstoreRelease arm64-v8a, R8 9.4.24, map id 93810d83cdd4ec06",
+        "largest_insns_code_units": 11671,
+        "largest_registers": 270
+      }
+    },
+    "devZapstoreBenchmarkRelease": {
+      "kind": "benchmark",
+      "max_insns_code_units": 16382,
+      "max_registers": 16382,
+      "basis": {
+        "source_sha": "8342b521687aa1454e4a0e4beba97656b8f43d89",
+        "artifact": "devZapstoreBenchmarkRelease universal APK, unminified D8 9.4.24",
+        "largest_insns_code_units": 15767,
+        "largest_registers": 299
+      }
+    }
+  }
+}

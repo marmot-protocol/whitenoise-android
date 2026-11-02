@@ -64,4 +64,17 @@
     <string name="smart_folder_always_include">Chats immer einschließen</string>
     <string name="smart_folder_read_help">Alles gelesen bedeutet nicht, dass der Agent fertig ist.</string>
   <string name="folder_show_when_empty">Auch leer anzeigen</string>
+  <string name="smart_folder_quick_start">Schnellfilter verwenden</string>
+  <string name="smart_folder_quick_hint">Wähle eine der beiden Optionen, um die Chats einzuschränken. Tippe erneut darauf, um diese Einschränkung aufzuheben. Speichern übernimmt deine Änderungen.</string>
+  <string name="smart_folder_quick_accepted">Nur angenommene Chats. Diese Einschränkung bleibt beim Zurücksetzen erhalten; ändere sie unter Erweitert.</string>
+  <string name="smart_folder_quick_not_accepted">Angenommene Chats: Nein. Diese Einschränkung bleibt beim Zurücksetzen erhalten; ändere sie unter Erweitert.</string>
+  <string name="smart_folder_quick_reset">Schnellfilter zurücksetzen</string>
+  <string name="smart_folder_quick_unread">Ungelesen</string>
+  <string name="smart_folder_quick_not_muted">Nicht stummgeschaltet</string>
+  <string name="smart_folder_quick_not_pinned">Nicht angeheftet</string>
+  <string name="smart_folder_quick_not_archived">Nicht archiviert</string>
+  <string name="smart_folder_quick_neutral">Nichts ausgewählt</string>
+  <string name="smart_folder_quick_state">%1$s: %2$s</string>
+  <string name="smart_folder_quick_expanded">Ausgeklappt</string>
+  <string name="smart_folder_quick_collapsed">Eingeklappt</string>
 </resources>

@@ -2,11 +2,18 @@ package dev.ipf.whitenoise.android.ui
 
 import android.content.Context
 import android.os.SystemClock
+import android.view.inspector.WindowInspector
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -15,13 +22,21 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatsController
@@ -49,6 +64,7 @@ import org.junit.Rule
 import org.junit.Test
 
 /** Shell navigation on a real device: avatar entry, startup and loading surfaces, and conversation routing. */
+@PullRequestDeviceSmoke
 class AppNavigationTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -258,6 +274,116 @@ class AppNavigationTest {
         val profileTop = profile.fetchSemanticsNode().boundsInRoot.top
         assertTrue("the banner stays clear of the account row", noticeBounds.bottom <= profileTop)
     }
+
+    /** The actual shell admits one focused editor and real IME; explicit close resets the query before re-entry. */
+    @Test
+    fun actualSearchCloseAndReentryKeepOneEditorAndExistingClearPolicy() {
+        val appState = appState()
+        composeRule.setContent { WhiteNoiseTheme { MainShell(appState = appState) } }
+        val controller = awaitAttachedChatsController(appState)
+        try {
+            composeRule.onNodeWithContentDescription(context.getString(R.string.chat_list_search_open)).performClick()
+            composeRule.onAllNodes(hasSetTextAction()).assertCountEquals(1)
+            composeRule.onNodeWithTag("chats.searchField").assertIsFocused().performTextInput("local query")
+            composeRule.waitUntil(timeoutMillis = 10_000) { realImeVisible() }
+            assertEquals(
+                "local query",
+                composeRule
+                    .onNodeWithTag("chats.searchField")
+                    .fetchSemanticsNode()
+                    .config[SemanticsProperties.EditableText]
+                    .text,
+            )
+            composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+            composeRule.onNodeWithTag("chats.searchField").assertDoesNotExist()
+            composeRule.onAllNodes(hasSetTextAction()).assertCountEquals(0)
+            composeRule.onNodeWithContentDescription(context.getString(R.string.chat_list_search_open)).performClick()
+            composeRule.onAllNodes(hasSetTextAction()).assertCountEquals(1)
+            composeRule.onNodeWithTag("chats.searchField").assertIsFocused()
+            assertEquals(
+                "closing search deliberately clears its query",
+                "",
+                composeRule
+                    .onNodeWithTag("chats.searchField")
+                    .fetchSemanticsNode()
+                    .config[SemanticsProperties.EditableText]
+                    .text,
+            )
+        } finally {
+            composeRule.runOnIdle { controller.onCleared() }
+        }
+    }
+
+    /** The real Appearance route keeps readability simulations local and Reset restores its inherited text layout. */
+    @Test
+    fun actualAppearanceSampleResetsWithoutChangingAppOrSystemPreferences() {
+        val appState = appState()
+        val appFont = appState.appFont
+        val appScale = appState.fontScale
+        val appTheme = appState.themeMode
+        val systemScale = context.resources.configuration.fontScale
+        val systemDirection = context.resources.configuration.layoutDirection
+        composeRule.setContent { WhiteNoiseTheme { MainShell(appState = appState) } }
+        val controller = awaitAttachedChatsController(appState)
+        try {
+            composeRule.onNodeWithContentDescription("Open settings", substring = true).performClick()
+            composeRule.onNodeWithText(context.getString(R.string.appearance)).performScrollTo().performClick()
+            val initial = appearanceSampleLayout().layoutInput
+            // Compose's text input retains a live Density; snapshot its value before changing the preview.
+            val initialFontScale = initial.density.fontScale
+            val initialDirection = initial.layoutDirection
+            composeRule
+                .onNodeWithText(context.getString(R.string.appearance_preview_rtl))
+                .performScrollTo()
+                .performClick()
+            composeRule
+                .onNodeWithText(context.getString(R.string.appearance_preview_large_text))
+                .performScrollTo()
+                .performClick()
+            val simulated = appearanceSampleLayout().layoutInput
+            assertEquals(initialFontScale * 2f, simulated.density.fontScale)
+            assertEquals(androidx.compose.ui.unit.LayoutDirection.Rtl, simulated.layoutDirection)
+            composeRule
+                .onNodeWithText(context.getString(R.string.appearance_preview_reset))
+                .performScrollTo()
+                .performClick()
+            val restored = appearanceSampleLayout().layoutInput
+            assertEquals(initialFontScale, restored.density.fontScale)
+            assertEquals(initialDirection, restored.layoutDirection)
+            composeRule.runOnIdle {
+                assertEquals(appFont, appState.appFont)
+                assertEquals(appScale, appState.fontScale)
+                assertEquals(appTheme, appState.themeMode)
+                assertEquals(systemScale, context.resources.configuration.fontScale)
+                assertEquals(systemDirection, context.resources.configuration.layoutDirection)
+            }
+        } finally {
+            composeRule.runOnIdle { controller.onCleared() }
+        }
+    }
+
+    /** Reads actual sample text metrics after scrolling the production Appearance screen to it. */
+    private fun appearanceSampleLayout(): TextLayoutResult {
+        composeRule.onNodeWithTag("settings.list").performScrollToNode(hasTestTag("appearance.accessibility.preview"))
+        val layouts = mutableListOf<TextLayoutResult>()
+        composeRule
+            .onNode(
+                hasText(context.getString(R.string.font_size_sample_received)) and
+                    hasAnyAncestor(hasTestTag("appearance.accessibility.sample")),
+                useUnmergedTree = true,
+            ).performScrollTo()
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        return layouts.single()
+    }
+
+    /** Observes the actual focused Android window instead of inferring keyboard visibility from focus alone. */
+    private fun realImeVisible(): Boolean =
+        composeRule.runOnUiThread {
+            WindowInspector.getGlobalWindowViews().any { view ->
+                view.hasWindowFocus() &&
+                    ViewCompat.getRootWindowInsets(view)?.isVisible(WindowInsetsCompat.Type.ime()) == true
+            }
+        }
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
 

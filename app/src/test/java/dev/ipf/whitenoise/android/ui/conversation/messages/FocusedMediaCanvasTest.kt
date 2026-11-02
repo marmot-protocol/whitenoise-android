@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.unit.Density
@@ -31,6 +32,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.MasonryImageLayout
 import dev.ipf.whitenoise.android.ui.conversation.media.imageBubbleSizing
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -97,6 +99,7 @@ class FocusedMediaCanvasTest {
         composeRule.runOnIdle { parentWidth = 160.dp }
         composeRule.waitForIdle()
         assertEquals("75% of the canvas the narrow row offers", narrowWidth * 0.75f, bounds("canvas").width, 1f)
+        assertMediaMetadataRow()
         assertEquals(narrowHeight * 0.75f, bounds("canvas").height, 1f)
         val focusedNarrowFootprint = bounds("timeline-footprint")
         assertEquals(160f, focusedNarrowFootprint.width, 1f)
@@ -131,6 +134,7 @@ class FocusedMediaCanvasTest {
         assertEquals(height * 0.75f, bounds("canvas").height, 1f)
         assertEquals(originalTime.width, time.width, 1f)
         assertEquals(originalTime.height, time.height, 1f)
+        assertMediaMetadataRow()
         assertEquals(originalControl.width, bounds("media-control").width, 1f)
         assertEquals(originalControl.height, bounds("media-control").height, 1f)
         assertEquals(originalFile.width, bounds("file-sibling").width, 1f)
@@ -145,6 +149,13 @@ class FocusedMediaCanvasTest {
         assertEquals(height, bounds("canvas").height, 1f)
         assertEquals(1, ownerStarts)
         assertEquals(0, ownerDisposals)
+    }
+
+    private fun assertMediaMetadataRow() {
+        val time = composeRule.onNodeWithText("12:34").fetchSemanticsNode().boundsInRoot
+        val status = composeRule.onNodeWithContentDescription("Sent").fetchSemanticsNode().boundsInRoot
+        assertEquals("media metadata stays on one row", time.center.y, status.center.y, 1f)
+        assertTrue("full-size status must not overlap the time", status.left >= time.right || time.left >= status.right)
     }
 
     /** Composes the surface under test with the given fixture. */

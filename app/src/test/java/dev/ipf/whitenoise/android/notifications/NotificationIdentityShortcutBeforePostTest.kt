@@ -82,6 +82,37 @@ class NotificationIdentityShortcutBeforePostTest {
         assertEquals(notificationMonogramBackgroundColor(seed), iconPixel(withoutPicture.shortcuts.single()))
     }
 
+    /** Private member pictures cannot reappear in a group's final shortcut Person or replace its group icon. */
+    @Test
+    fun groupShortcutKeepsSenderNamesWithoutPrivateMemberPixels() {
+        val recorder = Recorder()
+        val presenter = presenter(recorder, contactAvatar = { _, contact -> (contact == SENDER) to solid(Color.RED) })
+        post(presenter, update(isDm = false), picture = solid(Color.BLUE), sender = solid(Color.GREEN))
+        val shortcut = recorder.shortcuts.single()
+        val person = personsOf(shortcut).single()
+        assertEquals(Color.BLUE, iconPixel(shortcut))
+        assertEquals(SENDER, person.key)
+        assertTrue(person.name?.isNotBlank() == true)
+        val senderPixels = checkNotNull(person.icon?.loadDrawable(context)).toBitmap()
+        assertEquals(0, Color.alpha(senderPixels.getPixel(0, 0)))
+        val cardPerson =
+            checkNotNull(
+                androidx.core.app.NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(
+                    recorder.posts.single(),
+                ),
+            ).messages.single().person!!
+        assertEquals(person.name.toString(), cardPerson.name.toString())
+        assertEquals(
+            0,
+            Color.alpha(
+                cardPerson.icon!!
+                    .loadDrawable(context)!!
+                    .toBitmap()
+                    .getPixel(0, 0),
+            ),
+        )
+    }
+
     /** An unchanged conversation is not published again, so later first posts add no shortcut work. */
     @Test
     fun unchangedConversationPostsWithoutAnotherPublication() {

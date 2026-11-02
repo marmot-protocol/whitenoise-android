@@ -144,18 +144,19 @@ fun classifyShareStreams(
     return ShareStreamStaging(mediaUris = media.distinct(), documentUris = documents.distinct())
 }
 
-/** Actual private-file sizes share the 10-item/256 MiB raw-source shelf budget. */
+/** Actual private-file sizes and their tags share the same bounded intake budget after destination recovery. */
 internal fun capPrivateShareShelf(
     uris: List<Uri>,
     metadata: (Uri) -> org.json.JSONObject?,
+    limits: ShareImportLimits = LEGACY_SHARE_IMPORT_LIMITS,
 ): List<Uri> {
     var bytes = 0L
     val accepted = mutableListOf<Uri>()
     uris.distinct().forEach { uri ->
         val size = metadata(uri)?.optLong("size", -1) ?: -1
-        if (size > 0 && bytes + size <= PRIVATE_SHARE_BATCH_MAX_BYTES && accepted.size < SHARE_STREAM_MAX_ITEMS) {
+        if (size > 0 && size <= limits.remainingPlaintext(bytes) && accepted.size < SHARE_STREAM_MAX_ITEMS) {
             accepted += uri
-            bytes += size
+            bytes += size + dev.ipf.whitenoise.android.ui.conversation.media.FILE_BACKED_TAG_BYTES
         }
     }
     return accepted

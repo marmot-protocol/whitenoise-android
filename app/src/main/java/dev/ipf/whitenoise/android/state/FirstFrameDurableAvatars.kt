@@ -47,6 +47,7 @@ internal class FirstFrameDurableAvatar(
     val key: String,
     val image: ImageBitmap,
     val animatedSource: ByteArray?,
+    val animationClassification: Boolean? = null,
 )
 
 /**
@@ -72,7 +73,12 @@ internal suspend fun WhiteNoiseAppState.prewarmFirstFrameDurableAvatars(
     return assets.mapNotNull { asset ->
         val key = asset.cacheKey(accountRef) ?: return@mapNotNull null
         AvatarImageLoader.cachedImage(key)?.let { image ->
-            FirstFrameDurableAvatar(key, image, AvatarImageLoader.peekAnimatedSource(key))
+            FirstFrameDurableAvatar(
+                key,
+                image,
+                AvatarImageLoader.peekAnimatedSource(key),
+                AvatarImageLoader.cachedAnimationClassification(key),
+            )
         }
     }
 }
@@ -83,5 +89,7 @@ internal suspend fun WhiteNoiseAppState.prewarmFirstFrameDurableAvatars(
  * would fall back to initials. On a cold start nothing was cleared and every entry is already present.
  */
 internal fun AccountSwitchLocalSnapshot.installFirstFrameDurableAvatars() {
-    firstFrameAvatars.forEach { AvatarImageLoader.restoreStoredAvatar(it.key, it.image, it.animatedSource) }
+    firstFrameAvatars.forEach {
+        AvatarImageLoader.restoreStoredAvatar(it.key, it.image, it.animatedSource, it.animationClassification)
+    }
 }

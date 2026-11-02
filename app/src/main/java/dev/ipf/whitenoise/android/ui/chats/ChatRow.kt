@@ -184,6 +184,8 @@ internal fun ChatRow(
     item: ChatListItem,
     appState: WhiteNoiseAppState,
     accountRef: String? = appState.activeAccountRef,
+    ownerAccountIdHex: String? = appState.accounts.firstOrNull { it.label == accountRef }?.accountIdHex,
+    titleOverride: String? = null,
     onClick: () -> Unit,
     onOpenProfile: (String) -> Unit,
     onLongClick: (() -> Unit)? = null,
@@ -224,13 +226,13 @@ internal fun ChatRow(
     // actually change, instead of every chat-list recomposition pass.
     // Routed through the shared `chatListItemDisplayTitle` so the same
     // projection drives the search filter.
-    val title by remember(item, groupTitleCopy) {
-        derivedStateOf { chatListItemDisplayTitle(item, appState, groupTitleCopy) }
+    val title by remember(item, groupTitleCopy, titleOverride) {
+        derivedStateOf { titleOverride ?: chatListItemDisplayTitle(item, appState, groupTitleCopy) }
     }
     // Membership-aware unread state (#625): a group the local user has been
     // removed from keeps a frozen unread badge in the projection. Suppress it
     // once the cached roster confirms self is no longer a member.
-    val activeAccountIdHex = appState.activeAccount?.accountIdHex
+    val activeAccountIdHex = ownerAccountIdHex
     val rowHasUnread = item.effectiveHasUnread(activeAccountIdHex)
     val rowUnreadCount = item.effectiveUnreadCount(activeAccountIdHex)
     // On a message-body search hit (#594) the row's timestamp points at the
@@ -287,8 +289,7 @@ internal fun ChatRow(
         }
     val pinned = item.pinned()
     val deliveryIndicator = item.projectedDeliveryIndicator()
-    val hasSupportingMetadata = item.group.pendingConfirmation || rowHasUnread || deliveryIndicator != null
-    val actionColors = accountActionColors(appState)
+    val actionColors = accountActionColors(appState, accountRef)
     ChatRowLayout(
         modifier =
             modifier
@@ -347,9 +348,12 @@ internal fun ChatRow(
                     // Only the account the projector names (the peer of an unnamed pair, an inviter)
                     // lends its picture; MDK's selected avatar for a named group is ignored, as the
                     // conversation header does.
+                    accountRef = accountRef,
                     fallbackPictureUrl =
                         avatarAccount?.let {
-                            appState.privateContactAvatarSource(it) ?: item.selectedAvatarUrl ?: appState.avatarUrl(it)
+                            appState.privateContactAvatarSource(it, accountRef)
+                                ?: item.selectedAvatarUrl
+                                ?: appState.avatarUrl(it)
                         },
                     firstFrameAvatar = item.firstFrameAvatar,
                     durableAvatar = item.selectedAvatarAsset,
@@ -433,7 +437,14 @@ internal fun ChatRow(
                                     empty = stringResource(R.string.no_messages_yet),
                                     // Names the affected member and refreshes when their profile loads (#1581).
                                     groupSystemNames =
-                                        GroupSystemPreviewNames(activeAccountIdHex, appState::chatMemberTitle),
+                                        GroupSystemPreviewNames(activeAccountIdHex) {
+                                            if (!selectionMode && accountRef == appState.activeAccountRef) {
+                                                // Preserve Home's existing profile hydration (#1581).
+                                                appState.chatMemberTitle(it)
+                                            } else {
+                                                appState.contactDisplayNameCached(accountRef, it)
+                                            }
+                                        },
                                 )
                         },
                     )
@@ -486,23 +497,18 @@ internal fun ChatRow(
                 )
             }
         },
-        supportingMetadata =
-            if (hasSupportingMetadata) {
-                {
-                    ChatRowSupportingMetadata(
-                        pendingConfirmation = item.group.pendingConfirmation,
-                        rowHasUnread = rowHasUnread,
-                        rowUnreadCount = rowUnreadCount,
-                        unreadMention = item.unreadMention,
-                        actionColors = actionColors,
-                        pinned = false,
-                        evicted = false,
-                        deliveryIndicator = deliveryIndicator,
-                    )
-                }
-            } else {
-                null
-            },
+        supportingMetadata = {
+            ChatRowSupportingMetadata(
+                pendingConfirmation = item.group.pendingConfirmation,
+                rowHasUnread = rowHasUnread,
+                rowUnreadCount = rowUnreadCount,
+                unreadMention = item.unreadMention,
+                actionColors = actionColors,
+                pinned = false,
+                evicted = false,
+                deliveryIndicator = deliveryIndicator,
+            )
+        },
     )
 }
 

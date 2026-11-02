@@ -10,6 +10,11 @@ import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
+import dev.ipf.whitenoise.android.media.VideoMetadataScrubber
+import dev.ipf.whitenoise.android.media.aviVideoBytes
+import dev.ipf.whitenoise.android.media.containsAscii
+import dev.ipf.whitenoise.android.media.minimalMp4
+import dev.ipf.whitenoise.android.media.videoFixture
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -127,7 +132,7 @@ class ConversationAttachmentReaderFileBackedTest {
     @Test
     fun largeVideoIsStagedToAFileForTheAlbum() =
         runBlocking {
-            val uri = pick("clip.mp4", "video/mp4", ByteArray(4096), declaredSize = 40L * MIB)
+            val uri = pick("clip.mp4", "video/mp4", minimalMp4(4096), declaredSize = 40L * MIB)
             val reader = reader()
 
             val outcome = reader.readPickedImages(listOf(uri), checkNotNull(reader.fileBackedBudget()))
@@ -146,8 +151,8 @@ class ConversationAttachmentReaderFileBackedTest {
     @Test
     fun albumStopsAddingVideosOnceItsCiphertextBoundIsSpent() =
         runBlocking {
-            val first = pick("first.mp4", "video/mp4", ByteArray(1024), declaredSize = 1024)
-            val second = pick("second.mp4", "video/mp4", ByteArray(1024), declaredSize = 1024)
+            val first = pick("first.mp4", "video/mp4", minimalMp4(1024), declaredSize = 1024)
+            val second = pick("second.mp4", "video/mp4", minimalMp4(1024), declaredSize = 1024)
             val albumLimits = FileBackedSendLimits(perFileBytes = 1024, batchCiphertextBytes = 1536)
             val budget = FileBackedPickBudget(uploadSources, albumLimits)
 
@@ -166,8 +171,8 @@ class ConversationAttachmentReaderFileBackedTest {
     @Test
     fun anInMemoryVideoAfterAStagedOneIsLeftOutWhenItsCopiesDoNotFit() =
         runBlocking {
-            val large = pick("large.mp4", "video/mp4", ByteArray(4096), declaredSize = 4096)
-            val small = pick("small.mp4", "video/mp4", ByteArray(512), declaredSize = 512)
+            val large = pick("large.mp4", "video/mp4", minimalMp4(4096), declaredSize = 4096)
+            val small = pick("small.mp4", "video/mp4", minimalMp4(512), declaredSize = 512)
             val albumLimits = FileBackedSendLimits(perFileBytes = 8192, batchCiphertextBytes = 16_384)
             // Room for the large video's two copies with 100 bytes to spare, shrinking as snapshots land.
             val free = { APP_RESERVE_BYTES + 2 * 4096 + 100 - stagedBytes(uploadSources) }
@@ -180,6 +185,73 @@ class ConversationAttachmentReaderFileBackedTest {
             assertFalse(outcome.albumOverflowed)
             outcome.attachments.forEach { checkNotNull(it.sourceFile).close() }
         }
+
+    /**
+     * A large tagged video's snapshot loses its private metadata in place before it is handed on: the staged file is
+     * exactly the scrubbed clip, keeps the reserved size, and is read-only again (#3376).
+     */
+    @Test
+    fun largeVideoSnapshotIsScrubbedBeforeItIsHandedOn() =
+        runBlocking {
+            val tagged = videoFixture("mov-quicktime-keys.mov")
+            val uri = pick("tagged.mov", "video/quicktime", tagged, declaredSize = 40L * MIB)
+            val reader = reader()
+
+            val outcome = reader.readPickedImages(listOf(uri), checkNotNull(reader.fileBackedBudget()))
+
+            val source = checkNotNull(outcome.attachments.single().sourceFile)
+            val staged = source.file.readBytes()
+            assertArrayEquals(scrubbed(tagged), staged)
+            assertFalse(staged.containsAscii("WNPrivateMake"))
+            assertEquals(tagged.size.toLong(), source.byteCount)
+            assertFalse("the snapshot is read-only again", source.file.canWrite())
+            source.close()
+        }
+
+    /**
+     * A large video whose metadata cannot be removed is refused with the distinct failure: its snapshot is deleted,
+     * nothing is reported to the send, and the budget keeps every byte it had (#3376).
+     */
+    @Test
+    fun largeVideoWhoseMetadataCannotBeRemovedLeavesNoSnapshotOrReservation() =
+        runBlocking {
+            val uri = pick("clip.avi", "video/x-msvideo", aviVideoBytes(4096), declaredSize = 40L * MIB)
+            val reported = mutableListOf<StagedUploadSource>()
+            val staging = FileBackedSendStaging(reported::add)
+            val reader = reader()
+            val budget = checkNotNull(reader.fileBackedBudget(staging))
+            val room = budget.nextPickMaxBytes()
+
+            val outcome = reader.readPickedImages(listOf(uri), budget)
+
+            assertTrue(outcome.attachments.isEmpty())
+            assertTrue(outcome.videoMetadataRefused)
+            assertFalse(outcome.albumOverflowed || outcome.storageUnavailable)
+            assertTrue(reported.isEmpty())
+            assertEquals(room, budget.nextPickMaxBytes())
+            assertEquals(0L, staging.largestUploadWriteBytes)
+            assertTrue(uploadSources.list().orEmpty().isEmpty())
+        }
+
+    /** A large video picked through Files is scrubbed in its snapshot, and one that cannot be is refused (#3376). */
+    @Test
+    fun largeVideoDocumentIsScrubbedOrRefused() =
+        runBlocking {
+            val tagged = videoFixture("mkv-tagged.mkv")
+            val good = pick("tagged.mkv", "video/x-matroska", tagged, declaredSize = 40L * MIB)
+            val bad = pick("clip.avi", "video/avi", aviVideoBytes(2048), declaredSize = 40L * MIB)
+
+            val outcome = reader().readPickedDocuments(listOf(good, bad), allowFileBacked = true)
+
+            val source = checkNotNull(outcome.attachments.single().sourceFile)
+            assertArrayEquals(scrubbed(tagged), source.file.readBytes())
+            assertEquals(setOf(DocumentReadFailure.VIDEO_METADATA), outcome.failures)
+            source.close()
+            assertTrue(uploadSources.list().orEmpty().isEmpty())
+        }
+
+    /** [bytes] as the scrubber leaves them. */
+    private fun scrubbed(bytes: ByteArray): ByteArray = bytes.copyOf().also { VideoMetadataScrubber.scrub(it) }
 
     /** Bytes of every snapshot currently written under [directory]. */
     private fun stagedBytes(directory: File): Long = directory.walk().filter(File::isFile).sumOf(File::length)

@@ -66,6 +66,36 @@ class CiChangesTest(unittest.TestCase):
                     entry('app/src/main/java/example/Screen.kt', new='120000')):
             self.assertFalse(precheck_mode('pull_request', 'merge-queue', [], raw))
 
+    def test_required_test_metadata_is_not_docs_only_but_can_use_precheck(self):
+        source = entry('app/src/main/java/example/Screen.kt')
+        for path in ('docs/invariant-gates.md', 'docs/manual-release-testing-surfaces.json',
+                     'docs/manual-release-testing/surfaces/app/src/main/java/example/Screen.kt.json'):
+            for raw in (entry(path), source + entry(path)):
+                values = cli_outputs('pull_request', 'merge-queue', [], raw)
+                self.assertEqual(values['docs_only'], 'false')
+                self.assertEqual(values['precheck'], 'true')
+                self.assertEqual(values['supplemental_campaigns'], 'false')
+            for raw in (entry(path, new='120000'), entry(path, old='100755'),
+                        entry(path, status='T'), source + entry('docs/unknown.json')):
+                self.assertEqual(validation_mode('pull_request', 'merge-queue', [], raw), 'full')
+
+    def test_isolated_host_suites_use_complete_diff_and_fail_closed(self):
+        source = entry('app/src/main/java/example/Screen.kt')
+        legacy = cli_outputs('pull_request', '', [], source)
+        self.assertEqual(legacy['ci_mode'], 'legacy-pr')
+        self.assertEqual(legacy['tooling_regressions'], 'false')
+        for event in ('pull_request', 'merge_group', 'push', 'schedule', 'workflow_dispatch'):
+            value = cli_outputs(event, 'merge-queue', [], source)['tooling_regressions']
+            self.assertEqual(value, str(event != 'pull_request').lower())
+        for raw in (None, b'', b'bad', source + entry('scripts/helper.py'),
+                    source + entry('tools/attachment-fixture/server.py'),
+                    source + entry('.maestro/runtime/example.yaml'),
+                    source + entry('app/src/androidTest/java/example/Fixture.kt'),
+                    source + entry('build.gradle.kts')):
+            self.assertEqual(cli_outputs('pull_request', '', [], raw)['tooling_regressions'], 'true')
+        for labels in (None, {}, ['ci:full'], [1]):
+            self.assertEqual(cli_outputs('pull_request', '', labels, source)['tooling_regressions'], 'true')
+
     def test_modes_are_exclusive_and_activated_prs_have_one_lane(self):
         for event in ('pull_request', 'merge_group', 'push', 'workflow_dispatch'):
             for configured in ('merge-queue', '', 'unknown'):
@@ -114,7 +144,7 @@ class CiChangesTest(unittest.TestCase):
             diff.assert_called_once_with('merge_group', '', 'b' * 40)
             self.assertEqual(output.read_text(), stdout.getvalue())
             self.assertEqual(set(dict(line.split('=', 1) for line in stdout.getvalue().splitlines())),
-                             {'ci_mode', 'precheck', 'full_matrix', 'docs_only', 'supplemental_campaigns'})
+                             {'ci_mode', 'precheck', 'full_matrix', 'docs_only', 'supplemental_campaigns', 'tooling_regressions'})
 
     def test_only_known_plain_prose_files_skip_android(self):
         self.assertTrue(docs_only_diff(entry('README.md') + entry('docs/ci.md')))
@@ -132,7 +162,7 @@ class CiChangesTest(unittest.TestCase):
             with self.subTest(status=status):
                 raw = entry('docs/invariant-gates.md', old=old, new=new, status=status)
                 self.assertFalse(docs_only_diff(raw))
-                self.assertTrue(supplemental_campaigns_diff(raw))
+                self.assertFalse(supplemental_campaigns_diff(raw))
                 self.assertFalse(docs_only_diff(entry('README.md') + raw))
 
     def test_renamed_or_deleted_code_cannot_be_hidden_as_docs(self):

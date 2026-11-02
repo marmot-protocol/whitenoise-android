@@ -40,8 +40,6 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.FailedDeliveryBadge
 import dev.ipf.whitenoise.android.ui.common.InvitationBadge
-import dev.ipf.whitenoise.android.ui.common.ManualUnreadDot
-import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.chatRowBadgeDiameter
 import dev.ipf.whitenoise.android.ui.common.rememberedRelativeTime
@@ -107,8 +105,8 @@ internal fun ChatRowLayout(
             ),
         contentPadding = ChatRowContentPadding,
         leadingContent = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (selectionMode) ChatRowSelectionIndicator(selected)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ChatRowSelectionStrip(selectionMode, selected)
                 leadingContent()
             }
         },
@@ -119,21 +117,19 @@ internal fun ChatRowLayout(
                 },
                 metadata = titleMetadata,
                 timestamp = {
-                    if (!selectionMode) {
-                        Text(
-                            rememberedRelativeTime(timestampAt),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = scheme.onSurfaceVariant,
-                            maxLines = 1,
-                        )
-                    }
+                    Text(
+                        rememberedRelativeTime(timestampAt),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = scheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
                 },
                 preview = {
                     CompositionLocalProvider(LocalContentColor provides scheme.onSurfaceVariant) {
                         ProvideTextStyle(MaterialTheme.typography.bodyMedium) { supportingContent() }
                     }
                 },
-                status = { if (!selectionMode) supportingMetadata?.invoke() },
+                status = { supportingMetadata?.invoke() },
             )
         },
     )
@@ -184,7 +180,7 @@ private fun ChatRowTextLayout(
         val timeY = time?.let { baseline - it[FirstBaseline] } ?: 0
         val headlineHeight = maxOf(groupY + nameGroupHeight, timeY + (time?.height ?: 0))
         val badge = slots[4].firstOrNull()?.measure(loose.offset(vertical = -headlineHeight))
-        val badgeSpace = if (badge == null) 0 else badge.width + trailingGap
+        val badgeSpace = if (badge == null || badge.width == 0) 0 else badge.width + trailingGap
         val message = slots[3].single().measure(loose.offset(horizontal = -badgeSpace, vertical = -headlineHeight))
         val textHeight = headlineHeight + maxOf(message.height, badge?.height ?: 0)
         val width =
@@ -237,14 +233,8 @@ internal fun ChatRowSupportingMetadata(
                 OutgoingMessageIndicator.Failed -> FailedDeliveryBadge()
                 else -> ChatRowDeliveryGlyph(deliveryIndicator)
             }
-            if (rowHasUnread) {
-                if (unreadMention) MentionBadge()
-                if (rowUnreadCount > 0uL) {
-                    UnreadCountBadge(rowUnreadCount, actionColors = actionColors)
-                } else {
-                    ManualUnreadDot(actionColors = actionColors)
-                }
-            }
+            if (rowHasUnread && unreadMention) MentionBadge()
+            ChatUnreadBadgeMotion(rowHasUnread, rowUnreadCount, actionColors)
         }
     }
 }
@@ -265,7 +255,7 @@ private fun ChatRowDeliveryGlyph(indicator: OutgoingMessageIndicator) {
 /** The row owns toggle semantics; its leading native checkbox is decorative and never a second target. */
 @Suppress("FunctionNaming")
 @Composable
-private fun ChatRowSelectionIndicator(selected: Boolean) {
+internal fun ChatRowSelectionIndicator(selected: Boolean) {
     Checkbox(
         checked = selected,
         onCheckedChange = null,

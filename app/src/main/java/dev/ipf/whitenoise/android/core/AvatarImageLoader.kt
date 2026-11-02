@@ -330,6 +330,9 @@ object AvatarImageLoader {
         return synchronized(lock) { animatedSources.get(key) }
     }
 
+    /** Classification belongs to the same bounded first-frame entry, even after encoded bytes are evicted. */
+    internal fun cachedAnimationClassification(key: String): Boolean? = synchronized(lock) { cache.isAnimated(key) }
+
     /** Test-only injection of a first frame together with its animated source. */
     internal fun putCachedAnimated(
         url: String,
@@ -345,6 +348,7 @@ object AvatarImageLoader {
         url: String,
         source: ByteArray?,
     ) {
+        cache.classifyAnimation(url, source != null)
         if (source == null) animatedSources.remove(url) else animatedSources.put(url, source)
     }
 
@@ -371,6 +375,7 @@ object AvatarImageLoader {
         key: String,
         image: ImageBitmap,
         animatedSource: ByteArray?,
+        animationClassification: Boolean? = null,
     ) {
         if (!isStoredAvatarKey(key)) return
         synchronized(lock) {
@@ -378,6 +383,8 @@ object AvatarImageLoader {
             cache.put(key, image)
             failureExpiresAt.remove(key)
             publishAnimatedSourceLocked(key, animatedSource)
+            // Missing encoded bytes may mean eviction, not a static picture. Preserve the handed-off classification.
+            cache.classifyAnimation(key, if (animatedSource != null) true else animationClassification)
         }
     }
 
@@ -405,6 +412,14 @@ object AvatarImageLoader {
             expectedGeneration = null,
             fetchLane = AvatarFetchLane.NOTIFICATION,
         )?.asAndroidBitmap()
+
+    /** Releases LRU references without invalidating displayed pixels, deduplicated work or account fences. */
+    internal fun trimMemory(trim: dev.ipf.whitenoise.android.media.PresentationMemoryTrim) {
+        synchronized(lock) {
+            cache.trimMemory(trim)
+            animatedSources.trimToSize(trim.targetBytes(ANIMATED_SOURCE_CACHE_SIZE_BYTES))
+        }
+    }
 
     /** Wipes cached avatars and invalidates every queued or in-flight fetch. */
     fun clear() {
@@ -546,7 +561,12 @@ object AvatarImageLoader {
         val image = decode(bytes, ProfileImageVariant.AVATAR, MAX_AVATAR_DIMENSION)?.asImageBitmap() ?: return null
         val published =
             synchronized(lock) {
-                cacheLifetime.isCurrent(lifetime).also { current -> if (current) putCached(key, image) }
+                cacheLifetime.isCurrent(lifetime).also { current ->
+                    if (current) {
+                        putCached(key, image)
+                        publishAnimatedSourceLocked(key, profileAvatarAnimationSource(bytes))
+                    }
+                }
             }
         return image.takeIf { published }
     }
@@ -624,12 +644,16 @@ internal class PartitionedProfileImageCache(
     avatarBytes: Int,
     bannerBytes: Int,
 ) {
-    private val avatars = byteBudgetedCache(avatarBytes, AvatarCacheKind.PROFILE)
-    private val banners = byteBudgetedCache(bannerBytes, null)
+    private var trimmingMemory = false
+    private val avatars =
+        byteBudgetedCache(avatarBytes, AvatarCacheKind.PROFILE) {
+            if (!trimmingMemory) AvatarCacheChanges.published()
+        }
+    private val banners = byteBudgetedCache(bannerBytes, null) {}
 
     /** The image held for [cacheKey], looked up only in the partition its variant owns. */
     fun get(cacheKey: String): ImageBitmap? =
-        partitionFor(cacheKey).get(cacheKey).also { image ->
+        partitionFor(cacheKey).get(cacheKey)?.image.also { image ->
             if (profileImageVariantOf(cacheKey) == ProfileImageVariant.AVATAR) {
                 AvatarCacheDiagnostics.lookup(AvatarCacheKind.PROFILE, image != null)
             }
@@ -640,8 +664,35 @@ internal class PartitionedProfileImageCache(
         cacheKey: String,
         image: ImageBitmap,
     ) {
-        partitionFor(cacheKey).put(cacheKey, image)
+        partitionFor(cacheKey).put(cacheKey, CachedProfileFrame(image))
         if (profileImageVariantOf(cacheKey) == ProfileImageVariant.AVATAR) AvatarCacheChanges.published()
+    }
+
+    /** Null means absent or unclassified pixels; a known static frame needs no second original-byte read. */
+    fun isAnimated(cacheKey: String): Boolean? = partitionFor(cacheKey).get(cacheKey)?.animated
+
+    /** Called under the loader lock together with publishing the frame and its encoded-source classification. */
+    fun classifyAnimation(
+        cacheKey: String,
+        animated: Boolean?,
+    ) {
+        partitionFor(cacheKey).get(cacheKey)?.animated = animated
+    }
+
+    private class CachedProfileFrame(
+        val image: ImageBitmap,
+        var animated: Boolean? = null,
+    )
+
+    /** Trims each variant independently; shared ImageBitmaps are never recycled. */
+    fun trimMemory(trim: dev.ipf.whitenoise.android.media.PresentationMemoryTrim) {
+        trimmingMemory = true
+        try {
+            avatars.trimToSize(trim.targetBytes(avatars.maxSize().toLong()).toInt())
+            banners.trimToSize(trim.targetBytes(banners.maxSize().toLong()).toInt())
+        } finally {
+            trimmingMemory = false
+        }
     }
 
     /** Drops both variants for account teardown without recording a capacity eviction. */
@@ -676,11 +727,16 @@ internal class PartitionedProfileImageCache(
         fun byteBudgetedCache(
             maxBytes: Int,
             kind: AvatarCacheKind?,
-        ) = object : LruCache<String, ImageBitmap>(maxBytes) {
+            publishChange: () -> Unit,
+        ) = object : LruCache<String, CachedProfileFrame>(maxBytes) {
             override fun sizeOf(
                 key: String,
-                value: ImageBitmap,
-            ): Int = value.asAndroidBitmap().byteCount.coerceAtLeast(1)
+                value: CachedProfileFrame,
+            ): Int =
+                value.image
+                    .asAndroidBitmap()
+                    .byteCount
+                    .coerceAtLeast(1)
 
             /**
              * Records bounded cache eviction diagnostics and notifies avatar observers when their
@@ -689,11 +745,11 @@ internal class PartitionedProfileImageCache(
             override fun entryRemoved(
                 evicted: Boolean,
                 key: String,
-                oldValue: ImageBitmap,
-                newValue: ImageBitmap?,
+                oldValue: CachedProfileFrame,
+                newValue: CachedProfileFrame?,
             ) {
                 if (evicted && kind != null) AvatarCacheDiagnostics.evicted(kind)
-                if (kind == AvatarCacheKind.PROFILE) AvatarCacheChanges.published()
+                publishChange()
             }
         }
     }

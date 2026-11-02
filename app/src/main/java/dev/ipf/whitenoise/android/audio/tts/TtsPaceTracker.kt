@@ -153,10 +153,10 @@ internal class TtsPaceTracker(
     ) {
         if (bootstrapRetired) return
         val elapsedSinceStart = clock() - timing.startedAt
-        if (elapsedSinceStart <= TTS_ESTIMATED_AUDIO_LEAD_IN_MS) return
+        if (elapsedSinceStart <= TTS_PACE_BOOTSTRAP_LEAD_IN_MS) return
         paceCalibrator.observe(
             unitCount = TtsWordTimingEstimate.weightedLengthOf(chunk.text),
-            elapsedMs = elapsedSinceStart - TTS_ESTIMATED_AUDIO_LEAD_IN_MS,
+            elapsedMs = elapsedSinceStart - TTS_PACE_BOOTSTRAP_LEAD_IN_MS,
             rate = timing.rate,
         )
     }
@@ -167,3 +167,6 @@ internal data class ActiveUtteranceTiming(
     val startedAt: Long,
     val rate: Float,
 )
+
+/** Assumed startup offset for approximate ETA calibration, never a playback clock. */
+internal const val TTS_PACE_BOOTSTRAP_LEAD_IN_MS = 160L

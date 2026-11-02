@@ -984,7 +984,7 @@ internal fun MainShell(
         owner = chatsController,
         accountRef = appState.activeAccountRef,
         ready = chatsController.boundAccountRef == appState.activeAccountRef && !chatsController.isLoading,
-        targetRevision = chatsController.forwardTargetsRevision,
+        targetRevision = { chatsController.forwardTargetsRevision },
         profileRevision = appState.profileRevisionForCompose,
         publish = {
             if (chatsController.boundAccountRef == appState.activeAccountRef && !chatsController.isLoading) {
@@ -1339,9 +1339,13 @@ internal fun MainShell(
         selectedChat = item
         appState.clearPresentedProfile()
     }
-    val openGroupFromGroupCreateCompletion: (ChatListItem, Long) -> Unit = { item, requestToken ->
+    val openGroupFromGroupCreateCompletion: (ChatListItem, Long, ChatListReturnHead?) -> Unit = {
+        item,
+        requestToken,
+        flowOriginHead,
+        ->
         if (commitGroupCreateCompletionOpen(item.group.groupIdHex, requestToken)) {
-            chatListReturnHeadSnap = openGroupFromProfileSheet(chatListReturnHeadSnap)
+            chatListReturnHeadSnap = openCreatedGroup(chatListReturnHeadSnap, flowOriginHead)
             // The conversation cannot otherwise tell a group that was created moments ago from one
             // that has been around, and the two deserve different answers when an advisory
             // recovery read fails. `selectedChatJustCreated` stays false: it drives the DM-only
@@ -1762,6 +1766,19 @@ internal fun MainShell(
         },
         persistentTopContentConsumesStatusBars = forwardOperationVisible || playbackInShell,
         playbackHost = shellPlaybackHost,
+        handoffOwner = appState.activeAccountRef to appState.runtimeGeneration,
+        handoffDestination =
+            when {
+                !navAccountStable ||
+                    appState.appLockScreenVisible ||
+                    routingNotification ||
+                    routingShare ||
+                    routingAppUpdate ||
+                    pendingTtsDestinationNavigation != null -> null
+                selectedChat != null -> ComposerFabEndpoint.Composer
+                section == MainSection.Chats -> ComposerFabEndpoint.NewMessage
+                else -> null
+            },
     ) { dictationControlOwner ->
         if (!navAccountStable && !quickSwitchOwnsTargetFrame) {
             // Account invalidation is a privacy boundary, not an ordinary Back
@@ -1790,7 +1807,9 @@ internal fun MainShell(
                 },
             onOpenConversation = openGroupFromProfile,
             onGroupCreateSubmitted = onGroupCreateSubmitted,
-            onGroupCreateCompletedOpen = openGroupFromGroupCreateCompletion,
+            onGroupCreateCompletedOpen = { item, requestToken ->
+                openGroupFromGroupCreateCompletion(item, requestToken, null)
+            },
             onGroupCreateFlowSuperseded = supersedePendingGroupCreateOpen,
             onDismissProfile = {
                 chatListReturnHeadSnap = dismissChatListProfile(chatListReturnHeadSnap)

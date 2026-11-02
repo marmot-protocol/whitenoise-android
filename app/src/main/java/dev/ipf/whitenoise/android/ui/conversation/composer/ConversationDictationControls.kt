@@ -42,8 +42,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
@@ -224,7 +228,6 @@ private fun ConversationDictationActiveActions(
     controller: ConversationDictationController,
     actionColors: AccountActionColors,
 ) {
-    val pasteLabel = stringResource(R.string.paste_dictation_transcript)
     val sendLabel = stringResource(R.string.send)
     if (controller.captureInProgress) {
         ConversationDictationListeningIndicator()
@@ -236,36 +239,24 @@ private fun ConversationDictationActiveActions(
     ) {
         Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel))
     }
-    IconButton(
-        onClick = controller::paste,
-        enabled = controller.completionActionsEnabled,
-        modifier = Modifier.size(48.dp),
-    ) {
-        if (controller.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft) {
-            CircularProgressIndicator(
-                modifier =
-                    Modifier
-                        .size(22.dp)
-                        .testTag(DICTATION_PROGRESS_TAG)
-                        .semantics { contentDescription = pasteLabel },
-                strokeWidth = 2.dp,
-            )
-        } else {
-            Icon(Icons.Default.ContentPaste, contentDescription = pasteLabel)
-        }
-    }
+    ConversationDictationPasteAction(controller)
     if (controller.processingDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
         IconButton(
             onClick = controller::send,
             enabled = controller.completionActionsEnabled,
-            modifier = Modifier.size(48.dp),
+            modifier =
+                Modifier.size(48.dp).semantics {
+                    contentDescription = sendLabel
+                    selected = true
+                    progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
+                },
         ) {
             CircularProgressIndicator(
                 modifier =
                     Modifier
                         .size(22.dp)
                         .testTag(DICTATION_PROGRESS_TAG)
-                        .semantics { contentDescription = sendLabel },
+                        .clearAndSetSemantics {},
                 strokeWidth = 2.dp,
             )
         }
@@ -279,10 +270,41 @@ private fun ConversationDictationActiveActions(
             description = sendLabel,
             icon = R.drawable.ic_arrow_upward,
             enabled = controller.completionActionsEnabled,
+            modifier = Modifier.semantics { selected = false },
             // The composer's disc is 40dp wide because it sits in a crowded row. These three
             // commands are the whole control, and each keeps a 48dp target.
             width = 48.dp,
         )
+    }
+}
+
+@Composable
+private fun ConversationDictationPasteAction(controller: ConversationDictationController) {
+    val pasteLabel = stringResource(R.string.paste_dictation_transcript)
+    IconButton(
+        onClick = controller::paste,
+        enabled = controller.completionActionsEnabled,
+        modifier =
+            Modifier.size(48.dp).semantics {
+                contentDescription = pasteLabel
+                selected = controller.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft
+                if (controller.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft) {
+                    progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
+                }
+            },
+    ) {
+        if (controller.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft) {
+            CircularProgressIndicator(
+                modifier =
+                    Modifier
+                        .size(22.dp)
+                        .testTag(DICTATION_PROGRESS_TAG)
+                        .clearAndSetSemantics {},
+                strokeWidth = 2.dp,
+            )
+        } else {
+            Icon(Icons.Default.ContentPaste, contentDescription = null)
+        }
     }
 }
 
@@ -441,6 +463,7 @@ internal fun dictationFailureLabel(reason: ConversationDictationFailure): String
             ConversationDictationFailure.MicrophoneMuted -> R.string.dictation_microphone_muted
             ConversationDictationFailure.MicrophoneInUse -> R.string.dictation_microphone_in_use
             ConversationDictationFailure.AudioFocusUnavailable -> R.string.dictation_audio_focus_unavailable
+            ConversationDictationFailure.Interrupted -> R.string.dictation_interrupted
             ConversationDictationFailure.NoSpeech,
             ConversationDictationFailure.NoMatch,
             -> R.string.dictation_no_speech
@@ -452,5 +475,7 @@ internal fun dictationFailureLabel(reason: ConversationDictationFailure): String
             ConversationDictationFailure.SendBlocked -> R.string.dictation_send_blocked
             ConversationDictationFailure.DeliveryUnknown -> R.string.delivery_not_confirmed
             ConversationDictationFailure.Unknown -> R.string.dictation_failed
+            ConversationDictationFailure.DraftWriteDeferred -> R.string.dictation_waiting_for_unlock
+            ConversationDictationFailure.DraftWriteRefused -> R.string.toast_draft_save_failed
         },
     )

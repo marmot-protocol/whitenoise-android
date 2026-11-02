@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEdgeFade.kt",
+  "legacy_sha256": "1d6754c036266dfa31596092fce088e8dbc2dee263679b27cd6555a167a95597",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Modifier.chatListEdgeFade",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListEdgeFade.kt",
+        "anchor": "fun Modifier.chatListEdgeFade(",
+        "test_ids": [
+          "CHL-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

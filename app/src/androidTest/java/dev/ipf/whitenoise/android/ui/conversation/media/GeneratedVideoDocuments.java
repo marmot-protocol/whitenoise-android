@@ -1,0 +1,334 @@
+package dev.ipf.whitenoise.android.ui.conversation.media;
+
+import android.content.Context;
+import android.media.MediaCodec;
+import android.media.MediaExtractor;
+import android.media.MediaMuxer;
+import android.net.Uri;
+import android.util.Base64;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.SequenceInputStream;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
+/**
+ * Tagged videos for the #3376 video-metadata fixture, served by {@link GeneratedDocumentProvider} from the test APK's
+ * own process, so the instrumented app picks them through the same content resolver calls a real provider answers.
+ * The URI names the source, the MIME type the provider reports and the display name, so one source can be offered
+ * as {@code video/mp4} to the visual picker path and as {@code application/octet-stream} to the Files path.
+ *
+ * <ul>
+ *   <li>The committed ffmpeg fixtures are served exactly as committed.
+ *   <li>{@link #MUXED_SOURCE} is written on the device by Android's own {@link MediaMuxer} from the tagged MP4's
+ *       samples, with a location and the muxer's {@code com.android.version} key, the two fields the platform
+ *       retriever and a platform recording carry. It is muxed once per provider process and then served unchanged,
+ *       because the muxer stamps every file with the time it was written.
+ *   <li>{@link #AVI_SOURCE} is a bare RIFF AVI header, a container the scrubber cannot clean.
+ *   <li>A {@link #ABSENT_SOURCE} document answers its type but cannot be opened, like a picker grant that is gone.
+ * </ul>
+ *
+ * <p>An ISO BMFF source can be grown to an exact length with a zeroed top-level {@code free} box, which every reader
+ * skips, so a small clip crosses the in-memory send limit without a large committed file. Any source can carry one
+ * extra trailing byte, which no reader may accept as the end of a complete movie.
+ */
+public final class GeneratedVideoDocuments {
+    /** The first path segment of every video document. */
+    static final String PATH = "video";
+
+    /** A tagged MP4 re-muxed on the device by MediaMuxer with a location. */
+    public static final String MUXED_SOURCE = "android-muxed-location.mp4";
+
+    /** A bare RIFF AVI header. */
+    public static final String AVI_SOURCE = "riff.avi";
+
+    /** A document whose type is known but whose bytes can no longer be read. */
+    public static final String ABSENT_SOURCE = "absent";
+
+    private static final String AUTHORITY_SUFFIX = ".generated-documents";
+    private static final String ASSET_DIRECTORY = "video-metadata/";
+    private static final List<String> ASSET_SOURCES =
+            Collections.unmodifiableList(
+                    Arrays.asList(
+                            "mp4-tagged.mp4",
+                            "mov-quicktime-keys.mov",
+                            "mp4-timecode.mp4",
+                            "mkv-tagged.mkv",
+                            "webm-live-tagged.webm"));
+    private static final String MUX_INPUT = "mp4-tagged.mp4";
+    private static final float MUXED_LATITUDE = 37.7749f;
+    private static final float MUXED_LONGITUDE = -122.4194f;
+    private static final int FREE_BOX_HEADER_BYTES = 8;
+    private static final int AVI_BYTES = 512;
+    private static final int AVI_FILLER = 0x33;
+    private static final int SAMPLE_BUFFER_BYTES = 1024 * 1024;
+    private static final int COPY_BUFFER_BYTES = 64 * 1024;
+
+    private static byte[] muxed;
+
+    /** No instances: every member is static. */
+    private GeneratedVideoDocuments() {}
+
+    /**
+     * The URI of {@code source} served as {@code mimeType} under {@code displayName}. A positive {@code paddedLength}
+     * grows an ISO BMFF source to exactly that many bytes before any trailing byte, and {@code trailingByte} appends
+     * one {@code 0x01}.
+     */
+    public static Uri uri(
+            String testPackage,
+            String source,
+            String mimeType,
+            String displayName,
+            long paddedLength,
+            boolean trailingByte) {
+        return new Uri.Builder()
+                .scheme("content")
+                .authority(testPackage + AUTHORITY_SUFFIX)
+                .appendPath(PATH)
+                .appendPath(displayName)
+                .appendQueryParameter("source", source)
+                .appendQueryParameter("type", mimeType)
+                .appendQueryParameter("length", Long.toString(paddedLength))
+                .appendQueryParameter("trailer", Boolean.toString(trailingByte))
+                .build();
+    }
+
+    /** Whether {@code uri} names a video document rather than generated bytes. */
+    static boolean handles(Uri uri) {
+        List<String> segments = uri.getPathSegments();
+        return segments.size() == 2 && PATH.equals(segments.get(0));
+    }
+
+    /** The MIME type the URI asks the provider to report. */
+    static String type(Uri uri) {
+        String type = uri.getQueryParameter("type");
+        if (type == null || !type.contains("/")) {
+            throw new IllegalArgumentException("Video document needs a MIME type");
+        }
+        return type;
+    }
+
+    /** The display name, the second path segment. */
+    static String name(Uri uri) {
+        return uri.getPathSegments().get(1);
+    }
+
+    /** Whether the document can be read at all, which an absent one cannot. */
+    static boolean present(Uri uri) {
+        return !ABSENT_SOURCE.equals(source(uri));
+    }
+
+    /** The exact number of bytes {@link #open} serves. */
+    static long length(Context context, Uri uri) throws IOException {
+        long base = paddedLength(uri) > 0 ? paddedLength(uri) : sourceBytes(context, source(uri)).length;
+        return base + (trailingByte(uri) ? 1 : 0);
+    }
+
+    /** Opens the document: the source, then any {@code free} padding, then any trailing byte. */
+    static InputStream open(Context context, Uri uri) throws IOException {
+        String source = source(uri);
+        if (!present(uri)) {
+            throw new FileNotFoundException("Video document is no longer available");
+        }
+        byte[] base = sourceBytes(context, source);
+        InputStream stream = new ByteArrayInputStream(base);
+        long padded = paddedLength(uri);
+        if (padded > 0) {
+            stream = new SequenceInputStream(stream, freeBox(source, padded - base.length));
+        }
+        if (trailingByte(uri)) {
+            stream = new SequenceInputStream(stream, new ByteArrayInputStream(new byte[] {1}));
+        }
+        return stream;
+    }
+
+    /** The requested source, which must be one this class serves. */
+    private static String source(Uri uri) {
+        String source = uri.getQueryParameter("source");
+        if (ASSET_SOURCES.contains(source)
+                || MUXED_SOURCE.equals(source)
+                || AVI_SOURCE.equals(source)
+                || ABSENT_SOURCE.equals(source)) {
+            return source;
+        }
+        throw new IllegalArgumentException("Unknown video source");
+    }
+
+    /** The requested padded length, zero when the source is served at its own length. */
+    private static long paddedLength(Uri uri) {
+        String length = uri.getQueryParameter("length");
+        long value = length == null ? 0L : Long.parseLong(length);
+        if (value < 0) {
+            throw new IllegalArgumentException("Video document length is negative");
+        }
+        return value;
+    }
+
+    /** Whether one trailing byte follows the document. */
+    private static boolean trailingByte(Uri uri) {
+        return Boolean.parseBoolean(uri.getQueryParameter("trailer"));
+    }
+
+    /** A top-level {@code free} box of {@code bytes} bytes, zeroed after its header. Only ISO BMFF sources pad. */
+    private static InputStream freeBox(String source, long bytes) {
+        if (!(source.endsWith(".mp4") || source.endsWith(".mov"))) {
+            throw new IllegalArgumentException("Only ISO BMFF sources can be padded");
+        }
+        if (bytes < FREE_BOX_HEADER_BYTES || bytes > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("Padding does not fit one free box");
+        }
+        ByteBuffer header = ByteBuffer.allocate(FREE_BOX_HEADER_BYTES);
+        header.putInt((int) bytes);
+        header.put("free".getBytes(StandardCharsets.US_ASCII));
+        return new SequenceInputStream(
+                new ByteArrayInputStream(header.array()), new Zeros(bytes - FREE_BOX_HEADER_BYTES));
+    }
+
+    /** The source's own bytes. */
+    private static byte[] sourceBytes(Context context, String source) throws IOException {
+        if (MUXED_SOURCE.equals(source)) {
+            return muxedWithLocation(context);
+        }
+        if (AVI_SOURCE.equals(source)) {
+            return aviHeader();
+        }
+        return asset(context, source);
+    }
+
+    /** One committed fixture, decoded from its Base64 asset. */
+    private static byte[] asset(Context context, String name) throws IOException {
+        try (InputStream input = context.getAssets().open(ASSET_DIRECTORY + name + ".b64")) {
+            ByteArrayOutputStream encoded = new ByteArrayOutputStream();
+            byte[] buffer = new byte[COPY_BUFFER_BYTES];
+            for (int n = input.read(buffer); n >= 0; n = input.read(buffer)) {
+                encoded.write(buffer, 0, n);
+            }
+            return Base64.decode(encoded.toByteArray(), Base64.DEFAULT);
+        }
+    }
+
+    /** A RIFF file of the AVI form: {@code RIFF}, its little-endian size, {@code AVI LIST}, then filler. */
+    private static byte[] aviHeader() {
+        ByteBuffer avi = ByteBuffer.allocate(AVI_BYTES);
+        avi.put("RIFF".getBytes(StandardCharsets.US_ASCII));
+        avi.putInt(Integer.reverseBytes(AVI_BYTES - 8));
+        avi.put("AVI LIST".getBytes(StandardCharsets.US_ASCII));
+        while (avi.hasRemaining()) {
+            avi.put((byte) AVI_FILLER);
+        }
+        return avi.array();
+    }
+
+    /**
+     * Copies the tagged MP4's samples into a new file through MediaMuxer with a location, the way a platform
+     * recording is written, once per process. No encoder is needed, so it runs on any emulator.
+     */
+    private static synchronized byte[] muxedWithLocation(Context context) throws IOException {
+        if (muxed != null) {
+            return muxed;
+        }
+        File directory = new File(context.getCacheDir(), "generated-video");
+        if (!directory.isDirectory() && !directory.mkdirs()) {
+            throw new IOException("Video fixture directory unavailable");
+        }
+        File input = new File(directory, "mux-input.mp4");
+        File output = new File(directory, "muxed-with-location.mp4");
+        try {
+            try (OutputStream stream = new FileOutputStream(input)) {
+                stream.write(asset(context, MUX_INPUT));
+            }
+            mux(input, output);
+            muxed = Files.readAllBytes(output.toPath());
+            return muxed;
+        } finally {
+            input.delete();
+            output.delete();
+        }
+    }
+
+    /** Writes every track of {@code input} to {@code output} with a location, keeping each sample's time and flag. */
+    private static void mux(File input, File output) throws IOException {
+        MediaExtractor extractor = new MediaExtractor();
+        MediaMuxer muxer = new MediaMuxer(output.getAbsolutePath(), MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+        try {
+            extractor.setDataSource(input.getAbsolutePath());
+            int[] tracks = new int[extractor.getTrackCount()];
+            for (int index = 0; index < tracks.length; index++) {
+                tracks[index] = muxer.addTrack(extractor.getTrackFormat(index));
+            }
+            muxer.setLocation(MUXED_LATITUDE, MUXED_LONGITUDE);
+            muxer.start();
+            for (int index = 0; index < tracks.length; index++) {
+                copyTrack(extractor, index, muxer, tracks[index]);
+            }
+            muxer.stop();
+        } finally {
+            muxer.release();
+            extractor.release();
+        }
+    }
+
+    /** Writes every sample of one extractor track to the muxer track {@code muxedTrack}. */
+    private static void copyTrack(MediaExtractor extractor, int index, MediaMuxer muxer, int muxedTrack) {
+        for (int track = 0; track < extractor.getTrackCount(); track++) {
+            extractor.unselectTrack(track);
+        }
+        extractor.selectTrack(index);
+        extractor.seekTo(0L, MediaExtractor.SEEK_TO_PREVIOUS_SYNC);
+        ByteBuffer buffer = ByteBuffer.allocate(SAMPLE_BUFFER_BYTES);
+        MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
+        while (true) {
+            buffer.clear();
+            int size = extractor.readSampleData(buffer, 0);
+            if (size < 0) {
+                break;
+            }
+            boolean sync = (extractor.getSampleFlags() & MediaExtractor.SAMPLE_FLAG_SYNC) != 0;
+            info.set(0, size, extractor.getSampleTime(), sync ? MediaCodec.BUFFER_FLAG_KEY_FRAME : 0);
+            muxer.writeSampleData(muxedTrack, buffer, info);
+            extractor.advance();
+        }
+    }
+
+    /** A stream of a fixed number of zero bytes. */
+    private static final class Zeros extends InputStream {
+        private long remaining;
+
+        /** A stream of {@code count} zeros. */
+        Zeros(long count) {
+            remaining = count;
+        }
+
+        /** Produces one zero, or the end of the stream. */
+        @Override
+        public int read() {
+            if (remaining <= 0) {
+                return -1;
+            }
+            remaining--;
+            return 0;
+        }
+
+        /** Fills up to {@code count} bytes of {@code buffer} with zeros. */
+        @Override
+        public int read(byte[] buffer, int offset, int count) {
+            if (remaining <= 0) {
+                return -1;
+            }
+            int n = (int) Math.min(count, remaining);
+            Arrays.fill(buffer, offset, offset + n, (byte) 0);
+            remaining -= n;
+            return n;
+        }
+    }
+}

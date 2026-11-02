@@ -5,6 +5,8 @@ import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
+import dev.ipf.whitenoise.android.state.WarmResumeConversationPhase
+import dev.ipf.whitenoise.android.state.WarmResumeTrace
 
 /** Test-only content evidence from recorded transcript layers and actual Android root draws; never persisted. */
 internal object ConversationTranscriptDrawProbe {
@@ -50,6 +52,7 @@ internal object ConversationTranscriptDrawProbe {
     fun beginRootDraw(): (() -> Unit)? {
         val callback = observer
         if (!isObserving() || callback == null) return null
+        WarmResumeTrace.conversationPhase(WarmResumeConversationPhase.RootDraw)
         val frame = RootFrame(lastPainted, SystemClock.uptimeMillis())
         rootFrame = frame
         return {

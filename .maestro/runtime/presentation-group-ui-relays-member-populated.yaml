@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-group-ui-relays-member-populated
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Group relays
+- assertVisible:
+    text: Configured relays
+- assertVisible:
+    text: wss://fixture.example.invalid
+- scrollUntilVisible:
+    element:
+      text: Only admins can change the relays this chat uses. You can view and copy them here.
+    direction: DOWN
+- assertVisible:
+    text: Only admins can change the relays this chat uses. You can view and copy them here.
+- tapOn: Back
+- assertVisible:
+    id: presentation.complete

@@ -30,6 +30,41 @@
         "test_ids": [
           "MSG-022"
         ]
+      },
+      {
+        "surface": "builtinArtworkRegion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
+        "anchor": "fun builtinArtworkRegion(",
+        "test_ids": [
+          "NTF-034",
+          "MSG-023"
+        ]
+      },
+      {
+        "surface": "plainLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
+        "anchor": "fun plainLabel(",
+        "test_ids": [
+          "NTF-017"
+        ]
+      }
+    ],
+    "notification_content_contracts": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
+        "anchor": "R.string.emoji_name_marmot",
+        "surface": "Marmot name for the bundled :marmot: emoji where artwork cannot be drawn",
+        "test_ids": [
+          "NTF-017"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/EmojiShortcodes.kt",
+        "anchor": "R.string.white_noise",
+        "surface": "White Noise name for the bundled :wn: emoji where artwork cannot be drawn",
+        "test_ids": [
+          "NTF-017"
+        ]
       }
     ]
   },

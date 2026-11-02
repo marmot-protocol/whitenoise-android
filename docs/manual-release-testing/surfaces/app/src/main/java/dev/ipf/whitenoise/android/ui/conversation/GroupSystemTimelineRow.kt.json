@@ -42,6 +42,32 @@
         "test_ids": [
           "GRP-023"
         ]
+      },
+      {
+        "surface": "Activity reaction motion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemTimelineRow.kt",
+        "anchor": "localReactionOverlay(motion)",
+        "test_ids": [
+          "MSG-041"
+        ]
+      },
+      {
+        "surface": "rememberActivityReactionMotion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemTimelineRow.kt",
+        "anchor": "fun rememberActivityReactionMotion(",
+        "test_ids": [
+          "MSG-041"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Group activity consumes its row reaction owner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemTimelineRow.kt",
+        "anchor": "LocalRowReactionMotion.current",
+        "test_ids": [
+          "MSG-041"
+        ]
       }
     ]
   },

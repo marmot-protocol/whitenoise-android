@@ -53,4 +53,44 @@ class AnimationFrameProtocolTest {
             }
         }
     }
+
+    /** A status round-trips as fixed primitives, and unknown codes, flags, missing fields or trailing data fail. */
+    @Test
+    fun statusContainsOnlyTheFixedKnownPrimitiveShape() {
+        val status = AnimationStatusInfo(42, AnimationFrameProtocol.CODEC_REJECTED, true, false, false)
+        var received: AnimationStatusInfo? = null
+        val receiver =
+            object : Binder() {
+                /** Asserts the status transaction code and decodes the status parcel into [received]. */
+                override fun onTransact(
+                    code: Int,
+                    data: Parcel,
+                    reply: Parcel?,
+                    flags: Int,
+                ): Boolean {
+                    assertEquals(AnimationFrameProtocol.STATUS_TRANSACTION, code)
+                    received = readAnimationStatus(data)
+                    return true
+                }
+            }
+        writeAnimationStatus(receiver, status)
+        assertEquals(status, received)
+        for (variant in 0..4) {
+            val parcel = Parcel.obtain()
+            try {
+                parcel.writeInterfaceToken(AnimationFrameProtocol.DESCRIPTOR)
+                parcel.writeInt(42)
+                parcel.writeInt(if (variant == 0) 999 else AnimationFrameProtocol.CODEC_REJECTED)
+                parcel.writeInt(if (variant == 1) 7 else 1)
+                parcel.writeInt(0)
+                if (variant != 2) parcel.writeInt(0)
+                if (variant == 3) parcel.writeInt(9)
+                if (variant == 4) parcel.writeByteArray(ByteArray(300))
+                parcel.setDataPosition(0)
+                assertThrows(IllegalArgumentException::class.java) { readAnimationStatus(parcel) }
+            } finally {
+                parcel.recycle()
+            }
+        }
+    }
 }

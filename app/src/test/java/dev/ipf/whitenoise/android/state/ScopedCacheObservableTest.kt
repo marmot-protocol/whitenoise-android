@@ -74,4 +74,79 @@ class ScopedCacheObservableTest {
 
         assertTrue(rendered.isEmpty())
     }
+
+    /**
+     * Filling a key nobody saw missing, and writes that change no entry, leave readers of other keys alone: the first
+     * outgoing bubble filling its colour slot must not recompose every other bubble.
+     */
+    @Test
+    fun fillingAnUnseenKeyAndNoOpWritesDoNotInvalidateOtherReaders() {
+        val cache = observableCache<Int>(maxEntries = 8)
+        var compositions = 0
+        composeRule.setContent {
+            cache.getOrPut("incoming") { mutableStateOf(1) }.value
+            compositions += 1
+        }
+        composeRule.waitForIdle()
+        val settled = compositions
+
+        composeRule.runOnUiThread {
+            cache.getOrPut("outgoing") { mutableStateOf(2) }
+            val held = cache.getOrPut("incoming") { mutableStateOf(3) }
+            cache.put("incoming", held)
+            cache.remove("absent")
+            cache.removeAll { it == "absent" }
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(settled, compositions)
+    }
+
+    /** A reader that saw a key missing fell back to another source, so filling that key must reach it. */
+    @Test
+    fun fillingAKeyAReaderSawMissingInvalidatesThatReader() {
+        val cache = observableCache<String>(maxEntries = 8)
+        var rendered = ""
+        composeRule.setContent {
+            rendered = cache["key"]?.value ?: "fallback"
+        }
+        composeRule.waitForIdle()
+        assertEquals("fallback", rendered)
+
+        composeRule.runOnUiThread { cache.getOrPut("key") { mutableStateOf("cached") } }
+        composeRule.waitForIdle()
+
+        assertEquals("cached", rendered)
+    }
+
+    /** Evicting or replacing an entry a reader holds still invalidates that reader. */
+    @Test
+    fun evictingOrReplacingAHeldEntryInvalidatesItsReader() {
+        val cache = observableCache<String>(maxEntries = 1)
+        var rendered = ""
+        var compositions = 0
+        composeRule.setContent {
+            rendered = cache.getOrPut("held") { mutableStateOf("first") }.value
+            compositions += 1
+        }
+        composeRule.waitForIdle()
+        val settled = compositions
+
+        composeRule.runOnUiThread { cache.getOrPut("other") { mutableStateOf("evicts") } }
+        composeRule.waitForIdle()
+        assertTrue("an eviction must reach the reader of the evicted entry", compositions > settled)
+
+        composeRule.runOnUiThread { cache.put("held", mutableStateOf("second")) }
+        composeRule.waitForIdle()
+        assertEquals("second", rendered)
+    }
+
+    /** Builds an observable cache of mutable states, the shape every observable account-scoped cache uses. */
+    private fun <T> observableCache(maxEntries: Int): ScopedCache<String, MutableState<T>> =
+        ScopedCache(
+            registry = ScopedCacheRegistry(),
+            name = "observable",
+            maxEntries = maxEntries,
+            observable = true,
+        )
 }

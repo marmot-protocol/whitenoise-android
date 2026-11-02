@@ -70,6 +70,7 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Share
 import dev.ipf.whitenoise.android.ui.profile.profileQrContentForNpub
 import dev.ipf.whitenoise.android.ui.qr.QrScanOutcome
 import dev.ipf.whitenoise.android.ui.qr.QrScannerSheet
+import dev.ipf.whitenoise.android.ui.settings.AiAgentsScreen
 import dev.ipf.whitenoise.android.ui.settings.ShareConnectScreen
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 
@@ -354,6 +355,7 @@ private fun NewMessageAccountScreen(
     var searchRetry by remember { mutableIntStateOf(0) }
     val query = queryState.text.toString()
     var scannerSession by remember { mutableStateOf<Long?>(null) }
+    var agentSettingsOpen by rememberSaveable { mutableStateOf(false) }
     var nextScannerSession by remember { mutableStateOf(0L) }
     var creatingHex by remember { mutableStateOf<String?>(null) }
     var inviteShareInProgress by remember { mutableStateOf(false) }
@@ -377,7 +379,7 @@ private fun NewMessageAccountScreen(
 
     /** Shares a branded download QR card, retaining the existing localized text-only fallback. */
     fun shareInvite() {
-        val flowBusy = creatingHex != null || scannerSession != null || inviteShareInProgress
+        val flowBusy = creatingHex != null || scannerSession != null || agentSettingsOpen || inviteShareInProgress
         if (!session.isCurrent() || flowBusy) return
         inviteShareInProgress = true
         appState.launchMutation {
@@ -410,6 +412,7 @@ private fun NewMessageAccountScreen(
     /** Leaves the screen through [action] after closing the scanner, unless the flow is busy. */
     fun leaveScreen(action: () -> Unit) {
         if (!session.isCurrent() || creatingHex != null || scannerSession != null) return
+        if (agentSettingsOpen) return
         scannerSession = null
         session.dispose()
         action()
@@ -420,7 +423,11 @@ private fun NewMessageAccountScreen(
     // otherwise the process-lifetime create would yank the user into the new
     // conversation seconds after they left this screen.
     BackHandler {
-        if (scannerSession != null && session.isCurrent()) scannerSession = null else leaveScreen(onBack)
+        when {
+            agentSettingsOpen -> if (session.isCurrent()) agentSettingsOpen = false
+            scannerSession != null && session.isCurrent() -> scannerSession = null
+            else -> leaveScreen(onBack)
+        }
     }
 
     val activeHex = appState.activeAccount?.accountIdHex
@@ -539,7 +546,7 @@ private fun NewMessageAccountScreen(
         retryGroupIdHex: String? = null,
         existingDmGroupIdHex: String? = null,
     ) {
-        val canOpen = session.isCurrent() && creatingHex == null && scannerSession == null
+        val canOpen = session.isCurrent() && creatingHex == null && scannerSession == null && !agentSettingsOpen
         if (!canOpen || queryState.text.toString() != query) return
         startChatError = null
         creatingHex = hexForProgress
@@ -680,6 +687,7 @@ private fun NewMessageAccountScreen(
         session.isCurrent() &&
             creatingHex == null &&
             scannerSession == null &&
+            !agentSettingsOpen &&
             queryState.text.toString() == query
 
     /** Opens the candidate's profile, discovered or known. */
@@ -692,7 +700,9 @@ private fun NewMessageAccountScreen(
         }
     }
     val connectSession = scannerSession
-    if (connectSession != null && creatingHex == null && session.isCurrent()) {
+    if (agentSettingsOpen && session.isCurrent()) {
+        AiAgentsScreen(appState, onBack = { if (session.isCurrent()) agentSettingsOpen = false })
+    } else if (connectSession != null && creatingHex == null && session.isCurrent()) {
         ShareConnectScreen(
             appState = appState,
             onBack = { if (scannerSession == connectSession) scannerSession = null },
@@ -714,6 +724,7 @@ private fun NewMessageAccountScreen(
     } else {
         NewMessageContent(
             startingAs = startingAccount(appState, accountRef, runtimeGeneration),
+            inviteShareInProgress = inviteShareInProgress,
             isValidNpub = { npub -> appState.accountIdHexForMention(npub) != null },
             queryState = queryState,
             people = people,
@@ -737,6 +748,7 @@ private fun NewMessageAccountScreen(
                         }
                     },
                     invite = ::shareInvite,
+                    agentSettings = { if (canInteract() && !inviteShareInProgress) agentSettingsOpen = true },
                     retrySearch = { if (canInteract()) searchRetry++ },
                     retryChat = {
                         startChatError?.let { error ->

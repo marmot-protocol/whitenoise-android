@@ -3,6 +3,9 @@ package dev.ipf.whitenoise.android.state
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.ui.settings.defaultSmartFolder
+import dev.ipf.whitenoise.android.ui.settings.resetQuickFilters
+import dev.ipf.whitenoise.android.ui.settings.toggleQuickFilter
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
@@ -105,6 +108,36 @@ class ChatFolderDraftCommitTest {
         assertEquals(setOf("g2"), ChatFolderPreferences(context, preferences).excludedChats(A, folder.id))
         val reloadedFolder = ChatFolderPreferences(context, preferences).foldersFor(A).first { it.id == folder.id }
         assertEquals(ChatFolderSort.NAME, reloadedFolder.sort)
+    }
+
+    /** Paired edits stay local until the existing atomic Save, including after a failed write. */
+    @Test fun pairedDraftFailureAndRetryPreserveSavedRulesMembershipAndAccountScope() {
+        val original = ChatFolderRule(smartFilter = SmartFolderCodec.encode(defaultSmartFolder()))
+        val folder = store.commitFolderDraft(A, null, "Quick", "", setOf("manual"), original)!!
+        store.excludeChat(A, folder.id, "excluded")
+        val draft =
+            defaultSmartFolder()
+                .toggleQuickFilter(FolderField.UNREAD, FolderMode.NONE)
+                .toggleQuickFilter(FolderField.DRAFT, FolderMode.PRESENT)
+                .resetQuickFilters()
+                .toggleQuickFilter(FolderField.PINNED, FolderMode.NONE)
+        val edited = original.copy(smartFilter = SmartFolderCodec.encode(draft))
+        assertEquals(original, store.folderRule(A, folder.id))
+        preferences.failNext = true
+        assertThrows(IllegalStateException::class.java) {
+            store.commitFolderDraft(A, folder.id, "Quick", "", setOf("manual"), edited)
+        }
+        assertEquals(original, store.folderRule(A, folder.id))
+        assertEquals(setOf("manual"), store.membershipFor(A, folder.id))
+        preferences.failNext = false
+        preferences.writes = 0
+        store.commitFolderDraft(A, folder.id, "Quick", "", setOf("manual"), edited)
+        assertEquals(1, preferences.writes)
+        val reload = ChatFolderPreferences(context, preferences)
+        assertEquals(draft, SmartFolderCodec.decode(reload.folderRule(A, folder.id)!!.smartFilter!!))
+        assertEquals(setOf("manual"), reload.membershipFor(A, folder.id))
+        assertEquals(setOf("excluded"), reload.excludedChats(A, folder.id))
+        assertNull(reload.folderRule("another-account", folder.id))
     }
 
     /** Empty membership and rule removal use the same transaction as the edited text. */

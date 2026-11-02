@@ -15,9 +15,9 @@ internal class ConversationDictationCompletionIntent {
         private set
 
     val canChooseExplicit: Boolean
-        get() = phase == Phase.Open || phase == Phase.Automatic
+        get() = phase != Phase.Committed
 
-    /** The first explicit gesture overrides the automatic default until delivery starts. */
+    /** The latest explicit gesture owns delivery until its synchronous claim. */
     fun choose(
         delivery: ConversationDictationDeliveryMode?,
         automatic: Boolean = false,
@@ -28,6 +28,9 @@ internal class ConversationDictationCompletionIntent {
         phase = if (automatic) Phase.Automatic else Phase.Explicit
         return true
     }
+
+    val committed: Boolean
+        get() = phase == Phase.Committed
 
     fun commit() {
         phase = Phase.Committed

@@ -1106,6 +1106,8 @@ class LocalizationResourceTest {
             setOf(
                 // Two translated labels joined by locale-independent punctuation.
                 "developer_work_status",
+                // Folder state joins two translated labels with locale-specific punctuation.
+                "smart_folder_quick_state",
                 // "Audio" is the established media label in German, Spanish, French and Italian.
                 "library_audio",
                 // Pure positional-format string ("current/total"); no
@@ -1134,6 +1136,9 @@ class LocalizationResourceTest {
                 // In-app brand wordmark; the product name "White Noise" is kept
                 // identical across every locale.
                 "white_noise",
+                // Bundled sound names are stable product labels in Android's sound picker.
+                "notification_tone_ding",
+                "notification_tone_pulse",
                 "app_preferences",
                 "actions",
                 "bytes_count",

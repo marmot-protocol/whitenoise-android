@@ -94,8 +94,10 @@ def verify_bundle(directory, expected_digest, version, source, run_id, attempt, 
             manifest.get("productionRuntimeConfigurationComplete") is True and
             manifest.get("missingProductionRuntimeConfiguration") == [], "Rehearsal or incomplete bundle cannot be distributed")
     for field, key in (("applicationId", "APPLICATION_ID"), ("appSigningCertificateSha256", "APP_SIGNING_SHA256"),
-                       ("playUploadCertificateSha256", "PLAY_UPLOAD_SHA256"), ("zspVersion", "ZSP_VERSION")):
+                       ("playUploadCertificateSha256", "PLAY_UPLOAD_SHA256")):
         require(manifest.get(field) == policy[key], f"Release policy mismatch: {field}")
+    require(isinstance(manifest.get("zspVersion"), str) and
+            re.fullmatch(r"\d+\.\d+\.\d+", manifest["zspVersion"]), "Invalid producer ZSP version")
     require(type(manifest.get("versionCode")) is int and manifest["versionCode"] > 0, "Invalid version code")
     expected_files = {f"whitenoise-android-{version}-arm64-v8a.apk", f"whitenoise-android-{version}-play.aab",
                       f"mapping-{version}-play.txt", f"mapping-{version}-zapstore.txt",
@@ -129,6 +131,11 @@ def extract_flat_archive(archive, directory):
 
 def verify_source_metadata(directory, manifest):
     source = manifest["sourceCommit"]
+    # This records the producer's tooling, not today's publication client.
+    # A publisher upgrade must not invalidate or rewrite immutable candidates.
+    source_policy = command("git", "show", f"{source}:config/android-release.properties").decode()
+    require(re.findall(r"^ZSP_VERSION=(.+)$", source_policy, re.MULTILINE) == [manifest["zspVersion"]],
+            "Producer ZSP version differs from its source commit")
     gradle = command("git", "show", f"{source}:app/build.gradle.kts").decode()
     for pattern, value in ((r'versionName = "([^"]+)"', manifest["versionName"]),
                            (r'versionCode = (\d+)', str(manifest["versionCode"])),

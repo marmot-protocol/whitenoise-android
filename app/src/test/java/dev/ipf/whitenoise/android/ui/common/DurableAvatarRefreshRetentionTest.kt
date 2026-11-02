@@ -44,6 +44,23 @@ class DurableAvatarRefreshRetentionTest {
     /** Leaves no decoded pixels behind for other fixtures. */
     @After fun clearLoader() = AvatarImageLoader.clear()
 
+    /** Recomposition after a trim keeps the current surface's pixels and still rejects another account. */
+    @Test
+    fun memoryTrimPreservesDisplayedPixelsWithoutWeakeningAccountIsolation() {
+        val initial = asset(revision = 1uL)
+        val shown = mount(initial)
+        rule.runOnIdle {
+            AvatarImageLoader.trimMemory(dev.ipf.whitenoise.android.media.PresentationMemoryTrim.EMPTY)
+            assertNull(AvatarImageLoader.peek(requireNotNull(initial.cacheKey(ACCOUNT_REF))))
+            shown.asset = asset(revision = 2uL)
+        }
+        rule.waitForIdle()
+        assertSame(first, shown.image)
+        shown.accountRef = OTHER_ACCOUNT_REF
+        rule.waitForIdle()
+        assertNull(shown.image)
+    }
+
     /** A same-reference revision whose pixels are not ready yet keeps the previous pixels instead of blanking. */
     @Test
     fun sameTargetRevisionKeepsKnownPixelsWhileItsReadIsPending() {

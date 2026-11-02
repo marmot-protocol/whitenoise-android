@@ -6,10 +6,12 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -28,16 +30,9 @@ class ChatListSelectionBarTest {
 
     private fun string(res: Int): String = ApplicationProvider.getApplicationContext<android.content.Context>().getString(res)
 
-    /** Plural. */
-    private fun plural(
-        res: Int,
-        quantity: Int,
-        vararg args: Any,
-    ): String = ApplicationProvider.getApplicationContext<android.content.Context>().resources.getQuantityString(res, quantity, *args)
-
-    /** Shows count and routes actions. */
+    /** Hides the count and routes accessible icon actions. */
     @Test
-    fun showsCountAndRoutesActions() {
+    fun hidesCountAndRoutesIconActions() {
         var closes = 0
         var archives = 0
         var deletes = 0
@@ -53,10 +48,6 @@ class ChatListSelectionBarTest {
                         allVisibleSelected = false,
                         showMarkRead = false,
                         showMarkUnread = false,
-                        showMuteToggle = false,
-                        muted = false,
-                        showPinToggle = false,
-                        pinned = false,
                         showMovePinnedUp = false,
                         showMovePinnedDown = false,
                         onArchive = { archives++ },
@@ -64,8 +55,8 @@ class ChatListSelectionBarTest {
                         onAddToFolder = {},
                         onMarkRead = {},
                         onMarkUnread = {},
-                        onMuteToggle = {},
-                        onPinToggle = {},
+                        onSetMuted = {},
+                        onSetPinned = {},
                         onMovePinned = {},
                         onSelectAll = { selectAll++ },
                         onDeselectAll = {},
@@ -74,16 +65,15 @@ class ChatListSelectionBarTest {
             }
         }
 
-        composeRule.onNodeWithText("2").assertIsDisplayed()
-        composeRule
-            .onNodeWithContentDescription(
-                plural(R.plurals.chat_list_selected_count, 2, 2),
-            ).assertIsDisplayed()
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val selectedDescription = context.resources.getQuantityString(R.plurals.chat_list_selected_count, 2, 2)
+        composeRule.onNodeWithContentDescription(selectedDescription).assertIsDisplayed()
+        composeRule.onNodeWithText("2").assertDoesNotExist()
         composeRule.onNodeWithContentDescription(string(R.string.close)).performClick()
         composeRule.onAllNodesWithContentDescription(string(R.string.actions)).assertCountEquals(0)
         composeRule.onNodeWithContentDescription(string(R.string.archive)).performClick()
         composeRule.onNodeWithContentDescription(string(R.string.delete)).performClick()
-        composeRule.onNodeWithText(string(R.string.chat_list_select_all)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_select_all)).performClick()
 
         assertEquals(1, closes)
         assertEquals(1, archives)
@@ -110,10 +100,6 @@ class ChatListSelectionBarTest {
                     allVisibleSelected = false,
                     showMarkRead = false,
                     showMarkUnread = false,
-                    showMuteToggle = false,
-                    muted = false,
-                    showPinToggle = false,
-                    pinned = false,
                     showMovePinnedUp = false,
                     showMovePinnedDown = false,
                     onArchive = {},
@@ -121,8 +107,8 @@ class ChatListSelectionBarTest {
                     onAddToFolder = {},
                     onMarkRead = {},
                     onMarkUnread = {},
-                    onMuteToggle = {},
-                    onPinToggle = {},
+                    onSetMuted = {},
+                    onSetPinned = {},
                     onMovePinned = {},
                     onSelectAll = {},
                     onDeselectAll = {},
@@ -159,10 +145,6 @@ class ChatListSelectionBarTest {
                     allVisibleSelected = false,
                     showMarkRead = false,
                     showMarkUnread = false,
-                    showMuteToggle = false,
-                    muted = false,
-                    showPinToggle = false,
-                    pinned = false,
                     showMovePinnedUp = false,
                     showMovePinnedDown = false,
                     onArchive = {},
@@ -170,8 +152,8 @@ class ChatListSelectionBarTest {
                     onAddToFolder = {},
                     onMarkRead = {},
                     onMarkUnread = {},
-                    onMuteToggle = {},
-                    onPinToggle = {},
+                    onSetMuted = {},
+                    onSetPinned = {},
                     onMovePinned = {},
                     onSelectAll = { selectAll++ },
                     onDeselectAll = { deselectAll++ },
@@ -179,10 +161,16 @@ class ChatListSelectionBarTest {
             }
         }
 
-        composeRule.onNodeWithText(string(R.string.chat_list_select_all), useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_select_all)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_select_all)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_deselect_all)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_select_all)).performClick()
+
+        composeRule.onNodeWithText(string(R.string.chat_list_select_all)).assertDoesNotExist()
+        composeRule
+            .onNodeWithContentDescription(string(R.string.chat_list_select_all))
+            .performTouchInput { longClick() }
         composeRule.onNodeWithText(string(R.string.chat_list_select_all)).assertIsDisplayed()
-        composeRule.onNodeWithText(string(R.string.chat_list_deselect_all)).assertDoesNotExist()
-        composeRule.onNodeWithText(string(R.string.chat_list_select_all)).performClick()
 
         assertEquals(1, selectAll)
         assertEquals(0, deselectAll)
@@ -202,10 +190,6 @@ class ChatListSelectionBarTest {
                     allVisibleSelected = true,
                     showMarkRead = false,
                     showMarkUnread = false,
-                    showMuteToggle = false,
-                    muted = false,
-                    showPinToggle = false,
-                    pinned = false,
                     showMovePinnedUp = false,
                     showMovePinnedDown = false,
                     onArchive = {},
@@ -213,8 +197,8 @@ class ChatListSelectionBarTest {
                     onAddToFolder = {},
                     onMarkRead = {},
                     onMarkUnread = {},
-                    onMuteToggle = {},
-                    onPinToggle = {},
+                    onSetMuted = {},
+                    onSetPinned = {},
                     onMovePinned = {},
                     onSelectAll = { selectAll++ },
                     onDeselectAll = { deselectAll++ },
@@ -222,10 +206,10 @@ class ChatListSelectionBarTest {
             }
         }
 
-        composeRule.onNodeWithText(string(R.string.chat_list_deselect_all), useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNodeWithText(string(R.string.chat_list_deselect_all)).assertIsDisplayed()
-        composeRule.onNodeWithText(string(R.string.chat_list_select_all)).assertDoesNotExist()
-        composeRule.onNodeWithText(string(R.string.chat_list_deselect_all)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_deselect_all)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_deselect_all)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_select_all)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_deselect_all)).performClick()
 
         assertEquals(0, selectAll)
         assertEquals(1, deselectAll)
@@ -243,10 +227,6 @@ class ChatListSelectionBarTest {
                     allVisibleSelected = false,
                     showMarkRead = false,
                     showMarkUnread = false,
-                    showMuteToggle = false,
-                    muted = false,
-                    showPinToggle = false,
-                    pinned = false,
                     showMovePinnedUp = false,
                     showMovePinnedDown = false,
                     onArchive = {},
@@ -254,8 +234,8 @@ class ChatListSelectionBarTest {
                     onAddToFolder = {},
                     onMarkRead = {},
                     onMarkUnread = {},
-                    onMuteToggle = {},
-                    onPinToggle = {},
+                    onSetMuted = {},
+                    onSetPinned = {},
                     onMovePinned = {},
                     onSelectAll = {},
                     onDeselectAll = {},
@@ -264,7 +244,7 @@ class ChatListSelectionBarTest {
         }
 
         composeRule.onNodeWithContentDescription(string(R.string.unarchive)).assertIsNotEnabled()
-        composeRule.onNodeWithText(string(R.string.chat_list_select_all)).assertIsNotEnabled()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_select_all)).assertIsNotEnabled()
         composeRule.onNodeWithContentDescription(string(R.string.delete)).assertIsNotEnabled()
     }
 
@@ -282,10 +262,8 @@ class ChatListSelectionBarTest {
                     allVisibleSelected = false,
                     showMarkRead = true,
                     showMarkUnread = false,
-                    showMuteToggle = true,
-                    muted = false,
-                    showPinToggle = false,
-                    pinned = false,
+                    showMute = true,
+                    showUnmute = false,
                     showMovePinnedUp = false,
                     showMovePinnedDown = false,
                     onArchive = {},
@@ -293,8 +271,8 @@ class ChatListSelectionBarTest {
                     onAddToFolder = {},
                     onMarkRead = { markRead++ },
                     onMarkUnread = {},
-                    onMuteToggle = { muteToggle++ },
-                    onPinToggle = {},
+                    onSetMuted = { muteToggle++ },
+                    onSetPinned = {},
                     onMovePinned = {},
                     onSelectAll = {},
                     onDeselectAll = {},
@@ -302,7 +280,7 @@ class ChatListSelectionBarTest {
             }
         }
 
-        composeRule.onNodeWithText(string(R.string.chat_list_select_all), useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_select_all)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_mark_read)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_mute)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_unmute)).assertDoesNotExist()
@@ -327,10 +305,8 @@ class ChatListSelectionBarTest {
                     allVisibleSelected = false,
                     showMarkRead = false,
                     showMarkUnread = false,
-                    showMuteToggle = false,
-                    muted = false,
-                    showPinToggle = true,
-                    pinned = true,
+                    showPin = false,
+                    showUnpin = true,
                     showMovePinnedUp = true,
                     showMovePinnedDown = true,
                     onArchive = {},
@@ -338,8 +314,8 @@ class ChatListSelectionBarTest {
                     onAddToFolder = {},
                     onMarkRead = {},
                     onMarkUnread = {},
-                    onMuteToggle = {},
-                    onPinToggle = { pinToggles++ },
+                    onSetMuted = {},
+                    onSetPinned = { pinToggles++ },
                     onMovePinned = { moves += it },
                     onSelectAll = {},
                     onDeselectAll = {},
@@ -357,45 +333,72 @@ class ChatListSelectionBarTest {
         assertEquals(1, pinToggles)
     }
 
-    /** Multi-selection keeps single-chat actions absent from the direct bar. */
+    /** Mixed multi-selection offers separately named explicit desired states. */
     @Test
-    fun multiSelectionDirectBarHidesSingleChatActions() {
+    @Suppress("LongMethod") // Keep the explicit mixed-action fixture beside its paired-label routing assertions.
+    fun mixedMultiSelectionRoutesExplicitDesiredStates() {
+        val mutedTargets = mutableListOf<Boolean>()
+        val pinnedTargets = mutableListOf<Boolean>()
+        val folderTargets = mutableListOf<String>()
+        val deleteTargets = mutableListOf<String>()
         composeRule.setContent {
             WhiteNoiseTheme {
                 ChatListSelectionControls(
                     count = 2,
+                    deleteLabel = string(R.string.leave_and_delete),
                     archiveAction = ChatListBulkArchiveAction.Archive,
                     actionsEnabled = true,
                     allVisibleSelected = false,
-                    showMarkRead = false,
-                    showMarkUnread = false,
-                    showMuteToggle = false,
-                    muted = false,
-                    showPinToggle = false,
-                    pinned = false,
+                    showMarkRead = true,
+                    showMarkUnread = true,
                     showMovePinnedUp = false,
                     showMovePinnedDown = false,
                     onArchive = {},
-                    onDelete = {},
-                    onAddToFolder = {},
+                    onDelete = { deleteTargets += "leave" },
+                    onAddToFolder = { folderTargets += "add" },
                     onMarkRead = {},
                     onMarkUnread = {},
-                    onMuteToggle = {},
-                    onPinToggle = {},
                     onMovePinned = {},
                     onSelectAll = {},
                     onDeselectAll = {},
+                    showMute = true,
+                    showUnmute = true,
+                    showPin = true,
+                    showUnpin = true,
+                    onSetMuted = { mutedTargets += it },
+                    onSetPinned = { pinnedTargets += it },
+                    onExcludeFromFolder = { folderTargets += "exclude" },
+                    onDeleteLocal = { deleteTargets += "local" },
                 )
             }
         }
 
-        composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_mark_read)).assertDoesNotExist()
-        composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_mute)).assertDoesNotExist()
-        composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_unmute)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_mark_read)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_mute)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_unmute)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.archive)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.chat_list_action_add_to_folder)).assertIsDisplayed()
-        composeRule.onNodeWithContentDescription(string(R.string.delete)).assertIsDisplayed()
-        composeRule.onNodeWithText(string(R.string.chat_list_select_all)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.leave_and_delete)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_list_select_all)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_mute)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_unmute)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_pin)).performClick()
+        composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_unpin)).performClick()
+        val pairedLabels =
+            listOf(
+                R.string.chat_list_action_add_to_folder,
+                R.string.folder_exclude_chat,
+                R.string.delete_from_device,
+                R.string.leave_and_delete,
+            )
+        for (label in pairedLabels) {
+            composeRule.onNodeWithText(string(label)).assertDoesNotExist()
+            composeRule.onNodeWithContentDescription(string(label)).assertIsDisplayed().performClick()
+        }
+        assertEquals(listOf("add", "exclude"), folderTargets)
+        assertEquals(listOf("local", "leave"), deleteTargets)
+        assertEquals(listOf(true, false), mutedTargets)
+        assertEquals(listOf(true, false), pinnedTargets)
     }
 
     /** Direct multi-selection bar routes add to folder. */
@@ -411,10 +414,6 @@ class ChatListSelectionBarTest {
                     allVisibleSelected = false,
                     showMarkRead = false,
                     showMarkUnread = false,
-                    showMuteToggle = false,
-                    muted = false,
-                    showPinToggle = false,
-                    pinned = false,
                     showMovePinnedUp = false,
                     showMovePinnedDown = false,
                     onArchive = {},
@@ -422,8 +421,8 @@ class ChatListSelectionBarTest {
                     onAddToFolder = { addToFolder++ },
                     onMarkRead = {},
                     onMarkUnread = {},
-                    onMuteToggle = {},
-                    onPinToggle = {},
+                    onSetMuted = {},
+                    onSetPinned = {},
                     onMovePinned = {},
                     onSelectAll = {},
                     onDeselectAll = {},
@@ -449,10 +448,8 @@ class ChatListSelectionBarTest {
                     allVisibleSelected = false,
                     showMarkRead = true,
                     showMarkUnread = false,
-                    showMuteToggle = true,
-                    muted = false,
-                    showPinToggle = false,
-                    pinned = false,
+                    showMute = true,
+                    showUnmute = false,
                     showMovePinnedUp = false,
                     showMovePinnedDown = false,
                     onArchive = {},
@@ -460,8 +457,8 @@ class ChatListSelectionBarTest {
                     onAddToFolder = { addToFolder++ },
                     onMarkRead = {},
                     onMarkUnread = {},
-                    onMuteToggle = {},
-                    onPinToggle = {},
+                    onSetMuted = {},
+                    onSetPinned = {},
                     onMovePinned = {},
                     onSelectAll = {},
                     onDeselectAll = {},
@@ -487,10 +484,8 @@ class ChatListSelectionBarTest {
                     allVisibleSelected = false,
                     showMarkRead = false,
                     showMarkUnread = false,
-                    showMuteToggle = true,
-                    muted = true,
-                    showPinToggle = false,
-                    pinned = false,
+                    showMute = false,
+                    showUnmute = true,
                     showMovePinnedUp = false,
                     showMovePinnedDown = false,
                     onArchive = {},
@@ -498,8 +493,8 @@ class ChatListSelectionBarTest {
                     onAddToFolder = {},
                     onMarkRead = {},
                     onMarkUnread = {},
-                    onMuteToggle = {},
-                    onPinToggle = {},
+                    onSetMuted = {},
+                    onSetPinned = {},
                     onMovePinned = {},
                     onSelectAll = {},
                     onDeselectAll = {},

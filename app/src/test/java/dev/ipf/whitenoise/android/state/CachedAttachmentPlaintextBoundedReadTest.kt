@@ -173,6 +173,28 @@ class CachedAttachmentPlaintextBoundedReadTest {
             assertEquals("a plaintext lease was left on disk", emptyList<String>(), leaseFileNames())
         }
 
+    /**
+     * When the host caches miss, the cache-only render falls back to MDK's retention, and a retained body above the
+     * budget is refused from its declared size without any chunk being copied into a lease.
+     */
+    @Test
+    fun aRetainedBodyAboveTheBudgetIsRefusedWithoutCopyingIt() =
+        runTest(dispatcher) {
+            fixture.retainNatively(0, ByteArray(LARGE_ENTRY_BYTES) { it.toByte() })
+
+            val failure =
+                runCatching {
+                    localAttachmentBytes(controller, request(0).messageIdHex, 0, mine = false, maxBytes = BUDGET_BYTES)
+                }.exceptionOrNull()
+
+            assertTrue(
+                "expected a typed too-large failure, got $failure",
+                failure is AttachmentTooLargeToPresentException,
+            )
+            assertEquals(LARGE_ENTRY_BYTES.toLong(), (failure as AttachmentTooLargeToPresentException).declaredBytes)
+            assertEquals("the oversized body was copied before it was refused", 0, fixture.nativeAssetReads.get())
+        }
+
     /** An entry small enough for L1 is still read directly. */
     @Test
     fun aSmallDiskEntryIsReadDirectly() =

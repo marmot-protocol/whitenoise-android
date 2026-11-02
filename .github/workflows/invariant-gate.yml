@@ -39,7 +39,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.base.sha }}
           path: trusted
-          # The trusted tests read the base registry and this workflow, so check them out beside the script.
+          # Base-revision tests can inspect the workflow and registry beside the script.
           sparse-checkout: |
             .github/scripts
             .github/workflows/invariant-gate.yml

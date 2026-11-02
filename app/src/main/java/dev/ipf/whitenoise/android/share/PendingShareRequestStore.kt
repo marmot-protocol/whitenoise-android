@@ -199,6 +199,9 @@ internal fun encodePendingShareRequest(request: ShareRequest): ByteArray {
         .put("import_ready", request.payload.importReady)
         .put("import_rejected_count", request.payload.importRejectedCount)
         .put("import_errors", JSONArray(request.payload.importErrors.map { it.name }))
+        .put("import_image_limit", request.payload.importImageLimitBytes ?: JSONObject.NULL)
+        .put("import_document_limit", request.payload.importDocumentLimitBytes ?: JSONObject.NULL)
+        .put("import_batch_limit", request.payload.importBatchLimitBytes ?: JSONObject.NULL)
         .toString()
         .toByteArray(Charsets.UTF_8)
 }
@@ -227,6 +230,9 @@ internal fun decodePendingShareRequest(
                     intentMimeType = json.nullableString(KEY_MIME_TYPE),
                     importReady = json.optBoolean("import_ready"),
                     importRejectedCount = json.optInt("import_rejected_count").coerceAtLeast(0),
+                    importImageLimitBytes = json.optLong("import_image_limit", -1L).takeIf { it >= 0 },
+                    importDocumentLimitBytes = json.optLong("import_document_limit", -1L).takeIf { it >= 0 },
+                    importBatchLimitBytes = json.optLong("import_batch_limit", -1L).takeIf { it >= 0 },
                     importErrors =
                         json
                             .optJSONArray("import_errors")

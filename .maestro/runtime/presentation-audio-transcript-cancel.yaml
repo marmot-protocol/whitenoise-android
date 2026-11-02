@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-audio-transcript-cancel
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Audio transcript
+- assertVisible: ".*process this recording on your device using its installed speech model.*"
+- tapOn: Cancel
+- assertVisible:
+    id: presentation.complete

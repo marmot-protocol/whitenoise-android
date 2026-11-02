@@ -167,6 +167,38 @@
           "CHL-007",
           "CHL-012"
         ]
+      },
+      {
+        "surface": "Bulk explicit target directions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "onSetMuted",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.delete_from_device",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "R.string.delete_from_device",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.folder_exclude_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "R.string.folder_exclude_chat",
+        "test_ids": [
+          "CHL-012"
+        ]
+      },
+      {
+        "surface": "R.string.leave_and_delete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatListSelectionBar.kt",
+        "anchor": "R.string.leave_and_delete",
+        "test_ids": [
+          "CHL-012"
+        ]
       }
     ],
     "settings_controls": [

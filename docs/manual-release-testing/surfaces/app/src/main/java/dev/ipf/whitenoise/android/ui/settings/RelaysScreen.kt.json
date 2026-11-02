@@ -1,0 +1,409 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+  "legacy_sha256": "5f6af7d447f111786140e242a7740d33b3b09fab859425d889f9dbe6e9b2d0ce",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Authored emoji prompt: RelaysScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "AddRelaySheet",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "fun AddRelaySheet(",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003",
+          "SYS-014"
+        ]
+      },
+      {
+        "surface": "RelayDetailsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "fun RelayDetailsScreen(",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "RelaysContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "fun RelaysContent(",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003",
+          "SYS-014"
+        ]
+      },
+      {
+        "surface": "RelaysScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "fun RelaysScreen(",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:add_relay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.add_relay",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.cancel",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:choose_at_least_one_role",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.choose_at_least_one_role",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:inbox",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.inbox",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:name",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.name",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:nip_65",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.nip_65",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.profile",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:profile_relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.profile_relays",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.relay",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_defaults_in_use",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.relay_defaults_in_use",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_list_publish",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.relay_list_publish",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_list_publish_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.relay_list_publish_help",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_list_publishing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.relay_list_publishing",
+        "test_ids": [
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_list_refresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.relay_list_refresh",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_lists_section",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.relay_lists_section",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_onion_add_error",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.relay_onion_add_error",
+        "test_ids": [
+          "SYS-002",
+          "SYS-014"
+        ]
+      },
+      {
+        "surface": "string:relay_onion_needs_tor",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.relay_onion_needs_tor",
+        "test_ids": [
+          "SYS-014"
+        ]
+      },
+      {
+        "surface": "string:relay_remove_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.relay_remove_detail",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_remove_last_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.relay_remove_last_detail",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_restore_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.relay_restore_detail",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_restore_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.relay_restore_help",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_unique_url_error",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.relay_unique_url_error",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_url",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.relay_url",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relay_url_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.relay_url_help",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.relays",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:relays_explanation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.relays_explanation",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:remove_named_relay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.remove_named_relay",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:remove_relay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.remove_relay",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:restore_default_relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.restore_default_relays",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:restore_default_relays_question",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.restore_default_relays_question",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:restore_defaults",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.restore_defaults",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:url",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.url",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      },
+      {
+        "surface": "string:use_for",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "R.string.use_for",
+        "test_ids": [
+          "SYS-001",
+          "SYS-002",
+          "SYS-003"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Scroll boundaries: RelaysScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt",
+        "anchor": "SettingsList {",
+        "test_ids": [
+          "SCR-001",
+          "SCR-002",
+          "SCR-003",
+          "SCR-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

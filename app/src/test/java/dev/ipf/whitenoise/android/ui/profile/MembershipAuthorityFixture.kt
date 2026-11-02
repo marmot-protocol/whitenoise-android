@@ -32,6 +32,9 @@ internal class MembershipAuthorityFixture {
     val entered = ConcurrentHashMap<String, CountDownLatch>()
     val releases = ConcurrentHashMap<String, CountDownLatch>()
     val reads = CopyOnWriteArrayList<String>()
+
+    /** Worker threads that ran a native authority read, so a test can tell native I/O from composition work. */
+    val nativeThreads: MutableSet<Thread> = ConcurrentHashMap.newKeySet()
     private val authorityEvents = CopyOnWriteArrayList<String>()
     private val authorityTraceStartedAt = System.nanoTime()
     val self = ConversationTimelineTestIds.ACCOUNT_ID
@@ -126,10 +129,11 @@ internal class MembershipAuthorityFixture {
         return result
     }
 
-    /** Reads the same gated native snapshot while keeping proxy dispatch complexity bounded. */
+    /** Reads the same gated native snapshot on the calling worker, recording that worker as native I/O. */
     private fun readNativeSnapshot(args: Array<out Any?>?): GroupConversationSnapshotFfi {
         check(args!![0] == account)
         val id = args[1] as String
+        nativeThreads += Thread.currentThread()
         reads += id
         recordAuthorityEvent(id, "native-enter")
         return try {
