@@ -13,6 +13,10 @@ internal class WaveformAccumulator {
     private val chunkPeaks = ArrayList<Float>()
     private var totalFrames = 0L
 
+    /**
+     * Adds normalized absolute-amplitude sum and peak for a nonempty decoded-frame interval.
+     * Frame counts, rather than metadata duration, determine each chunk's waveform placement.
+     */
     fun addChunk(
         sum: Double,
         peak: Float,
@@ -27,6 +31,10 @@ internal class WaveformAccumulator {
         totalFrames = Math.addExact(totalFrames, frames.toLong())
     }
 
+    /**
+     * Consumes complete little-endian PCM16 frames from the current buffer position.
+     * Stereo amplitude is folded by channel mean; the buffer position advances by [byteCount].
+     */
     fun addPcm16(
         input: ByteBuffer,
         byteCount: Int,
@@ -48,6 +56,10 @@ internal class WaveformAccumulator {
         addChunk(sum, peak, frames)
     }
 
+    /**
+     * Returns normalized display bars from frame-weighted mean and peak amplitudes.
+     * Empty or entirely silent input returns null; accumulation is retained for subsequent calls.
+     */
     @Suppress("ReturnCount") // Empty and silent input return no waveform; successful input returns normalized bars.
     fun finish(): FloatArray? {
         if (totalFrames <= 0L) return null

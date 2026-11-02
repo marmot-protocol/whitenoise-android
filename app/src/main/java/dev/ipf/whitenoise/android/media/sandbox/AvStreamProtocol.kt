@@ -10,10 +10,14 @@ import java.io.IOException
 internal object AvStreamProtocol {
     const val DESCRIPTOR = "dev.ipf.whitenoise.media.av.stream.v2"
     const val READY_DESCRIPTOR = "dev.ipf.whitenoise.media.av.stream.ready.v1"
+    const val REFUSED = 1
+    const val CONTAINER_MALFORMED = 2
     const val OPEN = IBinder.FIRST_CALL_TRANSACTION
     const val READ = IBinder.FIRST_CALL_TRANSACTION + 1
     const val SEEK = IBinder.FIRST_CALL_TRANSACTION + 2
     const val RETIRE = IBinder.FIRST_CALL_TRANSACTION + 3
+    const val IDENTIFY = IBinder.FIRST_CALL_TRANSACTION + 4
+    const val IDENTITY = IBinder.FIRST_CALL_TRANSACTION + 1
     const val READY = IBinder.FIRST_CALL_TRANSACTION
     const val ANY_TRACK = 0
     const val VIDEO_TRACK = 1
@@ -27,13 +31,16 @@ internal object AvStreamProtocol {
     const val WATCHDOG_MS = 6000L
     const val MAX_DURATION_US = 24L * 60 * 60 * 1_000_000
 
+    /** Validates the requested edge before computing the exact packed RGBA allocation bound. */
     fun pixelCapacity(edge: Int): Int {
         require(edge in 1..MAX_EDGE)
         return (edge.toLong() * edge * 4).also { require(it <= MAX_PIXEL_BYTES) }.toInt()
     }
 
+    /** Rejects noncanonical wire booleans instead of treating arbitrary worker scalars as truthy. */
     fun boolean(data: Parcel): Boolean = data.readInt().also { require(it in 0..1) } == 1
 
+    /** Writes only the parent-generated generation token and monotonic request sequence. */
     fun writeTuple(
         data: Parcel,
         token: String,
@@ -43,6 +50,7 @@ internal object AvStreamProtocol {
         data.writeLong(sequence)
     }
 
+    /** Accepts a bounded hexadecimal generation token and positive request sequence only. */
     fun readTuple(data: Parcel): Pair<String, Long> {
         val token = checkNotNull(data.readString())
         val sequence = data.readLong()
@@ -50,6 +58,7 @@ internal object AvStreamProtocol {
         return token to sequence
     }
 
+    /** Serializes a fixed scalar vector without native objects or parser-controlled strings. */
     fun writeValues(
         data: Parcel,
         values: LongArray,
@@ -58,6 +67,7 @@ internal object AvStreamProtocol {
         values.forEach(data::writeLong)
     }
 
+    /** Requires the exact expected scalar count and no trailing primitive or object payload. */
     fun readValues(
         data: Parcel,
         count: Int,
@@ -72,6 +82,7 @@ internal typealias AvStreamInfo = NativeMediaInfo
 internal val AvStreamInfo.hasVideo: Boolean get() = width > 0 && height > 0
 internal val AvStreamInfo.hasAudio: Boolean get() = sampleRate > 0 && channels > 0
 
+/** Validates native metadata against raw output budgets and requires a usable requested track. */
 internal fun avStreamInfo(values: LongArray): AvStreamInfo {
     val info = NativeMediaOutputPolicy.info(values).also { require(it.hasVideo || it.hasAudio) }
     return info
@@ -87,6 +98,7 @@ internal data class AvStreamOutput(
     val byteCount: Int,
 ) {
     companion object {
+        /** Validates every scalar before the parent reads shared pixels or PCM. */
         fun from(
             values: LongArray,
             edge: Int,
@@ -120,6 +132,7 @@ internal data class AvStreamOutput(
             )
         }
 
+        /** Requires requested video and exact packed RGBA dimensions within the selected edge budget. */
         private fun validateVideoFrame(
             values: LongArray,
             edge: Int,
@@ -149,10 +162,22 @@ internal class AvStreamLifetime {
     private var activeRpc = false
     private var activeRetirement = false
 
+    @Volatile var openMayHaveBeenDelivered = false
+        private set
+
+    /** Commit immediately before IPC; cancellation or an uncertain result never revokes exposure. */
+    @Synchronized fun commitOpen(): Boolean {
+        if (closed || openMayHaveBeenDelivered) return false
+        openMayHaveBeenDelivered = true
+        return true
+    }
+
+    /** Revokes new operations immediately; cleanup and exact process-absence evidence remain separate. */
     @Synchronized fun close() {
         closed = true
     }
 
+    /** Records the framework bind outcome; only an explicit false establishes no worker creation. */
     @Synchronized fun bindCompleted(accepted: Boolean) {
         bindCompleted = true
         bindingAttempted = true
@@ -161,11 +186,13 @@ internal class AvStreamLifetime {
         }
     }
 
+    /** Retains process admission when a binding exception leaves creation uncertain. */
     @Synchronized fun bindOutcomeUnknown() {
         bindCompleted = true
         bindingAttempted = true
     }
 
+    /** Records a pre-bind failure with no framework connection or possible worker to retire. */
     @Synchronized fun neverBound() {
         check(!bindCompleted)
         bindCompleted = true
@@ -173,42 +200,51 @@ internal class AvStreamLifetime {
         unbound = true
     }
 
+    /** Revokes a dead Binder endpoint without claiming that its OS process has disappeared. */
     @Synchronized fun deathObserved() {
         closed = true // Binder death revokes the endpoint but supplies no OS process-absence proof.
     }
 
+    /** Records the separately calibrated kernel absence proof required before admission release. */
     @Synchronized fun processGoneObserved() {
         processGone = true
     }
 
+    /** Holds a caller-copy credit until the operation finishes; closed generations reject acquisition. */
     @Synchronized fun beginCall() {
         if (closed) throw IOException("Media session is closed")
         activeCalls++
     }
 
+    /** Settles one caller-copy credit without asserting RPC completion or worker death. */
     @Synchronized fun endCall() {
         check(activeCalls > 0)
         activeCalls--
     }
 
+    /** Holds the single RPC credit independently of the waiting caller deadline. */
     @Synchronized fun beginRpc() {
         check(!activeRpc)
         activeRpc = true
     }
 
+    /** Acknowledges actual RPC completion so timed-out Binder calls cannot lose their process credit. */
     @Synchronized fun endRpc() {
         activeRpc = false
     }
 
+    /** Keeps retirement IPC accounted until its executor has actually settled. */
     @Synchronized fun beginRetirement() {
         check(!activeRetirement)
         activeRetirement = true
     }
 
+    /** Settles retirement work without treating a successful send as process absence. */
     @Synchronized fun endRetirement() {
         activeRetirement = false
     }
 
+    /** Grants one framework cleanup attempt only after close and a known bind completion. */
     @Synchronized fun beginUnbind(): Boolean {
         val lifetime = closed && bindCompleted
         val connection = bindingAttempted && !unbinding && !unbound && !cleanupFailed
@@ -217,12 +253,14 @@ internal class AvStreamLifetime {
         return true
     }
 
+    /** Retains failed cleanup permanently; successful unbind alone never releases worker admission. */
     @Synchronized fun unbindFinished(success: Boolean) {
         check(unbinding)
         unbound = success
         cleanupFailed = !success
     }
 
+    /** Requires absence, successful connection cleanup and all caller/RPC/retirement credits settled. */
     @Synchronized fun releasable(): Boolean {
         val absent = processGone || definitiveNoWorker
         val cleanup = closed && bindCompleted && absent && unbound && !cleanupFailed
@@ -241,8 +279,10 @@ internal class AvStreamAdmissions<T : Any> {
     private val owners = java.util.EnumMap<AvStreamLane, T>(AvStreamLane::class.java)
     private var epoch = 0L
 
+    /** Returns the current account generation used to fence reservations and reply publication. */
     @Synchronized fun epoch(): Long = epoch
 
+    /** Returns the retained lane owner only for the exact current account epoch. */
     @Synchronized fun current(
         lane: AvStreamLane,
         expectedEpoch: Long,
@@ -251,6 +291,7 @@ internal class AvStreamAdmissions<T : Any> {
         return owners[lane]
     }
 
+    /** Claims one fixed lane without replacing an unresolved generation or another account owner. */
     @Synchronized fun reserve(
         lane: AvStreamLane,
         expectedEpoch: Long,
@@ -261,12 +302,14 @@ internal class AvStreamAdmissions<T : Any> {
         return create().also { owners[lane] = it }
     }
 
+    /** Checks both account epoch and object identity without releasing stale retained ownership. */
     @Synchronized fun isCurrent(
         lane: AvStreamLane,
         expectedEpoch: Long,
         owner: T,
     ): Boolean = epoch == expectedEpoch && owners[lane] === owner
 
+    /** Runs a short publication or exposure commit atomically against account invalidation. */
     @Synchronized fun accept(
         lane: AvStreamLane,
         expectedEpoch: Long,
@@ -277,6 +320,7 @@ internal class AvStreamAdmissions<T : Any> {
         return action()
     }
 
+    /** Removes only the exact retained owner after its independent cleanup proof is complete. */
     @Synchronized fun release(
         lane: AvStreamLane,
         owner: T,
@@ -284,11 +328,13 @@ internal class AvStreamAdmissions<T : Any> {
         if (owners[lane] === owner) owners.remove(lane)
     }
 
+    /** Revokes both account lanes while retaining their process credits until exact cleanup. */
     @Synchronized fun invalidateAll(): List<T> {
         epoch++
         return owners.values.toList()
     }
 
+    /** Rejects stale account operations before they can acquire or inspect current lane ownership. */
     private fun checkEpoch(expectedEpoch: Long) {
         if (epoch != expectedEpoch) throw IOException("Media account generation changed")
     }

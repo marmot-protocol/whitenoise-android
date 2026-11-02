@@ -48,6 +48,10 @@ internal class RawSonicSegment(
         processor = if (sonic.isActive) sonic.also { it.flush(AudioProcessor.StreamMetadata.DEFAULT) } else null
     }
 
+    /**
+     * Consumes one bounded, frame-aligned PCM16 byte range after all prior output is drained.
+     * Returns bytes accepted; callers must consume the returned output view before more input or EOS.
+     */
     fun queueInput(
         bytes: ByteArray,
         offset: Int,
@@ -82,6 +86,9 @@ internal class RawSonicSegment(
         return pending
     }
 
+    /**
+     * Signals EOS once after draining exposed output, then exposes any processor tail for consumption.
+     */
     fun endOfInput() {
         checkOpen()
         if (inputEnded) return
@@ -110,6 +117,9 @@ internal class RawSonicSegment(
         return mapped.coerceIn(0L, sourceDuration)
     }
 
+    /**
+     * Drops the pending output reference and resets the processor once; subsequent segment operations fail.
+     */
     override fun close() {
         if (closed) return
         closed = true
@@ -118,23 +128,39 @@ internal class RawSonicSegment(
         processor?.reset()
     }
 
+    /**
+     * Rejects operations after processor ownership has been released.
+     */
     private fun checkOpen() = check(!closed)
 
+    /**
+     * Rejects a consumer that changed the segment-owned output limit rather than advancing its position.
+     */
     private fun checkPendingShape() {
         check(pending.limit() == pendingLimit) { "PCM output limit changed" }
     }
 
+    /**
+     * Requires complete consumption of the current immutable-limit output before replacing it.
+     */
     private fun requireOutputDrained() {
         checkPendingShape()
         check(!pending.hasRemaining()) { "PCM output must be consumed before input or EOS" }
     }
 
+    /**
+     * Transfers the next processor output view only after the previous view has been drained.
+     */
     private fun captureOutput() {
         requireOutputDrained()
         val next = processor?.getOutput() ?: AudioProcessor.EMPTY_BUFFER
         if (next.hasRemaining()) ownOutput(next)
     }
 
+    /**
+     * Records bounded whole-frame output and exposes a read-only view whose position the consumer advances.
+     * The pre-call input policy bounds processor allocation; this post-call check is supplemental.
+     */
     private fun ownOutput(buffer: ByteBuffer) {
         // Supplemental invariant only: pre-call admission, not this check, bounds library allocations.
         check(buffer.remaining() <= MAX_EXPOSED_BYTES && buffer.remaining() % frameBytes == 0)
@@ -143,6 +169,9 @@ internal class RawSonicSegment(
         pendingLimit = pending.limit()
     }
 
+    /**
+     * Converts frames at this segment rate to microseconds with saturation instead of overflow.
+     */
     private fun framesToUs(frames: Long): Long {
         val seconds = frames / sampleRate
         if (seconds > Long.MAX_VALUE / MICROS_PER_SECOND) return Long.MAX_VALUE

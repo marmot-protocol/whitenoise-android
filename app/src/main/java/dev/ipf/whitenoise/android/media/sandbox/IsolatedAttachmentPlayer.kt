@@ -44,12 +44,14 @@ internal class IsolatedAttachmentPlayer(
             uri,
             listener =
                 object : RawAvPlaybackEngine.Listener {
+                    /** Publishes engine changes on the player contract while refusing callbacks after release. */
                     override fun onChanged() {
                         if (!released) invalidateState()
                     }
                 },
         )
 
+    /** Projects the engine snapshot into Player state without parsing the selected compressed source. */
     override fun getState(): State {
         val current = engine.snapshot()
         val tracks = tracks(current)
@@ -95,19 +97,23 @@ internal class IsolatedAttachmentPlayer(
             .build()
     }
 
+    /** Delegates preparation to the single raw playback owner and returns its asynchronous completion. */
     override fun handlePrepare(): ListenableFuture<*> = engine.prepare()
 
+    /** Updates requested playback through the engine so focus, pause and lifetime ownership stay centralized. */
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
         engine.setPlaying(playWhenReady)
         return done()
     }
 
+    /** Queues the target media position through the retained raw session rather than reopening the URI. */
     override fun handleSeek(
         mediaItemIndex: Int,
         positionMs: Long,
         seekCommand: Int,
     ): ListenableFuture<*> = engine.seekToAsync(positionMs)
 
+    /** Applies bounded supported speed parameters through the existing raw PCM timing owner. */
     override fun handleSetPlaybackParameters(playbackParameters: PlaybackParameters): ListenableFuture<*> {
         val speed = playbackParameters.speed
         if (
@@ -120,11 +126,13 @@ internal class IsolatedAttachmentPlayer(
         return done()
     }
 
+    /** Keeps the Player volume projection and parent PCM gain synchronized. */
     override fun handleSetVolume(volume: Float): ListenableFuture<*> {
         if (engine.setVolume(volume) && volume > 0) unmuteVolumeValue = volume
         return done()
     }
 
+    /** Accepts the supported repeat contract and updates the existing engine owner. */
     override fun handleSetRepeatMode(repeatMode: Int): ListenableFuture<*> {
         require(repeatMode in Player.REPEAT_MODE_OFF..Player.REPEAT_MODE_ALL)
         repeatModeValue = repeatMode
@@ -132,6 +140,7 @@ internal class IsolatedAttachmentPlayer(
         return done()
     }
 
+    /** Routes platform audio policy through the engine instead of exposing presentation to the worker. */
     override fun handleSetAudioAttributes(
         audioAttributes: AudioAttributes,
         handleAudioFocus: Boolean,
@@ -149,29 +158,35 @@ internal class IsolatedAttachmentPlayer(
         return done()
     }
 
+    /** Attaches the parent-owned presentation output; no Surface capability crosses worker IPC. */
     override fun handleSetVideoOutput(videoOutput: Any): ListenableFuture<*> {
         engine.attachVideo(videoOutput)
         return done()
     }
 
+    /** Clears only the matching parent presentation output so late removals cannot detach its replacement. */
     override fun handleClearVideoOutput(videoOutput: Any?): ListenableFuture<*> {
         engine.clearVideo(videoOutput)
         return done()
     }
 
+    /** Stops playback through the existing owner while retaining the selected media position contract. */
     override fun handleStop(): ListenableFuture<*> {
         engine.stop()
         return done()
     }
 
+    /** Revokes listener publication and releases the engine once through the Player lifecycle. */
     override fun handleRelease(): ListenableFuture<*> {
         released = true
         engine.close()
         return done()
     }
 
+    /** Routes noisy-output policy to the parent playback owner and its receiver lifetime. */
     fun setHandleAudioBecomingNoisy(enabled: Boolean) = engine.setHandleAudioBecomingNoisy(enabled)
 
+    /** Builds presentation-only track descriptions from validated raw metadata. */
     private fun tracks(state: RawAvPlaybackEngine.Snapshot): Tracks {
         val formats = ArrayList<Format>()
         if (state.videoWidth > 0 && state.videoHeight > 0) {
@@ -198,9 +213,17 @@ internal class IsolatedAttachmentPlayer(
         )
     }
 
+    /** Maps only attributable missing-file or exact container refusals to cache-invalidating Player codes. */
     private fun playbackError(failure: IOException): PlaybackException {
         var cause: Throwable? = failure
         repeat(8) {
+            if (cause is RawContainerFailure) {
+                return PlaybackException(
+                    "Selected attachment container is malformed",
+                    failure,
+                    PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
+                )
+            }
             if (cause is FileNotFoundException) {
                 return PlaybackException(
                     "Selected attachment file unavailable",
@@ -217,6 +240,7 @@ internal class IsolatedAttachmentPlayer(
         )
     }
 
+    /** Acknowledges synchronous presentation-only changes with an already completed Player future. */
     private fun done(): ListenableFuture<Void> = SettableFuture.create<Void>().apply { set(null) }
 
     companion object {

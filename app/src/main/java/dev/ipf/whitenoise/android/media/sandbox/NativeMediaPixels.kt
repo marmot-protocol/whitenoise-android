@@ -6,6 +6,11 @@ import java.nio.ByteBuffer
 
 /** Rotate raw RGBA pixels only; no compressed format is parsed in the parent process. */
 internal object NativeMediaPixels {
+    /**
+     * Copies packed RGBA pixels by an orthogonal rotation without parsing compressed bytes.
+     * Requires distinct source/target objects and adequate capacities; callers must also avoid aliased
+     * backing storage. Duplicate views preserve the caller buffers' positions and limits.
+     */
     fun rotate(
         source: ByteBuffer,
         target: ByteBuffer,

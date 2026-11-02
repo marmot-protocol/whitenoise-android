@@ -210,6 +210,40 @@ class AvStreamPolicyTest {
         assertTrue(admissions.current(AvStreamLane.Playback, admissions.epoch()) === owner)
     }
 
+    @Test
+    fun openExposureCommitIsStickyAndCloseBeforeCommitRefuses() {
+        val closed = AvStreamLifetime()
+        closed.close()
+        assertFalse(closed.commitOpen())
+        assertFalse(closed.openMayHaveBeenDelivered)
+        val committed = AvStreamLifetime()
+        assertTrue(committed.commitOpen())
+        assertTrue(committed.openMayHaveBeenDelivered)
+        assertFalse(committed.commitOpen())
+        committed.close()
+        committed.deathObserved()
+        assertTrue(committed.openMayHaveBeenDelivered)
+        assertFalse(committed.releasable())
+    }
+
+    @Test
+    fun accountRevocationBeforeOpenCommitPreservesUnexposedWorkerCredit() {
+        val admissions = AvStreamAdmissions<Any>()
+        val epoch = admissions.epoch()
+        val owner = Any()
+        val lifetime = AvStreamLifetime()
+        lifetime.bindCompleted(true)
+        admissions.reserve(AvStreamLane.Playback, epoch) { owner }
+        admissions.invalidateAll()
+        assertFalse(admissions.accept(AvStreamLane.Playback, epoch, owner) { lifetime.commitOpen() })
+        assertFalse(lifetime.openMayHaveBeenDelivered)
+        lifetime.close()
+        assertTrue(lifetime.beginUnbind())
+        lifetime.unbindFinished(true)
+        assertFalse(lifetime.releasable()) // Input-free is not an OS process absence proof.
+        assertTrue(admissions.current(AvStreamLane.Playback, admissions.epoch()) === owner)
+    }
+
     private fun rejected(action: () -> Unit) {
         assertTrue(runCatching(action).isFailure)
     }

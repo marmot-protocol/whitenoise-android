@@ -801,9 +801,17 @@ Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeOpen(
         // Stream discovery may otherwise open decoders before our surface/sample budgets.
         // An empty non-null whitelist denies every probe decoder, including late-created streams.
         av_dict_set(&options, "codec_whitelist", "", 0);
-        const int opened = avformat_open_input(&s->format, nullptr, nullptr, &options);
+        // A failed probe cannot distinguish corruption from an unsupported container.
+        // Keep that refusal generic; only a recognized demuxer may attribute invalid data.
+        const AVInputFormat* detected = nullptr;
+        const int probed = av_probe_input_buffer2(s->io, &detected, "", nullptr, 0, 2 * 1024 * 1024);
+        const int opened = avformat_open_input(&s->format, nullptr, detected, &options);
         av_dict_free(&options);
+        // Only explicit demuxer invalid-data refusals classify the selected container as corrupt.
+        // Unsupported codecs, budgets, allocation, interrupted work and IO remain generic.
+        if (probed >= 0 && detected && opened == AVERROR_INVALIDDATA) return -1;
         check(opened >= 0, "media_container_refused");
+        // Stream discovery can fail on valid unsupported codec parameters; keep it generic.
         check(avformat_find_stream_info(s->format, nullptr) >= 0, "media_stream_info_refused");
         selectTrack(*s, s->video, AVMEDIA_TYPE_VIDEO);
         selectTrack(*s, s->audio, AVMEDIA_TYPE_AUDIO);

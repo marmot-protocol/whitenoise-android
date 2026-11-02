@@ -22,20 +22,36 @@ internal data class RawAvPlaybackIntent(
 )
 
 internal interface RawAvRenderOwner {
+    /**
+     * Snapshots current source/control generations and presentation settings for the renderer.
+     */
     fun intent(): RawAvPlaybackIntent
 
+    /**
+     * Waits for admitted preparation before the renderer may open its streaming source.
+     */
     fun awaitPrepared()
 
+    /**
+     * Offers stream metadata for one activation; the owner must reject retired activations.
+     */
     fun opened(
         info: AvStreamInfo,
         activation: Long,
     )
 
+    /**
+     * Acknowledges the exact activation/seek pair after its stream seek and clock reset.
+     */
     fun seeked(
         activation: Long,
         seek: Long,
     )
 
+    /**
+     * Offers ownership of one raw bitmap for the exact activation/seek pair.
+     * True adopts the bitmap; false leaves recycling to the renderer.
+     */
     fun frame(
         bitmap: Bitmap,
         rotation: Int,
@@ -43,12 +59,18 @@ internal interface RawAvRenderOwner {
         seek: Long,
     ): Boolean
 
+    /**
+     * Offers terminal position in microseconds for the exact activation/seek pair.
+     */
     fun ended(
         activation: Long,
         seek: Long,
         endUs: Long,
     )
 
+    /**
+     * Offers a typed failure for one activation and, when known, its seek generation.
+     */
     fun failed(
         activation: Long,
         seek: Long?,
@@ -87,6 +109,10 @@ internal class RawAvRenderSession(
     @Volatile var appliedSeek = -1L
         private set
 
+    /**
+     * Reads media time in microseconds under the clock lock.
+     * Uses played PCM while audio is active and the elapsed-time anchor for silent or drained audio.
+     */
     fun positionUs(): Long =
         synchronized(clockLock) {
             if (sourceHasAudio && !eofWallClock) {
@@ -96,6 +122,10 @@ internal class RawAvRenderSession(
             }
         }
 
+    /**
+     * Retires the current run, detaches and closes its PCM sink, then closes the exact stream.
+     * Device pause refusal is returned as an output failure; sink cleanup is still attempted.
+     */
     @Suppress("TooGenericExceptionCaught") // Retirement closes the exact sink even when the device rejects pause.
     fun pause(): RawOutputFailure? =
         try {
@@ -116,12 +146,18 @@ internal class RawAvRenderSession(
             stream?.close()
         }
 
+    /**
+     * Applies gain under the clock lock and retains it for future sinks; returns typed device refusal.
+     */
     fun volume(value: Float): RawOutputFailure? =
         applyControl("volume") {
             pcm?.volume(value)
             outputGain = value
         }
 
+    /**
+     * Applies the rate under the clock lock and reanchors elapsed time without a position jump.
+     */
     fun speed(value: Float): RawOutputFailure? =
         applyControl("speed") {
             pcm?.speed(value)
@@ -130,6 +166,9 @@ internal class RawAvRenderSession(
             clockSpeed = value
         }
 
+    /**
+     * Serializes a sink/clock control and converts platform exceptions to output failures.
+     */
     @Suppress("TooGenericExceptionCaught") // A validated device control may still be refused by AudioTrack.
     private fun applyControl(name: String, action: () -> Unit): RawOutputFailure? =
         try {
@@ -140,6 +179,11 @@ internal class RawAvRenderSession(
         }
 
     // A raw renderer failure retires the exact stream without invalidating source bytes.
+
+    /**
+     * Owns one isolated stream and sink through cleanup for a single playback activation.
+     * Only failures still matching live activation/seek intent are reported to the owner.
+     */
     @Suppress("TooGenericExceptionCaught")
     suspend fun run(activation: Long) {
         var selected: IsolatedAvStream? = null
@@ -317,6 +361,9 @@ internal class RawAvRenderSession(
         }
     }
 
+    /**
+     * Requires preroll audio only while its live generation has not reached the discarded video timestamp.
+     */
     private fun needsPrerollAudio(
         progress: Progress,
         discardedVideoUs: Long,
@@ -326,6 +373,10 @@ internal class RawAvRenderSession(
         return !progress.audioEnded && progress.audio == null && progress.prerollAudioUs < discardedVideoUs
     }
 
+    /**
+     * Feeds audio until the buffered media horizon covers the next video timestamp or audio drains.
+     * All timestamps and the 1 ms horizon tolerance are expressed in microseconds.
+     */
     private suspend fun ensureAudioForVideo(
         progress: Progress,
         timestampUs: Long,
@@ -341,6 +392,10 @@ internal class RawAvRenderSession(
         }
     }
 
+    /**
+     * Writes at most one bounded audio quantum, preserving offsets across partial sink acceptance.
+     * Gap silence and media bytes keep separate credits; an invalid accepted byte count is an output failure.
+     */
     @Suppress("CyclomaticComplexMethod", "ThrowsCount") // Partial source credits and both EOF guards commit together.
     private suspend fun feedAudioStep(
         progress: Progress,
@@ -396,6 +451,10 @@ internal class RawAvRenderSession(
         pumpAudio(progress)
     }
 
+    /**
+     * Clips pre-seek PCM, checks stable layout and retains one pending suffix for partial writes.
+     * A timestamp gap beyond 1 ms becomes frame-counted silence before that suffix.
+     */
     private fun adoptPcm(
         frame: AvStreamFrame.Audio,
         progress: Progress,
@@ -414,6 +473,10 @@ internal class RawAvRenderSession(
         progress.audio = PendingPcm(frame, clipped.offset, clipped.offset + clipped.byteCount, clipped.timestampUs, gap)
     }
 
+    /**
+     * Pumps device progress/EOS and returns allowed video lead in microseconds.
+     * After audio drains, reanchors an elapsed-time clock so remaining video can advance.
+     */
     private fun pumpAudio(progress: Progress): Long {
         val sink = pcm
         val ending = progress.audioEnded && progress.audio == null
@@ -429,6 +492,10 @@ internal class RawAvRenderSession(
         return tolerance
     }
 
+    /**
+     * Waits for device drain and terminal media time before notifying a still-current owner.
+     * Uses declared positive duration or observed audio/video end when metadata has no duration.
+     */
     private suspend fun finishFrames(
         info: AvStreamInfo,
         activation: Long,
@@ -446,6 +513,10 @@ internal class RawAvRenderSession(
         if (valid(activation, appliedSeek)) owner.ended(activation, appliedSeek, endUs)
     }
 
+    /**
+     * Seeks the owned stream to a microsecond target, closes old PCM and resets both clock anchors.
+     * Already accepted speed/gain controls survive a blocked seek; only then is the seek acknowledged.
+     */
     internal fun applySeek(
         intent: RawAvPlaybackIntent,
         seek: (Long) -> Unit,
@@ -465,6 +536,11 @@ internal class RawAvRenderSession(
         owner.seeked(intent.activation, intent.seek)
     }
 
+    /**
+     * Creates and configures one sink before adoption under the clock lock.
+     * A canceled activation refuses adoption; every created but unadopted sink receives a best-effort
+     * close attempt, with cleanup exceptions suppressed.
+     */
     @Suppress("TooGenericExceptionCaught") // A refused new device output must close before it can be adopted.
     internal fun createPcm(
         frame: AvStreamFrame.Audio,
@@ -494,6 +570,9 @@ internal class RawAvRenderSession(
         }
     }
 
+    /**
+     * Checks live playing activation and, when supplied, seek identity against a fresh owner intent.
+     */
     private fun valid(
         activation: Long,
         seek: Long? = null,
@@ -507,6 +586,10 @@ internal class RawAvRenderSession(
             )
         }
 
+    /**
+     * Pumps audio while waiting for a microsecond timestamp within device priming tolerance.
+     * Returns false when activation or seek is superseded, leaving bitmap cleanup to the caller.
+     */
     private suspend fun waitForVideo(
         timestampUs: Long,
         activation: Long,

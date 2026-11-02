@@ -8,6 +8,9 @@ internal class RawOutputFailure(
     cause: Throwable? = null,
 ) : IOException(message, cause)
 
+/** Coarse OPEN-only invalid-container refusal; MDK remains the cache invalidation owner. */
+internal class RawContainerFailure : IOException("Selected media container is malformed")
+
 /** Reservation failed before this request acquired or handed off any source descriptor. */
 internal class MediaAdmissionFailure(
     message: String,

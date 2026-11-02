@@ -64,8 +64,14 @@ internal class RawAvPlaybackEngine(
     )
 
     interface Listener {
+        /**
+         * Receives a Main-thread state notification only while its posted revision remains current.
+         */
         fun onChanged()
 
+        /**
+         * Receives a Main-thread completion only while the same revision remains ended.
+         */
         fun onCompleted() = Unit
     }
 
@@ -148,6 +154,10 @@ internal class RawAvPlaybackEngine(
         if (owners.register(this, epoch)) scope.launch { worker() } else close()
     }
 
+    /**
+     * Snapshots presentation state under the engine lock, converting time to milliseconds
+     * and swapping display dimensions for orthogonal video rotation.
+     */
     fun snapshot(): Snapshot =
         synchronized(lock) {
             val rotated = rotation == 90 || rotation == 270
@@ -170,10 +180,20 @@ internal class RawAvPlaybackEngine(
             )
         }
 
+    /**
+     * Returns current media position in milliseconds under the engine lock.
+     */
     fun positionMs(): Long = synchronized(lock) { positionUsLocked() / 1000 }
 
+    /**
+     * Requires this unreleased instance to remain registered in its original account epoch.
+     */
     private fun current(): Boolean = !released && owners.current(this, epoch)
 
+    /**
+     * Uses renderer time only for a ready playing run with matching activation and seek.
+     * Otherwise returns the paused microsecond checkpoint; known duration bounds the live position.
+     */
     private fun positionUsLocked(): Long {
         val running = playIntent && status == Status.Ready
         val matching = renderer.activeRun == activation && renderer.appliedSeek == seekRevision
@@ -209,6 +229,9 @@ internal class RawAvPlaybackEngine(
             prepared
         }
 
+    /**
+     * Starts at most one preparation job, capturing its generation and exact completion promise.
+     */
     private fun startPreparationLocked() {
         if (prepareJob != null) return
         val generation = prepareGeneration
@@ -218,11 +241,18 @@ internal class RawAvPlaybackEngine(
         checkNotNull(prepareJob).start()
     }
 
+    /**
+     * Checks source ownership, requested preparation generation and completion-promise identity.
+     */
     private fun preparationCurrent(
         generation: Long,
         completion: SettableFuture<Void>,
     ): Boolean = current() && preparationRequested && prepareGeneration == generation && prepared === completion
 
+    /**
+     * Owns the optional preparation poster until adoption or recycling.
+     * Stale generations cannot update presentation; optional probe refusal still allows explicit playback.
+     */
     @Suppress("TooGenericExceptionCaught") // A refused optional poster does not disable explicit playback.
     private fun probe(generation: Long, completion: SettableFuture<Void>) {
         var poster: Bitmap? = null
@@ -260,6 +290,10 @@ internal class RawAvPlaybackEngine(
         }
     }
 
+    /**
+     * Releases only the returning probe generation and starts a queued successor afterward.
+     * A stopped synchronous probe retains its resource ownership until it returns.
+     */
     private fun finishProbe(generation: Long) {
         synchronized(lock) {
             if (prepareJobGeneration == generation) {
@@ -275,6 +309,9 @@ internal class RawAvPlaybackEngine(
         signal.trySend(Unit)
     }
 
+    /**
+     * Completes a current optional-probe refusal as prepared, or cancels the stale promise.
+     */
     private fun finishRefusedProbe(
         generation: Long,
         completion: SettableFuture<Void>,
@@ -284,6 +321,10 @@ internal class RawAvPlaybackEngine(
         }
     }
 
+    /**
+     * Marks header preparation complete and chooses Ready versus Buffering from current play intent.
+     * Caller holds the engine lock and has checked the exact preparation promise.
+     */
     private fun finishPreparation(completion: SettableFuture<Void>) {
         headerReady = true
         status = if (playIntent) Status.Buffering else Status.Ready
@@ -291,6 +332,9 @@ internal class RawAvPlaybackEngine(
         notifyChanged()
     }
 
+    /**
+     * Requests a paused poster only when no retained frame matches the current seek; wakes redraw work.
+     */
     private fun restorePosterLocked() {
         redraw = true
         firstFrameForOutput = false
@@ -357,6 +401,10 @@ internal class RawAvPlaybackEngine(
         return true
     }
 
+    /**
+     * Captures the best available position, invalidates run work and retires renderer output.
+     * Focus retention is explicit; device clock/pause refusal is reported against the captured activation.
+     */
     private fun pause(
         retainFocus: Boolean,
         reason: Int = Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST,
@@ -393,10 +441,17 @@ internal class RawAvPlaybackEngine(
         signal.trySend(Unit)
     }
 
+    /**
+     * Requests a millisecond seek through the same asynchronous path without observing its future.
+     */
     fun seekTo(positionMs: Long) {
         seekToAsync(positionMs)
     }
 
+    /**
+     * Supersedes the pending seek and advances its generation before dispatching playback or paused work.
+     * Returns the exact request promise; retired ownership fails that promise without admitting work.
+     */
     fun seekToAsync(positionMs: Long): ListenableFuture<Void> {
         val completion = SettableFuture.create<Void>()
         synchronized(lock) {
@@ -419,6 +474,9 @@ internal class RawAvPlaybackEngine(
         return completion
     }
 
+    /**
+     * Queues a generation-bound video poster attempt, or immediately acknowledges an audio-only paused seek.
+     */
     private fun dispatchPausedSeek(completion: SettableFuture<Void>) {
         if (wantVideo) {
             val target = RawAvPosterTarget(RawAvGeneration(activation, seekRevision), targetUs / 1000)
@@ -429,11 +487,18 @@ internal class RawAvPlaybackEngine(
         }
     }
 
+    /**
+     * Requires the exact paused source activation, seek generation and target position.
+     */
     override fun posterCurrent(target: RawAvPosterTarget): Boolean =
         synchronized(lock) {
             target.matches(RawAvGeneration(activation, seekRevision), current(), playIntent, targetUs / 1000)
         }
 
+    /**
+     * Adopts an optional poster only for the exact current pending paused seek.
+     * True transfers bitmap ownership; false leaves recycling to the producer.
+     */
     override fun posterResult(
         request: RawAvPausedSeekRequest,
         probe: MediaProbe?,
@@ -453,6 +518,9 @@ internal class RawAvPlaybackEngine(
             true
         }
 
+    /**
+     * Completes the pending seek only after its still-playing activation and seek generation match.
+     */
     override fun seeked(
         activation: Long,
         seek: Long,
@@ -464,6 +532,10 @@ internal class RawAvPlaybackEngine(
         }
     }
 
+    /**
+     * Accepts a finite bounded playback ratio only if both owner and device control remain usable.
+     * Device refusal transitions to playback failure without committing the new speed.
+     */
     fun setSpeed(value: Float): Boolean {
         require(value.isFinite() && value in RawPcmCapacity.MIN_SPEED..RawPcmCapacity.MAX_SPEED)
         return synchronized(lock) {
@@ -481,6 +553,9 @@ internal class RawAvPlaybackEngine(
         }
     }
 
+    /**
+     * Applies normalized gain with current ducking; commits it only after device acceptance.
+     */
     fun setVolume(value: Float): Boolean {
         require(value.isFinite() && value in 0f..1f)
         return synchronized(lock) {
@@ -498,6 +573,9 @@ internal class RawAvPlaybackEngine(
         }
     }
 
+    /**
+     * Updates the repeat policy used when the current generation reaches EOS.
+     */
     fun setRepeat(value: Boolean) {
         synchronized(lock) {
             repeat = value
@@ -505,10 +583,17 @@ internal class RawAvPlaybackEngine(
         }
     }
 
+    /**
+     * Stores platform audio attributes for subsequent focus requests and newly created sinks.
+     */
     fun setAttributes(value: AudioAttributes) {
         synchronized(lock) { attributes = value }
     }
 
+    /**
+     * Changes focus ownership on Main, releasing or acquiring it for current playback as needed.
+     * A newly required focus request that is refused pauses playback.
+     */
     fun setFocusHandling(enabled: Boolean) {
         check(Looper.myLooper() == Looper.getMainLooper())
         if (!enabled && handlesFocus) releaseFocus(false)
@@ -517,16 +602,29 @@ internal class RawAvPlaybackEngine(
         if (acquire && !acquireFocus()) pause(false)
     }
 
+    /**
+     * Reconciles route-loss monitoring with the requested policy and current play intent.
+     */
     fun setHandleAudioBecomingNoisy(value: Boolean) = focus.noisy(value, synchronized(lock) { playIntent })
 
+    /**
+     * Replaces the parent display target and requests redraw of any retained raw frame.
+     */
     fun attachVideo(output: Any?) {
         video.attach(output)
         redraw = true
         signal.trySend(Unit)
     }
 
+    /**
+     * Clears a matching display target; a stale target cannot detach its replacement.
+     */
     fun clearVideo(output: Any?) = video.clear(output)
 
+    /**
+     * Pauses output, cancels pending seek/preparation promises and advances generations to Idle.
+     * The engine remains registered until release or account retirement.
+     */
     fun stop() {
         setPlaying(false)
         synchronized(lock) {
@@ -543,6 +641,9 @@ internal class RawAvPlaybackEngine(
         }
     }
 
+    /**
+     * Snapshots source lifetime, generations and raw renderer settings under the engine lock.
+     */
     override fun intent(): RawAvPlaybackIntent =
         synchronized(lock) {
             RawAvPlaybackIntent(
@@ -563,6 +664,9 @@ internal class RawAvPlaybackEngine(
         completion.get(24, TimeUnit.SECONDS)
     }
 
+    /**
+     * Adopts stream layout and positive duration only for the current playing activation.
+     */
     override fun opened(
         info: AvStreamInfo,
         activation: Long,
@@ -578,6 +682,10 @@ internal class RawAvPlaybackEngine(
         notifyChanged()
     }
 
+    /**
+     * Adopts a raw bitmap only for a live matching activation/seek and schedules retained-frame rendering.
+     * False leaves bitmap recycling to the renderer.
+     */
     override fun frame(
         bitmap: Bitmap,
         rotation: Int,
@@ -597,6 +705,9 @@ internal class RawAvPlaybackEngine(
         return accepted
     }
 
+    /**
+     * Handles EOS only for a matching run: advances a repeat seek or records terminal position and completion.
+     */
     override fun ended(
         activation: Long,
         seek: Long,
@@ -622,6 +733,9 @@ internal class RawAvPlaybackEngine(
         }
     }
 
+    /**
+     * Rejects late failures from replaced activations or known superseded seeks before changing state.
+     */
     override fun failed(
         activation: Long,
         seek: Long?,
@@ -633,6 +747,10 @@ internal class RawAvPlaybackEngine(
         failPlaybackLocked(failure)
     }
 
+    /**
+     * Captures position, fails pending work and revokes playback/preparation generations under the engine lock.
+     * The typed failure remains presentation state; output refusal does not itself corrupt source bytes.
+     */
     private fun failPlaybackLocked(failure: IOException) {
         if (!current()) return
         pausedUs = runCatching { positionUsLocked() }.getOrDefault(pausedUs)
@@ -656,6 +774,10 @@ internal class RawAvPlaybackEngine(
         signal.trySend(Unit)
     }
 
+    /**
+     * Serializes renderer runs and retained-frame redraws through one conflated wake channel.
+     * Cancellation/closure exits the worker instead of admitting another source run.
+     */
     private suspend fun worker() {
         try {
             while (scope.isActive) {
@@ -683,6 +805,9 @@ internal class RawAvPlaybackEngine(
         }
     }
 
+    /**
+     * Checks live playing ownership and both activation/seek generations before accepting a callback.
+     */
     private fun accepts(
         activation: Long,
         seek: Long,
@@ -691,6 +816,10 @@ internal class RawAvPlaybackEngine(
         return generation.accepts(RawAvGeneration(this.activation, seekRevision), current(), playIntent)
     }
 
+    /**
+     * Transfers bitmap ownership under the frame lock, recycling the previous retained frame.
+     * The caller holds the engine lock to bind the frame to the current seek.
+     */
     private fun retainFrame(
         bitmap: Bitmap,
         frameRotation: Int,
@@ -704,6 +833,10 @@ internal class RawAvPlaybackEngine(
         redraw = true
     }
 
+    /**
+     * Renders only current registered ownership using engine → registry → frame → surface lock order.
+     * Account reset closes owners outside the registry monitor.
+     */
     private fun renderRetained() {
         synchronized(lock) {
             if (!current() || !redraw) return
@@ -723,11 +856,17 @@ internal class RawAvPlaybackEngine(
         }
     }
 
+    /**
+     * Posts a Main notification guarded by the captured state revision and current ownership.
+     */
     private fun notifyChanged() {
         val expected = revision
         main.post { if (synchronized(lock) { current() && revision == expected }) listener.onChanged() }
     }
 
+    /**
+     * Posts completion only if the same revision still belongs to a current ended engine.
+     */
     private fun notifyCompletion() {
         val expected = revision
         main.post {
@@ -740,8 +879,14 @@ internal class RawAvPlaybackEngine(
         }
     }
 
+    /**
+     * Requests focus with an engine-locked snapshot of the current platform attributes.
+     */
     private fun acquireFocus(): Boolean = focus.acquire(synchronized(lock) { attributes })
 
+    /**
+     * Maps focus loss, transient loss, ducking and gain to generation-aware playback controls.
+     */
     private fun focusChanged(change: Int) {
         when (change) {
             AudioManager.AUDIOFOCUS_LOSS -> pause(false, Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS)
@@ -756,6 +901,9 @@ internal class RawAvPlaybackEngine(
         }
     }
 
+    /**
+     * Applies temporary output gain and commits ducking state only after device acceptance.
+     */
     private fun applyDucking(value: Boolean): Boolean =
         synchronized(lock) {
             if (!current()) return@synchronized false
@@ -769,6 +917,10 @@ internal class RawAvPlaybackEngine(
             }
         }
 
+    /**
+     * Releases focus on Main only while registry identity still grants this engine that authority.
+     * Removal may release focus only if no replacement owner has become active.
+     */
     private fun releaseFocus(removeOwner: Boolean) {
         val removedActive = removeOwner && owners.remove(this)
         val action = {
@@ -782,15 +934,28 @@ internal class RawAvPlaybackEngine(
         if (Looper.myLooper() == Looper.getMainLooper()) action() else main.post { action() }
     }
 
+    /**
+     * Releases retired focus on Main only while the registry has no replacement active owner.
+     */
     private fun releaseRetiredFocus() {
         val action = { owners.withNoActive { if (handlesFocus) focus.release() } }
         if (Looper.myLooper() == Looper.getMainLooper()) action() else main.post { action() }
     }
 
+    /**
+     * Enables the focus helper's route-loss receiver for playback.
+     */
     private fun registerNoisy() = focus.started()
 
+    /**
+     * Requests removal of the route-loss receiver through the focus helper.
+     */
     private fun unregisterNoisy() = focus.paused()
 
+    /**
+     * Invalidates generations and pending seeks, cancels preparation/worker work and releases raw outputs.
+     * Retained bitmaps and display callbacks are cleared; focus release checks registry ownership.
+     */
     override fun close() {
         synchronized(lock) {
             if (released) return
@@ -820,6 +985,10 @@ internal class RawAvPlaybackEngine(
     companion object {
         private val owners = RawAvAccountOwners<RawAvPlaybackEngine>()
 
+        /**
+         * Revokes active streams and the account registry before closing the retired engine instances.
+         * Closures occur outside the registry monitor; newly registered epoch owners remain separate.
+         */
         fun retireAll() {
             // Invalidate stream generations first; engines admitted after the parent flip must survive.
             IsolatedAvStream.retireActive()

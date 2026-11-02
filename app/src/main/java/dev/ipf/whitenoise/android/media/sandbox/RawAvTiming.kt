@@ -10,6 +10,10 @@ internal object RawAvTiming {
         val timestampUs: Long,
     )
 
+    /**
+     * Returns a frame-aligned PCM16 slice at or after [targetUs], rounding skipped frames up.
+     * Offsets and lengths are bytes; both timestamps are microseconds. The input bytes remain caller-owned.
+     */
     fun clipPcm(
         byteCount: Int,
         rate: Int,
@@ -32,6 +36,10 @@ internal object RawAvTiming {
         )
     }
 
+    /**
+     * Computes the exclusive PCM16 end timestamp in microseconds from whole interleaved frames.
+     * The caller supplies a valid rate, channel count and frame-aligned byte length.
+     */
     fun pcmEnd(
         timestampUs: Long,
         bytes: Int,
@@ -39,6 +47,10 @@ internal object RawAvTiming {
         channels: Int,
     ): Long = timestampUs + bytes.toLong() / (channels * 2) * 1_000_000 / rate
 
+    /**
+     * Advances a microsecond anchor using elapsed millisecond clock readings and playback speed.
+     * Backward clock movement contributes no time; the result stays within the protocol duration bound.
+     */
     fun wallPosition(
         anchorUs: Long,
         startedMs: Long,
@@ -51,6 +63,9 @@ internal object RawAvTiming {
         return (anchorUs + delta).coerceIn(0, AvStreamProtocol.MAX_DURATION_US)
     }
 
+    /**
+     * Allows a frame whose microsecond timestamp leads the media clock by at most 1 ms.
+     */
     fun videoIsDue(
         timestampUs: Long,
         clockUs: Long,
@@ -62,6 +77,9 @@ internal data class RawAvGeneration(
     val activation: Long,
     val seek: Long,
 ) {
+    /**
+     * Rejects retired, paused or replaced activations; [includeSeek] also rejects superseded seeks.
+     */
     fun accepts(
         current: RawAvGeneration,
         alive: Boolean,
@@ -75,6 +93,9 @@ internal data class RawAvPosterTarget(
     val generation: RawAvGeneration,
     val positionMs: Long,
 ) {
+    /**
+     * Requires the exact still-paused activation, seek generation and millisecond position.
+     */
     fun matches(
         current: RawAvGeneration,
         alive: Boolean,
@@ -83,6 +104,9 @@ internal data class RawAvPosterTarget(
     ): Boolean = alive && !playing && generation == current && positionMs == currentPositionMs
 
     companion object {
+        /**
+         * Converts a bounded millisecond seek to microseconds, clamping to a known positive duration.
+         */
         fun positionUs(
             requestedMs: Long,
             durationUs: Long,

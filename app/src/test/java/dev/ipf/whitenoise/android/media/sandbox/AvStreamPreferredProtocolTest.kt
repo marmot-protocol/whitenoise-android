@@ -136,15 +136,124 @@ class AvStreamPreferredProtocolTest {
     }
 
     @Test
-    fun readyAcceptsDriverTransportFlagsButRefusesOnewayWithoutCalibratingIdentity() {
+    fun readyRequiresPriorIdentityAndRefusesOnewayWithoutLosingIdentity() {
         for (flags in listOf(0x10, 0x10 or IBinder.FLAG_ONEWAY)) {
             StreamFixture(ready = false).use { fixture ->
+                assertFalse(fixture.deliverIdentity(IBinder.FLAG_ONEWAY))
+                assertFalse(fixture.identityCalibrated())
+                assertTrue(fixture.deliverIdentity(0x10))
                 val accepted = fixture.deliverReady(flags)
                 assertEquals(flags and IBinder.FLAG_ONEWAY == 0, accepted)
-                assertEquals(accepted, fixture.identityCalibrated())
+                assertTrue(fixture.identityCalibrated())
                 assertEquals(accepted, fixture.stream.isolation != null)
             }
         }
+    }
+
+    @Test
+    fun identityRefusesWrongTokenTrailingDataAndDuplicatesBeforeReady() {
+        for (mode in listOf("token", "trailing", "fd")) {
+            StreamFixture(ready = false).use { fixture ->
+                assertFalse(fixture.deliverIdentity(0, mode))
+                assertFalse(fixture.identityCalibrated())
+                assertTrue(fixture.deliverIdentity(0))
+                assertTrue(fixture.identityCalibrated())
+                assertFalse(fixture.deliverIdentity(0))
+                assertFalse(fixture.lifetime.openMayHaveBeenDelivered)
+            }
+        }
+    }
+
+    @Test
+    fun exactLateIdentityAfterCloseOrAccountRevocationOnlyAidsCleanupAndNeverCommitsOpen() {
+        for (accountRevoked in listOf(false, true)) {
+            StreamFixture(ready = false).use { fixture ->
+                if (accountRevoked) fixture.revokeAccount()
+                fixture.lifetime.close()
+                assertTrue(fixture.deliverIdentity(0))
+                assertTrue(fixture.identityCalibrated())
+                assertFalse(fixture.lifetime.commitOpen())
+                assertFalse(fixture.lifetime.openMayHaveBeenDelivered)
+                assertEquals(null, fixture.stream.isolation)
+            }
+        }
+    }
+
+    @Test
+    fun readyFromDifferentCallerCannotReplaceTheInputFreeIdentity() {
+        StreamFixture(ready = false).use { fixture ->
+            assertTrue(fixture.deliverIdentity(0))
+            assertFalse(fixture.deliverReady(0, "caller"))
+            assertTrue(fixture.identityCalibrated())
+            assertTrue(fixture.lifetime.closed)
+            assertFalse(fixture.lifetime.openMayHaveBeenDelivered)
+            assertEquals(null, fixture.stream.isolation)
+        }
+    }
+
+    @Test
+    fun binderThrowAfterOpenCommitRetainsStickyExposure() {
+        StreamFixture().use { fixture ->
+            assertTrue(fixture.openFailureAfterCommit() is ExecutionException)
+            assertTrue(fixture.lifetime.openMayHaveBeenDelivered)
+            fixture.stream.close()
+            assertTrue(fixture.lifetime.openMayHaveBeenDelivered)
+        }
+    }
+
+    @Test
+    fun onlyExactOpenContainerRefusalWithReadyRetainsItsTypedCause() {
+        for (mode in listOf("container", "container-token", "container-sequence", "container-trailing")) {
+            StreamFixture(ready = false).use { fixture ->
+                assertTrue(fixture.deliverIdentity(0))
+                assertTrue(fixture.deliverReady(0))
+                fixture.replyMode = mode
+                val failure = fixture.transactionFailure(AvStreamProtocol.OPEN)
+                assertTrue(failure is IOException)
+                assertEquals(mode == "container", hasContainerCause(failure))
+                assertEquals(listOf(AvStreamProtocol.OPEN), fixture.transactions.toList())
+                assertTrue(fixture.lifetime.openMayHaveBeenDelivered)
+            }
+        }
+    }
+
+    @Test
+    fun containerStatusOnReadOrBeforeReadyNeverBecomesCacheInvalidationEvidence() {
+        StreamFixture(ready = false).use { fixture ->
+            assertTrue(fixture.deliverIdentity(0))
+            fixture.replyMode = "container"
+            val failure = fixture.transactionFailure(AvStreamProtocol.OPEN)
+            assertTrue(failure is IOException)
+            assertFalse(hasContainerCause(failure))
+            assertEquals(null, fixture.stream.isolation)
+        }
+        StreamFixture(ready = false).use { fixture ->
+            assertTrue(fixture.deliverIdentity(0))
+            assertTrue(fixture.deliverReady(0))
+            fixture.replyMode = "container"
+            val failure = fixture.transactionFailure(AvStreamProtocol.READ)
+            assertTrue(failure is IOException)
+            assertFalse(hasContainerCause(failure))
+            assertFalse(fixture.lifetime.openMayHaveBeenDelivered)
+        }
+    }
+
+    @Test
+    fun identifyReplyWithoutSynchronousIdentityCannotAuthorizeOpen() {
+        StreamFixture(ready = false).use { fixture ->
+            fixture.replyMode = "identity-without-callback"
+            val failure = fixture.transactionFailure(AvStreamProtocol.IDENTIFY)
+            assertTrue(failure is IOException)
+            assertFalse(hasContainerCause(failure))
+            assertFalse(fixture.identityCalibrated())
+            assertFalse(fixture.lifetime.openMayHaveBeenDelivered)
+            assertEquals(listOf(AvStreamProtocol.IDENTIFY), fixture.transactions.toList())
+        }
+    }
+
+    private fun hasContainerCause(failure: Throwable?): Boolean {
+        val causes = generateSequence(failure) { it.cause }.take(8)
+        return causes.any { it is RawContainerFailure }
     }
 
     private fun readFailure(action: () -> AvStreamFrame): Throwable? {
@@ -160,6 +269,7 @@ class AvStreamPreferredProtocolTest {
         ready: Boolean = true,
     ) : AutoCloseable {
         val selectors = CopyOnWriteArrayList<Int>()
+        val transactions = CopyOnWriteArrayList<Int>()
         var values = LongArray(7)
         var replyMode = "valid"
         private val caller = Executors.newSingleThreadExecutor()
@@ -179,7 +289,7 @@ class AvStreamPreferredProtocolTest {
             val current = field(null, "admissions") as AvStreamAdmissions<IsolatedAvStream>
             admissions = current
             epoch = admissions.epoch()
-            assertEquals(null, admissions.current(AvStreamLane.Analysis, epoch))
+            assertEquals(null, admissions.current(AvStreamLane.Analysis, admissions.epoch()))
             val constructor =
                 IsolatedAvStream::class.java.declaredConstructors
                     .single { it.parameterCount == 6 }
@@ -189,7 +299,10 @@ class AvStreamPreferredProtocolTest {
             lifetime = field(stream, "lifetime") as AvStreamLifetime
             // This fixture created no AMS binding; preserve normal cleanup without asserting kernel death.
             lifetime.neverBound()
-            if (ready) setField("readyIdentity", 101 to 201)
+            if (ready) {
+                setField("readyIdentity", uid to pid)
+                setField("identity", uid to pid)
+            }
             setField("processWitness", witness)
             setField("deathRegistered", true)
             setField("endpoint", endpoint())
@@ -205,14 +318,33 @@ class AvStreamPreferredProtocolTest {
                     flags: Int,
                 ): Boolean {
                     if (code == AvStreamProtocol.RETIRE) return true
-                    assertEquals(AvStreamProtocol.READ, code)
+                    transactions += code
+                    if (code == AvStreamProtocol.OPEN && replyMode == "valid") throw android.os.DeadObjectException()
+                    assertTrue(code in listOf(AvStreamProtocol.OPEN, AvStreamProtocol.IDENTIFY, AvStreamProtocol.READ))
                     data.enforceInterface(AvStreamProtocol.DESCRIPTOR)
                     val tuple = AvStreamProtocol.readTuple(data)
-                    assertEquals(Int.SIZE_BYTES, data.dataAvail())
-                    selectors += data.readInt()
+                    if (code == AvStreamProtocol.READ) {
+                        assertEquals(Int.SIZE_BYTES, data.dataAvail())
+                        selectors += data.readInt()
+                    }
                     assertEquals(0, data.dataAvail())
                     val result = checkNotNull(reply)
+                    if (replyMode.startsWith("container")) {
+                        result.writeInt(AvStreamProtocol.CONTAINER_MALFORMED)
+                        AvStreamProtocol.writeTuple(
+                            result,
+                            if (replyMode == "container-token") "f".repeat(32) else tuple.first,
+                            tuple.second + if (replyMode == "container-sequence") 1 else 0,
+                        )
+                        if (replyMode == "container-trailing") result.writeInt(0)
+                        return true
+                    }
                     result.writeInt(0)
+                    if (code == AvStreamProtocol.IDENTIFY) {
+                        AvStreamProtocol.writeTuple(result, tuple.first, tuple.second)
+                        AvStreamProtocol.writeValues(result, longArrayOf())
+                        return true
+                    }
                     AvStreamProtocol.writeTuple(result, tuple.first, tuple.second + if (replyMode == "tuple") 1 else 0)
                     val output =
                         when (replyMode) {
@@ -227,16 +359,35 @@ class AvStreamPreferredProtocolTest {
                 }
             }
 
+        fun revokeAccount() {
+            assertTrue(admissions.invalidateAll().any { it === stream })
+        }
+
         fun identityCalibrated(): Boolean = witness.acceptsCaller(uid, pid)
 
-        fun deliverReady(flags: Int): Boolean {
+        fun deliverReady(
+            flags: Int,
+            mode: String = "valid",
+        ): Boolean = deliverCallback(AvStreamProtocol.READY, flags, mode)
+
+        fun deliverIdentity(
+            flags: Int,
+            mode: String = "valid",
+        ): Boolean = deliverCallback(AvStreamProtocol.IDENTITY, flags, mode)
+
+        private fun deliverCallback(
+            code: Int,
+            flags: Int,
+            mode: String = "valid",
+        ): Boolean {
             val data = Parcel.obtain()
             val reply = Parcel.obtain()
+            val pipe = if (mode == "fd") android.os.ParcelFileDescriptor.createPipe() else null
             val identity =
                 org.robolectric.shadows.ShadowBinder.CallingIdentity
                     .newBuilder()
-                    .setUid(uid)
-                    .setPid(pid)
+                    .setUid(if (mode == "caller") uid + 1 else uid)
+                    .setPid(if (mode == "caller") pid + 1 else pid)
                     .setUserHandle(android.os.Process.myUserHandle())
                     .build()
             val previous =
@@ -244,14 +395,18 @@ class AvStreamPreferredProtocolTest {
                     .setCallingIdentityForCurrentThread(identity)
             return try {
                 data.writeInterfaceToken(AvStreamProtocol.READY_DESCRIPTOR)
-                data.writeString(field(stream, "token") as String)
+                data.writeString(if (mode == "token") "0".repeat(32) else field(stream, "token") as String)
                 data.writeInt(1)
                 data.writeInt(0)
                 data.writeInt(0)
-                data.writeInt(android.system.OsConstants.EACCES)
-                data.writeInt(android.system.OsConstants.EBADF)
+                if (code == AvStreamProtocol.READY) {
+                    data.writeInt(android.system.OsConstants.EACCES)
+                    data.writeInt(android.system.OsConstants.EBADF)
+                }
+                if (mode == "trailing") data.writeInt(0)
+                pipe?.let { data.writeFileDescriptor(it[0].fileDescriptor) }
                 val accepted =
-                    (field(stream, "readyCallback") as IBinder).transact(AvStreamProtocol.READY, data, reply, flags)
+                    (field(stream, "readyCallback") as IBinder).transact(code, data, reply, flags)
                 if (accepted) assertEquals(1, reply.readInt())
                 accepted
             } finally {
@@ -259,8 +414,37 @@ class AvStreamPreferredProtocolTest {
                     .setCallingIdentityForCurrentThread(previous)
                 reply.recycle()
                 data.recycle()
+                pipe?.forEach { it.close() }
             }
         }
+
+        /** Executes the real parent RPC validator; only the remote transport is a local Binder fake. */
+        fun transactionFailure(code: Int): Throwable? =
+            caller
+                .submit<Throwable?> {
+                    val transaction = IsolatedAvStream::class.java.declaredMethods.single { it.name == "transact" }
+                    transaction.isAccessible = true
+                    val writer: (Parcel) -> Unit = { data ->
+                        if (code == AvStreamProtocol.READ) data.writeInt(AvStreamProtocol.ANY_TRACK)
+                    }
+                    try {
+                        transaction.invoke(stream, code, if (code == AvStreamProtocol.IDENTIFY) 0 else 6, writer)
+                        null
+                    } catch (failure: java.lang.reflect.InvocationTargetException) {
+                        failure.targetException
+                    }
+                }.get(2, TimeUnit.SECONDS)
+
+        fun openFailureAfterCommit(): Throwable? =
+            runCatching {
+                caller
+                    .submit {
+                        val transaction = IsolatedAvStream::class.java.declaredMethods.single { it.name == "transact" }
+                        transaction.isAccessible = true
+                        val writer: (Parcel) -> Unit = {}
+                        transaction.invoke(stream, AvStreamProtocol.OPEN, 6, writer)
+                    }.get(2, TimeUnit.SECONDS)
+            }.exceptionOrNull()
 
         fun read(selector: Int? = null): AvStreamFrame =
             caller
@@ -288,7 +472,7 @@ class AvStreamPreferredProtocolTest {
                 released.await(5, TimeUnit.MILLISECONDS)
             }
             assertEquals("Only fixture-owned resources may remain", 0L, released.count)
-            assertEquals(null, admissions.current(AvStreamLane.Analysis, epoch))
+            assertEquals(null, admissions.current(AvStreamLane.Analysis, admissions.epoch()))
         }
 
         private fun setField(

@@ -51,6 +51,9 @@ internal class RawVoicePlaybackPlayer private constructor(
             )
         }
 
+    /**
+     * Delivers each distinct typed engine failure once while this voice player remains live.
+     */
     private fun engineChanged() {
         val failure = engine.snapshot().error
         if (!released && failure != null && reportedError !== failure) {
@@ -67,26 +70,41 @@ internal class RawVoicePlaybackPlayer private constructor(
             return engine.positionMs().coerceIn(0, Int.MAX_VALUE.toLong()).toInt()
         }
 
+    /**
+     * Reads cached engine state and rejects access after release.
+     */
     private fun snapshot(): RawAvPlaybackEngine.Snapshot {
         check(!released) { "Voice playback is released" }
         return engine.snapshot()
     }
 
+    /**
+     * Requests playback with externally owned voice focus; a retired source refuses synchronously.
+     */
     override fun start() {
         check(!released)
         if (!engine.setPlaying(true)) throw IOException("Voice playback source retired")
     }
 
+    /**
+     * Stops play-when-ready without releasing this prepared source.
+     */
     override fun pause() {
         check(!released)
         engine.setPlaying(false)
     }
 
+    /**
+     * Retires current playback work through the engine while retaining the adapter object.
+     */
     override fun stop() {
         check(!released)
         engine.stop()
     }
 
+    /**
+     * Invalidates pending seek callbacks, clears listeners and closes the engine once.
+     */
     override fun release() {
         if (released) return
         released = true
@@ -97,6 +115,10 @@ internal class RawVoicePlaybackPlayer private constructor(
         engine.close()
     }
 
+    /**
+     * Requests a nonnegative millisecond target and reports only the latest successful seek on Main.
+     * Canceled/superseded requests do not become source failures; already-refused requests throw.
+     */
     override fun seekTo(positionMs: Int) {
         check(!released)
         require(positionMs >= 0)
@@ -122,11 +144,17 @@ internal class RawVoicePlaybackPlayer private constructor(
         )
     }
 
+    /**
+     * Delegates the playback ratio to the engine's bounded speed policy.
+     */
     override fun setSpeed(speed: Float) {
         check(!released)
         engine.setSpeed(speed)
     }
 
+    /**
+     * Requires equal finite left/right gain from zero to one for the single raw PCM output.
+     */
     override fun setVolume(
         left: Float,
         right: Float,
@@ -136,19 +164,32 @@ internal class RawVoicePlaybackPlayer private constructor(
         engine.setVolume(left)
     }
 
+    /**
+     * Replaces the completion callback invoked for this live adapter when the engine completes.
+     */
     override fun setOnCompletionListener(listener: (VoicePlaybackPlayer) -> Unit) {
         completion = listener
     }
 
+    /**
+     * Replaces the callback used by the latest successful, still-current seek.
+     */
     override fun setOnSeekCompleteListener(listener: (VoicePlaybackPlayer) -> Unit) {
         seekComplete = listener
     }
 
+    /**
+     * Replaces the listener receiving typed source, output or admission failure codes.
+     */
     override fun setOnErrorListener(listener: (VoicePlaybackPlayer, Int, Int) -> Boolean) {
         error = listener
     }
 
     object Factory : VoicePlaybackPlayer.Factory {
+        /**
+         * Prepares one audio-only engine off Main with a bounded future wait.
+         * Any failed preparation closes that exact player; interruption is restored before propagation.
+         */
         @Suppress("TooGenericExceptionCaught") // Any failed preparation closes its exact created engine.
         override fun prepare(context: Context, file: File): VoicePlaybackPlayer {
             check(Looper.myLooper() != Looper.getMainLooper())

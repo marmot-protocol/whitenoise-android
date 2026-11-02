@@ -36,6 +36,9 @@ internal class RawAvAudioFocus(
             }
         }
 
+    /**
+     * Requests process video focus and binds posted callbacks to this request token and live owner.
+     */
     fun acquire(attributes: AudioAttributes): Boolean {
         val request = ++token
         return AudioFocusOwner.acquireWithFocusChanges(
@@ -54,6 +57,9 @@ internal class RawAvAudioFocus(
     /** The engine checks process-wide ownership before asking this helper to release focus. */
     fun release() = AudioFocusOwner.release(AudioFocusOwner.Owner.Video)
 
+    /**
+     * Updates route-loss monitoring policy and reconciles registration with current playback.
+     */
     fun noisy(
         enabled: Boolean,
         playing: Boolean,
@@ -66,6 +72,9 @@ internal class RawAvAudioFocus(
         }
     }
 
+    /**
+     * Registers route-loss callbacks only for a playing route owner with monitoring enabled.
+     */
     fun started() {
         if (!routeOwner || !noisyEnabled || registered) return
         ContextCompat.registerReceiver(
@@ -77,6 +86,9 @@ internal class RawAvAudioFocus(
         registered = true
     }
 
+    /**
+     * Removes route-loss registration on Main; calls from other threads post that cleanup.
+     */
     fun paused() {
         if (Looper.myLooper() != Looper.getMainLooper()) {
             main.post { paused() }
@@ -87,6 +99,10 @@ internal class RawAvAudioFocus(
         registered = false
     }
 
+    /**
+     * Invalidates pending focus callbacks and removes route monitoring on Main.
+     * Focus release remains the engine owner's separate responsibility.
+     */
     fun close() {
         if (Looper.myLooper() != Looper.getMainLooper()) {
             main.post { close() }

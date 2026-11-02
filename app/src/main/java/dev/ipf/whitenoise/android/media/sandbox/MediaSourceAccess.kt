@@ -25,6 +25,12 @@ internal class MediaSourceAccess(
     private val activeCancellation =
         AtomicReference<CancellationSignal?>()
 
+    /**
+     * Reserves process-wide provider admission through the block and its cleanup.
+     * The watchdog cancels the signal and closes the capability published through the atomic reference;
+     * providers may ignore cancellation, so this does not promise a hard return deadline.
+     * Retirement or refused admission returns null; the block must close capabilities it opens.
+     */
     @Suppress("ReturnCount") // Refuse expired or retired provider reads before holding scarce staging admission.
     fun <T> withProviderDeadline(block: (CancellationSignal, AtomicReference<AutoCloseable?>) -> T?): T? {
         if (closed ||
@@ -69,6 +75,10 @@ internal class MediaSourceAccess(
         }
     }
 
+    /**
+     * Registers a millisecond watchdog, serializing AV timer creation against retirement.
+     * Provider work and cancellation calls execute outside the registration monitor.
+     */
     private fun registerTimeout(block: () -> Unit): java.util.concurrent.ScheduledFuture<*>? {
         if (resources == null) {
             return sourceWatchdog.schedule(Runnable(block), MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)
@@ -88,6 +98,10 @@ internal class MediaSourceAccess(
         }
     }
 
+    /**
+     * Borrows a read-only descriptor for a bounded regular file only during [block].
+     * Checks both pathname size and opened descriptor size; closes the descriptor on every exit.
+     */
     fun <T> withMediaFileInput(
         file: File,
         block: (ParcelFileDescriptor) -> T?,
@@ -98,6 +112,10 @@ internal class MediaSourceAccess(
         }
     }
 
+    /**
+     * Borrows a whole selected descriptor directly, or stages only the selected byte range.
+     * The caller retains ownership of [input]; a staged descriptor is valid only during [block].
+     */
     fun <T> withSelectedMediaInput(
         input: ParcelFileDescriptor,
         offset: Long,
@@ -110,6 +128,10 @@ internal class MediaSourceAccess(
             withStagedInput({ writer -> copySelectedMediaSlice(input.fileDescriptor, offset, length, writer) }, block)
         }
 
+    /**
+     * Stages bounded provider bytes before invoking [block] with a separate read-only capability.
+     * Provider admission is released before decoding; the borrowed descriptor closes after the block.
+     */
     fun <T> withUriInput(
         resolver: android.content.ContentResolver,
         uri: android.net.Uri,
@@ -136,6 +158,11 @@ internal class MediaSourceAccess(
         return staged?.use { block(it.value) }
     }
 
+    /**
+     * Accepts file/content URI ranges after size and offset validation under provider admission.
+     * Whole files keep the descriptor path; slices are staged. The separate capability passed to
+     * [block] closes on return and does not retain the provider admission slot.
+     */
     fun <T> withMediaUriInput(
         resolver: android.content.ContentResolver,
         uri: android.net.Uri,
@@ -167,6 +194,10 @@ internal class MediaSourceAccess(
         return selected?.use { block(it.value) }
     }
 
+    /**
+     * Copies nonempty provider bytes within the image staging byte and elapsed-time budgets.
+     * A blocking read can outlive the loop deadline; provider cancellation is handled by the watchdog.
+     */
     private fun copyBoundedSource(
         source: java.io.InputStream,
         writer: java.io.OutputStream,
@@ -188,6 +219,10 @@ internal class MediaSourceAccess(
         return count < 0 && total > 0L
     }
 
+    /**
+     * Stages caller-owned bytes and borrows the resulting descriptor only for [block].
+     * This helper does not impose its own byte-array size limit.
+     */
     fun <T> withInput(
         bytes: ByteArray,
         block: (ParcelFileDescriptor) -> T,
@@ -197,6 +232,10 @@ internal class MediaSourceAccess(
             true
         }, block)
 
+    /**
+     * Unlinks the staging pathname before writing while retaining open writer/read capabilities.
+     * A false writer result refuses decoding; all handles close and residual paths are removed on exit.
+     */
     private fun <T> withStagedInput(
         write: (java.io.OutputStream) -> Boolean,
         block: (ParcelFileDescriptor) -> T?,
@@ -222,11 +261,18 @@ internal class MediaSourceAccess(
         }
     }
 
+    /**
+     * Tracks AV capability cleanup when a resource owner is supplied; otherwise preserves direct-close behavior.
+     */
     private fun <T : AutoCloseable> own(value: T): MediaParentResource<T> {
         val resource = resources?.own(value) ?: MediaParentResource(value)
         return resource
     }
 
+    /**
+     * Retires this source and queues cancellation/closure without holding a monitor over provider RPCs.
+     * Tracked cleanup retains admission credit until finished; rejected submission marks ownership uncertain.
+     */
     @Synchronized
     @Suppress("TooGenericExceptionCaught") // Rejected cleanup submission must retain every source/resource credit.
     override fun close() {

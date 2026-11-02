@@ -1,9 +1,16 @@
 package dev.ipf.whitenoise.android.media.sandbox
 
+/**
+ * Recycles the probe-owned poster; callers must stop using that bitmap after disposal.
+ */
 internal fun disposeProbe(probe: MediaProbe) {
     probe.poster?.recycle()
 }
 
+/**
+ * Accepts bounded source geometry, duration in milliseconds and poster allocation/shape.
+ * Returns the same probe on success; refusal recycles its poster and returns null.
+ */
 internal fun validateMediaProbe(
     probe: MediaProbe,
     edge: Int,

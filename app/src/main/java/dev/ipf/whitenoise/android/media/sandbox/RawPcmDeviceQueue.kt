@@ -32,6 +32,9 @@ internal class RawPcmDeviceQueue(
 
     private val silence = ByteArray(16 * frameBytes)
 
+    /**
+     * Credits only complete PCM16 media frames accepted by the device; refuses media after EOS.
+     */
     fun acceptedOutput(bytes: Int) {
         if (ending) throw RawOutputFailure("Raw audio received media after end of stream")
         require(bytes >= 0 && bytes % frameBytes == 0)
@@ -39,6 +42,10 @@ internal class RawPcmDeviceQueue(
         queuedFrames += bytes / frameBytes
     }
 
+    /**
+     * Validates a monotone device frame head against accepted media and padding credits.
+     * The first observed progress restores normal buffer size; refusal becomes an output failure.
+     */
     @Suppress("ThrowsCount") // Distinct monotone-credit and restoration guards retain typed device failures.
     private fun head(): Long {
         val value = hardwareFrames()
@@ -57,6 +64,9 @@ internal class RawPcmDeviceQueue(
         return value
     }
 
+    /**
+     * Restores normal device capacity and clears media/padding clocks for a caller-reset device head.
+     */
     fun reset() {
         if (resize(normalFrames) != normalFrames) throw RawOutputFailure("Raw audio buffer restoration refused")
         outputFrames = 0
@@ -70,6 +80,9 @@ internal class RawPcmDeviceQueue(
         paddingRemaining = 0
     }
 
+    /**
+     * Returns accepted media duration in microseconds, excluding terminal silence padding.
+     */
     fun writtenPositionUs(): Long = outputFrames * 1_000_000L / sampleRate
 
     val acceptedDeviceFrames: Long get() = queuedFrames
@@ -78,8 +91,14 @@ internal class RawPcmDeviceQueue(
     val mediaDrained: Boolean get() = observedHead >= outputFrames
     val fullyDrained: Boolean get() = paddingRemaining == 0 && observedHead >= queuedFrames
 
+    /**
+     * Returns observed played media duration in microseconds, clamped before padding credits.
+     */
     fun positionUs(): Long = playedOutputFrames * 1_000_000L / sampleRate
 
+    /**
+     * Refreshes and validates the device head, including buffer restoration after progress.
+     */
     fun poll() {
         head()
     }
@@ -102,6 +121,10 @@ internal class RawPcmDeviceQueue(
         return toleranceUs
     }
 
+    /**
+     * Temporarily shrinks an eligible stalled device queue and restarts once per observed head.
+     * Refuses platform minimums larger than the bounded terminal quantum when media cannot fill them.
+     */
     private fun prime(
         played: Long,
         pending: Long,
@@ -128,6 +151,9 @@ internal class RawPcmDeviceQueue(
         }
     }
 
+    /**
+     * Computes the microsecond video lead allowed for a short priming quantum; refuses above 3 ms.
+     */
     private fun tolerance(
         pending: Long,
         threshold: Int,
@@ -142,6 +168,9 @@ internal class RawPcmDeviceQueue(
         return toleranceUs
     }
 
+    /**
+     * Credits only frame-aligned silence actually accepted by the device, separately from media time.
+     */
     private fun writeTerminalPadding() {
         if (ending && paddingRemaining > 0) {
             val requestedBytes = paddingRemaining * frameBytes

@@ -126,6 +126,8 @@ class IsolatedAttachmentPlayerDeviceTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
         IsolatedMediaDecoder.install(context)
+        assertMalformedContainerInvalidatesCache(context)
+        assertUnsupportedSampleEntryPreservesCache(context)
         val source = File.createTempFile("sandbox-controls-", ".mp4", context.cacheDir)
         var scenario: ActivityScenario<ComponentActivity>? = null
         val player = AtomicReference<IsolatedAttachmentPlayer?>()
@@ -242,6 +244,105 @@ class IsolatedAttachmentPlayerDeviceTest {
         assertFalse(completed.bitmap.isRecycled)
         completed.releaseWhenSafe(requested = true)
         assertTrue(completed.bitmap.isRecycled)
+    }
+
+    /** Truncated recognized MP4 must cross native OPEN, primitive refusal and the player adapter. */
+    private fun assertMalformedContainerInvalidatesCache(context: android.content.Context) {
+        // Complete ftyp box with no required moov box: recognized MP4 with invalid container data.
+        assertContainerFailure(
+            context,
+            byteArrayOf(
+                0,
+                0,
+                0,
+                24,
+                102,
+                116,
+                121,
+                112,
+                105,
+                115,
+                111,
+                109,
+                0,
+                0,
+                0,
+                0,
+                105,
+                115,
+                111,
+                109,
+                109,
+                112,
+                52,
+                50,
+            ),
+            invalidates = true,
+        )
+    }
+
+    /** Keep the MP4 boxes intact but declare MPEG-4 Part 2, outside the native codec allowlist. */
+    private fun assertUnsupportedSampleEntryPreservesCache(context: android.content.Context) {
+        val bytes =
+            InstrumentationRegistry
+                .getInstrumentation()
+                .context.assets
+                .open("native-av-corpus/red-h264.mp4")
+                .use { it.readBytes() }
+        val stsd = byteArrayOf(115, 116, 115, 100)
+        val matches =
+            (0..bytes.size - stsd.size).filter { offset ->
+                stsd.indices.all { bytes[offset + it] == stsd[it] }
+            }
+        assertEquals("Fixture must contain one sample description box", 1, matches.size)
+        val type = matches.single() + 16 // type, fullbox flags/version, count, entry size, entry type.
+        assertTrue(type + 4 <= bytes.size)
+        assertTrue(bytes.copyOfRange(type, type + 4).contentEquals(byteArrayOf(97, 118, 99, 49)))
+        byteArrayOf(109, 112, 52, 118).copyInto(bytes, type) // mp4v, refused before compressed packet decode.
+        assertContainerFailure(context, bytes, invalidates = false)
+    }
+
+    private fun assertContainerFailure(
+        context: android.content.Context,
+        bytes: ByteArray,
+        invalidates: Boolean,
+    ) {
+        val source = File.createTempFile("sandbox-container-refusal-", ".mp4", context.cacheDir)
+        val player = AtomicReference<IsolatedAttachmentPlayer?>()
+        val failure = AtomicReference<androidx.media3.common.PlaybackException?>()
+        try {
+            source.writeBytes(bytes)
+            onMain {
+                val created = IsolatedAttachmentPlayer(context, android.net.Uri.fromFile(source))
+                player.set(created)
+                created.addListener(
+                    object : Player.Listener {
+                        override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                            failure.set(error)
+                        }
+                    },
+                )
+                created.prepare()
+            }
+            val deadline = SystemClock.elapsedRealtime() + 15_000
+            while (failure.get() == null && SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(20)
+            val error = requireNotNull(failure.get()) { "Selected fixture must refuse playback" }
+            val expected =
+                if (invalidates) {
+                    androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED
+                } else {
+                    androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FAILED
+                }
+            assertEquals(expected, error.errorCode)
+            assertEquals(
+                invalidates,
+                dev.ipf.whitenoise.android.media
+                    .playbackErrorInvalidatesAttachmentCache(error),
+            )
+        } finally {
+            onMain { player.getAndSet(null)?.release() }
+            check(source.delete()) { "Container fixture cleanup failed" }
+        }
     }
 
     private fun pausedSeek(

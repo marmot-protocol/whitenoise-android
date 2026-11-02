@@ -8,6 +8,12 @@ internal class MediaRefusalCache(
 ) {
     private val refusals = LinkedHashMap<String, Long>()
 
+    /**
+     * Checks caller validity before consulting a millisecond cooldown keyed by source identity.
+     * Cancellation and interruption propagate without caching. A null result or caught decode failure
+     * acquires a bounded cooldown only if still attributable and a second validity check succeeds.
+     * The process media-slot owner must serialize access; this cache supplies no lock.
+     */
     fun <T> attempt(
         key: String,
         check: () -> Unit,

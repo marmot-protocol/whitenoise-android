@@ -291,8 +291,7 @@ class MaestroWorkflowTest(unittest.TestCase):
             expression = expression[3:-2].strip()
         expression = expression.replace('&&', ' and ').replace('||', ' or ').replace('!inputs.', 'not inputs.').replace('!startsWith', 'not startsWith')
         lanes = SimpleNamespace(outputs=SimpleNamespace(attachment_fixture='true', connected='true'))
-        return eval(expression, {'__builtins__': {}},
-                    {'github': SimpleNamespace(event_name=event),
+        context = {'github': SimpleNamespace(event_name=event),
                      'inputs': SimpleNamespace(maestro_pilot=selected, maestro_suite='onboarding',
                          media_trace_target=trace_target, media_sandbox_api=media_api,
                          review_demo_e2e=review_demo, document_provider_matrix=document_matrix,
@@ -302,7 +301,14 @@ class MaestroWorkflowTest(unittest.TestCase):
                           mdk_preview_qualification=mdk_preview_qualification),
                      'needs': SimpleNamespace(changes=lanes),
                      'startsWith': lambda value, prefix: value.startswith(prefix),
-                     'always': lambda: True})
+                     'always': lambda: True, 'cancelled': lambda: False}
+        validation = re.search(r'^          TRACE_MODE_VALID: (.+)$', self.job('changes'), re.MULTILINE).group(1)
+        validation = validation.removeprefix('${{').removesuffix('}}')
+        validation = re.sub(r'!(?!=)', 'not ', validation.replace('&&', ' and ').replace('||', ' or ')).strip()
+        lanes.outputs.media_trace_allowed = 'true' if eval(validation, {'__builtins__': {}}, context) else ''
+        context['runtime_build_result'] = 'success'
+        expression = expression.replace('needs.maestro-runtime-build.result', 'runtime_build_result')
+        return eval(expression.replace('!cancelled()', 'not cancelled()'), {'__builtins__': {}}, context)
 
     def test_startup_trace_cannot_mix_with_mdk_campaigns(self):
         for name in ('mdk-qualification', 'mdk-signed-preview'):

@@ -6,6 +6,10 @@ package dev.ipf.whitenoise.android.media.sandbox
 internal object NativeMediaOutputPolicy {
     const val PCM_CAPACITY = 65536 * 2 * 2
 
+    /**
+     * Validates the six native metadata scalars before narrowing to integers.
+     * Duration is microseconds; absent video/audio fields must be paired zeros.
+     */
     fun info(values: LongArray): NativeMediaInfo {
         require(values.size == 6)
         val width = scalar(values[0], 0, MediaDecodePolicy.MAX_SOURCE_EDGE)
@@ -20,6 +24,10 @@ internal object NativeMediaOutputPolicy {
         return NativeMediaInfo(width, height, values[2], rotation, rate, channels)
     }
 
+    /**
+     * Validates the seven-scalar EOF, RGBA or PCM16 output shape before parent allocation/copy.
+     * PTS is microseconds; pixel bytes must match geometry and PCM bytes must contain complete frames.
+     */
     fun frame(
         values: LongArray,
         edge: Int,
@@ -59,6 +67,9 @@ internal object NativeMediaOutputPolicy {
         return NativeMediaFrame(kind, width, height, rate, channels, values[5], bytes)
     }
 
+    /**
+     * Checks the full Long value against inclusive integer bounds before narrowing.
+     */
     private fun scalar(
         value: Long,
         minimum: Int,

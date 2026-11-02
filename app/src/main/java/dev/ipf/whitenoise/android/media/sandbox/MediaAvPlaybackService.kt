@@ -22,6 +22,8 @@ class MediaAvPlaybackService : Service() {
     private val nativeLock = Any()
     private val watchdog = Executors.newSingleThreadScheduledExecutor()
     private var admitted = false
+    private var identityToken: String? = null
+    private var identityCallback: IBinder? = null
     private var token: String? = null
     private var sequence = 0L
     private var handle = 0L
@@ -35,6 +37,11 @@ class MediaAvPlaybackService : Service() {
     private val endpoint =
         object : Binder() {
             // Primitive request validation, watchdog and native call form one atomic Binder transaction.
+
+            /**
+             * Validates primitive requests before JNI and limits codec work with an independent
+             * process watchdog.
+             */
             @Suppress("ReturnCount", "TooGenericExceptionCaught", "LongMethod", "CyclomaticComplexMethod")
             override fun onTransact(
                 code: Int,
@@ -48,6 +55,7 @@ class MediaAvPlaybackService : Service() {
                     if (data.dataAvail() == 0 && !data.hasFileDescriptors()) Process.killProcess(Process.myPid())
                     return true
                 }
+                if (code == AvStreamProtocol.IDENTIFY) return identify(data, reply, flags)
                 if (code !in AvStreamProtocol.OPEN..AvStreamProtocol.SEEK || reply == null) return false
                 if (flags and IBinder.FLAG_ONEWAY != 0 || data.dataSize() > 2048) return false
                 val killer =
@@ -56,9 +64,11 @@ class MediaAvPlaybackService : Service() {
                         AvStreamProtocol.WATCHDOG_MS,
                         TimeUnit.MILLISECONDS,
                     )
+                var requestTuple: Pair<String, Long>? = null
                 try {
                     data.enforceInterface(AvStreamProtocol.DESCRIPTOR)
                     val tuple = AvStreamProtocol.readTuple(data)
+                    requestTuple = tuple
                     val values =
                         synchronized(nativeLock) {
                             if (code == AvStreamProtocol.OPEN) {
@@ -71,7 +81,7 @@ class MediaAvPlaybackService : Service() {
                                 when (code) {
                                     AvStreamProtocol.READ -> {
                                         val preferred = data.readInt()
-                                        require(data.dataAvail() == 0 && handle != 0L)
+                                        require(data.dataAvail() == 0 && handle > 0L)
                                         require(preferred in AvStreamProtocol.ANY_TRACK..AvStreamProtocol.AUDIO_TRACK)
                                         require(preferred != AvStreamProtocol.VIDEO_TRACK || videoBuffer != null)
                                         require(preferred != AvStreamProtocol.AUDIO_TRACK || audioBuffer != null)
@@ -100,6 +110,12 @@ class MediaAvPlaybackService : Service() {
                     reply.writeInt(0)
                     AvStreamProtocol.writeTuple(reply, tuple.first, tuple.second)
                     AvStreamProtocol.writeValues(reply, values)
+                } catch (_: RawContainerFailure) {
+                    reply.setDataPosition(0)
+                    reply.setDataSize(0)
+                    reply.writeInt(AvStreamProtocol.CONTAINER_MALFORMED)
+                    val tuple = checkNotNull(requestTuple)
+                    AvStreamProtocol.writeTuple(reply, tuple.first, tuple.second)
                 } catch (_: Exception) {
                     reply.setDataPosition(0)
                     reply.setDataSize(0)
@@ -113,14 +129,68 @@ class MediaAvPlaybackService : Service() {
             }
         }
 
+    /** Returns the isolated Binder endpoint without receiving any media or presentation capability. */
     override fun onBind(intent: Intent): IBinder = endpoint
 
+    /** Input-free exchange binds this one worker to its parent's exact generation before OPEN. */
+    private fun identify(
+        data: Parcel,
+        reply: Parcel?,
+        flags: Int,
+    ): Boolean {
+        if (reply == null || flags and IBinder.FLAG_ONEWAY != 0) return false
+        return try {
+            require(data.dataSize() <= AvStreamProtocol.MAX_REPLY_BYTES && !data.hasFileDescriptors())
+            data.enforceInterface(AvStreamProtocol.DESCRIPTOR)
+            val tuple = AvStreamProtocol.readTuple(data)
+            val callback = checkNotNull(data.readStrongBinder())
+            require(tuple.second == 1L && data.dataAvail() == 0)
+            synchronized(nativeLock) {
+                check(!admitted && identityToken == null)
+                identityToken = tuple.first
+                identityCallback = callback
+            }
+            sendIdentity(callback, tuple.first)
+            reply.writeInt(0)
+            AvStreamProtocol.writeTuple(reply, tuple.first, tuple.second)
+            AvStreamProtocol.writeValues(reply, longArrayOf())
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /** Only fixed isolation primitives cross this synchronous, descriptor-free callback. */
+    private fun sendIdentity(
+        callback: IBinder,
+        nextToken: String,
+    ) {
+        val data = Parcel.obtain()
+        val reply = Parcel.obtain()
+        try {
+            data.writeInterfaceToken(AvStreamProtocol.READY_DESCRIPTOR)
+            data.writeString(nextToken)
+            data.writeInt(if (Process.isIsolated()) 1 else 0)
+            val network = checkSelfPermission(android.Manifest.permission.INTERNET) == PackageManager.PERMISSION_GRANTED
+            data.writeInt(if (network) 1 else 0)
+            val runtime =
+                (application as dev.ipf.whitenoise.android.WhiteNoiseApplication).initializedAppState() != null
+            data.writeInt(if (runtime) 1 else 0)
+            check(callback.transact(AvStreamProtocol.IDENTITY, data, reply, 0))
+            check(reply.dataAvail() == Int.SIZE_BYTES && !reply.hasFileDescriptors() && reply.readInt() == 1)
+        } finally {
+            reply.recycle()
+            data.recycle()
+        }
+    }
+
+    /** Owns the one selected FD and output mappings; refuses any generation lacking identity. */
     private fun open(
         nextToken: String,
         nextSequence: Long,
         data: Parcel,
     ): LongArray {
-        check(!admitted && nextSequence == 1L)
+        check(!admitted && nextSequence == 1L && identityToken == nextToken)
         admitted = true // One OPEN, even if a parser or protocol later refuses.
         token = nextToken
         sequence = nextSequence
@@ -143,18 +213,20 @@ class MediaAvPlaybackService : Service() {
             audioBuffer = checkNotNull(audio).mapReadWrite()
         }
         val ready = checkNotNull(data.readStrongBinder())
-        require(data.dataAvail() == 0)
+        require(data.dataAvail() == 0 && ready == identityCallback)
         sendReady(ready, nextToken)
         edge = nextEdge
         NativeMediaEngine.ensureLoaded()
         handle = NativeMediaEngine.nativeOpen(input.fd, 0, input.statSize, edge)
-        check(handle != 0L)
+        if (handle == -1L) throw RawContainerFailure()
+        check(handle > 0L)
         return NativeMediaEngine.nativeInfo(handle).also { info ->
             val admittedInfo = avStreamInfo(info)
             require((wantVideo && admittedInfo.hasVideo) || (wantAudio && admittedInfo.hasAudio))
         }
     }
 
+    /** Synchronously confirms source write denial and isolation to the same pre-admitted parent generation. */
     private fun sendReady(
         callback: IBinder,
         nextToken: String,
@@ -180,6 +252,7 @@ class MediaAvPlaybackService : Service() {
         }
     }
 
+    /** Checks only the fixed debug private canary path and returns its denial errno. */
     private fun privateCanaryErrno(): Int {
         if (!dev.ipf.whitenoise.android.BuildConfig.DEBUG) return -1
         val path = applicationInfo.dataDir + "/files/media-containment-canary"
@@ -191,6 +264,7 @@ class MediaAvPlaybackService : Service() {
         }
     }
 
+    /** Verifies debug selected-FD write denial without acquiring any additional file-opening authority. */
     private fun inputWriteErrno(): Int {
         if (!dev.ipf.whitenoise.android.BuildConfig.DEBUG) return -1
         return try {
@@ -201,6 +275,7 @@ class MediaAvPlaybackService : Service() {
         }
     }
 
+    /** Terminates the disposable process; blocked native cleanup cannot delay retirement. */
     override fun onDestroy() {
         // No potentially blocked native cleanup can delay retirement or its independent control path.
         if (Process.isIsolated()) Process.killProcess(Process.myPid())

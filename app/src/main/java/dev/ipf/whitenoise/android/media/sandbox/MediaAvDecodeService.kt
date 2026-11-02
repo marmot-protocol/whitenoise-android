@@ -26,8 +26,10 @@ class MediaAvDecodeService : Service() {
     private var identityRequest = 0
     private var identityReply: android.os.IBinder? = null
 
+    /** Exposes only the isolated worker command endpoint; binding admits no source descriptor. */
     override fun onBind(intent: Intent) = messenger.binder
 
+    /** Requires prior exact input-free identity before dispatching one bounded selected-source decode. */
     @Suppress("ReturnCount") // Refuse unrelated or repeated capabilities before dispatch.
     private fun accept(message: Message): Boolean {
         if (!Process.isIsolated()) return true
@@ -82,6 +84,7 @@ class MediaAvDecodeService : Service() {
         return true
     }
 
+    /** Owns and closes the selected FD and shared output mapping, rejecting ranges before JNI entry. */
     @Suppress("DEPRECATION", "ReturnCount") // Refuse each invalid capability before native entry.
     private fun execute(data: Bundle, result: Bundle): Bundle {
         val input = data.getParcelable<ParcelFileDescriptor>("input") ?: return result
@@ -108,7 +111,7 @@ class MediaAvDecodeService : Service() {
                 result.putInt("inputWriteErrno", readOnlyErrno(input))
                 NativeMediaEngine.ensureLoaded()
                 val handle = NativeMediaEngine.nativeOpen(input.fd, offset, length, edge)
-                if (handle == 0L) return result
+                if (handle <= 0L) return result
                 try {
                     if (fillResult(handle, data, output, result)) result.putBoolean("success", true)
                 } finally {
@@ -119,6 +122,7 @@ class MediaAvDecodeService : Service() {
         return result
     }
 
+    /** Publishes validated dimensions, duration and optional bounded raw output for the requested operation. */
     @Suppress("ReturnCount") // Distinct absent-audio, empty-waveform and poster refusal boundaries.
     private fun fillResult(
         handle: Long,
@@ -141,6 +145,7 @@ class MediaAvDecodeService : Service() {
         return true
     }
 
+    /** Accumulates bounded PCM into finite waveform bins under a fixed read count and work deadline. */
     private fun waveform(handle: Long): FloatArray? {
         val samples = ByteBuffer.allocateDirect(NativeMediaOutputPolicy.PCM_CAPACITY)
         val signal = WaveformAccumulator()
@@ -162,6 +167,7 @@ class MediaAvDecodeService : Service() {
         return null
     }
 
+    /** Maps only the selected bounded shared output and closes its mapping after raw poster publication. */
     private fun poster(
         handle: Long,
         rotation: Int,
@@ -195,6 +201,7 @@ class MediaAvDecodeService : Service() {
         }
     }
 
+    /** Keeps the latest bounded frame until the requested media timestamp or global EOF. */
     @Suppress("ReturnCount") // EOF, the target frame and the bounded iteration limit are distinct outcomes.
     private fun readPosterFrame(
         handle: Long,
@@ -214,6 +221,7 @@ class MediaAvDecodeService : Service() {
         return null
     }
 
+    /** Collects only fixed isolation and debug denial diagnostics, without user media or account data. */
     private fun isolation(data: Bundle): Bundle =
         Bundle().apply {
             putBoolean("isolated", Process.isIsolated())
@@ -226,6 +234,7 @@ class MediaAvDecodeService : Service() {
             putBoolean("privateCanaryDenied", errno in setOf(OsConstants.EACCES, OsConstants.EPERM, OsConstants.ENOENT))
         }
 
+    /** Stops worker executors and terminates the disposable isolated process rather than reusing parser state. */
     override fun onDestroy() {
         codec.shutdownNow()
         watchdog.shutdownNow()
@@ -239,6 +248,7 @@ class MediaAvDecodeService : Service() {
     }
 }
 
+/** Checks the selected descriptor write denial only for debug qualification; release builds do not write. */
 private fun readOnlyErrno(input: ParcelFileDescriptor): Int {
     if (!dev.ipf.whitenoise.android.BuildConfig.DEBUG) return -1
     return try {
@@ -249,6 +259,7 @@ private fun readOnlyErrno(input: ParcelFileDescriptor): Int {
     }
 }
 
+/** Tests only the fixed debug canary suffix and reports a bounded errno without disclosing file contents. */
 private fun canaryErrno(data: Bundle): Int {
     val path = data.getString("canaryPath")?.takeIf { it.endsWith("/files/media-containment-canary") }
     if (!dev.ipf.whitenoise.android.BuildConfig.DEBUG || path == null) return -1
@@ -260,6 +271,7 @@ private fun canaryErrno(data: Bundle): Int {
     }
 }
 
+/** Requires a real bounded selected file and an offset/length wholly inside that descriptor. */
 private fun validSelectedMediaRange(
     input: ParcelFileDescriptor,
     offset: Long,

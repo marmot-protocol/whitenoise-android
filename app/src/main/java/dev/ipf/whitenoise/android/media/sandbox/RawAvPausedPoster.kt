@@ -13,14 +13,23 @@ internal class RawAvPausedSeekRequest(
     val target: RawAvPosterTarget,
     val completion: SettableFuture<Void>,
 ) {
+    /**
+     * Completes the exact seek future on acceptance or cancels it on refusal without interruption.
+     */
     fun finish(accepted: Boolean) {
         if (accepted) completion.set(null) else completion.cancel(false)
     }
 }
 
 internal interface RawAvPausedPosterOwner {
+    /**
+     * Waits for initial preparation before sharing its automatic decode lane; cancellation may propagate.
+     */
     fun awaitPrepared()
 
+    /**
+     * Tests whether a paused target still belongs to the current source, seek and position.
+     */
     fun posterCurrent(target: RawAvPosterTarget): Boolean
 
     /** True transfers ownership of any returned poster; false leaves recycling to the helper. */
@@ -45,10 +54,17 @@ internal class RawAvPausedPoster(
         }
     }
 
+    /**
+     * Offers a target to the conflated producer; only its latest queued request is retained.
+     */
     fun submit(request: RawAvPausedSeekRequest) {
         requests.trySend(request)
     }
 
+    /**
+     * Checks preparation and target currency before probing, then lets the owner accept the result.
+     * Refusal recycles the returned poster and cancels that request without replacing the prior frame.
+     */
     @Suppress("TooGenericExceptionCaught") // Bounded optional poster refusal preserves the prior frame and duration.
     private fun attempt(request: RawAvPausedSeekRequest) {
         var probe: MediaProbe? = null

@@ -87,8 +87,11 @@ internal class IsolatedAvStream private constructor(
     private var input: MediaParentResource<ParcelFileDescriptor>? = null
     private var sequence = 0L
     private var bindingAttempted = false
-    private var deathRegistered = false
+
+    @Volatile private var deathRegistered = false
     private var readyIdentity: Pair<Int, Int>? = null
+
+    @Volatile private var identity: Pair<Int, Int>? = null
 
     @Volatile private var endpoint: IBinder? = null
     private var sessionInfo: AvStreamInfo? = null
@@ -108,6 +111,7 @@ internal class IsolatedAvStream private constructor(
 
     private val connection =
         object : ServiceConnection {
+            /** Retains the actual endpoint and death registration even when startup was already revoked. */
             override fun onServiceConnected(
                 name: ComponentName,
                 service: IBinder,
@@ -130,16 +134,24 @@ internal class IsolatedAvStream private constructor(
                 finishIfPossible()
             }
 
+            /** Revokes availability without converting a framework disconnect into kernel absence evidence. */
             override fun onServiceDisconnected(name: ComponentName) = unavailable()
 
+            /** Retains the process credit after framework binding loss until exact cleanup can be proved. */
             override fun onBindingDied(name: ComponentName) = unavailable()
 
+            /** Revokes this generation without inventing a worker PID or releasing an accepted binding credit. */
             override fun onNullBinding(name: ComponentName) = unavailable()
         }
 
     private val readyCallback =
         object : Binder() {
             // Primitive READY validation and exact endpoint admission stay in one atomic Binder transaction.
+
+            /**
+             * Admits only fixed synchronous identity/READY primitives from the exact retained worker
+             * generation.
+             */
             @Suppress("ReturnCount", "TooGenericExceptionCaught", "LongMethod", "CyclomaticComplexMethod")
             override fun onTransact(
                 code: Int,
@@ -147,6 +159,7 @@ internal class IsolatedAvStream private constructor(
                 reply: Parcel?,
                 flags: Int,
             ): Boolean {
+                if (code == AvStreamProtocol.IDENTITY) return acceptIdentity(data, reply, flags)
                 if (code != AvStreamProtocol.READY || reply == null || flags and IBinder.FLAG_ONEWAY != 0) return false
                 val accepted =
                     try {
@@ -179,7 +192,8 @@ internal class IsolatedAvStream private constructor(
                                     uid != Process.myUid() &&
                                     pid > 0 &&
                                     debugWriteDenied &&
-                                    processWitness.admit(uid, pid)
+                                    identity == (uid to pid) &&
+                                    processWitness.acceptsCaller(uid, pid)
                             if (current && valid) {
                                 readyIdentity = uid to pid
                                 val canaryDenied =
@@ -222,6 +236,48 @@ internal class IsolatedAvStream private constructor(
             }
         }
 
+    /**
+     * A late exact generation identity may establish cleanup evidence after revocation. It never
+     * authorizes OPEN: that requires the current account epoch and an atomic exposure commit.
+     */
+    private fun acceptIdentity(
+        data: Parcel,
+        reply: Parcel?,
+        flags: Int,
+    ): Boolean {
+        if (reply == null || flags and IBinder.FLAG_ONEWAY != 0) return false
+        val accepted =
+            runCatching {
+                require(data.dataSize() <= AvStreamProtocol.MAX_REPLY_BYTES && !data.hasFileDescriptors())
+                data.enforceInterface(AvStreamProtocol.READY_DESCRIPTOR)
+                val received = data.readString()
+                val isolated = AvStreamProtocol.boolean(data)
+                val network = AvStreamProtocol.boolean(data)
+                val initialized = AvStreamProtocol.boolean(data)
+                require(data.dataAvail() == 0)
+                val uid = Binder.getCallingUid()
+                val pid = Binder.getCallingPid()
+                synchronized(stateLock) {
+                    val retained = !cleaned.get() && endpoint != null && identity == null
+                    val valid = received == token && isolated && !network && !initialized
+                    if (retained && valid && processWitness.admit(uid, pid)) {
+                        identity = uid to pid
+                        true
+                    } else {
+                        false
+                    }
+                }
+            }.getOrDefault(false)
+        if (!accepted) return false
+        reply.writeInt(1)
+        if (lifetime.closed) {
+            retire()
+            finishIfPossible()
+        }
+        return true
+    }
+
+    /** Revokes operations and starts independent retirement/cleanup without waiting for codec RPC. */
     private fun unavailable() {
         // Disconnect/null callbacks are availability information, not an exact endpoint death witness.
         lifetime.close()
@@ -230,6 +286,7 @@ internal class IsolatedAvStream private constructor(
         finishIfPossible()
     }
 
+    /** Owns bounded parent resources and completes input-free identity before committing any OPEN capability. */
     private fun initialize(selected: ParcelFileDescriptor) =
         call {
             require(selected.statSize in 1..AvStreamProtocol.MAX_SOURCE_BYTES)
@@ -256,6 +313,8 @@ internal class IsolatedAvStream private constructor(
                     throw IOException("Media worker unavailable")
                 }
             }
+            // Identity carries no source/shared-memory capability and consumes no media sequence.
+            transact(AvStreamProtocol.IDENTIFY, 0) { data -> data.writeStrongBinder(readyCallback) }
             val values =
                 transact(AvStreamProtocol.OPEN, 6) { data ->
                     data.writeInt(edge)
@@ -271,6 +330,7 @@ internal class IsolatedAvStream private constructor(
             require((wantVideo && info.hasVideo) || (wantAudio && info.hasAudio))
         }
 
+    /** Records accepted, refused or uncertain creation and retains every unresolved framework lifetime. */
     @Suppress("TooGenericExceptionCaught") // Any binding exception leaves process creation uncertain.
     private fun bind() {
         bindingAttempted = true
@@ -293,6 +353,7 @@ internal class IsolatedAvStream private constructor(
         if (!accepted) throw IOException("Media worker binding refused")
     }
 
+    /** Validates raw output metadata before copying owned pixel/PCM bytes from shared memory. */
     @Suppress("CyclomaticComplexMethod") // Validate and own one exact typed shared-memory output in this call.
     fun read(preferred: Int = AvStreamProtocol.ANY_TRACK): AvStreamFrame =
         call {
@@ -346,6 +407,7 @@ internal class IsolatedAvStream private constructor(
             }
         }
 
+    /** Serializes a bounded media-time seek through the retained exact worker generation. */
     fun seek(positionUs: Long) =
         call {
             require(positionUs in 0..AvStreamProtocol.MAX_DURATION_US)
@@ -353,6 +415,13 @@ internal class IsolatedAvStream private constructor(
             Unit
         }
 
+    /**
+
+     * Serializes caller work and rejects stale-account publication while retaining all in-flight
+
+     * cleanup credits.
+
+     */
     @Suppress("TooGenericExceptionCaught", "ThrowsCount") // Every failed IPC/copy revokes this capability.
     private fun <T> call(action: () -> T): T {
         check(Looper.myLooper() != Looper.getMainLooper()) { "Media IPC must run off the main thread" }
@@ -397,7 +466,7 @@ internal class IsolatedAvStream private constructor(
                 }
                 checkNotNull(endpoint)
             }
-        val request = ++sequence
+        val request = if (code == AvStreamProtocol.IDENTIFY) 1L else ++sequence
         lifetime.beginRpc()
         val future: Future<LongArray> =
             try {
@@ -411,15 +480,41 @@ internal class IsolatedAvStream private constructor(
                         data.writeInterfaceToken(AvStreamProtocol.DESCRIPTOR)
                         AvStreamProtocol.writeTuple(data, token, request)
                         write(data)
+                        if (code == AvStreamProtocol.OPEN) {
+                            val committed =
+                                admissions.accept(lane, ownerEpoch, this) {
+                                    endpoint === remote && deathRegistered && identity != null && lifetime.commitOpen()
+                                }
+                            if (!committed) throw IOException("Media OPEN ownership retired")
+                        }
                         if (!remote.transact(code, data, reply, 0)) throw IOException("Media transaction refused")
                         require(reply.dataSize() <= AvStreamProtocol.MAX_REPLY_BYTES && !reply.hasFileDescriptors())
-                        if (reply.readInt() != 0) throw IOException("Media decoding refused")
+                        val status = reply.readInt()
+                        if (status != 0) {
+                            if (code == AvStreamProtocol.OPEN && status == AvStreamProtocol.CONTAINER_MALFORMED) {
+                                val refused = AvStreamProtocol.readTuple(reply)
+                                require(refused.first == token && refused.second == request && reply.dataAvail() == 0)
+                                synchronized(stateLock) {
+                                    require(endpoint === remote && readyIdentity != null && !lifetime.closed)
+                                    require(admissions.isCurrent(lane, ownerEpoch, this))
+                                }
+                                throw RawContainerFailure()
+                            }
+                            require(reply.dataAvail() == 0)
+                            throw IOException("Media decoding refused")
+                        }
                         val tuple = AvStreamProtocol.readTuple(reply)
                         require(tuple.first == token && tuple.second == request)
                         synchronized(stateLock) {
                             require(
                                 endpoint === remote &&
-                                    readyIdentity != null &&
+                                    (
+                                        if (code == AvStreamProtocol.IDENTIFY) {
+                                            identity != null
+                                        } else {
+                                            readyIdentity != null
+                                        }
+                                    ) &&
                                     !lifetime.closed &&
                                     admissions.isCurrent(lane, ownerEpoch, this),
                             )
@@ -454,16 +549,25 @@ internal class IsolatedAvStream private constructor(
         finishIfPossible()
     }
 
+    /** Waits off the main thread for acknowledged cleanup; a timeout never releases ownership. */
     fun awaitRetired(timeoutMs: Long = AvStreamProtocol.CALL_DEADLINE_MS): Boolean {
         check(Looper.myLooper() != Looper.getMainLooper())
         require(timeoutMs in 0..AvStreamProtocol.CALL_DEADLINE_MS)
         return released.await(timeoutMs, TimeUnit.MILLISECONDS)
     }
 
+    /**
+
+     * Revokes source acquisition and records uncertain parent cleanup instead of dropping its
+
+     * resource credit.
+
+     */
     private fun closeSources() {
         runCatching { sources.close() }.onFailure { parentResources.uncertain() }
     }
 
+    /** Uses an independent executor so blocked codec work cannot queue ahead of the termination request. */
     private fun retire() {
         val remote =
             synchronized(stateLock) {
@@ -490,6 +594,13 @@ internal class IsolatedAvStream private constructor(
         }
     }
 
+    /**
+
+     * Releases admission only after process absence, connection cleanup, settled work and parent
+
+     * resource closure.
+
+     */
     @Suppress("TooGenericExceptionCaught") // Each selected capability is closed once before admission release.
     private fun finishIfPossible() {
         if (Looper.myLooper() != callbacks.looper) {
@@ -533,6 +644,7 @@ internal class IsolatedAvStream private constructor(
         }
     }
 
+    /** Attempts each owned descriptor/mapping closure once and retains uncertain cleanup evidence. */
     @Suppress("TooGenericExceptionCaught") // A failed close retains the resource budget for any capability type.
     private fun closeDescriptorsOnce() {
         if (descriptorCleanupStarted.compareAndSet(false, true)) {
@@ -546,6 +658,7 @@ internal class IsolatedAvStream private constructor(
         }
     }
 
+    /** Schedules bounded-backoff absence observation while retaining unresolved worker accounting. */
     private fun observeLater() {
         if (lifetime.closed && !cleaned.get() && observationScheduled.compareAndSet(false, true)) {
             val delay = AutomaticAvIdentity.observationDelay(observationPolls++)
@@ -617,6 +730,8 @@ internal class IsolatedAvStream private constructor(
         ): IsolatedAvStream = openFixed(context, wantVideo, wantAudio, edge, lane) { it.initialize(selected) }
 
         // One reserved source owns every startup failure.
+
+        /** Owns the reservation through source acquisition, initialization and acknowledged failure cleanup. */
         @Suppress("TooGenericExceptionCaught", "LongParameterList", "ThrowsCount")
         private fun openFixed(
             context: Context,
@@ -651,6 +766,7 @@ internal class IsolatedAvStream private constructor(
             }
         }
 
+        /** Waits for exact prior-generation cleanup without increasing the fixed two-lane process bound. */
         private fun reserve(
             context: Context,
             wantVideo: Boolean,

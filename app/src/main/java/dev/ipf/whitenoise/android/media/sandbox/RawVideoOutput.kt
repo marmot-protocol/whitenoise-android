@@ -61,6 +61,10 @@ internal class RawVideoOutput(
             }
         }
 
+    /**
+     * Detaches the previous display target and installs callbacks for the replacement.
+     * Direct/holder surfaces remain borrowed; only wrappers created for textures are owned here.
+     */
     fun attach(next: Any?) {
         close()
         synchronized(lock) {
@@ -80,12 +84,18 @@ internal class RawVideoOutput(
         }
     }
 
+    /**
+     * Borrows a holder surface and registers lifecycle updates for that exact holder.
+     */
     private fun attachHolder(next: SurfaceHolder) {
         holder = next
         next.addCallback(holderCallback)
         updateHolder(next)
     }
 
+    /**
+     * Refreshes a current holder under the output lock and signals an available valid surface.
+     */
     private fun updateHolder(next: SurfaceHolder) {
         synchronized(lock) {
             if (holder === next) surface = next.surface.takeIf { it.isValid }
@@ -93,6 +103,9 @@ internal class RawVideoOutput(
         }
     }
 
+    /**
+     * Rejects stale texture callbacks and owns at most one wrapper for the current texture.
+     */
     private fun updateTexture(value: SurfaceTexture) {
         synchronized(lock) {
             if (texture?.surfaceTexture !== value) return
@@ -133,6 +146,9 @@ internal class RawVideoOutput(
             }
         }
 
+    /**
+     * Detaches only if [expected] is null or is the exact current target, rejecting stale clears.
+     */
     fun clear(expected: Any?) {
         synchronized(lock) {
             if (expected != null && output !== expected) return
@@ -140,6 +156,9 @@ internal class RawVideoOutput(
         }
     }
 
+    /**
+     * Releases only a texture wrapper owned here and forgets borrowed surface references.
+     */
     private fun releaseSurface() {
         if (ownedSurface) surface?.release()
         surface = null
@@ -147,6 +166,9 @@ internal class RawVideoOutput(
         textureIdentity = null
     }
 
+    /**
+     * Attempts to replace the current displayed frame with black; tolerates platform surface loss.
+     */
     private fun clearFrame() {
         val target = surface?.takeIf { it.isValid } ?: return
         try {
@@ -165,6 +187,10 @@ internal class RawVideoOutput(
         }
     }
 
+    /**
+     * Clears the frame, removes owned callbacks and releases texture wrappers under the output lock.
+     * Borrowed display surfaces and decoder bitmaps remain caller-owned.
+     */
     override fun close() {
         synchronized(lock) {
             clearFrame()

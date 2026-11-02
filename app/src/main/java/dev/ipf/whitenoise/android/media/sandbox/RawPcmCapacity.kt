@@ -8,6 +8,11 @@ internal object RawPcmCapacity {
     const val MAX_SPEED = 2f
     const val MAX_BUFFER_BYTES = 1024 * 1024
 
+    /**
+     * Sizes an interleaved PCM16 device buffer in bytes, aligned to complete frames.
+     * It exceeds the maximum-speed platform minimum by one frame and holds at least a quarter second.
+     * Throws when these requirements exceed the fixed allocation ceiling.
+     */
     fun bytes(
         minimumBytes: Int,
         sampleRate: Int,

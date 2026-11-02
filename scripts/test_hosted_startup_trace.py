@@ -215,14 +215,20 @@ class HostedStartupTraceTests(unittest.TestCase):
                       review_demo_e2e=False,document_provider_matrix=False)
         def evaluate(expression,event='workflow_dispatch',status='failure',**changes):
             values={**defaults,**changes}
-            expression=expression.strip().removeprefix('${{').removesuffix('}}').replace('&&',' and ').replace('||',' or ')
-            expression=re.sub(r'!(?!=)','not ',expression)
-            return eval(expression,{'__builtins__':{}},dict(github=SimpleNamespace(event_name=event),
-                        inputs=SimpleNamespace(**{**values,'maestro_suite':'onboarding'}),job=SimpleNamespace(status=status),
-                        needs=SimpleNamespace(changes=SimpleNamespace(outputs=SimpleNamespace(connected='true',attachment_fixture='true'))),
-                        always=lambda:True,startsWith=lambda text,prefix:text.startswith(prefix),
-                        success=lambda:status=='success',failure=lambda:status=='failure',
-                        cancelled=lambda:status=='cancelled',format=lambda *a:'standard'))
+            def normalized(text):
+                text=text.strip().removeprefix('${{').removesuffix('}}').replace('&&',' and ').replace('||',' or ')
+                return re.sub(r'!(?!=)','not ',text).strip()
+            context=dict(github=SimpleNamespace(event_name=event),
+                inputs=SimpleNamespace(**{**values,'maestro_suite':'onboarding'}),job=SimpleNamespace(status=status),
+                always=lambda:True,startsWith=lambda text,prefix:text.startswith(prefix),
+                success=lambda:status=='success',failure=lambda:status=='failure',
+                cancelled=lambda:status=='cancelled',format=lambda *a:'standard')
+            validation=re.search(r'^          TRACE_MODE_VALID: (.+)$',workflow,re.M).group(1)
+            allowed=eval(normalized(validation),{'__builtins__':{}},context)
+            context['needs']=SimpleNamespace(changes=SimpleNamespace(outputs=SimpleNamespace(
+                connected='true',attachment_fixture='true',media_trace_allowed='true' if allowed else '')))
+            context['runtime_build_result']='success'
+            return eval(normalized(expression).replace('needs.maestro-runtime-build.result','runtime_build_result'),{'__builtins__':{}},context)
         self.assertFalse(evaluate(condition))
         for flag in ('maestro_pilot','responsiveness_only','outbound_share_only','mdk_adoption_only','review_demo_e2e','document_provider_matrix'):
             self.assertTrue(evaluate(condition,**{flag:True}))
@@ -537,14 +543,21 @@ class HostedStartupTraceTests(unittest.TestCase):
                       responsiveness_only=False,outbound_share_only=False,mdk_adoption_only=False,
                       mdk_qualification=False,mdk_preview_qualification=False,review_demo_e2e=False,
                       document_provider_matrix=False,maestro_suite='onboarding')
-        def evaluate(expr,event='workflow_dispatch',draft=False,**values):
-            expr=expr.strip().removeprefix('${{').removesuffix('}}').replace('&&',' and ').replace('||',' or ')
-            expr=re.sub(r'!(?!=)','not ',expr).strip()
-            return bool(eval(expr,{'__builtins__':{}},dict(
+        def evaluate(expr,event='workflow_dispatch',draft=False,changes_output=None,cancelled=False,runtime_build_result='success',**values):
+            def normalized(expression):
+                expression=expression.strip().removeprefix('${{').removesuffix('}}').replace('&&',' and ').replace('||',' or ')
+                return re.sub(r'!(?!=)','not ',expression).strip()
+            context=dict(
                 inputs=SimpleNamespace(**{**defaults,**values}),
                 github=SimpleNamespace(event_name=event,event=SimpleNamespace(pull_request=SimpleNamespace(draft=draft))),
-                needs=SimpleNamespace(changes=SimpleNamespace(outputs=SimpleNamespace(connected='true',attachment_fixture='true'))),
-                always=lambda:True,startsWith=lambda text,prefix:text.startswith(prefix))))
+                always=lambda:True,cancelled=lambda:cancelled,runtime_build_result=runtime_build_result,
+                startsWith=lambda text,prefix:text.startswith(prefix))
+            if changes_output is None:
+                allowed=eval(normalized(current['changes']['steps'][0]['env']['TRACE_MODE_VALID']),{'__builtins__':{}},context)
+                changes_output='true' if allowed else ''
+            context['needs']=SimpleNamespace(changes=SimpleNamespace(outputs=SimpleNamespace(
+                connected='true',attachment_fixture='true',media_trace_allowed=changes_output)))
+            return bool(eval(normalized(expr).replace('needs.maestro-runtime-build.result','runtime_build_result'),{'__builtins__':{}},context))
         flags=['maestro_pilot','responsiveness_only','outbound_share_only','mdk_adoption_only',
                'mdk_qualification','mdk_preview_qualification','range_selection_only','review_demo_e2e',
                'document_provider_matrix','media_sandbox_only','media_startup_trace']
@@ -577,13 +590,91 @@ class HostedStartupTraceTests(unittest.TestCase):
             for job in current:
                 if job!='changes':self.assertFalse(evaluate(current[job]['if'],event,**valid),(job,event))
         first=current['changes']['steps'][0]
-        self.assertIn('Reject incompatible AV trace selection',first['name'])
+        self.assertIn('Validate media trace selection',first['name'])
+        self.assertNotIn('if',first)
+        self.assertEqual(first['id'],'media-trace-selection')
+        self.assertEqual(current['changes']['outputs']['media_trace_allowed'], '${{ steps.media-trace-selection.outputs.allowed }}')
         for values in invalid:
             self.assertFalse(evaluate(first['env']['TRACE_MODE_VALID'],**values))
         self.assertTrue(evaluate(first['env']['TRACE_MODE_VALID'],**valid))
-        for result,expected in [('true',0),('false',1)]:
-            run=subprocess.run(['bash','-c',first['run']],env={**os.environ,'TRACE_MODE_VALID':result},capture_output=True)
-            self.assertEqual(run.returncode,expected)
+        for target in ('healthy',''):
+            self.assertTrue(evaluate(first['env']['TRACE_MODE_VALID'],media_trace_target=target))
+        for result,expected in [('true',0),('false',1),('',1)]:
+            with tempfile.TemporaryDirectory() as temporary:
+                output=Path(temporary)/'output'
+                run=subprocess.run(['bash','-c',first['run']],env={**os.environ,'TRACE_MODE_VALID':result,
+                    'GITHUB_OUTPUT':str(output)},capture_output=True)
+                self.assertEqual(run.returncode,expected)
+                self.assertEqual(output.read_text() if output.exists() else '', 'allowed=true\n' if expected==0 else '')
+        # Every consumer names changes directly; the independent signed preview never consumes its output.
+        for job in current:
+            if job in ('changes','mdk-signed-preview'):continue
+            needs=current[job]['needs']
+            self.assertIn('changes',[needs] if isinstance(needs,str) else needs)
+            self.assertFalse(evaluate(current[job]['if'],changes_output=''))
+        self.assertNotIn('needs',current['mdk-signed-preview'])
+        self.assertNotIn('needs.changes',current['mdk-signed-preview']['if'])
+        self.assertIn('always()',current['maestro-runtime-summary']['if'])
+        runtime=dict(maestro_pilot=True,maestro_suite='runtime-all')
+        self.assertTrue(evaluate(current['maestro-runtime-summary']['if'],changes_output='true',**runtime))
+        self.assertFalse(evaluate(current['maestro-runtime-summary']['if'],changes_output='',**runtime))
+        # Newly dependent campaigns bypass a later unrelated changes failure, honoring cancellation.
+        for job in ('maestro-pilot','maestro-runtime-build','mdk-qualification'):
+            self.assertIn('!cancelled()',current[job]['if'])
+        self.assertTrue(evaluate(current['maestro-pilot']['if'],changes_output='true',maestro_pilot=True))
+        self.assertFalse(evaluate(current['maestro-pilot']['if'],changes_output='true',cancelled=True,maestro_pilot=True))
+        for target,expected in [('healthy',True),('',True),('av',False),('other',False)]:
+            self.assertEqual(evaluate(current['mdk-signed-preview']['if'],changes_output='',
+                mdk_preview_qualification=True,media_trace_target=target),expected)
+        def admitted(job,results,**values):
+            # GitHub adds success() when a job expression has no status check. Model that
+            # dependency gate as well as evaluating the actual checked-in condition.
+            definition=current[job]
+            expression=definition['if']
+            dependencies=definition.get('needs',[])
+            if isinstance(dependencies,str):dependencies=[dependencies]
+            explicit_status=re.search(r'\b(always|cancelled|success|failure)\(\)',expression)
+            if not explicit_status and (values.get('cancelled',False) or any(
+                    results.get(name,'success')!='success' for name in dependencies)):
+                return False
+            return evaluate(expression,runtime_build_result=results.get('maestro-runtime-build','success'),**values)
+        for result in ('failure','cancelled'):
+            results={'changes':result}
+            # A successful first validation can survive a later unrelated changes failure.
+            for job,values in [('maestro-pilot',dict(maestro_pilot=True)),
+                               ('maestro-runtime-build',runtime),
+                               ('mdk-qualification',dict(mdk_qualification=True))]:
+                self.assertTrue(admitted(job,results,changes_output='true',**values),(job,result))
+                self.assertFalse(admitted(job,results,changes_output='true',cancelled=True,**values))
+                self.assertFalse(admitted(job,results,changes_output='',**values))
+            # Existing changes-dependent jobs retain their implicit dependency success gate.
+            self.assertFalse(admitted('instrumented',results,changes_output='true'))
+            self.assertFalse(admitted('attachment-fixture',results,changes_output='true'))
+            self.assertTrue(admitted('maestro-runtime',results,changes_output='true',**runtime))
+            self.assertFalse(admitted('maestro-runtime',results,changes_output='true',cancelled=True,**runtime))
+            for build_result in ('failure','skipped','cancelled'):
+                self.assertFalse(admitted('maestro-runtime',{**results,'maestro-runtime-build':build_result},
+                                          changes_output='true',**runtime))
+            # always() must reconcile a failed/skipped runtime while validation remains admitted.
+            runtime_results={**results,'maestro-runtime-build':result,'maestro-runtime':result}
+            self.assertTrue(admitted('maestro-runtime-summary',runtime_results,
+                                     changes_output='true',**runtime))
+            self.assertFalse(admitted('maestro-runtime-summary',runtime_results,
+                                      changes_output='',**runtime))
+            self.assertTrue(admitted('mdk-signed-preview',results,changes_output='',
+                                     mdk_preview_qualification=True))
+        for output in ('','false','TRUE','1'):
+            for job,values in [('maestro-pilot',dict(maestro_pilot=True)),
+                               ('maestro-runtime-build',runtime),
+                               ('mdk-qualification',dict(mdk_qualification=True))]:
+                self.assertFalse(admitted(job,{'changes':'skipped'},changes_output=output,**values))
+        self.assertTrue(admitted('maestro-runtime-summary',{'changes':'success','maestro-runtime':'cancelled'},
+                                 changes_output='true',cancelled=True,**runtime))
+        self.assertFalse(admitted('mdk-signed-preview',{},changes_output='',cancelled=True,
+                                  mdk_preview_qualification=True))
+        # Exactly one long AV allow expression remains, before any checkout.
+        workflow=(ROOT/'.github/workflows/android-instrumented.yml').read_text()
+        self.assertEqual(workflow.count("inputs.media_trace_target == 'av' && inputs.media_startup_trace && inputs.media_sandbox_only"),1)
 
 
 if __name__ == '__main__':
