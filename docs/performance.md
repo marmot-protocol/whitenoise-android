@@ -394,7 +394,7 @@ timeouts, worker starts, live worker processes and caller FD/RSS. It is an
 opt-in `ManualDeviceFixture`; run it with `am instrument` on a disposable
 emulator or dedicated device, in ABBA order. The procedure and record format are
 in [the still-worker baseline](media-worker-baseline.md#matched-throughput-comparison);
-the #3373 results and proposed budget are recorded with the
+the #3373 results and accepted budget are recorded with the
 [domain-bound worker generations](media-containment.md#domain-bound-worker-generations). Measure worker
 PSS separately with `dumpsys meminfo`; RSS counts shared zygote pages per process.
 

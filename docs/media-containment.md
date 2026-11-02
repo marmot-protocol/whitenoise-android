@@ -1087,11 +1087,11 @@ On the same emulators:
 
 ### Default
 
-Production installation uses domain-bound generations, pending approval of the
-[proposed budget](#measurements-and-proposed-budget). `ReusableMediaTransport`
-is no longer installed. It stays in production code as the lane to restore if
-the budget is rejected and as the measurement baseline, and removing it waits
-for that decision.
+Production installation uses domain-bound generations. The maintainer accepted
+the amended domain rule and its [measured budget](#measurements-and-proposed-budget)
+on #3373 on 2 November 2026. `ReusableMediaTransport` is no longer installed. It
+stays in production code as the measurement baseline, and removing it is a
+follow-up.
 
 ### Residual risks
 
