@@ -83,6 +83,20 @@ class GlobalAttachmentLibraryScreenshotTest {
         capture("filters_unsupported")
     }
 
+    /** No attachment matches: the empty state says so without claiming a failure. */
+    @Test
+    fun emptyLibrary() {
+        render(emptyList(), setOf(GlobalSearchContentKind.ANY_ATTACHMENT))
+        capture("empty")
+    }
+
+    /** A narrow 280dp window keeps tiles, rows and headings within the screen. */
+    @Test
+    fun narrowWindow() {
+        render(MIXED, setOf(GlobalSearchContentKind.ANY_ATTACHMENT), width = 280)
+        capture("narrow")
+    }
+
     /** TalkBack hears one sentence per item and can reach Go to Message as a custom action. */
     @Test
     fun itemsAnnounceTheirOriginAndOfferGoToMessage() {
@@ -123,6 +137,7 @@ class GlobalAttachmentLibraryScreenshotTest {
         amoled: Boolean = false,
         rtl: Boolean = false,
         large: Boolean = false,
+        width: Int? = null,
         paging: GlobalAttachmentPaging = GlobalAttachmentPaging(),
         onOpen: (GlobalAttachmentItem) -> Unit = {},
         onViewInChat: (GlobalAttachmentItem) -> Unit = {},
@@ -130,7 +145,7 @@ class GlobalAttachmentLibraryScreenshotTest {
         composeRule.setContent {
             CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (large) 2f else 1f) {
-                    Surface(Modifier.width(if (large) 320.dp else 360.dp).height(720.dp)) {
+                    Surface(Modifier.width((width ?: if (large) 320 else 360).dp).height(720.dp)) {
                         Box {
                             GlobalAttachmentBrowser(
                                 items = items,

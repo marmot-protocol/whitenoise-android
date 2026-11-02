@@ -59,7 +59,7 @@ private val LibraryRowIconSize = 40.dp
 /**
  * One library card: a square tile for photos and videos, otherwise a row naming the file, its sender
  * and chat. TalkBack reads one sentence with the type, name, sender, chat and time, and offers
- * Go to Message as a custom action beside the default open.
+ * Go to Message as a custom action beside the default open. Keyboard and switch users can focus it.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -92,11 +92,21 @@ internal fun GlobalAttachmentCard(
         }
     val clickable =
         Modifier.combinedClickable(onClick = { actions.onOpen(item) }, onLongClick = { actions.onViewInChat(item) })
-    val base = modifier.fillMaxWidth().testTag(globalLibraryItemTag(item)).then(semantics)
-    if (presentation == GlobalAttachmentPresentation.VISUAL) {
-        GlobalAttachmentTile(item, actions.thumbnail(item), base.clip(MaterialTheme.shapes.small).then(clickable))
+    val tile = presentation == GlobalAttachmentPresentation.VISUAL
+    val shape = if (tile) Modifier.clip(MaterialTheme.shapes.small) else Modifier
+    // The clickable precedes the cleared semantics so its focus state and focus request reach keyboard and
+    // switch users; the card's inner text and buttons stay cleared behind the one spoken sentence.
+    val base =
+        modifier
+            .fillMaxWidth()
+            .testTag(globalLibraryItemTag(item))
+            .then(shape)
+            .then(clickable)
+            .then(semantics)
+    if (tile) {
+        GlobalAttachmentTile(item, actions.thumbnail(item), base)
     } else {
-        GlobalAttachmentRow(item, presentation, "$origin · $time", base.then(clickable), actions)
+        GlobalAttachmentRow(item, presentation, "$origin · $time", base, actions)
     }
 }
 
