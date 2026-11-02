@@ -569,7 +569,18 @@ class GroupSenderHeaderTimelineScreenshotTest : MessageBubbleFileAttachmentFixtu
                         },
                     ),
                 accountIdHexResolver = { selfId },
-                accounts = listOf(AccountSummaryFfi("personal", selfId, true, false, false, true)),
+                accounts =
+                    listOf(
+                        AccountSummaryFfi(
+                            label = "personal",
+                            accountIdHex = selfId,
+                            localSigning = true,
+                            externalSigning = false,
+                            signedOut = false,
+                            running = true,
+                            unlinked = false,
+                        ),
+                    ),
                 activeAccountRef = "personal",
                 profileReader = { id ->
                     UserProfileMetadataFfi(
