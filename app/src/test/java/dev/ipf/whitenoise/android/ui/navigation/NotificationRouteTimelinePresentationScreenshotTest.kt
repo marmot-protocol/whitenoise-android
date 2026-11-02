@@ -496,11 +496,13 @@ class NotificationRouteTimelinePresentationScreenshotTest : NotificationRouteTim
         awaitCondition {
             mountedController.memberCount == 3 && !mountedController.usesDirectTranscriptChrome
         }
-        composeRule.onNodeWithText(SENDER_NAME, useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithText(SENDER_NAME, substring = true, useUnmergedTree = true).assertIsDisplayed()
         val groupBounds = composeRule.onNodeWithText(NOTIFIED_BODY).getUnclippedBoundsInRoot()
-        assertTrue(
-            "three-member transcript must reserve a logical-leading avatar gutter",
-            if (rtl) groupBounds.right < directBounds.right else groupBounds.left > directBounds.left,
+        assertEquals(
+            "three-member identity must keep the body's shared logical-leading edge",
+            if (rtl) directBounds.right.value else directBounds.left.value,
+            if (rtl) groupBounds.right.value else groupBounds.left.value,
+            0.5f,
         )
 
         routeGate.includeThirdMember.set(false)
@@ -508,7 +510,7 @@ class NotificationRouteTimelinePresentationScreenshotTest : NotificationRouteTim
         awaitCondition {
             mountedController.memberCount == 2 && mountedController.usesDirectTranscriptChrome
         }
-        composeRule.onNodeWithText(SENDER_NAME, useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithText(SENDER_NAME, substring = true, useUnmergedTree = true).assertDoesNotExist()
         composeRule
             .onNodeWithText(IdentityFormatter.initials(SENDER_NAME), useUnmergedTree = true)
             .assertDoesNotExist()
@@ -526,7 +528,7 @@ class NotificationRouteTimelinePresentationScreenshotTest : NotificationRouteTim
         )
         assertFalse(mountedController.transcriptPresentationNeedsRetry)
         composeRule.onNodeWithTag(PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE).assertIsDisplayed()
-        composeRule.onNodeWithText(SENDER_NAME, useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithText(SENDER_NAME, substring = true, useUnmergedTree = true).assertDoesNotExist()
     }
 }
 

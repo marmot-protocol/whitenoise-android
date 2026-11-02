@@ -13,6 +13,16 @@
           "CON-002"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Actual body hit bounds preserve sender profile and row gesture ownership",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageSenderLabel.kt",
+        "anchor": "fun Modifier.messageBodyHitBoundary(",
+        "test_ids": [
+          "MSG-045"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

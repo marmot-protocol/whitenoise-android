@@ -140,6 +140,15 @@ class MessageSenderLabelCoverageTest {
                 }
             }
         }
+        assertCompactGeometry(loaded, title)
+        composeRule.onNodeWithTag("comparison").captureRoboImage("src/test/snapshots/$name.png")
+    }
+
+    /** Compares the real inline identity with the unchanged plain-name control and its body gap. */
+    private fun assertCompactGeometry(
+        loaded: Boolean,
+        title: String,
+    ) {
         val control = bounds("control")
         val identity = bounds("identity")
         val avatar = bounds(MESSAGE_SENDER_AVATAR_TAG)
@@ -174,7 +183,6 @@ class MessageSenderLabelCoverageTest {
             0,
             composeRule.onAllNodesWithText("M", useUnmergedTree = false).fetchSemanticsNodes().size,
         )
-        composeRule.onNodeWithTag("comparison").captureRoboImage("src/test/snapshots/$name.png")
     }
 
     @Test fun cachedBitmapReplacementUpdatesTheExistingInlineAvatar() {

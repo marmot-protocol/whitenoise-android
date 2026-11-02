@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -91,3 +92,13 @@ internal fun MessageSenderLabel(
             ),
     )
 }
+
+/** Lets actual body bounds outrank an expanded profile target without consuming row or text gestures. */
+internal fun Modifier.messageBodyHitBoundary(): Modifier =
+    pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) {
+                awaitPointerEvent()
+            }
+        }
+    }

@@ -524,6 +524,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
     record: AppMessageRecordFfi,
     controller: ConversationController,
     appState: WhiteNoiseAppState,
+    modifier: Modifier = Modifier,
     eventCardResolver: NostrEventCardResolver? = null,
     bodyText: String?,
     bodyMarkdownDocument: MarkdownDocumentFfi? = null,
@@ -871,9 +872,11 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
             )
         }
         val bodyModifier =
-            messageBubbleBodyModifier(
-                hasReplyPreview = replyPreviewPresent,
-                hasMedia = hasMedia,
+            modifier.then(
+                messageBubbleBodyModifier(
+                    hasReplyPreview = replyPreviewPresent,
+                    hasMedia = hasMedia,
+                ),
             )
         // Read after the body measures: its first onTextLayout already owns the
         // last-line metrics in this pass, before a recomposition can capture them.

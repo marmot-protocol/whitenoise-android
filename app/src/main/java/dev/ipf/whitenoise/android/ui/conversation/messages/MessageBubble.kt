@@ -2251,6 +2251,12 @@ internal fun MessageBubble(
                  * shared media card when media is present, or as the first child
                  * of the text-only bubble otherwise.
                  */
+                val senderBodyHitModifier =
+                    if (showSenderName && !selectionMode && !textSelectionMode) {
+                        Modifier.messageBodyHitBoundary()
+                    } else {
+                        Modifier
+                    }
                 val senderNameLabel: @Composable (insideBubble: Boolean) -> Unit = { insideBubble ->
                     if (showSenderName) {
                         MessageSenderLabel(
@@ -2266,7 +2272,7 @@ internal fun MessageBubble(
                                 },
                             modifier =
                                 Modifier.combinedClickable(
-                                    enabled = !textSelectionMode,
+                                    enabled = !selectionMode && !textSelectionMode,
                                     onClick = { appState.presentProfile(appState.npub(record.sender)) },
                                     onLongClick = {
                                         if (!deleted && !selectionMode && !textSelectionMode) {
@@ -2414,7 +2420,7 @@ internal fun MessageBubble(
                             controller,
                             appState,
                             canVote = !actionsReadOnly && !selectionMode,
-                            modifier = Modifier.testTag("poll-message-card"),
+                            modifier = Modifier.testTag("poll-message-card").then(senderBodyHitModifier),
                             footer = {
                                 Column(horizontalAlignment = Alignment.End) {
                                     invalidationWarning?.let { warning ->
@@ -2455,7 +2461,7 @@ internal fun MessageBubble(
                         replyPreviewCard(false)
                         if (bodyOrWarningInsideBubble) {
                             MediaCaptionFrame(
-                                modifier = actionAnchorBoundsModifier,
+                                modifier = actionAnchorBoundsModifier.then(senderBodyHitModifier),
                                 presentation = bubblePresentation,
                                 highlighted = highlighted,
                                 mine = mine,
@@ -2544,7 +2550,7 @@ internal fun MessageBubble(
                             }
                         } else {
                             MediaCaptionFrame(
-                                modifier = actionAnchorBoundsModifier,
+                                modifier = actionAnchorBoundsModifier.then(senderBodyHitModifier),
                                 presentation = bubblePresentation,
                                 highlighted = highlighted,
                                 mine = mine,
@@ -2673,6 +2679,7 @@ internal fun MessageBubble(
                         senderNameLabel(true)
                         replyPreviewCard(true)
                         BubbleBodyFooterAndRetry(
+                            modifier = senderBodyHitModifier,
                             item = item,
                             record = record,
                             controller = controller,

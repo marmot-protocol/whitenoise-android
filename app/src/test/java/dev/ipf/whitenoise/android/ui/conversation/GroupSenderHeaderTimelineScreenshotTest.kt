@@ -19,11 +19,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
@@ -271,6 +273,32 @@ class GroupSenderHeaderTimelineScreenshotTest : MessageBubbleFileAttachmentFixtu
             1024,
         )
         render(listOf(item), app, controller, preserveSeededMedia = true)
+        val sourceView = openRecordedMediaAction()
+        val identity = composeRule.onNodeWithTag("message-actions-sender-identity", useUnmergedTree = true)
+        val preview = composeRule.onNodeWithTag("message-actions-preview", useUnmergedTree = true)
+        val layouts = mutableListOf<TextLayoutResult>()
+        identity.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertEquals(
+            "outside identity uses the author color, including a dark custom caption bubble",
+            checkNotNull(expectedAuthorArgb),
+            layouts
+                .single()
+                .layoutInput.style.color
+                .toArgb(),
+        )
+        val previewNode = preview.fetchSemanticsNode()
+        val identityNode = identity.fetchSemanticsNode()
+        val popupPixels = captureAttachedFocusedPopup(previewNode, identityNode, sourceView)
+        val previewBounds = previewNode.boundsInRoot
+        val identityBounds = identityNode.boundsInRoot
+        verifiedFocusedMediaCrop(popupPixels, previewBounds, identityBounds)
+            .captureRoboImage(
+                "src/test/snapshots/group_sender_focused_${if (customColor) "custom_caption" else "uncaptioned"}.png",
+            )
+    }
+
+    /** Opens the genuine row action and submits the source draw that records its retained media layer. */
+    private fun openRecordedMediaAction(): View {
         val sourceImage = composeRule.onNodeWithContentDescription("focus.jpg")
         val sourcePixels = sourceImage.captureToImage().asAndroidBitmap()
         assertTrue(
@@ -295,20 +323,15 @@ class GroupSenderHeaderTimelineScreenshotTest : MessageBubbleFileAttachmentFixtu
         }
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.waitForIdle()
-        val identity = composeRule.onNodeWithTag("message-actions-sender-identity", useUnmergedTree = true)
-        val preview = composeRule.onNodeWithTag("message-actions-preview", useUnmergedTree = true)
-        val layouts = mutableListOf<TextLayoutResult>()
-        identity.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
-        assertEquals(
-            "outside identity uses the author color, including a dark custom caption bubble",
-            checkNotNull(expectedAuthorArgb),
-            layouts
-                .single()
-                .layoutInput.style.color
-                .toArgb(),
-        )
-        val previewNode = preview.fetchSemanticsNode()
-        val identityNode = identity.fetchSemanticsNode()
+        return sourceView
+    }
+
+    /** Captures the attached popup owner after verifying that its sender and preview share that owner. */
+    private fun captureAttachedFocusedPopup(
+        previewNode: SemanticsNode,
+        identityNode: SemanticsNode,
+        sourceView: View,
+    ): Bitmap {
         val composeView = checkNotNull(previewNode.root as? View)
         assertTrue("the lifted preview has its own attached native owner", composeView !== sourceView)
         assertTrue("identity and media must belong to the same native popup", identityNode.root === previewNode.root)
@@ -319,8 +342,15 @@ class GroupSenderHeaderTimelineScreenshotTest : MessageBubbleFileAttachmentFixtu
         assertTrue("the popup has a measured raster", composeView.width > 0 && composeView.height > 0)
         val popupPixels = Bitmap.createBitmap(composeView.width, composeView.height, Bitmap.Config.ARGB_8888)
         composeRule.runOnUiThread { composeView.draw(Canvas(popupPixels)) }
-        val previewBounds = previewNode.boundsInRoot
-        val identityBounds = identityNode.boundsInRoot
+        return popupPixels
+    }
+
+    /** Requires visible retained media and author pixels in the expected order before cropping the preview. */
+    private fun verifiedFocusedMediaCrop(
+        popupPixels: Bitmap,
+        previewBounds: Rect,
+        identityBounds: Rect,
+    ): Bitmap {
         val left = floor(previewBounds.left).toInt().coerceAtLeast(0)
         val top = floor(previewBounds.top).toInt().coerceAtLeast(0)
         val right = ceil(previewBounds.right).toInt().coerceAtMost(popupPixels.width)
@@ -350,11 +380,51 @@ class GroupSenderHeaderTimelineScreenshotTest : MessageBubbleFileAttachmentFixtu
             "senderBottom=${identityBounds.bottom}, firstImageRootY=$firstImageY; sender must be above retained media",
             identityBounds.bottom <= checkNotNull(firstImageY),
         )
-        Bitmap
-            .createBitmap(popupPixels, left, top, right - left, bottom - top)
-            .captureRoboImage(
-                "src/test/snapshots/group_sender_focused_${if (customColor) "custom_caption" else "uncaptioned"}.png",
+        return Bitmap.createBitmap(popupPixels, left, top, right - left, bottom - top)
+    }
+
+    @Test fun captionedMediaFramePaddingKeepsItsOwnTouchOwnership() {
+        checkMediaFrameTouchOwnership("A picture caption.")
+    }
+
+    @Test fun bareMediaFramePaddingKeepsItsOwnTouchOwnership() = checkMediaFrameTouchOwnership("")
+
+    /** The passive frame inset must beat the header's expanded hit target without taking row holds. */
+    private fun checkMediaFrameTouchOwnership(caption: String) {
+        val app = appState()
+        val item = fileTimelineMessage(18, "frame.jpg", mediaType = "image/jpeg", caption = caption)
+        val controller = controller(app)
+        controller.cacheThumbnail(item.record.messageIdHex, 0, landscape(), 1024)
+        render(listOf(item), app, controller, preserveSeededMedia = true)
+        val header = composeRule.onNodeWithText("Maya Reed", substring = true)
+        val column = composeRule.onNodeWithTag(messageBubbleColumnTestTag(item.record.messageIdHex))
+        val headerTouch = header.fetchSemanticsNode().touchBoundsInRoot
+        val columnBounds = column.fetchSemanticsNode().boundsInRoot
+        val image = composeRule.onNodeWithContentDescription("frame.jpg").fetchSemanticsNode().boundsInRoot
+        val point =
+            Offset(
+                (
+                    maxOf(headerTouch.left, columnBounds.left) +
+                        minOf(headerTouch.right, columnBounds.right)
+                ) / 2,
+                image.top - 3f,
             )
+        assertTrue("probe is in the passive six-pixel frame inset", point.y > image.top - 6f && point.y < image.top)
+        assertTrue("probe reaches real expanded profile overlap", headerTouch.contains(point))
+        assertTrue("probe stays in the message column", columnBounds.contains(point))
+        header.performTouchInput { click() }
+        composeRule.runOnIdle {
+            assertEquals(app.npub(senderId), app.pendingProfileNpub)
+            app.clearPresentedProfile()
+        }
+        val local = point - columnBounds.topLeft
+        column.performTouchInput { click(local) }
+        composeRule.runOnIdle { assertNull("frame padding cannot activate the sender", app.pendingProfileNpub) }
+        column.performTouchInput { longClick(local) }
+        composeRule.runOnIdle {
+            assertEquals("the row owns a hold on passive frame padding", 1, openedMenus)
+            assertNull(app.pendingProfileNpub)
+        }
     }
 
     @Test fun existingHeaderReceivesLateProfilePictureSourceChanges() {
@@ -386,6 +456,15 @@ class GroupSenderHeaderTimelineScreenshotTest : MessageBubbleFileAttachmentFixtu
             assertEquals(app.npub(senderId), app.pendingProfileNpub)
             app.clearPresentedProfile()
         }
+        header.performTouchInput { click() }
+        composeRule.runOnIdle {
+            assertEquals(
+                "the physical header target still opens the profile",
+                app.npub(senderId),
+                app.pendingProfileNpub,
+            )
+            app.clearPresentedProfile()
+        }
         val body = composeRule.onNodeWithText(LONG_MESSAGE, substring = true, useUnmergedTree = true)
         val bodyBounds = body.fetchSemanticsNode().boundsInRoot
         val profileTouch = header.fetchSemanticsNode().touchBoundsInRoot
@@ -413,7 +492,7 @@ class GroupSenderHeaderTimelineScreenshotTest : MessageBubbleFileAttachmentFixtu
         render(rows, app, controller(app), selection = true)
         val column =
             composeRule
-                .onNodeWithTag(messageBubbleColumnTestTag(rows.single().record.messageIdHex))
+                .onNodeWithTag(messageBubbleColumnTestTag(rows.single().record.messageIdHex), useUnmergedTree = true)
                 .getUnclippedBoundsInRoot()
         assertEquals(
             "only the actual selection lane is withheld from wide group text",
@@ -421,9 +500,14 @@ class GroupSenderHeaderTimelineScreenshotTest : MessageBubbleFileAttachmentFixtu
             (column.right - column.left).value,
             1f,
         )
-        composeRule.onNodeWithText(LONG_MESSAGE, substring = true, useUnmergedTree = true).performClick()
+        composeRule.onNodeWithText(LONG_MESSAGE, substring = true, useUnmergedTree = true).performTouchInput { click() }
         composeRule.runOnIdle {
-            assertEquals(1, selectionToggles)
+            assertEquals("a physical body tap belongs to row selection", 1, selectionToggles)
+            assertNull(app.pendingProfileNpub)
+        }
+        composeRule.onNodeWithText("Maya Reed", substring = true, useUnmergedTree = true).performTouchInput { click() }
+        composeRule.runOnIdle {
+            assertEquals("a physical header tap also belongs to row selection", 2, selectionToggles)
             assertNull(app.pendingProfileNpub)
         }
     }

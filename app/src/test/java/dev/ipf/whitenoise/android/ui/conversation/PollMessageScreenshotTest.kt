@@ -6,11 +6,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -21,6 +28,7 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_ACTION_MENU_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_DETAILS_TAG
+import dev.ipf.whitenoise.android.ui.conversation.messages.MESSAGE_SENDER_AVATAR_TAG
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageDetailsScreen
 import dev.ipf.whitenoise.android.ui.conversation.reactions.REACTION_PILL_TEST_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -29,6 +37,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -48,6 +57,7 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
     @get:Rule val composeRule = createComposeRule(effectContext = UnconfinedTestDispatcher())
 
     private val originalTimeZone = TimeZone.getDefault()
+    private var openedMenuRequests = 0
 
     /** Message details include the zone ID, so pin the exact same ID as the committed baselines. */
     @Before fun bindRoster() {
@@ -90,6 +100,44 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
             PollScreenshotConfiguration(invalidation = "local_publish_failed"),
         )
 
+    /** A closed poll's passive top strip must not borrow the sender's expanded profile target. */
+    @Test fun closedPollCardKeepsSenderAndBodyTouchOwnersDistinct() {
+        render("touch_probe", PollScreenshotConfiguration(closed = true), captureScreenshot = false)
+        val header =
+            composeRule.onNode(
+                hasClickAction() and hasAnyDescendant(hasTestTag(MESSAGE_SENDER_AVATAR_TAG)),
+                useUnmergedTree = true,
+            )
+        val card = composeRule.onNodeWithTag("poll-message-card")
+        val touch = header.fetchSemanticsNode().touchBoundsInRoot
+        val bounds = card.fetchSemanticsNode().boundsInRoot
+        val left = maxOf(touch.left, bounds.left)
+        val right = minOf(touch.right, bounds.right)
+        val top = maxOf(touch.top, bounds.top)
+        val bottom = minOf(touch.bottom, bounds.bottom)
+        assertTrue(
+            "the probe must overlap the passive poll top and expanded profile target",
+            right > left && bottom > top,
+        )
+        val expected = pollState.npub(pollMessage(closed = true).record.sender)
+        assertTrue("the positive control has a real operational identity", expected.isNotBlank())
+        header.performTouchInput { click() }
+        composeRule.runOnIdle {
+            assertEquals(expected, pollState.pendingProfileNpub)
+            pollState.clearPresentedProfile()
+        }
+        val point = Offset((left + right) / 2 - bounds.left, (top + bottom) / 2 - bounds.top)
+        card.performTouchInput { click(point) }
+        composeRule.runOnIdle {
+            assertNull("passive poll content cannot activate the sender", pollState.pendingProfileNpub)
+        }
+        card.performTouchInput { longClick(point) }
+        composeRule.runOnIdle {
+            assertEquals("the row owns a hold on the closed poll", 1, openedMenuRequests)
+            assertNull(pollState.pendingProfileNpub)
+        }
+    }
+
     @Test fun pollInfoLight() {
         val item = pollMessage(closed = true)
         composeRule.setContent {
@@ -117,6 +165,7 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
     private fun render(
         name: String,
         configuration: PollScreenshotConfiguration = PollScreenshotConfiguration(),
+        captureScreenshot: Boolean = true,
     ) {
         val item =
             pollMessage(
@@ -142,7 +191,7 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
                     Surface(Modifier.width(360.dp).testTag("poll-discussion")) {
                         // Reaction pills overlap the footer; leave capture room for their full outline.
                         Column(Modifier.padding(bottom = 24.dp)) {
-                            RealPollMessage(warnedItem, configuration.menu) { }
+                            RealPollMessage(warnedItem, configuration.menu) { if (it) openedMenuRequests++ }
                             if (configuration.reply) {
                                 ComposerBar(
                                     replyingTo = item.record,
@@ -159,9 +208,11 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
             }
         }
         assertPollLayout(configuration)
-        composeRule
-            .onNodeWithTag(if (configuration.menu) MESSAGE_ACTION_MENU_TEST_TAG else "poll-discussion")
-            .captureRoboImage("src/test/snapshots/poll_message_$name.png")
+        if (captureScreenshot) {
+            composeRule
+                .onNodeWithTag(if (configuration.menu) MESSAGE_ACTION_MENU_TEST_TAG else "poll-discussion")
+                .captureRoboImage("src/test/snapshots/poll_message_$name.png")
+        }
     }
 
     private fun assertPollLayout(configuration: PollScreenshotConfiguration) {
