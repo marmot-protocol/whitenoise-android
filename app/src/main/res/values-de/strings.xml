@@ -2543,6 +2543,8 @@
     <string name="notification_tone_added">Hinzugefügt. Öffne unten eine Kategorie und dann „Ton“, um einen Ton auszuwählen. Auf manchen Geräten findest du sie unter „Meine Töne“.</string>
     <string name="notification_tone_add_failed">Die Töne konnten nicht hinzugefügt werden. Versuche es erneut oder behalte deinen aktuellen Android-Ton.</string>
     <string name="notification_tone_scope">Das Anhören oder Hinzufügen von Tönen ändert deine Benachrichtigungen nicht. Wähle in Android für jede Kategorie, Unterhaltung oder Person einen Ton aus. Unterhaltungen und Personen, denen ausdrücklich ein eigener Ton zugewiesen wurde, behalten diesen Ton. Neue Nachrichtenkategorien verwenden Ding; stumme und angepasste Kategorien bleiben unverändert. Vorschauen verwenden die Benachrichtigungslautstärke und beachten den Lautlosmodus und „Nicht stören“.</string>
+    <string name="notification_quiet_during_spoken_audio">Leise bei Podcasts</string>
+    <string name="notification_quiet_during_spoken_audio_detail">Nachrichten kommen ohne Ton und Vibration an, während eine andere App einen Podcast oder ein Hörbuch abspielt, damit die Wiedergabe weiterläuft. Erwähnungen melden sich weiterhin.</string>
     <string name="notification_tone_android">Android-Ton</string>
     <string name="notification_tone_silent">Lautlos</string>
     <string name="notification_tone_off">Aus</string>

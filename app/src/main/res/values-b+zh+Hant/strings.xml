@@ -2492,6 +2492,8 @@
     <string name="notification_tone_added">已新增。開啟下方的類別，然後選擇「音效」來選取提示音。部分裝置會將其列在「我的音效」中。</string>
     <string name="notification_tone_add_failed">無法新增提示音。請重試或保留目前的 Android 提示音。</string>
     <string name="notification_tone_scope">試聽或新增提示音不會變更通知提醒。請在 Android 中為每個類別、對話或聯絡人選擇聲音。已明確指定專屬聲音的對話和聯絡人會保留該聲音。新的訊息類別使用 Ding；靜音和自訂類別維持不變。試聽使用通知音量，並遵循靜音模式和勿擾模式。</string>
+    <string name="notification_quiet_during_spoken_audio">播客播放時靜音</string>
+    <string name="notification_quiet_during_spoken_audio_detail">當其他應用程式播放播客或有聲書時，訊息送達不響鈴也不震動，以免播放暫停。提及仍會提醒。</string>
     <string name="notification_tone_android">Android 提示音</string>
     <string name="notification_tone_silent">靜音</string>
     <string name="notification_tone_off">關閉</string>

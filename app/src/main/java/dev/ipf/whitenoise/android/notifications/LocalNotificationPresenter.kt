@@ -148,6 +148,7 @@ class LocalNotificationPresenter(
     },
     private val postPacer: NotificationPostPacer = NotificationPostPacer.shared,
     private val alertBudget: NotificationAlertBudget = NotificationAlertBudget(),
+    private val spokenAudioPlaying: () -> Boolean = { quietAlertForSpokenAudio(context) },
     private val dismissalRetryDelay: suspend () -> Unit = { delay(CONVERSATION_DISMISSAL_RETRY_DELAY_MS) },
     private val groupReconciliation: () -> Unit = { NotificationGroupReconciler.shared(context).request() },
     private val emojiArtworkPreparer: suspend (String, String?) -> NotificationEmojiArtifact? = { text, source ->
@@ -866,15 +867,23 @@ class LocalNotificationPresenter(
                 return false
             }
         val rawNotificationContent = formattedContent ?: return false
-        // A first post rings only if its catch-up cohort has not rung yet and no alert rang moments ago
-        // (#1579). The ring is held from here, so a concurrent first post for another conversation stays
+        // A first post rings only if its catch-up cohort has not rung yet, no alert rang moments ago
+        // (#1579) and, for a message that does not mention the reader, no other app is playing speech
+        // (#1717). The ring is held from here, so a concurrent first post for another conversation stays
         // silent, and handed back below if this card is never written. Enrichment rewrites arrive with
         // silentUpdate already set and never touch the budget.
         val alertReservation =
             if (silentUpdate) {
                 null
             } else {
-                alertBudget.reserve(nowMs = nowMillis(), isMention = update.isMention, accountRef = update.accountRef)
+                alertBudget.reserve(
+                    nowMs = nowMillis(),
+                    isMention = update.isMention,
+                    accountRef = update.accountRef,
+                    spokenAudioPlaying = {
+                        update.trigger == NotificationTriggerFfi.NEW_MESSAGE && spokenAudioPlaying()
+                    },
+                )
             }
         val heldAlert = alertReservation?.takeIf { it.decision == NotificationAlertDecision.Alert }
         val silentPost = silentUpdate || alertReservation?.decision?.silent == true

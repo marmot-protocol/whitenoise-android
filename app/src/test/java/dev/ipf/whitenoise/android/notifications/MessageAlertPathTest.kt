@@ -208,7 +208,7 @@ class MessageAlertPathTest {
             assertEquals(sound, manager.getNotificationChannel(second.channelId).sound)
         }
 
-    /** The diagnostic line names roles and the OS-channel policy, never an id or any content. */
+    /** The diagnostic line names roles, the OS-channel policy and the speech state, never an id or any content. */
     @Test
     fun diagnosticLineIsPrivacySafe() =
         runBlocking {
@@ -224,7 +224,7 @@ class MessageAlertPathTest {
                 ).line()
             assertEquals(
                 "alert_path route=messages_dm channel=conversation_child policy=os_channel silent_write=false " +
-                    "importance=4 channel_sound=on channel_vibration=on other_media=idle",
+                    "importance=4 channel_sound=on channel_vibration=on other_media=idle spoken_audio=idle",
                 line,
             )
             assertFalse(line.contains(card.channelId))
