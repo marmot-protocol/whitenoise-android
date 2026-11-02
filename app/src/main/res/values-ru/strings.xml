@@ -1752,6 +1752,27 @@
         <item quantity="many">Осталось ~%1$d с</item>
         <item quantity="other">Осталось ~%1$d с</item>
     </plurals>
+    <plurals name="tts_bar_minutes_remaining">
+        <item quantity="one">Осталось ~%1$d мин</item>
+        <item quantity="few">Осталось ~%1$d мин</item>
+        <item quantity="many">Осталось ~%1$d мин</item>
+        <item quantity="other">Осталось ~%1$d мин</item>
+    </plurals>
+    <string name="tts_bar_minutes_seconds_remaining">Осталось ~%1$d мин %2$d с</string>
+    <string name="tts_bar_remaining_spoken">Осталось примерно %1$s</string>
+    <plurals name="tts_bar_spoken_minutes">
+        <item quantity="one">%1$d минута</item>
+        <item quantity="few">%1$d минуты</item>
+        <item quantity="many">%1$d минут</item>
+        <item quantity="other">%1$d минуты</item>
+    </plurals>
+    <plurals name="tts_bar_spoken_seconds">
+        <item quantity="one">%1$d секунда</item>
+        <item quantity="few">%1$d секунды</item>
+        <item quantity="many">%1$d секунд</item>
+        <item quantity="other">%1$d секунды</item>
+    </plurals>
+    <string name="tts_bar_spoken_minutes_seconds">%1$s %2$s</string>
     <string name="tts_bar_stop">Остановить чтение</string>
     <string name="tts_bar_return_to_source">Вернуться к озвученному сообщению</string>
     <string name="tts_source_unavailable">Озвученное сообщение больше недоступно</string>

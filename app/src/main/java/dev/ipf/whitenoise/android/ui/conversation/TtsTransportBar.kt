@@ -25,13 +25,14 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -257,16 +258,16 @@ private fun TtsTransportProgress(
             when {
                 isError -> Text(stringResource(R.string.tts_bar_error), color = MaterialTheme.colorScheme.error)
                 isPreparing -> Text(stringResource(R.string.tts_bar_preparing))
-                remainingSeconds != null ->
+                remainingSeconds != null -> {
+                    val resources = LocalResources.current
+                    val description = ttsRemainingDescription(resources, remainingSeconds)
                     Text(
-                        pluralStringResource(
-                            R.plurals.tts_bar_seconds_remaining,
-                            remainingSeconds,
-                            remainingSeconds,
-                        ),
+                        ttsRemainingLabel(resources, remainingSeconds),
+                        modifier = Modifier.semantics { contentDescription = description },
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
             }
         }
     }
