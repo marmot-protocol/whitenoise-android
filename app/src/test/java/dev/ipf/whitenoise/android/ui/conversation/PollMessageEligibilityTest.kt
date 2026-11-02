@@ -95,6 +95,7 @@ class PollMessageEligibilityTest : PollMessageTestFixtures() {
         assertNull(resolveTtsSpeakableSource(item.record, editedText = null))
     }
 
+    /** Reply-target and received reply-quote previews of a poll use the localized poll copy. */
     @Test fun composerAndReceivedQuoteUseLocalizedPollCopy() {
         val item = pollMessage()
         val projected = checkNotNull(item.projected)
@@ -117,6 +118,7 @@ class PollMessageEligibilityTest : PollMessageTestFixtures() {
                         deleted = false,
                         deletionSource = DeletionSourceFfi.UNKNOWN,
                         invalidationStatus = null,
+                        sticker = null,
                     ),
             )
         assertEquals("Localized poll", TimelineProjector.replyPreview(reply, copy)?.body)

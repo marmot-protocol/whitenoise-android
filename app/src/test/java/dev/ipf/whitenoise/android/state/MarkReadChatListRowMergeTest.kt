@@ -228,6 +228,7 @@ class MarkReadChatListRowMergeTest {
     private val idA = "a".repeat(64)
     private val idB = "b".repeat(64)
 
+    /** Builds a chat list row with the given last message, unread counts and read marker. */
     private fun row(
         messageId: String = "msg",
         lastMessageAt: ULong,
@@ -271,6 +272,7 @@ class MarkReadChatListRowMergeTest {
                     attachmentCount = 0u,
                     groupSystem = null,
                     deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                    sticker = null,
                 )
             } else {
                 null

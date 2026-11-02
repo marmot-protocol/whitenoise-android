@@ -233,6 +233,7 @@ class AtomicAdminInviteTest {
         var onPeerResolution: () -> Unit = {}
         var afterCommit: suspend () -> Unit = {}
 
+        /** Replaces the current snapshot with a newer roster that adds the other member and makes the peer an admin. */
         fun publishNewerRoster() {
             current = snapshot(listOf(SELF, PEER, OTHER), listOf(SELF, PEER))
         }
@@ -251,7 +252,7 @@ class AtomicAdminInviteTest {
                     }
                     if (ref == ACCOUNT) SELF else ref
                 },
-                accounts = listOf(AccountSummaryFfi(ACCOUNT, SELF, true, false, false, true)),
+                accounts = listOf(AccountSummaryFfi(ACCOUNT, SELF, true, false, false, true, false)),
                 activeAccountRef = ACCOUNT,
             )
         val controller: ConversationController =

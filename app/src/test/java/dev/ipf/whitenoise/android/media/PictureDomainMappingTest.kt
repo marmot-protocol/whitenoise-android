@@ -70,6 +70,7 @@ class PictureDomainMappingTest {
             isFromSelf = false,
             reactionEmoji = null,
             reactedToPreview = null,
+            sticker = null,
         )
 
     private companion object {

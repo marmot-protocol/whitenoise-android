@@ -251,6 +251,7 @@ class SelectedMembersReviewScreenTest {
         assertEquals(0, changes)
     }
 
+    /** Builds an app state with alice as the active account. */
     private fun appState() =
         WhiteNoiseAppState(
             context = context,
@@ -265,6 +266,7 @@ class SelectedMembersReviewScreenTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = "alice",

@@ -58,6 +58,7 @@ class NewGroupSetupScreenTest {
             activeAccountRef = ACCOUNT_REF,
         )
 
+    /** Builds the running local-signing active account summary. */
     private fun activeAccount() =
         AccountSummaryFfi(
             label = ACCOUNT_REF,
@@ -66,6 +67,7 @@ class NewGroupSetupScreenTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private companion object {

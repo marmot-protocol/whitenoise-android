@@ -807,6 +807,7 @@ class MessageProjectorTest {
         open = true,
     )
 
+    /** Builds a message record with overridable direction, sender, text, kind, tags, time and expiry. */
     private fun message(
         id: String,
         direction: String = "received",
@@ -830,6 +831,7 @@ class MessageProjectorTest {
         retentionExpiresAt = retentionExpiresAt,
         recordedAt = at.toULong(),
         receivedAt = at.toULong(),
+        sticker = null,
     )
 
     @Test

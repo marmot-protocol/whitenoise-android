@@ -86,6 +86,7 @@ class ProfileSheetMessageActionTest {
         return appState
     }
 
+    /** Builds the running, locally signing active account summary. */
     private fun activeAccount() =
         AccountSummaryFfi(
             label = ACTIVE_ACCOUNT_REF,
@@ -94,6 +95,7 @@ class ProfileSheetMessageActionTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private class EmptyDraftPersistence : DraftPersistence {

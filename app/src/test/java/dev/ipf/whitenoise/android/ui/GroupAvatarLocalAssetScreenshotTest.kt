@@ -1345,7 +1345,7 @@ private class AvatarLocalFixture(
                     },
                 ),
             accountIdHexResolver = { ACCOUNT_ID },
-            accounts = listOf(AccountSummaryFfi(ACCOUNT_REF, ACCOUNT_ID, true, false, false, true)),
+            accounts = listOf(AccountSummaryFfi(ACCOUNT_REF, ACCOUNT_ID, true, false, false, true, false)),
             activeAccountRef = ACCOUNT_REF,
             initialMarmotRuntime = if (withRuntime) AppMarmotRuntime("local-avatar-test", native) else null,
         )

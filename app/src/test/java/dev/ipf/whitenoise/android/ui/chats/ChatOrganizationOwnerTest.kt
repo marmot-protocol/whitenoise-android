@@ -144,6 +144,7 @@ internal fun chatOrganizationAppState(context: Context): WhiteNoiseAppState =
                     externalSigning = false,
                     signedOut = false,
                     running = true,
+                    unlinked = false,
                 ),
             ),
         activeAccountRef = "alice",

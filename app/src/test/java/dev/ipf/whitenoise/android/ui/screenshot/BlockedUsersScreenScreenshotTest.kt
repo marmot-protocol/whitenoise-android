@@ -41,6 +41,7 @@ class BlockedUsersScreenScreenshotTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = "acct",

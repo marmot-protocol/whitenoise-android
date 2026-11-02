@@ -78,6 +78,7 @@ class ChatListStartupTest {
         assertFalse(controller.hasLoadedLocalSnapshot)
     }
 
+    /** Builds a chats controller for a single-account app state that returns no chat rows. */
     private fun controller(): ChatsController {
         val appState =
             WhiteNoiseAppState(
@@ -93,6 +94,7 @@ class ChatListStartupTest {
                             externalSigning = false,
                             signedOut = false,
                             running = true,
+                            unlinked = false,
                         ),
                     ),
                 activeAccountRef = ACCOUNT_REF,

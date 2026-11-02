@@ -71,7 +71,7 @@ class ChatFolderManageRouteTest {
                 context,
                 DraftStore.forContext(context),
                 { null },
-                listOf(AccountSummaryFfi("a", "aa".repeat(32), true, false, false, true)),
+                listOf(AccountSummaryFfi("a", "aa".repeat(32), true, false, false, true, false)),
                 "a",
                 profileReader = { null },
                 profileRefreshRequest = {},

@@ -116,6 +116,7 @@ class ProfileSheetEntryPointTest {
         return appState
     }
 
+    /** Returns the running active account summary for the profile sheet. */
     private fun activeAccount() =
         AccountSummaryFfi(
             label = ACTIVE_ACCOUNT_REF,
@@ -124,6 +125,7 @@ class ProfileSheetEntryPointTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private class EmptyDraftPersistence : DraftPersistence {

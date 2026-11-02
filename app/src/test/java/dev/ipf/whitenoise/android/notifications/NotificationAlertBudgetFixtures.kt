@@ -32,6 +32,7 @@ internal fun alertBudgetUpdate(
     reactedToPreview = null,
     timestampMs = timestampMs,
     isFromSelf = false,
+    sticker = null,
 )
 
 /** True when the card was written with the flag that suppresses a repeated sound or vibration. */

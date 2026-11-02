@@ -171,6 +171,8 @@ class ConversationRetentionPolicyTransitionTest {
             sourceEpoch = null,
             retentionSeconds = retentionSeconds,
             retentionExpiresAt = retentionExpiresAt,
+            sticker = null,
+            importedFrom = null,
         )
 
     /** Supplies the minimum account-owned state required by the controller. */
@@ -188,6 +190,7 @@ class ConversationRetentionPolicyTransitionTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,

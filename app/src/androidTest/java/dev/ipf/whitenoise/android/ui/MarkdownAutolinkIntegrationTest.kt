@@ -64,6 +64,7 @@ class MarkdownAutolinkIntegrationTest {
         ).single()
     }
 
+    /** Builds an optimistic sent record carrying the given text and markdown document. */
     private fun optimisticRecord(
         text: String,
         document: dev.ipf.marmotkit.MarkdownDocumentFfi,
@@ -81,8 +82,10 @@ class MarkdownAutolinkIntegrationTest {
         retentionExpiresAt = null,
         recordedAt = 1uL,
         receivedAt = 1uL,
+        sticker = null,
     )
 
+    /** Builds the confirmed timeline projection of a sent message with the given text and markdown document. */
     private fun projectedRecord(
         text: String,
         document: dev.ipf.marmotkit.MarkdownDocumentFfi,
@@ -116,5 +119,7 @@ class MarkdownAutolinkIntegrationTest {
         deletionSource = DeletionSourceFfi.UNKNOWN,
         deletedByMessageIdHex = null,
         invalidationStatus = null,
+        sticker = null,
+        importedFrom = null,
     )
 }

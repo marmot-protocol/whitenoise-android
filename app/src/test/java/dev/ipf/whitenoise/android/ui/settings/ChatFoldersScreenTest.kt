@@ -101,6 +101,7 @@ class ChatFoldersScreenTest {
         setter.invoke(controller, items)
     }
 
+    /** Returns the running active account summary for the chat folders screen. */
     private fun activeAccount() =
         AccountSummaryFfi(
             label = ACCOUNT_REF,
@@ -109,6 +110,7 @@ class ChatFoldersScreenTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private fun chatItem(groupIdHex: String): ChatListItem =

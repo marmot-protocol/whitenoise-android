@@ -131,6 +131,7 @@ class TtsSpeakableProjectionContractTest {
             blankLinesBefore = byteArrayOf(),
         )
 
+    /** Builds a received kind-9 message record with the given text and markdown tokens. */
     private fun message(
         plaintext: String,
         contentTokens: MarkdownDocumentFfi,
@@ -148,5 +149,6 @@ class TtsSpeakableProjectionContractTest {
         retentionExpiresAt = null,
         recordedAt = 1uL,
         receivedAt = 1uL,
+        sticker = null,
     )
 }

@@ -364,6 +364,7 @@ class NativePushFallbackIntentIntegrationTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     /** Builds the local/native-enabled setting that requires capability fallback. */

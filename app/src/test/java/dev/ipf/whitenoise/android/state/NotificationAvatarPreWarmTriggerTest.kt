@@ -132,6 +132,7 @@ class NotificationAvatarPreWarmTriggerTest {
         )
     }
 
+    /** Builds a notification update with the given DM flag, picture, trigger, reaction and sender. */
     private fun update(
         isDm: Boolean,
         pictureUrl: String?,
@@ -157,5 +158,6 @@ class NotificationAvatarPreWarmTriggerTest {
         reactedToPreview = null,
         timestampMs = 1L,
         isFromSelf = isFromSelf,
+        sticker = null,
     )
 }

@@ -289,6 +289,7 @@ class ConversationControllerAccountPinningTest {
         }
     }
 
+    /** Builds an app state holding the test accounts with the given account active. */
     private fun appState(activeAccountRef: String) =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext(),
@@ -303,6 +304,7 @@ class ConversationControllerAccountPinningTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                     AccountSummaryFfi(
                         label = TARGET_REF,
@@ -311,6 +313,7 @@ class ConversationControllerAccountPinningTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = activeAccountRef,

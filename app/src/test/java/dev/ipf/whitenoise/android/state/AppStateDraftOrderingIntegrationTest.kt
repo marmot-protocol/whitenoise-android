@@ -154,6 +154,7 @@ class AppStateDraftOrderingIntegrationTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     /** Wraps [gateway] with the dispatcher that controls summary completion order. */

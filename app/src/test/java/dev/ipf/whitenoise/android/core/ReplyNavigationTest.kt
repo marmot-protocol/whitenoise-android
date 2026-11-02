@@ -277,6 +277,7 @@ class ReplyNavigationTest {
             assertEquals(1, calls)
         }
 
+    /** Builds a received reply record with the given tags and kind. */
     private fun message(
         tags: List<MessageTagFfi> = emptyList(),
         kind: ULong = 9uL,
@@ -294,6 +295,7 @@ class ReplyNavigationTest {
         retentionExpiresAt = null,
         recordedAt = 1uL,
         receivedAt = 1uL,
+        sticker = null,
     )
 
     /** Creates a reply-navigation record with all native projection fields populated explicitly. */
@@ -334,6 +336,7 @@ class ReplyNavigationTest {
                     deleted = false,
                     deletionSource = DeletionSourceFfi.UNKNOWN,
                     invalidationStatus = null,
+                    sticker = null,
                 )
             },
         mediaJson = null,
@@ -350,5 +353,7 @@ class ReplyNavigationTest {
         sourceEpoch = null,
         retentionSeconds = null,
         retentionExpiresAt = null,
+        sticker = null,
+        importedFrom = null,
     )
 }

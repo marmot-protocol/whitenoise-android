@@ -58,7 +58,7 @@ internal class GroupEditGifFixture {
             context = context,
             draftStore = DraftStore(EmptyGifDraftPersistence()),
             accountIdHexResolver = { self },
-            accounts = listOf(AccountSummaryFfi(account, self, true, false, false, true)),
+            accounts = listOf(AccountSummaryFfi(account, self, true, false, false, true, false)),
             activeAccountRef = account,
             profileReader = { null },
             profileDisplayNameReader = { "Editor account" },

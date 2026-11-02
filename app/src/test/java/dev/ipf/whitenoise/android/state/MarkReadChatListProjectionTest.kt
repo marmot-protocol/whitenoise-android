@@ -214,6 +214,7 @@ class MarkReadChatListProjectionTest {
         lastReadMessageIdHex = readThroughId,
     )
 
+    /** Builds a member chat-list row with the given last message, unread count and read marker. */
     private fun chatRow(
         lastMessageId: String,
         unreadCount: ULong,
@@ -252,6 +253,7 @@ class MarkReadChatListProjectionTest {
                 attachmentCount = 0u,
                 groupSystem = null,
                 deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                sticker = null,
             ),
         unreadCount = unreadCount,
         hasUnread = unreadCount > 0uL,

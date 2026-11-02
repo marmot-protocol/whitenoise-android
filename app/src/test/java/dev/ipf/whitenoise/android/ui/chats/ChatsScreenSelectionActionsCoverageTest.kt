@@ -36,7 +36,10 @@ class ChatsScreenSelectionActionsCoverageTest {
         assertTrue("the viewport expires off-window return focus", "globalSearchReturnFocusExpiryEffect(" in source)
     }
 
-    /** Inline body failure keeps names available; request-only retry cannot settle the results viewport. */
+    /**
+     * Inline body failure keeps names available, request-only retry cannot settle the results viewport, and a failed
+     * attachment batch offers a retry that pages the account library again.
+     */
     @Test
     fun lookupFailureRetainsLocalRowsAndOffersRequestOnlyRetry() {
         val source = chatsScreenSource().readText()
@@ -50,19 +53,27 @@ class ChatsScreenSelectionActionsCoverageTest {
             "inline failure preserves retry controls",
             "InlineErrorBanner(" in stage && "onRetry = onRetry" in stage,
         )
+        val library = File(chatsScreenSource().parentFile, "GlobalAttachmentLibraryHost.kt").readText()
         assertTrue(
             "attachment failures have recoverable presentation",
-            "browsingAttachments && libraryFailure != null ->" in source,
+            "failed = failure != null," in library && "onRetry = loadMore," in library,
         )
         assertTrue("body retry renews the lookup only", "onRetry = { bodySearchRetry++ }" in source)
-        assertTrue("attachment retry renews the lookup only", "onRetry = { libraryRetry++ }" in source)
         assertTrue(
             "body lookup uses the cancellation-safe presenter",
             "rememberGlobalSearchLookup(bodySearchRequest" in source,
         )
         assertTrue(
-            "library lookup uses the cancellation-safe presenter",
-            "rememberGlobalSearchLookup(libraryRequest" in source,
+            "library pages come from the account pager",
+            "rememberGlobalAttachmentPager(" in source && "searchViewport?.libraryExtent," in source,
+        )
+        val session = File(chatsScreenSource().parentFile, "GlobalAttachmentLibrarySession.kt").readText()
+        assertTrue(
+            "the library names and opens archived and off-window chats, which the account index includes",
+            "rememberLibraryChats(controller, libraryEntries)" in source &&
+                "openSearchMessage(group, message, libraryChats)" in source &&
+                "controller.items + controller.archivedItems" in session &&
+                "controller.resolveChatListActionItem(group, owner)" in session,
         )
         assertTrue(
             "failed lookups cannot expire return focus as settled data",

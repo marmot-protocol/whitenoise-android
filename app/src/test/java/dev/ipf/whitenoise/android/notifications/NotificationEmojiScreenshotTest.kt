@@ -119,6 +119,7 @@ class NotificationEmojiScreenshotTest {
         }
     }
 
+    /** Posts a new-message notification with the given text, optionally redacted, and returns it. */
     private suspend fun post(
         text: String,
         redacted: Boolean = false,
@@ -148,6 +149,7 @@ class NotificationEmojiScreenshotTest {
                 isMention = false,
                 reactionEmoji = null,
                 reactedToPreview = null,
+                sticker = null,
             )
         val artifact = if (redacted) null else notificationEmojiArtwork(context, text)
         val presenter =

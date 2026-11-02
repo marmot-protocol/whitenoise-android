@@ -266,8 +266,8 @@ class ImportedIdentitySetupRoutingTest {
         val profileRequests = ConcurrentLinkedQueue<String>()
         val openedSubscriptions = AtomicInteger()
         val closedSubscriptions = AtomicInteger()
-        private val existing = AccountSummaryFfi("existing", "aa".repeat(32), true, false, false, true)
-        val imported = AccountSummaryFfi("bb".repeat(32), "bb".repeat(32), !amber, amber, false, true)
+        private val existing = AccountSummaryFfi("existing", "aa".repeat(32), true, false, false, true, false)
+        val imported = AccountSummaryFfi("bb".repeat(32), "bb".repeat(32), !amber, amber, false, true, false)
         var pending = setupSnapshot(actions = emptyList()).copy(accountIdHex = imported.label)
         val accountList get() = listOf(existing, imported)
 
@@ -292,6 +292,8 @@ class ImportedIdentitySetupRoutingTest {
                             keyPackagesDeleted = 0u,
                             keyPackageFailures = emptyList(),
                             localCleanup = dev.ipf.marmotkit.LocalCleanupReportFfi(false, "scripted retained runtime"),
+                            groupsLeftToSiblings = 0u,
+                            siblingsNotReached = false,
                         )
                     "listAccounts" -> {
                         val reply = accountsReply

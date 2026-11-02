@@ -767,6 +767,7 @@ abstract class NotificationDelayedRosterFixture {
         externalSigning = false,
         signedOut = false,
         running = true,
+        unlinked = false,
     )
 }
 
@@ -917,6 +918,7 @@ private fun delayedRosterFreshTargetUpdate() =
         reactedToPreview = null,
         timestampMs = 1_982L,
         isFromSelf = false,
+        sticker = null,
     )
 
 /** Builds a complete authoritative page in the exact order supplied by the live source. */

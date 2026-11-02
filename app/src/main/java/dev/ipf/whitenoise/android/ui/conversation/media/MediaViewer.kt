@@ -158,7 +158,8 @@ internal suspend fun attachmentBytes(
 // viewer (one fixed messageIdHex + mine for the whole pager), each page now
 // carries its own message context so the pager can span attachments from
 // different messages — the cross-message gallery the shared-media grids open.
-// The save/share/decrypt paths read the CURRENT page's descriptor.
+// The save/share/decrypt paths read the CURRENT page's descriptor. A page from another chat (the
+// account-wide library, #2000) names its group, so equal message IDs in two chats stay distinct.
 internal data class MediaViewerPage(
     val messageIdHex: String,
     val attachmentIndex: Int,
@@ -166,6 +167,7 @@ internal data class MediaViewerPage(
     val mine: Boolean,
     val sender: String,
     val recordedAt: ULong,
+    val groupIdHex: String? = null,
 )
 
 /** Exact visible-page identity handed to the external Android sharing boundary. */
@@ -184,11 +186,17 @@ internal data class MediaViewerGallery(
 private data class MediaViewerPageKey(
     val messageIdHex: String,
     val attachmentIndex: Int,
+    val groupIdHex: String?,
 )
 
-private fun MediaViewerPage.key(): MediaViewerPageKey = MediaViewerPageKey(messageIdHex, attachmentIndex)
+/** The pager's page identity: message slot, plus the chat for a page that names one. */
+private fun MediaViewerPage.key(): MediaViewerPageKey = MediaViewerPageKey(messageIdHex, attachmentIndex, groupIdHex)
 
-private fun MediaViewerPage.saveableKey(): String = "${messageIdHex.length}:$messageIdHex:$attachmentIndex"
+/** The saveable pager key; a single-chat page keeps its existing form, a cross-chat page adds its group. */
+private fun MediaViewerPage.saveableKey(): String {
+    val slot = "${messageIdHex.length}:$messageIdHex:$attachmentIndex"
+    return groupIdHex?.let { "$slot:$it" } ?: slot
+}
 
 internal data class MediaViewerPagerSelection(
     val pagerState: PagerState,
@@ -396,7 +404,9 @@ internal fun ConversationMediaViewer(
 
 /**
  * Presents the media pager and reports its settled logical page without owning conversation
- * lifetime. The caller decides when a viewer generation is created or dismissed.
+ * lifetime. The caller decides when a viewer generation is created or dismissed. [pageController]
+ * supplies each page's own chat when the gallery spans chats; the group-picture action is offered
+ * only for pages of [controller]'s chat, judged by the page's group rather than controller identity.
  */
 @Composable
 @Suppress("FunctionNaming", "LongParameterList", "LongMethod", "CyclomaticComplexMethod")
@@ -415,6 +425,7 @@ internal fun FullScreenMediaViewer(
     imageBytes: (suspend (MediaViewerPage) -> ByteArray)? = null,
     thumbnails: MediaViewerThumbnailRegistry? = null,
     icons: MediaViewerChromeIcons = rememberMediaViewerChromeIconProvider().value,
+    pageController: (MediaViewerPage) -> ConversationController = { controller },
 ) {
     if (pages.isEmpty()) {
         // Defensive — callers shouldn't open an empty viewer, but guard so the
@@ -621,7 +632,8 @@ internal fun FullScreenMediaViewer(
                         }
                     },
                 onSetGroupPicture =
-                    if (canSetViewerGroupPicture(
+                    if (currentPage.groupIdHex.let { it == null || it.equals(controller.group.groupIdHex, true) } &&
+                        canSetViewerGroupPicture(
                             controller.isDm,
                             controller.isSelfMember,
                             controller.isSelfAdmin,
@@ -658,6 +670,7 @@ internal fun FullScreenMediaViewer(
                     val attachmentIndex = currentAttachmentIndex
                     val msgId = currentMessageIdHex
                     val owned = currentMine
+                    val controller = pageController(currentPage)
                     scope.launch {
                         val outcome =
                             runCatchingCancellable {
@@ -698,6 +711,7 @@ internal fun FullScreenMediaViewer(
                     }
                 },
                 onShare = {
+                    val controller = pageController(currentPage)
                     val request =
                         MediaViewerShareRequest(
                             messageIdHex = currentMessageIdHex,
@@ -779,7 +793,7 @@ internal fun FullScreenMediaViewer(
                 ) { pageDescriptor, isCurrent ->
                     if (MediaReferenceSupport.isVideoMedia(pageDescriptor.reference)) {
                         VideoViewerPage(
-                            controller = controller,
+                            controller = pageController(pageDescriptor),
                             messageIdHex = pageDescriptor.messageIdHex,
                             attachmentIndex = pageDescriptor.attachmentIndex,
                             reference = pageDescriptor.reference,
@@ -793,7 +807,7 @@ internal fun FullScreenMediaViewer(
                         )
                     } else {
                         ViewerPage(
-                            controller = controller,
+                            controller = pageController(pageDescriptor),
                             messageIdHex = pageDescriptor.messageIdHex,
                             attachmentIndex = pageDescriptor.attachmentIndex,
                             reference = pageDescriptor.reference,

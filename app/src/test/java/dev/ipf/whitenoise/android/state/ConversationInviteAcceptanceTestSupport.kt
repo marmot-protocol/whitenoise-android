@@ -172,6 +172,7 @@ internal object InviteAcceptanceTestData {
         externalSigning = false,
         signedOut = false,
         running = true,
+        unlinked = false,
     )
 
     /** Builds a roster whose count and self-membership are internally consistent. */

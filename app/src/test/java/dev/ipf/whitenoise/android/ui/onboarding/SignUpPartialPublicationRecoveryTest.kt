@@ -283,7 +283,7 @@ class SignUpPartialPublicationRecoveryTest {
                         initialProfiles += profile
                         if (createFails) error("create failed")
                         beforeCreateReturn()
-                        AccountSummaryFfi("created", "11".repeat(32), true, false, false, true)
+                        AccountSummaryFfi("created", "11".repeat(32), true, false, false, true, false)
                     }
                 },
                 hasPendingIdentityReceipt = identityCoordinator::hasPendingReceipt,

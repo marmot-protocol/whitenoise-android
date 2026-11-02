@@ -190,6 +190,7 @@ class ConversationHeaderNicknameTest {
         externalSigning = false,
         signedOut = false,
         running = true,
+        unlinked = false,
     )
 
     /** One roster entry; [local] marks the viewing account's own membership. */

@@ -445,5 +445,6 @@ internal fun reactionArtworkUpdate(emoji: String): NotificationUpdateFfi {
         isMention = false,
         reactionEmoji = emoji,
         reactedToPreview = "Hello :wn:",
+        sticker = null,
     )
 }

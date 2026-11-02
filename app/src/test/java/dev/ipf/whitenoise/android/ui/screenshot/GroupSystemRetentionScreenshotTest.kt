@@ -352,6 +352,7 @@ class GroupSystemRetentionScreenshotTest {
 
     private enum class WaveTheme { LIGHT, DARK, AMOLED, LARGE_RTL }
 
+    /** Builds an app state with the screenshot test account active. */
     private fun testAppState(): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,
@@ -366,11 +367,13 @@ class GroupSystemRetentionScreenshotTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,
         )
 
+    /** Builds a system record announcing the disappearing timer changing from off to five minutes. */
     private fun retentionChangeRecord() =
         AppMessageRecordFfi(
             messageIdHex = MESSAGE_ID,
@@ -393,6 +396,7 @@ class GroupSystemRetentionScreenshotTest {
             retentionExpiresAt = null,
             recordedAt = 100uL,
             receivedAt = 100uL,
+            sticker = null,
         )
 
     private fun retentionChangeEvent() =

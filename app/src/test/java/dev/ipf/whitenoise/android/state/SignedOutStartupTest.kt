@@ -205,5 +205,5 @@ class SignedOutStartupTest {
         label: String,
         signedOut: Boolean = false,
         external: Boolean = false,
-    ) = AccountSummaryFfi(label, label, !external, external, signedOut, false)
+    ) = AccountSummaryFfi(label, label, !external, external, signedOut, false, false)
 }

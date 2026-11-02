@@ -8,6 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SignOutOutcomeTest {
+    /** Builds a locally signing account summary, running unless signed out. */
     private fun account(
         label: String,
         signedOut: Boolean = false,
@@ -19,6 +20,7 @@ class SignOutOutcomeTest {
             externalSigning = false,
             signedOut = signedOut,
             running = !signedOut,
+            unlinked = false,
         )
 
     @Test
@@ -107,6 +109,7 @@ class ShouldResetNavOnAccountChangeTest {
 }
 
 class OtherAccountAvatarsTest {
+    /** Builds a running account summary with the given sign-out and signing flags. */
     private fun account(
         label: String,
         signedOut: Boolean = false,
@@ -120,6 +123,7 @@ class OtherAccountAvatarsTest {
             signedOut = signedOut,
             running = true,
             externalSigning = externalSigning,
+            unlinked = false,
         )
 
     @Test

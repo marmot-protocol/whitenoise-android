@@ -332,6 +332,7 @@ class GroupConversationSnapshotApplicationTest {
             }
         }
 
+    /** Builds a conversation controller whose group snapshot reads come from the given reader. */
     private fun controller(
         initialGroup: AppGroupRecordFfi = conversationTimelineTestGroup(),
         read: suspend () -> GroupConversationSnapshotFfi,
@@ -341,7 +342,7 @@ class GroupConversationSnapshotApplicationTest {
                 context = ApplicationProvider.getApplicationContext(),
                 draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
                 accountIdHexResolver = { SELF },
-                accounts = listOf(AccountSummaryFfi(ACCOUNT, SELF, true, false, false, true)),
+                accounts = listOf(AccountSummaryFfi(ACCOUNT, SELF, true, false, false, true, false)),
                 activeAccountRef = ACCOUNT,
             )
         return ConversationController(

@@ -157,8 +157,10 @@ class ConversationInitialTimelineTest {
         attachmentCount = attachmentCount,
         groupSystem = null,
         deliveryState = deliveryState,
+        sticker = null,
     )
 
+    /** Builds the sent kind-9 test message record with the given text. */
     private fun record(plaintext: String) =
         AppMessageRecordFfi(
             messageIdHex = MESSAGE_ID,
@@ -174,6 +176,7 @@ class ConversationInitialTimelineTest {
             retentionExpiresAt = null,
             recordedAt = 11uL,
             receivedAt = 11uL,
+            sticker = null,
         )
 
     private fun markdown(truncated: Boolean = false) =

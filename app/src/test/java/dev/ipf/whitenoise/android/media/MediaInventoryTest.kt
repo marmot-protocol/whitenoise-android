@@ -256,6 +256,7 @@ class MediaInventoryTest {
             blankLinesBefore = ByteArray(0),
         )
 
+    /** Builds an incoming message record with the given attachments and body. */
     private fun record(
         id: String,
         attachments: List<MediaAttachmentReferenceFfi> = emptyList(),
@@ -275,5 +276,6 @@ class MediaInventoryTest {
             retentionExpiresAt = null,
             recordedAt = 0uL,
             receivedAt = 0uL,
+            sticker = null,
         )
 }

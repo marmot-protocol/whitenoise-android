@@ -648,6 +648,7 @@ private fun instrumentedConversationFixture(
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = DEVICE_ACCOUNT_REF,
@@ -1274,6 +1275,8 @@ private fun instrumentedTimelineRecord(
         sourceEpoch = media?.sourceEpoch,
         retentionSeconds = null,
         retentionExpiresAt = null,
+        sticker = null,
+        importedFrom = null,
     )
 }
 

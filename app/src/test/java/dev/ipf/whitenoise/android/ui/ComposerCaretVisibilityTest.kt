@@ -465,6 +465,7 @@ class ComposerCaretVisibilityTest {
         )
     }
 
+    /** Builds the parent message record that the composer replies to. */
     private fun replyRecord() =
         AppMessageRecordFfi(
             messageIdHex = "parent",
@@ -485,6 +486,7 @@ class ComposerCaretVisibilityTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
+            sticker = null,
         )
 
     private class Harness(

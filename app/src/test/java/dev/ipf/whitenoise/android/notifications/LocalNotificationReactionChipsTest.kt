@@ -228,6 +228,7 @@ class LocalNotificationReactionChipsTest {
 
     private fun defaultChoices() = listOf("❤️", "👍", "👎", "😂", "😮", "😢")
 
+    /** Builds a new-message notification update for the given message id in the General group. */
     private fun update(messageIdHex: String) =
         NotificationUpdateFfi(
             notificationKey = "key-$messageIdHex",
@@ -248,6 +249,7 @@ class LocalNotificationReactionChipsTest {
             reactedToPreview = null,
             timestampMs = 1234,
             isFromSelf = false,
+            sticker = null,
         )
 
     private fun user(

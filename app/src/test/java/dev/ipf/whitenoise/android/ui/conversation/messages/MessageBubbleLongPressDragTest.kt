@@ -432,6 +432,7 @@ class MessageBubbleLongPressDragTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,
@@ -515,11 +516,13 @@ class MessageBubbleLongPressDragTest {
                     retentionExpiresAt = null,
                     recordedAt = 1uL,
                     receivedAt = 1uL,
+                    sticker = null,
                 ),
             status = if (mine) MessageStatus.Sent else MessageStatus.Received,
         )
     }
 
+    /** Builds a timeline message carrying a PDF file attachment, sent or received. */
     private fun fileTimelineMessage(mine: Boolean): TimelineMessage {
         val record =
             timelineMessage().record.copy(
@@ -528,19 +531,7 @@ class MessageBubbleLongPressDragTest {
                 plaintext = "",
                 sourceEpoch = 1uL,
             )
-        val media =
-            MediaAttachmentReferenceFfi(
-                locators = listOf(MediaLocatorFfi("blossom-v1", "https://media.example/release-notes.pdf")),
-                ciphertextSha256 = "a".repeat(64),
-                plaintextSha256 = "b".repeat(64),
-                nonceHex = "c".repeat(24),
-                fileName = "release-notes.pdf",
-                mediaType = "application/pdf",
-                version = EncryptedMediaVersionFfi.V1,
-                sourceEpoch = 1uL,
-                dim = null,
-                thumbhash = null,
-            )
+        val media = releaseNotesAttachment()
         val projected =
             TimelineMessageRecordFfi(
                 clientToken = null,
@@ -572,6 +563,8 @@ class MessageBubbleLongPressDragTest {
                 sourceEpoch = record.sourceEpoch,
                 retentionSeconds = null,
                 retentionExpiresAt = null,
+                sticker = null,
+                importedFrom = null,
             )
         return TimelineMessage(
             id = "msg:${record.messageIdHex}",
@@ -580,6 +573,21 @@ class MessageBubbleLongPressDragTest {
             projected = projected,
         )
     }
+
+    /** A PDF attachment reference, `release-notes.pdf`, sealed at epoch 1. */
+    private fun releaseNotesAttachment() =
+        MediaAttachmentReferenceFfi(
+            locators = listOf(MediaLocatorFfi("blossom-v1", "https://media.example/release-notes.pdf")),
+            ciphertextSha256 = "a".repeat(64),
+            plaintextSha256 = "b".repeat(64),
+            nonceHex = "c".repeat(24),
+            fileName = "release-notes.pdf",
+            mediaType = "application/pdf",
+            version = EncryptedMediaVersionFfi.V1,
+            sourceEpoch = 1uL,
+            dim = null,
+            thumbhash = null,
+        )
 
     private fun group() =
         AppGroupRecordFfi(

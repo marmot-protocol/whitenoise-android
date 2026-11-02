@@ -109,6 +109,12 @@
     <string name="library_loading">正在加载文件和媒体…</string>
     <string name="library_empty">未找到文件或媒体</string>
     <string name="library_source">来自：%1$s · %2$s</string>
+    <string name="library_section_this_week">本周</string>
+    <string name="library_section_this_month">本月</string>
+    <string name="library_sender_in_chat">%1$s · %2$s</string>
+    <string name="library_item_description">%1$s，%2$s，来自 %4$s 中的 %3$s，%5$s</string>
+    <string name="library_load_more_failed">无法加载更多文件和媒体</string>
+    <string name="library_filters_unsupported">这些筛选条件无法用于浏览文件和媒体</string>
     <string name="chat_list_search_filter_remove">移除筛选：%1$s</string>
     <string name="chat_list_filter_all">全部</string>
     <string name="chat_list_filter_unread">未读</string>
@@ -127,6 +133,7 @@
     <string name="chat_pinned_badge">已置顶</string>
     <string name="chat_row_removed_badge">已移除</string>
     <string name="chat_row_removed_description">你已被移出此对话</string>
+    <string name="chat_row_device_removed_description">此设备已被移出此对话</string>
     <string name="chat_row_action_move_up">上移</string>
     <string name="chat_row_action_move_down">下移</string>
     <string name="chat_row_action_mark_read">标记为已读</string>
@@ -239,6 +246,7 @@
     <string name="group_empty_only_you_title">这个群组目前只有你</string>
     <string name="group_empty_invite_members">准备好后邀请其他人。</string>
     <string name="you_are_no_longer_a_member">你无法向此群组发送消息，因为你已不再是成员。</string>
+    <string name="device_removed_from_group_composer">此设备已被移出此群组，因此无法从此设备发送消息。你的其他设备仍在群组中。</string>
     <string name="group_unrecoverable_notice">White Noise 正在验证并修复此群组的状态，因此群组暂时处于冻结状态。</string>
     <string name="chat_row_draft_prefix">草稿：</string>
     <string name="jump_to_newest">跳到最新</string>
@@ -819,6 +827,7 @@
     <string name="toast_couldnt_publish_profile">无法发布个人资料</string>
     <string name="toast_send_failed">发送失败</string>
     <string name="toast_send_storage_full">存储空间不足，无法发送。请释放空间后重试。</string>
+    <string name="error_storage_full">此设备存储空间不足。请释放空间后重试。</string>
     <string name="toast_send_connection_failed">无法连接到中继。请检查网络连接，然后重试。</string>
     <string name="toast_send_queue_full">此聊天有太多消息在等待发送，因此你的消息未发送。等积压清空后再试。</string>
     <string name="toast_send_chat_changed">发送期间聊天已更改，因此消息未发出。请重试。</string>

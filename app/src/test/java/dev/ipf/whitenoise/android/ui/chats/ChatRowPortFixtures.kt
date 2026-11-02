@@ -29,7 +29,7 @@ internal object ChatRowPortFixtures {
             context = context,
             draftStore = DraftStore.forContext(context),
             accountIdHexResolver = { null },
-            accounts = listOf(AccountSummaryFfi(ACCOUNT_REF, ACCOUNT_HEX, true, false, false, true)),
+            accounts = listOf(AccountSummaryFfi(ACCOUNT_REF, ACCOUNT_HEX, true, false, false, true, false)),
             activeAccountRef = ACCOUNT_REF,
         )
 
@@ -84,6 +84,7 @@ internal object ChatRowPortFixtures {
                         attachmentCount = 0u,
                         groupSystem = null,
                         deliveryState = delivery,
+                        sticker = null,
                     ),
             )
         return ChatListItem(group, null, null, 3, null, projection = projected)

@@ -309,6 +309,7 @@ internal class NotificationBootstrapTestFixture(
             reactedToPreview = null,
             timestampMs = 1_982L,
             isFromSelf = false,
+            sticker = null,
         )
 
     /** Identifies only this fixture's platform card, including scenarios that isolate their conversation. */

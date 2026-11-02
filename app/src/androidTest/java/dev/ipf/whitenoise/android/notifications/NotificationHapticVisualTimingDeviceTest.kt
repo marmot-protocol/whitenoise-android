@@ -527,6 +527,7 @@ class NotificationHapticVisualTimingDeviceTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     /** Captures the exact NotificationManager write boundary while preserving real posting. */
@@ -623,6 +624,7 @@ class NotificationHapticVisualTimingDeviceTest {
             reactedToPreview = null,
             timestampMs = System.currentTimeMillis(),
             isFromSelf = false,
+            sticker = null,
         )
 
     /** Builds one synthetic notification participant without an avatar dependency. */

@@ -130,7 +130,7 @@ class NativeAttachmentSettingsCommitTest {
                     },
                 ),
             accountIdHexResolver = { "account-id" },
-            accounts = listOf(AccountSummaryFfi("account", "account-id", true, false, false, true)),
+            accounts = listOf(AccountSummaryFfi("account", "account-id", true, false, false, true, false)),
             activeAccountRef = "account",
             initialMarmotRuntime = AppMarmotRuntime("generated-settings-test", engine),
             preferences = preferences,

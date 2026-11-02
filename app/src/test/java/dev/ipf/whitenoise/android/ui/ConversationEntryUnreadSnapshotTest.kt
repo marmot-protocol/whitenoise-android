@@ -478,6 +478,7 @@ class ConversationEntryUnreadSnapshotTest {
             status = MessageStatus.Sent,
         )
 
+    /** Builds a timeline message with the given id, direction and delivery status. */
     private fun message(
         id: String,
         direction: String,
@@ -505,6 +506,7 @@ class ConversationEntryUnreadSnapshotTest {
                     retentionExpiresAt = null,
                     recordedAt = 1uL,
                     receivedAt = 1uL,
+                    sticker = null,
                 ),
             status = status,
         )

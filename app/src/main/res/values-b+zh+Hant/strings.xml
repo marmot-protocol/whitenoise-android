@@ -109,6 +109,12 @@
     <string name="library_loading">正在載入檔案與媒體…</string>
     <string name="library_empty">找不到檔案或媒體</string>
     <string name="library_source">來自：%1$s · %2$s</string>
+    <string name="library_section_this_week">本週</string>
+    <string name="library_section_this_month">本月</string>
+    <string name="library_sender_in_chat">%1$s · %2$s</string>
+    <string name="library_item_description">%1$s，%2$s，來自 %4$s 中的 %3$s，%5$s</string>
+    <string name="library_load_more_failed">無法載入更多檔案和媒體</string>
+    <string name="library_filters_unsupported">這些篩選條件無法用於瀏覽檔案和媒體</string>
     <string name="chat_list_search_filter_remove">移除篩選：%1$s</string>
     <string name="chat_list_filter_all">全部</string>
     <string name="chat_list_filter_unread">未讀</string>
@@ -127,6 +133,7 @@
     <string name="chat_pinned_badge">已置頂</string>
     <string name="chat_row_removed_badge">已移除</string>
     <string name="chat_row_removed_description">你已被移出此對話</string>
+    <string name="chat_row_device_removed_description">此裝置已被移出此對話</string>
     <string name="chat_row_action_move_up">上移</string>
     <string name="chat_row_action_move_down">下移</string>
     <string name="chat_row_action_mark_read">標示為已讀</string>
@@ -239,6 +246,7 @@
     <string name="group_empty_only_you_title">這個群組目前只有你</string>
     <string name="group_empty_invite_members">準備好後邀請其他人。</string>
     <string name="you_are_no_longer_a_member">你無法向此群組發送訊息，因為你已不再是成員。</string>
+    <string name="device_removed_from_group_composer">此裝置已被移出此群組，因此無法從此裝置發送訊息。你的其他裝置仍在群組中。</string>
     <string name="group_unrecoverable_notice">White Noise 正在驗證並修復此群組的狀態，因此群組暫時處於凍結狀態。</string>
     <string name="chat_row_draft_prefix">草稿：</string>
     <string name="jump_to_newest">跳至最新</string>
@@ -819,6 +827,7 @@
     <string name="toast_couldnt_publish_profile">無法發布個人檔案</string>
     <string name="toast_send_failed">發送失敗</string>
     <string name="toast_send_storage_full">儲存空間不足，無法發送。請釋放空間後重試。</string>
+    <string name="error_storage_full">此裝置儲存空間不足。請釋放空間後重試。</string>
     <string name="toast_send_connection_failed">無法連線至中繼站。請檢查網路連線後再試一次。</string>
     <string name="toast_send_queue_full">此聊天有太多訊息正在等待傳送，因此你的訊息未傳送。等積壓清空後再試。</string>
     <string name="toast_send_chat_changed">傳送期間聊天室已變更，因此訊息未送出。請再試一次。</string>

@@ -330,6 +330,7 @@ class NotificationMarkReadAccountUnreadReconciliationTest {
         assertTrue(description, condition())
     }
 
+    /** Builds a running, locally signing account summary with the given label and id. */
     private fun account(
         label: String,
         accountIdHex: String,
@@ -340,12 +341,14 @@ class NotificationMarkReadAccountUnreadReconciliationTest {
         externalSigning = false,
         signedOut = false,
         running = true,
+        unlinked = false,
     )
 
     private fun unreadRow(unreadCount: ULong = 2uL) = chatRow(unreadCount = unreadCount)
 
     private fun readRow() = chatRow(unreadCount = 0uL)
 
+    /** Builds the test group's chat list row with the given unread count. */
     private fun chatRow(unreadCount: ULong) =
         ChatListRowFfi(
             selfMembership = SelfMembershipFfi.MEMBER,
@@ -380,6 +383,7 @@ class NotificationMarkReadAccountUnreadReconciliationTest {
                     attachmentCount = 0u,
                     groupSystem = null,
                     deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                    sticker = null,
                 ),
             unreadCount = unreadCount,
             hasUnread = unreadCount > 0uL,

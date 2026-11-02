@@ -187,6 +187,7 @@ class NotificationChannelSpecTest {
         )
     }
 
+    /** Builds a notification update with the given trigger, DM, reaction, mention and traffic class. */
     private fun update(
         trigger: NotificationTriggerFfi,
         isDm: Boolean = false,
@@ -212,6 +213,7 @@ class NotificationChannelSpecTest {
         isFromSelf = false,
         reactionEmoji = reactionEmoji,
         reactedToPreview = null,
+        sticker = null,
     )
 
     private fun user(

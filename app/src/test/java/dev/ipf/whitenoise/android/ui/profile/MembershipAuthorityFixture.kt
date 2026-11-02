@@ -47,7 +47,7 @@ internal class MembershipAuthorityFixture {
             context = ApplicationProvider.getApplicationContext(),
             draftStore = DraftStore.forContext(ApplicationProvider.getApplicationContext()),
             accountIdHexResolver = { self },
-            accounts = listOf(AccountSummaryFfi(account, self, true, false, false, true)),
+            accounts = listOf(AccountSummaryFfi(account, self, true, false, false, true, false)),
             activeAccountRef = account,
             profileReader = { null },
             profileDisplayNameReader = { if (it == self) actorName else "River" },

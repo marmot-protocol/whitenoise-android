@@ -4,9 +4,9 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "Testing-only MarmotKit October 30 nightly from f7178f0e: verified archive/API; typed stale-epoch media errors keep emoji and forward re-uploads; one-way migrations 0117-0134 over the 0.14.0 baseline need the hosted populated upgrade, cold restart, pending upload and recovery; no downgrade",
+        "surface": "Testing-only MarmotKit November 2 nightly from 2854335c: verified archive/API; queued sends keep their order; one-way migrations 0133, 0135-0149, 0160-0164 and 0166 over the October 30 baseline need the hosted populated upgrade, cold restart, pending upload and recovery; device groups stay gated off; no downgrade",
         "source": "app/src/main/marmotkit/MARMOT_VERSION",
-        "anchor": "artifact-id=0.15.0-nightly.20261030",
+        "anchor": "artifact-id=0.15.0-nightly.20261102",
         "test_ids": [
           "INT-010",
           "INT-003",

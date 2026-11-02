@@ -587,6 +587,7 @@ class ShareChatPickerFullScreenProfileTest {
         lud16 = null,
     )
 
+    /** Returns the running active account summary for the share picker. */
     private fun activeAccount() =
         AccountSummaryFfi(
             label = ACCOUNT_REF,
@@ -595,6 +596,7 @@ class ShareChatPickerFullScreenProfileTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private fun member(

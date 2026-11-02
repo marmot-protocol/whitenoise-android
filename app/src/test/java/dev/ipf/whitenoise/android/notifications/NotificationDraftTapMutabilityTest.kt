@@ -53,6 +53,7 @@ class NotificationDraftTapMutabilityTest {
         assertNull(NotificationNavigation.parse(intent, isTrustedTargetSignature = tokens::isValidTarget))
     }
 
+    /** Builds a group notification update with the given trigger and optional reaction emoji. */
     private fun update(
         trigger: NotificationTriggerFfi,
         reaction: String?,
@@ -77,6 +78,7 @@ class NotificationDraftTapMutabilityTest {
             isMention = false,
             reactionEmoji = reaction,
             reactedToPreview = null,
+            sticker = null,
         )
     }
 }

@@ -37,6 +37,7 @@ object DiagnosticFormatter {
     )
 
     /** Summarizes SDK events for diagnostics without copying private event payloads. */
+    @Suppress("CyclomaticComplexMethod") // One branch per native event, so a new MDK event stays a compile error.
     fun describe(
         event: MarmotEventFfi,
         identity: DiagnosticIdentityPresentation,
@@ -96,6 +97,21 @@ object DiagnosticFormatter {
                 "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] linked devices changed"
             is MarmotEventFfi.KeyPackageRefreshOverdueChanged ->
                 "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] key package refresh overdue changed"
+            // The device-group events below carry only the account — their state is re-read from the
+            // runtime, never copied here. This MDK build holds them back: device groups sit behind their test
+            // gate, and recovery status waits for MDK's recovery runner to own its debt.
+            is MarmotEventFfi.UnrecognizedSignInsChanged ->
+                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] unrecognized sign-ins changed"
+            is MarmotEventFfi.CompromiseWarningChanged ->
+                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] compromise warning changed"
+            is MarmotEventFfi.DeviceLinkChanged ->
+                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] device link changed"
+            is MarmotEventFfi.ChatHistoryImportsChanged ->
+                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] chat history imports changed"
+            is MarmotEventFfi.RecoveryStatusChanged ->
+                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] recovery status changed"
+            is MarmotEventFfi.DeviceUnlinked ->
+                "[${identity.accountLabel(event.accountLabel, event.accountIdHex)}] device unlinked"
         }
 
     private const val MAX_ERROR_LEN = 80

@@ -404,6 +404,7 @@ class ConversationVisibleReadObserverTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private class ReadLifecycleOwner : LifecycleOwner {

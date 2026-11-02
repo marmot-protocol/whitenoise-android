@@ -439,6 +439,7 @@ class ConversationUnreadBadgeTest {
                     retentionExpiresAt = null,
                     recordedAt = 1uL,
                     receivedAt = 1uL,
+                    sticker = null,
                 ),
             status = if (direction == "received") MessageStatus.Received else MessageStatus.Sent,
         )

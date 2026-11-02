@@ -158,7 +158,7 @@ class SignUpProfileDraftSubmissionTest {
                         { true },
                         create = { _, _ ->
                             creations++
-                            AccountSummaryFfi("new", "11".repeat(32), true, false, false, true)
+                            AccountSummaryFfi("new", "11".repeat(32), true, false, false, true, false)
                         },
                         hasPendingIdentityReceipt = { false },
                         qualify = {},
@@ -210,7 +210,7 @@ class SignUpProfileDraftSubmissionTest {
                         scope,
                         { owner },
                         { true },
-                        create = { _, _ -> AccountSummaryFfi("new", "11".repeat(32), true, false, false, true) },
+                        create = { _, _ -> AccountSummaryFfi("new", "11".repeat(32), true, false, false, true, false) },
                         hasPendingIdentityReceipt = { false },
                         qualify = {},
                         accept = { account, old ->

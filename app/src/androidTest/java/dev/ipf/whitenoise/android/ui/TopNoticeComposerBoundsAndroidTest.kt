@@ -250,6 +250,7 @@ class TopNoticeComposerBoundsAndroidTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_LABEL,

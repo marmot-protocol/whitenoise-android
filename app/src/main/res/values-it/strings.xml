@@ -113,6 +113,12 @@
     <string name="library_loading">Caricamento di file e contenuti multimediali…</string>
     <string name="library_empty">Nessun file o contenuto multimediale trovato</string>
     <string name="library_source">Da: %1$s · %2$s</string>
+    <string name="library_section_this_week">Questa settimana</string>
+    <string name="library_section_this_month">Questo mese</string>
+    <string name="library_sender_in_chat">%1$s nella chat %2$s</string>
+    <string name="library_item_description">%1$s, %2$s, da %3$s in %4$s, %5$s</string>
+    <string name="library_load_more_failed">Impossibile caricare altri file e contenuti multimediali</string>
+    <string name="library_filters_unsupported">Questi filtri non possono essere usati per sfogliare file e contenuti multimediali</string>
     <string name="chat_list_search_filter_remove">Rimuovi filtro: %1$s</string>
     <string name="chat_list_filter_all">Tutti</string>
     <string name="chat_list_filter_unread">Non letti</string>
@@ -131,6 +137,7 @@
     <string name="chat_pinned_badge">Fissata</string>
     <string name="chat_row_removed_badge">Rimosso</string>
     <string name="chat_row_removed_description">Sei stato rimosso da questa chat</string>
+    <string name="chat_row_device_removed_description">Questo dispositivo è stato rimosso da questa chat</string>
     <string name="chat_row_action_move_up">Sposta su</string>
     <string name="chat_row_action_move_down">Sposta giù</string>
     <string name="chat_row_action_mark_read">Segna come letto</string>
@@ -250,6 +257,7 @@
     <string name="group_empty_only_you_title">Questo gruppo contiene solo te</string>
     <string name="group_empty_invite_members">Invita persone quando sei pronto.</string>
     <string name="you_are_no_longer_a_member">Non puoi inviare messaggi a questo gruppo perché non ne fai più parte.</string>
+    <string name="device_removed_from_group_composer">Non puoi inviare da questo dispositivo perché è stato rimosso da questo gruppo. I tuoi altri dispositivi ne fanno ancora parte.</string>
     <string name="group_unrecoverable_notice">Questo gruppo è temporaneamente bloccato mentre White Noise ne verifica e ripara lo stato.</string>
     <string name="chat_row_draft_prefix">Bozza: </string>
     <string name="jump_to_newest">Vai al più recente</string>
@@ -832,6 +840,7 @@
     <string name="toast_couldnt_publish_profile">Impossibile pubblicare il profilo</string>
     <string name="toast_send_failed">Invio non riuscito</string>
     <string name="toast_send_storage_full">Spazio insufficiente per l’invio. Libera spazio e riprova.</string>
+    <string name="error_storage_full">Spazio insufficiente su questo dispositivo. Libera spazio e riprova.</string>
     <string name="toast_send_connection_failed">Impossibile raggiungere il relay. Controlla la connessione e riprova.</string>
     <string name="toast_send_queue_full">Questa chat ha troppi messaggi in attesa di invio, quindi il tuo non è stato inviato. Riprova quando sarà in pari.</string>
     <string name="toast_send_chat_changed">La chat è cambiata durante l\'invio, quindi il messaggio non è stato inviato. Riprova.</string>

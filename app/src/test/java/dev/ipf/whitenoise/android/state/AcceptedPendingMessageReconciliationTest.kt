@@ -142,6 +142,7 @@ class AcceptedPendingMessageReconciliationTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
         ).firstOrNull(File::exists) ?: error("Missing Controllers.kt source file")
 
+    /** Builds a sent message record from alice with the given id. */
     private fun message(id: String): AppMessageRecordFfi =
         AppMessageRecordFfi(
             messageIdHex = id,
@@ -162,5 +163,6 @@ class AcceptedPendingMessageReconciliationTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
+            sticker = null,
         )
 }

@@ -292,6 +292,7 @@ class ForwardRetainedSourceTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     /** The forward's source request, without a source id, exactly as the production transport builds it. */

@@ -144,7 +144,7 @@ class AccountSwitchFirstFrameDurableAvatarTest {
         fun account(
             label: String,
             id: String,
-        ) = AccountSummaryFfi(label, id, true, false, false, true)
+        ) = AccountSummaryFfi(label, id, true, false, false, true, false)
 
         /** Each account's single unnamed direct chat, with a peer-sourced stored avatar. */
         fun presentedRow(accountRef: String): PresentedChatRowFfi =

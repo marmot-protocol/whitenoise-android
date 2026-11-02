@@ -36,6 +36,7 @@ class AccountWipeMemberMuteRetentionTest {
     private var wiped = false
     private var localCleanupCompleted = true
 
+    /** Builds a locally signing account summary whose id is derived from the label hash. */
     private fun localAccount(
         label: String,
         signedOut: Boolean = false,
@@ -51,6 +52,7 @@ class AccountWipeMemberMuteRetentionTest {
         externalSigning = false,
         signedOut = signedOut,
         running = !signedOut,
+        unlinked = false,
     )
 
     @Suppress("UNCHECKED_CAST")
@@ -59,6 +61,7 @@ class AccountWipeMemberMuteRetentionTest {
             MarmotInterface::class.java.classLoader,
             arrayOf(MarmotInterface::class.java),
         ) { proxy, method, arguments ->
+            /** Resumes the suspended native call with the given failure. */
             fun suspendFailure(failure: Throwable): Any {
                 (arguments!!.last() as Continuation<Any?>).resumeWithException(failure)
                 return COROUTINE_SUSPENDED
@@ -72,6 +75,8 @@ class AccountWipeMemberMuteRetentionTest {
                         keyPackagesDeleted = 1u,
                         keyPackageFailures = emptyList(),
                         localCleanup = LocalCleanupReportFfi(completed = localCleanupCompleted, reason = null),
+                        groupsLeftToSiblings = 0u,
+                        siblingsNotReached = false,
                     ).also { wiped = true }
                 "listAccounts" -> {
                     listAccountsFailure?.let(::suspendFailure)

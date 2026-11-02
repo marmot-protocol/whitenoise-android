@@ -231,6 +231,7 @@ class ContentReportScreenshotTest {
         assertEquals(listOf("open"), dismissed)
     }
 
+    /** Builds the received spam message record being reported. */
     private fun record() =
         AppMessageRecordFfi(
             messageIdHex = "aa".repeat(32),
@@ -246,6 +247,7 @@ class ContentReportScreenshotTest {
             retentionExpiresAt = null,
             recordedAt = 1_800_000_000uL,
             receivedAt = 1_800_000_000uL,
+            sticker = null,
         )
 
     private fun report(

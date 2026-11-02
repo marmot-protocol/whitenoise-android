@@ -12,7 +12,7 @@ printf '%s\n' "$baseline" > "$reports/baseline-source.txt"
 git show "$baseline:app/src/main/marmotkit/MARMOT_VERSION" > "$reports/baseline-MARMOT_VERSION"
 cp app/src/main/marmotkit/MARMOT_VERSION "$reports/candidate-MARMOT_VERSION"
 # Fail closed if master has moved to a runtime outside this reviewed upgrade pair.
-grep -qx 'mdk-sha=3fb4b4759ac676b0c21c4c3527074866c9fa4c89' "$reports/baseline-MARMOT_VERSION"
+grep -qx 'mdk-sha=f7178f0e997e3d6d450fb0af45a32e4780ed862c' "$reports/baseline-MARMOT_VERSION"
 git worktree add --detach "$RUNNER_TEMP/mdk-baseline" "$baseline"
 python3 scripts/stage_mdk_baseline_fixture.py "$RUNNER_TEMP/mdk-baseline"
 for role in baseline candidate; do

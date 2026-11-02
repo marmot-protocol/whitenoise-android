@@ -355,4 +355,6 @@ private fun message(
     sourceEpoch = null,
     retentionSeconds = null,
     retentionExpiresAt = null,
+    sticker = null,
+    importedFrom = null,
 )

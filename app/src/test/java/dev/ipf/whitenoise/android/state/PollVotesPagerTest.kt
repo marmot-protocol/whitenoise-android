@@ -374,6 +374,8 @@ class PollVotesPagerTest {
             sourceEpoch = null,
             retentionSeconds = null,
             retentionExpiresAt = null,
+            sticker = null,
+            importedFrom = null,
         )
 
     /** Builds a projection event for the [account] label and [group] carrying the given messages and changes. */

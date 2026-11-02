@@ -50,6 +50,7 @@ class QuarantinedGroupsAccountGateTest {
             assertNull(state.quarantinedGroupsAccess())
         }
 
+    /** Builds an app state with a fake native runtime and the given sign-out, signing and runtime flags. */
     private fun state(
         signedOut: Boolean = false,
         signing: Boolean = true,
@@ -81,6 +82,7 @@ class QuarantinedGroupsAccountGateTest {
                         false,
                         signedOut,
                         true,
+                        false,
                     ),
                 ),
             activeAccountRef = ConversationTimelineTestIds.ACCOUNT_REF,

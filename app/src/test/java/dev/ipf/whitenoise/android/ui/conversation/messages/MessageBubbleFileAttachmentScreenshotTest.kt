@@ -772,6 +772,7 @@ open class MessageBubbleFileAttachmentFixtures {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,
@@ -817,6 +818,7 @@ open class MessageBubbleFileAttachmentFixtures {
                 retentionExpiresAt = retentionExpiresAt,
                 recordedAt = (ONE_AM_UTC_EPOCH_SECONDS + index).toULong(),
                 receivedAt = (ONE_AM_UTC_EPOCH_SECONDS + index).toULong(),
+                sticker = null,
             )
         val projected =
             TimelineMessageRecordFfi(
@@ -852,6 +854,8 @@ open class MessageBubbleFileAttachmentFixtures {
                 sourceEpoch = 1uL,
                 retentionSeconds = retentionSeconds,
                 retentionExpiresAt = retentionExpiresAt,
+                sticker = null,
+                importedFrom = null,
             )
         return TimelineMessage(
             id = "msg:$messageId",
@@ -927,6 +931,7 @@ open class MessageBubbleFileAttachmentFixtures {
             deleted = false,
             deletionSource = DeletionSourceFfi.UNKNOWN,
             invalidationStatus = null,
+            sticker = null,
         )
 
     /** Seeds the matching local member used before authoritative roster hydration. */

@@ -174,6 +174,7 @@ class LocalNotificationRemovalScreenshotTest {
                 isMention = false,
                 reactionEmoji = null,
                 reactedToPreview = null,
+                sticker = null,
             )
         val presenter = LocalNotificationPresenter(context, nowMillis = { 0L }, groupReconciliation = {})
         presenter.ensureChannels()
