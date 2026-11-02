@@ -30,8 +30,8 @@ import java.util.Collections
 
 /**
  * Which worker domain each photo-editor decode names (#3373). Every decode of a pick, its inspection, the editor's
- * preview and its unedited or edited render, runs in its conversation's shared outgoing worker, which never sees
- * another conversation's picks.
+ * preview and its unedited or edited render, runs in its draft's shared outgoing worker, which never sees another
+ * draft's or conversation's picks.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -79,11 +79,11 @@ class PhotoEditorDomainTest {
     }
 
     /**
-     * Inspection, the editor preview and an unedited or edited render of a pick all run in its conversation's shared
-     * outgoing domain, the one the draft names.
+     * Inspection, the editor preview and an unedited or edited render of a pick all run in its draft's shared outgoing
+     * domain, the one the draft state names.
      */
     @Test
-    fun everyEditorDecodeOfAPickRunsInItsConversationsSharedWorker() =
+    fun everyEditorDecodeOfAPickRunsInItsDraftsSharedWorker() =
         runTest {
             val renderer = renderer()
             val source = source(EDGE_A)
@@ -144,11 +144,11 @@ class PhotoEditorDomainTest {
     }
 
     private companion object {
-        /** A pick's domain in conversation A, the conversation's shared outgoing worker. */
-        val PICK_A = MediaTrustDomain.outgoing("account", "conversation-a")
+        /** A pick's domain in a draft of conversation A, that draft's shared outgoing worker. */
+        val PICK_A = MediaTrustDomain.outgoing("account", "conversation-a", "draft")
 
-        /** A pick's domain in conversation B. */
-        val PICK_B = MediaTrustDomain.outgoing("account", "conversation-b")
+        /** A pick's domain in a draft of conversation B. */
+        val PICK_B = MediaTrustDomain.outgoing("account", "conversation-b", "draft")
         const val EDGE_A = 64
         const val EDGE_B = 96
         const val ROUNDS = 4

@@ -31,19 +31,21 @@ class PictureDomainMappingTest {
     }
 
     /**
-     * Every pick of one conversation's draft shares that conversation's outgoing domain, which no other conversation,
-     * account, received media or local file shares.
+     * Every pick of one draft shares that draft's outgoing domain, which no later draft, other conversation, account,
+     * received media or local file shares.
      */
     @Test
-    fun outgoingPicksShareTheirConversationsDomain() {
-        val outgoing = MediaTrustDomain.outgoing(ACCOUNT, GROUP)
-        assertEquals(MediaTrustDomain.Outgoing(ACCOUNT, GROUP), outgoing)
-        assertNotEquals(outgoing, MediaTrustDomain.outgoing(ACCOUNT, "other"))
-        assertNotEquals(outgoing, MediaTrustDomain.outgoing("other", GROUP))
+    fun outgoingPicksShareTheirDraftsDomain() {
+        val outgoing = MediaTrustDomain.outgoing(ACCOUNT, GROUP, DRAFT)
+        assertEquals(MediaTrustDomain.Outgoing(ACCOUNT, GROUP, DRAFT), outgoing)
+        assertNotEquals(outgoing, MediaTrustDomain.outgoing(ACCOUNT, GROUP, "later-draft"))
+        assertNotEquals(outgoing, MediaTrustDomain.outgoing(ACCOUNT, "other", DRAFT))
+        assertNotEquals(outgoing, MediaTrustDomain.outgoing("other", GROUP, DRAFT))
         assertNotEquals(outgoing, MediaTrustDomain.local(ACCOUNT))
         assertNotEquals(outgoing, MediaTrustDomain.conversation(ACCOUNT, GROUP))
-        assertEquals(MediaTrustDomain.Unique, MediaTrustDomain.outgoing(ACCOUNT, null))
-        assertEquals(MediaTrustDomain.Unique, MediaTrustDomain.outgoing(null, GROUP))
+        assertEquals(MediaTrustDomain.Unique, MediaTrustDomain.outgoing(ACCOUNT, GROUP, null))
+        assertEquals(MediaTrustDomain.Unique, MediaTrustDomain.outgoing(ACCOUNT, null, DRAFT))
+        assertEquals(MediaTrustDomain.Unique, MediaTrustDomain.outgoing(null, GROUP, DRAFT))
         assertEquals("Outgoing", outgoing.toString())
     }
 
@@ -73,5 +75,6 @@ class PictureDomainMappingTest {
     private companion object {
         const val ACCOUNT = "account"
         const val GROUP = "group"
+        const val DRAFT = "draft"
     }
 }

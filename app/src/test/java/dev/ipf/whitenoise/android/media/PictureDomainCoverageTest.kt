@@ -52,32 +52,45 @@ class PictureDomainCoverageTest {
     }
 
     /**
-     * Every outgoing domain is made by `MediaTrustDomain.outgoing`, the one policy that maps a draft's picks to their
-     * conversation's shared worker, so no preview, staging, editor, thumbhash or poster decode can disagree.
+     * Every outgoing domain is made by `MediaTrustDomain.outgoing`, which production code calls only from the
+     * conversation controller's draft policy, the one place that maps each pick to the shared worker of the draft it
+     * belongs to. No preview, staging, editor, thumbhash or poster decode can then name another draft's worker.
      */
     @Test
-    fun outgoingDomainsAreMadeOnlyByTheirPickPolicy() {
+    fun outgoingDomainsAreMadeOnlyByTheirDraftPolicy() {
         val construction = Regex("""(?<![A-Za-z0-9_])Outgoing\s*\(""")
+        val factory = Regex("""MediaTrustDomain\s*\.\s*outgoing\s*\(""")
+        var policyCalls = 0
         val outside =
             mainSources().flatMap { file ->
                 val text = file.readText()
-                construction
-                    .findAll(text)
-                    .filterNot { text.substring(maxOf(0, it.range.first - 6), it.range.first) == "class " }
-                    .filterNot { file.name == "MediaTrustDomain.kt" && insidePickPolicy(text, it.range.first) }
-                    .map { "${file.name}:${lineOf(text, it.range.first)}" }
-                    .toList()
+                val made =
+                    construction
+                        .findAll(text)
+                        .filterNot { text.substring(maxOf(0, it.range.first - 6), it.range.first) == "class " }
+                        .filterNot {
+                            file.name == "MediaTrustDomain.kt" && inside(text, it.range.first, "fun outgoing(")
+                        }
+                val called =
+                    factory.findAll(text).filterNot { call ->
+                        val policy = file.name == "Controllers.kt" && inside(text, call.range.first, OUTGOING_POLICY)
+                        if (policy) policyCalls++
+                        policy
+                    }
+                (made + called).map { "${file.name}:${lineOf(text, it.range.first)}" }.toList()
             }
-        assertEquals("outgoing domains made outside the pick policy", emptyList<String>(), outside)
+        assertEquals("outgoing domains made outside the draft policy", emptyList<String>(), outside)
+        assertEquals("the draft policy makes the outgoing domain", 1, policyCalls)
     }
 
-    /** Whether [offset] lies in the body of `fun outgoing(` in the domain's own file. */
-    private fun insidePickPolicy(
+    /** Whether [offset] lies in the body of the function [declaration] starts, up to the next declaration. */
+    private fun inside(
         text: String,
         offset: Int,
+        declaration: String,
     ): Boolean {
-        val start = text.indexOf("fun outgoing(")
-        val end = text.indexOf("fun local(", start)
+        val start = text.indexOf(declaration)
+        val end = text.indexOf("fun ", start + declaration.length)
         return start in 0..offset && offset < end
     }
 
@@ -229,6 +242,8 @@ class PictureDomainCoverageTest {
     }
 
     private companion object {
+        /** The controller function that maps a pick to its draft's outgoing domain. */
+        const val OUTGOING_POLICY = "fun outgoingDraftDomain("
         const val MIN_RENDERER_CALLS = 8
     }
 }

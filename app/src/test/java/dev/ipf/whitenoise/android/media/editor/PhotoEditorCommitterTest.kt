@@ -114,13 +114,13 @@ class PhotoEditorCommitterTest {
             assertEquals(0, fixture.gateway.saveCalls)
         }
 
-    /** An edit commits through a render in its conversation's shared outgoing worker, as the draft names it (#3373). */
+    /** An edit commits through a render in its draft's shared outgoing worker, as the draft state names it (#3373). */
     @Test
-    fun editRendersInTheConversationsSharedWorker() =
+    fun editRendersInItsDraftsSharedWorker() =
         runTest {
             EditorDomainRecorder().use { recorder ->
                 val fixture = fixture()
-                val outgoing = MediaTrustDomain.outgoing(ACCOUNT, GROUP)
+                val outgoing = MediaTrustDomain.outgoing(ACCOUNT, GROUP, "draft")
                 val result =
                     fixture.committer.commit(
                         accountRef = ACCOUNT,

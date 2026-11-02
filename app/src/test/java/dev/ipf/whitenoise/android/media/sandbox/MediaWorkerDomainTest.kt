@@ -299,6 +299,58 @@ class MediaWorkerDomainTest {
     }
 
     /**
+     * Retiring an idle draft's domain, as sending or emptying the draft does, stops its worker before its next input.
+     */
+    @Test
+    fun retiringAnIdleDomainStopsItsWorkerBeforeItsNextInput() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), validReplyAt = { true })
+        val transport = domainLane(context)
+        var next: DecodeCall? = null
+        try {
+            finish(decodeIn(transport, 1, outgoingIn(1)))
+            val first = context.bindings.single()
+            transport.retireDomain(outgoingIn(1))
+            assertTrue("The retired draft's worker is told to retire", first.remote.retired.await(2, TimeUnit.SECONDS))
+            next = decodeIn(transport, 2, outgoingIn(1))
+            Thread.sleep(FENCE_OBSERVATION_MS)
+            assertEquals("The draft's next input waits for its retired worker's death", 1, context.bindings.size)
+            first.remote.die()
+            finish(next)
+            assertEquals(
+                listOf(2),
+                context.bindings[1]
+                    .remote.inputs
+                    .toList(),
+            )
+        } finally {
+            next?.interruptAndJoin()
+            context.dieAll()
+            transport.close()
+        }
+    }
+
+    /** Retiring a draft's domain while its request is in flight lets the request finish, then retires that worker. */
+    @Test
+    fun retiringABusyDomainRetiresItsWorkerOnceItsRequestEnds() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
+        val transport = domainLane(context)
+        val call = decodeIn(transport, 1, outgoingIn(1))
+        try {
+            val worker = context.next()
+            assertTrue(worker.remote.decoded.await(2, TimeUnit.SECONDS))
+            transport.retireDomain(outgoingIn(1))
+            assertEquals("A busy worker is not retired under its request", 1L, worker.remote.retired.count)
+            assertTrue(withWorkerIdentity { worker.remote.deliverHeldReply(successfulPixelReply()) })
+            finish(call)
+            assertTrue("The worker retires once its request ends", worker.remote.retired.await(2, TimeUnit.SECONDS))
+        } finally {
+            call.interruptAndJoin()
+            context.dieAll()
+            transport.close()
+        }
+    }
+
+    /**
      * A domain's own request racing an eviction never lands on the worker being evicted: the victim is marked
      * retiring under the same lock that chose it, so the domain waits for a fresh worker instead of failing.
      */
@@ -548,7 +600,7 @@ class MediaWorkerDomainTest {
         val D = MediaTrustDomain.PublicProfiles("account")
 
         /** Conversation [n]'s outgoing draft domain, one per conversation. */
-        fun outgoingIn(n: Int): MediaTrustDomain = MediaTrustDomain.Outgoing("account", "conversation-$n")
+        fun outgoingIn(n: Int): MediaTrustDomain = MediaTrustDomain.Outgoing("account", "conversation-$n", "draft")
 
         const val DRAFTS = 10
         const val INPUTS_PER_DOMAIN = 6

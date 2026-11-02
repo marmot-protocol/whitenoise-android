@@ -17,6 +17,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.whitenoise.android.ManualDeviceFixture
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.MediaTrustDomain
+import dev.ipf.whitenoise.android.media.OutgoingDrafts
 import dev.ipf.whitenoise.android.media.editor.PhotoEditRecipe
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorRenderResult
 import dev.ipf.whitenoise.android.media.editor.PhotoEditorRenderer
@@ -95,10 +96,15 @@ internal class SyntheticAlbum private constructor(
     private val uris: List<Uri>,
 ) {
     /**
-     * This attempt's picks: every pick in the conversation's one shared outgoing domain, by production's own policy.
-     * The master lane ignores domains.
+     * This attempt's picks: one new draft, every pick in that draft's one shared outgoing domain, by production's own
+     * policy. The master lane ignores domains.
      */
-    fun picks(): List<AlbumPick> = uris.map { uri -> AlbumPick(uri, MediaTrustDomain.outgoing(ACCOUNT, CONVERSATION)) }
+    fun picks(): List<AlbumPick> {
+        val drafts = OutgoingDrafts(retire = {})
+        return uris.map { uri ->
+            AlbumPick(uri, MediaTrustDomain.outgoing(ACCOUNT, CONVERSATION, drafts.draftOf(uri.toString())))
+        }
+    }
 
     /** Removes the album's files. */
     fun delete() {
@@ -219,8 +225,8 @@ internal object AlbumScenarios {
 
     /**
      * Send tap -> attachments encoded for upload, then just-sent posters: the picks in slot order, as an unprepared
-     * slot is read at send time, then each sent attachment's poster. Sending retires nothing: the draft's shared
-     * worker serves every poster.
+     * slot is read at send time, then each sent attachment's poster. The draft's shared worker serves every poster and
+     * then retires, as production's does once the send has ended.
      */
     fun send(
         context: Context,
@@ -254,7 +260,9 @@ internal object AlbumScenarios {
             val (spent, ok) = results[index]
             results[index] = (spent + SystemClock.elapsedRealtimeNanos() - begin) to (ok && poster != null)
         }
-        return row("album_send", started, results)
+        val row = row("album_send", started, results)
+        picks.firstOrNull()?.let { IsolatedMediaDecoder.retireDomain(lane.domain(it.domain)) }
+        return row
     }
 
     /** One phase's row: whole-album time, each pick's time and how many picks failed. */

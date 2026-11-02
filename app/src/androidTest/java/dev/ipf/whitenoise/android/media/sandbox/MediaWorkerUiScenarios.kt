@@ -197,7 +197,7 @@ internal object MediaWorkerUiScenarios {
     private val PROFILES = MediaTrustDomain.PublicProfiles("ui-account")
 
     /** The open conversation's draft, whose picks share its one outgoing worker, by production's own policy. */
-    private val OPEN_DRAFT = MediaTrustDomain.outgoing("ui-account", "open")
+    private val OPEN_DRAFT = MediaTrustDomain.outgoing("ui-account", "open", "draft")
 
     /**
      * Scrolls a real three-column Compose grid of distinct JPEG tiles to its end with touch swipes, each

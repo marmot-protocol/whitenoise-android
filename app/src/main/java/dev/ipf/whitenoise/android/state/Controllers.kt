@@ -6431,7 +6431,7 @@ internal typealias MediaPublisher =
 
 internal typealias InviteAcceptor = suspend (String, String) -> AppGroupRecordFfi
 
-/** Decodes a just-sent attachment's poster in the given worker domain, its send's shared outgoing domain. */
+/** Decodes a just-sent attachment's poster in the given worker domain, that of the draft it was sent from. */
 internal typealias MediaThumbnailDecoder =
     suspend (PendingAttachment, dev.ipf.whitenoise.android.media.MediaTrustDomain) -> android.graphics.Bitmap?
 
@@ -6486,7 +6486,7 @@ class ConversationController(
         }
     },
     private val mediaPublisher: MediaPublisher? = null,
-    // A just-sent pick decodes in the domain its send names, the conversation's shared outgoing worker.
+    // A just-sent pick decodes in its sent draft's domain, whose worker retires once the send has ended.
     private val mediaThumbnailDecoder: MediaThumbnailDecoder = { attachment, domain ->
         decodeMediaThumbnailOffMain(attachment, domain)
     },
@@ -6897,14 +6897,44 @@ class ConversationController(
             dev.ipf.whitenoise.android.media.MediaTrustDomain
                 .conversation(conversationAccountRef, group.groupIdHex)
 
+    // Which draft each pick belongs to; an ended draft's worker retires once nothing decodes in it any more.
+    private val outgoingDrafts =
+        dev.ipf.whitenoise.android.media.OutgoingDrafts { draft ->
+            dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                .retireDomain(outgoingDraftDomain(draft))
+        }
+
     /**
-     * The domain every file this conversation's user picks to send here decodes in, restored draft attachments
-     * included: the draft's one shared outgoing worker, never another conversation's.
+     * The domain of one file this conversation's user picked to send here: [pick] is its composer slot id, which a
+     * restored draft attachment keeps as its own, or a document's URI. It decodes in its draft's one shared worker,
+     * which no later draft reaches, while a read that names no pick decodes single-use.
      */
-    internal val outgoingMediaTrustDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain
-        get() =
-            dev.ipf.whitenoise.android.media.MediaTrustDomain
-                .outgoing(conversationAccountRef, group.groupIdHex)
+    internal fun outgoingMediaTrustDomain(pick: String?): dev.ipf.whitenoise.android.media.MediaTrustDomain =
+        if (pick.isNullOrEmpty()) {
+            dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique
+        } else {
+            outgoingDraftDomain(outgoingDrafts.draftOf(pick))
+        }
+
+    /** The outgoing domain of [draft] in this conversation. */
+    private fun outgoingDraftDomain(draft: String): dev.ipf.whitenoise.android.media.MediaTrustDomain =
+        dev.ipf.whitenoise.android.media.MediaTrustDomain
+            .outgoing(conversationAccountRef, group.groupIdHex, draft)
+
+    /**
+     * Starts a send of [picks]: they keep their draft's worker and the next pick starts a new draft. Returns the drafts
+     * the send decodes in, which [endOutgoingSend] releases once its just-sent thumbnails are done.
+     */
+    internal fun beginOutgoingSend(picks: Collection<String>): Set<String> = outgoingDrafts.beginSend(picks)
+
+    /** Ends a send [beginOutgoingSend] started, retiring each of its [drafts] that nothing decodes in any more. */
+    internal fun endOutgoingSend(drafts: Set<String>) = outgoingDrafts.endSend(drafts)
+
+    /**
+     * Records the [picks] now in the composer, so a sent pick that left it releases its draft and an empty composer
+     * ends the current draft.
+     */
+    internal fun retainOutgoingPicks(picks: Set<String>) = outgoingDrafts.retain(picks)
 
     /** Current retained owner eligibility; the shell's privacy and route admission remain independent. */
     internal val ownsRetainedForegroundPresentation: Boolean
@@ -9607,11 +9637,8 @@ class ConversationController(
                         // Offload the multi-MB ARGB decode to Default; the
                         // main-confined thumbnail-cache put resumes on Main.
                         // Mirrors the receive/render path in WhiteNoiseApp.
-                        // The send's own account and conversation name the outgoing domain its previews used.
-                        val outgoing =
-                            dev.ipf.whitenoise.android.media.MediaTrustDomain
-                                .outgoing(account, group.groupIdHex)
-                        val decoded = mediaThumbnailDecoder(attachment, outgoing)
+                        // The attachment names its sent draft's domain, the one its previews used.
+                        val decoded = mediaThumbnailDecoder(attachment, attachment.outgoingDomain)
                         if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
                         if (decoded != null) {
                             appState.cacheMediaThumbnail(confirmedKey, decoded)

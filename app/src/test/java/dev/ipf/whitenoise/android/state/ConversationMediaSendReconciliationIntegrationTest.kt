@@ -90,6 +90,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -764,12 +765,13 @@ class ConversationMediaSendReconciliationThumbnailTest {
         }
 
     /**
-     * A just-sent photo's poster decodes in its send's account and conversation outgoing domain, the shared draft
-     * worker its previews used, and never in another conversation's.
+     * A just-sent photo's poster decodes in the outgoing domain its attachment names, that of the draft it was sent
+     * from, whatever draft is current by then. The poster retires nothing: its draft's worker retires once the send
+     * that owns it has ended.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun justSentPosterDecodesInItsConversationsSharedWorker() =
+    fun justSentPosterDecodesInItsSentDraftsDomain() =
         runTest {
             Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
             val state = mediaSendReconciliationAppState()
@@ -788,13 +790,14 @@ class ConversationMediaSendReconciliationThumbnailTest {
                 )
             try {
                 controller.retryMembers()
+                val sentDraft = MediaTrustDomain.outgoing(ACCOUNT_REF, GROUP_ID, "sent-draft")
                 controller.sendAttachments(
-                    listOf(PendingAttachment(PHOTO_BYTES, "image/png", "photo.png", "1x1")),
+                    listOf(PendingAttachment(PHOTO_BYTES, "image/png", "photo.png", "1x1", outgoingDomain = sentDraft)),
                     null,
                 )
-                val outgoing = MediaTrustDomain.Outgoing(ACCOUNT_REF, GROUP_ID)
-                assertEquals(outgoing, controller.outgoingMediaTrustDomain)
-                assertEquals(listOf(outgoing), recorder.decoded.toList())
+                assertNotEquals(sentDraft, controller.outgoingMediaTrustDomain(PHOTO_PICK))
+                assertEquals(listOf(sentDraft), recorder.decoded.toList())
+                assertEquals(emptyList<MediaTrustDomain>(), recorder.retired.toList())
             } finally {
                 IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)
                 finishMediaFixture(controller, state)
@@ -1191,11 +1194,13 @@ private val GROUP_ID = "b2".repeat(32)
 private val CONFIRMED_MESSAGE_ID = "c3".repeat(32)
 private const val VIDEO_MEDIA_TYPE = "video/mp4"
 private val VIDEO_BYTES = byteArrayOf(0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109)
+private const val PHOTO_PICK = "slot-photo"
 private val PHOTO_BYTES = byteArrayOf(1, 2, 3, 4)
 
-/** Decodes nothing and records the domain of every still decode, in order. */
+/** Decodes nothing and records the domain of every still decode and every retirement, in order. */
 private class PosterDomainRecorder : MediaDecodeTransport {
     val decoded = CopyOnWriteArrayList<MediaTrustDomain>()
+    val retired = CopyOnWriteArrayList<MediaTrustDomain>()
 
     /** Records the domain the decode declares and returns no pixels. */
     override fun decode(
@@ -1210,6 +1215,11 @@ private class PosterDomainRecorder : MediaDecodeTransport {
 
     /** No inspection: the poster path only decodes. */
     override fun inspect(bytes: ByteArray): ImageInspection? = null
+
+    /** Records [domain] in call order. */
+    override fun retireDomain(domain: MediaTrustDomain) {
+        retired += domain
+    }
 }
 
 /** Allocates a test-only opaque native draft token without loading the device ABI. */

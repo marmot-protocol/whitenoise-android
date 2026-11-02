@@ -286,15 +286,17 @@ class PhotoDraftStagerTest {
 
     /**
      * Picks staged through their content URIs, at standard and Original quality, run every inspection, render and
-     * Original preparation in their conversation's one shared outgoing worker, and a pick of another conversation
-     * runs in that conversation's own. Staging an attachment the draft already holds, as restoring a draft does,
-     * inspects it in the same shared worker (#3373).
+     * Original preparation in the domain the draft policy names for them: one draft's picks share its worker, and a
+     * pick of a later draft runs in that draft's own. Staging an attachment the draft already holds, as restoring a
+     * draft does, inspects it in the same shared worker (#3373).
      */
     @Test
-    fun everyStagedPickDecodesInItsConversationsSharedWorker() =
+    fun everyStagedPickDecodesInItsDraftsSharedWorker() =
         runTest {
             EditorDomainRecorder().use { recorder ->
-                val fixture = fixture()
+                val draftOf = mapOf("slot-a" to "first-draft", "slot-b" to "first-draft", "slot-c" to "later-draft")
+                val domainOf = { pick: String -> MediaTrustDomain.outgoing(ACCOUNT, GROUP, draftOf.getValue(pick)) }
+                val fixture = fixture(outgoingDomain = domainOf)
                 val bytes = pngBytes()
                 ShadowContentResolver.reset()
                 val uris =
@@ -304,22 +306,29 @@ class PhotoDraftStagerTest {
                 }
                 val cases =
                     listOf(
-                        Triple("slot-a", GROUP, MediaQuality.Standard),
-                        Triple("slot-b", GROUP, MediaQuality.Original),
-                        Triple("slot-c", OTHER_GROUP, MediaQuality.Standard),
+                        "slot-a" to MediaQuality.Standard,
+                        "slot-b" to MediaQuality.Original,
+                        "slot-c" to MediaQuality.Standard,
                         // Already in the draft: restored through its committed session, not staged again.
-                        Triple("slot-a", GROUP, MediaQuality.Standard),
+                        "slot-a" to MediaQuality.Standard,
                     )
-                cases.forEach { (slot, group, quality) ->
+                cases.forEach { (slot, quality) ->
                     recorder.clear()
-                    val staged = fixture.stager.stage(uris.getValue(slot), slot, ACCOUNT, group, quality)
+                    val staged = fixture.stager.stage(uris.getValue(slot), slot, ACCOUNT, GROUP, quality)
                     assertTrue(staged is PhotoDraftStageResult.Success)
-                    assertEquals(setOf(MediaTrustDomain.Outgoing(ACCOUNT, group)), recorder.domains())
+                    assertEquals(setOf(domainOf(slot)), recorder.domains())
                 }
+                // The later draft's pick never shared the first draft's worker.
+                val distinct = draftOf.keys.map(domainOf).toSet()
+                assertEquals(2, distinct.size)
             }
         }
 
-    private fun fixture(onEncode: () -> Unit = {}): Fixture {
+    /** A stager over in-memory stores whose picks decode in [outgoingDomain], single-use unless a test names one. */
+    private fun fixture(
+        onEncode: () -> Unit = {},
+        outgoingDomain: (String) -> MediaTrustDomain = { MediaTrustDomain.Unique },
+    ): Fixture {
         val payloads = StagerPayloadStore()
         val sources =
             EditorSourceStore(
@@ -348,6 +357,7 @@ class PhotoDraftStagerTest {
                     sessions = sessions,
                     renderer = renderer,
                     drafts = drafts,
+                    outgoingDomain = outgoingDomain,
                     ioDispatcher = dispatcher,
                 ),
         )
@@ -414,7 +424,6 @@ class PhotoDraftStagerTest {
     companion object {
         private const val ACCOUNT = "account"
         private const val GROUP = "group"
-        private const val OTHER_GROUP = "other-group"
         private const val PNG_IEND_CHUNK_BYTES = 12
         private const val SENSITIVE_METADATA = "private gps metadata"
     }

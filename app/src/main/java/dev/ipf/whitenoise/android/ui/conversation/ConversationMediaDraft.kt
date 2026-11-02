@@ -23,6 +23,7 @@ import androidx.core.content.FileProvider
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.media.editor.DraftBackedPhoto
 import dev.ipf.whitenoise.android.media.editor.DraftPreparedPhoto
 import dev.ipf.whitenoise.android.media.editor.MessageDraftRepository
@@ -108,12 +109,11 @@ internal class ConversationMediaDraftState(
     private val messages: PhotoEditorMessages,
     private val pendingCameraFiles: PendingCameraCaptureFiles? = null,
 ) {
-    // Every inspection, preview and render names the conversation's shared outgoing domain per call.
+    // Every inspection, preview and render names its pick's draft's outgoing domain per call.
     private val renderer = PhotoEditorRenderer()
 
-    /** The outgoing domain this conversation's own picks decode in, for previews that hold no controller. */
-    val pickedMediaDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain
-        get() = controller.outgoingMediaTrustDomain
+    /** The outgoing domain of one pick's draft, by slot id or document URI, for previews that hold no controller. */
+    fun pickedMediaDomain(pick: String?): MediaTrustDomain = controller.outgoingMediaTrustDomain(pick)
 
     private val stager =
         PhotoDraftStager(
@@ -122,6 +122,7 @@ internal class ConversationMediaDraftState(
             sessions = appState.editorSessionStore,
             renderer = renderer,
             drafts = appState.messageDraftRepository,
+            outgoingDomain = controller::outgoingMediaTrustDomain,
         )
     private val committer =
         PhotoEditorCommitter(
@@ -130,7 +131,7 @@ internal class ConversationMediaDraftState(
             drafts = appState.messageDraftRepository,
         )
     private val attachmentReader =
-        ConversationAttachmentReader(appState, context, domain = { controller.outgoingMediaTrustDomain })
+        ConversationAttachmentReader(appState, context, domain = controller::outgoingMediaTrustDomain)
 
     private var currentSlots: List<PendingMediaSlot> = emptyList()
     private var currentDocumentUris: List<Uri> = emptyList()
@@ -157,7 +158,10 @@ internal class ConversationMediaDraftState(
         private set
     private var requestedEditorSlotId: String? = null
 
-    /** Refreshes the latest shelf projection without making it the byte owner. */
+    /**
+     * Refreshes the latest shelf projection without making it the byte owner, and tells the controller which picks the
+     * composer holds, so a draft that was sent or emptied gains no later pick.
+     */
     fun updateInputs(
         slots: List<PendingMediaSlot>,
         documentUris: List<Uri>,
@@ -176,6 +180,8 @@ internal class ConversationMediaDraftState(
         currentSlots = slots
         currentDocumentUris = documentUris
         currentAccountRef = accountRef
+        // A sent pick that left the composer releases its draft, and an empty composer ends the current one.
+        controller.retainOutgoingPicks(slots.mapTo(HashSet()) { it.id } + documentUris.map(Uri::toString))
     }
 
     /** Stages picks on the process lifetime so navigation cannot cancel native-draft persistence. */
@@ -244,7 +250,7 @@ internal class ConversationMediaDraftState(
                         controller.group.groupIdHex,
                         photo,
                         DraftPhotoEdit(photo.recipe, quality),
-                        controller.outgoingMediaTrustDomain,
+                        controller.outgoingMediaTrustDomain(slot.id),
                     )
                 if (result is PhotoEditorCommitResult.Success) {
                     val updated =
@@ -316,7 +322,7 @@ internal class ConversationMediaDraftState(
                         controller.group.groupIdHex,
                         editor.photo,
                         DraftPhotoEdit(recipe, quality),
-                        controller.outgoingMediaTrustDomain,
+                        controller.outgoingMediaTrustDomain(editor.slot.id),
                     )
             ) {
                 is PhotoEditorCommitResult.Success -> {
@@ -571,7 +577,7 @@ internal class ConversationMediaDraftState(
         slot: PendingMediaSlot,
         accountRef: String,
     ) {
-        val pending = attachmentReader.readVisualDraft(slot.uri) ?: return
+        val pending = attachmentReader.readVisualDraft(slot.uri, slot.id) ?: return
         val prepared =
             stageVisualDraft(
                 appState.messageDraftRepository,
@@ -650,7 +656,7 @@ internal class ConversationMediaDraftState(
 
         requestedEditorSlotId = null
         val sourceBytes = withContext(Dispatchers.IO) { appState.editorSourceStore.bytes(photo.sourceLeaseId) }
-        val preview = sourceBytes?.let { renderer.decodePreview(it, controller.outgoingMediaTrustDomain) }
+        val preview = sourceBytes?.let { renderer.decodePreview(it, controller.outgoingMediaTrustDomain(slot.id)) }
         if (!currentCoroutineContext().isActive) {
             preview?.recycle()
         } else if (preview == null) {
@@ -871,8 +877,8 @@ internal fun ConversationMediaDraftContent(
             }
         previewStateHolder.SaveableStateProvider(if (onClosePreview == null) chatId else previewKey) {
             androidx.compose.runtime.CompositionLocalProvider(
-                dev.ipf.whitenoise.android.ui.conversation.media.LocalPickedMediaDomain provides
-                    state.pickedMediaDomain,
+                dev.ipf.whitenoise.android.ui.conversation.media.LocalPickMediaDomains provides
+                    state::pickedMediaDomain,
             ) {
                 MediaPreviewScreen(
                     mediaSlots = mediaSlots,

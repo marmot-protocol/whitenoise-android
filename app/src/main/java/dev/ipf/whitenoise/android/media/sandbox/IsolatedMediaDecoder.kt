@@ -86,6 +86,11 @@ internal object IsolatedMediaDecoder {
         mediaTransport = null
     }
 
+    /** Retires [domain]'s still-image worker, such as a draft that was sent or emptied. */
+    fun retireDomain(domain: dev.ipf.whitenoise.android.media.MediaTrustDomain) {
+        transport?.retireDomain(domain)
+    }
+
     fun decode(
         bytes: ByteArray,
         edge: Int,

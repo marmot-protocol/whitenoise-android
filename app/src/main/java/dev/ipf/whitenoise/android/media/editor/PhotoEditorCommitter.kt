@@ -65,7 +65,7 @@ internal class PhotoEditorCommitter(
                 null
             } ?: return PhotoEditorCommitResult.SourceUnavailable
         currentCoroutineContext().ensureActive()
-        // The render runs in the conversation's shared outgoing worker, which only this draft's picks reach.
+        // The render runs in the pick's draft's shared outgoing worker, which only that draft's picks reach.
         val rendered = renderer.render(sourceBytes, recipe, quality, domain)
         if (rendered !is PhotoEditorRenderResult.Success) {
             return PhotoEditorCommitResult.RenderFailed(rendered)

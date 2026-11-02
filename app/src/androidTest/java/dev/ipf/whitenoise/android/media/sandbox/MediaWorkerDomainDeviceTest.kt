@@ -6,6 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.whitenoise.android.PullRequestDeviceSmoke
 import dev.ipf.whitenoise.android.media.MediaTrustDomain
+import dev.ipf.whitenoise.android.media.OutgoingDrafts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
@@ -55,12 +56,12 @@ class MediaWorkerDomainDeviceTest {
     }
 
     /**
-     * A draft's picks share their conversation's outgoing worker: the second pick's input reaches the process that
-     * holds the first pick's state. A second conversation's picks never reach it, and no other domain shares it, not
-     * even the same conversation's received media.
+     * A draft's picks share their draft's outgoing worker: the second pick's input reaches the process that holds the
+     * first pick's state. A second conversation's draft never reaches it, and no other domain shares it, not even the
+     * same conversation's received media.
      */
     @Test
-    fun aDraftsPicksShareTheirConversationsOutgoingWorker() {
+    fun aDraftsPicksShareTheirDraftsOutgoingWorker() {
         val context = MediaWorkerBaselineBinding(InstrumentationRegistry.getInstrumentation().targetContext)
         val transport =
             IsolatedMediaTransport(
@@ -83,6 +84,55 @@ class MediaWorkerDomainDeviceTest {
             assertNotEquals(firstPick.pid, otherDraft.pid)
             assertEquals(WorkerCanary(received.pid, "-", "-"), received)
             assertNotEquals(firstPick.pid, received.pid)
+        } finally {
+            transport.close()
+            context.closeObservers()
+        }
+    }
+
+    /**
+     * Successive drafts of one conversation, by production's draft policy, never share a worker, even within the
+     * earlier worker's idle time and input cap. An emptied draft's pick is absent from the next draft's process; a
+     * pick made while a send runs starts a fresh process, while the sent pick's thumbnail still lands in its own
+     * draft's; and once that send has ended, the next draft's later picks reach only that next draft's process.
+     */
+    @Test
+    fun successiveDraftsNeverShareAWorker() {
+        val context = MediaWorkerBaselineBinding(InstrumentationRegistry.getInstrumentation().targetContext)
+        val transport =
+            IsolatedMediaTransport(
+                context,
+                "successive_drafts",
+                MediaWorkerPool.DOMAIN_SPARES,
+                liveLimit = MediaWorkerPool.MAX_LIVE_GENERATIONS,
+            )
+        val drafts = OutgoingDrafts { draft -> transport.retireDomain(draftDomain(draft)) }
+        try {
+            val emptied = png(Color.RED)
+            val sent = png(Color.BLUE)
+            val duringSend = png(Color.GREEN)
+            val firstDraft = canary(transport, draftDomain(drafts.draftOf("slot-a")), emptied)
+            drafts.retain(emptySet())
+            val secondDraft = canary(transport, draftDomain(drafts.draftOf("slot-b")), sent)
+            val send = drafts.beginSend(listOf("slot-b"))
+            val thirdDraft = canary(transport, draftDomain(drafts.draftOf("slot-c")), duringSend)
+            val sentThumbnail = canary(transport, draftDomain(drafts.draftOf("slot-b")), png(Color.YELLOW))
+            drafts.retain(setOf("slot-c"))
+            drafts.endSend(send)
+            val thirdDraftNext = canary(transport, draftDomain(drafts.draftOf("slot-d")), png(Color.CYAN))
+            assertEquals(WorkerCanary(firstDraft.pid, "-", "-"), firstDraft)
+            // The emptied draft's pick is absent from the next draft's process.
+            assertEquals(WorkerCanary(secondDraft.pid, "-", "-"), secondDraft)
+            assertNotEquals(firstDraft.pid, secondDraft.pid)
+            // A pick made during the send starts a fresh process holding nothing of the sent draft.
+            assertEquals(WorkerCanary(thirdDraft.pid, "-", "-"), thirdDraft)
+            assertNotEquals(secondDraft.pid, thirdDraft.pid)
+            // The sent pick's thumbnail stays in its own draft's process.
+            assertEquals(secondDraft.pid, sentThumbnail.pid)
+            assertEquals(digest(sent), sentThumbnail.previousState)
+            // The next draft's later pick reaches that draft's process only, never the sent draft's.
+            assertEquals(thirdDraft.pid, thirdDraftNext.pid)
+            assertEquals(digest(duringSend), thirdDraftNext.previousState)
         } finally {
             transport.close()
             context.closeObservers()
@@ -121,8 +171,11 @@ class MediaWorkerDomainDeviceTest {
     private companion object {
         val CONVERSATION_A = MediaTrustDomain.Conversation("device-test", "a")
         val CONVERSATION_B = MediaTrustDomain.Conversation("device-test", "b")
-        val DRAFT_A = MediaTrustDomain.outgoing("device-test", "a")
-        val DRAFT_B = MediaTrustDomain.outgoing("device-test", "b")
+        val DRAFT_A = MediaTrustDomain.outgoing("device-test", "a", "draft")
+        val DRAFT_B = MediaTrustDomain.outgoing("device-test", "b", "draft")
         const val CANARY_DIGEST_CHARS = 16
+
+        /** The outgoing domain of [draft] in conversation A. */
+        fun draftDomain(draft: String): MediaTrustDomain = MediaTrustDomain.outgoing("device-test", "a", draft)
     }
 }
