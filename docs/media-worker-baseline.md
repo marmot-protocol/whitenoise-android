@@ -3,8 +3,8 @@
 This characterization was introduced before worker-per-input retirement, when
 the production transport reused its worker after successful requests. Preserve
 those measurements separately from later lifetime measurements. The baseline
-drives the domain-bound transport (#3373), which production installs. Its budget
-was accepted on #3373 on 2 November 2026.
+drives the domain-bound transport (#3373), which production installs pending
+approval of its budget.
 The audio/video containment, sender-trust, video-metadata and document-privacy
 work in #3374–#3377 remains pending.
 
@@ -82,20 +82,21 @@ execution supplies the platform evidence.
 
 Review raw healthy and negative samples before choosing a regression budget.
 Historical baseline measurements remain separate from the candidate's
-domain-bound lifetime behavior. The lifetime candidate's matched performance budget and
-amended acceptance were accepted on #3373 on 2 November 2026, with release-type measurements on a
-stock Pixel 9 Pro XL and a GrapheneOS Pixel 9a.
+domain-bound lifetime behavior. Matched performance-budget approval, worker-resource evidence
+and platform qualification for the lifetime candidate remain pending. The
+default is switched pending that review; restore the reusable default if the
+budget is rejected.
 
 The original `non-production` invariant exemption applies to the historical
 test-only baseline slice. The lifetime implementation has separate behavioral
-tests and platform requirements. #3374–#3377 remain open, and #3373 ends with the lifetime implementation. Existing permanent
+tests and platform requirements. All five issues remain open. Existing permanent
 manual IDs and unchecked results are retained.
 
 The [still-image worker lifetime](media-worker-lifetime.md) documents the
 production owner and its qualification boundaries.
 
-Production installation uses the domain-bound transport. Its budget was
-accepted on #3373 on 2 November 2026. That acceptance rests on the matched throughput comparison and
+Production installation uses the domain-bound transport, pending approval of
+its budget. That approval rests on the matched throughput comparison and
 UI-level checks below, not on this sequential corpus.
 
 ## Healthy startup timing
