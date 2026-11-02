@@ -148,6 +148,80 @@ void check(bool condition, const char* reason) {
     if (!condition) throw Failure(reason);
 }
 
+constexpr size_t kMaxQueuedBytes = 8U * 1024 * 1024;
+
+// Charge copied packet data and referenced buffer view bytes retained by clone.
+// Allocator bookkeeping is bounded separately by the 512-packet limit.
+constexpr bool addRetainedBytes(size_t bytes, size_t& total) {
+    if (total > kMaxQueuedBytes || bytes > kMaxQueuedBytes - total) return false;
+    total += bytes;
+    return true;
+}
+
+constexpr bool packetRetainedBytes(const AVPacket& packet, size_t& total) {
+    total = sizeof(AVPacket);
+    if (packet.size < 0 || packet.side_data_elems < 0 ||
+        packet.side_data_elems > AV_PKT_DATA_NB ||
+        (packet.side_data_elems && !packet.side_data)) return false;
+    if (packet.buf) {
+        if (!addRetainedBytes(sizeof(AVBufferRef), total) ||
+            !addRetainedBytes(packet.buf->size, total)) return false;
+    } else {
+        if (!addRetainedBytes(sizeof(AVBufferRef), total) ||
+            !addRetainedBytes(static_cast<size_t>(packet.size), total) ||
+            !addRetainedBytes(AV_INPUT_BUFFER_PADDING_SIZE, total)) return false;
+    }
+    if (packet.opaque_ref &&
+        (!addRetainedBytes(sizeof(AVBufferRef), total) ||
+         !addRetainedBytes(packet.opaque_ref->size, total))) return false;
+    for (int i = 0; i < packet.side_data_elems; ++i) {
+        if (!addRetainedBytes(sizeof(AVPacketSideData), total) ||
+            !addRetainedBytes(packet.side_data[i].size, total) ||
+            !addRetainedBytes(AV_INPUT_BUFFER_PADDING_SIZE, total)) return false;
+    }
+    return total <= kMaxQueuedBytes;
+}
+
+// These exercise the production accounting against the pinned FFmpeg structs in
+// every CI native compilation; no independent model of the algorithm is used.
+constexpr bool packetRetentionRegression() {
+    AVPacket packet{};
+    AVPacketSideData side[2]{};
+    size_t cost = 0;
+    packet.side_data = side;
+    packet.side_data_elems = 2;
+    side[0].size = 1024;
+    side[1].size = 2048;
+    if (!packetRetainedBytes(packet, cost) ||
+        cost != sizeof(AVPacket) + sizeof(AVBufferRef) +
+                    2 * sizeof(AVPacketSideData) + 3072 + 3 * AV_INPUT_BUFFER_PADDING_SIZE) return false;
+    size_t aggregate = kMaxQueuedBytes - cost;
+    if (!addRetainedBytes(cost, aggregate) || addRetainedBytes(1, aggregate)) return false;
+    side[1].size = std::numeric_limits<size_t>::max();
+    if (packetRetainedBytes(packet, cost)) return false;
+    packet.side_data_elems = 0;
+    packet.size = -1;
+    if (packetRetainedBytes(packet, cost)) return false;
+    packet.size = 1;
+    AVBufferRef buffer{};
+    packet.buf = &buffer;
+    buffer.size = kMaxQueuedBytes;
+    if (packetRetainedBytes(packet, cost)) return false;
+    buffer.size = 1024;
+    packet.opaque_ref = &buffer;
+    if (!packetRetainedBytes(packet, cost) ||
+        cost != sizeof(AVPacket) + 2 * (sizeof(AVBufferRef) + 1024)) return false;
+    packet.side_data_elems = 1;
+    packet.side_data = nullptr;
+    return !packetRetainedBytes(packet, cost);
+}
+static_assert(packetRetentionRegression(), "compressed packet retention accounting changed");
+
+struct QueuedPacket {
+    AVPacket* packet;
+    size_t retainedBytes;
+};
+
 struct Track {
     int index = -1;
     AVCodecContext* codec = nullptr;
@@ -155,9 +229,9 @@ struct Track {
     bool ended = false;
     bool hasFrame = false;
     AVFrame* frame = nullptr;
-    std::deque<AVPacket*> packets;
+    std::deque<QueuedPacket> packets;
     ~Track() {
-        for (auto* packet : packets) av_packet_free(&packet);
+        for (auto& queued : packets) av_packet_free(&queued.packet);
         av_frame_free(&frame);
         avcodec_free_context(&codec);
     }
@@ -603,11 +677,12 @@ bool pump(Session& s, Track& track) {
         if (result == AVERROR_EOF) { track.ended = true; return false; }
         check(result == AVERROR(EAGAIN), "media_decode_failed");
         if (!track.packets.empty()) {
-            auto* packet = track.packets.front();
+            auto queued = track.packets.front();
+            auto* packet = queued.packet;
             const int sent = avcodec_send_packet(track.codec, packet);
             // receive(EAGAIN) then send(EAGAIN) violates the codec API contract.
             check(sent >= 0, "media_packet_refused");
-            s.queuedBytes -= static_cast<size_t>(packet->size);
+            s.queuedBytes -= queued.retainedBytes;
             --s.queuedPackets;
             track.packets.pop_front();
             av_packet_free(&packet);
@@ -634,13 +709,19 @@ void queuePacket(Session& s) {
     if (s.wantVideo && s.packet->stream_index == s.video.index) track = &s.video;
     if (s.wantAudio && s.packet->stream_index == s.audio.index) track = &s.audio;
     if (track && !track->ended) {
-        check(s.packet->size >= 0 && s.packet->size <= 8 * 1024 * 1024 &&
-              s.queuedBytes <= 8 * 1024 * 1024 - static_cast<size_t>(s.packet->size) && s.queuedPackets < 512,
+        size_t retainedBytes = 0;
+        check(packetRetainedBytes(*s.packet, retainedBytes) &&
+              s.queuedBytes <= kMaxQueuedBytes - retainedBytes && s.queuedPackets < 512,
               "compressed_lookahead_budget_refused");
         auto* owned = av_packet_clone(s.packet);
         check(owned, "packet_queue_allocation_refused");
-        track->packets.push_back(owned);
-        s.queuedBytes += static_cast<size_t>(owned->size);
+        try {
+            track->packets.push_back({owned, retainedBytes});
+        } catch (...) {
+            av_packet_free(&owned);
+            throw;
+        }
+        s.queuedBytes += retainedBytes;
         ++s.queuedPackets;
     }
     av_packet_unref(s.packet);
@@ -894,7 +975,7 @@ Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeSeek(
             if (track->codec) avcodec_flush_buffers(track->codec);
             track->flushed = false; track->ended = false; track->hasFrame = false;
             if (track->frame) av_frame_unref(track->frame);
-            for (auto* packet : track->packets) av_packet_free(&packet);
+            for (auto& queued : track->packets) av_packet_free(&queued.packet);
             track->packets.clear();
         }
         av_packet_unref(s.packet);
