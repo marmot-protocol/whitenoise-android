@@ -9,7 +9,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import java.io.FileNotFoundException
 
-/** Public, immutable audio only; no files, account data, grants or caller-controlled paths. */
+/** Public, bundled audio only; no files, account data, grants or caller-controlled paths. */
 class NotificationToneProvider : ContentProvider() {
     override fun onCreate(): Boolean = true
 

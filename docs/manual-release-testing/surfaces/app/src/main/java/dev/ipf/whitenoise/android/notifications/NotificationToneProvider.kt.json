@@ -4,7 +4,7 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "Canonical named and legacy public audio URIs",
+        "surface": "Canonical named and legacy public audio URIs serving the current bundled Ding",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationToneProvider.kt",
         "anchor": "class NotificationToneProvider",
         "test_ids": [

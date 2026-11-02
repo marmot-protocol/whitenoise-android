@@ -156,7 +156,7 @@ class NotificationTonesTest {
     }
 
     @Test
-    fun retainedVersionOneUrisAlwaysResolveToTheOriginalWaveforms() {
+    fun retainedToneUrisResolveToTheCurrentBundledWaveforms() {
         val provider =
             Robolectric.setupContentProvider(
                 NotificationToneProvider::class.java,
@@ -167,7 +167,7 @@ class NotificationTonesTest {
                 Triple(
                     NotificationTone.DING,
                     "ding-v1",
-                    "29c4fae0fb9ef09032fdd3bf72d541d1e89f966fabf0b3f246df7047b514c884",
+                    "2ff4a14155ecef716aaa40023bf31d3df8b623915af723cd2a95f96994198917",
                 ),
                 Triple(
                     NotificationTone.PULSE,
