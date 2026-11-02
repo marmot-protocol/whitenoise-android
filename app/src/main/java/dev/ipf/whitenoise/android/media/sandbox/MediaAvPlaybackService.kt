@@ -185,6 +185,7 @@ class MediaAvPlaybackService : Service() {
     }
 
     /** Owns the one selected FD and output mappings; refuses any generation lacking identity. */
+    @Suppress("CyclomaticComplexMethod") // One OPEN owns selected-FD validation, mappings and native admission.
     private fun open(
         nextToken: String,
         nextSequence: Long,

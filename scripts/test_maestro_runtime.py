@@ -2279,7 +2279,7 @@ class RuntimeEvidenceTest(unittest.TestCase):
         jobs = workflow['jobs']
         self.assertIn("github.event_name == 'workflow_dispatch'", jobs['maestro-runtime-build']['if'])
         self.assertIn("startsWith(inputs.maestro_suite, 'runtime-')", jobs['maestro-runtime-build']['if'])
-        self.assertEqual(jobs['maestro-runtime']['needs'], 'maestro-runtime-build')
+        self.assertEqual(jobs['maestro-runtime']['needs'], ['changes', 'maestro-runtime-build'])
         self.assertNotIn('gradlew', json.dumps(jobs['maestro-runtime']))
         self.assertEqual(jobs['maestro-runtime']['strategy']['max-parallel'], 2)
         self.assertGreater(jobs['maestro-runtime']['timeout-minutes'] * 60,

@@ -323,6 +323,7 @@ class IsolatedAttachmentPlayerDeviceTest {
                     },
                 )
                 created.prepare()
+                created.play()
             }
             val deadline = SystemClock.elapsedRealtime() + 15_000
             while (failure.get() == null && SystemClock.elapsedRealtime() < deadline) SystemClock.sleep(20)

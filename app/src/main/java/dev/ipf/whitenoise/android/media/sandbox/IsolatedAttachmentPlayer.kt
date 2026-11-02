@@ -214,6 +214,7 @@ internal class IsolatedAttachmentPlayer(
     }
 
     /** Maps only attributable missing-file or exact container refusals to cache-invalidating Player codes. */
+    @Suppress("ReturnCount") // Preserve distinct attributed refusals and the bounded cause-chain fallback.
     private fun playbackError(failure: IOException): PlaybackException {
         var cause: Throwable? = failure
         repeat(8) {

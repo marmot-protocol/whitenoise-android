@@ -1100,6 +1100,8 @@ class MediaBindingRecoveryTest {
             assertTrue(first.thread.isAlive)
             first.interruptAndJoin()
             assertNull(first.result.get())
+            // Drain asynchronous unbinding while requiring the failed cleanup to retain ownership.
+            assertFalse(awaitAutomaticRelease(transport))
             val held = startAutomatic { transport.probe(file, 1, false) }.also { calls += it }
             held.join()
             assertNull(held.result.get())

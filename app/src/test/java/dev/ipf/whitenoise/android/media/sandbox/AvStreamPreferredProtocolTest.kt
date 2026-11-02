@@ -311,6 +311,7 @@ class AvStreamPreferredProtocolTest {
 
         private fun endpoint(): Binder =
             object : Binder() {
+                @Suppress("ReturnCount") // Each simulated reply mode terminates at its exact protocol boundary.
                 override fun onTransact(
                     code: Int,
                     data: Parcel,

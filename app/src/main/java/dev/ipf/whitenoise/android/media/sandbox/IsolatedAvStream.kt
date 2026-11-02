@@ -240,6 +240,7 @@ internal class IsolatedAvStream private constructor(
      * A late exact generation identity may establish cleanup evidence after revocation. It never
      * authorizes OPEN: that requires the current account epoch and an atomic exposure commit.
      */
+    @Suppress("ReturnCount") // Reject invalid callbacks before acknowledging the exact retained generation.
     private fun acceptIdentity(
         data: Parcel,
         reply: Parcel?,
@@ -452,7 +453,7 @@ internal class IsolatedAvStream private constructor(
         }
     }
 
-    @Suppress("CyclomaticComplexMethod", "ThrowsCount", "TooGenericExceptionCaught")
+    @Suppress("CyclomaticComplexMethod", "ThrowsCount", "TooGenericExceptionCaught", "LongMethod")
     // One RPC owns tuple validation, deadline, parcel recycling and its lifetime credit on every failure.
     private fun transact(
         code: Int,
