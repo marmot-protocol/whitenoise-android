@@ -81,13 +81,15 @@ internal const val LIBRARY_AUTO_EMPTY_BATCHES = 3
 /**
  * How far the library has read. [hasMore] means MDK returned a continuation; [failed] stops automatic
  * paging until the user retries, and [filtersUnsupported] means MDK refused these filters outright.
- * [emptyBatches] counts the latest consecutive batches that admitted nothing.
+ * [emptyBatches] counts the latest consecutive batches that admitted nothing, and [batch] changes with
+ * every finished batch, so paging effects relaunch even when a batch loads within one frame.
  */
 internal data class GlobalAttachmentPaging(
     val hasMore: Boolean = false,
     val failed: Boolean = false,
     val filtersUnsupported: Boolean = false,
     val emptyBatches: Int = 0,
+    val batch: Int = 0,
     val onLoadMore: () -> Unit = {},
     val onRetry: () -> Unit = {},
 )
@@ -139,10 +141,10 @@ internal fun GlobalAttachmentBrowser(
     }
     // A selective filter can end a bounded batch with no rows and more history left. The grid's paging
     // effect is not composed then, so the empty view reads a few more batches on its own, keyed by the
-    // batch count so a fast batch still relaunches it, then offers Load more.
+    // batch sequence so a fast batch still relaunches it, then offers Load more.
     val readingOn = items.isEmpty() && paging.autoReads()
     val currentPaging by rememberUpdatedState(paging)
-    LaunchedEffect(readingOn, loading, paging.emptyBatches) {
+    LaunchedEffect(readingOn, loading, paging.batch) {
         if (readingOn && !loading) currentPaging.onLoadMore()
     }
     Column(modifier.fillMaxSize().testTag(GLOBAL_LIBRARY_TAG)) {
@@ -294,7 +296,8 @@ private fun LibraryPagingEffect(
             last != null && last >= info.totalItemsCount - LIBRARY_PREFETCH_ITEMS
         }
     }
-    LaunchedEffect(nearEnd, loading, paging.hasMore, paging.failed, paging.emptyBatches) {
+    // Keyed on the batch sequence: a batch that loads within one frame changes no other key.
+    LaunchedEffect(nearEnd, loading, paging.hasMore, paging.failed, paging.batch) {
         if (nearEnd && !loading && currentPaging.autoReads()) currentPaging.onLoadMore()
     }
 }

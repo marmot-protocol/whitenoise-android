@@ -48,7 +48,8 @@ internal enum class AccountAttachmentFailure {
  * pagination and validity. [nextExpiry] is the earliest retention deadline the loaded pages reported.
  * [resuming] holds while a returning session rereads the rows an earlier session had loaded, so the
  * screen can wait for all of them before restoring its scroll position. [emptyBatches] counts the
- * consecutive batches that admitted no row, so the screen can stop reading a sparse filter on its own.
+ * consecutive batches that admitted no row, so the screen can stop reading a sparse filter on its own,
+ * and [batches] increases with every finished batch, so the screen can react to one it never saw load.
  */
 internal data class AccountAttachmentState(
     val entries: List<AccountAttachmentEntryFfi> = emptyList(),
@@ -59,6 +60,7 @@ internal data class AccountAttachmentState(
     val nextExpiry: ULong? = null,
     val resuming: Boolean = false,
     val emptyBatches: Int = 0,
+    val batches: Int = 0,
 )
 
 /**
@@ -173,7 +175,7 @@ internal class AccountAttachmentPager(
             work.entries.size - before < ACCOUNT_ATTACHMENT_BATCH_TARGET
         )
         val empty = work.entries.size == before
-        work = work.copy(emptyBatches = if (empty) work.emptyBatches + 1 else 0)
+        work = work.copy(emptyBatches = if (empty) work.emptyBatches + 1 else 0, batches = work.batches + 1)
     }
 
     /** Applies one native outcome without retaining stale rows across a destructive change. */

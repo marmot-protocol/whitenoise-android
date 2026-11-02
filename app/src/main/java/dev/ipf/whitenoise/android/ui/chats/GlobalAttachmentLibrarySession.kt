@@ -41,6 +41,8 @@ private const val NATIVE_SELECTION_LIMIT = 100
 
 private const val MILLIS_PER_SECOND = 1_000L
 private const val LIBRARY_OBSERVER_RETRY_MS = 5_000L
+private const val LIBRARY_CHAT_LOOKUP_ATTEMPTS = 3
+private const val LIBRARY_CHAT_LOOKUP_RETRY_MS = 1_000L
 
 /**
  * What the Files & media library lists (#2000). [groups] is null for every chat, and empty when the
@@ -286,13 +288,18 @@ internal fun rememberLibraryChats(
     val window = remember(controller.items, controller.archivedItems) { controller.items + controller.archivedItems }
     val known = remember(window) { window.mapTo(HashSet()) { it.group.groupIdHex.lowercase(Locale.ROOT) } }
     val resolved = remember(controller.boundAccountRef) { mutableStateMapOf<String, ChatListItem>() }
-    val missing =
-        remember(entries, known, resolved.size) {
-            entries.mapTo(HashSet()) { it.groupIdHex.lowercase(Locale.ROOT) } - known - resolved.keys
+    // Keyed on the listed chats outside the window only, so a finished lookup never cancels the next one.
+    val outside =
+        remember(entries, known) { entries.mapTo(HashSet()) { it.groupIdHex.lowercase(Locale.ROOT) } - known }
+    LaunchedEffect(outside) {
+        // A lookup can miss while the chat list is changing underneath it, so the misses are tried again.
+        repeat(LIBRARY_CHAT_LOOKUP_ATTEMPTS) { attempt ->
+            val owner = controller.captureChatListActionOwner() ?: return@LaunchedEffect
+            val pending = outside - resolved.keys
+            if (pending.isEmpty()) return@LaunchedEffect
+            if (attempt > 0) delay(LIBRARY_CHAT_LOOKUP_RETRY_MS)
+            for (group in pending) controller.resolveChatListActionItem(group, owner)?.let { resolved[group] = it }
         }
-    LaunchedEffect(missing) {
-        val owner = controller.captureChatListActionOwner() ?: return@LaunchedEffect
-        for (group in missing) controller.resolveChatListActionItem(group, owner)?.let { resolved[group] = it }
     }
     return remember(window, known, resolved.size) { window + resolved.filterKeys { it !in known }.values }
 }

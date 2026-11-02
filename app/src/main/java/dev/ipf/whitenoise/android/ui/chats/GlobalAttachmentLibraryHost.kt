@@ -52,6 +52,7 @@ internal fun GlobalAttachmentLibraryHost(
                 failed = failure != null,
                 filtersUnsupported = failure == AccountAttachmentFailure.QUERY,
                 emptyBatches = pager?.state?.emptyBatches ?: 0,
+                batch = pager?.state?.batches ?: 0,
                 onLoadMore = loadMore,
                 onRetry = loadMore,
             ),

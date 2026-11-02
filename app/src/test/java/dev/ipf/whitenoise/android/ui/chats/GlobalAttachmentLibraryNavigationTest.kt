@@ -135,7 +135,7 @@ class GlobalAttachmentLibraryNavigationTest {
         var reads = 0
         var empty by mutableStateOf(1)
         val paging = {
-            GlobalAttachmentPaging(hasMore = true, emptyBatches = empty, onLoadMore = {
+            GlobalAttachmentPaging(hasMore = true, emptyBatches = empty, batch = empty, onLoadMore = {
                 reads++
                 empty++
             })
@@ -161,6 +161,40 @@ class GlobalAttachmentLibraryNavigationTest {
         composeRule.onNodeWithText("No files or media found").assertIsDisplayed()
         composeRule.onNodeWithText("Load more").performClick()
         assertEquals(LIBRARY_AUTO_EMPTY_BATCHES, reads)
+    }
+
+    /**
+     * A sparse filter whose rows do not fill the screen keeps paging even when every batch loads within one
+     * frame, so loading never visibly flips: the batch sequence relaunches the read each time.
+     */
+    @Test
+    fun gridKeepsPagingWhenBatchesLoadWithinOneFrame() {
+        var shown by mutableStateOf(ITEMS.take(2))
+        var batch by mutableStateOf(0)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                GlobalAttachmentBrowser(
+                    items = shown,
+                    kinds = setOf(GlobalSearchContentKind.IMAGES_VIDEO),
+                    loading = false,
+                    bottomPadding =
+                        androidx.compose.ui.unit
+                            .Dp(0f),
+                    actions = GlobalAttachmentCardActions(),
+                    paging =
+                        GlobalAttachmentPaging(hasMore = shown.size < 6, batch = batch, onLoadMore = {
+                            shown = ITEMS.take(shown.size + 1)
+                            batch++
+                        }),
+                    zoneId = ZoneOffset.UTC,
+                    today = TODAY,
+                )
+            }
+        }
+        composeRule.waitForIdle()
+
+        assertEquals(6, shown.size)
+        assertEquals(4, batch)
     }
 
     /** The browser at a fixed day in UTC, recording opens and View in chat. */
