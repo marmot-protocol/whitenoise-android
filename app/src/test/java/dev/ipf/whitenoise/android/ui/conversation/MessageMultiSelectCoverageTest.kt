@@ -163,12 +163,30 @@ class MessageMultiSelectCoverageTest {
                     "onActionMenuOpenChange(true)",
             ),
         )
+        assertTrue(source.contains("val senderNameLabel:"))
+        assertTrue(source.contains("val replyPreviewCard:"))
+        val senderLabel = source.substringAfter("val senderNameLabel:").substringBefore("val replyPreviewCard:")
+        assertTrue(senderLabel.contains("MessageSenderLabel("))
+        assertTrue(
+            senderLabel.contains(
+                "Modifier.clickable( enabled = !selectionMode && !textSelectionMode, " +
+                    "onClick = { appState.presentProfile(appState.npub(record.sender)) }",
+            ),
+        )
+        assertFalse(senderLabel.contains("onLongClick"))
+        assertFalse(senderLabel.contains("combinedClickable"))
+        assertFalse(senderLabel.contains("onActionMenuOpenChange(true)"))
         assertTrue(
             source.contains(
-                "if (!deleted && !selectionMode && !textSelectionMode) { " +
-                    "pressState.longPressWindowPosition = null pressState.selectionSeedVisibleOffset = null " +
-                    "longPressWindowY = null pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0] " +
-                    "onActionMenuOpenChange(true)",
+                "Modifier.longPressOrVerticalDrag( enabled = " +
+                    "!tombstoneCleanupUnavailable && !longPressBlockedBySelection && !textSelectionMode, " +
+                    "onLongPressStart =",
+            ),
+        )
+        assertTrue(
+            source.contains(
+                "if (tombstoneCleanupUnavailable || selectionMode || textSelectionMode) { Modifier } else { " +
+                    "Modifier.semantics { onLongClick(label = messageActionsLabel)",
             ),
         )
     }
