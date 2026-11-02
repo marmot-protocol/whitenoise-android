@@ -35,6 +35,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.tts.TtsHistoryEdgeState
@@ -264,7 +265,9 @@ private fun TtsTransportProgress(
                     Text(
                         ttsRemainingLabel(resources, remainingSeconds),
                         modifier = Modifier.semantics { contentDescription = description },
-                        style = MaterialTheme.typography.labelMedium,
+                        // Direction follows the label's own script, so in an RTL layout an English
+                        // estimate keeps its leading ~ instead of moving it to the far end.
+                        style = MaterialTheme.typography.labelMedium.copy(textDirection = TextDirection.Content),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
