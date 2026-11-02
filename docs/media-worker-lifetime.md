@@ -1,7 +1,7 @@
 # Still-image worker lifetime
 
-Production installation uses domain-bound worker generations (#3373), switched
-pending approval of their proposed budget. The facade keeps one process-owned
+Production installation uses domain-bound worker generations (#3373). Their
+amended acceptance and measured budget were accepted on #3373 on 2 November 2026. The facade keeps one process-owned
 `IsolatedMediaTransport` across clear, install and account reset, so a held
 generation survives facade replacement.
 Each session has its own source access, refusal ledger and epoch; the ledger
