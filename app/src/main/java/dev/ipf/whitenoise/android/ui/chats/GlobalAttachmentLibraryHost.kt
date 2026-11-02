@@ -51,15 +51,14 @@ internal fun GlobalAttachmentLibraryHost(
                 hasMore = pager?.state?.hasMore == true,
                 failed = failure != null,
                 filtersUnsupported = failure == AccountAttachmentFailure.QUERY,
+                emptyBatches = pager?.state?.emptyBatches ?: 0,
                 onLoadMore = loadMore,
                 onRetry = loadMore,
             ),
         selectionOwner = viewport?.selection,
         gridState = viewport?.attachmentGrid ?: rememberLazyGridState(),
     )
-    // A failed read may leave only part of a reread range, so the viewer keeps its pages until Retry settles it.
-    val viewerLoading = library.loading || failure != null
     opener?.let {
-        GlobalAttachmentViewerHost(it, appState, library.items, viewerLoading, onGoToMessage = onOpenMessage)
+        GlobalAttachmentViewerHost(it, appState, library.items, library.loading, onGoToMessage = onOpenMessage)
     }
 }

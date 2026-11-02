@@ -91,7 +91,11 @@ internal fun GlobalAttachmentCard(
             customActions = listOf(CustomAccessibilityAction(goToMessage) { actions.onViewInChat(item).let { true } })
         }
     val clickable =
-        Modifier.combinedClickable(onClick = { actions.onOpen(item) }, onLongClick = { actions.onViewInChat(item) })
+        Modifier.combinedClickable(
+            onClick = { actions.onOpen(item) },
+            onLongClickLabel = goToMessage,
+            onLongClick = { actions.onViewInChat(item) },
+        )
     val tile = presentation == GlobalAttachmentPresentation.VISUAL
     val shape = if (tile) Modifier.clip(MaterialTheme.shapes.small) else Modifier
     // The clickable precedes the cleared semantics so its focus state and focus request reach keyboard and

@@ -108,6 +108,7 @@ class GlobalAttachmentLibraryTest {
         assertEquals(GlobalAttachmentSectionKey.Today, globalAttachmentSectionKey(secondsAt(43, 20), calendar))
     }
 
+    /** One image item at [timelineAt] in [group], with fixed title and file name. */
     private fun item(
         messageIdHex: String,
         timelineAt: ULong,

@@ -5,6 +5,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -21,6 +22,8 @@ import dev.ipf.marmotkit.MediaAttachmentOutcomeFfi
 import dev.ipf.whitenoise.android.core.GlobalAttachmentItem
 import dev.ipf.whitenoise.android.core.MessageSearchConstraints
 import dev.ipf.whitenoise.android.search.GlobalSearchContentKind
+import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.medialibrary.ACCOUNT_ATTACHMENT_PAGE_LIMIT
@@ -108,6 +111,12 @@ internal class GlobalAttachmentLibraryExtent {
 
     /** The rows to reread for [query]: the recorded count for the same query, otherwise none. */
     fun resumeCount(query: GlobalAttachmentLibraryQuery): Int = if (query == this.query) loaded else 0
+
+    /** Forgets the extent once the user leaves attachment browsing, whose return starts at the top. */
+    fun clear() {
+        query = null
+        loaded = 0
+    }
 }
 
 /** What the search screen hands the library: its listed items, view kinds and native session. */
@@ -181,7 +190,8 @@ internal fun AccountAttachmentEntryFfi.toLibraryItem(chatTitle: (String) -> Stri
  * Opens one library session for [query] while the screen is started, and closes it with every native
  * handle on stop, query change, account switch or runtime replacement. Projection updates for the
  * account and the earliest retention deadline the pages reported both trigger a change probe. With an
- * [extent], a reopened session for the same query first rereads as many rows as the last one held.
+ * [extent], a reopened session for the same query first rereads as many rows as the last one held; the
+ * extent records only settled reads and is forgotten when attachment browsing ends.
  */
 @Composable
 internal fun rememberGlobalAttachmentPager(
@@ -192,6 +202,7 @@ internal fun rememberGlobalAttachmentPager(
     extent: GlobalAttachmentLibraryExtent? = null,
 ): AccountAttachmentPager? {
     val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
+    SideEffect { if (!enabled) extent?.clear() }
     val active = account?.takeIf { enabled && it == appState.activeAccountRef }
     val started = lifecycleState.isAtLeast(Lifecycle.State.STARTED)
     if (active == null || query.matchesNothing || !started) return null
@@ -218,7 +229,7 @@ internal fun rememberGlobalAttachmentPager(
             )
         }
     DisposableEffect(pager) { onDispose { pager.close() } }
-    val settled = pager.state.takeIf { it.initialized && !it.resuming }
+    val settled = pager.state.takeIf { it.initialized && !it.resuming && !it.loading }
     SideEffect { if (settled != null) extent?.record(query, settled.entries.size) }
     val wakeups = remember(pager) { Channel<Unit>(Channel.CONFLATED) }
     LaunchedEffect(pager, appState.runtimeMirrors.blocks.users) { wakeups.send(Unit) }
@@ -260,6 +271,30 @@ private suspend fun observeLibraryChanges(
     } finally {
         subscription?.let { withContext(NonCancellable) { runCatching { it.destroy() } } }
     }
+}
+
+/**
+ * The chats the library can name and open (#2000). The chat list holds only a bounded window of rows, active
+ * and archived, so a listed attachment from a chat outside it is resolved from MDK by group, once per chat
+ * per account, the way off-window chat actions are.
+ */
+@Composable
+internal fun rememberLibraryChats(
+    controller: ChatsController,
+    entries: List<AccountAttachmentEntryFfi>,
+): List<ChatListItem> {
+    val window = remember(controller.items, controller.archivedItems) { controller.items + controller.archivedItems }
+    val known = remember(window) { window.mapTo(HashSet()) { it.group.groupIdHex.lowercase(Locale.ROOT) } }
+    val resolved = remember(controller.boundAccountRef) { mutableStateMapOf<String, ChatListItem>() }
+    val missing =
+        remember(entries, known, resolved.size) {
+            entries.mapTo(HashSet()) { it.groupIdHex.lowercase(Locale.ROOT) } - known - resolved.keys
+        }
+    LaunchedEffect(missing) {
+        val owner = controller.captureChatListActionOwner() ?: return@LaunchedEffect
+        for (group in missing) controller.resolveChatListActionItem(group, owner)?.let { resolved[group] = it }
+    }
+    return remember(window, known, resolved.size) { window + resolved.filterKeys { it !in known }.values }
 }
 
 /** "You" for the active account's own attachments, otherwise the sender's profile name. */

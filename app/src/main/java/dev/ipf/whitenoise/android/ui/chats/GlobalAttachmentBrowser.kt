@@ -73,13 +73,21 @@ private val LibraryGridGap = 3.dp
 private const val LIBRARY_PREFETCH_ITEMS = 12
 
 /**
+ * Consecutive batches that may admit nothing before the library stops reading on its own and offers Load
+ * more instead, so a filter matching nothing never walks the whole account index unasked.
+ */
+internal const val LIBRARY_AUTO_EMPTY_BATCHES = 3
+
+/**
  * How far the library has read. [hasMore] means MDK returned a continuation; [failed] stops automatic
  * paging until the user retries, and [filtersUnsupported] means MDK refused these filters outright.
+ * [emptyBatches] counts the latest consecutive batches that admitted nothing.
  */
 internal data class GlobalAttachmentPaging(
     val hasMore: Boolean = false,
     val failed: Boolean = false,
     val filtersUnsupported: Boolean = false,
+    val emptyBatches: Int = 0,
     val onLoadMore: () -> Unit = {},
     val onRetry: () -> Unit = {},
 )
@@ -130,10 +138,11 @@ internal fun GlobalAttachmentBrowser(
             gridState.layoutInfo.visibleItemsInfo.any { it.key == globalLibraryItemTag(item) }
     }
     // A selective filter can end a bounded batch with no rows and more history left. The grid's paging
-    // effect is not composed then, so the empty view keeps reading until a row arrives or the history ends.
-    val readingOn = items.isEmpty() && paging.hasMore && !paging.failed
+    // effect is not composed then, so the empty view reads a few more batches on its own, keyed by the
+    // batch count so a fast batch still relaunches it, then offers Load more.
+    val readingOn = items.isEmpty() && paging.autoReads()
     val currentPaging by rememberUpdatedState(paging)
-    LaunchedEffect(readingOn, loading) {
+    LaunchedEffect(readingOn, loading, paging.emptyBatches) {
         if (readingOn && !loading) currentPaging.onLoadMore()
     }
     Column(modifier.fillMaxSize().testTag(GLOBAL_LIBRARY_TAG)) {
@@ -191,6 +200,14 @@ private fun LibraryEmpty(paging: GlobalAttachmentPaging) {
                     )
                     TextButton(onClick = paging.onRetry) { Text(stringResource(R.string.retry)) }
                 }
+            paging.hasMore ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    WhiteNoiseEmptyState(
+                        title = stringResource(R.string.library_empty),
+                        detail = stringResource(R.string.chat_rows_no_results_detail),
+                    )
+                    TextButton(onClick = paging.onLoadMore) { Text(stringResource(R.string.poll_votes_load_more)) }
+                }
             else ->
                 WhiteNoiseEmptyState(
                     title = stringResource(R.string.library_empty),
@@ -198,6 +215,12 @@ private fun LibraryEmpty(paging: GlobalAttachmentPaging) {
                 )
         }
     }
+}
+
+/** True while the library may read the next batch unasked: more history, no failure, few empty batches. */
+internal fun GlobalAttachmentPaging.autoReads(): Boolean {
+    val withinBound = emptyBatches < LIBRARY_AUTO_EMPTY_BATCHES
+    return hasMore && !failed && withinBound
 }
 
 /** The grid's fixed inputs for one composition. */
@@ -271,9 +294,8 @@ private fun LibraryPagingEffect(
             last != null && last >= info.totalItemsCount - LIBRARY_PREFETCH_ITEMS
         }
     }
-    LaunchedEffect(nearEnd, loading, paging.hasMore, paging.failed) {
-        val wanted = currentPaging.hasMore && !currentPaging.failed
-        if (nearEnd && !loading && wanted) currentPaging.onLoadMore()
+    LaunchedEffect(nearEnd, loading, paging.hasMore, paging.failed, paging.emptyBatches) {
+        if (nearEnd && !loading && currentPaging.autoReads()) currentPaging.onLoadMore()
     }
 }
 
@@ -325,6 +347,9 @@ private fun LibraryFooter(
                     )
                     TextButton(onClick = paging.onRetry) { Text(stringResource(R.string.retry)) }
                 }
+            // Several batches in a row added nothing: reading on is the user's choice.
+            paging.hasMore && !paging.autoReads() ->
+                TextButton(onClick = paging.onLoadMore) { Text(stringResource(R.string.poll_votes_load_more)) }
         }
     }
 }

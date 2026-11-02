@@ -127,14 +127,19 @@ class GlobalAttachmentLibraryNavigationTest {
     }
 
     /**
-     * A selective filter whose bounded batch admitted nothing keeps reading while the history has more,
-     * showing progress instead of "no results", and stops once the history ends.
+     * A selective filter whose bounded batch admitted nothing reads a few more batches on its own, showing
+     * progress, then stops and offers Load more instead of walking the whole history.
      */
     @Test
-    fun emptyBatchWithMoreHistoryKeepsReading() {
+    fun emptyBatchesReadOnBrieflyThenOfferLoadMore() {
         var reads = 0
-        var paging by mutableStateOf(GlobalAttachmentPaging())
-        paging = GlobalAttachmentPaging(hasMore = true, onLoadMore = { reads++ })
+        var empty by mutableStateOf(1)
+        val paging = {
+            GlobalAttachmentPaging(hasMore = true, emptyBatches = empty, onLoadMore = {
+                reads++
+                empty++
+            })
+        }
         composeRule.setContent {
             WhiteNoiseTheme {
                 GlobalAttachmentBrowser(
@@ -145,18 +150,17 @@ class GlobalAttachmentLibraryNavigationTest {
                         androidx.compose.ui.unit
                             .Dp(0f),
                     actions = GlobalAttachmentCardActions(),
-                    paging = paging,
+                    paging = paging(),
                 )
             }
         }
-
-        composeRule.onNodeWithTag(GLOBAL_LIBRARY_LOADING_TAG).assertIsDisplayed()
-        assertEquals(1, reads)
-
-        paging = GlobalAttachmentPaging(hasMore = false, onLoadMore = { reads++ })
         composeRule.waitForIdle()
+
+        // Each fast batch relaunches the read, up to the bound.
+        assertEquals(LIBRARY_AUTO_EMPTY_BATCHES - 1, reads)
         composeRule.onNodeWithText("No files or media found").assertIsDisplayed()
-        assertEquals(1, reads)
+        composeRule.onNodeWithText("Load more").performClick()
+        assertEquals(LIBRARY_AUTO_EMPTY_BATCHES, reads)
     }
 
     /** The browser at a fixed day in UTC, recording opens and View in chat. */

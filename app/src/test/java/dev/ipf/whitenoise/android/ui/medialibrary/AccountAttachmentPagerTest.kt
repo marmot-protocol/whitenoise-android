@@ -247,6 +247,70 @@ class AccountAttachmentPagerTest {
             pager.close()
         }
 
+    /** A change reread keeps the previous rows on screen until it completes, then shows the new head. */
+    @Test
+    fun changeRereadKeepsThePreviousRowsUntilItCompletes() =
+        runTest {
+            val source = AccountAttachmentFixture((249 downTo 0).map { accountEntry(it) }, size = 40)
+            val pager = AccountAttachmentPager(source, everything)
+            pager.refresh()
+            pager.loadMore()
+            val before = pager.state.entries
+            assertEquals(80, before.size)
+            source.rows = listOf(accountEntry(500)) + source.rows
+            source.additions++
+            val shownDuringReads = mutableListOf<Int>()
+            source.beforePage = { shownDuringReads += pager.state.entries.size }
+
+            pager.refresh()
+
+            assertTrue("the screen never saw a shorter list", shownDuringReads.all { it == 80 })
+            assertEquals(
+                "message-500",
+                pager.state.entries
+                    .first()
+                    .entry.messageIdHex,
+            )
+            assertTrue(pager.state.entries.size >= 81)
+            pager.close()
+        }
+
+    /** A failed change reread shows what it read, never the rows it was holding back. */
+    @Test
+    fun failedChangeRereadDropsTheHeldRows() =
+        runTest {
+            val source = AccountAttachmentFixture((249 downTo 0).map { accountEntry(it) }, size = 40)
+            val pager = AccountAttachmentPager(source, everything)
+            pager.refresh()
+            pager.loadMore()
+            source.rows = source.rows.drop(1)
+            source.removals++
+            var reads = 0
+            source.beforePage = { if (reads++ == 1) source.failNext = true }
+
+            pager.refresh()
+
+            assertEquals(AccountAttachmentFailure.READ, pager.state.failure)
+            assertTrue("message-249" !in pager.state.entries.map { it.entry.messageIdHex })
+            pager.close()
+        }
+
+    /** Consecutive batches that admit nothing are counted, and one admitting a row resets the count. */
+    @Test
+    fun countsConsecutiveEmptyBatches() =
+        runTest {
+            val rows = (999 downTo 0).map { accountEntry(it, category = if (it == 0) AttachmentCategoryFfi.VIDEO else AttachmentCategoryFfi.FILE) }
+            val pager = AccountAttachmentPager(AccountAttachmentFixture(rows), { it.entry.category == AttachmentCategoryFfi.VIDEO })
+
+            pager.refresh()
+            assertEquals(1, pager.state.emptyBatches)
+            pager.loadMore()
+            assertEquals(2, pager.state.emptyBatches)
+            while (pager.state.hasMore) pager.loadMore()
+            assertEquals(0, pager.state.emptyBatches)
+            pager.close()
+        }
+
     /** A closed or superseded owner ignores late reads and keeps no rows. */
     @Test
     fun closedOwnerIgnoresLaterReads() =

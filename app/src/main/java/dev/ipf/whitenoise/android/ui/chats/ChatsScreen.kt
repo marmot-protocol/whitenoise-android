@@ -732,16 +732,6 @@ internal fun ChatsScreen(
             browsingAttachments,
             searchViewport?.libraryExtent,
         )
-    // The account index spans archived chats too, so the library names and opens them as well.
-    val libraryChats =
-        remember(controller.items, controller.archivedItems) { controller.items + controller.archivedItems }
-    val libraryTitles =
-        remember(libraryChats, groupTitleCopy, profileRev) {
-            libraryChats.associate { item ->
-                val title = chatListItemDisplayTitle(item, appState, groupTitleCopy)
-                item.group.groupIdHex.lowercase() to title
-            }
-        }
     // A returning session holds its rows back until it has reread as far as before, so the grid keeps its place.
     val libraryEntries =
         libraryPager
@@ -749,6 +739,14 @@ internal fun ChatsScreen(
             ?.takeUnless { it.resuming }
             ?.entries
             .orEmpty()
+    val libraryChats = rememberLibraryChats(controller, libraryEntries)
+    val libraryTitles =
+        remember(libraryChats, groupTitleCopy, profileRev) {
+            libraryChats.associate { item ->
+                val title = chatListItemDisplayTitle(item, appState, groupTitleCopy)
+                item.group.groupIdHex.lowercase() to title
+            }
+        }
     val libraryItems =
         remember(libraryEntries, libraryTitles) {
             val fallback = groupTitleCopy.unavailableConversationTitle

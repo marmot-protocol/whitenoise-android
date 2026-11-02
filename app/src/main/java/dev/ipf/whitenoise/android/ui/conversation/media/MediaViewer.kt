@@ -406,7 +406,7 @@ internal fun ConversationMediaViewer(
  * Presents the media pager and reports its settled logical page without owning conversation
  * lifetime. The caller decides when a viewer generation is created or dismissed. [pageController]
  * supplies each page's own chat when the gallery spans chats; the group-picture action is offered
- * only for pages of [controller]'s chat.
+ * only for pages of [controller]'s chat, judged by the page's group rather than controller identity.
  */
 @Composable
 @Suppress("FunctionNaming", "LongParameterList", "LongMethod", "CyclomaticComplexMethod")
@@ -632,7 +632,7 @@ internal fun FullScreenMediaViewer(
                         }
                     },
                 onSetGroupPicture =
-                    if (pageController(currentPage) === controller &&
+                    if (currentPage.groupIdHex.let { it == null || it.equals(controller.group.groupIdHex, true) } &&
                         canSetViewerGroupPicture(
                             controller.isDm,
                             controller.isSelfMember,

@@ -220,6 +220,14 @@
           "FIND-013",
           "FIND-017"
         ]
+      },
+      {
+        "surface": "string:poll_votes_load_more",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentBrowser.kt",
+        "anchor": "R.string.poll_votes_load_more",
+        "test_ids": [
+          "FIND-017"
+        ]
       }
     ],
     "source_coverage": [

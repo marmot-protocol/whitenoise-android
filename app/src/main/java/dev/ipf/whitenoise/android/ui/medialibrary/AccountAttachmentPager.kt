@@ -47,7 +47,8 @@ internal enum class AccountAttachmentFailure {
  * Transient rendering state. Only admitted entries are kept; the native cursor and version decide
  * pagination and validity. [nextExpiry] is the earliest retention deadline the loaded pages reported.
  * [resuming] holds while a returning session rereads the rows an earlier session had loaded, so the
- * screen can wait for all of them before restoring its scroll position.
+ * screen can wait for all of them before restoring its scroll position. [emptyBatches] counts the
+ * consecutive batches that admitted no row, so the screen can stop reading a sparse filter on its own.
  */
 internal data class AccountAttachmentState(
     val entries: List<AccountAttachmentEntryFfi> = emptyList(),
@@ -57,6 +58,7 @@ internal data class AccountAttachmentState(
     val initialized: Boolean = false,
     val nextExpiry: ULong? = null,
     val resuming: Boolean = false,
+    val emptyBatches: Int = 0,
 )
 
 /**
@@ -67,7 +69,9 @@ internal data class AccountAttachmentState(
  * destructive change discards every loaded row. Closing fences late callbacks and releases handles
  * once any in-flight read returns. A session for a query the user is returning to starts with
  * [resumeCount], the rows the earlier session had loaded, and rereads that far from the head; it keeps
- * no native handle from the earlier session.
+ * no native handle from the earlier session. While a change rereads the loaded range, the published
+ * state keeps the previous rows until the reread completes or fails, so the screen never drops to an
+ * empty list and loses its scroll position over an unrelated addition.
  */
 internal class AccountAttachmentPager(
     private val reader: AccountAttachmentReader,
@@ -75,8 +79,18 @@ internal class AccountAttachmentPager(
     resumeCount: Int = 0,
     private val isCurrent: () -> Boolean = { true },
 ) : AutoCloseable {
+    /** What the screen shows; it lags [work] while a change reread is held back. */
     var state by mutableStateOf(AccountAttachmentState(resuming = resumeCount > 0))
         private set
+
+    private var holding = false
+
+    /** The working state; setting it publishes to [state] unless a change reread is holding the previous rows. */
+    private var work = state
+        set(next) {
+            field = next
+            if (!holding) state = next
+        }
 
     private val mutex = Mutex()
     private var baseline: AccountAttachmentVersion? = null
@@ -91,7 +105,7 @@ internal class AccountAttachmentPager(
     suspend fun refresh() =
         operation {
             val previous = baseline
-            if (previous == null || !state.initialized) {
+            if (previous == null || !work.initialized) {
                 restoreRange()
             } else {
                 retryProbe = true
@@ -101,11 +115,12 @@ internal class AccountAttachmentPager(
                 if (change != AttachmentHistoryChangeFfi.UNCHANGED) {
                     // Additions keep every older row, so the old tail is still there to read back to.
                     restoreThrough =
-                        state.entries
+                        work.entries
                             .lastOrNull()
                             ?.slotKey()
                             ?.takeIf { change == AttachmentHistoryChangeFfi.ADDITIONS }
-                    restoreCount = state.entries.size
+                    restoreCount = work.entries.size
+                    holding = true
                     clearCollection()
                     restoreRange()
                 }
@@ -120,7 +135,7 @@ internal class AccountAttachmentPager(
             operation {
                 if (restoreThrough != null || restoreCount > 0) {
                     restoreRange()
-                } else if (!state.initialized || state.hasMore) {
+                } else if (!work.initialized || work.hasMore) {
                     readBatch()
                 }
             }
@@ -135,27 +150,30 @@ internal class AccountAttachmentPager(
             readBatch()
             val target = restoreThrough
             val restored =
-                if (target != null) state.entries.any { it.slotKey() == target } else state.entries.size >= restoreCount
-            if (restored || !state.hasMore) {
+                if (target != null) work.entries.any { it.slotKey() == target } else work.entries.size >= restoreCount
+            if (restored || !work.hasMore) {
                 restoreThrough = null
                 restoreCount = 0
             }
         } while (restoreThrough != null || restoreCount > 0)
-        if (state.resuming) state = state.copy(resuming = false)
+        holding = false
+        work = work.copy(resuming = false)
     }
 
     /** Reads up to the batch's page budget, stopping early once enough rows were admitted. */
     private suspend fun readBatch() {
-        val before = state.entries.size
+        val before = work.entries.size
         var pages = 0
         do {
             readNext()
             pages++
         } while (
-            state.hasMore &&
+            work.hasMore &&
             pages < ACCOUNT_ATTACHMENT_BATCH_PAGES &&
-            state.entries.size - before < ACCOUNT_ATTACHMENT_BATCH_TARGET
+            work.entries.size - before < ACCOUNT_ATTACHMENT_BATCH_TARGET
         )
+        val empty = work.entries.size == before
+        work = work.copy(emptyBatches = if (empty) work.emptyBatches + 1 else 0)
     }
 
     /** Applies one native outcome without retaining stale rows across a destructive change. */
@@ -171,19 +189,19 @@ internal class AccountAttachmentPager(
                     val destructive =
                         previous != null &&
                             page.version.changeSince(previous) == AttachmentHistoryChangeFfi.RESTART_REQUIRED
-                    if (destructive && state.initialized) {
+                    if (destructive && work.initialized) {
                         restart(restartAllowed)
                     } else {
                         cursor?.close()
                         cursor = page.nextCursor
                         adoptHeadVersion(page.version)
                         adopted = true
-                        state =
-                            state.copy(
-                                entries = (state.entries + page.entries.filter(admits)).distinctBy { it.slotKey() },
+                        work =
+                            work.copy(
+                                entries = (work.entries + page.entries.filter(admits)).distinctBy { it.slotKey() },
                                 initialized = true,
                                 hasMore = page.nextCursor != null,
-                                nextExpiry = earliest(state.nextExpiry, page.nextExpiry),
+                                nextExpiry = earliest(work.nextExpiry, page.nextExpiry),
                             )
                     }
                 } finally {
@@ -203,7 +221,7 @@ internal class AccountAttachmentPager(
 
     /** The first page of a range becomes the comparison baseline for later pages and probes. */
     private fun adoptHeadVersion(version: AccountAttachmentVersion) {
-        if (state.initialized) return
+        if (work.initialized) return
         baseline?.close()
         baseline = version
     }
@@ -228,14 +246,16 @@ internal class AccountAttachmentPager(
             if (closed || !isCurrent()) return@withLock
             val fail = { failure: AccountAttachmentFailure ->
                 // A failed resume shows the rows it did read, with the retry that continues it.
-                if (!closed && isCurrent()) state = state.copy(loading = false, failure = failure, resuming = false)
+                // A failed change reread publishes what it read, never the stale rows it was holding.
+                holding = false
+                if (!closed && isCurrent()) work = work.copy(loading = false, failure = failure, resuming = false)
             }
             busy = true
-            state = state.copy(loading = true, failure = null)
+            work = work.copy(loading = true, failure = null)
             try {
                 block()
                 checkCurrent()
-                state = state.copy(loading = false)
+                work = work.copy(loading = false)
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (_: InvalidAccountAttachmentQuery) {
@@ -244,6 +264,10 @@ internal class AccountAttachmentPager(
                 fail(AccountAttachmentFailure.READ)
             } finally {
                 busy = false
+                if (holding) {
+                    holding = false
+                    state = work
+                }
                 if (closed) clearCollection()
             }
         }
@@ -260,13 +284,14 @@ internal class AccountAttachmentPager(
         cursor = null
         baseline?.close()
         baseline = null
-        state = AccountAttachmentState()
+        work = AccountAttachmentState()
     }
 
     /** Releases all handles exactly once, after any in-flight borrower has returned. */
     override fun close() {
         closed = true
-        state = AccountAttachmentState()
+        holding = false
+        work = AccountAttachmentState()
         if (!busy) clearCollection()
     }
 }

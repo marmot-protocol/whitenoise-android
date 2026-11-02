@@ -67,10 +67,13 @@ class ChatsScreenSelectionActionsCoverageTest {
             "library pages come from the account pager",
             "rememberGlobalAttachmentPager(" in source && "searchViewport?.libraryExtent," in source,
         )
+        val session = File(chatsScreenSource().parentFile, "GlobalAttachmentLibrarySession.kt").readText()
         assertTrue(
-            "the library names and opens archived chats, which the account index includes",
-            "controller.items + controller.archivedItems }" in source &&
-                "openSearchMessage(group, message, libraryChats)" in source,
+            "the library names and opens archived and off-window chats, which the account index includes",
+            "rememberLibraryChats(controller, libraryEntries)" in source &&
+                "openSearchMessage(group, message, libraryChats)" in source &&
+                "controller.items + controller.archivedItems" in session &&
+                "controller.resolveChatListActionItem(group, owner)" in session,
         )
         assertTrue(
             "failed lookups cannot expire return focus as settled data",
