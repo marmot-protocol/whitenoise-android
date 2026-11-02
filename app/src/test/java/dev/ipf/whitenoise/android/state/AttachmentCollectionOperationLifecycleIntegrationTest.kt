@@ -8,6 +8,7 @@ import dev.ipf.whitenoise.android.ui.conversation.cancelCollection
 import dev.ipf.whitenoise.android.ui.conversation.collectionChunkKey
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.restoreCollectionOperations
+import dev.ipf.whitenoise.android.ui.conversation.resumeCollection
 import dev.ipf.whitenoise.android.ui.conversation.retryCollectionChunk
 import dev.ipf.whitenoise.android.ui.conversation.skipCollectionChunk
 import kotlinx.coroutines.Dispatchers
@@ -349,6 +350,57 @@ class AttachmentCollectionOperationLifecycleIntegrationTest {
             assertEquals(1, restored.published)
             assertEquals(listOf("d0", "d1", "d2"), restored.items.map { it.id })
             assertTrue(fixture.calls.uploads.isEmpty())
+        }
+
+    /**
+     * An operation MDK accepted nothing of, kept paused because its token could not be checked, goes back to the
+     * composer draft once Resume learns the token was not accepted: nothing is sent without its caption.
+     */
+    @Test
+    fun resumeHandsAZeroAcceptedOperationBackToTheDraftOnceItsTokenResolves() =
+        lifecycle { fixture ->
+            val account = requireNotNull(fixture.controller.boundAccountRef)
+            val group = fixture.controller.group.groupIdHex
+            val planned = List(2) { PlannedCollectionItem("d$it", CollectionItemKind.DOCUMENT, 1L) }
+            val base =
+                AttachmentCollectionOperation(
+                    id = "unknown-first-token",
+                    accountRef = account,
+                    groupIdHex = group,
+                    items = planned.map { CollectionItem(it.id, "content://collection.test/doc/${it.id}", it.kind) },
+                    chunks = planAttachmentChunks("unknown-first-token", planned),
+                    createdAtMs = System.currentTimeMillis(),
+                    updatedAtMs = System.currentTimeMillis(),
+                )
+            val first = base.chunks[0].id
+            AttachmentCollectionJournal(fixture.state.appContext.noBackupFilesDir).write(
+                base
+                    .withChunkToken(first, "token-1", 1L)
+                    .withChunkState(first, CollectionChunkState.UPLOADING, CollectionItemState.UPLOADING, 1L)
+                    .copy(updatedAtMs = System.currentTimeMillis()),
+            )
+
+            fixture.state.restoreCollectionOperations(
+                account,
+                group,
+                readable = { true },
+                tokenStatus = { CollectionTokenStatus.UNRESOLVED },
+            )
+            assertEquals(
+                "an unknown token keeps the record paused",
+                CollectionOperationPhase.PAUSED,
+                fixture.registry.operations.value["unknown-first-token"]
+                    ?.phase,
+            )
+
+            fixture.sender.resumeCollection("unknown-first-token") { CollectionTokenStatus.NOT_ACCEPTED }
+            awaitUntil("the operation is handed back") {
+                fixture.registry.operations.value
+                    .isEmpty()
+            }
+            assertTrue("nothing is sent from the collection", fixture.calls.uploads.isEmpty())
+            assertNull("no item is read, skipped or reported", fixture.state.toast)
+            assertTrue("its record is deleted", fixture.journalFiles.isEmpty())
         }
 
     private companion object {

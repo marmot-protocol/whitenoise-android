@@ -160,6 +160,10 @@ internal fun planCollectionOperation(
     )
 }
 
+/** Whether MDK accepted no chunk yet, so the composer's native draft still owns the selection and caption. */
+internal val AttachmentCollectionOperation.ownedByComposerDraft: Boolean
+    get() = chunks.none { it.state == CollectionChunkState.ACCEPTED }
+
 /**
  * Asks MDK about every unsettled chunk that recorded a token and has no queued send in this process. Accepted
  * tokens settle as sent; any other chunk returns to planned with its token cleared, so it is sent afresh.
@@ -223,8 +227,7 @@ internal suspend fun WhiteNoiseAppState.restoreCollectionOperations(
                     .filter { !it.state.isSettled && (it.uri.isBlank() || !readable(it.uri)) }
                     .mapTo(linkedSetOf()) { it.id }
             }
-        val anyAccepted = reconciled.chunks.any { it.state == CollectionChunkState.ACCEPTED }
-        if (!unresolved && (!anyAccepted || reconciled.nextChunk == null)) {
+        if (!unresolved && (reconciled.ownedByComposerDraft || reconciled.nextChunk == null)) {
             withContext(Dispatchers.IO) { registry.adopt(reconciled) }
             registry.discard(reconciled.id)
         } else {
@@ -237,7 +240,10 @@ internal suspend fun WhiteNoiseAppState.restoreCollectionOperations(
  * Continues a paused operation with the same stable ids: MDK is asked about recorded tokens again, unreadable
  * items are skipped and named, and the remaining chunks are sent in order from their URIs.
  */
-internal fun ConversationMediaSender.resumeCollection(operationId: String) {
+internal fun ConversationMediaSender.resumeCollection(
+    operationId: String,
+    tokenStatus: (suspend (String) -> CollectionTokenStatus?)? = null,
+) {
     val registry = appState.attachmentCollections
     val paused = registry.operations.value[operationId]?.takeIf { it.paused } ?: return
     // Claimed before the first suspension, so a second tap cannot start a second runner for the same chunks.
@@ -253,11 +259,17 @@ internal fun ConversationMediaSender.resumeCollection(operationId: String) {
                     collectionTokenStatuses(
                         paused,
                         { token -> optimistic[collectionChunkKey(token)] != null },
-                        appState.mdkCollectionTokenStatus(paused.accountRef, paused.groupIdHex),
+                        tokenStatus ?: appState.mdkCollectionTokenStatus(paused.accountRef, paused.groupIdHex),
                     )
                 if (CollectionTokenStatus.UNRESOLVED in statuses.values) {
                     // Sending on could duplicate a chunk MDK may already hold, so the operation stays paused.
                     appState.present(R.string.error_try_again)
+                    return@launchMutation
+                }
+                if (paused.withTokenStatuses(statuses, registry.now()).ownedByComposerDraft) {
+                    // As on restore: with nothing accepted, the composer's draft still owns the selection, the
+                    // caption and its clearing, so sending from here would lose the caption or duplicate the draft.
+                    registry.discard(operationId)
                     return@launchMutation
                 }
                 withContext(Dispatchers.IO) {
@@ -341,7 +353,14 @@ internal suspend fun ConversationController.cancelCollection(operationId: String
     val before = registry.operations.value[operationId] ?: return
     val cancelled = registry.update(operationId) { it.cancelUnaccepted(registry.now()) }
     if (before.paused || cancelled == null) return registry.discard(operationId)
-    before.chunks.filter { !it.state.isSettled }.mapNotNull { it.clientToken }.forEach { token ->
+    // Tokens come from the cancelled snapshot, so one recorded after `before` is withdrawn as well, and a chunk
+    // MDK accepted meanwhile is never touched.
+    val wasOpen = before.chunks.filter { !it.state.isSettled }.mapTo(hashSetOf()) { it.id }
+    val withdrawn =
+        cancelled.chunks.filter { chunk ->
+            chunk.state != CollectionChunkState.ACCEPTED && (!chunk.state.isSettled || chunk.id in wasOpen)
+        }
+    withdrawn.mapNotNull { it.clientToken }.forEach { token ->
         val item = timeline.firstOrNull { it.id == collectionChunkKey(token) } ?: return@forEach
         if (item.status == MessageStatus.Failed) {
             discardFailedSend(item)

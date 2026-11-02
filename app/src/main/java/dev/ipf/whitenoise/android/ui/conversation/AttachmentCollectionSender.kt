@@ -128,7 +128,7 @@ internal class AttachmentCollectionSender(
         if (!holds) {
             // Another account or session now owns the app. Once MDK holds the caption chunk the record
             // stays for a later Resume, before that the composer's native draft still owns everything.
-            if (operation.chunks.none { it.state == CollectionChunkState.ACCEPTED }) {
+            if (operation.ownedByComposerDraft) {
                 registry.discard(run.operationId)
             } else {
                 registry.update(run.operationId) { it.copy(paused = true, updatedAtMs = registry.now()) }
@@ -205,7 +205,8 @@ internal class AttachmentCollectionSender(
         // The live operation, not the recorded snapshot: a discard may have landed while the write was awaited.
         val live = recorded?.let { registry.operations.value[run.operationId] }
         val owned = live?.chunks?.firstOrNull { it.id == chunk.id }
-        if (owned?.state != CollectionChunkState.UPLOADING || owned.clientToken != queued.tempId) {
+        val claimed = owned?.state == CollectionChunkState.UPLOADING && owned.clientToken == queued.tempId
+        if (!claimed || live.cancelRequested) {
             val storageFailed = recorded == null && registry.operations.value[run.operationId] != null
             return appState.withdrawUnrecorded(current.controller, queued, run.operationId, chunk.id, storageFailed)
         }
