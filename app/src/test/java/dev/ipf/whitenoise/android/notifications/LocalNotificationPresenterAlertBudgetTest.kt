@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
+import dev.ipf.marmotkit.NotificationTriggerFfi
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -173,5 +174,18 @@ class LocalNotificationPresenterAlertBudgetTest {
 
             assertEquals(3, posted.size)
             assertEquals(listOf(true, false, false), posted.map { it.isOnlyAlertOnce() })
+        }
+
+    /** Speech quiets messages only, so an invite that arrives over a podcast still rings. */
+    @Test
+    fun spokenAudioLeavesAnInviteAudible() =
+        runBlocking {
+            speaking = true
+            val invite =
+                alertBudgetUpdate(messageIdHex = "invite", timestampMs = now)
+                    .copy(trigger = NotificationTriggerFfi.GROUP_INVITE)
+            assertTrue(presenter.show(invite, shortNpub = { it }))
+
+            assertEquals(listOf(false), posted.map { it.isOnlyAlertOnce() })
         }
 }

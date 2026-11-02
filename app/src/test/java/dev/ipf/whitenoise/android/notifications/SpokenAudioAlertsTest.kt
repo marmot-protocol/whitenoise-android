@@ -16,11 +16,12 @@ import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowAudioManager
 
 /**
- * Only another player's speech, while something is actually playing, quiets an alert (#1717). API 30 is
- * pinned because it has no per-player playing state, so the anonymized attributes alone decide there.
+ * Only another player's speech, while something is actually playing, quiets an alert (#1717). Runs on the
+ * minimum and newest API, because an app's anonymized playback configurations carry no player state or
+ * output device on any release.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [30])
+@Config(sdk = [30, 36])
 class SpokenAudioAlertsTest {
     private val context: Context
         get() = RuntimeEnvironment.getApplication()

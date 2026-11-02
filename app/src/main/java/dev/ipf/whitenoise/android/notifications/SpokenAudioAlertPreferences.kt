@@ -5,7 +5,6 @@ import android.content.SharedPreferences
 import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.AudioPlaybackConfiguration
-import android.os.Build
 
 /**
  * Device-wide choice to keep message alerts silent while another app plays speech (#1717). Android plays
@@ -37,30 +36,25 @@ internal object SpokenAudioAlertPreferences {
 }
 
 /**
- * True when the choice is on and some player is producing speech for media now. Android hands apps only
- * anonymized playback configurations, so this reads the kind of audio, never which app or what it plays.
- * Any failure answers false, so a platform error can only leave an alert audible.
+ * True when the choice is on, something is playing, and some player is tagged as speech for media. Android
+ * hands apps only anonymized playback configurations, so this reads the kind of audio, never which app or
+ * what it plays. Any failure answers false, so a platform error can only leave an alert audible.
  */
 internal fun quietAlertForSpokenAudio(context: Context): Boolean =
     SpokenAudioAlertPreferences.enabled(context) &&
         runCatching {
             val audio = context.getSystemService(AudioManager::class.java) ?: return@runCatching false
-            audio.isMusicActive && audio.activePlaybackConfigurations.any(::isPlayingSpeech)
+            audio.isMusicActive && audio.activePlaybackConfigurations.any(::isSpeechPlayer)
         }.getOrDefault(false)
 
 /**
- * A media player tagged as speech that is playing now. The list also keeps paused and idle players; from
- * API 31 only a playing one reports an output device. API 30 has no per-player state, so there the caller's
- * `isMusicActive` check is the only sign that anything is playing.
+ * A media player tagged as speech. The list also keeps paused and idle players, and an anonymized copy
+ * carries neither the player's state nor its output device, so the caller's `isMusicActive` check is the
+ * only sign that anything is playing.
  */
-@Suppress("DEPRECATION")
-internal fun isPlayingSpeech(configuration: AudioPlaybackConfiguration): Boolean {
+internal fun isSpeechPlayer(configuration: AudioPlaybackConfiguration): Boolean {
     val attributes = configuration.audioAttributes
-    val speechMedia =
-        attributes.contentType == AudioAttributes.CONTENT_TYPE_SPEECH &&
-            attributes.usage in SPEECH_MEDIA_USAGES
-    return speechMedia &&
-        (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || configuration.audioDeviceInfo != null)
+    return attributes.contentType == AudioAttributes.CONTENT_TYPE_SPEECH && attributes.usage in SPEECH_MEDIA_USAGES
 }
 
 /** Usages a podcast or audiobook player plays under; calls, assistants and accessibility are left alone. */

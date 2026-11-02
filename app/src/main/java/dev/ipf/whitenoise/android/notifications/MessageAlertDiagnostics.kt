@@ -86,7 +86,7 @@ internal fun messageAlertDiagnostic(
         }.getOrNull()
     val audio = runCatching { context.getSystemService(AudioManager::class.java) }.getOrNull()
     val mediaActive = runCatching { audio?.isMusicActive }.getOrNull()
-    val speech = runCatching { audio?.activePlaybackConfigurations?.any(::isPlayingSpeech) }.getOrNull()
+    val speech = runCatching { audio?.activePlaybackConfigurations?.any(::isSpeechPlayer) }.getOrNull()
     return MessageAlertDiagnostic(
         route = route,
         channelKind = messageAlertChannelKind(route, channelId, existingCardChannel),

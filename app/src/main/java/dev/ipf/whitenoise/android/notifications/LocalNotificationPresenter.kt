@@ -868,10 +868,10 @@ class LocalNotificationPresenter(
             }
         val rawNotificationContent = formattedContent ?: return false
         // A first post rings only if its catch-up cohort has not rung yet, no alert rang moments ago
-        // (#1579) and, unless it mentions the reader, no other app is playing speech (#1717). The ring is
-        // held from here, so a concurrent first post for another conversation stays silent, and handed back
-        // below if this card is never written. Enrichment rewrites arrive with silentUpdate already set and
-        // never touch the budget.
+        // (#1579) and, for a message that does not mention the reader, no other app is playing speech
+        // (#1717). The ring is held from here, so a concurrent first post for another conversation stays
+        // silent, and handed back below if this card is never written. Enrichment rewrites arrive with
+        // silentUpdate already set and never touch the budget.
         val alertReservation =
             if (silentUpdate) {
                 null
@@ -880,7 +880,9 @@ class LocalNotificationPresenter(
                     nowMs = nowMillis(),
                     isMention = update.isMention,
                     accountRef = update.accountRef,
-                    spokenAudioPlaying = spokenAudioPlaying,
+                    spokenAudioPlaying = {
+                        update.trigger == NotificationTriggerFfi.NEW_MESSAGE && spokenAudioPlaying()
+                    },
                 )
             }
         val heldAlert = alertReservation?.takeIf { it.decision == NotificationAlertDecision.Alert }
