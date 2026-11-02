@@ -940,35 +940,16 @@ APK in place.
 
 ## Generate and package the Baseline Profile
 
-`BaselineProfileGenerator` collects on the
-[prepared device](#prepare-a-physical-device-fixture), whose `GROUP_NAME`
-conversation must hold enough history to scroll several screens. Only cold launch-to-surface rules (populated startup to the
-chat list and a cold share to the recipient picker) enter the Startup Profile.
-Chat open, conversation scroll, member roster and warm share delivery remain in
-the Baseline Profile so they cannot crowd startup code out of the primary DEX:
+Generate startup, chat-list, group-open, and member-roster rules on the prepared
+device. Only launch-to-chat-list rules enter the Startup Profile; the broader
+group and roster journey remains in the Baseline Profile so it cannot crowd
+startup code out of the primary DEX:
 
 ```bash
 ./gradlew :app:generateBaselineProfile \
   -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
   -Pandroid.testInstrumentationRunnerArguments.groupName="$GROUP_NAME"
 ```
-
-Device limits found while regenerating (2026-11-01):
-
-- GrapheneOS leaves `dalvik.vm.usejitprofiles` unset and blocks kernel tracing,
-  so profile dumps come back empty ("Generated Profile is empty") and
-  Macrobenchmark cannot record its Perfetto metrics there. Generate on a stock
-  device or an emulator, and measure on a stock physical device.
-- On a device with a second user, the AGP runner fails with `Invalid userId -2`
-  and copies empty profiles into the source set. Run the generator class with
-  `am instrument -w -r --user 0 -e class
-  dev.ipf.whitenoise.android.benchmark.BaselineProfileGenerator -e groupName
-  "$GROUP_NAME" -e androidx.benchmark.enabledRules BaselineProfile
-  dev.ipf.whitenoise.android.benchmark/androidx.test.runner.AndroidJUnitRunner`,
-  pull `Android/media/dev.ipf.whitenoise.android.benchmark/*-prof.txt`, and merge
-  them: the Startup Profile is the union of the startup journeys' files, the
-  Baseline Profile the union of all four, with each rule's `H`, `S` and `P` flags
-  combined.
 
 The generated profile is merged into and committed from
 `app/src/main/generated/baselineProfiles/`. It is consumed by every supported
@@ -991,29 +972,6 @@ bash scripts/verify-baseline-profile.sh \
 
 The verifier uses `apkanalyzer` when available and falls back to the ZIP table.
 For a signed staging/production APK, pass that APK path to the same script.
-
-Run `bash scripts/verify-generated-profiles.sh` before committing to confirm the
-Startup Profile stays a strict subset of the Baseline Profile.
-
-Each regenerated profile commit or PR records its provenance:
-
-- source revision: full commit SHA the profileable target was built from;
-- fixture: `GROUP_NAME`'s member count and approximate message count, plus the
-  account's chat count, never identities or message content;
-- device: model, build fingerprint and API level;
-- toolchain: AGP, Kotlin, AndroidX Benchmark and UiAutomator versions from
-  `gradle/libs.versions.toml`, plus the JDK;
-- the exact generation command, and the startup and baseline rule counts that
-  `verify-generated-profiles.sh` prints.
-
-Review and regenerate the profiles when a change substantially reworks a covered
-hot path: startup through the chat list, inbound share routing or the recipient
-picker, conversation open, transcript rendering or scrolling, or the member
-roster. Also regenerate after a MarmotKit, Compose or AGP upgrade that changes
-those paths, and add a generator journey when a new hot path deserves coverage.
-Profile age alone does not justify regeneration. Compare matching release-like
-runs of `StartupBenchmark` and `ConversationScrollBenchmark` with and without the
-update, and report neutral or adverse results as well.
 
 ## Compose compiler reports
 
