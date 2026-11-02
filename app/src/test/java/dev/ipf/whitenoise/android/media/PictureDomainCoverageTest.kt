@@ -52,9 +52,9 @@ class PictureDomainCoverageTest {
     }
 
     /**
-     * Every outgoing domain is made by `MediaTrustDomain.outgoing`, which production code calls only from the
-     * conversation controller's draft policy, the one place that maps each pick to the shared worker of the draft it
-     * belongs to. No preview, staging, editor, thumbhash or poster decode can then name another draft's worker.
+     * Every outgoing domain is made by `MediaTrustDomain.outgoing`, which production code calls only from
+     * `OutgoingDraftRegistry`, the one place that maps each pick to the shared worker of the draft it belongs to. No
+     * preview, staging, editor, thumbhash or poster decode can then name another draft's worker.
      */
     @Test
     fun outgoingDomainsAreMadeOnlyByTheirDraftPolicy() {
@@ -72,15 +72,15 @@ class PictureDomainCoverageTest {
                             file.name == "MediaTrustDomain.kt" && inside(text, it.range.first, "fun outgoing(")
                         }
                 val called =
-                    factory.findAll(text).filterNot { call ->
-                        val policy = file.name == "Controllers.kt" && inside(text, call.range.first, OUTGOING_POLICY)
+                    factory.findAll(text).filterNot {
+                        val policy = file.name == OUTGOING_POLICY
                         if (policy) policyCalls++
                         policy
                     }
                 (made + called).map { "${file.name}:${lineOf(text, it.range.first)}" }.toList()
             }
         assertEquals("outgoing domains made outside the draft policy", emptyList<String>(), outside)
-        assertEquals("the draft policy makes the outgoing domain", 1, policyCalls)
+        assertTrue("the draft policy makes the outgoing domain", policyCalls > 0)
     }
 
     /** Whether [offset] lies in the body of the function [declaration] starts, up to the next declaration. */
@@ -242,8 +242,8 @@ class PictureDomainCoverageTest {
     }
 
     private companion object {
-        /** The controller function that maps a pick to its draft's outgoing domain. */
-        const val OUTGOING_POLICY = "fun outgoingDraftDomain("
+        /** The file whose registry maps a pick to its draft's outgoing domain. */
+        const val OUTGOING_POLICY = "OutgoingDraftRegistry.kt"
         const val MIN_RENDERER_CALLS = 8
     }
 }

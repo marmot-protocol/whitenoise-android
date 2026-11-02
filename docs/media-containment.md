@@ -991,8 +991,10 @@ thumbhashes, the pending preview, the just-sent poster and attachments restored
 from a saved draft. The domain is keyed by account, conversation and draft.
 
 A draft runs from its first pick until the user sends it or empties the
-composer; `OutgoingDrafts`, one per conversation controller, keeps that
-identity. A send keeps each of its picks on the draft it decodes in now, for the
+composer. `OutgoingDraftRegistry` keeps that identity in app state, one
+`OutgoingDrafts` per account and conversation, so a draft and a collection send
+that outlives its screen keep their picks' drafts when the controller, the
+sender or the activity is replaced. A send keeps each of its picks on the draft it decodes in now, for the
 send's own reads, and the next pick starts a new draft, including a pick made
 while the send is still running. A sent attachment carries its draft's domain,
 so its pending preview and just-sent poster decode there whatever draft is
@@ -1001,12 +1003,13 @@ enters the composer and keeps that draft for good, so work still running for a
 pick that was sent or removed, such as a preparation that resumes after the
 composer was emptied and another pick was made, decodes in its own draft. The
 stager also fixes a pick's domain before its first suspension. A document picked
-again after it left the composer joins the draft it enters. An ended draft gains
-no pick, and a draft identity is random, so a conversation reopened later starts
-a new one.
-`ConversationController.outgoingMediaTrustDomain(pick)` is the only caller of
-`MediaTrustDomain.outgoing` in production, and `PictureDomainCoverageTest`
-fails on any other call or construction, so every decode of a pick agrees.
+again after it left the composer joins the draft it enters. A collection send
+keeps its draft open until it stops running, and one resumed after the process
+restarted puts its items in a draft of their own, never the composer's. An ended
+draft gains no pick, and a draft identity is random.
+`OutgoingDraftRegistry` is the only caller of `MediaTrustDomain.outgoing` in
+production, and `PictureDomainCoverageTest` fails on any other call or
+construction, so every decode of a pick agrees.
 
 An ended draft's worker retires once nothing can still decode in it: its sends
 have ended, after their posters, and none of its sent picks is still staged. A

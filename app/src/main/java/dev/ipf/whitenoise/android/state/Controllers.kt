@@ -108,6 +108,7 @@ import dev.ipf.whitenoise.android.media.GroupImageMutationFailure
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
+import dev.ipf.whitenoise.android.media.OutgoingSend
 import dev.ipf.whitenoise.android.media.REMOVE_GROUP_IMAGE_MUTATION_KEY
 import dev.ipf.whitenoise.android.media.classifyGroupImageMutationFailure
 import dev.ipf.whitenoise.android.media.mutationKey
@@ -6111,44 +6112,35 @@ class ConversationController(
             dev.ipf.whitenoise.android.media.MediaTrustDomain
                 .conversation(conversationAccountRef, group.groupIdHex)
 
-    // Which draft each pick belongs to; an ended draft's worker retires once nothing decodes in it any more.
-    private val outgoingDrafts =
-        dev.ipf.whitenoise.android.media.OutgoingDrafts { draft ->
-            dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
-                .retireDomain(outgoingDraftDomain(draft))
-        }
-
     /**
      * The domain of one file this conversation's user picked to send here: [pick] is its composer slot id, which a
      * restored draft attachment keeps as its own, or a document's URI. It decodes in its draft's one shared worker,
-     * which no later draft reaches, while a read that names no pick decodes single-use.
+     * which no later draft reaches, while a read that names no pick decodes single-use. The drafts belong to the
+     * app, not this controller, so a replaced controller or screen keeps every pick's draft.
      */
     internal fun outgoingMediaTrustDomain(pick: String?): dev.ipf.whitenoise.android.media.MediaTrustDomain =
-        if (pick.isNullOrEmpty()) {
-            dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique
-        } else {
-            outgoingDraftDomain(outgoingDrafts.draftOf(pick))
-        }
-
-    /** The outgoing domain of [draft] in this conversation. */
-    private fun outgoingDraftDomain(draft: String): dev.ipf.whitenoise.android.media.MediaTrustDomain =
-        dev.ipf.whitenoise.android.media.MediaTrustDomain
-            .outgoing(conversationAccountRef, group.groupIdHex, draft)
+        appState.outgoingDrafts.domain(conversationAccountRef, group.groupIdHex, pick)
 
     /**
-     * Starts a send of [picks]: they keep their draft's worker and the next pick starts a new draft. Returns the drafts
-     * the send decodes in, which [endOutgoingSend] releases once its just-sent thumbnails are done.
+     * Starts a send of [picks]: they keep their draft's worker and the next pick starts a new draft. With [ownDraft],
+     * picks that joined no draft yet, as after a restart, join one of their own. The returned send stays open until
+     * [endOutgoingSend], once its just-sent thumbnails are done.
      */
-    internal fun beginOutgoingSend(picks: Collection<String>): Set<String> = outgoingDrafts.beginSend(picks)
+    internal fun beginOutgoingSend(
+        picks: Collection<String>,
+        ownDraft: Boolean = false,
+    ): OutgoingSend = appState.outgoingDrafts.beginSend(conversationAccountRef, group.groupIdHex, picks, ownDraft)
 
-    /** Ends a send [beginOutgoingSend] started, retiring each of its [drafts] that nothing decodes in any more. */
-    internal fun endOutgoingSend(drafts: Set<String>) = outgoingDrafts.endSend(drafts)
+    /** Ends a send [beginOutgoingSend] started, retiring each of its drafts that nothing decodes in any more. */
+    internal fun endOutgoingSend(send: OutgoingSend) = appState.outgoingDrafts.endSend(send)
 
     /**
      * Records the [picks] now in the composer, so a sent pick that left it releases its draft and an empty composer
      * ends the current draft.
      */
-    internal fun retainOutgoingPicks(picks: Set<String>) = outgoingDrafts.retain(picks)
+    internal fun retainOutgoingPicks(picks: Set<String>) {
+        appState.outgoingDrafts.retain(conversationAccountRef, group.groupIdHex, picks)
+    }
 
     /** Current retained owner eligibility; the shell's privacy and route admission remain independent. */
     internal val ownsRetainedForegroundPresentation: Boolean

@@ -89,7 +89,7 @@ bound and no exception. `MediaRefusalLedgerTest` hammers the session's refusal
 ledger from eight threads; without its lock it throws.
 `PictureDomainCoverageTest` and `PictureDomainMappingTest` check that every
 production picture names its domain, that only member-pinned bytes reach a
-conversation's worker and that only the conversation controller's draft policy
+conversation's worker and that only `OutgoingDraftRegistry`, the draft policy,
 makes an outgoing domain; `PhotoEditorDomainTest`, `PhotoDraftStagerTest` and
 `PhotoEditorCommitterTest` check that every decode of a draft's picks, edited,
 staged or recovered, runs in its draft's shared outgoing worker and never

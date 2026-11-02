@@ -768,6 +768,7 @@ internal class ConversationMediaSender(
         val pendingDraftClear =
             appState.captureDraftForSend(controller.boundAccountRef, controller.group.groupIdHex)
         val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }
+        val sendDrafts = controller.beginOutgoingSend(imageSlots.map { it.id } + documentUris.map { it.toString() })
         if (replyTarget == null && imageSlots.size + documentUris.size > 1) {
             // Several picks become one ordered collection operation, sent as bounded chunks (#2576).
             val request =
@@ -779,11 +780,10 @@ internal class ConversationMediaSender(
                     preparedDocumentAttachments,
                     pendingDraftClear,
                 )
-            return startCollectionSend(request, completion, onAfterSend)
+            return startCollectionSend(request, completion, onAfterSend, sendDrafts)
         }
         val sourceAccount = appState.accounts.firstOrNull { it.label == controller.boundAccountRef }?.accountIdHex
         val outboundVisibleStartedAtElapsedMs = SystemClock.elapsedRealtime()
-        val sendDrafts = controller.beginOutgoingSend(imageSlots.map { it.id } + documentUris.map { it.toString() })
         appState.launchMutation {
             var accepted = false
             var sourceLease: PrivateShareSendLease? = null

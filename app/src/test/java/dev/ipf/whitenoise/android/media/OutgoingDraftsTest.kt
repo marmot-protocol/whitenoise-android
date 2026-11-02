@@ -117,6 +117,23 @@ class OutgoingDraftsTest {
         assertEquals("draft-2", drafts.draftOf("b"))
     }
 
+    /**
+     * A send resumed after a restart puts picks that joined no draft into a draft of its own, leaving the composer's
+     * draft as it is, and that draft retires when the send ends.
+     */
+    @Test
+    fun aResumedSendJoinsADraftOfItsOwn() {
+        val drafts = drafts()
+        drafts.retain(setOf("composer"))
+        assertEquals("draft-1", drafts.draftOf("composer"))
+        val send = drafts.beginSend(listOf("resumed"), ownDraft = true)
+        assertEquals(setOf("draft-2"), send)
+        assertEquals("draft-2", drafts.draftOf("resumed"))
+        assertEquals("the composer's draft goes on", "draft-1", drafts.draftOf("composer"))
+        drafts.endSend(send)
+        assertEquals(listOf("draft-2"), retired)
+    }
+
     private companion object {
         const val DOCUMENT = "content://picker/document"
     }

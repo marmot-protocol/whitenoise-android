@@ -1321,6 +1321,11 @@ class WhiteNoiseAppState private constructor(
 
     private val legacyDraftMigrationSource by lazy { LegacyDraftMigrationSource(appContext) }
     internal val editorSourceStore: EditorSourceStore = EditorSourceStore.create(appContext)
+
+    /** Which draft each picked file belongs to, per account and conversation, so its outgoing worker never changes. */
+    internal val outgoingDrafts =
+        dev.ipf.whitenoise.android.media
+            .OutgoingDraftRegistry()
     internal val editorSessionStore: EditorSessionStore = EditorSessionStore.create(appContext)
     internal val messageDraftRepository: MessageDraftRepository =
         messageDraftRepositoryOverride
