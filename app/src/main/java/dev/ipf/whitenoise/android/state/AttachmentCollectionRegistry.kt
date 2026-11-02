@@ -36,12 +36,18 @@ internal class AttachmentCollectionRegistry(
     fun now(): Long = clock()
 
     /**
-     * Journals [operation] and only then adds it; false when the journal could not hold it, and nothing is
-     * added. Blocks on the journal, so it is called off the main thread.
+     * Adds [operation] and journals it; false when the journal could not hold it, and the operation is removed
+     * again. Blocks on the journal, so it is called off the main thread.
      */
     fun start(operation: AttachmentCollectionOperation): Boolean {
-        val written = journaled { journal.write(operation) }.get()
-        if (written) synchronized(lock) { state.update { it + (operation.id to operation) } }
+        // Live before its record exists, so a concurrent restore never adopts and deletes it as a stray record.
+        val effect =
+            synchronized(lock) {
+                state.update { it + (operation.id to operation) }
+                journaled { journal.write(operation) }
+            }
+        val written = effect.get()
+        if (!written) discard(operation.id)
         return written
     }
 
@@ -56,7 +62,8 @@ internal class AttachmentCollectionRegistry(
 
     /**
      * Like [update], but waits until the journal holds the result: null when the operation is gone or the
-     * journal could not record it. A chunk token must be on disk before its upload begins.
+     * journal could not record it. A chunk token must be on disk before its upload begins. Memory has already
+     * advanced when the write fails, so the caller corrects it.
      */
     suspend fun updateDurably(
         operationId: String,

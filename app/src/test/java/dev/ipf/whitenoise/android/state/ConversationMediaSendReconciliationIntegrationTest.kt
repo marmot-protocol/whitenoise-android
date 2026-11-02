@@ -72,6 +72,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -84,7 +85,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -1732,17 +1732,17 @@ class ConversationFileBackedMediaSendTest {
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun albumLeavesOutADraftPhotoThatNoLongerFitsAfterALargeVideo() =
+    fun aDraftPhotoPickedWithALargeVideoSendsInItsOwnMessage() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
             val state = mediaSendReconciliationAppState()
             Robolectric.setupContentProvider(ScriptedPickProvider::class.java, SENDER_PICKS_AUTHORITY)
             val video = scriptedPick(state, "clip.mp4", "video/mp4", ALBUM_VIDEO_BYTES)
             val photo = scriptedPick(state, "photo.jpg", "image/jpeg", DRAFT_PHOTO_BYTES.toLong())
-            val uploaded = CompletableDeferred<List<String>>()
+            val uploaded = ChunkUploads()
             val controller =
                 fileBackedController(state) { request, _ ->
-                    uploaded.complete(request.attachments.map { it.fileName })
+                    uploaded.record(request.attachments.map { it.fileName })
                     oneAttachmentUpload()
                 }
             val albumLimits =
@@ -1761,11 +1761,10 @@ class ConversationFileBackedMediaSendTest {
                     preparedImageAttachments = mapOf("photo" to draftPhoto()),
                 )
 
-                assertEquals(listOf("clip.mp4"), uploaded.await())
-                assertNotEquals(
-                    AppText.Resource(dev.ipf.whitenoise.android.R.string.media_album_too_large),
-                    state.toast?.title,
-                )
+                assertEquals(listOf("clip.mp4"), uploaded.first.await())
+                val photoState = awaitPhotoQueuedOrSettled(state)
+                assertTrue("the photo is not left out", photoState != CollectionItemState.SKIPPED)
+                assertNull("no pick is refused or left out", state.toast)
             } finally {
                 ScriptedPickProvider.picks.clear()
                 finishMediaFixture(controller, state)
@@ -1779,17 +1778,17 @@ class ConversationFileBackedMediaSendTest {
      * without a storage notice.
      */
     @Test
-    fun albumLeavesOutADraftPhotoWhoseCopiesNoLongerFitBesideALargeVideo() =
+    fun aDraftPhotoWhoseCopiesDoNotFitBesideALargeVideoSendsAfterIt() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
             val state = mediaSendReconciliationAppState()
             Robolectric.setupContentProvider(ScriptedPickProvider::class.java, SENDER_PICKS_AUTHORITY)
             val video = scriptedPick(state, "clip.mp4", "video/mp4", ALBUM_VIDEO_BYTES)
             val photo = scriptedPick(state, "photo.jpg", "image/jpeg", DRAFT_PHOTO_BYTES.toLong())
-            val uploaded = CompletableDeferred<List<String>>()
+            val uploaded = ChunkUploads()
             val controller =
                 fileBackedController(state) { request, _ ->
-                    uploaded.complete(request.attachments.map { it.fileName })
+                    uploaded.record(request.attachments.map { it.fileName })
                     oneAttachmentUpload()
                 }
             val roomyLimits =
@@ -1816,11 +1815,10 @@ class ConversationFileBackedMediaSendTest {
                     preparedImageAttachments = mapOf("photo" to draftPhoto()),
                 )
 
-                assertEquals(listOf("clip.mp4"), uploaded.await())
-                assertNotEquals(
-                    AppText.Resource(dev.ipf.whitenoise.android.R.string.share_import_storage),
-                    state.toast?.title,
-                )
+                assertEquals(listOf("clip.mp4"), uploaded.first.await())
+                val photoState = awaitPhotoQueuedOrSettled(state)
+                assertTrue("the photo is not left out", photoState != CollectionItemState.SKIPPED)
+                assertNull("no pick is refused or left out", state.toast)
             } finally {
                 ScriptedPickProvider.picks.clear()
                 finishMediaFixture(controller, state)
@@ -1834,16 +1832,16 @@ class ConversationFileBackedMediaSendTest {
      * raised for a copy the album no longer holds.
      */
     @Test
-    fun aLargeDocumentCountsTheCopiesTheAlbumStillOwes() =
+    fun aLargeDocumentSendsAfterTheVideoWithoutAStorageNotice() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
             val state = mediaSendReconciliationAppState()
             val document = scriptedDocument(state)
             val video = scriptedPick(state, "clip.mp4", "video/mp4", LARGER_VIDEO_BYTES)
-            val uploaded = CompletableDeferred<List<String>>()
+            val uploaded = ChunkUploads()
             val controller =
                 fileBackedController(state) { request, _ ->
-                    uploaded.complete(request.attachments.map { it.fileName })
+                    uploaded.record(request.attachments.map { it.fileName })
                     oneAttachmentUpload()
                 }
             // After the video lands there is room for the document's two copies alone, but not for its
@@ -1868,11 +1866,9 @@ class ConversationFileBackedMediaSendTest {
                     caption = "",
                 )
 
-                assertEquals(listOf("clip.mp4"), uploaded.await())
-                assertNotEquals(
-                    AppText.Resource(dev.ipf.whitenoise.android.R.string.share_import_storage),
-                    state.toast?.title,
-                )
+                assertEquals(listOf("clip.mp4"), uploaded.first.await())
+                assertEquals(1, uploaded.second.await().size)
+                assertNull("no pick is refused or left out", state.toast)
             } finally {
                 ScriptedPickProvider.picks.clear()
                 finishMediaFixture(controller, state)
@@ -2179,4 +2175,31 @@ internal fun collectionLifecycleController(
         },
         markdownParser = { emptyMarkdownDocument() },
     )
+}
+
+/** The attachment names of the first two uploads, in order; later uploads are ignored. */
+private class ChunkUploads {
+    val first = CompletableDeferred<List<String>>()
+    val second = CompletableDeferred<List<String>>()
+
+    /** Completes [first], then [second], with one upload's attachment names. */
+    fun record(names: List<String>) {
+        if (!first.complete(names)) second.complete(names)
+    }
+}
+
+/**
+ * Waits until the collection's draft photo is uploading or sent, or its operation has finished (a skip would
+ * also show a notice), and returns the photo's state, or null once the operation is gone.
+ */
+private suspend fun awaitPhotoQueuedOrSettled(state: WhiteNoiseAppState): CollectionItemState? {
+    val reached = setOf(CollectionItemState.UPLOADING, CollectionItemState.PUBLISHED, CollectionItemState.SKIPPED)
+    val operations =
+        state.attachmentCollections.operations.first { all ->
+            all.values.none { operation -> operation.items.any { it.id == "photo" && it.state !in reached } }
+        }
+    return operations.values
+        .flatMap { it.items }
+        .firstOrNull { it.id == "photo" }
+        ?.state
 }

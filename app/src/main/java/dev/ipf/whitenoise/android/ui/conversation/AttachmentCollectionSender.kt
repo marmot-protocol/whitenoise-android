@@ -202,7 +202,9 @@ internal class AttachmentCollectionSender(
         val recorded = registry.recordChunkToken(run.operationId, chunk.id, queued.tempId)
         // A cancel, pause or discard that landed while the send was being seeded leaves the chunk without this
         // token, so the send is withdrawn before any upload, as is one whose token the journal could not hold.
-        val owned = recorded?.chunks?.firstOrNull { it.id == chunk.id }
+        // The live operation, not the recorded snapshot: a discard may have landed while the write was awaited.
+        val live = recorded?.let { registry.operations.value[run.operationId] }
+        val owned = live?.chunks?.firstOrNull { it.id == chunk.id }
         if (owned?.state != CollectionChunkState.UPLOADING || owned.clientToken != queued.tempId) {
             val storageFailed = recorded == null && registry.operations.value[run.operationId] != null
             return appState.withdrawUnrecorded(current.controller, queued, run.operationId, chunk.id, storageFailed)
@@ -272,12 +274,13 @@ internal class AttachmentCollectionSender(
                     if (media) images += attachment else documents += attachment
                 }
             }
+            val withThumbhashes = addMissingThumbhashes(documents)
             completed = true
+            return PreparedChunk(images, withThumbhashes, skipped, reason, staged.toList())
         } finally {
             // Copies made before a failure or cancellation have no owner yet, so they are released here.
             if (!completed) withContext(NonCancellable) { releaseUnadoptedStagedSources(staged.toList(), emptySet()) }
         }
-        return PreparedChunk(images, addMissingThumbhashes(documents), skipped, reason, staged.toList())
     }
 
     /**
