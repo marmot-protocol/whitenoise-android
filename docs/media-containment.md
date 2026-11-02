@@ -134,7 +134,7 @@ caller cannot place under the rule decodes single-use.
 | --- | --- | --- |
 | Conversation | account, conversation | Bytes a member fixed: encrypted, hash-verified message media, thumbnails, bubbles and the viewer; custom emoji received as the message's own attachments; link-preview JPEGs whose digest the message pins, checked before decode; and the group's encrypted, hash-pinned image wherever it is drawn, in the chat list, durable chat rows and the notification loader included. |
 | Public profiles | account | Kind-0 profile pictures and banners, of people in every conversation and of the user's own accounts. They are published to relays, so anyone can fetch all of them and anyone may choose their bytes; sharing one worker exposes nothing new. A group's image is never one of these. Every caller names this domain explicitly. |
-| Outgoing | account, conversation | Every file the user picks from the device to send into one conversation, for its whole life in that conversation's draft: composer and shelf previews, staging (inspection, EXIF and the Original or standard render), the photo editor's inspection, preview and edited render, thumbhashes, just-sent thumbnails and restored draft attachments. The draft's picks share this one worker on every device; see [shared draft worker](#shared-draft-worker). Removing or sending a pick retires nothing. |
+| Outgoing | account, conversation, draft | Every file the user picks from the device for one draft to one conversation, for its whole life in that draft: composer and shelf previews, staging (inspection, EXIF and the Original or standard render), the photo editor's inspection, preview and edited render, thumbhashes, pending previews, just-sent thumbnails and restored draft attachments. The draft's picks share this one worker on every device. A draft ends when it is sent or the composer is emptied, and the next pick starts a new one; see [shared draft worker](#shared-draft-worker). |
 | Local | account | Display-only files of this device: the user's custom-emoji files, notification emoji included, and stored private contact pictures. Their decoded pixels are drawn on this device or exported only to this user's own notification surfaces (notification emoji are re-encoded as PNG and shared with the system through the app's FileProvider); they are never sent, and an emoji is sent as its stored file. |
 | Unique | none | Anything else. Each input gets its own single-use generation, as in the per-input lane. Today: GIPHY first frames, Nostr event and linked-note images, a group's URL picture (in a header, the chat list, a durable row whose group has a URL, or a notification), web image search results and typed image URLs, picks during sign-up, identity-picture cropping, profile and group picture picks, preparing a new private contact picture, the avatar viewer, and picker rows that may show either a group or a person. The avatar loader and the generic picture rows fall back to this when a caller names nothing. |
 
@@ -155,19 +155,19 @@ Audit of the conversation rows against the rule, after round 3's review:
 | GIPHY first frame | GIPHY, an allow-listed host, with no digest | Unique (was Conversation) |
 | Nostr event and linked-note images | The note's author and its host | Unique (was Conversation) |
 | Direct chat peer's picture in a header or notification | Its host; it is published | Public profiles (was Conversation) |
-| Each pick to send, every decode of it included | That file's author | Outgoing, one shared domain per conversation's draft (round 6 measured one per pick, superseded; before that, account-wide Local) |
+| Each pick to send, every decode of it included | That file's author | Outgoing, one shared domain per draft (round 6 measured one per pick, superseded; before that, account-wide Local) |
 | Edited renders and the editor preview | The draft's own picks | The draft's shared outgoing domain (round 5 made them single-use, round 6 per pick; both superseded) |
 
 Within its domain a compromised worker can still read every later input the
 generation serves, including descriptors it retained; alter the pixels it
 returns, which the parent validates for shape but not content; and use CPU and
-memory up to its watchdog. A conversation's outgoing worker serves every pick of
-that conversation's draft. A hostile picked file can therefore reach the other
-picks of the same draft, their originals included, and nothing else: it can
-substitute another pick's original pixels into its own output, or into another
-pick's render, so it could undo a crop, blur or mark of a photo in the same
-message. It reaches no other conversation's draft, no received media, no other
-account and no other domain. In the local domain a hostile emoji file can draw a private
+memory up to its watchdog. A draft's outgoing worker serves every pick of that
+draft. A hostile picked file can therefore reach the other picks of the same
+draft, their originals included, and nothing else: it can substitute another
+pick's original pixels into its own output, or into another pick's render, so it
+could undo a crop, blur or mark of a photo in the same message. It reaches no
+later draft of the same conversation, no other conversation's draft, no received
+media, no other account and no other domain. In the local domain a hostile emoji file can draw a private
 contact picture in an emoji slot, on this device or in this user's own
 notification. Escapes through the kernel or system services are not contained
 by domains.
@@ -196,11 +196,13 @@ Lifetime:
 - A generation is replaced after 64 inputs and retired after 30 seconds idle,
   so none serves its domain indefinitely and a quiet conversation frees its
   memory. A replacement costs one application-zygote fork on stock Android.
-- Account reset and close retire every generation and spare. Removing or sending
-  a pick retires nothing: the draft's shared outgoing worker still serves its
-  other picks, and retires like any domain's, after 30 seconds idle, after 64
-  inputs, on a crash, watchdog, deadline miss or invalid reply, or at account
-  reset.
+- Account reset and close retire every generation and spare. A draft's outgoing
+  worker retires once the draft has ended, by being sent or emptied, and nothing
+  can still decode in it: its send, which decodes the just-sent thumbnails there,
+  has ended, and none of its sent picks is still staged. A request in flight
+  finishes first. Removing some of a draft's picks retires nothing. Otherwise it
+  retires like any domain's, after 30 seconds idle, after 64 inputs, on a crash,
+  watchdog, deadline miss or invalid reply, or at account reset.
 - A Unique input gets a single-use generation, retired after its reply. Its
   Binder death precedes the parent pixel copy and the next Unique input.
 - Retirement sends RETIRE first; the worker's own exit normally follows within
@@ -958,7 +960,8 @@ the window keeps a margin of more than 9.5 seconds and stays as it is.
 ##### Verification
 
 The domain canary gained a per-pick case for this round; the shared draft worker
-replaced it with a case where a draft's picks share one process. Containment
+replaced it with a case where a draft's picks share one process, and its draft
+identity added a case where successive drafts never share one. Containment
 acceptance, which runs it, passed 35 of 35 on API 30 and API 36 with the final
 build. Three earlier API 30 runs on the build of `a9443e30e`, which differed
 from it only in comment text, each failed `AvCapabilityLogCaptureDeviceTest`:
@@ -981,32 +984,58 @@ one worker for the conversation's picks. One worker per pick roughly doubled
 master's album times on stock Android as well, so the design changed on every
 device, with no launch-mode detection.
 
-Every file the user picks to send into a conversation now decodes in that
-account and conversation's one outgoing worker, for its whole life in the draft:
-composer, shelf and preview tiles, staging, the photo editor's inspection,
-preview and edited render, thumbhashes, the just-sent poster, which decodes in
-its send's own account and conversation, and attachments restored from a saved
-draft. `MediaTrustDomain.outgoing(account, conversation)` is the only place an
-outgoing domain is made, and `PictureDomainCoverageTest` fails on any other
-construction, so every decode of a pick agrees. The pick no longer keys the
-domain.
+Every file the user picks to send into a conversation decodes in its draft's one
+outgoing worker, for its whole life in that draft: composer, shelf and preview
+tiles, staging, the photo editor's inspection, preview and edited render,
+thumbhashes, the pending preview, the just-sent poster and attachments restored
+from a saved draft. The domain is keyed by account, conversation and draft.
 
-Removing or sending a pick retires nothing, since the worker still serves the
-draft's other picks. It retires like any domain's worker: after 30 seconds idle,
-after 64 inputs, on a crash, watchdog kill, deadline miss or invalid reply, and
-at account reset.
+A draft runs from its first pick until the user sends it or empties the
+composer; `OutgoingDrafts`, one per conversation controller, keeps that
+identity. A send keeps each of its picks on the draft it decodes in now, for the
+send's own reads, and the next pick starts a new draft, including a pick made
+while the send is still running. A sent attachment carries its draft's domain,
+so its pending preview and just-sent poster decode there whatever draft is
+current by then. A pick still staged after a send, as after a rejected one, keeps
+its draft until it leaves the composer; any other pick decodes in the current
+draft. An ended draft gains no pick, and a draft identity is random, so a
+conversation reopened later starts a new one.
+`ConversationController.outgoingMediaTrustDomain(pick)` is the only caller of
+`MediaTrustDomain.outgoing` in production, and `PictureDomainCoverageTest`
+fails on any other call or construction, so every decode of a pick agrees.
+
+An ended draft's worker retires once nothing can still decode in it: its sends
+have ended, after their posters, and none of its sent picks is still staged. A
+request in flight finishes first, and a later poster of a failed send that is
+retried decodes in a fresh generation of the same draft's domain, which only that
+draft's picks reach. Removing some of a draft's picks retires nothing. The
+worker otherwise retires like any domain's: after 30 seconds idle, after 64
+inputs, on a crash, watchdog kill, deadline miss or invalid reply, and at account
+reset.
 
 The trade is the draft. A hostile picked file can reach the other picks of the
-same conversation's draft, their unredacted originals included, and can
-substitute another pick's pixels into its own output or into another pick's
-render, so it could undo a crop, blur or mark of a photo in the same message. It
-reaches no other conversation's draft, none of the conversation's received
-media, no other account and no other domain.
+same draft, their unredacted originals included, and can substitute another
+pick's pixels into its own output or into another pick's render, so it could undo
+a crop, blur or mark of a photo in the same message. It reaches no later draft
+of the same conversation, no other conversation's draft, none of the
+conversation's received media, no other account and no other domain.
+
+The review of the shared draft worker's first form found that keying it by
+account and conversation alone let it outlive the draft: after a send, or after every pick was removed, a pick
+of the next draft within 30 seconds and 64 inputs reached the same generation.
+The draft identity closes that. `OutgoingDraftsTest` covers the policy,
+`SharedOutgoingWorkerTest` drives it through the controller and the draft state
+on an isolated test lane (an emptied draft and a pick made during a send each
+get a fresh worker, and the sent draft's worker retires after its send), and
+`MediaWorkerDomainDeviceTest.successiveDraftsNeverShareAWorker` checks the same
+sequence on real isolated workers through the debug canary.
 
 The measurement harnesses follow production. The album harness keeps two lanes,
-`master` and `conversation`, and the conversation lane maps its picks through
-production's policy; its per-pick lane is gone. The UI harness's editor
-cancellation rows decode both picks in the open conversation's shared worker.
+`master` and `conversation`. In the conversation lane each attempt is a new
+draft whose picks map through production's draft policy, and its worker retires
+after the send, as production's does; its per-pick lane is gone. The UI
+harness's editor cancellation rows decode both picks in the open draft's shared
+worker.
 The round-6 emulator album rows above measured the per-pick and conversation
 lanes side by side; the conversation lane is this design.
 
@@ -1023,6 +1052,10 @@ On the same emulators:
   reach a decoder that another group's image may have compromised.
 - One outgoing worker per account (round 3): a hostile pick would reach every
   conversation's drafts.
+- One outgoing worker per conversation, kept across drafts (round 5, and the
+  shared draft worker's first form): a hostile pick would reach the
+  conversation's next draft whenever it was picked before the worker idled out
+  or reached its input cap.
 - One outgoing worker per pick (round 6): no pick reaches another, but a
   ten-photo album took about twice master's time on a stock Pixel 9 Pro XL and
   over three times the shared worker's on a GrapheneOS Pixel 9a; see the [shared
@@ -1067,11 +1100,11 @@ for that decision.
 - The avatar cache and its in-flight requests are keyed by URL, not domain. If
   one URL were both a person's published picture and a group's URL picture, the
   first request's domain would decode it for both.
-- A conversation's outgoing worker serves every pick of its draft, so a hostile
-  picked file can reach the other picks of the same draft, their originals
-  included, and substitute their pixels into its own output or into another
-  pick's render, undoing an edit of a photo in the same message. It reaches
-  nothing outside that draft.
+- A draft's outgoing worker serves every pick of that draft, so a hostile picked
+  file can reach the other picks of the same draft, their originals included,
+  and substitute their pixels into its own output or into another pick's render,
+  undoing an edit of a photo in the same message. It reaches nothing outside
+  that draft, not even the same conversation's next draft.
 - In the local domain a hostile emoji file can draw a private contact picture in
   an emoji slot, on this device or in this user's own notification; nothing from
   the local domain is sent.

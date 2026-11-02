@@ -89,15 +89,20 @@ bound and no exception. `MediaRefusalLedgerTest` hammers the session's refusal
 ledger from eight threads; without its lock it throws.
 `PictureDomainCoverageTest` and `PictureDomainMappingTest` check that every
 production picture names its domain, that only member-pinned bytes reach a
-conversation's worker and that `MediaTrustDomain.outgoing` is the only place an
-outgoing domain is made; `PhotoEditorDomainTest`, `PhotoDraftStagerTest` and
+conversation's worker and that only the conversation controller's draft policy
+makes an outgoing domain; `PhotoEditorDomainTest`, `PhotoDraftStagerTest` and
 `PhotoEditorCommitterTest` check that every decode of a draft's picks, edited,
-staged or recovered, runs in its conversation's shared outgoing worker and never
-another conversation's, also under concurrency. `SharedOutgoingWorkerTest`
-checks that removing a photo or a document, or sending one, retires nothing and
-the draft's next decode reaches the same worker;
+staged or recovered, runs in its draft's shared outgoing worker and never
+another draft's, also under concurrency. `OutgoingDraftsTest` checks the draft
+policy: a draft's picks share it, a send or an empty composer ends it, a pick
+made during a send starts the next one, and an ended draft retires once its
+sends have ended and its picks have left the composer. `SharedOutgoingWorkerTest`
+drives that through the controller and the draft state on an isolated test lane:
+removing one pick keeps the draft's worker, while an emptied draft's worker
+retires and the next draft's pick reaches a fresh one, and a pick made during a
+send never reaches the sent draft's worker, which retires after its send;
 `ConversationMediaSendReconciliationIntegrationTest` that the just-sent poster
-decodes in its send's account and conversation domain. `MediaWorkerDomainTest`
+decodes in the domain its attachment carries, its sent draft's. `MediaWorkerDomainTest`
 adds a ten-draft concurrency canary and parallel eviction for several new
 domains at once. `MediaClaimDeadlineTest` checks that a missed deadline after a
 long wait for a worker quarantines nothing, while the same miss without that
@@ -115,8 +120,12 @@ not as a self-exit.
 `MediaWorkerDomainDeviceTest` uses the same canary across domains: a
 conversation's later input lands in the worker holding its earlier input's
 state, and another conversation's input lands in a different process holding
-none of it. Its draft case shows two picks of one conversation's draft sharing
-one outgoing process, a second conversation's picks never reaching it, and no
-other domain sharing it. These cases ran on API 30 and API 36 emulators and run
-in the hosted API 34 pull-request lane. MED-031 and MED-032 keep their image,
+none of it. Its draft case shows two picks of one draft sharing one outgoing
+process, a second conversation's draft never reaching it, and no other domain
+sharing it. These cases ran on API 30 and API 36 emulators and run in the hosted
+API 34 pull-request lane. Its successive-draft case, added later and run in that
+lane, follows production's draft policy on real workers: an emptied draft's pick
+is absent from the next draft's process, a pick made during a send starts a fresh
+process while the sent pick's thumbnail stays in its own, and the next draft's
+later pick reaches only that draft's process. MED-031 and MED-032 keep their image,
 account-switching and format checks.
