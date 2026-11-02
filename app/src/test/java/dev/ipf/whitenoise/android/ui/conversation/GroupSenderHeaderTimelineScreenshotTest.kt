@@ -454,6 +454,7 @@ class GroupSenderHeaderTimelineScreenshotTest : MessageBubbleFileAttachmentFixtu
         header.performClick()
         composeRule.runOnIdle {
             assertEquals(app.npub(senderId), app.pendingProfileNpub)
+            assertEquals("a profile tap cannot open message actions", 0, openedMenus)
             app.clearPresentedProfile()
         }
         header.performTouchInput { click() }
@@ -463,6 +464,7 @@ class GroupSenderHeaderTimelineScreenshotTest : MessageBubbleFileAttachmentFixtu
                 app.npub(senderId),
                 app.pendingProfileNpub,
             )
+            assertEquals("a profile tap cannot open message actions", 0, openedMenus)
             app.clearPresentedProfile()
         }
         val body = composeRule.onNodeWithText(LONG_MESSAGE, substring = true, useUnmergedTree = true)
@@ -478,6 +480,7 @@ class GroupSenderHeaderTimelineScreenshotTest : MessageBubbleFileAttachmentFixtu
         body.performTouchInput { click(Offset(bodyX, bodyY)) }
         composeRule.runOnIdle {
             assertNull("the message body cannot activate the expanded profile target", app.pendingProfileNpub)
+            assertEquals("a body tap cannot open message actions", 0, openedMenus)
         }
         header.performTouchInput { longClick() }
         composeRule.runOnIdle {

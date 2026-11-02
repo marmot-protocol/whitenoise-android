@@ -3,7 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.messages
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -2270,19 +2270,11 @@ internal fun MessageBubble(
                                 } else {
                                     groupAuthorColor(record.sender)
                                 },
+                            // The row owns physical and accessible holds; the header owns only profile taps.
                             modifier =
-                                Modifier.combinedClickable(
+                                Modifier.clickable(
                                     enabled = !selectionMode && !textSelectionMode,
                                     onClick = { appState.presentProfile(appState.npub(record.sender)) },
-                                    onLongClick = {
-                                        if (!deleted && !selectionMode && !textSelectionMode) {
-                                            pressState.longPressWindowPosition = null
-                                            pressState.selectionSeedVisibleOffset = null
-                                            longPressWindowY = null
-                                            pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0]
-                                            onActionMenuOpenChange(true)
-                                        }
-                                    },
                                 ),
                         )
                     }
