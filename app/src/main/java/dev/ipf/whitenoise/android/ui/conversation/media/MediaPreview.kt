@@ -238,17 +238,26 @@ internal sealed class StagedPreviewItem {
         override val uri: android.net.Uri = slot.uri
     }
 
+    /** A staged document; [occurrence] tells repeated picks of one URI apart, starting at 1. */
     data class Document(
         override val uri: android.net.Uri,
+        val occurrence: Int = 1,
     ) : StagedPreviewItem()
 }
 
+/** The preview's items in send order, numbering repeated document URIs so each keeps its own key. */
 internal fun stagedPreviewItems(
     mediaSlots: List<PendingMediaSlot>,
     documentUris: List<android.net.Uri>,
 ): List<StagedPreviewItem> {
     val media = mediaSlots.map { StagedPreviewItem.Media(it) }
-    return media + documentUris.map { StagedPreviewItem.Document(it) }
+    val seen = mutableMapOf<android.net.Uri, Int>()
+    return media +
+        documentUris.map { uri ->
+            val occurrence = (seen[uri] ?: 0) + 1
+            seen[uri] = occurrence
+            StagedPreviewItem.Document(uri, occurrence)
+        }
 }
 
 /**
@@ -291,6 +300,7 @@ internal fun MediaPreviewScreen(
     initialCaption: String = "",
     previewOnly: Boolean = false,
     initialIndex: Int = 0,
+    onCollectionChange: ((StagedCollectionOrder) -> Unit)? = null,
 ) {
     PlaybackDialog(
         onDismissRequest = onDismiss,
@@ -320,6 +330,7 @@ internal fun MediaPreviewScreen(
             preparingPhotoSlotIds = preparingPhotoSlotIds,
             nonEditableMediaSlotIds = nonEditableMediaSlotIds,
             nonEditableMediaDescriptions = nonEditableMediaDescriptions,
+            onCollectionChange = onCollectionChange,
         )
     }
 }
@@ -352,8 +363,10 @@ internal fun MediaPreviewContent(
     initialCaption: String = "",
     previewOnly: Boolean = false,
     initialIndex: Int = 0,
+    onCollectionChange: ((StagedCollectionOrder) -> Unit)? = null,
 ) {
     val items = remember(mediaSlots, documentUris) { stagedPreviewItems(mediaSlots, documentUris) }
+    val collection = rememberMediaCollectionState(items, onCollectionChange?.takeUnless { previewOnly })
     val metadata = rememberPreviewMetadata(items)
     // Local guard against a rapid double-tap firing onSend twice before the
     // parent clears the staging shelf and this screen leaves composition.
@@ -387,12 +400,15 @@ internal fun MediaPreviewContent(
             // App banners sit below this screen's bar rather than over it (#3312).
             Column {
                 MediaPreviewTopBar(
+                    title = collection.title(items.size),
+                    gridToggle = collection.gridToggle(items.size, enabled = !sending && !applying),
                     editAction =
                         currentMedia
                             // The prototype withholds Edit from video and GIF. Unresolved metadata is
                             // not evidence of either, so a still whose probe is still in flight keeps
                             // its action rather than losing it for the life of the screen.
-                            ?.takeIf { onEditMediaAt != null && currentMetadata?.isVideo != true }
+                            ?.takeIf { onEditMediaAt != null && !collection.gridMode }
+                            ?.takeIf { currentMetadata?.isVideo != true }
                             ?.takeIf { currentMetadata?.isGif != true }
                             ?.let { media ->
                                 MediaPreviewEditAction(
@@ -420,19 +436,42 @@ internal fun MediaPreviewContent(
         },
     ) { contentPadding ->
         Column(Modifier.fillMaxSize().padding(contentPadding)) {
-            MediaPreviewPager(
-                items = items,
-                pagerState = pagerState,
-                metadata = metadata,
-                prepared = preparedPhotoPreviews,
-                excluded = excluded.toSet(),
-                onIncludedChange = { key, included ->
-                    excluded = if (included) excluded - key else (excluded + key).distinct()
-                },
-                onDismiss = onClose,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-            )
-            if (items.size > 1 || !previewOnly) {
+            if (collection.gridMode) {
+                MediaCollectionGrid(
+                    items = items,
+                    metadata = metadata,
+                    prepared = preparedPhotoPreviews,
+                    selectedKeys = collection.selected,
+                    onToggle = collection::toggle,
+                    onOpen = { index ->
+                        pagerState.requestScrollToPage(index)
+                        collection.gridMode = false
+                    },
+                    onMove = { key, delta -> collection.move(mediaSlots, documentUris, setOf(key), delta) },
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                )
+                MediaCollectionActionBar(
+                    selectedCount = collection.selected.size,
+                    total = items.size,
+                    actions = collection.actions(items, mediaSlots, documentUris),
+                    enabled = !sending && !applying,
+                )
+            }
+            if (!collection.gridMode) {
+                MediaPreviewPager(
+                    items = items,
+                    pagerState = pagerState,
+                    metadata = metadata,
+                    prepared = preparedPhotoPreviews,
+                    excluded = excluded.toSet(),
+                    onIncludedChange = { key, included ->
+                        excluded = if (included) excluded - key else (excluded + key).distinct()
+                    },
+                    onDismiss = onClose,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                )
+            }
+            if (!collection.gridMode && (items.size > 1 || !previewOnly)) {
                 MediaPreviewFilmstrip(
                     items = items,
                     metadata = metadata,
@@ -515,17 +554,23 @@ private fun ApplyPreviewExclusions(
     }
 }
 
-/** Prototype preview chrome: cancel on the left, then Edit photo (stills only) and Done. */
+/**
+ * Prototype preview chrome: cancel on the left, then the grid toggle for collections, Edit photo (stills
+ * only) and Done. [title] replaces the plain heading with the collection count while the grid shows.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("LongParameterList")
 private fun MediaPreviewTopBar(
+    title: String?,
+    gridToggle: MediaCollectionToggle?,
     editAction: MediaPreviewEditAction?,
     onClose: () -> Unit,
     onDone: () -> Unit,
     doneEnabled: Boolean,
 ) {
     TopAppBar(
-        title = { Text(stringResource(R.string.preview_media)) },
+        title = { Text(title ?: stringResource(R.string.preview_media)) },
         navigationIcon = {
             IconButton(onClick = onClose) {
                 Icon(
@@ -535,6 +580,9 @@ private fun MediaPreviewTopBar(
             }
         },
         actions = {
+            gridToggle?.let { toggle ->
+                TextButton(onClick = toggle.onToggle, enabled = toggle.enabled) { Text(toggle.label) }
+            }
             editAction?.let { action ->
                 val fallback = stringResource(R.string.photo_editor_edit_action)
                 val describe = Modifier.semantics { contentDescription = action.description ?: fallback }

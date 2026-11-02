@@ -82,8 +82,11 @@ class MediaDownloadHostRegressionTest {
     /** Releases only this test's work, files, and dispatcher. */
     @After
     fun tearDown() {
-        fixture.close()
-        Dispatchers.resetMain()
+        try {
+            if (::fixture.isInitialized) fixture.closeAndDrain(dispatcher)
+        } finally {
+            Dispatchers.resetMain()
+        }
     }
 
     /** Sixteen distinct cold references share three slots; a late explicit request gets the next slot. */

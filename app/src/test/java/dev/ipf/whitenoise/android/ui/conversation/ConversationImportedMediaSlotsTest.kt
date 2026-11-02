@@ -112,12 +112,35 @@ class ConversationImportedMediaSlotsTest {
         assertFalse(importedComposerExceedsLimit(nativeFirst.mediaSlots.dropLast(1), emptyList(), 10, owns))
     }
 
-    /** Appends to an already overflowing recovered shelf without truncating its accepted originals. */
+    /** A pick beside an already overflowing recovered shelf is refused and counted, never trimming the shelf. */
     @Test
     fun aNewDocumentPickCannotTrimAlreadyRecoveredSources() {
         val recovered = List(11) { Uri.parse("content://private-share/$it") }
-        assertEquals(recovered, appendRecoveredDocuments(recovered, listOf(Uri.parse("content://native/new")), 10))
+        val admission = admitComposerAttachments(listOf(Uri.parse("content://native/new")), 0, recovered.size, 10)
+        assertEquals(emptyList<Uri>(), admission.accepted)
+        assertEquals(1, admission.droppedCount)
         assertFalse(importedComposerExceedsLimit(emptyList(), recovered, 10) { false })
+    }
+
+    /** Media and documents share one limit: staged documents shrink the room left for a photo pick (#2576). */
+    @Test
+    fun photoPickCountsStagedDocumentsTowardTheCombinedLimit() {
+        val picked = List(6) { Uri.parse("content://media/$it") }
+        val admission = admitComposerAttachments(picked, mediaCount = 3, documentCount = 4, maxItems = 10)
+        assertEquals(picked.take(3), admission.accepted)
+        assertEquals(3, admission.droppedCount)
+    }
+
+    /** Duplicate occurrences keep their source order and each one counts, so nothing is dropped unreported. */
+    @Test
+    fun overLimitPickKeepsSourceOrderAndCountsEveryRejectedOccurrence() {
+        val same = Uri.parse("content://media/same")
+        val picked = listOf(same, Uri.parse("content://media/a"), same, Uri.parse("content://media/b"))
+        val admission = admitComposerAttachments(picked, mediaCount = 8, documentCount = 0, maxItems = 10)
+        assertEquals(listOf(same, Uri.parse("content://media/a")), admission.accepted)
+        assertEquals(2, admission.droppedCount)
+        assertEquals(picked, admitComposerAttachments(picked, 0, 0, 10).accepted)
+        assertEquals(0, admitComposerAttachments(picked, 0, 0, 10).droppedCount)
     }
 
     /** Repeats shelf revisions and removal while checking slot object identity, including the camera item. */
@@ -176,5 +199,36 @@ class ConversationImportedMediaSlotsTest {
             )
         assertEquals(listOf(fresh, imported), merged.mediaSlots)
         assertSame(imported, merged.mediaSlots.last())
+    }
+
+    /** A hundred-item limit admits the first picks that fit after staged media and documents, in order. */
+    @Test
+    fun hundredItemLimitAdmitsTheLeadingPicksAcrossMediaAndDocuments() {
+        val picked = List(30) { Uri.parse("content://media/$it") }
+        val admission = admitComposerAttachments(picked, mediaCount = 60, documentCount = 15, maxItems = 100)
+        assertEquals(picked.take(25), admission.accepted)
+        assertEquals(5, admission.droppedCount)
+        val full = admitComposerAttachments(picked, mediaCount = 50, documentCount = 50, maxItems = 100)
+        assertEquals(emptyList<Uri>(), full.accepted)
+        assertEquals(30, full.droppedCount)
+    }
+
+    /** The over-limit notice names accepted, offered, rejected and the limit in localized text. */
+    @Test
+    fun overLimitNoticeStatesAcceptedRejectedAndLimit() {
+        val resources =
+            androidx.test.core.app.ApplicationProvider
+                .getApplicationContext<android.content.Context>()
+                .resources
+        val text =
+            resources.getQuantityString(
+                dev.ipf.whitenoise.android.R.plurals.attachment_collection_limit_result,
+                5,
+                25,
+                30,
+                5,
+                100,
+            )
+        assertEquals("Added 25 of 30. 5 attachments didn't fit — the limit is 100 per send.", text)
     }
 }
