@@ -1740,8 +1740,9 @@ class ConversationFileBackedMediaSendTest {
             val video = scriptedPick(state, "clip.mp4", "video/mp4", ALBUM_VIDEO_BYTES)
             val photo = scriptedPick(state, "photo.jpg", "image/jpeg", DRAFT_PHOTO_BYTES.toLong())
             val uploaded = ChunkUploads()
+            // The prepared draft photo goes up from memory once the video has been sent.
             val controller =
-                fileBackedController(state) { request, _ ->
+                fileBackedController(state, inMemoryUpload = { acceptedUploadResult(1) }) { request, _ ->
                     uploaded.record(request.attachments.map { it.fileName })
                     oneAttachmentUpload()
                 }
@@ -1786,8 +1787,9 @@ class ConversationFileBackedMediaSendTest {
             val video = scriptedPick(state, "clip.mp4", "video/mp4", ALBUM_VIDEO_BYTES)
             val photo = scriptedPick(state, "photo.jpg", "image/jpeg", DRAFT_PHOTO_BYTES.toLong())
             val uploaded = ChunkUploads()
+            // The prepared draft photo goes up from memory once the video has been sent.
             val controller =
-                fileBackedController(state) { request, _ ->
+                fileBackedController(state, inMemoryUpload = { acceptedUploadResult(1) }) { request, _ ->
                     uploaded.record(request.attachments.map { it.fileName })
                     oneAttachmentUpload()
                 }
@@ -2030,19 +2032,23 @@ private fun scriptedDocument(state: WhiteNoiseAppState): android.net.Uri {
 
 /**
  * A controller whose file uploads run [upload] with the cancel registration the native control would
- * receive; the in-memory uploader must never be reached, and every publish reports relay acceptance.
+ * receive. The in-memory uploader runs [inMemoryUpload], which by default must never be reached, and every
+ * publish reports relay acceptance.
  */
 private fun fileBackedController(
     state: WhiteNoiseAppState,
     publish: () -> Unit = {},
     publishSummary: () -> SendSummaryFfi = { requireNotNull(uploadResult(mediaReference()).sent) },
+    inMemoryUpload: (MediaUploadRequestFfi) -> MediaUploadResultFfi = {
+        error("the in-memory upload path must not run")
+    },
     upload: suspend (MediaFileUploadRequestFfi, ((() -> Unit)?) -> Unit) -> MediaUploadResultFfi,
 ) = ConversationController(
     appState = state,
     initialGroup = group(),
     initialMemberSnapshot = memberSnapshot(),
     groupRosterReader = { _, _ -> authoritativeRoster() },
-    mediaUploader = { _, _, _ -> error("the in-memory upload path must not run") },
+    mediaUploader = { _, _, request -> inMemoryUpload(request) },
     mediaFileUploader = { _, _, request, register -> upload(request, register) },
     fileBatchCiphertextBytes = { FILE_BATCH_CIPHERTEXT_BYTES },
     mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
