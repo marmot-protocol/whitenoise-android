@@ -40,6 +40,14 @@
           "FIND-013",
           "FIND-017"
         ]
+      },
+      {
+        "surface": "string:toast_original_message_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/GlobalAttachmentOpeners.kt",
+        "anchor": "R.string.toast_original_message_unavailable",
+        "test_ids": [
+          "FIND-017"
+        ]
       }
     ]
   },
