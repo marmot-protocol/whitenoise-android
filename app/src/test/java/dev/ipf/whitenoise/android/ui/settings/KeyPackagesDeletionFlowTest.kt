@@ -200,6 +200,7 @@ class KeyPackagesDeletionFlowTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     /** Models a relay-discovered package whose provenance is bound by the screen's account generation. */

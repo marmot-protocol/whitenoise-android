@@ -55,6 +55,7 @@ class OptimisticMessageConfirmationTest {
             status = status,
         )
 
+    /** Builds a sent plain-text message record with the given id. */
     private fun message(id: String): AppMessageRecordFfi =
         AppMessageRecordFfi(
             messageIdHex = id,
@@ -75,5 +76,6 @@ class OptimisticMessageConfirmationTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
+            sticker = null,
         )
 }

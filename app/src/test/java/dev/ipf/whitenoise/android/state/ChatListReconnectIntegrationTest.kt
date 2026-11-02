@@ -778,6 +778,7 @@ internal fun chatListTestAppState(
                     externalSigning = false,
                     signedOut = false,
                     running = true,
+                    unlinked = false,
                 ),
             ),
         activeAccountRef = ConversationTimelineTestIds.ACCOUNT_REF,

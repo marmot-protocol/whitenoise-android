@@ -99,6 +99,18 @@ class ChatRowPortPresentationTest {
         )
     }
 
+    /** A removed device copy names this device, never a removal of the account, which stays in elsewhere. */
+    @Test
+    fun deviceRemovedRowNamesThisDeviceRatherThanTheAccount() {
+        assertEquals(
+            R.string.chat_row_device_removed_description,
+            chatRowMembershipStatus(
+                ChatRowPortFixtures.item(membership = SelfMembershipFfi.DEVICE_REMOVED),
+                ChatRowPortFixtures.ACCOUNT_HEX,
+            ),
+        )
+    }
+
     /** Composes the surface under test with the given fixture. */
     private fun render(
         item: ChatListItem,

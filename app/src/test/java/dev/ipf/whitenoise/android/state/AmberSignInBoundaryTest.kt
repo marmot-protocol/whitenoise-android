@@ -110,7 +110,7 @@ class AmberSignInBoundaryTest {
     /** Fakes only the pre-commit MDK calls; any data mutation fails the test. */
     private fun fixture(legacyFallback: Boolean): Fixture {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val account = AccountSummaryFfi("existing", ACCOUNT_ID, true, false, false, true)
+        val account = AccountSummaryFfi("existing", ACCOUNT_ID, true, false, false, true, false)
         val calls = ConcurrentLinkedQueue<String>()
         val marmot =
             Proxy.newProxyInstance(

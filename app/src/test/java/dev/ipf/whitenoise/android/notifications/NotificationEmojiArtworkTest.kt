@@ -564,6 +564,7 @@ class NotificationEmojiArtworkTest {
         )
     }
 
+    /** Builds a new-message notification update from Alice with the given text. */
     private fun messageUpdate(
         text: String,
         messageChar: Char,
@@ -592,6 +593,7 @@ class NotificationEmojiArtworkTest {
             isMention = false,
             reactionEmoji = null,
             reactedToPreview = null,
+            sticker = null,
         )
     }
 

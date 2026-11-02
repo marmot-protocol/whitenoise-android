@@ -403,6 +403,7 @@ class ChatListTitleTest {
                 attachmentCount = 0u,
                 groupSystem = null,
                 deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                sticker = null,
             ),
         unreadCount = 0uL,
         hasUnread = false,

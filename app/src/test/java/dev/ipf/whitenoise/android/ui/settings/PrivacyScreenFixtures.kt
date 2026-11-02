@@ -41,7 +41,7 @@ internal fun privacyAppState(
         accountIdHexResolver = { null },
         accounts =
             if (hasAccount) {
-                listOf(AccountSummaryFfi("account", "aa".repeat(32), true, false, false, true))
+                listOf(AccountSummaryFfi("account", "aa".repeat(32), true, false, false, true, false))
             } else {
                 emptyList()
             },

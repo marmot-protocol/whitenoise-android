@@ -559,6 +559,7 @@ class GroupMemberAdministrationGateTest {
         )
     }
 
+    /** Builds an app state for alice with optional runtime-access recording and native runtime. */
     private fun appState(
         runtimeAccess: RuntimeAccessRecorder? = null,
         accountIdHexResolver: suspend (String) -> String? = { it },
@@ -577,6 +578,7 @@ class GroupMemberAdministrationGateTest {
                     externalSigning = false,
                     signedOut = false,
                     running = true,
+                    unlinked = false,
                 ),
             ),
         activeAccountRef = "alice",

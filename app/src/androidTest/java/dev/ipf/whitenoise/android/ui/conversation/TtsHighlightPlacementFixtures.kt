@@ -73,6 +73,7 @@ internal object TtsHighlightPlacementFixtures {
         tolerance: Float = 1f,
     ): Boolean = x >= left - tolerance && x <= right + tolerance && y >= top - tolerance && y <= bottom + tolerance
 
+    /** Builds a received message record whose plaintext and markdown document can be spoken. */
     fun speakableRecord(
         plaintext: String,
         document: MarkdownDocumentFfi = plainTextDocument(plaintext),
@@ -90,6 +91,7 @@ internal object TtsHighlightPlacementFixtures {
         retentionExpiresAt = null,
         recordedAt = 1uL,
         receivedAt = 1uL,
+        sticker = null,
     )
 
     fun plainTextDocument(text: String) =
@@ -117,6 +119,7 @@ internal object TtsHighlightPlacementFixtures {
                 ),
         )
 
+    /** Builds an app state with one running local-signing account for TTS highlight tests. */
     fun appState(context: android.content.Context) =
         WhiteNoiseAppState(
             context = context,
@@ -131,6 +134,7 @@ internal object TtsHighlightPlacementFixtures {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,

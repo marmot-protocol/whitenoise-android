@@ -93,7 +93,7 @@ class ChatListContinuityAndroidTest {
                     context = context,
                     draftStore = DraftStore(DiscardedDrafts),
                     accountIdHexResolver = { null },
-                    accounts = listOf(AccountSummaryFfi(account, "a0".repeat(32), true, false, false, true)),
+                    accounts = listOf(AccountSummaryFfi(account, "a0".repeat(32), true, false, false, true, false)),
                     activeAccountRef = account,
                 )
             controller = ChatsController(state, account) { _, _ -> emptyList() }

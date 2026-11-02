@@ -130,6 +130,7 @@ class ChatRowPreviewMarkdownSourceTest {
                 attachmentCount = 0u,
                 groupSystem = null,
                 deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                sticker = null,
             ),
     ) = ChatListRowFfi(
         selfMembership = SelfMembershipFfi.MEMBER,

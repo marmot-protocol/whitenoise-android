@@ -9,6 +9,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Test
 
 class DiagnosticIdentityPresentationTest {
+    /** Diagnostic lines render hex account, sender and welcome recipient ids as short npubs. */
     @Test
     fun hexAccountLabelAndSenderUseCanonicalNpubPresentation() {
         val accountNpub = IdentityFormatter.short(ACCOUNT_NPUB, prefix = 10, suffix = 8)
@@ -47,6 +48,7 @@ class DiagnosticIdentityPresentationTest {
                             retentionExpiresAt = null,
                             recordedAt = 1_779_926_400uL,
                             receivedAt = 1_779_926_400uL,
+                            sticker = null,
                         ),
                 ),
             )

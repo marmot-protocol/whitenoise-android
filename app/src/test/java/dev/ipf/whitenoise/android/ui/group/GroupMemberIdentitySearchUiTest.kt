@@ -401,6 +401,7 @@ class GroupMemberIdentitySearchUiTest {
         }
     }
 
+    /** Builds the local account summaries used by the member search tests. */
     private fun accounts(): List<AccountSummaryFfi> =
         listOf(
             AccountSummaryFfi(
@@ -410,6 +411,7 @@ class GroupMemberIdentitySearchUiTest {
                 externalSigning = false,
                 signedOut = false,
                 running = true,
+                unlinked = false,
             ),
             AccountSummaryFfi(
                 label = "account-b",
@@ -418,6 +420,7 @@ class GroupMemberIdentitySearchUiTest {
                 externalSigning = false,
                 signedOut = false,
                 running = true,
+                unlinked = false,
             ),
         )
 

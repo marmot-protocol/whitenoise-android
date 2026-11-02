@@ -146,6 +146,7 @@ class GroupSystemSubjectLinkTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
+            sticker = null,
         )
 
     private companion object {

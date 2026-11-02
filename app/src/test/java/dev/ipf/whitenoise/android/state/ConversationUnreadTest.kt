@@ -610,6 +610,7 @@ class ConversationUnreadTest {
         recordedAt: ULong = 1uL,
     ): TimelineMessage = message(id, direction = "received", recordedAt = recordedAt, kind = 1210uL)
 
+    /** Builds a timeline message with the given id, direction, recording time, status and kind. */
     private fun message(
         id: String,
         direction: String,
@@ -639,6 +640,7 @@ class ConversationUnreadTest {
                     retentionExpiresAt = null,
                     recordedAt = recordedAt,
                     receivedAt = recordedAt,
+                    sticker = null,
                 ),
             status = status,
         )

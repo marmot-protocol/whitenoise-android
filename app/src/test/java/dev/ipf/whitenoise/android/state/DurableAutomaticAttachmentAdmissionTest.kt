@@ -550,6 +550,7 @@ class DurableAutomaticAttachmentAdmissionTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private companion object {

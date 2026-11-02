@@ -472,6 +472,7 @@ class ConversationImeCollapseFocusTest {
         )
     }
 
+    /** Builds the cached chat-list preview shown before the timeline loads. */
     private fun cachedPreview() =
         ChatListMessagePreviewFfi(
             retentionSeconds = null,
@@ -494,6 +495,7 @@ class ConversationImeCollapseFocusTest {
             attachmentCount = 0u,
             groupSystem = null,
             deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+            sticker = null,
         )
 
     private fun cachedProjection(preview: ChatListMessagePreviewFfi) =
@@ -558,6 +560,7 @@ class ConversationImeCollapseFocusTest {
         (field.get(controller) as MutableState<T>).value = value
     }
 
+    /** Builds an app state with one running local-signing account. */
     private fun appState() =
         WhiteNoiseAppState(
             context = context,
@@ -572,6 +575,7 @@ class ConversationImeCollapseFocusTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,

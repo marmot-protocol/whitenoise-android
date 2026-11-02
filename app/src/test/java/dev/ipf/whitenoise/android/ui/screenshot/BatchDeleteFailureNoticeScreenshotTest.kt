@@ -147,6 +147,7 @@ class BatchDeleteFailureNoticeScreenshotTest {
         )
     }
 
+    /** Builds a batch delete attempt for the given message id and operation. */
     private fun attempt(
         id: String,
         operation: BatchDeleteOperationKind,
@@ -171,6 +172,7 @@ class BatchDeleteFailureNoticeScreenshotTest {
                 retentionExpiresAt = null,
                 recordedAt = 1uL,
                 receivedAt = 1uL,
+                sticker = null,
             )
         return BatchDeleteAttempt(
             selection =

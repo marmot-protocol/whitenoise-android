@@ -12,6 +12,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class WipeReportTest {
+    /** Builds a wipe outcome with the given leave, key-package and local cleanup results. */
     private fun outcome(
         groupsLeft: UInt = 0u,
         groupLeaveFailures: List<GroupLeaveFailureFfi> = emptyList(),
@@ -26,6 +27,8 @@ class WipeReportTest {
             keyPackagesDeleted = keyPackagesDeleted,
             keyPackageFailures = keyPackageFailures,
             localCleanup = LocalCleanupReportFfi(completed = localCompleted, reason = localReason),
+            groupsLeftToSiblings = 0u,
+            siblingsNotReached = false,
         )
 
     @Test

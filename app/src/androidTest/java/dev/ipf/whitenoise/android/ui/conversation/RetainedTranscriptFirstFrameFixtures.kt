@@ -259,7 +259,7 @@ internal class RetainedFixture(
             accountRef = route.accountRef,
             additionalAccounts =
                 if (includeSecondAccount) {
-                    listOf(AccountSummaryFfi("fixture-other", "ab".repeat(32), true, false, false, true))
+                    listOf(AccountSummaryFfi("fixture-other", "ab".repeat(32), true, false, false, true, false))
                 } else {
                     emptyList()
                 },

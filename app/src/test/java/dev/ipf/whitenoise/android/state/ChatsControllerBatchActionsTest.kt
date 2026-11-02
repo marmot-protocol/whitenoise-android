@@ -775,6 +775,7 @@ class ChatsControllerBatchActionsTest {
                 .invoke(state, "replacement")
         }
 
+        /** Pins the given chats in order and pushes every row into the controller. */
         fun seedPinnedOrder(vararg ids: String) {
             ids.forEachIndexed { index, id ->
                 rows[id] = rows.getValue(id).copy(pinned = true, pinnedPosition = index.toUInt())
@@ -870,7 +871,7 @@ class ChatsControllerBatchActionsTest {
                     context = ApplicationProvider.getApplicationContext<Context>(),
                     draftStore = DraftStore.forContext(ApplicationProvider.getApplicationContext()),
                     accountIdHexResolver = { ACCOUNT_ID },
-                    accounts = listOf(AccountSummaryFfi(ACCOUNT, ACCOUNT_ID, true, false, false, true)),
+                    accounts = listOf(AccountSummaryFfi(ACCOUNT, ACCOUNT_ID, true, false, false, true, false)),
                     activeAccountRef = ACCOUNT,
                     initialMarmotRuntime = AppMarmotRuntime("batch-test", native),
                     marmotIoDispatcher = StandardTestDispatcher(scope.testScheduler),

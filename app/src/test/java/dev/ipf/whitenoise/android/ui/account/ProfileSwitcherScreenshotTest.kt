@@ -83,7 +83,10 @@ class ProfileSwitcherScreenshotTest {
         header: Boolean = false,
         cycle: Boolean = false,
     ) {
-        val accounts = listOf("a", "b", "c").map { AccountSummaryFfi(it, it.repeat(64), true, false, false, true) }
+        val accounts =
+            listOf("a", "b", "c").map {
+                AccountSummaryFfi(it, it.repeat(64), true, false, false, true, false)
+            }
         val context = ApplicationProvider.getApplicationContext<Context>()
         val app =
             WhiteNoiseAppState(

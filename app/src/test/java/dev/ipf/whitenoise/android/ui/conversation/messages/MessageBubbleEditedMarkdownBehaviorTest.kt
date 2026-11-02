@@ -329,6 +329,7 @@ class MessageBubbleEditedMarkdownBehaviorTest {
             blankLinesBefore = byteArrayOf(),
         )
 
+    /** Builds a received record whose original markdown body was later edited. */
     private fun editedRecord() =
         AppMessageRecordFfi(
             messageIdHex = MESSAGE_ID,
@@ -358,8 +359,10 @@ class MessageBubbleEditedMarkdownBehaviorTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
+            sticker = null,
         )
 
+    /** Builds an app state with one running local-signing account for the edited bubble tests. */
     private fun appState() =
         WhiteNoiseAppState(
             context = context,
@@ -374,6 +377,7 @@ class MessageBubbleEditedMarkdownBehaviorTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,

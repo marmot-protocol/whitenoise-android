@@ -231,6 +231,7 @@ class ChatsControllerInitialLoadStateTest {
             resolution = PresentationResolutionFfi.FALLBACK,
         )
 
+    /** Builds the running active account summary with the given label. */
     private fun activeAccount(label: String) =
         AccountSummaryFfi(
             label = label,
@@ -239,6 +240,7 @@ class ChatsControllerInitialLoadStateTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private class InMemoryDraftPersistence : DraftPersistence {

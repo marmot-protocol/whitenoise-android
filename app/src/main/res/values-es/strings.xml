@@ -131,6 +131,7 @@
     <string name="chat_pinned_badge">Fijado</string>
     <string name="chat_row_removed_badge">Expulsado</string>
     <string name="chat_row_removed_description">Te han expulsado de este chat</string>
+    <string name="chat_row_device_removed_description">Este dispositivo se eliminó de este chat</string>
     <string name="chat_row_action_move_up">Subir</string>
     <string name="chat_row_action_move_down">Bajar</string>
     <string name="chat_row_action_mark_read">Marcar como leído</string>
@@ -250,6 +251,7 @@
     <string name="group_empty_only_you_title">Solo estás tú en este grupo</string>
     <string name="group_empty_invite_members">Invita a otras personas cuando quieras.</string>
     <string name="you_are_no_longer_a_member">No puedes enviar mensajes a este grupo porque ya no eres miembro.</string>
+    <string name="device_removed_from_group_composer">No puedes enviar desde este dispositivo porque se eliminó de este grupo. Tus otros dispositivos siguen en él.</string>
     <string name="group_unrecoverable_notice">Este grupo está temporalmente bloqueado mientras White Noise verifica y repara su estado.</string>
     <string name="chat_row_draft_prefix">Borrador: </string>
     <string name="jump_to_newest">Saltar al más reciente</string>
@@ -832,6 +834,7 @@
     <string name="toast_couldnt_publish_profile">No se pudo publicar el perfil</string>
     <string name="toast_send_failed">Envío fallido</string>
     <string name="toast_send_storage_full">No hay suficiente espacio para enviar. Libera espacio e inténtalo de nuevo.</string>
+    <string name="error_storage_full">No hay suficiente espacio en este dispositivo. Libera espacio e inténtalo de nuevo.</string>
     <string name="toast_send_connection_failed">No se pudo conectar con el relé. Comprueba tu conexión e inténtalo de nuevo.</string>
     <string name="toast_send_queue_full">Este chat tiene demasiados mensajes esperando para enviarse, así que el tuyo no se envió. Inténtalo de nuevo cuando se ponga al día.</string>
     <string name="toast_send_chat_changed">El chat cambió mientras se enviaba tu mensaje, así que no se envió. Inténtalo de nuevo.</string>

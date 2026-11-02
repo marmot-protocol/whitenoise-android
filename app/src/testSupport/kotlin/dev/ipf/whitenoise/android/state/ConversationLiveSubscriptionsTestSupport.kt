@@ -257,6 +257,8 @@ internal fun timelineRecord(
         sourceEpoch = null,
         retentionSeconds = null,
         retentionExpiresAt = null,
+        sticker = null,
+        importedFrom = null,
     )
 
 /**
@@ -287,6 +289,7 @@ internal fun conversationTimelineTestAppState(
                     externalSigning = false,
                     signedOut = false,
                     running = true,
+                    unlinked = false,
                 ),
             ) + additionalAccounts,
         activeAccountRef = accountRef,
@@ -396,6 +399,7 @@ internal fun notifiedMessagePreview(): ChatListMessagePreviewFfi =
         attachmentCount = 0u,
         groupSystem = null,
         deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+        sticker = null,
     )
 
 /** Builds the unread native chat-list projection used to correlate a notification with bounded content. */

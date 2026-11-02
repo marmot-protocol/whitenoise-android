@@ -189,6 +189,7 @@
     <string name="chat_pinned_badge">Pinned</string>
     <string name="chat_row_removed_badge">Removed</string>
     <string name="chat_row_removed_description">You were removed from this chat</string>
+    <string name="chat_row_device_removed_description">This device was removed from this chat</string>
     <string name="chat_row_action_move_up">Move up</string>
     <string name="chat_row_action_move_down">Move down</string>
     <string name="chat_row_action_delete_group">Delete group</string>
@@ -324,6 +325,7 @@
     <string name="group_empty_only_you_title">This group is only you</string>
     <string name="group_empty_invite_members">Invite people when you are ready.</string>
     <string name="you_are_no_longer_a_member">You can\'t send messages to this group because you\'re no longer a member.</string>
+    <string name="device_removed_from_group_composer">You can\'t send from this device because it was removed from this group. Your other devices are still in it.</string>
     <string name="group_unrecoverable_notice">This group is temporarily frozen while White Noise verifies and repairs its state.</string>
     <string name="chat_row_draft_prefix">Draft: </string>
     <string name="jump_to_newest">Jump to newest</string>
@@ -1178,6 +1180,7 @@
     <string name="toast_couldnt_publish_profile">Couldn\'t publish profile</string>
     <string name="toast_send_failed">Send failed</string>
     <string name="toast_send_storage_full">Not enough storage to send. Free up space and try again.</string>
+    <string name="error_storage_full">Not enough storage on this device. Free up space and try again.</string>
     <string name="toast_send_connection_failed">Couldn’t reach the relay. Check your connection and try again.</string>
     <string name="toast_send_queue_full">This chat has too many messages waiting to send, so yours wasn\'t sent. Try again once it catches up.</string>
     <string name="toast_send_chat_changed">The chat changed while your message was sending, so it wasn\'t sent. Try again.</string>

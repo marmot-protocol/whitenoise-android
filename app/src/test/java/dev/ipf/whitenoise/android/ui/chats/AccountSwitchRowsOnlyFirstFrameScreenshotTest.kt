@@ -137,6 +137,7 @@ class AccountSwitchRowsOnlyFirstFrameScreenshotTest {
         )
     }
 
+    /** Builds the running local-signing active account summary. */
     private fun activeAccount() =
         AccountSummaryFfi(
             label = ACCOUNT_REF,
@@ -145,6 +146,7 @@ class AccountSwitchRowsOnlyFirstFrameScreenshotTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private fun peerProfile() =

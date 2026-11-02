@@ -430,6 +430,7 @@ class ChatsScreenFolderSelectionRecompositionTest {
             .invoke(controller, items)
     }
 
+    /** Returns the running active account summary for the chats screen. */
     private fun activeAccount() =
         AccountSummaryFfi(
             label = ACCOUNT_REF,
@@ -438,6 +439,7 @@ class ChatsScreenFolderSelectionRecompositionTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private fun chatItem(groupIdHex: String): ChatListItem =

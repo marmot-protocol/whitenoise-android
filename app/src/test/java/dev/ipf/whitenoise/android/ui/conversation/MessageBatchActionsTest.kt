@@ -542,6 +542,7 @@ class MessageBatchActionsTest {
             thumbhash = null,
         )
 
+    /** Builds a batch selection for the given message, optionally deletable for everyone. */
     private fun selection(
         id: String,
         recordedAt: ULong,
@@ -570,6 +571,7 @@ class MessageBatchActionsTest {
                     retentionExpiresAt = null,
                     recordedAt = recordedAt,
                     receivedAt = recordedAt,
+                    sticker = null,
                 ),
             status = MessageStatus.Received,
             timelineOrder = timelineOrder,

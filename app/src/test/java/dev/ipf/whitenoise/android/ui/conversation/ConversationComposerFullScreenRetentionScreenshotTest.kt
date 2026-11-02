@@ -270,6 +270,7 @@ class ConversationComposerFullScreenRetentionScreenshotTest {
         externalSigning = false,
         signedOut = false,
         running = true,
+        unlinked = false,
     )
 
     /** Avoids external persistence while the real DraftStore owns the test's draft. */

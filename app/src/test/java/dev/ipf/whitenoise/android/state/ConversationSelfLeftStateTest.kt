@@ -64,6 +64,43 @@ class ConversationSelfLeftStateTest {
         assertTrue(state.isSelfMember(joinedDetailsMembers, activeAccountIdHex = "alice"))
     }
 
+    /** Reopening a chat whose device was removed keeps the account listed while this device takes no sends. */
+    @Test
+    fun deviceRemovedColdOpenKeepsTheAccountOnTheRosterAndEndsSends() {
+        val members = applyDetailsMembers("alice", "bob")
+        val seed =
+            conversationMembershipSeed(
+                group(admins = listOf("alice")).copy(selfMembership = SelfMembershipFfi.DEVICE_REMOVED),
+                GroupMemberSnapshot(members),
+                activeAccountIdHex = "alice",
+            )
+        val state =
+            ConversationSelfLeftState(seed.seededMembershipKnown, seed.seededSelfMember, seed.accountStaysOnRoster)
+
+        assertEquals(members, seed.members)
+        assertTrue(state.selfLeft)
+        // A later roster refresh still lists the account through its other device.
+        val refreshed = state.rosterHonoringSelfLeft(members, activeAccountIdHex = "alice")
+        assertEquals(members, refreshed)
+        assertFalse(state.isSelfMember(refreshed, activeAccountIdHex = "alice"))
+    }
+
+    /** A removed device keeps its account listed until the account itself is removed. */
+    @Test
+    fun deviceRemovalKeepsTheAccountUntilTheAccountIsRemoved() {
+        val state = ConversationSelfLeftState(seededMembershipKnown = true, seededSelfMember = true)
+        val members = applyDetailsMembers("alice", "bob")
+
+        state.recordSelfLeft(accountStaysOnRoster = true)
+
+        assertEquals(members, state.rosterHonoringSelfLeft(members, activeAccountIdHex = "alice"))
+        assertFalse(state.isSelfMember(members, activeAccountIdHex = "alice"))
+
+        state.recordSelfLeft()
+
+        assertEquals(listOf(appMember("bob")), state.rosterHonoringSelfLeft(members, activeAccountIdHex = "alice"))
+    }
+
     private fun applyDetailsMembers(
         self: String,
         other: String,

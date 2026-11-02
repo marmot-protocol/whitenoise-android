@@ -882,6 +882,10 @@ internal fun reconcileProvisionalOpenChat(
     return authoritative?.let { reconcileOpenChatWithAuthoritativeRow(open, it) }
 }
 
+/**
+ * Whether [update] ends this device's membership. A [SelfMembershipFfi.DEVICE_REMOVED] copy counts: this device takes
+ * no more sends, while its account stays on the roster through another device.
+ */
 internal fun groupStateUpdateRemovesSelf(
     previous: AppGroupRecordFfi,
     update: AppGroupRecordFfi,
@@ -3964,10 +3968,18 @@ class ChatsController private constructor(
         members: List<AppGroupMemberRecordFfi>,
     ) {
         appState.removeComposerExpansionForGroup(account, groupIdHex)
-        appState.removeActiveAccountFromGroupMemberSnapshot(account, groupIdHex)
+        // A removed device's account stays in the group through its other device, so its roster keeps the account.
+        val accountStaysOnRoster =
+            chatRowsByGroup[chatRowKey(groupIdHex)]?.selfMembership == SelfMembershipFfi.DEVICE_REMOVED
+        if (!accountStaysOnRoster) appState.removeActiveAccountFromGroupMemberSnapshot(account, groupIdHex)
         if (activeAccountIdHex != null) {
-            memberCacheByGroup = memberCacheByGroup +
-                (groupIdHex to GroupProjector.membersWithoutActiveAccount(members, activeAccountIdHex))
+            val departedMembers =
+                if (accountStaysOnRoster) {
+                    members
+                } else {
+                    GroupProjector.membersWithoutActiveAccount(members, activeAccountIdHex)
+                }
+            memberCacheByGroup = memberCacheByGroup + (groupIdHex to departedMembers)
             removedGroupIds = removedGroupIds + groupIdHex
             recompute()
         }
@@ -5591,6 +5603,7 @@ internal fun conversationStartsLoading(
     activeAccountRef: String?,
 ): Boolean = startOnConstruction && (accountRefOverride ?: activeAccountRef) != null
 
+/** Whether a conversation open failed in a way Retry cannot fix, so no Retry action is offered. */
 internal fun isTerminalOpenFailure(throwable: Throwable): Boolean = throwable is ConversationInitialLoadException
 
 /** Retry cadence while MarmotKit reports a documented not-ready state; well under the connectivity backoff. */
@@ -5599,7 +5612,8 @@ internal const val NOT_READY_RETRY_DELAY_MS = 2_000L
 /**
  * The sentence shown for a failed conversation load. A bounded-read timeout keeps its restart guidance;
  * MarmotKit's not-ready and window-timeout states get copy that says the app is still working and will
- * retry, instead of the generic "something went wrong".
+ * retry, instead of the generic "something went wrong". A full disk asks the user to free space: since
+ * MDK #2826 it no longer latches the account, so Retry can succeed once space is free.
  */
 internal fun conversationLoadFailureMessage(
     throwable: Throwable,
@@ -5607,6 +5621,7 @@ internal fun conversationLoadFailureMessage(
 ): Int =
     when {
         initialOpenTimedOut -> R.string.error_restart_app_before_retry
+        DiagnosticFormatter.errorCode(throwable) == "STORAGE_FULL" -> R.string.error_storage_full
         DiagnosticFormatter.isNotReady(throwable) -> R.string.error_not_ready
         DiagnosticFormatter.errorCode(throwable) == "TIMEOUT" -> R.string.error_window_timed_out
         else -> R.string.error_try_again
@@ -5928,7 +5943,8 @@ class ConversationController(
     // refreshMembers() could re-add self and revert the left state (the exact
     // #787 repro). These seed paths are the same local evidence the composer
     // gate uses for its initial NOTICE.
-    private val selfMembership = ConversationSelfLeftState(seededMembershipKnown, seededSelfMember)
+    private val selfMembership =
+        ConversationSelfLeftState(seededMembershipKnown, seededSelfMember, membershipSeed.accountStaysOnRoster)
 
     // A snapshot map (not mutableStateOf<Map>) so a bubble reading one key isn't
     // recomposed when a different message's reactions change.
@@ -7628,6 +7644,7 @@ class ConversationController(
                 retentionExpiresAt = null,
                 recordedAt = now,
                 receivedAt = now,
+                sticker = null,
             )
         val optimisticOrder = nextOptimisticTimelineOrder()
         val optimisticKey = "msg:$tempId"
@@ -7709,6 +7726,7 @@ class ConversationController(
                                     attachmentCount = 0u,
                                     groupSystem = null,
                                     deliveryState = ChatListMessageDeliveryStateFfi.PENDING,
+                                    sticker = null,
                                 ),
                             )
                     if (previewApplied == false) {
@@ -8414,6 +8432,7 @@ class ConversationController(
             retentionExpiresAt = null,
             recordedAt = now,
             receivedAt = now,
+            sticker = null,
         )
 
     /** Attaches Android source cleanup to a queued item's existing retained-byte owner. */
@@ -9735,7 +9754,7 @@ class ConversationController(
         appState.failOptimisticSentPreview(conversationAccountRef, group.groupIdHex, optimisticMessageIdHex)
     }
 
-    // The pending chat-list preview an outgoing send bumps its row with.
+    /** The pending chat-list preview an outgoing send bumps its row with. */
     private fun sentPreview(
         tempId: String,
         plaintext: String,
@@ -9758,6 +9777,7 @@ class ConversationController(
             attachmentCount = 0u,
             groupSystem = null,
             deliveryState = ChatListMessageDeliveryStateFfi.PENDING,
+            sticker = null,
         )
 
     // The chat-list preview a manual retry re-applies: same optimistic id so
@@ -13914,11 +13934,7 @@ class ConversationController(
         // a later authoritative roster result that races ahead of eviction can't re-add
         // self (issue #787).
         recordSelfLeft()
-        val updatedMembers =
-            members.filterNot {
-                GroupProjector.isActiveAccountMember(it, activeAccountIdHex)
-            }
-        members = updatedMembers
+        members = selfMembership.rosterHonoringSelfLeft(members, activeAccountIdHex)
         acceptedInvitePeerAccount = null
         membersLoaded = true
         membersVerified = true
@@ -13931,7 +13947,7 @@ class ConversationController(
         // in-flight immutable dictation target before any late provider result
         // can reach the draft persistence path.
         appState.conversationDictation.onTargetRemoved(account, group.groupIdHex)
-        appState.cacheGroupMemberSnapshot(account, group.groupIdHex, updatedMembers)
+        appState.cacheGroupMemberSnapshot(account, group.groupIdHex, members)
     }
 
     /**
@@ -13939,10 +13955,11 @@ class ConversationController(
      * confirmed self-leave (leaveGroup success) or engine eviction
      * ([markActiveAccountRemovedFromMembers]); honoured by [isSelfMember] and
      * roster application so a transient round-trip can't restore self
-     * before the engine eviction is observed locally.
+     * before the engine eviction is observed locally. A removed device
+     * ([SelfMembershipFfi.DEVICE_REMOVED]) keeps its account on the roster.
      */
     private fun recordSelfLeft() {
-        selfMembership.recordSelfLeft()
+        selfMembership.recordSelfLeft(accountStaysOnRoster = group.isDeviceRemovedCopy())
     }
 
     private fun Throwable.isUseAfterEviction(): Boolean {
@@ -14213,6 +14230,7 @@ class ConversationController(
                 retentionExpiresAt = null,
                 recordedAt = now,
                 receivedAt = now,
+                sticker = null,
             )
         val item =
             TimelineMessage(
@@ -14257,6 +14275,7 @@ class ConversationController(
         publishTimelineFromIndexes()
     }
 
+    /** Creates or updates the timeline row that shows an agent stream's latest text and status. */
     private fun updateStreamPreview(
         streamId: String,
         plaintext: String,
@@ -14283,6 +14302,7 @@ class ConversationController(
                     retentionExpiresAt = null,
                     recordedAt = nowSeconds(),
                     receivedAt = nowSeconds(),
+                    sticker = null,
                 )
             ).copy(
                 plaintext = plaintext,

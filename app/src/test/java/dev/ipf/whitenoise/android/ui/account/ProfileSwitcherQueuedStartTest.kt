@@ -63,8 +63,8 @@ class ProfileSwitcherQueuedStartTest {
                     DraftStore.forContext(context),
                     { null },
                     listOf(
-                        AccountSummaryFfi("a", "aa".repeat(32), true, false, false, true),
-                        AccountSummaryFfi("retained", "bb".repeat(32), true, false, true, false),
+                        AccountSummaryFfi("a", "aa".repeat(32), true, false, false, true, false),
+                        AccountSummaryFfi("retained", "bb".repeat(32), true, false, true, false, false),
                     ),
                     "a",
                     profileReader = { null },

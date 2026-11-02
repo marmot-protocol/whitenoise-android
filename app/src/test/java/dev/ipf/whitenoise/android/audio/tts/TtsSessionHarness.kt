@@ -112,6 +112,7 @@ internal class SessionHarness(
         return stamped.substringBefore('.').toLong()
     }
 
+    /** Builds a received plain-text message record with the given id and body. */
     private fun rawRecord(
         id: String,
         plaintext: String,
@@ -135,6 +136,7 @@ internal class SessionHarness(
             retentionExpiresAt = null,
             recordedAt = timelinePosition(id),
             receivedAt = 1uL,
+            sticker = null,
         )
 
     // Fake ids carry their timeline order in their digits, so recovery

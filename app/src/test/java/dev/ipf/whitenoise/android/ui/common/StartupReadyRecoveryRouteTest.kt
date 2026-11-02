@@ -114,7 +114,7 @@ class StartupReadyRecoveryRouteTest {
             context = ApplicationProvider.getApplicationContext<Context>(),
             draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
             accountIdHexResolver = { "aa".repeat(32) },
-            accounts = listOf(AccountSummaryFfi("startup-account", "aa".repeat(32), true, false, false, true)),
+            accounts = listOf(AccountSummaryFfi("startup-account", "aa".repeat(32), true, false, false, true, false)),
             activeAccountRef = "startup-account",
         ).also { state ->
             WhiteNoiseAppState::class.java

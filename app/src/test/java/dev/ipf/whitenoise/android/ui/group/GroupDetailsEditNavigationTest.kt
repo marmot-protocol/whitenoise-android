@@ -1034,6 +1034,7 @@ private fun member(
         local = local,
     )
 
+/** Builds an app state for the self account with the given member names and optional runtime. */
 private fun testAppState(
     memberNames: Map<String, String> = emptyMap(),
     marmotRuntime: dev.ipf.whitenoise.android.state.AppMarmotRuntime? = null,
@@ -1051,6 +1052,7 @@ private fun testAppState(
                     externalSigning = false,
                     signedOut = false,
                     running = true,
+                    unlinked = false,
                 ),
             ),
         activeAccountRef = ACCOUNT_REF,

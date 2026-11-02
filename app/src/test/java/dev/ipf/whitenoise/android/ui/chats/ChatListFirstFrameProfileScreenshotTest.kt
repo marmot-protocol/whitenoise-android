@@ -136,6 +136,7 @@ class ChatListFirstFrameProfileScreenshotTest {
         )
     }
 
+    /** Builds the running, locally signing test account summary. */
     private fun activeAccount() =
         AccountSummaryFfi(
             label = ACCOUNT_REF,
@@ -144,6 +145,7 @@ class ChatListFirstFrameProfileScreenshotTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private fun peerProfile() =

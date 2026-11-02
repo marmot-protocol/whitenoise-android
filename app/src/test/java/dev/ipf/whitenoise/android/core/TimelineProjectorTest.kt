@@ -127,6 +127,7 @@ class TimelineProjectorTest {
         assertEquals("parent", MessageProjector.replyTargetMessageId(halfTagged))
     }
 
+    /** A projected record yields its display body, the reply preview, and reaction tallies marking the user's own. */
     @Test
     fun projectedRecordProvidesBodyReplyPreviewAndReactionTallies() {
         val record =
@@ -150,6 +151,7 @@ class TimelineProjectorTest {
                         deleted = false,
                         deletionSource = DeletionSourceFfi.UNKNOWN,
                         invalidationStatus = null,
+                        sticker = null,
                     ),
                 reactions =
                     TimelineReactionSummaryFfi(
@@ -527,6 +529,7 @@ class TimelineProjectorTest {
         assertNull(legacyDisplay?.mediaType)
     }
 
+    /** Builds a reply preview of the parent message with the given body, kind, sender, deletion and media fields. */
     private fun replyPreview(
         plaintext: String,
         kind: ULong = 9uL,
@@ -547,6 +550,7 @@ class TimelineProjectorTest {
         deleted = deleted,
         deletionSource = DeletionSourceFfi.UNKNOWN,
         invalidationStatus = invalidationStatus,
+        sticker = null,
     )
 
     /** The image attachment several projector cases hide behind a deleted or invalidated reply. */
@@ -613,5 +617,7 @@ class TimelineProjectorTest {
         sourceEpoch = null,
         retentionSeconds = null,
         retentionExpiresAt = null,
+        sticker = null,
+        importedFrom = null,
     )
 }

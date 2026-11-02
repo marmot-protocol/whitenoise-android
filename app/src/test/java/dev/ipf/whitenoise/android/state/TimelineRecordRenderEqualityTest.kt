@@ -70,6 +70,7 @@ class TimelineRecordRenderEqualityTest {
         assertFalse(timelineRecordsRenderEqual(waiting, running))
     }
 
+    /** Builds the baseline timeline record compared in the render-equality checks. */
     private fun record() =
         TimelineMessageRecordFfi(
             clientToken = null,
@@ -106,6 +107,8 @@ class TimelineRecordRenderEqualityTest {
             sourceEpoch = null,
             retentionSeconds = null,
             retentionExpiresAt = null,
+            sticker = null,
+            importedFrom = null,
         )
 
     private fun reference() =

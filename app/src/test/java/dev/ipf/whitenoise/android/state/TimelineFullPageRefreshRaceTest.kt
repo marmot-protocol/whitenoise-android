@@ -211,6 +211,7 @@ class TimelineFullPageRefreshRaceTest {
                             externalSigning = false,
                             signedOut = false,
                             running = true,
+                            unlinked = false,
                         ),
                     ),
                 activeAccountRef = ACCOUNT_REF,
@@ -278,6 +279,7 @@ class TimelineFullPageRefreshRaceTest {
             hasMoreAfter = false,
         )
 
+    /** Builds a received timeline record with the given id, timestamp, kind and tags. */
     private fun timelineRecord(
         messageId: String,
         timelineAt: ULong,
@@ -314,6 +316,8 @@ class TimelineFullPageRefreshRaceTest {
             sourceEpoch = null,
             retentionSeconds = null,
             retentionExpiresAt = null,
+            sticker = null,
+            importedFrom = null,
         )
 
     private fun emptyMarkdown(): MarkdownDocumentFfi =

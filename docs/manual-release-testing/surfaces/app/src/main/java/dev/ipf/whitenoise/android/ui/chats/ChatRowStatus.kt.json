@@ -1,0 +1,65 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowStatus.kt",
+  "legacy_sha256": "0a3a7c9a93d8f4e1342c5089a13b72ae7fa1b1748ecbed850febbd18cd412b82",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "R.string.chat_row_removed_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowStatus.kt",
+        "anchor": "R.string.chat_row_removed_description",
+        "test_ids": [
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_disbanded_notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowStatus.kt",
+        "anchor": "R.string.conversation_disbanded_notice",
+        "test_ids": [
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_disbanding_notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowStatus.kt",
+        "anchor": "R.string.conversation_disbanding_notice",
+        "test_ids": [
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "R.string.group_system_you_member_left",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowStatus.kt",
+        "anchor": "R.string.group_system_you_member_left",
+        "test_ids": [
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "R.string.leaving_chat",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowStatus.kt",
+        "anchor": "R.string.leaving_chat",
+        "test_ids": [
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "R.string.you_are_no_longer_a_member",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowStatus.kt",
+        "anchor": "R.string.you_are_no_longer_a_member",
+        "test_ids": [
+          "CHL-002"
+        ]
+      },
+      {
+        "surface": "R.string.chat_row_device_removed_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowStatus.kt",
+        "anchor": "R.string.chat_row_device_removed_description",
+        "test_ids": [
+          "CON-039"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -344,6 +344,7 @@ class AccountSwitchFirstFrameTopBarScreenshotTest {
         profileRefreshRequest = {},
     )
 
+    /** Builds a running, locally signing account summary with the given label and id. */
     private fun account(
         label: String,
         accountIdHex: String,
@@ -354,6 +355,7 @@ class AccountSwitchFirstFrameTopBarScreenshotTest {
         externalSigning = false,
         signedOut = false,
         running = true,
+        unlinked = false,
     )
 
     private fun profile(

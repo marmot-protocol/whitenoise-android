@@ -512,6 +512,7 @@ class DeletedMessageLocalRemovalTest {
                     externalSigning = false,
                     signedOut = false,
                     running = true,
+                    unlinked = false,
                 ),
             ),
         activeAccountRef = ACCOUNT_REF,
@@ -551,6 +552,7 @@ class DeletedMessageLocalRemovalTest {
             blankLinesBefore = byteArrayOf(),
         )
 
+    /** Builds an app state for one account whose runtime opens are counted by the given counter. */
     private fun integrationAppState(
         accountRef: String,
         accountId: String,
@@ -568,6 +570,7 @@ class DeletedMessageLocalRemovalTest {
                     externalSigning = false,
                     signedOut = false,
                     running = true,
+                    unlinked = false,
                 ),
             ),
         activeAccountRef = accountRef,
@@ -600,6 +603,7 @@ class DeletedMessageLocalRemovalTest {
     private fun deletedRecord(deletionSource: DeletionSourceFfi = DeletionSourceFfi.UNKNOWN) =
         messageRecord(body = LIVE_BODY, deleted = true, deletionSource = deletionSource)
 
+    /** Builds the received test message record with the given body, deletion state and reactions. */
     private fun messageRecord(
         body: String,
         deleted: Boolean,
@@ -640,6 +644,8 @@ class DeletedMessageLocalRemovalTest {
         sourceEpoch = null,
         retentionSeconds = null,
         retentionExpiresAt = null,
+        sticker = null,
+        importedFrom = null,
     )
 
     private fun emptyReactionSummary() = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList())

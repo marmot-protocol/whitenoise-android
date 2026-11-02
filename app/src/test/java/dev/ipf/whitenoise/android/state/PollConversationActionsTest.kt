@@ -228,6 +228,7 @@ class PollConversationActionsTest {
     private fun summary(disposition: SendAcceptDispositionFfi = SendAcceptDispositionFfi.PUBLISHED) =
         SendSummaryFfi(1u, listOf(MESSAGE_ID), disposition, SendMaintenanceDispositionFfi.READY)
 
+    /** Builds an app state on the given native interface with the previous account active. */
     private fun appState(native: MarmotInterface) =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext(),
@@ -242,6 +243,7 @@ class PollConversationActionsTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                     AccountSummaryFfi(
                         label = TARGET_REF,
@@ -250,6 +252,7 @@ class PollConversationActionsTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = PREVIOUS_REF,

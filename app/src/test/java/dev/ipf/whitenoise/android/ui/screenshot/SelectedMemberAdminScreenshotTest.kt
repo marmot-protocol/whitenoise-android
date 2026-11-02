@@ -52,6 +52,7 @@ class SelectedMemberAdminScreenshotTest {
     /** Toggling a privilege keeps the public review identity visible and changes only that person. */
     @Test fun roleControlKeepsIdentityVisible() = capture("invite_roles_control", toggle = true)
 
+    /** Renders the selected-member admin screen with the given theme, state and layout options and captures it. */
     private fun capture(
         name: String,
         dark: Boolean = false,
@@ -79,7 +80,7 @@ class SelectedMemberAdminScreenshotTest {
                 context = ApplicationProvider.getApplicationContext<android.content.Context>(),
                 draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
                 accountIdHexResolver = { null },
-                accounts = listOf(AccountSummaryFfi("alice", "ee".repeat(32), true, false, false, true)),
+                accounts = listOf(AccountSummaryFfi("alice", "ee".repeat(32), true, false, false, true, false)),
                 activeAccountRef = "alice",
             )
         composeRule.setContent {

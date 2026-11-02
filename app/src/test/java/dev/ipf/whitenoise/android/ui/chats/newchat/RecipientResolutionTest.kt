@@ -851,6 +851,7 @@ private fun dmChatRow(
     leaveRequestedAtMs = null,
 )
 
+/** Builds a DM chat-list preview of a "hi" message from the given sender. */
 private fun dmLatestMessage(sender: String) =
     ChatListMessagePreviewFfi(
         retentionSeconds = null,
@@ -868,6 +869,7 @@ private fun dmLatestMessage(sender: String) =
         attachmentCount = 0u,
         groupSystem = null,
         deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+        sticker = null,
     )
 
 private fun dmChatGroup(

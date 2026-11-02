@@ -261,6 +261,7 @@ internal data class GroupInviteNotificationIdentity(
             reactedToPreview = null,
             timestampMs = 0L,
             isFromSelf = false,
+            sticker = null,
         )
 }
 

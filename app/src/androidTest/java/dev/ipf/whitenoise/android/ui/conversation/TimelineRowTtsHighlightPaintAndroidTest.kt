@@ -293,6 +293,7 @@ class TimelineRowTtsHighlightPaintAndroidTest {
         )
     }
 
+    /** Builds a received message whose body is a rich markdown document for highlight painting. */
     private fun richRecord() =
         AppMessageRecordFfi(
             messageIdHex = MESSAGE_B,
@@ -308,6 +309,7 @@ class TimelineRowTtsHighlightPaintAndroidTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
+            sticker = null,
         )
 
     /**
@@ -414,6 +416,7 @@ class TimelineRowTtsHighlightPaintAndroidTest {
             status = MessageStatus.Received,
         )
 
+    /** Builds a received plain-text message record with the given id and body. */
     private fun speakableRecord(
         messageIdHex: String,
         plaintext: String,
@@ -431,6 +434,7 @@ class TimelineRowTtsHighlightPaintAndroidTest {
         retentionExpiresAt = null,
         recordedAt = 1uL,
         receivedAt = 1uL,
+        sticker = null,
     )
 
     private fun plainTextDocument(text: String) =
@@ -445,6 +449,7 @@ class TimelineRowTtsHighlightPaintAndroidTest {
                 ),
         )
 
+    /** Builds an app state with one running local-signing account. */
     private fun appState() =
         WhiteNoiseAppState(
             context = context,
@@ -459,6 +464,7 @@ class TimelineRowTtsHighlightPaintAndroidTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,

@@ -120,6 +120,7 @@ class LauncherBadgeUnreadReconciliationTest {
                 attachmentCount = 0u,
                 groupSystem = null,
                 deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                sticker = null,
             ),
         unreadCount = unreadCount,
         hasUnread = unreadCount > 0uL,

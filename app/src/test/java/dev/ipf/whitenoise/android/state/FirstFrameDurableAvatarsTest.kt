@@ -218,7 +218,7 @@ class FirstFrameDurableAvatarsTest {
                 context = ApplicationProvider.getApplicationContext(),
                 draftStore = DraftStore(NoDrafts),
                 accountIdHexResolver = { ACCOUNT_HEX },
-                accounts = listOf(AccountSummaryFfi(ACCOUNT, ACCOUNT_HEX, true, false, false, true)),
+                accounts = listOf(AccountSummaryFfi(ACCOUNT, ACCOUNT_HEX, true, false, false, true, false)),
                 activeAccountRef = ACCOUNT,
                 initialMarmotRuntime = AppMarmotRuntime("first-frame-avatar-test", native),
             )

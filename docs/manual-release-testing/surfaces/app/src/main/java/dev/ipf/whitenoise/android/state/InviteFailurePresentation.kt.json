@@ -110,6 +110,15 @@
         "test_ids": [
           "GRP-005"
         ]
+      },
+      {
+        "surface": "setting:error_storage_full",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/InviteFailurePresentation.kt",
+        "anchor": "R.string.error_storage_full",
+        "test_ids": [
+          "CON-038",
+          "GRP-005"
+        ]
       }
     ],
     "source_coverage": [

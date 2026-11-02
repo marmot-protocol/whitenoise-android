@@ -247,6 +247,7 @@ class GroupAvatarCommitOwnershipTest {
             }
         } as MarmotInterface
 
+    /** Builds an app state whose runtime counts avatar writes, on the given IO dispatcher. */
     private fun appState(
         writes: AtomicInteger,
         ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -265,6 +266,7 @@ class GroupAvatarCommitOwnershipTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT,

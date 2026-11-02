@@ -965,6 +965,8 @@ private fun projectedMediaMessage(
     sourceEpoch = null,
     retentionSeconds = null,
     retentionExpiresAt = null,
+    sticker = null,
+    importedFrom = null,
 )
 
 /** Builds a single account owner with process-local drafts and no real relay connection. */
@@ -982,6 +984,7 @@ internal fun mediaSendReconciliationAppState() =
                     externalSigning = false,
                     signedOut = false,
                     running = true,
+                    unlinked = false,
                 ),
             ),
         activeAccountRef = ACCOUNT_REF,
@@ -1101,6 +1104,7 @@ private fun chatListRow() =
                 attachmentCount = 0u,
                 groupSystem = null,
                 deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                sticker = null,
             ),
         unreadCount = 0uL,
         hasUnread = false,

@@ -46,6 +46,7 @@ class CompareTimelineMessagesTest {
                 retentionExpiresAt = null,
                 recordedAt = recordedAt,
                 receivedAt = recordedAt,
+                sticker = null,
             ),
         status = MessageStatus.Received,
         timelineOrder = order,

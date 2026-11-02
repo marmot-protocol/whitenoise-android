@@ -68,8 +68,8 @@ class ChatAbandonmentEligibilityTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val accounts =
             listOf(
-                AccountSummaryFfi("active-ref", "a".repeat(64), true, false, false, true),
-                AccountSummaryFfi("captured-ref", "c".repeat(64), true, false, false, true),
+                AccountSummaryFfi("active-ref", "a".repeat(64), true, false, false, true, false),
+                AccountSummaryFfi("captured-ref", "c".repeat(64), true, false, false, true, false),
             )
         val app =
             WhiteNoiseAppState(

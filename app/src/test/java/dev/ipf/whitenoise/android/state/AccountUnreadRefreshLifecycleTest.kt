@@ -174,6 +174,7 @@ class AccountUnreadRefreshLifecycleTest {
             hasManualUnread = false,
         )
 
+    /** A running, locally signing account with the given label and id. */
     private fun account(
         label: String,
         accountIdHex: String,
@@ -184,6 +185,7 @@ class AccountUnreadRefreshLifecycleTest {
         externalSigning = false,
         signedOut = false,
         running = true,
+        unlinked = false,
     )
 
     private fun appStateSource(): String =

@@ -115,7 +115,7 @@ class StartupPostReadyBackgroundRecoveryTest {
         }
 
     /** Supplies an authenticated local account through the existing bootstrap FFI fixture. */
-    private fun account() = AccountSummaryFfi(ACCOUNT, "a".repeat(64), true, false, false, true)
+    private fun account() = AccountSummaryFfi(ACCOUNT, "a".repeat(64), true, false, false, true, false)
 
     /** The local projection belongs to one stable native group identity throughout reconciliation. */
     private fun row() =

@@ -226,6 +226,7 @@ class TimelineOrderingInversionTest {
         assertTrue(adjacentTimelineInversions(listOf(older, newer, optimistic)).isEmpty())
     }
 
+    /** Builds a received timeline message with the given displayed, timeline, received and ordering keys. */
     private fun projectedMsg(
         id: String,
         displayedAt: ULong,
@@ -269,6 +270,8 @@ class TimelineOrderingInversionTest {
                 sourceEpoch = null,
                 retentionSeconds = null,
                 retentionExpiresAt = null,
+                sticker = null,
+                importedFrom = null,
             )
         return TimelineMessage(
             id = "msg:$id",
@@ -291,6 +294,7 @@ class TimelineOrderingInversionTest {
             timelineOrder = order,
         )
 
+    /** Builds an empty received message record with the given id and recording time. */
     private fun record(
         id: String,
         recordedAt: ULong,
@@ -314,6 +318,7 @@ class TimelineOrderingInversionTest {
             retentionExpiresAt = null,
             recordedAt = recordedAt,
             receivedAt = recordedAt,
+            sticker = null,
         )
 
     private fun controllersSource(): File =

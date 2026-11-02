@@ -140,6 +140,7 @@ class KeptMessagesOverlayInsetTest {
                     retentionExpiresAt = null,
                     recordedAt = 1_700_000_000uL,
                     receivedAt = 1_700_000_000uL,
+                    sticker = null,
                 ),
             status = MessageStatus.Received,
         )

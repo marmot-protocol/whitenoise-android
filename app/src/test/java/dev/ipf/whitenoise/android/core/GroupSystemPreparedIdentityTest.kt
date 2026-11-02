@@ -136,6 +136,8 @@ class GroupSystemPreparedIdentityTest {
             sourceEpoch = null,
             retentionSeconds = null,
             retentionExpiresAt = null,
+            sticker = null,
+            importedFrom = null,
         )
 
     private companion object {

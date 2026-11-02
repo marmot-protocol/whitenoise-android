@@ -321,6 +321,7 @@ class WindowApplyPreparationTest {
             }
         }
 
+    /** Builds a reply preview whose id and quoted text are keyed by the given index. */
     private fun replyPreview(index: Int) =
         TimelineReplyPreviewFfi(
             messageIdHex = "reply-$index",
@@ -339,6 +340,7 @@ class WindowApplyPreparationTest {
             deleted = false,
             deletionSource = DeletionSourceFfi.UNKNOWN,
             invalidationStatus = null,
+            sticker = null,
         )
 
     private fun reactions(

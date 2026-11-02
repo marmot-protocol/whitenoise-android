@@ -67,6 +67,7 @@ class ConversationDerivedRowUnreadTest {
 
     private fun groupSystem(id: String): TimelineMessage = message(id, kind = 1210uL)
 
+    /** Builds a received peer message with the given id and event kind. */
     private fun message(
         id: String,
         kind: ULong,
@@ -93,6 +94,7 @@ class ConversationDerivedRowUnreadTest {
                     retentionExpiresAt = null,
                     recordedAt = 1uL,
                     receivedAt = 1uL,
+                    sticker = null,
                 ),
             status = MessageStatus.Received,
         )

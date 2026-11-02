@@ -11,6 +11,7 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 
+/** Builds an app state with one running local-signing account for TTS paint tests. */
 internal fun paintTestAppState(
     context: android.content.Context,
     accountRef: String,
@@ -28,6 +29,7 @@ internal fun paintTestAppState(
                 externalSigning = false,
                 signedOut = false,
                 running = true,
+                unlinked = false,
             ),
         ),
     activeAccountRef = accountRef,

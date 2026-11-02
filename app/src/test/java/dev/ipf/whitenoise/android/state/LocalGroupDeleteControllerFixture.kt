@@ -57,7 +57,16 @@ internal fun TestScope.localGroupDeleteFixture(
     val present = AtomicBoolean(true)
     val native = localDeleteNative(calls, present, failureMethod, onRowRead, beforeDelete, localDeleteEligible)
     val context = ApplicationProvider.getApplicationContext<Context>()
-    val fixtureAccount = AccountSummaryFfi(LOCAL_DELETE_ACCOUNT, LOCAL_DELETE_ACCOUNT_ID, true, false, false, true)
+    val fixtureAccount =
+        AccountSummaryFfi(
+            LOCAL_DELETE_ACCOUNT,
+            LOCAL_DELETE_ACCOUNT_ID,
+            true,
+            false,
+            false,
+            true,
+            false,
+        )
     val state =
         WhiteNoiseAppState(
             context = context,
