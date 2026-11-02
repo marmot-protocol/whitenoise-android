@@ -482,6 +482,14 @@
         "test_ids": [
           "SEC-002"
         ]
+      },
+      {
+        "surface": "Actual composer text edits remain distinct from unchanged presentation across draft hydration and remount",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "private fun setDraftForAccount(",
+        "test_ids": [
+          "DIC-011"
+        ]
       }
     ]
   },

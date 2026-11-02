@@ -81,7 +81,7 @@ class ComposerSendAcceptanceBoundaryTest {
                         onCancelReply = {},
                         onSend = { _, onAccepted -> onAccepted() },
                         initialDraft = TextFieldValue(sentText),
-                        onDraftChange = { persistedDraftChanges += it.text },
+                        onDraftChange = { draftValue, _ -> persistedDraftChanges += draftValue.text },
                         onAfterSend = { afterSendCount += 1 },
                     )
                 }
@@ -143,7 +143,7 @@ class ComposerSendAcceptanceBoundaryTest {
                         onCancelReply = {},
                         onSend = { _, callback -> accepted = callback },
                         initialDraft = value,
-                        onDraftChange = { value = it },
+                        onDraftChange = { draftValue, _ -> value = draftValue },
                     )
                 }
             }

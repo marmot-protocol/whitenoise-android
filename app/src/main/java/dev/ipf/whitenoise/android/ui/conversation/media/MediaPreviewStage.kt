@@ -110,14 +110,18 @@ internal fun MediaPreviewPager(
     }
 }
 
-/** Stable per-frame identity; duplicate URIs staged twice stay independently includable. */
+/**
+ * Stable per-frame identity that survives reordering; duplicate URIs staged twice stay independently
+ * includable. [index] is kept for callers that iterate by position.
+ */
+@Suppress("UnusedParameter", "UNUSED_PARAMETER")
 internal fun mediaPreviewItemKey(
     item: StagedPreviewItem,
     index: Int,
 ): String =
     when (item) {
         is StagedPreviewItem.Media -> "media:${item.slot.id}"
-        is StagedPreviewItem.Document -> "document:$index:${item.uri}"
+        is StagedPreviewItem.Document -> "document:${item.occurrence}:${item.uri}"
     }
 
 /** Drags the page down past a fixed distance to leave the preview, matching the full viewer's gesture. */

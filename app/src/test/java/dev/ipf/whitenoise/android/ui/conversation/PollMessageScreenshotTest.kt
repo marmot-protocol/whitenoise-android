@@ -37,6 +37,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.TimeZone
 
 /** Baselines of actual timeline poll chrome, its passive action preview and reply composer. */
 @RunWith(RobolectricTestRunner::class)
@@ -46,10 +47,21 @@ import org.robolectric.annotation.GraphicsMode
 class PollMessageScreenshotTest : PollMessageTestFixtures() {
     @get:Rule val composeRule = createComposeRule(effectContext = UnconfinedTestDispatcher())
 
-    @Before fun bindRoster() = runTest { pollController.retryMembers() }
+    private val originalTimeZone = TimeZone.getDefault()
 
+    /** Message details include the zone ID, so pin the exact same ID as the committed baselines. */
+    @Before fun bindRoster() {
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+        runTest { pollController.retryMembers() }
+    }
+
+    /** Restore process-level clock state even when controller cleanup fails. */
     @After fun clearController() {
-        pollController.onCleared()
+        try {
+            pollController.onCleared()
+        } finally {
+            TimeZone.setDefault(originalTimeZone)
+        }
     }
 
     @Test fun pollReactionsLight() = render("light", PollScreenshotConfiguration(sent = true))

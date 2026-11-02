@@ -242,7 +242,7 @@ class ComposerCaretVisibilityTest {
                             onCancelReply = {},
                             onSend = { _, _ -> },
                             initialDraft = initialDraft,
-                            onDraftChange = { initialDraft = it },
+                            onDraftChange = { draftValue, _ -> initialDraft = draftValue },
                             draftKey = draftKey,
                             composerFocus = focusRequester,
                         )
@@ -360,7 +360,7 @@ class ComposerCaretVisibilityTest {
                         onCancelReply = {},
                         onSend = { _, _ -> },
                         initialDraft = value,
-                        onDraftChange = { value = it },
+                        onDraftChange = { draftValue, _ -> value = draftValue },
                         onBottomInputChanged = { bottomInputChanges++ },
                     )
                 }
@@ -433,7 +433,7 @@ class ComposerCaretVisibilityTest {
                             onCancelReply = {},
                             onSend = { _, _ -> },
                             initialDraft = harness.value,
-                            onDraftChange = { harness.value = it },
+                            onDraftChange = { draftValue, _ -> harness.value = draftValue },
                             composerFocus = harness.focusRequester,
                         )
                     }

@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.updates
 
 import dev.ipf.whitenoise.android.functionBody
+import dev.ipf.whitenoise.android.propertyInitializerCall
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -24,6 +25,24 @@ class AppUpdateAdmissionCoverageTest {
         assertEquals(
             3,
             Regex("notificationScope\\.launch \\{ refreshAppUpdateIfStale\\(").findAll(state).count(),
+        )
+    }
+
+    /** Fixture foreground changes must retain the constructor's platform-service opt-out. */
+    @Test
+    fun fixturePlatformOptOutAlsoDisablesLifecycleUpdateFetches() {
+        val state = source("state/AppState.kt")
+        val repository = state.propertyInitializerCall("appUpdateRepository")
+        assertTrue("selfUpdateEnabled = startPlatformServices && BuildConfig.SELF_UPDATE_ENABLED" in repository)
+        assertTrue("class WhiteNoiseAppState private constructor(" in state)
+        assertTrue("constructor(context: Context)" in state)
+        assertTrue("internal constructor(" in state)
+        assertEquals(
+            listOf("true", "false"),
+            Regex("startPlatformServices\\s*=\\s*(true|false)\\b")
+                .findAll(state)
+                .map { it.groupValues[1] }
+                .toList(),
         )
     }
 

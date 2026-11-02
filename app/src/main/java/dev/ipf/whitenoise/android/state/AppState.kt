@@ -184,6 +184,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolutio
 import dev.ipf.whitenoise.android.ui.chats.relaysConnectedFromHealth
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
 import dev.ipf.whitenoise.android.ui.conversation.media.closeQuietly
+import dev.ipf.whitenoise.android.ui.conversation.presentAttachmentAdmission
 import dev.ipf.whitenoise.android.ui.onboarding.SignUpController
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupCoordinator
 import dev.ipf.whitenoise.android.ui.onboarding.setup.setupOptions
@@ -1747,7 +1748,11 @@ class WhiteNoiseAppState private constructor(
         NotificationContentInvalidations(NOTIFICATION_CONTENT_INVALIDATION_CAPACITY)
     private val notificationReconcileLocks = Array(64) { Mutex() }
     private val inviteNotificationIdentityRefreshStore = GroupInviteNotificationIdentityRefreshStore()
-    private val appUpdateRepository = AppUpdateRepository(appContext)
+    private val appUpdateRepository =
+        AppUpdateRepository(
+            appContext,
+            selfUpdateEnabled = startPlatformServices && BuildConfig.SELF_UPDATE_ENABLED,
+        )
     private val appUpdateNotifier = AppUpdateNotifier(appContext)
     private val appSelfUpdateFlow = AppSelfUpdateFlows.create(appContext)
     internal val chatMutePreferences = ChatMutePreferences(appContext)
@@ -3022,17 +3027,19 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String,
         value: TextFieldValue,
+        textChanged: Boolean? = null,
     ) {
         accountRef ?: return
-        setDraftForAccount(accountRef, groupIdHex, value)
+        setDraftForAccount(accountRef, groupIdHex, value, textChanged)
     }
 
     private fun setDraftForAccount(
         accountRef: String,
         groupIdHex: String,
         value: TextFieldValue,
+        textChanged: Boolean? = null,
     ) {
-        composerDraftExpansionBridge.setDraft(accountRef, groupIdHex, value)
+        composerDraftExpansionBridge.setDraft(accountRef, groupIdHex, value, textChanged)
     }
 
     /** Current draft generation used to bind an explicit composer resize. */
@@ -4021,17 +4028,8 @@ class WhiteNoiseAppState private constructor(
                     accountRef,
                 )
                 if (payload.importReady && payload.streamUris.isNotEmpty()) shareStaging.notifyTextStaged()
-                if (droppedCount > 0) {
-                    presentText(
-                        AppText.Plain(
-                            appContext.resources.getQuantityString(
-                                R.plurals.toast_share_attachments_dropped,
-                                droppedCount,
-                                droppedCount,
-                            ),
-                        ),
-                    )
-                }
+                val offered = payload.streamUris.size
+                presentAttachmentAdmission(appContext, (offered - droppedCount).coerceAtLeast(0), offered)
                 true
             }
         }
@@ -6883,7 +6881,10 @@ class WhiteNoiseAppState private constructor(
         ): Boolean = !networkNotificationRecoverySuppressed && canPublishAccountActivation(label, runtime)
 
         /** Hides platform share targets before publishing a different active account. */
-        override suspend fun hidePreviousAccountShortcuts() = hideConversationShortcutsFromDirectShare()
+        override suspend fun hidePreviousAccountShortcuts() {
+            hideConversationShortcutsFromDirectShare()
+            recordAccountSwitchMark("previous-shortcuts-hide-finished")
+        }
 
         /** Commits the prepared projection and active label together without a suspension. */
         override fun publish(
@@ -6901,6 +6902,7 @@ class WhiteNoiseAppState private constructor(
             currentStartupProfiles.forEach(::applyAccountSwitchProfileSeed)
             activeAccountRef = label
             preferences.edit().putString(ACTIVE_ACCOUNT_KEY, label).apply()
+            recordAccountSwitchMark("published", label)
             reloadMediaAutoDownloadMatrix()
         }
 
@@ -6992,6 +6994,20 @@ class WhiteNoiseAppState private constructor(
             startupPerformance.record(PerformancePhase.MEMBER_DERIVED_LOCAL_READY)
         }
         recordPendingAccountSwitchStage(accountRef, "member-derived-local-ready", rowCount)
+    }
+
+    /**
+     * Logs an elapsed-time mark for the account switch in flight. Debug builds only. A mark naming [accountRef]
+     * is dropped unless that account is the switch's target, so the outgoing account's rebind cannot pose as it.
+     */
+    internal fun recordAccountSwitchMark(
+        stage: String,
+        accountRef: String? = null,
+    ) {
+        val trace = pendingAccountSwitchTrace ?: return
+        if (accountRef != null && trace.accountRef != accountRef) return
+        val elapsedMs = (SystemClock.elapsedRealtime() - trace.startedAtMs).coerceAtLeast(0L)
+        appStateDebug { "account-switch $stage +${elapsedMs}ms" }
     }
 
     private fun recordPendingAccountSwitchStage(
@@ -7561,6 +7577,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Retires only the signed-out account's transient drafts and controllers, preserving a replacement account. */
     private fun clearSignedOutAccountMemory(account: String) {
+        attachmentCollections.forgetAccount(account)
         composerExpansionStateRetention.removeAccount(account)
         composerDraftExpansionBridge.removeAccount(account)
         pendingMessageEditHandoff.removeAccount(account)
@@ -7663,6 +7680,7 @@ class WhiteNoiseAppState private constructor(
             }
             chatMutePreferences.removeAccount(wipedRef)
             defaultDisappearingMessagesPreferences.removeAccount(wipedRef)
+            attachmentCollections.forgetAccount(wipedRef)
             composerExpansionStateRetention.removeAccount(wipedRef)
             composerDraftExpansionBridge.removeAccount(wipedRef)
             pendingMessageEditHandoff.removeAccount(wipedRef)

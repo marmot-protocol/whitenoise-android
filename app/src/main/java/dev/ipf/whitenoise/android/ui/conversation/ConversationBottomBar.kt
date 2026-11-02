@@ -83,7 +83,7 @@ internal fun ConversationBottomBar(
     messageTextCopy: MessageTextCopy,
     onBack: () -> Unit,
     initialDraft: TextFieldValue,
-    onDraftChange: (TextFieldValue) -> Unit,
+    onDraftChange: (TextFieldValue, Boolean) -> Unit,
     composerTextState: ComposerTextState,
     composerAttachmentSheet: ComposerAttachmentSheetState,
     attachmentContent: (@Composable () -> Unit)? = null,

@@ -182,6 +182,14 @@
         "test_ids": [
           "CON-036"
         ]
+      },
+      {
+        "surface": "Actual composer text edits remain distinct from unchanged presentation across draft hydration and remount",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "onDraftChange = { value, textChanged ->",
+        "test_ids": [
+          "DIC-011"
+        ]
       }
     ],
     "message_rendering_contracts": [

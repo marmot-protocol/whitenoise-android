@@ -35,7 +35,8 @@ OBSERVATION_SCENARIOS = frozenset({"extra-wait-signout", "extra-wait-wipe", "mod
 SUITES = ('navigation', 'settings', 'conversation', 'preferences', 'advanced', 'connectors', 'groups', 'creation', 'actions', 'polls', 'folders', 'nested', 'reader', 'composer', 'developer', 'support', 'ballots', 'profiles', 'chats', 'chatstate', 'consent', 'keys', 'search', 'permissions', 'reports', 'acquisition', 'speech', 'speech-validation', 'dictation', 'reactions', 'alert-dialogs', 'smart-folders', 'account-guards', 'account-actions', 'app-lock', 'settings-lifecycle', 'speech-persistence', 'profile-text', 'folder-rules', 'relay-validation', 'inbound-share', 'presentation', 'modals')
 MAX_CASES_PER_SHARD = 4
 CASE_RESERVE_SECONDS = 660
-UI_TIMEOUTS = {'polls-question-boundary': 240}
+# Measured overruns only: two save-and-reopen cycles plus two Advanced reveals take about 140 s.
+UI_TIMEOUTS = {'polls-question-boundary': 240, 'folder-rules-replace-saved-confirm': 180}
 CAMPAIGN_SECONDS = MAX_CASES_PER_SHARD * CASE_RESERVE_SECONDS
 CASES = json.loads((ROOT / 'config/maestro-runtime-cases.json').read_text())['cases']
 

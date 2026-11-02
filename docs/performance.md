@@ -178,6 +178,16 @@ reported as durable ownership rather than success, with
 `engine_phase_unavailable` making clear that Android cannot see the deeper MDK
 queue, MLS, storage, transport, or acknowledgement phases.
 
+Text admission returns without an Android-triggered convergence pass. MarmotKit
+0.14.0 wakes its durable queue and schedules convergence independently of the
+conversation route. Android leaves the row pending until the authoritative
+publication projection arrives. An automatic `retryGroupConvergence` after each
+acceptance would hold the group commit lock during native network work, blocking
+later admissions; that RPC has a two-minute worker-response deadline before its
+post-command catch-up. Retrying a committed, unpublished text reuses its native
+projection without readmitting it or invoking host convergence. This dependency
+explains a possible minute-scale host wait, not a measured production send duration.
+
 `op=message_forward` follows one forwarding operation from acceptance to its
 terminal state. For each source attachment it emits `forward_source_lookup`
 (`result=success layer=storage` when the plaintext was already in the Android

@@ -42,6 +42,7 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.acceptedUploadResult
+import dev.ipf.whitenoise.android.state.attachmentCollections
 import dev.ipf.whitenoise.android.state.finishMediaFixture
 import dev.ipf.whitenoise.android.state.mediaSendReconciliationAppState
 import dev.ipf.whitenoise.android.state.uploadCapturingController
@@ -130,13 +131,22 @@ class VideoUploadMetadataCoverageTest {
             val large = pick("send-large.mp4", "video/mp4", tagged, declaredSize = LARGE)
             val draftSlot = pick("send-draft.mp4", "video/mp4", tagged, declaredSize = tagged.size.toLong())
             val legacyNative = draft("legacy.mp4", "video/mp4", tagged.copyOf())
+            // Two picks form a collection: the large staged video and the small draft go as separate chunks (#2576).
+            val payloads = java.util.Collections.synchronizedList(mutableListOf<ByteArray>())
             val uploaded = CompletableDeferred<List<ByteArray>>()
+            val record = { bytes: List<ByteArray> ->
+                payloads += bytes
+                if (payloads.size >= 2) uploaded.complete(payloads.toList())
+            }
             val controller =
                 uploadCapturingController(
                     state,
-                    inMemory = { error("a message with a staged pick uploads from files") },
+                    inMemory = { request ->
+                        record(request.attachments.map { it.plaintext })
+                        acceptedUploadResult(request.attachments.size)
+                    },
                     fromFiles = { request ->
-                        uploaded.complete(request.attachments.map { File(it.sourcePath).readBytes() })
+                        record(request.attachments.map { File(it.sourcePath).readBytes() })
                         acceptedUploadResult(request.attachments.size)
                     },
                 )
@@ -266,9 +276,22 @@ class VideoUploadMetadataCoverageTest {
                 onRejected = { rejected.complete(true) },
             )
 
-            assertTrue("the $label send is rejected", rejected.await())
+            // Several picks become a collection operation (#2576): it is accepted, and each refused pick is
+            // skipped with a notice that names the refusal instead of reaching MDK.
+            assertFalse("the $label collection is accepted", rejected.await())
+            val skippedNotice = "1 attachment couldn't be prepared and wasn't sent."
+            for (round in 0 until SETTLE_ROUNDS) {
+                if (state.attachmentCollections.operations.value
+                        .isEmpty()
+                ) {
+                    break
+                }
+                testScheduler.advanceUntilIdle()
+                Thread.sleep(SETTLE_SLEEP_MS)
+            }
             assertTrue("no refused $label attachment reaches MDK: $uploads", uploads.isEmpty())
-            assertEquals(AppText.Resource(R.string.media_file_video_metadata_not_removable), state.toast?.title)
+            assertEquals(AppText.Plain(skippedNotice), state.toast?.title)
+            assertEquals(AppText.Resource(R.string.media_file_video_metadata_not_removable), state.toast?.detail)
             assertTrue("$label leaves no snapshot", stagedFiles().isEmpty())
             assertTrue("$label leaves no temporary copy", videoTempFiles().isEmpty())
             val untouched = legacyNative.plaintext
@@ -627,6 +650,8 @@ class VideoUploadMetadataCoverageTest {
         // The visual album, the fresh Files pick and the Files draft each upload as their own message.
         const val EXPECTED_IN_MEMORY_UPLOADS = 3
         val LIMITS = FileBackedSendLimits(perFileBytes = 64L * MIB, batchCiphertextBytes = 900L * MIB)
+        const val SETTLE_ROUNDS = 300
+        const val SETTLE_SLEEP_MS = 10L
         val PRIVATE =
             listOf("WNPrivateTitle", "WNPrivateAuthor", "WNPrivateComment", "WNPrivateVideoHandler", "Lavf", "libx264")
     }

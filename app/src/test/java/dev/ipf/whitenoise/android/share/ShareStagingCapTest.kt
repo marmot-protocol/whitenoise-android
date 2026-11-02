@@ -58,15 +58,16 @@ class ShareStagingCapTest {
         assertNull(store.consumeCapped("acct", "group", 0, 0, 10))
     }
 
-    /** Counts existing and incoming visual/document items together when applying the shared shelf limit. */
+    /** Counts existing and incoming visual/document items together under the one 100-item limit (#2576). */
     @Test
-    fun mixedMediaAndDocumentsShareOneTenItemShelf() {
+    fun mixedMediaAndDocumentsShareOneHundredItemShelf() {
         val capped =
             capShareStreamStaging(
                 ShareStreamStaging(listOf(uri(1), uri(2)), listOf(uri(3), uri(4), uri(5))),
-                existingMediaCount = 4,
-                existingDocumentCount = 3,
+                existingMediaCount = 64,
+                existingDocumentCount = 33,
             )
+        assertEquals(100, SHARE_STREAM_MAX_ITEMS)
         assertEquals(2, capped.accepted.mediaUris.size)
         assertEquals(1, capped.accepted.documentUris.size)
         assertEquals(2, capped.droppedCount)

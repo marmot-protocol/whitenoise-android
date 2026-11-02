@@ -1,9 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -226,64 +224,53 @@ internal fun TimelineRow(
             ) {
                 onActionMenuOpenChange(false)
             }
-            // The prototype opens each sender cluster with a 12 dp gap; rows inside a run keep the list spacing,
-            // and a row the unread divider already separated keeps the divider's interval alone.
-            Box(
-                Modifier.padding(
-                    top =
-                        conversationClusterTopGap(
-                            sameSenderAsOlderBubble = sameSenderAsOlderBubble,
-                            followsUnreadDivider = showUnreadDivider,
-                        ),
-                ),
-            ) {
-                key(controller.boundAccountRef, controller.group.groupIdHex, item.presentationId) {
-                    TimelineRowMessageBubble(
-                        messageIdHex = item.record.messageIdHex,
-                        item = item,
-                        controller = controller,
-                        appState = appState,
-                        onOpenConversationMedia = onOpenConversationMedia,
-                        eventCardResolver = eventCardResolver,
-                        documentSaveFallback = documentSaveFallback,
-                        composerTextState = composerTextState,
-                        highlighted = highlighted,
-                        selectionMode = selectionMode,
-                        textSelectionMode = textSelectionMode,
-                        onTextSelectionModeChange = onTextSelectionModeChange,
-                        onTextSelectionBoundsChange = onTextSelectionBoundsChange,
-                        batchSelectable = batchSelectable,
-                        selected = selected,
-                        onToggleSelection = onToggleSelection,
-                        rangeDragActive = rangeDragActive,
-                        onDragSelectionStart = onDragSelectionStart,
-                        onDragSelection = onDragSelection,
-                        onDragSelectionEnd = onDragSelectionEnd,
-                        onDragSelectionCancel = onDragSelectionCancel,
-                        quickReactionEmojis = quickReactionEmojis,
-                        recentEmojis = recentEmojis,
-                        onEmojiUsed = onEmojiUsed,
-                        isActionMenuOpen = isActionMenuOpen,
-                        onActionMenuOpenChange = onActionMenuOpenChange,
-                        onQuickReactionsSave = onQuickReactionsSave,
-                        onReplyPreviewClick = onReplyPreviewClick,
-                        composerGate = composerGate,
-                        blockedDmUnblockInFlight = blockedDmUnblockInFlight,
-                        onUnblockBlockedDm = onUnblockBlockedDm,
-                        onBack = onBack,
-                        mentionCandidates = mentionCandidates,
-                        mentionPickerEnabled = mentionPickerEnabled,
-                        onReaderSendAccepted = onReaderSendAccepted,
-                        onBeforeBodyCollapse = onBeforeBodyCollapse,
-                        showSenderName = senderDecoration.showName,
-                        showSenderAvatar = senderDecoration.showAvatar,
-                        collapseLongMessages = collapseLongMessages,
-                        readOnly = controller.group.pendingConfirmation,
-                        ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,
-                        ttsSentenceLayoutSink = ttsSentenceLayoutSink,
-                        onTtsSentenceSeek = onTtsSentenceSeek,
-                    )
-                }
+            // Sender runs own attribution only; the timeline arrangement owns the outer interval.
+            key(controller.boundAccountRef, controller.group.groupIdHex, item.presentationId) {
+                TimelineRowMessageBubble(
+                    messageIdHex = item.record.messageIdHex,
+                    item = item,
+                    controller = controller,
+                    appState = appState,
+                    onOpenConversationMedia = onOpenConversationMedia,
+                    eventCardResolver = eventCardResolver,
+                    documentSaveFallback = documentSaveFallback,
+                    composerTextState = composerTextState,
+                    highlighted = highlighted,
+                    selectionMode = selectionMode,
+                    textSelectionMode = textSelectionMode,
+                    onTextSelectionModeChange = onTextSelectionModeChange,
+                    onTextSelectionBoundsChange = onTextSelectionBoundsChange,
+                    batchSelectable = batchSelectable,
+                    selected = selected,
+                    onToggleSelection = onToggleSelection,
+                    rangeDragActive = rangeDragActive,
+                    onDragSelectionStart = onDragSelectionStart,
+                    onDragSelection = onDragSelection,
+                    onDragSelectionEnd = onDragSelectionEnd,
+                    onDragSelectionCancel = onDragSelectionCancel,
+                    quickReactionEmojis = quickReactionEmojis,
+                    recentEmojis = recentEmojis,
+                    onEmojiUsed = onEmojiUsed,
+                    isActionMenuOpen = isActionMenuOpen,
+                    onActionMenuOpenChange = onActionMenuOpenChange,
+                    onQuickReactionsSave = onQuickReactionsSave,
+                    onReplyPreviewClick = onReplyPreviewClick,
+                    composerGate = composerGate,
+                    blockedDmUnblockInFlight = blockedDmUnblockInFlight,
+                    onUnblockBlockedDm = onUnblockBlockedDm,
+                    onBack = onBack,
+                    mentionCandidates = mentionCandidates,
+                    mentionPickerEnabled = mentionPickerEnabled,
+                    onReaderSendAccepted = onReaderSendAccepted,
+                    onBeforeBodyCollapse = onBeforeBodyCollapse,
+                    showSenderName = senderDecoration.showName,
+                    showSenderAvatar = senderDecoration.showAvatar,
+                    collapseLongMessages = collapseLongMessages,
+                    readOnly = controller.group.pendingConfirmation,
+                    ttsQuickTransportViewportLock = ttsQuickTransportViewportLock,
+                    ttsSentenceLayoutSink = ttsSentenceLayoutSink,
+                    onTtsSentenceSeek = onTtsSentenceSeek,
+                )
             }
         }
     }

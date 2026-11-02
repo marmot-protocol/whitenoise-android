@@ -47,6 +47,7 @@ class ChatsScreenOffWindowActionsTest {
     private var fixture: OffWindowActionFixture? = null
     private val folder = mutableStateOf<String?>(null)
 
+    /** Releases held native calls, then waits for the app's mutation jobs to finish cancelling. */
     @After fun close() {
         val model = fixture
         model?.releaseLookup?.complete(Unit)
@@ -60,7 +61,7 @@ class ChatsScreenOffWindowActionsTest {
                 model?.controller?.onCleared()
             }
             try {
-                rule.waitUntil {
+                rule.waitUntil(WAIT_MILLIS) {
                     scope.testScheduler.runCurrent()
                     model
                         ?.state
@@ -437,8 +438,9 @@ class ChatsScreenOffWindowActionsTest {
         rule.onAllNodes(isDialog()).assertCountEquals(0)
     }
 
+    /** Drives the test scheduler and Android Main until [ready] holds or [WAIT_MILLIS] passes. */
     private fun awaitProgress(ready: () -> Boolean) {
-        rule.waitUntil {
+        rule.waitUntil(WAIT_MILLIS) {
             scope.testScheduler.runCurrent()
             // Controller/native continuations post to Android Main; Compose frames do not run its 16ms debounce.
             ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
@@ -454,5 +456,11 @@ class ChatsScreenOffWindowActionsTest {
         scope.testScheduler.runCurrent()
         ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
         rule.waitForIdle()
+    }
+
+    private companion object {
+        // Wall-clock budget. These waits settle in under 250 ms locally, but CI runs six 2 GiB forks
+        // and the 1 s default timed out at four different waits across CI and local runs.
+        const val WAIT_MILLIS = 10_000L
     }
 }

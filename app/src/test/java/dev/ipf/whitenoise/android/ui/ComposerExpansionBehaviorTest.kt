@@ -1069,7 +1069,7 @@ class ComposerExpansionBehaviorTest {
                                 dictationAccountRef = null,
                                 dictationGroupIdHex = null,
                                 initialDraft = value,
-                                onDraftChange = { value = it },
+                                onDraftChange = { draftValue, _ -> value = draftValue },
                                 modifier = Modifier.testTag(TAG),
                             )
                         }
@@ -1197,7 +1197,7 @@ class ComposerExpansionBehaviorTest {
                                 dictationAccountRef = dictationController?.let { ACCOUNT },
                                 dictationGroupIdHex = dictationController?.let { GROUP },
                                 initialDraft = value,
-                                onDraftChange = { value = it },
+                                onDraftChange = { draftValue, _ -> value = draftValue },
                                 overlayBackRegistrar = overlayBackRegistrar,
                                 topInteractionClearance = topInteractionClearance,
                                 modifier = Modifier.testTag(TAG),

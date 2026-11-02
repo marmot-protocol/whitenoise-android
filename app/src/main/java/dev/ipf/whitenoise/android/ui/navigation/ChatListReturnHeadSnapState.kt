@@ -65,6 +65,23 @@ internal fun openGroupFromProfileSheet(state: ChatListReturnHeadSnapState): Chat
         else -> ChatListReturnHeadSnapState.Unarmed
     }
 
+/**
+ * Conversation open after Create Group completes (issue #3529). A create started from
+ * the chat list binds [flowOriginHead], the head the list showed when the flow opened —
+ * the list is not composed behind the flow, so its keyed scroll anchor still holds that
+ * row while the new group lands above it. Without one, a profile-sheet head transfers
+ * and any other provenance clears.
+ */
+internal fun openCreatedGroup(
+    state: ChatListReturnHeadSnapState,
+    flowOriginHead: ChatListReturnHead?,
+): ChatListReturnHeadSnapState =
+    if (flowOriginHead != null) {
+        openGroupFromChatList(state, flowOriginHead)
+    } else {
+        openGroupFromProfileSheet(state)
+    }
+
 internal fun resetChatListReturnHeadSnap(): ChatListReturnHeadSnapState = ChatListReturnHeadSnapState.Unarmed
 
 /**

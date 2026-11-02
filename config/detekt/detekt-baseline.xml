@@ -30,7 +30,7 @@
     <ID>CyclomaticComplexMethod:Controllers.kt:ConversationController$private suspend fun CoroutineScope.runTimelineSubscriptionPipeline</ID>
     <ID>CyclomaticComplexMethod:Controllers.kt:ConversationController$private suspend fun performMediaUpload</ID>
     <ID>CyclomaticComplexMethod:Controllers.kt:ConversationController$suspend fun send</ID>
-    <ID>CyclomaticComplexMethod:Controllers.kt:internal fun optimisticMessageIdForProjection: String?</ID>
+    <ID>CyclomaticComplexMethod:OptimisticMessageReconciliation.kt:internal fun optimisticMessageIdForProjection: String?</ID>
     <ID>CyclomaticComplexMethod:Controllers.kt:internal fun reduceSubscriptionChatListRow: ChatListRowFfi</ID>
     <ID>CyclomaticComplexMethod:ConversationScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ConversationScreen</ID>
     <ID>CyclomaticComplexMethod:ConversationStreamPresentation.kt:internal fun durableStreamDisplayPositions: Map&lt;String, StreamFinalDisplayPosition&gt;</ID>
@@ -364,11 +364,12 @@
     <ID>MagicNumber:BubbleColors.kt:8</ID>
     <ID>MagicNumber:ChatFlowComponents.kt:0.45f</ID>
     <ID>MagicNumber:ComposerBar.kt:900L</ID>
-    <ID>MagicNumber:Controllers.kt:1009uL</ID>
+    <ID>MagicNumber:ConversationUnreadProjection.kt:1009uL</ID>
     <ID>MagicNumber:Controllers.kt:1200uL</ID>
-    <ID>MagicNumber:Controllers.kt:1210uL</ID>
+    <ID>MagicNumber:ConversationUnreadProjection.kt:1210uL</ID>
     <ID>MagicNumber:Controllers.kt:8</ID>
     <ID>MagicNumber:Controllers.kt:9uL</ID>
+    <ID>MagicNumber:ConversationUnreadProjection.kt:9uL</ID>
     <ID>MagicNumber:ChatListItem.kt:ChatListItem$1009uL</ID>
     <ID>MagicNumber:ChatListItem.kt:ChatListItem$1200uL</ID>
     <ID>MagicNumber:Controllers.kt:ChatsController$8</ID>
@@ -430,8 +431,8 @@
     <ID>MagicNumber:IdentityFormatter.kt:IdentityFormatter$60</ID>
     <ID>MagicNumber:IdentityFormatter.kt:IdentityFormatter$7L</ID>
     <ID>MagicNumber:IdentityFormatter.kt:IdentityFormatter$86_400</ID>
-    <ID>MagicNumber:LocalNotificationPresenter.kt:0.45f</ID>
-    <ID>MagicNumber:LocalNotificationPresenter.kt:0.58f</ID>
+    <ID>MagicNumber:NotificationIdentityRendering.kt:0.45f</ID>
+    <ID>MagicNumber:NotificationIdentityRendering.kt:0.58f</ID>
     <ID>MagicNumber:LocalNotificationPresenter.kt:LocalNotificationPresenter$16</ID>
     <ID>MagicNumber:LocalNotificationPresenter.kt:LocalNotificationPresenter$8</ID>
     <ID>MagicNumber:LocationShare.kt:180.0</ID>
@@ -636,7 +637,7 @@
     <ID>MaxLineLength:Controllers.kt:ConversationController$private val membershipSeed = conversationMembershipSeed(initialGroup, initialMemberSnapshot, conversationAccountIdHex)</ID>
     <ID>MaxLineLength:Controllers.kt:GroupMemberSnapshot$fun otherMemberAccount: String?</ID>
     <ID>MaxLineLength:Controllers.kt:internal</ID>
-    <ID>MaxLineLength:Controllers.kt:internal fun AppMessageRecordFfi.withRecordedAtOverride: AppMessageRecordFfi</ID>
+    <ID>MaxLineLength:ConversationTimelineOrdering.kt:internal fun AppMessageRecordFfi.withRecordedAtOverride: AppMessageRecordFfi</ID>
     <ID>MaxLineLength:ConversationMentionPickerStateCoverageTest.kt:ConversationMentionPickerStateCoverageTest$"mention picker candidates must use contactDisplayNameCached so private nicknames flow into Candidate.displayName and MentionComposer.filter"</ID>
     <ID>MaxLineLength:ConversationMentionPickerStateCoverageTest.kt:ConversationMentionPickerStateCoverageTest$"mention picker must not use chatMemberTitleCached for candidate displayName; that skips the local nickname"</ID>
     <ID>MaxLineLength:ConversationMentionPickerStateCoverageTest.kt:ConversationMentionPickerStateCoverageTest$File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationMentionPickerState.kt")</ID>
@@ -738,11 +739,9 @@
     <ID>MaxLineLength:LocalNotificationFormatter.kt:LocalNotificationFormatter$text(context, R.string.notification_sender_invited_you_to_group, "%1\$s invited you to %2\$s", sender, group)</ID>
     <ID>MaxLineLength:LocalNotificationFormatterTest.kt:LocalNotificationFormatterTest$val redacted = LocalNotificationFormatter.redactedContent(content, appName = "White Noise", body = "New notification")</ID>
     <ID>MaxLineLength:LocalNotificationPolicy.kt:LocalNotificationPolicy$conversationNotifyMode: (accountRef: String, groupIdHex: String) -&gt; ChatNotifyMode = { _, _ -&gt; ChatNotifyMode.ALL }</ID>
-    <ID>MaxLineLength:LocalNotificationPresenter.kt:LocalNotificationPresenter$(conversationTitleOverride?.takeIf { it.isNotBlank() } ?: content.conversationTitle)?.let { style.conversationTitle = it }</ID>
     <ID>MaxLineLength:LocalNotificationPresenter.kt:LocalNotificationPresenter$.</ID>
-    <ID>MaxLineLength:LocalNotificationPresenter.kt:LocalNotificationPresenter$// Cap carried-forward history; the extracted style is otherwise re-serialized unbounded across Binder on every post.</ID>
     <ID>MaxLineLength:LocalNotificationPresenter.kt:LocalNotificationPresenter$NotificationActionKind.MARK_READ -&gt; builder.addAction(markReadNotificationAction(actionTarget))</ID>
-    <ID>MaxLineLength:LocalNotificationPresenter.kt:LocalNotificationPresenter$NotificationNavigation.applyToIntent(this, target, content.notificationTag, tapTokens.tokenFor(content.notificationTag))</ID>
+    <ID>MaxLineLength:NotificationInteractionFactory.kt:NotificationInteractionFactory$NotificationNavigation.applyToIntent(this, target, content.notificationTag, tapTokens.tokenFor(content.notificationTag))</ID>
     <ID>MaxLineLength:LocalNotificationPresenter.kt:LocalNotificationPresenter$stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)</ID>
     <ID>MaxLineLength:LocalNotificationPresenterConversationTest.kt:LocalNotificationPresenterConversationTest$ConversationNotificationChannels.conversationChannelId(NotificationChannelSpec.GROUP_MESSAGES.id, shortcutId!!)</ID>
     <ID>MaxLineLength:LocalNotificationPresenterConversationTest.kt:LocalNotificationPresenterConversationTest$assertEquals(notificationMonogramBackgroundColor("conversation-a"), notificationMonogramBackgroundColor("conversation-a"))</ID>
@@ -969,14 +968,14 @@
     <ID>ReturnCount:Controllers.kt:ConversationController$suspend fun send</ID>
     <ID>ReturnCount:Controllers.kt:ConversationController$suspend fun toggleReaction</ID>
     <ID>ReturnCount:Controllers.kt:internal fun chatRowNeedsMediaKindResolve: String?</ID>
-    <ID>ReturnCount:Controllers.kt:internal fun firstUnreadReceivedIndex: Int</ID>
-    <ID>ReturnCount:Controllers.kt:internal fun isDisappearingSendTimeExpiryDeferred: Boolean</ID>
-    <ID>ReturnCount:Controllers.kt:internal fun optimisticMessageIdForProjection: String?</ID>
+    <ID>ReturnCount:ConversationUnreadProjection.kt:internal fun firstUnreadReceivedIndex: Int</ID>
+    <ID>ReturnCount:TimelineRetentionProjection.kt:internal fun isDisappearingSendTimeExpiryDeferred: Boolean</ID>
+    <ID>ReturnCount:OptimisticMessageReconciliation.kt:internal fun optimisticMessageIdForProjection: String?</ID>
     <ID>ReturnCount:Controllers.kt:internal fun sharedChatListItemsWith: List&lt;ChatListItem&gt;</ID>
-    <ID>ReturnCount:Controllers.kt:internal fun timelineMessageIdsExceedingLiveCap: List&lt;String&gt;</ID>
-    <ID>ReturnCount:Controllers.kt:internal fun unreadCountDivergenceReport: UnreadCountDivergenceReport?</ID>
-    <ID>ReturnCount:Controllers.kt:internal fun unreadReceivedMentionIds: List&lt;String&gt;</ID>
-    <ID>ReturnCount:Controllers.kt:private fun messagesHaveSameRenderableSendShape: Boolean</ID>
+    <ID>ReturnCount:ConversationTimelineOrdering.kt:internal fun timelineMessageIdsExceedingLiveCap: List&lt;String&gt;</ID>
+    <ID>ReturnCount:ConversationUnreadProjection.kt:internal fun unreadCountDivergenceReport: UnreadCountDivergenceReport?</ID>
+    <ID>ReturnCount:ConversationUnreadProjection.kt:internal fun unreadReceivedMentionIds: List&lt;String&gt;</ID>
+    <ID>ReturnCount:OptimisticMessageReconciliation.kt:private fun messagesHaveSameRenderableSendShape: Boolean</ID>
     <ID>ReturnCount:ConversationLogic.kt:internal fun isNearBottom: Boolean</ID>
     <ID>ReturnCount:ConversationNotificationChannels.kt:ConversationNotificationChannels$private fun ensureConversationChannel: String?</ID>
     <ID>ReturnCount:ConversationStreamPresentation.kt:internal fun streamFinalDisplayPosition: StreamFinalDisplayPosition?</ID>
@@ -1006,7 +1005,7 @@
     <ID>ReturnCount:LocalNotificationPostDecision.kt:internal fun shouldCancelRepliedConversationCard: Boolean</ID>
     <ID>ReturnCount:LocalNotificationPresenter.kt:LocalNotificationPresenter$@SuppressLint("MissingPermission") suspend fun show: Boolean</ID>
     <ID>ReturnCount:LocalNotificationPresenter.kt:LocalNotificationPresenter$fun dismissConversationSiblingCardsNotNewerThan: Boolean</ID>
-    <ID>ReturnCount:LocalNotificationPresenter.kt:LocalNotificationPresenter$private fun pruneConversationShortcutsBeforePublish</ID>
+    <ID>ReturnCount:NotificationConversationShortcuts.kt:NotificationConversationShortcuts$private fun pruneConversationShortcutsBeforePublish</ID>
     <ID>ReturnCount:LocationShare.kt:@SuppressLint("MissingPermission") internal suspend fun fetchCurrentLocation: SharedLocation?</ID>
     <ID>ReturnCount:LocationShare.kt:internal fun parseSharedLocationFromText: SharedLocation?</ID>
     <ID>ReturnCount:Lud16Resolver.kt:Lud16Address$fun parse: Parsed?</ID>

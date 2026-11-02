@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.NotificationUserFfi
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -29,20 +30,27 @@ class NotificationDraftTapMutabilityTest {
                 update(NotificationTriggerFfi.REMOVED_FROM_GROUP, null) to false,
                 update(NotificationTriggerFfi.MADE_ADMIN, null) to false,
             )
-        val presenter = LocalNotificationPresenter(context)
-        val method =
-            presenter.javaClass
-                .getDeclaredMethod(
-                    "conversationPendingIntent",
-                    NotificationUpdateFfi::class.java,
-                    String::class.java,
-                ).apply { isAccessible = true }
+        val interactions = NotificationInteractionFactory(context, NotificationTapTokens.create(context))
         cases.forEachIndexed { index, (update, mutable) ->
-            val pending = method.invoke(presenter, update, "card-$index") as PendingIntent
+            val pending = interactions.conversationPendingIntent(update, "card-$index")
             val flags = shadowOf(pending).flags
             assertEquals(mutable, flags and PendingIntent.FLAG_MUTABLE != 0)
             assertEquals(!mutable, flags and PendingIntent.FLAG_IMMUTABLE != 0)
         }
+    }
+
+    @Test
+    fun messageTapUsesTheSharedTokenOwnerAndRevocationInvalidatesIt() {
+        val tokens = NotificationTapTokens.create(context)
+        val interactions = NotificationInteractionFactory(context, tokens)
+        val update = update(NotificationTriggerFfi.NEW_MESSAGE, null)
+        val tag = "shared-owner-card"
+        val intent = shadowOf(interactions.conversationPendingIntent(update, tag)).savedIntent
+        val target = NotificationNavigation.fromUpdate(update)
+        assertEquals(target, NotificationNavigation.parse(intent, isTrustedTargetSignature = tokens::isValidTarget))
+
+        tokens.remove(tag)
+        assertNull(NotificationNavigation.parse(intent, isTrustedTargetSignature = tokens::isValidTarget))
     }
 
     private fun update(

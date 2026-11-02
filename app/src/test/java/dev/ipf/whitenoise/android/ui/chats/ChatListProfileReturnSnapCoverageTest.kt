@@ -61,14 +61,18 @@ class ChatListProfileReturnSnapCoverageTest {
     fun listOpensCaptureAndReturnComparesThePinnedAwareHead() {
         val chatsScreen = chatsScreenSource().readText()
 
-        val directOpenBody = chatsScreen.kotlinFunctionBody("openGroupFromVisibleList")
+        val headBody = chatsScreen.kotlinFunctionBody("visibleReturnHead")
         assertTrue(
-            "direct list opens must capture the pinned head and first unpinned row together",
-            "chatListReturnHead(visibleItems)" in directOpenBody,
+            "list opens must capture the pinned head and first unpinned row together",
+            "chatListReturnHead(visibleItems)" in headBody,
         )
         assertFalse(
-            "direct list opens must not fall back to the absolute first row alone",
-            "visibleItems.firstOrNull()?.id" in directOpenBody,
+            "list opens must not fall back to the absolute first row alone",
+            "visibleItems.firstOrNull()?.id" in headBody,
+        )
+        assertTrue(
+            "direct list opens must capture through the shared visible head",
+            "visibleReturnHead()" in chatsScreen.kotlinFunctionBody("openGroupFromVisibleList"),
         )
 
         val returnEffect =
@@ -88,6 +92,51 @@ class ChatListProfileReturnSnapCoverageTest {
         assertTrue(
             "a snap must reach the absolute top above the pinned block",
             "chatListState.scrollToItem(0)" in returnEffect,
+        )
+    }
+
+    /**
+     * The list is not composed behind New Message, so its keyed scroll anchor keeps the head it
+     * showed when the flow opened. Chats created there return against that head, not one read at
+     * completion that may already include the new chat (#3529).
+     */
+    @Test
+    fun newMessageFlowOpensReturnAgainstTheHeadHeldWhenTheFlowOpened() {
+        val chatsScreen = chatsScreenSource().readText()
+        val mainShell = mainShellSource().readText()
+
+        val openFlow =
+            chatsScreen.requiredSection(
+                start = "val openNewMessageFlow = {",
+                end = "showNewChatFlow = true",
+            )
+        assertTrue(
+            "opening New Message must capture the visible head first",
+            "newChatFlowOriginHead = visibleReturnHead()" in openFlow,
+        )
+
+        val flowHost =
+            chatsScreen.requiredSection(
+                start = "NewChatFlowHost(",
+                end = "\n        return\n",
+            )
+        assertTrue(
+            "a created or reopened direct chat must return against the flow-origin head",
+            "onOpenGroup(item, null, justCreated, newChatFlowReturnHead())" in flowHost,
+        )
+        assertTrue(
+            "a created group must return against the flow-origin head",
+            "onGroupCreateCompletedOpen(item, requestToken, newChatFlowReturnHead())" in flowHost,
+        )
+
+        val createdGroupOpen =
+            mainShell.requiredSection(
+                start = "val openGroupFromGroupCreateCompletion:",
+                end = "selectedChat = item",
+            )
+        assertTrue(
+            "the shell must arm a created group from the flow-origin head",
+            "openCreatedGroup(chatListReturnHeadSnap, flowOriginHead)" in createdGroupOpen,
         )
     }
 
