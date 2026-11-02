@@ -1298,6 +1298,8 @@ class LocalizationResourceTest {
                     ),
                 "values-fr" to
                     setOf(
+                        // "minute"/"minutes" is the French word for the spoken read-aloud unit.
+                        "tts_bar_spoken_minutes",
                         // "Messages" is also the French plural.
                         "conversation_search_messages",
                         // Source is also the standard French provenance label.
