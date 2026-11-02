@@ -113,6 +113,12 @@
     <string name="library_loading">Cargando archivos y contenido multimedia…</string>
     <string name="library_empty">No se encontraron archivos ni contenido multimedia</string>
     <string name="library_source">De: %1$s · %2$s</string>
+    <string name="library_section_this_week">Esta semana</string>
+    <string name="library_section_this_month">Este mes</string>
+    <string name="library_sender_in_chat">%1$s en %2$s</string>
+    <string name="library_item_description">%1$s, %2$s, de %3$s en %4$s, %5$s</string>
+    <string name="library_load_more_failed">No se pudieron cargar más archivos y contenido multimedia</string>
+    <string name="library_filters_unsupported">Estos filtros no se pueden usar para explorar archivos y contenido multimedia</string>
     <string name="chat_list_search_filter_remove">Quitar filtro: %1$s</string>
     <string name="chat_list_filter_all">Todos</string>
     <string name="chat_list_filter_unread">No leídos</string>

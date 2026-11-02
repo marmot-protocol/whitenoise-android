@@ -113,6 +113,12 @@
     <string name="library_loading">Dosyalar ve medya yükleniyor…</string>
     <string name="library_empty">Dosya veya medya bulunamadı</string>
     <string name="library_source">Kaynak: %1$s · %2$s</string>
+    <string name="library_section_this_week">Bu hafta</string>
+    <string name="library_section_this_month">Bu ay</string>
+    <string name="library_sender_in_chat">%1$s, %2$s</string>
+    <string name="library_item_description">%1$s, %2$s, %3$s tarafından %4$s içinde, %5$s</string>
+    <string name="library_load_more_failed">Daha fazla dosya ve medya yüklenemedi</string>
+    <string name="library_filters_unsupported">Bu filtreler dosya ve medyaya göz atmak için kullanılamaz</string>
     <string name="chat_list_search_filter_remove">Filtreyi kaldır: %1$s</string>
     <string name="chat_list_filter_all">Tümü</string>
     <string name="chat_list_filter_unread">Okunmamış</string>

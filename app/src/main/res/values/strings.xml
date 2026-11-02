@@ -118,6 +118,12 @@
     <string name="library_loading">Loading files and media…</string>
     <string name="library_empty">No files or media found</string>
     <string name="library_source">From: %1$s · %2$s</string>
+    <string name="library_section_this_week">This week</string>
+    <string name="library_section_this_month">This month</string>
+    <string name="library_sender_in_chat">%1$s in %2$s</string>
+    <string name="library_item_description">%1$s, %2$s, from %3$s in %4$s, %5$s</string>
+    <string name="library_load_more_failed">Couldn\'t load more files and media</string>
+    <string name="library_filters_unsupported">These filters can\'t be used to browse files and media</string>
     <string name="chat_list_search_filter_remove">Remove filter: %1$s</string>
     <string name="chat_list_filter_all">All</string>
     <string name="chat_list_filter_unread">Unread</string>

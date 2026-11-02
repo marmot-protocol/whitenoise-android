@@ -101,13 +101,17 @@ internal data class GlobalSearchResetOwners(
     val grid: ChatListSearchViewportState,
 )
 
-/** Shell-lived coordinates and ids only: never retains messages, thumbnails, or native result pages. */
+/**
+ * Shell-lived coordinates and ids only: never retains messages, thumbnails, or native result pages. The
+ * library extent is a row count for one query, so a return rereads that far instead of keeping pages.
+ */
 internal class GlobalSearchViewport(
     private val active: LazyListState,
     private val archived: LazyListState,
     val attachmentGrid: LazyGridState,
     private val resetOwners: GlobalSearchResetOwners,
     val selection: GlobalSearchSelectionOwner,
+    val libraryExtent: GlobalAttachmentLibraryExtent = GlobalAttachmentLibraryExtent(),
 ) {
     fun listState(showArchived: Boolean): LazyListState = if (showArchived) archived else active
 
