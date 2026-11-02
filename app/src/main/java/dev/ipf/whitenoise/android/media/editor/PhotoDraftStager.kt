@@ -72,7 +72,7 @@ internal sealed interface PhotoDraftStageResult {
 
 /**
  * Materializes a transient URI into an encrypted source and an MDK draft attachment. [outgoingDomain] names the
- * worker domain of one pick, its draft's shared outgoing worker; a stager given none decodes single-use.
+ * worker domain of one pick, its draft's shared outgoing worker, and a stager given none decodes single-use.
  */
 @Suppress("LongParameterList") // The stores it commits through, its renderer, its pick routing and its dispatcher.
 internal class PhotoDraftStager(
@@ -95,9 +95,10 @@ internal class PhotoDraftStager(
         legacyOccurrenceIndex: Int? = null,
     ): PhotoDraftStageResult {
         val attachmentId = stagedPhotoAttachmentId(accountRef, groupIdHex, attachmentSlotId)
-        // The slot is the pick: every decode of this source runs in that pick's draft's worker.
-        val pick = attachmentSlotId
-        findExisting(attachmentId, accountRef, groupIdHex, pick)?.let { return it }
+        // The slot is the pick. Its draft's worker is fixed before the first suspension, so work that resumes after
+        // the composer changed still decodes in the pick's own draft.
+        val domain = outgoingDomain(attachmentSlotId)
+        findExisting(attachmentId, accountRef, groupIdHex, domain)?.let { return it }
 
         val staged =
             try {
@@ -114,7 +115,7 @@ internal class PhotoDraftStager(
                     occurrenceIndex = legacyOccurrenceIndex,
                     accountRef = accountRef,
                     groupIdHex = groupIdHex,
-                    pick = pick,
+                    domain = domain,
                 )
             if (restored != null) {
                 withContext(NonCancellable + ioDispatcher) {
@@ -130,13 +131,14 @@ internal class PhotoDraftStager(
             accountRef = accountRef,
             groupIdHex = groupIdHex,
             quality = quality,
-            pick = pick,
+            domain = domain,
         )
     }
 
     /**
      * Byte entry point used by already-materialized sources and deterministic tests. Its decodes run in the outgoing
-     * worker of [pick]'s draft, the pick being the attachment itself unless the caller names its composer slot.
+     * worker of [pick]'s draft, fixed before the first suspension, the pick being the attachment itself unless the
+     * caller names its composer slot.
      */
     @Suppress("LongParameterList") // The draft identity, its source, its quality and the pick that keys its worker.
     suspend fun stageBytes(
@@ -148,7 +150,8 @@ internal class PhotoDraftStager(
         quality: MediaQuality,
         pick: String = attachmentId,
     ): PhotoDraftStageResult {
-        findExisting(attachmentId, accountRef, groupIdHex, pick)?.let { return it }
+        val domain = outgoingDomain(pick)
+        findExisting(attachmentId, accountRef, groupIdHex, domain)?.let { return it }
         val staged =
             try {
                 withContext(ioDispatcher) { sources.stageBytes(sourceBytes) }
@@ -164,11 +167,11 @@ internal class PhotoDraftStager(
             accountRef = accountRef,
             groupIdHex = groupIdHex,
             quality = quality,
-            pick = pick,
+            domain = domain,
         )
     }
 
-    // One transaction owns inspection, Original fallback, MDK commit, and lease cleanup.
+    /** One transaction owns inspection, Original fallback, MDK commit and lease cleanup, decoding in [domain]. */
     @Suppress("LongMethod", "CyclomaticComplexMethod", "LongParameterList")
     private suspend fun stageLease(
         leaseId: String,
@@ -177,9 +180,8 @@ internal class PhotoDraftStager(
         accountRef: String,
         groupIdHex: String,
         quality: MediaQuality,
-        pick: String,
+        domain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
     ): PhotoDraftStageResult {
-        val domain = outgoingDomain(pick)
         var committed = false
         try {
             val sourceBytes =
@@ -247,7 +249,7 @@ internal class PhotoDraftStager(
                             .getOrNull()
                             ?.mediaAttachments
                             ?.firstOrNull { it.id == attachmentId }
-                    val recovered = reread?.let { recover(it, accountRef, groupIdHex, pick) }
+                    val recovered = reread?.let { recover(it, accountRef, groupIdHex, domain) }
                     if (recovered != null) {
                         PhotoDraftStageResult.Success(recovered)
                     } else if (reread != null) {
@@ -336,12 +338,12 @@ internal class PhotoDraftStager(
         }
     }
 
-    /** Reopens [attachment]'s committed editor session, inspecting its source in [pick]'s draft's outgoing worker. */
+    /** Reopens [attachment]'s committed editor session, inspecting its source in its pick's draft's [domain]. */
     private suspend fun recover(
         attachment: MessageDraftAttachmentFfi,
         accountRef: String,
         groupIdHex: String,
-        pick: String,
+        domain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
     ): DraftBackedPhoto? {
         val digest = attachment.editorDigest()
         val session =
@@ -356,7 +358,6 @@ internal class PhotoDraftStager(
             } catch (_: Exception) {
                 null
             } ?: return null
-        val domain = outgoingDomain(pick)
         val inspected = renderer.inspect(sourceBytes, domain) as? PhotoEditorInspectResult.Success ?: return null
         return DraftBackedPhoto(
             attachment = attachment,
@@ -369,12 +370,12 @@ internal class PhotoDraftStager(
         )
     }
 
-    /** The draft's existing attachment [attachmentId], recovered for [pick], or null when there is none. */
+    /** The draft's existing attachment [attachmentId], recovered in [domain], or null when there is none. */
     private suspend fun findExisting(
         attachmentId: String,
         accountRef: String,
         groupIdHex: String,
-        pick: String,
+        domain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
     ): PhotoDraftStageResult? {
         val currentResult = drafts.draft(accountRef, groupIdHex)
         if (currentResult.isFailure) return PhotoDraftStageResult.DraftUnavailable
@@ -384,7 +385,7 @@ internal class PhotoDraftStager(
                 ?.mediaAttachments
                 ?.firstOrNull { it.id == attachmentId }
                 ?: return null
-        val recovered = recover(existing, accountRef, groupIdHex, pick)
+        val recovered = recover(existing, accountRef, groupIdHex, domain)
         return recovered?.let { PhotoDraftStageResult.Success(it) }
             ?: PhotoDraftStageResult.PreparedOnly(
                 DraftPreparedPhoto(
@@ -399,14 +400,14 @@ internal class PhotoDraftStager(
      * Old saved-state payloads retained only URI order, so their random slot ID
      * cannot be reconstructed. Match the materialized source lease back to the
      * persisted attachment/session at the same duplicate occurrence instead of
-     * appending a second draft attachment.
+     * appending a second draft attachment. The match is inspected in [domain].
      */
     private suspend fun findLegacyExisting(
         sourceLeaseId: String,
         occurrenceIndex: Int,
         accountRef: String,
         groupIdHex: String,
-        pick: String,
+        domain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
     ): DraftBackedPhoto? {
         if (occurrenceIndex < 0) return null
         val attachments =
@@ -421,7 +422,7 @@ internal class PhotoDraftStager(
             val session = sessions.committed(accountRef, groupIdHex, attachment.id, digest)
             if (session?.sourceLeaseId == sourceLeaseId) {
                 if (matchingOccurrence == occurrenceIndex) {
-                    return recover(attachment, accountRef, groupIdHex, pick)
+                    return recover(attachment, accountRef, groupIdHex, domain)
                 }
                 matchingOccurrence++
             }

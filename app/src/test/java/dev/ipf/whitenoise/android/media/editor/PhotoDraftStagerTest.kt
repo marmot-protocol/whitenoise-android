@@ -324,6 +324,31 @@ class PhotoDraftStagerTest {
             }
         }
 
+    /**
+     * A pick's staging decodes in the draft its pick belonged to when staging began, even when the composer is emptied
+     * and another pick starts a new draft while the source is still being read (#3373).
+     */
+    @Test
+    fun stagingKeepsItsDraftWhenTheComposerChangesMidRead() =
+        runTest {
+            EditorDomainRecorder().use { recorder ->
+                var draft = "first-draft"
+                val fixture = fixture(outgoingDomain = { MediaTrustDomain.outgoing(ACCOUNT, GROUP, draft) })
+                val bytes = pngBytes()
+                val uri = Uri.parse("content://photo-editor/slot-a")
+                ShadowContentResolver.reset()
+                shadowOf(app.contentResolver).registerInputStreamSupplier(uri) {
+                    // The source read is in flight: the user empties the composer and picks into a new draft.
+                    draft = "later-draft"
+                    ByteArrayInputStream(bytes)
+                }
+                val staged = fixture.stager.stage(uri, "slot-a", ACCOUNT, GROUP, MediaQuality.Standard)
+                assertTrue(staged is PhotoDraftStageResult.Success)
+                assertEquals("later-draft", draft)
+                assertEquals(setOf(MediaTrustDomain.outgoing(ACCOUNT, GROUP, "first-draft")), recorder.domains())
+            }
+        }
+
     /** A stager over in-memory stores whose picks decode in [outgoingDomain], single-use unless a test names one. */
     private fun fixture(
         onEncode: () -> Unit = {},

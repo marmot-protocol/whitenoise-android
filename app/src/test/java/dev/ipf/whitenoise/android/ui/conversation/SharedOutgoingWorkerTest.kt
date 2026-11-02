@@ -53,7 +53,8 @@ import java.util.concurrent.TimeUnit
 class SharedOutgoingWorkerTest {
     /**
      * Two picks share their draft's worker, and removing one keeps it. Emptying the composer retires it, and a pick of
-     * the next draft decodes in a fresh worker that holds nothing of the earlier draft.
+     * the next draft decodes in a fresh worker that holds nothing of the earlier draft. Late work for the emptied
+     * draft's pick, such as a preparation that resumes now, still names that pick's own draft.
      */
     @Test
     fun aLaterDraftNeverReachesAnEmptiedDraftsWorker() =
@@ -71,6 +72,7 @@ class SharedOutgoingWorkerTest {
             worker.remote.die()
             val later = controller.outgoingMediaTrustDomain(SLOT_C)
             assertNotEquals(first, later)
+            assertEquals("a resumed preparation keeps its draft", first, controller.outgoingMediaTrustDomain(SLOT_A))
             decode(transport, 3, later)
             val fresh = fixture.bindings[1]
             assertEquals(listOf(1, 2), worker.remote.inputs.toList())

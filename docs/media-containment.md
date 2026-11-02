@@ -996,10 +996,14 @@ identity. A send keeps each of its picks on the draft it decodes in now, for the
 send's own reads, and the next pick starts a new draft, including a pick made
 while the send is still running. A sent attachment carries its draft's domain,
 so its pending preview and just-sent poster decode there whatever draft is
-current by then. A pick still staged after a send, as after a rejected one, keeps
-its draft until it leaves the composer; any other pick decodes in the current
-draft. An ended draft gains no pick, and a draft identity is random, so a
-conversation reopened later starts a new one.
+current by then. A pick joins the current draft when it is first decoded or
+enters the composer and keeps that draft for good, so work still running for a
+pick that was sent or removed, such as a preparation that resumes after the
+composer was emptied and another pick was made, decodes in its own draft. The
+stager also fixes a pick's domain before its first suspension. A document picked
+again after it left the composer joins the draft it enters. An ended draft gains
+no pick, and a draft identity is random, so a conversation reopened later starts
+a new one.
 `ConversationController.outgoingMediaTrustDomain(pick)` is the only caller of
 `MediaTrustDomain.outgoing` in production, and `PictureDomainCoverageTest`
 fails on any other call or construction, so every decode of a pick agrees.
@@ -1021,14 +1025,23 @@ of the same conversation, no other conversation's draft, none of the
 conversation's received media, no other account and no other domain.
 
 The review of the shared draft worker's first form found that keying it by
-account and conversation alone let it outlive the draft: after a send, or after every pick was removed, a pick
-of the next draft within 30 seconds and 64 inputs reached the same generation.
+account and conversation alone let it outlive the draft: after a send, or after
+every pick was removed, a pick of the next draft within 30 seconds and 64 inputs
+reached the same generation.
 The draft identity closes that. `OutgoingDraftsTest` covers the policy,
 `SharedOutgoingWorkerTest` drives it through the controller and the draft state
 on an isolated test lane (an emptied draft and a pick made during a send each
 get a fresh worker, and the sent draft's worker retires after its send), and
 `MediaWorkerDomainDeviceTest.successiveDraftsNeverShareAWorker` checks the same
 sequence on real isolated workers through the debug canary.
+
+Its next review found that a pick's draft was still looked up again after a
+suspension. A preparation that resumed after the composer was emptied and
+another pick was made named the new draft, so its pick reached the next draft's
+worker. A pick now keeps the draft it joined for good, and the stager fixes its
+domain before its first suspension. `PhotoDraftStagerTest` changes the draft
+while a pick's source is being read, and `OutgoingDraftsTest` and
+`SharedOutgoingWorkerTest` check that the pick keeps its own draft.
 
 The measurement harnesses follow production. The album harness keeps two lanes,
 `master` and `conversation`. In the conversation lane each attempt is a new

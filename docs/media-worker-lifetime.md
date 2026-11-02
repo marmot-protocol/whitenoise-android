@@ -95,8 +95,10 @@ makes an outgoing domain; `PhotoEditorDomainTest`, `PhotoDraftStagerTest` and
 staged or recovered, runs in its draft's shared outgoing worker and never
 another draft's, also under concurrency. `OutgoingDraftsTest` checks the draft
 policy: a draft's picks share it, a send or an empty composer ends it, a pick
-made during a send starts the next one, and an ended draft retires once its
-sends have ended and its picks have left the composer. `SharedOutgoingWorkerTest`
+made during a send starts the next one, a pick keeps its draft for its late work
+after it left, and an ended draft retires once its sends have ended and its
+picks have left the composer. `PhotoDraftStagerTest` checks that staging keeps
+its pick's draft when the composer changes while the source is being read. `SharedOutgoingWorkerTest`
 drives that through the controller and the draft state on an isolated test lane:
 removing one pick keeps the draft's worker, while an emptied draft's worker
 retires and the next draft's pick reaches a fresh one, and a pick made during a
