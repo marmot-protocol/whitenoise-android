@@ -139,6 +139,7 @@
     <string name="chat_pinned_badge">Закреплено</string>
     <string name="chat_row_removed_badge">Исключены</string>
     <string name="chat_row_removed_description">Вас исключили из этого чата</string>
+    <string name="chat_row_device_removed_description">Это устройство удалено из этого чата</string>
     <string name="chat_row_action_move_up">Переместить вверх</string>
     <string name="chat_row_action_move_down">Переместить вниз</string>
     <string name="chat_row_action_mark_read">Отметить прочитанным</string>
@@ -272,6 +273,7 @@
     <string name="group_empty_only_you_title">В этой группе пока только вы</string>
     <string name="group_empty_invite_members">Пригласите людей, когда будете готовы.</string>
     <string name="you_are_no_longer_a_member">Вы не можете отправлять сообщения в эту группу, так как больше не являетесь её участником.</string>
+    <string name="device_removed_from_group_composer">С этого устройства нельзя отправлять сообщения, так как оно удалено из этой группы. Ваши другие устройства по-прежнему в ней.</string>
     <string name="group_unrecoverable_notice">Эта группа временно заморожена, пока White Noise проверяет и восстанавливает её состояние.</string>
     <string name="chat_row_draft_prefix">Черновик: </string>
     <string name="jump_to_newest">К новым</string>

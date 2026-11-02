@@ -131,6 +131,7 @@
     <string name="chat_pinned_badge">Sabitlendi</string>
     <string name="chat_row_removed_badge">Çıkarıldınız</string>
     <string name="chat_row_removed_description">Bu sohbetten çıkarıldınız</string>
+    <string name="chat_row_device_removed_description">Bu cihaz bu sohbetten çıkarıldı</string>
     <string name="chat_row_action_move_up">Yukarı taşı</string>
     <string name="chat_row_action_move_down">Aşağı taşı</string>
     <string name="chat_row_action_mark_read">Okundu olarak işaretle</string>
@@ -250,6 +251,7 @@
     <string name="group_empty_only_you_title">Bu grupta yalnızca sen varsın</string>
     <string name="group_empty_invite_members">Hazır olduğunda kişileri davet et.</string>
     <string name="you_are_no_longer_a_member">Artık bu grubun üyesi olmadığınız için bu gruba mesaj gönderemezsiniz.</string>
+    <string name="device_removed_from_group_composer">Bu cihaz bu gruptan çıkarıldığı için buradan mesaj gönderemezsiniz. Diğer cihazlarınız grupta kalmaya devam ediyor.</string>
     <string name="group_unrecoverable_notice">White Noise grubun durumunu doğrulayıp onarırken bu grup geçici olarak donduruldu.</string>
     <string name="chat_row_draft_prefix">Taslak: </string>
     <string name="jump_to_newest">En yeniye atla</string>

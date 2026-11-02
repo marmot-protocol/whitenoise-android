@@ -79,8 +79,12 @@ Android changes needed to keep current behavior:
   `DiagnosticFormatter.describe`.
 - `SelfMembershipFfi` and `ConversationParticipationFfi` add `DEVICE_REMOVED`: this
   device's leaf left a chat the account stays in through another of its devices.
-  Android treats it as terminal for this device (`isNonMember`, invite
-  availability) but never as the account leaving the roster or as an eviction.
+  Android treats it as terminal for this device's sends (`isNonMember` and
+  invite availability), but never as an eviction: the conversation roster keeps
+  the account, which stays in through its other device. The chat row
+  reads "This device was removed from this chat", and the composer says the
+  account's other devices are still in the group, instead of the
+  "no longer a member" copy MDK says hosts must not show for it (`CON-039`).
 - `HistoryNoticeCauseFfi.UNPROVEN_HISTORY` and the new `MarmotKitException`
   variants (`AccountUnlinked` and five sticker errors) need no exhaustive
   handling in Android today.
@@ -92,7 +96,10 @@ history bundles, account backups under a recovery key, removing a linked device)
 runs only when `device_groups_enabled()` holds, which requires the
 `test-policy-overrides` feature this artifact does not enable. In this build the
 new device-group methods return empty or unchanged state and the six new events
-are not emitted. `DEVICE_REMOVED` cannot arise until the gate opens.
+are not emitted. `DEVICE_REMOVED` is **not** gated: MDK reports it whenever this
+device's leaf leaves a group in which the account keeps another leaf. Since the
+October 30 pin added every recent device of an account to the groups it joins,
+an account signed in on two devices can reach it in this build.
 
 ## Storage-full presentation
 
@@ -103,7 +110,8 @@ Android as `MarmotKitException.StorageFull` on paths that used to report a backe
 failure. Sends already presented it. Opening a chat and creating a group or
 inviting now say "Not enough storage on this device. Free up space and try again."
 instead of the generic retry text, and opening a chat keeps its Retry action
-because the account is no longer latched.
+because the account is no longer latched. A failed chat-list load still shows its
+existing generic text and retries on its usual backoff.
 
 ## Behavior that changes without Android code
 

@@ -127,6 +127,7 @@
     <string name="chat_pinned_badge">已置顶</string>
     <string name="chat_row_removed_badge">已移除</string>
     <string name="chat_row_removed_description">你已被移出此对话</string>
+    <string name="chat_row_device_removed_description">此设备已被移出此对话</string>
     <string name="chat_row_action_move_up">上移</string>
     <string name="chat_row_action_move_down">下移</string>
     <string name="chat_row_action_mark_read">标记为已读</string>
@@ -239,6 +240,7 @@
     <string name="group_empty_only_you_title">这个群组目前只有你</string>
     <string name="group_empty_invite_members">准备好后邀请其他人。</string>
     <string name="you_are_no_longer_a_member">你无法向此群组发送消息，因为你已不再是成员。</string>
+    <string name="device_removed_from_group_composer">此设备已被移出此群组，因此无法从此设备发送消息。你的其他设备仍在群组中。</string>
     <string name="group_unrecoverable_notice">White Noise 正在验证并修复此群组的状态，因此群组暂时处于冻结状态。</string>
     <string name="chat_row_draft_prefix">草稿：</string>
     <string name="jump_to_newest">跳到最新</string>

@@ -131,6 +131,7 @@
     <string name="chat_pinned_badge">Angeheftet</string>
     <string name="chat_row_removed_badge">Entfernt</string>
     <string name="chat_row_removed_description">Du wurdest aus diesem Chat entfernt</string>
+    <string name="chat_row_device_removed_description">Dieses Gerät wurde aus diesem Chat entfernt</string>
     <string name="chat_row_action_move_up">Nach oben</string>
     <string name="chat_row_action_move_down">Nach unten</string>
     <string name="chat_row_action_mark_read">Als gelesen markieren</string>
@@ -250,6 +251,7 @@
     <string name="group_empty_only_you_title">Diese Gruppe besteht nur aus dir</string>
     <string name="group_empty_invite_members">Lade Leute ein, wenn du bereit bist.</string>
     <string name="you_are_no_longer_a_member">Du kannst dieser Gruppe keine Nachrichten mehr senden, weil du kein Mitglied mehr bist.</string>
+    <string name="device_removed_from_group_composer">Von diesem Gerät kannst du nicht senden, weil es aus dieser Gruppe entfernt wurde. Deine anderen Geräte sind weiterhin dabei.</string>
     <string name="group_unrecoverable_notice">Diese Gruppe ist vorübergehend eingefroren, während White Noise ihren Zustand überprüft und repariert.</string>
     <string name="chat_row_draft_prefix">Entwurf: </string>
     <string name="jump_to_newest">Zum Neuesten springen</string>

@@ -23,6 +23,9 @@ internal fun SelfMembershipFfi.isNonMember(): Boolean =
         SelfMembershipFfi.MEMBER -> false
     }
 
+/** Whether only this device's copy left the group while the account stays in through another of its devices. */
+internal fun AppGroupRecordFfi.isDeviceRemovedCopy(): Boolean = selfMembership == SelfMembershipFfi.DEVICE_REMOVED
+
 /**
  * Whether local abandonment (#3310) is offered for this group. A read-only invite declines instead, and once MDK
  * confirms the account no longer holds the group (it left, was removed, or the group is disbanded) there is nothing
@@ -40,6 +43,7 @@ internal data class ConversationMembershipSeed(
     val seededSelfMember: Boolean,
     val seededMembershipKnown: Boolean,
     val membersVerified: Boolean,
+    val accountStaysOnRoster: Boolean,
 )
 
 internal fun conversationMembershipSeed(
@@ -50,8 +54,10 @@ internal fun conversationMembershipSeed(
     val initialMembers = initialMemberSnapshot?.members.orEmpty()
     val projectedNonMember = initialGroup.selfMembership.isNonMember()
     val projectedMember = initialGroup.selfMembership == SelfMembershipFfi.MEMBER
+    // A removed device ends this device's sends, but the account stays on the roster through its other device.
+    val accountStaysOnRoster = initialGroup.isDeviceRemovedCopy()
     val seededMembers =
-        if (projectedNonMember) {
+        if (projectedNonMember && !accountStaysOnRoster) {
             GroupProjector.membersWithoutActiveAccount(initialMembers, activeAccountIdHex)
         } else {
             initialMembers
@@ -68,22 +74,38 @@ internal fun conversationMembershipSeed(
         seededSelfMember = seededSelfMember,
         seededMembershipKnown = projectedMember || projectedNonMember || initialMemberSnapshot != null,
         membersVerified = projectedNonMember,
+        accountStaysOnRoster = accountStaysOnRoster,
     )
 }
 
 internal class ConversationSelfLeftState(
     seededMembershipKnown: Boolean,
     seededSelfMember: Boolean,
+    seededAccountStaysOnRoster: Boolean = false,
 ) {
     var selfLeft by mutableStateOf(seededMembershipKnown && !seededSelfMember)
         private set
 
-    fun recordSelfLeft() {
+    /**
+     * Whether this device left while its account stays in the group through another device
+     * ([SelfMembershipFfi.DEVICE_REMOVED]). This device takes no sends, but the roster keeps the account.
+     */
+    private var accountStaysOnRoster by mutableStateOf(seededAccountStaysOnRoster)
+
+    /** Whether the roster drops this account: it left, and no other device of it keeps it in the group. */
+    private val hidesAccount: Boolean
+        get() = selfLeft && !accountStaysOnRoster
+
+    /** Latches this device's departure; [accountStaysOnRoster] keeps the account listed for a removed device. */
+    fun recordSelfLeft(accountStaysOnRoster: Boolean = false) {
         selfLeft = true
+        this.accountStaysOnRoster = accountStaysOnRoster
     }
 
+    /** Clears the departure latch, as a fresh reinvite does. */
     fun clearSelfLeft() {
         selfLeft = false
+        accountStaysOnRoster = false
     }
 
     fun isSelfMember(
@@ -94,5 +116,5 @@ internal class ConversationSelfLeftState(
     fun rosterHonoringSelfLeft(
         members: List<AppGroupMemberRecordFfi>,
         activeAccountIdHex: String?,
-    ): List<AppGroupMemberRecordFfi> = GroupProjector.rosterHonoringSelfLeft(members, activeAccountIdHex, selfLeft)
+    ): List<AppGroupMemberRecordFfi> = GroupProjector.rosterHonoringSelfLeft(members, activeAccountIdHex, hidesAccount)
 }

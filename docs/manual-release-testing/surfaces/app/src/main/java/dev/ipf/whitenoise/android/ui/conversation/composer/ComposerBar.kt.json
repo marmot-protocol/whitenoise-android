@@ -169,6 +169,23 @@
         "test_ids": [
           "CON-030"
         ]
+      },
+      {
+        "surface": "Device-removed composer notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "R.string.device_removed_from_group_composer",
+        "test_ids": [
+          "CON-039"
+        ]
+      },
+      {
+        "surface": "Removed-member composer notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
+        "anchor": "R.string.you_are_no_longer_a_member",
+        "test_ids": [
+          "GRP-006",
+          "CON-039"
+        ]
       }
     ]
   },

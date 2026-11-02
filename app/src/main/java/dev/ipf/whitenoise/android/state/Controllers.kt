@@ -883,16 +883,13 @@ internal fun reconcileProvisionalOpenChat(
 }
 
 /**
- * Whether [update] takes the active account out of the group's members. A [SelfMembershipFfi.DEVICE_REMOVED]
- * copy is excluded — the account stays a member through another of its devices, so its roster row must remain.
+ * Whether [update] ends this device's membership. A [SelfMembershipFfi.DEVICE_REMOVED] copy counts: this device takes
+ * no more sends, while its account stays on the roster through another device.
  */
 internal fun groupStateUpdateRemovesSelf(
     previous: AppGroupRecordFfi,
     update: AppGroupRecordFfi,
-): Boolean =
-    !previous.selfMembership.isNonMember() &&
-        update.selfMembership.isNonMember() &&
-        update.selfMembership != SelfMembershipFfi.DEVICE_REMOVED
+): Boolean = !previous.selfMembership.isNonMember() && update.selfMembership.isNonMember()
 
 internal fun cacheAppliedGroupMembers(
     appState: WhiteNoiseAppState,
@@ -3971,10 +3968,18 @@ class ChatsController private constructor(
         members: List<AppGroupMemberRecordFfi>,
     ) {
         appState.removeComposerExpansionForGroup(account, groupIdHex)
-        appState.removeActiveAccountFromGroupMemberSnapshot(account, groupIdHex)
+        // A removed device's account stays in the group through its other device, so its roster keeps the account.
+        val accountStaysOnRoster =
+            chatRowsByGroup[chatRowKey(groupIdHex)]?.selfMembership == SelfMembershipFfi.DEVICE_REMOVED
+        if (!accountStaysOnRoster) appState.removeActiveAccountFromGroupMemberSnapshot(account, groupIdHex)
         if (activeAccountIdHex != null) {
-            memberCacheByGroup = memberCacheByGroup +
-                (groupIdHex to GroupProjector.membersWithoutActiveAccount(members, activeAccountIdHex))
+            val departedMembers =
+                if (accountStaysOnRoster) {
+                    members
+                } else {
+                    GroupProjector.membersWithoutActiveAccount(members, activeAccountIdHex)
+                }
+            memberCacheByGroup = memberCacheByGroup + (groupIdHex to departedMembers)
             removedGroupIds = removedGroupIds + groupIdHex
             recompute()
         }
@@ -5938,7 +5943,8 @@ class ConversationController(
     // refreshMembers() could re-add self and revert the left state (the exact
     // #787 repro). These seed paths are the same local evidence the composer
     // gate uses for its initial NOTICE.
-    private val selfMembership = ConversationSelfLeftState(seededMembershipKnown, seededSelfMember)
+    private val selfMembership =
+        ConversationSelfLeftState(seededMembershipKnown, seededSelfMember, membershipSeed.accountStaysOnRoster)
 
     // A snapshot map (not mutableStateOf<Map>) so a bubble reading one key isn't
     // recomposed when a different message's reactions change.
@@ -13928,11 +13934,7 @@ class ConversationController(
         // a later authoritative roster result that races ahead of eviction can't re-add
         // self (issue #787).
         recordSelfLeft()
-        val updatedMembers =
-            members.filterNot {
-                GroupProjector.isActiveAccountMember(it, activeAccountIdHex)
-            }
-        members = updatedMembers
+        members = selfMembership.rosterHonoringSelfLeft(members, activeAccountIdHex)
         acceptedInvitePeerAccount = null
         membersLoaded = true
         membersVerified = true
@@ -13945,7 +13947,7 @@ class ConversationController(
         // in-flight immutable dictation target before any late provider result
         // can reach the draft persistence path.
         appState.conversationDictation.onTargetRemoved(account, group.groupIdHex)
-        appState.cacheGroupMemberSnapshot(account, group.groupIdHex, updatedMembers)
+        appState.cacheGroupMemberSnapshot(account, group.groupIdHex, members)
     }
 
     /**
@@ -13953,10 +13955,11 @@ class ConversationController(
      * confirmed self-leave (leaveGroup success) or engine eviction
      * ([markActiveAccountRemovedFromMembers]); honoured by [isSelfMember] and
      * roster application so a transient round-trip can't restore self
-     * before the engine eviction is observed locally.
+     * before the engine eviction is observed locally. A removed device
+     * ([SelfMembershipFfi.DEVICE_REMOVED]) keeps its account on the roster.
      */
     private fun recordSelfLeft() {
-        selfMembership.recordSelfLeft()
+        selfMembership.recordSelfLeft(accountStaysOnRoster = group.isDeviceRemovedCopy())
     }
 
     private fun Throwable.isUseAfterEviction(): Boolean {
