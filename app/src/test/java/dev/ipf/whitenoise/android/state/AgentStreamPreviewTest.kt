@@ -412,6 +412,8 @@ class AgentStreamPreviewTest {
             sourceEpoch = null,
             retentionSeconds = null,
             retentionExpiresAt = null,
+            sticker = null,
+            importedFrom = null,
         )
 
     private fun timelineMessage(
@@ -429,6 +431,7 @@ class AgentStreamPreviewTest {
             timelineOrder = position?.timelineOrder ?: 0uL,
         )
 
+    /** Builds an agent message record belonging to the given text stream, final or partial. */
     private fun appMessage(
         id: String,
         recordedAt: ULong,
@@ -458,5 +461,6 @@ class AgentStreamPreviewTest {
             retentionExpiresAt = null,
             recordedAt = recordedAt,
             receivedAt = recordedAt,
+            sticker = null,
         )
 }

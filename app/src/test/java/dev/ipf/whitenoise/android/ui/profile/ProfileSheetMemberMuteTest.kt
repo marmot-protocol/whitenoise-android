@@ -152,7 +152,7 @@ class ProfileSheetMemberMuteTest {
             context = context,
             draftStore = DraftStore(EmptyDraftPersistence),
             accountIdHexResolver = { TARGET_HEX },
-            accounts = listOf(AccountSummaryFfi(ACCOUNT_REF, activeAccountIdHex, true, false, false, true)),
+            accounts = listOf(AccountSummaryFfi(ACCOUNT_REF, activeAccountIdHex, true, false, false, true, false)),
             activeAccountRef = ACCOUNT_REF,
         )
     }

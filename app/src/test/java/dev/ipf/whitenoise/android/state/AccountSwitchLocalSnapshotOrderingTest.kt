@@ -11,6 +11,7 @@ import java.io.File
 /** Regression coverage for the local-ready account-switch boundary. */
 @Suppress("LargeClass") // Source-order assertions share one parser and the same account-switch lifecycle boundary.
 class AccountSwitchLocalSnapshotOrderingTest {
+    /** Profile seeds keep direct peers plus only the visible other accounts, excluding the target and overflow. */
     @Test
     fun profileSeedSetIncludesEveryVisibleOtherAccountAndExcludesOverflow() {
         val accounts =
@@ -22,6 +23,7 @@ class AccountSwitchLocalSnapshotOrderingTest {
                     externalSigning = false,
                     signedOut = false,
                     running = true,
+                    unlinked = false,
                 )
             }
 

@@ -3,8 +3,6 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -13,60 +11,6 @@ import org.junit.Test
 import java.io.File
 
 class AcceptedPendingMessageReconciliationTest {
-    /** Accepted durable intents converge once even after their conversation route is no longer visible. */
-    @Test
-    fun acceptedPendingTextSendRunsNativeConvergence() =
-        runTest {
-            var convergenceCalls = 0
-
-            runAcceptedPendingTextConvergence(
-                acceptedPending = true,
-                converge = { convergenceCalls += 1 },
-            )
-
-            assertEquals(1, convergenceCalls)
-        }
-
-    /** Non-pending success must not schedule an unnecessary native convergence pass. */
-    @Test
-    fun publishedTextSendSkipsAcceptedPendingConvergence() =
-        runTest {
-            var convergenceCalls = 0
-
-            runAcceptedPendingTextConvergence(
-                acceptedPending = false,
-                converge = { convergenceCalls += 1 },
-            )
-
-            assertEquals(0, convergenceCalls)
-        }
-
-    /** A transient convergence failure keeps the durable send pending instead of converting it to failure. */
-    @Test
-    fun acceptedPendingConvergenceFailureIsDeferred() =
-        runTest {
-            val failure = IllegalStateException("relay unavailable")
-            var reportedFailure: Throwable? = null
-
-            runAcceptedPendingTextConvergence(
-                acceptedPending = true,
-                converge = { throw failure },
-                onFailure = { reportedFailure = it },
-            )
-
-            assertEquals(failure, reportedFailure)
-        }
-
-    /** Cancellation still terminates convergence when the owning account or process lifetime ends. */
-    @Test(expected = CancellationException::class)
-    fun acceptedPendingConvergencePropagatesCancellation() =
-        runTest {
-            runAcceptedPendingTextConvergence(
-                acceptedPending = true,
-                converge = { throw CancellationException("account switched") },
-            )
-        }
-
     @Test
     fun acceptedPendingTextSendKeepsTheBubblePendingUntilProjection() {
         val tempId = "temp-accepted-pending"
@@ -198,6 +142,7 @@ class AcceptedPendingMessageReconciliationTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"),
         ).firstOrNull(File::exists) ?: error("Missing Controllers.kt source file")
 
+    /** Builds a sent message record from alice with the given id. */
     private fun message(id: String): AppMessageRecordFfi =
         AppMessageRecordFfi(
             messageIdHex = id,
@@ -218,5 +163,6 @@ class AcceptedPendingMessageReconciliationTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
+            sticker = null,
         )
 }

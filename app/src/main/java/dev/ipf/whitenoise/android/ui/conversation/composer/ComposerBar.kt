@@ -168,8 +168,15 @@ internal fun shouldReanchorBottomInputForReplyTargetChange(
     hasReplyTarget: Boolean,
 ): Boolean = hasReplyTarget && !hadReplyTarget
 
+/**
+ * Explains the disabled composer. [deviceRemoved] says only this device left the group while the account
+ * stays in through another device, so it must not read as the account's removal.
+ */
 @Composable
-internal fun RemovedMemberComposerNotice(modifier: Modifier = Modifier) {
+internal fun RemovedMemberComposerNotice(
+    modifier: Modifier = Modifier,
+    deviceRemoved: Boolean = false,
+) {
     Surface(
         modifier =
             modifier
@@ -180,10 +187,16 @@ internal fun RemovedMemberComposerNotice(modifier: Modifier = Modifier) {
         tonalElevation = 3.dp,
     ) {
         Text(
-            // Explains the disabled composer for a member who left or was
-            // removed; the timeline system row carries the left-vs-removed
-            // distinction on its own.
-            text = stringResource(R.string.you_are_no_longer_a_member),
+            // Explains the disabled composer for a member who left or was removed, or a device that was
+            // removed while its account stays in. The timeline system row carries the left-vs-removed distinction.
+            text =
+                stringResource(
+                    if (deviceRemoved) {
+                        R.string.device_removed_from_group_composer
+                    } else {
+                        R.string.you_are_no_longer_a_member
+                    },
+                ),
             modifier =
                 Modifier
                     .fillMaxWidth()
@@ -356,10 +369,11 @@ internal class ComposerTextState(
     }
 
     /** Applies an editor-originated value, preserving a shared explicit intent signal across both composer surfaces. */
-    fun updateValueFromUser(value: TextFieldValue) {
+    fun updateValueFromUser(value: TextFieldValue): Boolean {
         val textChanged = value.text != valueState.value.text
         updateValue(value)
         if (textChanged) userTextEditRevision += 1L
+        return textChanged
     }
 
     /** Clears an accepted send only while its exact text generation still owns the field. */
@@ -418,7 +432,7 @@ internal fun ComposerBar(
     onSendWithPresentation: ((String, (String?) -> Unit) -> Unit)? = null,
     modifier: Modifier = Modifier,
     initialDraft: TextFieldValue = TextFieldValue(""),
-    onDraftChange: (TextFieldValue) -> Unit = {},
+    onDraftChange: (TextFieldValue, Boolean) -> Unit = { _, _ -> },
     draftKey: Any? = null,
     draftAccountRef: String? = null,
     draftGroupIdHex: String? = null,
@@ -978,8 +992,8 @@ internal fun ComposerBar(
 
     /** Updates the active text owner and publishes a draft only when this is not an edit. */
     fun applyComposerFieldValue(value: TextFieldValue) {
-        textState.updateValueFromUser(value)
-        if (editingMessageId == null) onDraftChange(value)
+        val textChanged = textState.updateValueFromUser(value)
+        if (editingMessageId == null) onDraftChange(value, textChanged)
     }
 
     /** Deletes the current selection or previous code point and repairs mention tokens before publishing. */

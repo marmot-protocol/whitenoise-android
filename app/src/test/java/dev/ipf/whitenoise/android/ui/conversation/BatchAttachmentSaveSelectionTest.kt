@@ -74,6 +74,7 @@ class BatchAttachmentSaveSelectionTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt"),
         ).first(File::exists).readText()
 
+    /** Builds a batch selection for the given message id, recorded time and timeline order. */
     private fun selection(
         id: String,
         recordedAt: ULong,
@@ -109,6 +110,7 @@ class BatchAttachmentSaveSelectionTest {
                     retentionExpiresAt = null,
                     recordedAt = recordedAt,
                     receivedAt = recordedAt,
+                    sticker = null,
                 ),
             status = MessageStatus.Received,
             timelineOrder = timelineOrder,

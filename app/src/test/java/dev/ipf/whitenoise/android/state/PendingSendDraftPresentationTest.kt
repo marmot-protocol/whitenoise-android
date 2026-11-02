@@ -38,7 +38,12 @@ import dev.ipf.whitenoise.android.ui.chats.ChatRowPortFixtures
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -79,7 +84,9 @@ class PendingSendDraftPresentationTest {
                                     .draftSnapshotFor(ACCOUNT_REF, GROUP_ID)
                                     ?.textFieldValue
                                     ?: TextFieldValue(""),
-                            onDraftChange = { appState.setDraft(it) },
+                            onDraftChange = { draftValue, textChanged ->
+                                appState.setDraft(ACCOUNT_REF, GROUP_ID, draftValue, textChanged)
+                            },
                             draftKey = GROUP_ID,
                         )
                     }
@@ -256,6 +263,7 @@ class PendingSendDraftPresentationTest {
     @Test
     fun nativeDraftCannotFlashDuringAcceptedSendDark() = acceptedSendNativeDraft(dark = true)
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     private fun acceptedSendNativeDraft(dark: Boolean) =
         runTest {
             val fixture = nativeDraftFixture()
@@ -270,6 +278,8 @@ class PendingSendDraftPresentationTest {
                 assertSendPreview("preparing", dark, "Sending")
                 fixture.finishParse.complete(Unit)
                 fixture.publishStarted.await()
+                // Native publication may already be blocked; drain the independent parse continuation.
+                runCurrent()
                 settleChatRowRecompute()
                 assertSendPreview("pending", dark, "sending now")
                 composeRule.runOnIdle { state.setDraft(TextFieldValue("sending now")) }
@@ -382,6 +392,17 @@ class PendingSendDraftPresentationTest {
     private fun stoppedSendPreview(cancel: Boolean) =
         runTest {
             val fixture = nativeDraftFixture(failPublication = !cancel)
+            val releaseSendOrder = CompletableDeferred<Unit>()
+            val sendOrderHolder =
+                if (cancel) {
+                    launch(start = CoroutineStart.UNDISPATCHED) {
+                        fixture.state.withConversationTextSendOrder(ACCOUNT_REF, GROUP_ID) {
+                            releaseSendOrder.await()
+                        }
+                    }
+                } else {
+                    null
+                }
             try {
                 val send = async { fixture.state.sendConversationText(fixture.conversation, "sending now") }
                 fixture.parserStarted.await()
@@ -399,6 +420,7 @@ class PendingSendDraftPresentationTest {
                             .record
                     assertEquals(true, fixture.conversation.deleteMessage(pending, presentFailure = false))
                 }
+                releaseSendOrder.complete(Unit)
                 fixture.finishParse.complete(Unit)
                 if (!cancel) fixture.publishStarted.await()
                 fixture.finishPublish.complete(Unit)
@@ -415,6 +437,8 @@ class PendingSendDraftPresentationTest {
                 val native = nativeDraft("sending now")
                 assertEquals(native, fixture.state.chatRowSelectedPreviewFor(ACCOUNT_REF, GROUP_ID, native))
             } finally {
+                releaseSendOrder.complete(Unit)
+                sendOrderHolder?.cancelAndJoin()
                 fixture.close()
             }
         }
@@ -526,6 +550,7 @@ class PendingSendDraftPresentationTest {
     }
 
     @Test
+    @OptIn(ExperimentalCoroutinesApi::class)
     fun nativeDraftFenceAndPendingPreviewSurviveChatControllerReplacement() =
         runTest {
             val fixture = nativeDraftFixture()
@@ -551,6 +576,7 @@ class PendingSendDraftPresentationTest {
                 )
                 fixture.finishParse.complete(Unit)
                 fixture.publishStarted.await()
+                runCurrent()
                 // Controller debounce belongs to the Android main looper, separately from Compose frames.
                 settleChatRowRecompute()
                 assertEquals(
@@ -639,6 +665,7 @@ class PendingSendDraftPresentationTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,

@@ -584,6 +584,7 @@ class ProfileAddToGroupsFlowTest {
             activeAccountRef = ACTIVE_ACCOUNT_REF,
         )
 
+    /** Builds the running local-signing active account summary. */
     private fun activeAccount() =
         AccountSummaryFfi(
             label = ACTIVE_ACCOUNT_REF,
@@ -592,6 +593,7 @@ class ProfileAddToGroupsFlowTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private fun groupItem(

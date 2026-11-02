@@ -88,6 +88,7 @@ class LocalNotificationAdminFormatterTest {
             shortNpub = { SAMPLE_SHORT_NPUB },
         )
 
+    /** Builds a notification update for the given trigger, group name, preview and sender flags. */
     private fun update(
         trigger: NotificationTriggerFfi,
         groupName: String? = "General",
@@ -113,6 +114,7 @@ class LocalNotificationAdminFormatterTest {
         isFromSelf = isFromSelf,
         reactionEmoji = null,
         reactedToPreview = null,
+        sticker = null,
     )
 
     private fun user(

@@ -118,6 +118,7 @@ internal fun usesPersistedFailurePresentation(record: TimelineMessageRecordFfi):
         timelineInvalidationPresentation(record.invalidationStatus) == TimelineInvalidationPresentation.PersistedFailure
 
 object TimelineProjector {
+    /** Converts a native timeline row into the message record Android renders, carrying its sticker reference. */
     fun toAppMessageRecord(record: TimelineMessageRecordFfi): AppMessageRecordFfi =
         AppMessageRecordFfi(
             messageIdHex = record.messageIdHex,
@@ -133,6 +134,7 @@ object TimelineProjector {
             retentionExpiresAt = record.retentionExpiresAt,
             recordedAt = record.timelineAt,
             receivedAt = record.receivedAt,
+            sticker = record.sticker,
         )
 
     /**
@@ -294,6 +296,7 @@ object TimelineProjector {
         )
     }
 
+    /** Reshapes a reply preview into the record the body projector reads, keeping its sticker reference. */
     private fun TimelineReplyPreviewFfi.toAppMessageRecord(): AppMessageRecordFfi =
         AppMessageRecordFfi(
             messageIdHex = messageIdHex,
@@ -309,6 +312,7 @@ object TimelineProjector {
             retentionExpiresAt = null,
             recordedAt = 0uL,
             receivedAt = 0uL,
+            sticker = sticker,
         )
 
     private fun projectedBody(

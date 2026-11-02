@@ -42,6 +42,15 @@ class InviteFailurePresentationTest {
         )
     }
 
+    /** A full disk asks the user to free space rather than blaming the recipient or offering a bare retry. */
+    @Test
+    fun aFullDiskAsksForSpaceInsteadOfTheGenericFailure() {
+        val full = MarmotKitException.StorageFull("synthetic native reserve")
+
+        assertEquals(AppText.Resource(R.string.error_storage_full), groupCreateFailureDetail(full) { "Alice" })
+        assertEquals(AppText.Resource(R.string.error_storage_full), startProfileChatFailureDetail(full) { "Alice" })
+    }
+
     /** Obsolete-only KeyPackages ask the recipient to update, never to set up, and offer no install link. */
     @Test
     fun obsoleteOnlyKeyPackagesAskTheRecipientToUpdate() {

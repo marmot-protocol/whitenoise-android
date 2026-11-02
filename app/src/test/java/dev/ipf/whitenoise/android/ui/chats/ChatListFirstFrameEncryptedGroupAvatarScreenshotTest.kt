@@ -332,6 +332,7 @@ class ChatListFirstFrameEncryptedGroupAvatarScreenshotTest {
             .captureRoboImage("src/test/snapshots/chat_list_first_frame_encrypted_group_avatar_$themeName.png")
     }
 
+    /** Builds an app state with the given account as the single active account. */
     private fun appState(
         accountRef: String = ACCOUNT_REF_A,
         accountId: String = ACCOUNT_ID_A,
@@ -350,6 +351,7 @@ class ChatListFirstFrameEncryptedGroupAvatarScreenshotTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = accountRef,

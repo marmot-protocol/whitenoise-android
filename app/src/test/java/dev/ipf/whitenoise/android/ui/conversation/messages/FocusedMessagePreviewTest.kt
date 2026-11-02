@@ -108,7 +108,8 @@ class FocusedMessagePreviewTest {
         assertEquals(source, layout.layoutInput.text.text)
     }
 
-    @Test fun textPreviewCompactsAtExactTwoHundredDpBoundary() {
+    /** At 200 dp and 2× font a one-line quote fits above one whole excerpt line and the footer (issue #3532). */
+    @Test fun textPreviewFitsAQuoteAboveAWholeExcerptLineAtTwoHundredDp() {
         composeRule.setContent {
             WhiteNoiseTheme(fontScale = 2f) {
                 Box(Modifier.width(260.dp).height(200.dp)) {
@@ -129,8 +130,10 @@ class FocusedMessagePreviewTest {
         composeRule
             .onNodeWithTag("message-actions-excerpt")
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
-        assertEquals(1, results.single().lineCount)
-        composeRule.onNodeWithText("Quoted reply").assertDoesNotExist()
+        val layout = results.single()
+        assertEquals(1, layout.lineCount)
+        assertTrue(layout.getLineBottom(0) <= layout.size.height + 0.5f)
+        composeRule.onNodeWithText("Quoted reply").assertExists()
     }
 
     /**

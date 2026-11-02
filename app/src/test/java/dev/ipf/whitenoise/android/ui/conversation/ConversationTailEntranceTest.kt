@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import org.junit.Assert.assertEquals
@@ -113,6 +115,68 @@ class ConversationTailEntranceTest {
         assertEquals("the row above settles one slot up", startTop - rowHeightPx, seenTop("m3"), 1f)
     }
 
+    /** A full list keeps the new row off-screen until the tail is pinned; nothing above it may move before then. */
+    @Test
+    fun rowsAboveStayPutUntilTheEnteringRowIsPlacedAtTheTail() {
+        val harness = TailHarness().apply { rows = rows + (1..6).map { "h$it" } }
+        setTailContent(harness, composerPadding = COMPOSER_PADDING)
+        composeRule.mainClock.autoAdvance = false
+        composeRule.waitForIdle()
+        val startTop = seenTop("m3")
+
+        composeRule.runOnUiThread {
+            harness.rows = listOf("m4") + harness.rows
+            harness.latestId = "m4"
+            Snapshot.sendApplyNotifications()
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+        // Reading a position first waits for the frame's layout, which is when the shift would start.
+        assertEquals("the row above is not drawn below its slot", startTop, seenTop("m3"), 1f)
+        assertEquals("no shift starts before the entering row reaches the tail", 0f, harness.entrance.shiftPx, 0f)
+
+        composeRule.runOnIdle {
+            harness.followedId = "m4"
+            harness.listState.requestScrollToItem(0, 0)
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+        assertEquals("the row above is still seen where it was", startTop, seenTop("m3"), 1f)
+        assertEquals("the pinned frame starts the shift", rowHeightPx, harness.entrance.shiftPx, 1f)
+    }
+
+    /** A follow that reaches the tail late still gets its whole entrance; the hold outlasts its fixed delay. */
+    @Test
+    fun aLateTailFollowKeepsTheEnteringRowUntilItsMotionSettles() {
+        val harness = TailHarness().apply { rows = rows + (1..6).map { "h$it" } }
+        setTailContent(harness, composerPadding = COMPOSER_PADDING)
+        composeRule.mainClock.autoAdvance = false
+        composeRule.waitForIdle()
+
+        composeRule.runOnUiThread {
+            harness.rows = listOf("m4") + harness.rows
+            harness.latestId = "m4"
+            Snapshot.sendApplyNotifications()
+        }
+        composeRule.mainClock.advanceTimeBy(LATE_FOLLOW_MILLIS)
+        composeRule.runOnIdle {
+            harness.followedId = "m4"
+            harness.listState.requestScrollToItem(0, 0)
+        }
+        composeRule.mainClock.advanceTimeByFrame()
+        seenTop("m3")
+        assertEquals("the late pin still starts the shift", rowHeightPx, harness.entrance.shiftPx, 1f)
+
+        // Past the fixed 260ms hold, but inside the 180ms motion that began at the pin.
+        composeRule.mainClock.advanceTimeBy(MID_MOTION_MILLIS)
+        seenTop("m3")
+        assertEquals("the entering row stays held mid-motion", "m4", harness.entrance.enteringItemId)
+        assertTrue("the motion is still running", harness.entrance.shiftPx > 0f)
+
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.waitForIdle()
+        assertEquals("the hold ends once the motion settles", null, harness.entrance.enteringItemId)
+        assertEquals("the shift returns to zero", 0f, harness.entrance.shiftPx, 0f)
+    }
+
     /**
      * Advances through the entrance and checks both rows rise monotonically, as one, through
      * in-between positions. The fifth frame, well inside the 180ms, is recorded as the baseline.
@@ -153,7 +217,10 @@ class ConversationTailEntranceTest {
     }
 
     /** Composes a reversed list whose rows carry the entrance motion, resolved from the harness inputs. */
-    private fun setTailContent(harness: TailHarness) {
+    private fun setTailContent(
+        harness: TailHarness,
+        composerPadding: Dp = 0.dp,
+    ) {
         composeRule.setContent {
             harness.listState = rememberLazyListState()
             harness.entrance =
@@ -167,6 +234,7 @@ class ConversationTailEntranceTest {
                     rowSpacingPx = 0f,
                     motionEnabled = harness.motionEnabled,
                     ownerKey = harness.owner,
+                    tailReached = { harness.listState.firstVisibleItemIndex == 0 },
                 )
             // The production claim path: one remembered claim source shared with every row's modifier.
             val claim: () -> String? = remember(harness) { { harness.claimedId } }
@@ -174,6 +242,7 @@ class ConversationTailEntranceTest {
             LazyColumn(
                 state = harness.listState,
                 reverseLayout = true,
+                contentPadding = PaddingValues(bottom = composerPadding),
                 modifier = Modifier.fillMaxWidth().height(LIST_HEIGHT).testTag(LIST_TAG),
             ) {
                 items(harness.rows, key = { it }) { id ->
@@ -392,5 +461,14 @@ class ConversationTailEntranceTest {
         const val CAPTURED_FRAME = 4
         val LIST_HEIGHT = 300.dp
         val ROW_HEIGHT = 72.dp
+
+        /** Bottom padding under the composer, where a reversed list lays out rows it has not scrolled to yet. */
+        val COMPOSER_PADDING = 100.dp
+
+        /** A tail follow that lands after the motion's own 180ms would end inside the fixed 260ms hold. */
+        const val LATE_FOLLOW_MILLIS = 150L
+
+        /** From the late pin, past the fixed hold's end but before the 180ms motion settles. */
+        const val MID_MOTION_MILLIS = 130L
     }
 }

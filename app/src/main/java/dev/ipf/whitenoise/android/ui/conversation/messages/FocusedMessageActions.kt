@@ -663,7 +663,10 @@ private fun FocusedReactionTarget(
     }
 }
 
-/** Bundled/custom artwork keeps existing feedback; only already-rendered system glyphs fly. */
+/**
+ * Bundled/custom artwork keeps existing feedback; only already-rendered system glyphs fly.
+ * The target already announces the reaction's name, so the glyph adds no second one (#3292).
+ */
 @Composable
 private fun MeasuredReactionGlyph(
     emoji: String,
@@ -680,9 +683,11 @@ private fun MeasuredReactionGlyph(
         emoji,
         size = size,
         modifier =
-            Modifier.reactionSourceBounds { bounds ->
-                onBounds(if (systemGlyph) bounds else androidx.compose.ui.geometry.Rect.Zero)
-            },
+            Modifier
+                .clearAndSetSemantics {}
+                .reactionSourceBounds { bounds ->
+                    onBounds(if (systemGlyph) bounds else androidx.compose.ui.geometry.Rect.Zero)
+                },
     )
 }
 

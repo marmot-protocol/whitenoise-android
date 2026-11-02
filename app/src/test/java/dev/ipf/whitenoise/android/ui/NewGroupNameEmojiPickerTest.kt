@@ -315,6 +315,7 @@ class NewGroupNameEmojiPickerTest {
         hasContentDescription(string(R.string.open_emoji_picker)) and
             hasAnyAncestor(hasTestTag("group_setup.name"))
 
+    /** Builds the running, locally signing test account summary. */
     private fun activeAccount() =
         AccountSummaryFfi(
             label = ACCOUNT_REF,
@@ -323,6 +324,7 @@ class NewGroupNameEmojiPickerTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private companion object {

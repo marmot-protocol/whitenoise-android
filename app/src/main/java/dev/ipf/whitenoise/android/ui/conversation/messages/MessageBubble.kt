@@ -110,6 +110,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.authoritativeEditHistory
 import dev.ipf.whitenoise.android.state.canReportMessage
 import dev.ipf.whitenoise.android.state.dismissReports
+import dev.ipf.whitenoise.android.state.isDeviceRemovedCopy
 import dev.ipf.whitenoise.android.state.mediaReferencesFor
 import dev.ipf.whitenoise.android.state.parseMarkdownOrEmpty
 import dev.ipf.whitenoise.android.state.reportMessage
@@ -3121,7 +3122,10 @@ internal fun MessageBubble(
                                                 .height(64.dp),
                                         )
                                     }
-                                ComposerGate.NOTICE -> RemovedMemberComposerNotice()
+                                ComposerGate.NOTICE ->
+                                    RemovedMemberComposerNotice(
+                                        deviceRemoved = controller.group.isDeviceRemovedCopy(),
+                                    )
                                 ComposerGate.BLOCKED ->
                                     BlockedDmComposerNotice(
                                         unblockInFlight = blockedDmUnblockInFlight,
@@ -3172,8 +3176,13 @@ internal fun MessageBubble(
                                                         .draftSnapshotFor(controller.boundAccountRef, groupIdHex)
                                                         ?.textFieldValue
                                                         ?: TextFieldValue(""),
-                                                onDraftChange = {
-                                                    appState.setDraft(controller.boundAccountRef, groupIdHex, it)
+                                                onDraftChange = { value, textChanged ->
+                                                    appState.setDraft(
+                                                        controller.boundAccountRef,
+                                                        groupIdHex,
+                                                        value,
+                                                        textChanged,
+                                                    )
                                                 },
                                                 draftKey =
                                                     composerDraftOwnerKey(controller.boundAccountRef, groupIdHex),

@@ -152,9 +152,9 @@ class ComposerDraftTopSettlementTest {
                             onPickFromGallery = {},
                             onPickDocument = {},
                             initialDraft = value,
-                            onDraftChange = {
-                                value = it
-                                observed = it
+                            onDraftChange = { draftValue, _ ->
+                                value = draftValue
+                                observed = draftValue
                             },
                             modifier = Modifier.testTag(TAG),
                         )

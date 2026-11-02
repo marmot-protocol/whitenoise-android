@@ -153,6 +153,7 @@ class NotificationCatchUpAlertDeviceTest {
             reactedToPreview = null,
             timestampMs = System.currentTimeMillis(),
             isFromSelf = false,
+            sticker = null,
         )
 
     /** Runs a bounded fixture shell command and returns its UTF-8 output. */

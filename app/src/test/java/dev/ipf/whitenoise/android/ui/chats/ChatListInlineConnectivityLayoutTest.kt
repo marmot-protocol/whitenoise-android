@@ -323,6 +323,7 @@ class ChatListInlineConnectivityLayoutTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     )
                 },
             activeAccountRef = "personal",

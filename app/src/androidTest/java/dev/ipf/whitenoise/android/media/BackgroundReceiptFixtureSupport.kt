@@ -61,6 +61,7 @@ internal object BackgroundReceiptFixtureSupport {
         reactedToPreview = null,
         timestampMs = System.currentTimeMillis(),
         isFromSelf = false,
+        sticker = null,
     )
 
     /** Activities of this process that are on screen or still leaving it. */

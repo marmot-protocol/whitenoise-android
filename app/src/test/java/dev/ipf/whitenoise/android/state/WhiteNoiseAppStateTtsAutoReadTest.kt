@@ -589,6 +589,7 @@ class WhiteNoiseAppStateTtsAutoReadTest {
         assertTrue(appState.ttsController.state.value is TtsState.Speaking)
     }
 
+    /** Builds an app state with one active account wired to the test preferences. */
     private fun testAppState(): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,
@@ -603,6 +604,7 @@ class WhiteNoiseAppStateTtsAutoReadTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = accountRef,
@@ -648,6 +650,7 @@ class WhiteNoiseAppStateTtsAutoReadTest {
         return true
     }
 
+    /** Builds an app state holding two accounts with the given one active. */
     private fun testAppStateWithTwoAccounts(activeAccountRef: String): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,
@@ -662,6 +665,7 @@ class WhiteNoiseAppStateTtsAutoReadTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                     AccountSummaryFfi(
                         label = "account-b",
@@ -670,6 +674,7 @@ class WhiteNoiseAppStateTtsAutoReadTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = activeAccountRef,

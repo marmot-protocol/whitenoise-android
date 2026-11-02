@@ -127,6 +127,7 @@ class DiagnosticFormatterTest {
                             retentionExpiresAt = null,
                             recordedAt = 1_779_926_400uL,
                             receivedAt = 1_779_926_400uL,
+                            sticker = null,
                         ),
                 ),
             )
@@ -136,21 +137,7 @@ class DiagnosticFormatterTest {
                 accountLabel = "alice",
                 groupIdHex = "fedcba9876543210",
             )
-        val projection =
-            MarmotEventFfi.ProjectionUpdated(
-                RuntimeProjectionUpdateFfi(
-                    accountIdHex = "alice-account",
-                    accountLabel = "alice",
-                    update =
-                        TimelineProjectionUpdateFfi(
-                            groupIdHex = "aaaabbbbccccdddd",
-                            messages = emptyList(),
-                            changes = emptyList(),
-                            chatListRow = null,
-                            chatListTrigger = ChatListUpdateTriggerFfi.SNAPSHOT_REFRESH,
-                        ),
-                ),
-            )
+        val projection = emptyProjectionUpdate()
 
         assertEquals(
             "[alice] msg from 01234567...cdef kind=9 len=5",
@@ -204,6 +191,24 @@ class DiagnosticFormatterTest {
             "[alice] key package refresh overdue changed",
             DiagnosticFormatter.describe(overdue, legacyShortHexIdentity),
         )
+    }
+
+    /** Device-link, sign-in and recovery events describe only the account, never their re-read state. */
+    @Test
+    fun laterDeviceGroupEventsNameOnlyTheAccount() {
+        val expected =
+            mapOf(
+                MarmotEventFfi.UnrecognizedSignInsChanged("account-id", "alice") to "unrecognized sign-ins changed",
+                MarmotEventFfi.CompromiseWarningChanged("account-id", "alice") to "compromise warning changed",
+                MarmotEventFfi.DeviceLinkChanged("account-id", "alice") to "device link changed",
+                MarmotEventFfi.ChatHistoryImportsChanged("account-id", "alice") to "chat history imports changed",
+                MarmotEventFfi.RecoveryStatusChanged("account-id", "alice") to "recovery status changed",
+                MarmotEventFfi.DeviceUnlinked("account-id", "alice") to "device unlinked",
+            )
+
+        expected.forEach { (event, summary) ->
+            assertEquals("[alice] $summary", DiagnosticFormatter.describe(event, legacyShortHexIdentity))
+        }
     }
 
     /** Redacts secrets before truncation so long native errors cannot expose their sensitive prefix. */
@@ -413,4 +418,21 @@ class DiagnosticFormatterTest {
             assertEquals(expected, DiagnosticFormatter.errorCode(failure))
         }
     }
+
+    /** An empty snapshot-refresh projection update for alice's group `aaaabbbbccccdddd`. */
+    private fun emptyProjectionUpdate() =
+        MarmotEventFfi.ProjectionUpdated(
+            RuntimeProjectionUpdateFfi(
+                accountIdHex = "alice-account",
+                accountLabel = "alice",
+                update =
+                    TimelineProjectionUpdateFfi(
+                        groupIdHex = "aaaabbbbccccdddd",
+                        messages = emptyList(),
+                        changes = emptyList(),
+                        chatListRow = null,
+                        chatListTrigger = ChatListUpdateTriggerFfi.SNAPSHOT_REFRESH,
+                    ),
+            ),
+        )
 }

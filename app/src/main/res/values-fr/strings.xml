@@ -131,6 +131,7 @@
     <string name="chat_pinned_badge">Épinglé</string>
     <string name="chat_row_removed_badge">Retiré</string>
     <string name="chat_row_removed_description">Vous avez été retiré de cette conversation</string>
+    <string name="chat_row_device_removed_description">Cet appareil a été retiré de cette conversation</string>
     <string name="chat_row_action_move_up">Monter</string>
     <string name="chat_row_action_move_down">Descendre</string>
     <string name="chat_row_action_mark_read">Marquer comme lu</string>
@@ -250,6 +251,7 @@
     <string name="group_empty_only_you_title">Ce groupe ne contient que vous</string>
     <string name="group_empty_invite_members">Invitez des personnes quand vous êtes prêt.</string>
     <string name="you_are_no_longer_a_member">Vous ne pouvez plus envoyer de messages à ce groupe, car vous n’en êtes plus membre.</string>
+    <string name="device_removed_from_group_composer">Vous ne pouvez pas envoyer depuis cet appareil, car il a été retiré de ce groupe. Vos autres appareils en font toujours partie.</string>
     <string name="group_unrecoverable_notice">Ce groupe est temporairement figé pendant que White Noise vérifie et répare son état.</string>
     <string name="chat_row_draft_prefix">Brouillon : </string>
     <string name="jump_to_newest">Aller au plus récent</string>
@@ -501,10 +503,6 @@
         <item quantity="other">%1$d pièces jointes</item>
     </plurals>
     <string name="toast_share_staged_other_chats">Également préparé dans %1$d autres discussions</string>
-    <plurals name="toast_share_attachments_dropped">
-        <item quantity="one">%1$d pièce jointe n\'a pas pu être ajoutée. Vous pouvez en envoyer jusqu\'à 10 à la fois.</item>
-        <item quantity="other">%1$d pièces jointes n\'ont pas pu être ajoutées. Vous pouvez en envoyer jusqu\'à 10 à la fois.</item>
-    </plurals>
     <string name="delete">Supprimer</string>
     <string name="delete_for_me">Supprimer pour moi</string>
     <string name="delete_for_everyone">Supprimer pour tout le monde</string>
@@ -836,6 +834,7 @@
     <string name="toast_couldnt_publish_profile">Impossible de publier le profil</string>
     <string name="toast_send_failed">Échec de l’envoi</string>
     <string name="toast_send_storage_full">Espace de stockage insuffisant pour envoyer. Libérez de l’espace et réessayez.</string>
+    <string name="error_storage_full">Espace de stockage insuffisant sur cet appareil. Libérez de l’espace et réessayez.</string>
     <string name="toast_send_connection_failed">Impossible de joindre le relais. Vérifiez votre connexion et réessayez.</string>
     <string name="toast_send_queue_full">Trop de messages attendent d\'être envoyés dans cette discussion, le vôtre n\'a pas été envoyé. Réessayez une fois le retard rattrapé.</string>
     <string name="toast_send_chat_changed">La conversation a changé pendant l\'envoi, votre message n\'a donc pas été envoyé. Réessayez.</string>

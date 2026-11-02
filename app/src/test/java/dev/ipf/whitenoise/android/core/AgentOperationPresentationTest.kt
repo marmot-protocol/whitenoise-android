@@ -100,6 +100,7 @@ class AgentOperationPresentationTest {
         assertFalse(MessageProjector.isAgentOperation(agentOperation("hello").copy(kind = 9uL)))
     }
 
+    /** Builds a received agent-operation (kind 1202) record with the given text and tags. */
     private fun agentOperation(
         plaintext: String,
         tags: List<MessageTagFfi> = emptyList(),
@@ -117,5 +118,6 @@ class AgentOperationPresentationTest {
         retentionExpiresAt = null,
         recordedAt = 1uL,
         receivedAt = 1uL,
+        sticker = null,
     )
 }

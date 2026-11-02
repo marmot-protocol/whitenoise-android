@@ -37,7 +37,9 @@ internal fun TextLayoutResult.bubbleFooterLastLineWidth(layoutDirection: LayoutD
  * line when it leaves room ([lastLineWidth], the occupied extent from logical start when
  * the caller can supply it; otherwise the widest line) and sits on that line's
  * [lastLineBaseline]; else it drops to its own line below. Either way it stays
- * on the text's logical trailing side and never overlaps.
+ * on the text's logical trailing side and never overlaps. Under a bounded height a dropped
+ * footer stays inside the layout: the body gives up the footer's row unless it fits on one line
+ * beside the footer.
  */
 @Composable
 internal fun BubbleFooterLayout(
@@ -55,15 +57,44 @@ internal fun BubbleFooterLayout(
             Box { footer() }
         },
     ) { measurables, constraints ->
+        val gap = BubbleFooterGap.roundToPx()
         val footerPlaceable = measurables[1].measure(constraints.copy(minWidth = 0, minHeight = 0))
-        val contentPlaceable = measurables[0].measure(constraints.copy(minWidth = 0))
+        // A footer that drops below a body filling a bounded height would land outside the layout, where
+        // a clipping parent such as the focused-message preview hides it (issue #3532), so a bounded body
+        // gives up the footer's row. A body that fits on one line beside the footer keeps the footer inline
+        // and needs no row, so a one-word excerpt in a tiny frame keeps its whole line. The decision reads
+        // only this pass's measurements, never state written during layout, so it cannot oscillate.
+        // Transcript bubbles measure with an unbounded height and never reserve.
+        val reserving =
+            constraints.hasBoundedHeight &&
+                footerPlaceable.height > 0 &&
+                !(
+                    allowInline &&
+                        footerPlaceable.hasSingleFooterBaseline() &&
+                        measurables[0].maxIntrinsicWidth(constraints.maxHeight) + gap + footerPlaceable.width <=
+                        constraints.maxWidth
+                )
+        val bodyMaxHeight =
+            if (reserving) {
+                (constraints.maxHeight - footerPlaceable.height - gap / 2).coerceAtLeast(0)
+            } else {
+                constraints.maxHeight
+            }
+        val contentPlaceable =
+            measurables[0].measure(
+                constraints.copy(
+                    minWidth = 0,
+                    minHeight = minOf(constraints.minHeight, bodyMaxHeight),
+                    maxHeight = bodyMaxHeight,
+                ),
+            )
         layoutMeasuredBubbleFooter(
             constraints = constraints,
             content = contentPlaceable,
             footer = footerPlaceable,
             lastLineWidth = lastLineWidth(),
             lastLineBaseline = lastLineBaseline(),
-            gap = BubbleFooterGap.roundToPx(),
+            gap = gap,
             allowInline = allowInline,
         )
     }
@@ -104,6 +135,10 @@ internal fun bubbleInlineFooterGeometry(
     return BubbleInlineFooterGeometry(width, maxOf(textHeight, y + footerHeight), width - footerWidth, y)
 }
 
+/**
+ * Places a measured body and footer: inline beside the last line when it fits, else on its own row,
+ * reporting a height clamped to [constraints] and never placing the footer below that height.
+ */
 private fun MeasureScope.layoutMeasuredBubbleFooter(
     constraints: Constraints,
     content: Placeable,
@@ -131,7 +166,7 @@ private fun MeasureScope.layoutMeasuredBubbleFooter(
         content[LastBaseline].takeIf { it != AlignmentLine.Unspecified }
             ?: lastLineBaseline
             ?: (content.height - footer.height + footerBaseline)
-    val geometry =
+    val measured =
         bubbleInlineFooterGeometry(
             textWidth = content.width,
             textHeight = content.height,
@@ -145,7 +180,10 @@ private fun MeasureScope.layoutMeasuredBubbleFooter(
             gap = effectiveGap,
             allowInline = allowInline && footer.hasSingleFooterBaseline(),
         )
-    return layout(geometry.width, geometry.height.coerceIn(constraints.minHeight, constraints.maxHeight)) {
+    val height = measured.height.coerceIn(constraints.minHeight, constraints.maxHeight)
+    // Never below the reported bounds, even when a tiny bound cannot fit the body's row at all.
+    val geometry = measured.copy(y = measured.y.coerceAtMost((height - footer.height).coerceAtLeast(0)))
+    return layout(geometry.width, height) {
         content.placeRelative(0, 0)
         footer.placeRelative(geometry.x, geometry.y)
     }

@@ -923,6 +923,13 @@ internal fun ConversationMediaDraftContent(
                 preparingPhotoSlotIds = state.preparingSlotIds,
                 nonEditableMediaSlotIds = state.nonEditableDescriptions.keys,
                 nonEditableMediaDescriptions = state.nonEditableDescriptions,
+                onCollectionChange = { order ->
+                    val keptIds = order.media.mapTo(mutableSetOf()) { it.id }
+                    mediaSlots.filterNot { it.id in keptIds }.forEach { state.releasePreparedPhoto(it.id) }
+                    documentUris.filterNot { it in order.documents }.forEach(state::releasePreparedDocument)
+                    onMediaSlotsChange(order.media)
+                    onDocumentUrisChange(order.documents)
+                },
             )
         }
     }

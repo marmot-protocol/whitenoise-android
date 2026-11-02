@@ -53,6 +53,35 @@ class ChatListReturnHeadSnapTest {
         )
     }
 
+    /** A group created from the list arms the head held when New Message opened, replacing older provenance (#3529). */
+    @Test
+    fun openCreatedGroupArmsTheFlowOriginHead() {
+        assertEquals(
+            ChatListReturnHeadSnapState.Conversation(head("origin-head")),
+            openCreatedGroup(ChatListReturnHeadSnapState.Unarmed, flowOriginHead = head("origin-head")),
+        )
+        assertEquals(
+            ChatListReturnHeadSnapState.Conversation(head("origin-head")),
+            openCreatedGroup(
+                ChatListReturnHeadSnapState.Published(head("stale-published")),
+                flowOriginHead = head("origin-head"),
+            ),
+        )
+    }
+
+    /** A group created without a list origin keeps the profile-sheet transfer and clears anything else. */
+    @Test
+    fun openCreatedGroupWithoutFlowOriginFallsBackToProfileSheetRules() {
+        assertEquals(
+            ChatListReturnHeadSnapState.Conversation(head("profile-head")),
+            openCreatedGroup(ChatListReturnHeadSnapState.Profile(head("profile-head")), flowOriginHead = null),
+        )
+        assertEquals(
+            ChatListReturnHeadSnapState.Unarmed,
+            openCreatedGroup(ChatListReturnHeadSnapState.Conversation(head("stale-row-head")), flowOriginHead = null),
+        )
+    }
+
     /** Dismissing the profile clears only a profile head and keeps an armed conversation. */
     @Test
     fun dismissChatListProfileClearsProfileOnlyAndPreservesConversation() {

@@ -39,6 +39,7 @@ class AmberAccountDisplayNameFallbackTest {
         assertEquals(1, profileRefreshRequests)
     }
 
+    /** Builds a running account summary that signs externally through Amber. */
     private fun amberAccountSummary(): AccountSummaryFfi =
         AccountSummaryFfi(
             label = ACCOUNT_HEX,
@@ -47,6 +48,7 @@ class AmberAccountDisplayNameFallbackTest {
             externalSigning = true,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private fun seedNpub(

@@ -82,5 +82,6 @@ class SettingsSignOutProgressTest {
         externalSigning = false,
         signedOut = false,
         running = true,
+        unlinked = false,
     )
 }

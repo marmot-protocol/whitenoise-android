@@ -51,6 +51,7 @@ class ConversationAutoReadResumeTest {
         assertEquals(emptyList<TimelineMessage>(), conversationMessagesAfterAutoReadCursor(withOlderHistory, cursor))
     }
 
+    /** Builds a received message with the given id and timeline order. */
     private fun message(
         id: String,
         timelineOrder: ULong,
@@ -77,6 +78,7 @@ class ConversationAutoReadResumeTest {
                     retentionExpiresAt = null,
                     recordedAt = timelineOrder,
                     receivedAt = timelineOrder,
+                    sticker = null,
                 ),
             status = MessageStatus.Received,
             timelineOrder = timelineOrder,

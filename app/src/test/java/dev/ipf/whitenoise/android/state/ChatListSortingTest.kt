@@ -478,6 +478,7 @@ class ChatListSortingTest {
                 attachmentCount = 0u,
                 groupSystem = null,
                 deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                sticker = null,
             ),
         unreadCount = unreadCount,
         hasUnread = unreadCount > 0uL,
@@ -500,6 +501,7 @@ class ChatListSortingTest {
         disbandRequest = null,
     )
 
+    /** Builds a chat-list message preview with the given id, text and timeline timestamp. */
     private fun preview(
         messageId: String,
         plaintext: String,
@@ -520,6 +522,7 @@ class ChatListSortingTest {
         attachmentCount = 0u,
         groupSystem = null,
         deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+        sticker = null,
     )
 
     private fun noMessageRow(
@@ -604,6 +607,7 @@ class ChatListSortingTest {
             defaultBlobEndpoints = listOf(AppBlobEndpointFfi(locatorKind = "blossom-v1", baseUrl = "https://blossom.primal.net")),
         )
 
+    /** Builds a received message in the given group recorded at the given time. */
     private fun message(
         groupId: String,
         recordedAt: ULong,
@@ -623,5 +627,6 @@ class ChatListSortingTest {
         retentionExpiresAt = null,
         recordedAt = recordedAt,
         receivedAt = recordedAt,
+        sticker = null,
     )
 }

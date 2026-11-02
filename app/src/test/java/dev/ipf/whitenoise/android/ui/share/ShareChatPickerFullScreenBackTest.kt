@@ -268,6 +268,7 @@ class ShareChatPickerFullScreenBackTest {
         return tracker
     }
 
+    /** Builds an app state with one running local-signing account. */
     private fun testAppState(): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = app,
@@ -282,6 +283,7 @@ class ShareChatPickerFullScreenBackTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,

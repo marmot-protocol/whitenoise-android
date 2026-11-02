@@ -199,6 +199,7 @@ class AccountKeysPresentationTest {
             externalSigning = !localSigning,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private fun seedNpub(

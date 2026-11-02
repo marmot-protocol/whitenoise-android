@@ -80,7 +80,7 @@ class StartupRecoveryStateHolderTest {
             context = ApplicationProvider.getApplicationContext<Context>(),
             draftStore = DraftStore(ConversationTimelineTestDraftPersistence()),
             accountIdHexResolver = { null },
-            accounts = listOf(AccountSummaryFfi(ACCOUNT_REF, "a".repeat(64), true, false, false, true)),
+            accounts = listOf(AccountSummaryFfi(ACCOUNT_REF, "a".repeat(64), true, false, false, true, false)),
             activeAccountRef = ACCOUNT_REF,
         )
 

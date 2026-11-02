@@ -537,6 +537,7 @@ class TimelineRowTtsHighlightPaintTest {
         fixture.Render(item, collapseLongMessages)
     }
 
+    /** Builds the received rich-markdown record used for highlight paint checks. */
     private fun richRecord() =
         AppMessageRecordFfi(
             messageIdHex = MESSAGE_B,
@@ -552,6 +553,7 @@ class TimelineRowTtsHighlightPaintTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
+            sticker = null,
         )
 
     /**
@@ -575,6 +577,7 @@ class TimelineRowTtsHighlightPaintTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
+            sticker = null,
         )
 
     /**

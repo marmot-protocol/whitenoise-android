@@ -131,6 +131,7 @@
     <string name="chat_pinned_badge">Angeheftet</string>
     <string name="chat_row_removed_badge">Entfernt</string>
     <string name="chat_row_removed_description">Du wurdest aus diesem Chat entfernt</string>
+    <string name="chat_row_device_removed_description">Dieses Gerät wurde aus diesem Chat entfernt</string>
     <string name="chat_row_action_move_up">Nach oben</string>
     <string name="chat_row_action_move_down">Nach unten</string>
     <string name="chat_row_action_mark_read">Als gelesen markieren</string>
@@ -250,6 +251,7 @@
     <string name="group_empty_only_you_title">Diese Gruppe besteht nur aus dir</string>
     <string name="group_empty_invite_members">Lade Leute ein, wenn du bereit bist.</string>
     <string name="you_are_no_longer_a_member">Du kannst dieser Gruppe keine Nachrichten mehr senden, weil du kein Mitglied mehr bist.</string>
+    <string name="device_removed_from_group_composer">Von diesem Gerät kannst du nicht senden, weil es aus dieser Gruppe entfernt wurde. Deine anderen Geräte sind weiterhin dabei.</string>
     <string name="group_unrecoverable_notice">Diese Gruppe ist vorübergehend eingefroren, während White Noise ihren Zustand überprüft und repariert.</string>
     <string name="chat_row_draft_prefix">Entwurf: </string>
     <string name="jump_to_newest">Zum Neuesten springen</string>
@@ -501,10 +503,6 @@
         <item quantity="other">%1$d Anhänge</item>
     </plurals>
     <string name="toast_share_staged_other_chats">Auch in %1$d weiteren Chats vorbereitet</string>
-    <plurals name="toast_share_attachments_dropped">
-        <item quantity="one">%1$d Anhang konnte nicht hinzugefügt werden. Du kannst bis zu 10 auf einmal senden.</item>
-        <item quantity="other">%1$d Anhänge konnten nicht hinzugefügt werden. Du kannst bis zu 10 auf einmal senden.</item>
-    </plurals>
     <string name="delete">Löschen</string>
     <string name="delete_for_me">Für mich löschen</string>
     <string name="delete_for_everyone">Für alle löschen</string>
@@ -836,6 +834,7 @@
     <string name="toast_couldnt_publish_profile">Profil konnte nicht veröffentlicht werden</string>
     <string name="toast_send_failed">Senden fehlgeschlagen</string>
     <string name="toast_send_storage_full">Nicht genügend Speicherplatz zum Senden. Gib Speicherplatz frei und versuche es erneut.</string>
+    <string name="error_storage_full">Nicht genügend Speicherplatz auf diesem Gerät. Gib Speicherplatz frei und versuche es erneut.</string>
     <string name="toast_send_connection_failed">Relay konnte nicht erreicht werden. Überprüfe deine Verbindung und versuche es erneut.</string>
     <string name="toast_send_queue_full">In diesem Chat warten zu viele Nachrichten auf den Versand, deine wurde nicht gesendet. Versuche es erneut, sobald der Rückstand abgebaut ist.</string>
     <string name="toast_send_chat_changed">Der Chat hat sich während des Sendens geändert, deshalb wurde die Nachricht nicht gesendet. Versuche es erneut.</string>

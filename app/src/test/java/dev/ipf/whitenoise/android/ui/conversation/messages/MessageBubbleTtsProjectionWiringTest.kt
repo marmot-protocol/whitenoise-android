@@ -277,6 +277,7 @@ class MessageBubbleTtsProjectionWiringTest {
                 ),
         )
 
+    /** Builds a received message record whose original body contains bold markdown. */
     private fun editedRecord() =
         AppMessageRecordFfi(
             messageIdHex = MESSAGE_ID,
@@ -306,8 +307,10 @@ class MessageBubbleTtsProjectionWiringTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
+            sticker = null,
         )
 
+    /** Builds an app state with one running local-signing account. */
     private fun appState() =
         WhiteNoiseAppState(
             context = context,
@@ -322,6 +325,7 @@ class MessageBubbleTtsProjectionWiringTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,

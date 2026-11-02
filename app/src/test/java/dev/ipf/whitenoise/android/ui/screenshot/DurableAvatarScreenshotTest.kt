@@ -146,6 +146,7 @@ class DurableAvatarScreenshotTest {
             byteCount = 1_024uL,
         )
 
+    /** Builds an app state with one running local-signing account for the avatar screenshot. */
     private fun appState() =
         WhiteNoiseAppState(
             context = context,
@@ -160,6 +161,7 @@ class DurableAvatarScreenshotTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,

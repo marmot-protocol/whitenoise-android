@@ -191,5 +191,6 @@ class NewGroupNotificationDefaultsTest {
             reactedToPreview = null,
             timestampMs = 1234,
             isFromSelf = false,
+            sticker = null,
         )
 }

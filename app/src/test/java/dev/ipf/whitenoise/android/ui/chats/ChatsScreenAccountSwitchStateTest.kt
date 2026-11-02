@@ -267,6 +267,7 @@ class ChatsScreenAccountSwitchStateTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     /** A stable hex identity per account label. */

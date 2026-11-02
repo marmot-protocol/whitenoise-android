@@ -381,6 +381,7 @@ class ConversationArchiveOptimisticAcceptanceTest {
         controller.setChatListVisible(true)
     }
 
+    /** Builds an app state with the archive test account active. */
     private fun testAppState(): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext<Context>(),
@@ -395,6 +396,7 @@ class ConversationArchiveOptimisticAcceptanceTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,
@@ -491,6 +493,7 @@ class ConversationArchiveOptimisticAcceptanceTest {
                     attachmentCount = 0u,
                     groupSystem = null,
                     deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                    sticker = null,
                 ),
             unreadCount = 0uL,
             hasUnread = false,

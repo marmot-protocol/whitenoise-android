@@ -120,6 +120,7 @@ class TtsSpeakableSourceTest {
                 ),
         )
 
+    /** Builds a received message from alice carrying the given markdown tokens. */
     private fun message(contentTokens: MarkdownDocumentFfi) =
         AppMessageRecordFfi(
             messageIdHex = "message",
@@ -135,5 +136,6 @@ class TtsSpeakableSourceTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
+            sticker = null,
         )
 }

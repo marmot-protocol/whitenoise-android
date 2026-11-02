@@ -94,7 +94,7 @@ class PersonSharedGroupsLiveControllerTest {
                     },
                 ),
                 { null },
-                listOf(AccountSummaryFfi("alice", self, true, false, false, true)),
+                listOf(AccountSummaryFfi("alice", self, true, false, false, true, false)),
                 "alice",
             )
         val controller = ChatsController(app, "alice") { _, _ -> emptyList() }

@@ -1376,6 +1376,7 @@ class MessageBubbleTextSelectionSpeakTest {
                             externalSigning = false,
                             signedOut = false,
                             running = true,
+                            unlinked = false,
                         ),
                     ),
                 activeAccountRef = ACCOUNT_REF,
@@ -1394,6 +1395,7 @@ class MessageBubbleTextSelectionSpeakTest {
     private fun conversationController(appState: WhiteNoiseAppState): ConversationController =
         ConversationController(appState = appState, initialGroup = group())
 
+    /** Builds a received timeline message with the given body and optionally truncated content tokens. */
     private fun timelineMessage(
         body: String,
         contentTokensTruncated: Boolean = false,
@@ -1426,6 +1428,7 @@ class MessageBubbleTextSelectionSpeakTest {
                     retentionExpiresAt = null,
                     recordedAt = 1uL,
                     receivedAt = 1uL,
+                    sticker = null,
                 ),
             status = MessageStatus.Received,
         )

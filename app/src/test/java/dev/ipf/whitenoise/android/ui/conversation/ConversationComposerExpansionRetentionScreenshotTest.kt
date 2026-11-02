@@ -261,8 +261,13 @@ class ConversationComposerExpansionRetentionScreenshotTest {
                                     TextFieldValue(
                                         checkNotNull(drafts[destination.accountRef to destination.groupIdHex]),
                                     ),
-                                onDraftChange = {
-                                    appState.setDraft(destination.accountRef, destination.groupIdHex, it)
+                                onDraftChange = { draftValue, textChanged ->
+                                    appState.setDraft(
+                                        destination.accountRef,
+                                        destination.groupIdHex,
+                                        draftValue,
+                                        textChanged,
+                                    )
                                 },
                                 draftKey = destination.groupIdHex,
                                 draftAccountRef = destination.accountRef,
@@ -1270,6 +1275,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
         externalSigning = false,
         signedOut = false,
         running = true,
+        unlinked = false,
     )
 
     /** Keeps fixture text long enough to surface resize semantics. */

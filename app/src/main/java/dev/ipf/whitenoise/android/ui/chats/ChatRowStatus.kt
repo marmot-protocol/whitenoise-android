@@ -9,7 +9,10 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.chatListItemEvicted
 import dev.ipf.whitenoise.android.state.ChatListItem
 
-/** Native membership facts keep disband, removal, voluntary leave and pending leave distinct. */
+/**
+ * Native membership facts keep disband, removal, voluntary leave, pending leave and a removed device distinct.
+ * A [SelfMembershipFfi.DEVICE_REMOVED] copy is not a removal of the account, so it never reads as one.
+ */
 @StringRes
 internal fun chatRowMembershipStatus(
     item: ChatListItem,
@@ -19,12 +22,17 @@ internal fun chatRowMembershipStatus(
     if (accountIdHex.isNullOrBlank() || (!item.removedFromGroup(accountIdHex) && !groupEnding)) return null
     return chatRowTerminalGroupStatus(item) ?: when {
         chatListItemEvicted(item) -> R.string.chat_row_removed_description
-        item.group.selfMembership == SelfMembershipFfi.LEFT ||
-            item.projection?.selfMembership == SelfMembershipFfi.LEFT -> R.string.group_system_you_member_left
+        item.hasSelfMembership(SelfMembershipFfi.DEVICE_REMOVED) -> R.string.chat_row_device_removed_description
+        item.hasSelfMembership(SelfMembershipFfi.LEFT) -> R.string.group_system_you_member_left
         item.group.leaveRequestPending || item.projection?.leaveRequestPending == true -> R.string.leaving_chat
         else -> R.string.you_are_no_longer_a_member
     }
 }
+
+/** Whether the group record or its native projection reports this self-membership state. */
+private fun ChatListItem.hasSelfMembership(state: SelfMembershipFfi): Boolean =
+    group.selfMembership == state ||
+        projection?.selfMembership == state
 
 /** Terminal group lifecycle labels retain their original precedence over membership labels. */
 @StringRes

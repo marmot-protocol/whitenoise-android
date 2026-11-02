@@ -203,6 +203,7 @@ class ChatListFirstFrameCachedDmAvatarScreenshotTest {
         )
     }
 
+    /** Returns the running active account summary for the screenshot. */
     private fun activeAccount() =
         AccountSummaryFfi(
             label = ACCOUNT_REF,
@@ -211,6 +212,7 @@ class ChatListFirstFrameCachedDmAvatarScreenshotTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private fun peerProfile(picture: String = PEER_AVATAR_A) =

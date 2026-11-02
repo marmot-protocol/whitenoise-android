@@ -106,6 +106,7 @@ class LocalNotificationRemovalFormatterTest {
             shortNpub = { SAMPLE_SHORT_NPUB },
         )
 
+    /** Builds a notification update for the given trigger, group name, preview and self-authorship. */
     private fun update(
         trigger: NotificationTriggerFfi = NotificationTriggerFfi.REMOVED_FROM_GROUP,
         groupName: String? = "General",
@@ -130,6 +131,7 @@ class LocalNotificationRemovalFormatterTest {
         isFromSelf = isFromSelf,
         reactionEmoji = null,
         reactedToPreview = null,
+        sticker = null,
     )
 
     private fun user(

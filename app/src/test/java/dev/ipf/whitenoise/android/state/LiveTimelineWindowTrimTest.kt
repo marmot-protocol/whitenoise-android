@@ -104,6 +104,7 @@ class LiveTimelineWindowTrimTest {
             timelineOrder = recordedAt,
         )
 
+    /** Builds a received timeline record with the given id and timeline timestamp. */
     private fun timelineRecord(
         id: String,
         recordedAt: ULong,
@@ -137,8 +138,11 @@ class LiveTimelineWindowTrimTest {
         sourceEpoch = null,
         retentionSeconds = null,
         retentionExpiresAt = null,
+        sticker = null,
+        importedFrom = null,
     )
 
+    /** Builds a received app message record with the given id and recorded timestamp. */
     private fun appMessage(
         id: String,
         recordedAt: ULong,
@@ -162,5 +166,6 @@ class LiveTimelineWindowTrimTest {
             retentionExpiresAt = null,
             recordedAt = recordedAt,
             receivedAt = recordedAt,
+            sticker = null,
         )
 }

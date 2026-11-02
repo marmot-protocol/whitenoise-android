@@ -218,6 +218,7 @@ class SharedMediaVisibilityTest {
         assertEquals(listOf(0, 1), tiles.visuals.map { it.attachmentIndex })
     }
 
+    /** Builds a received media message with configurable kind, retention, deletion, time and media type. */
     private fun imageMessage(
         id: String,
         kind: ULong = 9uL,
@@ -246,6 +247,7 @@ class SharedMediaVisibilityTest {
                 retentionExpiresAt = retentionExpiresAt,
                 recordedAt = recordedAt,
                 receivedAt = 1uL,
+                sticker = null,
             )
         val message = projectedTimelineMessage(record)
         return message.copy(

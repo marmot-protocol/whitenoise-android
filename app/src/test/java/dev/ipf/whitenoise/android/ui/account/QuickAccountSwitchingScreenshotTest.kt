@@ -95,8 +95,8 @@ class QuickAccountSwitchingScreenshotTest {
                 DraftStore.forContext(context),
                 { null },
                 listOf(
-                    AccountSummaryFfi("a", "aa".repeat(32), true, false, false, true),
-                    AccountSummaryFfi("b", "bb".repeat(32), true, false, false, true),
+                    AccountSummaryFfi("a", "aa".repeat(32), true, false, false, true, false),
+                    AccountSummaryFfi("b", "bb".repeat(32), true, false, false, true, false),
                 ),
                 "a",
                 preferences = preferences,

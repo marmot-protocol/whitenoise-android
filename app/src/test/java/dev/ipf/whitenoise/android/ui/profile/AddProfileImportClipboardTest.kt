@@ -73,7 +73,7 @@ class AddProfileImportClipboardTest {
                     else -> throw UnsupportedOperationException("Unused native test call: ${method.name}")
                 }
             } as MarmotInterface
-        val account = AccountSummaryFfi("alice", "11".repeat(32), true, false, false, true)
+        val account = AccountSummaryFfi("alice", "11".repeat(32), true, false, false, true, false)
         val app =
             WhiteNoiseAppState(
                 context,

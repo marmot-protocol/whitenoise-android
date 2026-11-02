@@ -157,7 +157,15 @@ class GroupInviteRetrySelectionTest {
                 accountIdHexResolver = { if (it == "alice") ConversationTimelineTestIds.ACCOUNT_ID else it },
                 accounts =
                     listOf(
-                        AccountSummaryFfi("alice", ConversationTimelineTestIds.ACCOUNT_ID, true, false, false, true),
+                        AccountSummaryFfi(
+                            "alice",
+                            ConversationTimelineTestIds.ACCOUNT_ID,
+                            true,
+                            false,
+                            false,
+                            true,
+                            false,
+                        ),
                     ),
                 activeAccountRef = "alice",
                 profileReader = { null },

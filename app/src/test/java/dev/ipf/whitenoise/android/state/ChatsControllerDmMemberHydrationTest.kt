@@ -588,6 +588,7 @@ class ChatsControllerDmMemberHydrationTest {
         )
     }
 
+    /** Builds an app state with one running local-signing account. */
     private fun testAppState(): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext(),
@@ -602,6 +603,7 @@ class ChatsControllerDmMemberHydrationTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,
@@ -674,6 +676,7 @@ class ChatsControllerDmMemberHydrationTest {
                 attachmentCount = 0u,
                 groupSystem = null,
                 deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                sticker = null,
             ),
         unreadCount = 0uL,
         hasUnread = false,

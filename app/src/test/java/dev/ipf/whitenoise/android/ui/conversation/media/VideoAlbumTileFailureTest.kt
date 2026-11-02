@@ -74,6 +74,8 @@ class VideoAlbumTileFailureTest {
                 )
             }
         }
+        // The tile ignores taps until its off-main cache probe offers a download
+        composeRule.waitUntil(WAIT_MILLIS) { offers(R.string.media_tap_to_download) }
         composeRule.onNodeWithTag(TILE_TAG).performTouchInput { click() }
         composeRule.waitUntil(WAIT_MILLIS) {
             composeRule.waitForIdle()
@@ -83,15 +85,15 @@ class VideoAlbumTileFailureTest {
         composeRule.runOnIdle { fixture.calls.single().fail(MarmotKitException.InvalidMediaReference("synthetic")) }
         composeRule.waitUntil(WAIT_MILLIS) {
             composeRule.waitForIdle()
-            showsRetry()
+            offers(R.string.media_tap_to_retry)
         }
 
         composeRule.onAllNodesWithContentDescription(text(R.string.voice_message_failed)).assertCountEquals(0)
     }
 
-    /** True once a node offers Retry for the failed transfer. */
-    private fun showsRetry(): Boolean {
-        val nodes = composeRule.onAllNodesWithContentDescription(text(R.string.media_tap_to_retry))
+    /** True once a node carries the [label] string resource as its content description. */
+    private fun offers(label: Int): Boolean {
+        val nodes = composeRule.onAllNodesWithContentDescription(text(label))
         return nodes.fetchSemanticsNodes().isNotEmpty()
     }
 

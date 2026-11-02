@@ -236,6 +236,7 @@ class ConversationTopBarSemanticsTest {
         }
     }
 
+    /** Builds an app state with the test account active. */
     private fun appState() =
         WhiteNoiseAppState(
             context = context,
@@ -250,6 +251,7 @@ class ConversationTopBarSemanticsTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,

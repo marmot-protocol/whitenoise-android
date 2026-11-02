@@ -528,6 +528,7 @@ class AccountSwitcherUnreadDotLayoutTest {
         composeRule.waitForIdle()
     }
 
+    /** Builds an app state with the given number of accounts and the chosen one active. */
     private fun testAppState(
         accountCount: Int,
         activeAccountRef: String = "personal",
@@ -545,11 +546,13 @@ class AccountSwitcherUnreadDotLayoutTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     )
                 },
             activeAccountRef = activeAccountRef,
         )
 
+    /** Builds a running, locally signing account summary with the given label and id. */
     private fun accountSummary(
         label: String,
         accountIdHex: String,
@@ -561,6 +564,7 @@ class AccountSwitcherUnreadDotLayoutTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private class InMemoryDraftPersistence : DraftPersistence {

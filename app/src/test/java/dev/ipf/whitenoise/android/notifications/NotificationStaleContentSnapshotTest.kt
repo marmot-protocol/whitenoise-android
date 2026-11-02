@@ -340,6 +340,7 @@ class NotificationStaleContentSnapshotTest {
         reactedToPreview = quoted,
         timestampMs = 1_000L,
         isFromSelf = false,
+        sticker = null,
     )
 
     private companion object {

@@ -237,6 +237,7 @@ class TimelineRowTwoMemberGroupChromeTest {
             .left
             .value
 
+    /** Builds an app state with one account and the sender's display name already warmed. */
     private fun appState(): WhiteNoiseAppState {
         val state =
             WhiteNoiseAppState(
@@ -252,6 +253,7 @@ class TimelineRowTwoMemberGroupChromeTest {
                             externalSigning = false,
                             signedOut = false,
                             running = true,
+                            unlinked = false,
                         ),
                     ),
                 activeAccountRef = ACCOUNT_REF,
@@ -281,6 +283,7 @@ class TimelineRowTwoMemberGroupChromeTest {
         return controller
     }
 
+    /** Builds the received timeline message rendered by each chrome test. */
     private fun timelineMessage(): TimelineMessage {
         val record =
             AppMessageRecordFfi(
@@ -297,6 +300,7 @@ class TimelineRowTwoMemberGroupChromeTest {
                 retentionExpiresAt = null,
                 recordedAt = 1uL,
                 receivedAt = 1uL,
+                sticker = null,
             )
         return TimelineMessage(id = "msg:$MESSAGE_ID", record = record, status = MessageStatus.Received)
     }

@@ -98,6 +98,7 @@ class ReplyPreviewCardTest {
                 retentionExpiresAt = null,
                 recordedAt = 1uL,
                 receivedAt = 1uL,
+                sticker = null,
             )
         var target: String? = null
         render(

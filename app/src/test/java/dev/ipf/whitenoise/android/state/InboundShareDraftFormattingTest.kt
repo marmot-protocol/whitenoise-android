@@ -40,7 +40,7 @@ class InboundShareDraftFormattingTest {
             val dispatcher = UnconfinedTestDispatcher(testScheduler)
             Dispatchers.setMain(dispatcher)
             val gateway = FormattingDraftGateway()
-            val account = AccountSummaryFfi("share", "ab".repeat(32), true, false, false, true)
+            val account = AccountSummaryFfi("share", "ab".repeat(32), true, false, false, true, false)
             val state =
                 WhiteNoiseAppState(
                     context = ApplicationProvider.getApplicationContext(),

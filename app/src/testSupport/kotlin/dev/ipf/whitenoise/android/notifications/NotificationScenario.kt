@@ -42,6 +42,7 @@ internal object NotificationScenario {
         externalSigning = false,
         signedOut = false,
         running = true,
+        unlinked = false,
     )
 
     /** The source account that starts active and the target account a notification tap must switch to. */

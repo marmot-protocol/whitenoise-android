@@ -388,6 +388,7 @@ class ReceivedFileCachedFirstFrameTest {
         )
     }
 
+    /** Builds an app state backed by the given disk media cache that counts Marmot calls. */
     private fun appState(
         diskMediaCache: DiskByteCache,
         marmotCalls: AtomicInteger,
@@ -404,6 +405,7 @@ class ReceivedFileCachedFirstFrameTest {
                     externalSigning = false,
                     signedOut = false,
                     running = true,
+                    unlinked = false,
                 ),
             ),
         activeAccountRef = ACCOUNT_REF,

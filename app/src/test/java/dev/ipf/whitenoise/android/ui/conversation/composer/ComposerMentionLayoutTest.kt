@@ -260,7 +260,7 @@ class ComposerMentionLayoutTest {
                                 onPickFromGallery = {},
                                 onPickDocument = {},
                                 initialDraft = observed,
-                                onDraftChange = { observed = it },
+                                onDraftChange = { draftValue, _ -> observed = draftValue },
                                 editingMessageId = "edit-message".takeIf { editing },
                                 editingInitialText = "Hi ".takeIf { editing },
                                 mentionCandidates = candidates.take(memberCount),
@@ -292,6 +292,7 @@ class ComposerMentionLayoutTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
+            sticker = null,
         )
 
     private companion object {

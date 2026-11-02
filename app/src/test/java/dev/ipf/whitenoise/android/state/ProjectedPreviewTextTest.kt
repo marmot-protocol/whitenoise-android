@@ -389,8 +389,10 @@ class ProjectedPreviewTextTest {
         attachmentCount = attachmentCount,
         groupSystem = groupSystem,
         deliveryState = deliveryState,
+        sticker = null,
     )
 
+    /** Builds the latest received message record with the given text and tags. */
     private fun latest(
         plaintext: String,
         tags: List<MessageTagFfi> = emptyList(),
@@ -408,6 +410,7 @@ class ProjectedPreviewTextTest {
         retentionExpiresAt = null,
         recordedAt = 5uL,
         receivedAt = 5uL,
+        sticker = null,
     )
 
     private fun row(

@@ -25,6 +25,7 @@ import org.robolectric.annotation.Config
 class GroupManagementSnapshotRefreshEffectTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** A settled roster triggers one extra snapshot read, then equal native records stop further refreshes. */
     @Test
     fun settledRosterTriggersOneNewSnapshotThenEqualNativeRecordsStopRefreshing() {
         var reads = 0
@@ -36,7 +37,15 @@ class GroupManagementSnapshotRefreshEffectTest {
                 accountIdHexResolver = { ConversationTimelineTestIds.ACCOUNT_ID },
                 accounts =
                     listOf(
-                        AccountSummaryFfi("alice", ConversationTimelineTestIds.ACCOUNT_ID, true, false, false, true),
+                        AccountSummaryFfi(
+                            "alice",
+                            ConversationTimelineTestIds.ACCOUNT_ID,
+                            true,
+                            false,
+                            false,
+                            true,
+                            false,
+                        ),
                     ),
                 activeAccountRef = "alice",
             )

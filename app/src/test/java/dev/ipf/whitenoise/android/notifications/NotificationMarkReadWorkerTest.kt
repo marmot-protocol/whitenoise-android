@@ -211,6 +211,7 @@ class NotificationMarkReadWorkerTest {
         return NotificationActionRetryStore(preferences) { expiredNow }
     }
 
+    /** A running account `account-a` that signs locally. */
     private fun signingAccount() =
         dev.ipf.marmotkit.AccountSummaryFfi(
             label = "account-a",
@@ -219,6 +220,7 @@ class NotificationMarkReadWorkerTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private class PlainApplicationContext(

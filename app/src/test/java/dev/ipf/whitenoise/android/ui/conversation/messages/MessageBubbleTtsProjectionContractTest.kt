@@ -194,6 +194,7 @@ class MessageBubbleTtsProjectionContractTest {
             messageCount = 2,
         )
 
+    /** Builds a received record whose markdown is the literal text "Hello **world**". */
     private fun record() =
         AppMessageRecordFfi(
             messageIdHex = MESSAGE_ID,
@@ -219,6 +220,7 @@ class MessageBubbleTtsProjectionContractTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
+            sticker = null,
         )
 
     private companion object {

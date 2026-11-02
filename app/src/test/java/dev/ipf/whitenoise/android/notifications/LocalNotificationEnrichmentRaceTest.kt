@@ -229,6 +229,7 @@ class LocalNotificationEnrichmentRaceTest {
             reactedToPreview = null,
             timestampMs = 1_000L,
             isFromSelf = false,
+            sticker = null,
         )
 
     /** Creates the minimal notification identity used by the race fixture. */

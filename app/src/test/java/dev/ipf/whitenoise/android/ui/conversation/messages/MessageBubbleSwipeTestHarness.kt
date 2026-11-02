@@ -187,6 +187,8 @@ internal fun swipeTestProjectedRecord(
         sourceEpoch = if (media) 1uL else null,
         retentionSeconds = null,
         retentionExpiresAt = null,
+        sticker = null,
+        importedFrom = null,
     )
 }
 
@@ -228,6 +230,7 @@ private fun swipeTestAppState(context: Context) =
                     externalSigning = false,
                     signedOut = false,
                     running = true,
+                    unlinked = false,
                 ),
             ),
         activeAccountRef = SWIPE_TEST_ACCOUNT_REF,

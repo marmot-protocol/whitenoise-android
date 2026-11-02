@@ -5,6 +5,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.ui.conversation.media.UploadStagingStorageFullException
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.IOException
 
@@ -24,6 +25,15 @@ class SendFailureMessageTest {
 
         assertEquals(R.string.toast_send_storage_full, sendFailureMessageRes(refused))
         assertEquals("STORAGE_FULL", DiagnosticFormatter.errorCode(refused))
+    }
+
+    /** A chat that cannot open on a full disk asks for space; MDK no longer latches the account, so Retry stays. */
+    @Test
+    fun aChatThatCannotOpenOnAFullDiskAsksForSpaceAndKeepsRetry() {
+        val full = MarmotKitException.StorageFull("synthetic native reserve")
+
+        assertEquals(R.string.error_storage_full, conversationLoadFailureMessage(full, initialOpenTimedOut = false))
+        assertTrue(shouldOfferConversationLoadRetry(full))
     }
 
     @Test

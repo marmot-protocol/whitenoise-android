@@ -66,7 +66,18 @@ internal class OffWindowActionFixture(
                 context = context,
                 draftStore = DraftStore.forContext(context),
                 accountIdHexResolver = { ACTION_ACCOUNT_ID },
-                accounts = listOf(AccountSummaryFfi(ACTION_ACCOUNT, ACTION_ACCOUNT_ID, true, false, false, true)),
+                accounts =
+                    listOf(
+                        AccountSummaryFfi(
+                            ACTION_ACCOUNT,
+                            ACTION_ACCOUNT_ID,
+                            true,
+                            false,
+                            false,
+                            true,
+                            false,
+                        ),
+                    ),
                 activeAccountRef = ACTION_ACCOUNT,
                 initialMarmotRuntime = AppMarmotRuntime("unread-actions-test", native()),
                 marmotIoDispatcher = ioDispatcher,

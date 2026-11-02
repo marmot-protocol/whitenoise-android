@@ -139,6 +139,7 @@ class MessageBubbleSpeakGatingTest {
             status = dev.ipf.whitenoise.android.state.MessageStatus.Received,
         )
 
+    /** Builds a received message record with the given id, text and tags. */
     private fun message(
         id: String = "message",
         plaintext: String,
@@ -162,5 +163,6 @@ class MessageBubbleSpeakGatingTest {
         retentionExpiresAt = null,
         recordedAt = 1uL,
         receivedAt = 1uL,
+        sticker = null,
     )
 }

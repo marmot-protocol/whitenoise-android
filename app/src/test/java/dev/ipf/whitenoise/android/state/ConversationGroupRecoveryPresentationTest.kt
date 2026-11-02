@@ -331,6 +331,7 @@ class ConversationGroupRecoveryPresentationTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,
