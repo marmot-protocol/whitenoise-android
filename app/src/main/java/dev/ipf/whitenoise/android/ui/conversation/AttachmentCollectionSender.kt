@@ -7,6 +7,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.share.PrivateShareSendLease
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.AttachmentCollectionOperation
+import dev.ipf.whitenoise.android.state.AttachmentCollectionRegistry
 import dev.ipf.whitenoise.android.state.CollectionChunk
 import dev.ipf.whitenoise.android.state.CollectionChunkState
 import dev.ipf.whitenoise.android.state.CollectionItemKind
@@ -149,6 +150,7 @@ internal class AttachmentCollectionSender(
     }
 
     /** Prepares, queues and uploads one chunk, recording its MDK token in the journal before the upload. */
+    @Suppress("ReturnCount") // Withdrawal, nothing to send, a failed seed and an unrecorded token each stop here.
     private suspend fun sendChunk(
         run: CollectionRun,
         operation: AttachmentCollectionOperation,
@@ -158,6 +160,11 @@ internal class AttachmentCollectionSender(
             op.withChunkState(chunk.id, CollectionChunkState.PREPARING, CollectionItemState.PREPARING, now)
         }
         val prepared = prepareChunk(run, operation, chunk)
+        if (!sessionHolds(run) || !registry.stillPreparing(run.operationId, chunk.id)) {
+            // Cancelled, paused or dropped while its items were read: nothing of it is queued.
+            releaseUnadoptedStagedSources(prepared.staged, emptySet())
+            return
+        }
         if (prepared.skipped.isNotEmpty()) {
             persist(run) { op, now -> op.skipItems(prepared.skipped, now) }
             appState.presentSkippedAttachments(prepared.skipped.size, prepared.reason)
@@ -192,11 +199,13 @@ internal class AttachmentCollectionSender(
             }
             return
         }
-        persist(run) { op, now ->
-            op
-                .withChunkToken(chunk.id, queued.tempId, now)
-                .withChunkState(chunk.id, CollectionChunkState.UPLOADING, CollectionItemState.UPLOADING, now)
-        }
+        val recorded =
+            persist(run, durable = true) { op, now ->
+                op
+                    .withChunkToken(chunk.id, queued.tempId, now)
+                    .withChunkState(chunk.id, CollectionChunkState.UPLOADING, CollectionItemState.UPLOADING, now)
+            }
+        if (recorded == null) return appState.withdrawUnrecorded(current.controller, queued, run.operationId, chunk.id)
         run.release(chunk.itemIds, operation.items.filter { it.id in chunk.itemIds }.map { Uri.parse(it.uri) })
         if (!run.revealed) {
             run.revealed = true
@@ -272,7 +281,9 @@ internal class AttachmentCollectionSender(
                 registry.operations.map { it[run.operationId] },
             ) { status, operation -> status to operation }.first { (status, operation) ->
                 val chunk = operation?.chunks?.firstOrNull { it.id == chunkId }
-                if (chunk != null && !chunk.state.isSettled) mirrorBubble(run, chunk, status)
+                // A chunk replanned for a fresh send no longer owns this bubble, so its state is not copied back.
+                val owned = chunk?.clientToken?.let(::collectionChunkKey) == key
+                if (chunk != null && owned && !chunk.state.isSettled) mirrorBubble(run, chunk, status)
                 chunk == null ||
                     chunk.state.isSettled ||
                     status == null ||
@@ -349,15 +360,47 @@ internal class AttachmentCollectionSender(
             appState.mediaUploadSessionEpoch(),
         )
 
-    /** Applies [transform] with the journal write off the main thread, so the token is on disk before upload. */
+    /**
+     * Applies [transform] with the journal write off the main thread. When [durable], null means the result was
+     * not recorded and not applied, so the caller must not act on it.
+     */
     private suspend fun persist(
         run: CollectionRun,
+        durable: Boolean = false,
         transform: (AttachmentCollectionOperation, Long) -> AttachmentCollectionOperation,
-    ) {
+    ): AttachmentCollectionOperation? =
         withContext(Dispatchers.IO) {
-            registry.update(run.operationId) { transform(it, registry.now()) }
+            registry.update(run.operationId, durable) { transform(it, registry.now()) }
+        }
+}
+
+/**
+ * Withdraws a queued chunk whose token the journal could not record, before any upload: a restart could not
+ * tell whether MDK took it. The chunk fails, so the user can retry it once storage is writable again.
+ */
+private suspend fun dev.ipf.whitenoise.android.state.WhiteNoiseAppState.withdrawUnrecorded(
+    controller: ConversationController,
+    queued: ConversationController.QueuedAttachmentSend,
+    operationId: String,
+    chunkId: String,
+) {
+    controller.deleteMessage(queued.optimistic, presentFailure = false, optimisticKeyOverride = queued.key)
+    val registry = attachmentCollections
+    withContext(Dispatchers.IO) {
+        registry.update(operationId) {
+            it.withChunkState(chunkId, CollectionChunkState.FAILED, CollectionItemState.FAILED, registry.now())
         }
     }
+    present(R.string.share_import_storage)
+}
+
+/** Whether [chunkId] may still be queued: its operation is live, not cancelled or paused, and still on it. */
+private fun AttachmentCollectionRegistry.stillPreparing(
+    operationId: String,
+    chunkId: String,
+): Boolean {
+    val live = operations.value[operationId]?.takeUnless { it.cancelRequested || it.paused }
+    return live?.chunks?.firstOrNull { it.id == chunkId }?.state == CollectionChunkState.PREPARING
 }
 
 /** Tells the user how many picks of a chunk were not sent, with the first reason as detail. */

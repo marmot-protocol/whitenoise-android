@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.ui.conversation.CollectionTokenStatus
+import dev.ipf.whitenoise.android.ui.conversation.withTokenStatuses
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -162,5 +164,36 @@ class AttachmentCollectionPlanTest {
         assertEquals(listOf("m2"), resumed.chunks[1].itemIds)
         assertEquals(CollectionItemState.SKIPPED, resumed.items.single { it.id == "m3" }.state)
         assertTrue(resumed.chunks[0].carriesCaption)
+    }
+
+    /** A caption chunk whose items are all skipped hands the caption to the next chunk still to be sent. */
+    @Test
+    fun skippedCaptionChunkHandsTheCaptionOn() {
+        val operation = operation()
+        val first = operation.chunks[0]
+        val skipped = operation.skipItems(first.itemIds.toSet(), 1L)
+        assertEquals(CollectionChunkState.SKIPPED, skipped.chunks[0].state)
+        assertEquals(listOf(false, true, false), skipped.chunks.map { it.carriesCaption })
+        val accepted =
+            operation.withChunkState(first.id, CollectionChunkState.ACCEPTED, CollectionItemState.PUBLISHED, 1L)
+        assertEquals(
+            listOf(true, false, false),
+            accepted.skipItems(operation.chunks[1].itemIds.toSet(), 2L).chunks.map { it.carriesCaption },
+        )
+    }
+
+    /** MDK's answer applies only to a chunk that still holds the probed token, so a later change survives. */
+    @Test
+    fun tokenStatusesApplyOnlyToChunksStillHoldingTheProbedToken() {
+        val base = operation()
+        val probed =
+            base
+                .withChunkToken(base.chunks[0].id, "t0", 1L)
+                .withChunkToken(base.chunks[1].id, "t1", 1L)
+        val changed = probed.replanned(probed.chunks[1].id, 2L)
+        val statuses = mapOf("t0" to CollectionTokenStatus.ACCEPTED, "t1" to CollectionTokenStatus.ACCEPTED)
+        val applied = changed.withTokenStatuses(statuses, 3L)
+        assertEquals(CollectionChunkState.ACCEPTED, applied.chunks[0].state)
+        assertEquals(changed.chunks[1], applied.chunks[1])
     }
 }

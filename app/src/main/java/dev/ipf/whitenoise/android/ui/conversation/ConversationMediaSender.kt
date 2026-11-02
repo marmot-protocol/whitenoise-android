@@ -12,6 +12,7 @@ import dev.ipf.whitenoise.android.media.Thumbhash
 import dev.ipf.whitenoise.android.media.VideoScrubResult
 import dev.ipf.whitenoise.android.media.dropKeptOversizedCacheEntries
 import dev.ipf.whitenoise.android.share.PrivateShareSendLease
+import dev.ipf.whitenoise.android.state.ATTACHMENT_CHUNK_MAX_ITEMS
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -703,8 +704,9 @@ internal class ConversationMediaSender(
     }
 
     /**
-     * Sends the staged images and documents with the caption. One pick, or any reply, goes as one message;
-     * several picks become a collection operation whose bounded chunks carry the caption on chunk 1 only.
+     * Sends the staged images and documents with the caption. One pick, or any reply of at most
+     * [ATTACHMENT_CHUNK_MAX_ITEMS], goes as one message; several picks become a collection operation whose
+     * bounded chunks carry the caption on chunk 1 only.
      */
     @Suppress("LongMethod") // The collection hand-off precedes the unchanged single-message path.
     fun sendStagedAttachments(
@@ -719,12 +721,15 @@ internal class ConversationMediaSender(
         onAfterSend: () -> Unit = {},
     ) {
         val completion = StagedMediaSendCompletion(onAccepted, onRejected, onSettled)
-        if (imageSlots.isEmpty() && documentUris.isEmpty()) {
+        val replyTarget = controller.replyingTo?.messageIdHex
+        val replyVersion = controller.replySelectionVersion
+        // A reply is one message read wholly into memory, so it keeps the one-message limit; the shelf stays.
+        val replyTooLarge = replyTarget != null && imageSlots.size + documentUris.size > ATTACHMENT_CHUNK_MAX_ITEMS
+        if (replyTooLarge || (imageSlots.isEmpty() && documentUris.isEmpty())) {
+            if (replyTooLarge) appState.present(R.string.media_album_too_large)
             completion.reject()
             return
         }
-        val replyTarget = controller.replyingTo?.messageIdHex
-        val replyVersion = controller.replySelectionVersion
         val pendingDraftClear =
             appState.captureDraftForSend(controller.boundAccountRef, controller.group.groupIdHex)
         val trimmedCaption = caption.trim().takeIf { it.isNotBlank() }

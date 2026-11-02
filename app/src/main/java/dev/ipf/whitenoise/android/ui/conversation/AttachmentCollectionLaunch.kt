@@ -49,9 +49,12 @@ internal enum class CollectionTokenStatus {
 
     /** MDK never admitted the token, or refused it; the chunk must be sent again. */
     NOT_ACCEPTED,
+
+    /** The probe failed, so nothing is known; the chunk and its token stay as they are until asked again. */
+    UNRESOLVED,
 }
 
-/** Asks MDK for a token's local send status; a failed probe counts as not accepted only if MDK has no record. */
+/** Asks MDK for a token's local send status; MDK having no record means not accepted, a failed probe unresolved. */
 internal fun WhiteNoiseAppState.mdkCollectionTokenStatus(
     accountRef: String,
     groupIdHex: String,
@@ -63,7 +66,7 @@ internal fun WhiteNoiseAppState.mdkCollectionTokenStatus(
                     CollectionTokenStatus.ACCEPTED
                 LocalSendStatusFfi.Rejected, null -> CollectionTokenStatus.NOT_ACCEPTED
             }
-        }.getOrNull()
+        }.getOrDefault(CollectionTokenStatus.UNRESOLVED)
     }
 
 /**
@@ -86,7 +89,11 @@ internal fun ConversationMediaSender.startCollectionSend(
         var started = false
         try {
             val uris = request.imageSlots.map { it.uri } + request.documentUris
-            lease = acquireStagedSources(context, uris, sourceAccount).getOrNull()
+            lease =
+                acquireStagedSources(context, uris, sourceAccount).getOrElse {
+                    // Without the lease, stale cleanup could delete private sources before their chunk is read.
+                    return@launchMutation appState.present(R.string.share_import_storage)
+                }
             val operation =
                 withContext(Dispatchers.IO) {
                     planCollectionOperation(context, account, groupIdHex, request, appState.attachmentCollections.now())
@@ -162,20 +169,34 @@ internal suspend fun reconcileCollectionTokens(
     tokenStatus: suspend (String) -> CollectionTokenStatus?,
     nowMs: Long,
 ): AttachmentCollectionOperation {
-    var result = operation
-    operation.chunks.filter { !it.state.isSettled }.forEach { chunk ->
-        val token = chunk.clientToken
-        val status = if (token == null || stillQueued(token)) null else tokenStatus(token)
-        result =
-            when (status) {
-                CollectionTokenStatus.ACCEPTED ->
-                    result.withChunkState(chunk.id, CollectionChunkState.ACCEPTED, CollectionItemState.PUBLISHED, nowMs)
-                CollectionTokenStatus.NOT_ACCEPTED -> result.replanned(chunk.id, nowMs)
-                null -> result
-            }
-    }
-    return result
+    val statuses = collectionTokenStatuses(operation, stillQueued, tokenStatus)
+    return operation.withTokenStatuses(statuses, nowMs)
 }
+
+/** MDK's answer for each recorded token of an unsettled chunk not queued here; a failed probe is unresolved. */
+internal suspend fun collectionTokenStatuses(
+    operation: AttachmentCollectionOperation,
+    stillQueued: (String) -> Boolean,
+    tokenStatus: suspend (String) -> CollectionTokenStatus?,
+): Map<String, CollectionTokenStatus> =
+    operation.chunks
+        .filter { !it.state.isSettled }
+        .mapNotNull { it.clientToken?.takeUnless(stillQueued) }
+        .associateWith { token -> tokenStatus(token) ?: CollectionTokenStatus.UNRESOLVED }
+
+/** Applies MDK's answers to the chunks that still hold the probed tokens; any other chunk is left alone. */
+internal fun AttachmentCollectionOperation.withTokenStatuses(
+    statuses: Map<String, CollectionTokenStatus>,
+    nowMs: Long,
+): AttachmentCollectionOperation =
+    chunks.filter { !it.state.isSettled }.fold(this) { result, chunk ->
+        when (chunk.clientToken?.let(statuses::get)) {
+            CollectionTokenStatus.ACCEPTED ->
+                result.withChunkState(chunk.id, CollectionChunkState.ACCEPTED, CollectionItemState.PUBLISHED, nowMs)
+            CollectionTokenStatus.NOT_ACCEPTED -> result.replanned(chunk.id, nowMs)
+            CollectionTokenStatus.UNRESOLVED, null -> result
+        }
+    }
 
 /**
  * Recovers this conversation's journaled operations after the process ended. An operation MDK accepted no
@@ -190,7 +211,10 @@ internal suspend fun WhiteNoiseAppState.restoreCollectionOperations(
 ) {
     val registry = attachmentCollections
     withContext(Dispatchers.IO) { registry.journaledFor(accountRef, groupIdHex) }.forEach { journaled ->
-        val reconciled = reconcileCollectionTokens(journaled, { false }, tokenStatus, registry.now())
+        val statuses = collectionTokenStatuses(journaled, { false }, tokenStatus)
+        val reconciled = journaled.withTokenStatuses(statuses, registry.now())
+        // A token MDK could not be asked about may already be sent, so its record is kept for another try.
+        val unresolved = CollectionTokenStatus.UNRESOLVED in statuses.values
         val unrecoverable =
             withContext(Dispatchers.IO) {
                 reconciled.items
@@ -198,7 +222,7 @@ internal suspend fun WhiteNoiseAppState.restoreCollectionOperations(
                     .mapTo(linkedSetOf()) { it.id }
             }
         val anyAccepted = reconciled.chunks.any { it.state == CollectionChunkState.ACCEPTED }
-        if (!anyAccepted || reconciled.nextChunk == null) {
+        if (!unresolved && (!anyAccepted || reconciled.nextChunk == null)) {
             withContext(Dispatchers.IO) { registry.adopt(reconciled) }
             registry.discard(reconciled.id)
         } else {
@@ -214,24 +238,38 @@ internal suspend fun WhiteNoiseAppState.restoreCollectionOperations(
 internal fun ConversationMediaSender.resumeCollection(operationId: String) {
     val registry = appState.attachmentCollections
     val paused = registry.operations.value[operationId]?.takeIf { it.paused } ?: return
+    // Claimed before the first suspension, so a second tap cannot start a second runner for the same chunks.
+    if (!registry.claimResume(operationId)) return
     val sessionEpoch = appState.mediaUploadSessionEpoch()
     val original = this
     appState.launchMutation {
-        val optimistic = appState.optimisticMessages(paused.accountRef, paused.groupIdHex)
-        val reconciled =
-            reconcileCollectionTokens(
-                paused,
-                { token -> optimistic[collectionChunkKey(token)] != null },
-                appState.mdkCollectionTokenStatus(paused.accountRef, paused.groupIdHex),
-                registry.now(),
-            )
-        val skipped = paused.unrecoverableItemIds.size
-        val resumed =
-            withContext(Dispatchers.IO) {
-                registry.update(operationId) {
-                    reconciled.resumedWithout(paused.unrecoverableItemIds, 1, registry.now())
+        var skipped = 0
+        val updated =
+            try {
+                val optimistic = appState.optimisticMessages(paused.accountRef, paused.groupIdHex)
+                val statuses =
+                    collectionTokenStatuses(
+                        paused,
+                        { token -> optimistic[collectionChunkKey(token)] != null },
+                        appState.mdkCollectionTokenStatus(paused.accountRef, paused.groupIdHex),
+                    )
+                if (CollectionTokenStatus.UNRESOLVED in statuses.values) {
+                    // Sending on could duplicate a chunk MDK may already hold, so the operation stays paused.
+                    appState.present(R.string.error_try_again)
+                    return@launchMutation
                 }
-            } ?: return@launchMutation
+                withContext(Dispatchers.IO) {
+                    registry.update(operationId) { current ->
+                        skipped = current.unrecoverableItemIds.size
+                        current
+                            .withTokenStatuses(statuses, registry.now())
+                            .resumedWithout(current.unrecoverableItemIds, 1, registry.now())
+                    }
+                }
+            } finally {
+                registry.releaseResume(operationId)
+            }
+        val resumed = updated ?: return@launchMutation
         if (skipped > 0) appState.presentSkippedAttachments(skipped, R.string.attachment_collection_reselect)
         val lease =
             acquireStagedSources(context, resumed.items.map { Uri.parse(it.uri) }, null).getOrNull()

@@ -360,6 +360,7 @@ private fun rememberConversationNavigationState(
 
 // One combined limit for every composer intake path, media and documents together (#2576). Sends are
 // split into bounded chunks, so the count no longer bounds a single message's payload.
+// A reply is still one message, so ConversationMediaSender keeps it to ATTACHMENT_CHUNK_MAX_ITEMS.
 private const val MEDIA_PICKER_MAX_ITEMS = dev.ipf.whitenoise.android.state.ATTACHMENT_COLLECTION_MAX_ITEMS
 
 /** Maps recorder failures to localized, privacy-safe user presentation. */
@@ -4189,11 +4190,12 @@ internal fun ConversationScreen(
                             pasteCandidates.mapNotNull { uri ->
                                 materializeReceiveContentImageUri(context, uri)
                             }
-                        val unreadable = localUris.size < pasteCandidates.size
+                        val unreadableCount = pasteCandidates.size - localUris.size
+                        val unreadable = unreadableCount > 0
                         // One notice carries both outcomes, since a second notice would replace the first.
                         if (admission.droppedCount > 0) {
                             val detail = AppText.Resource(R.string.toast_couldnt_decode_image).takeIf { unreadable }
-                            appState.presentAdmission(context, admission, detail)
+                            appState.presentAdmission(context, admission, detail, unreadableCount)
                         } else if (unreadable) {
                             appState.present(R.string.toast_couldnt_decode_image, copyable = true)
                         }

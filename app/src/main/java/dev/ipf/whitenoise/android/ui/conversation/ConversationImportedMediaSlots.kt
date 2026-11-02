@@ -78,6 +78,7 @@ internal fun <T> admitComposerAttachments(
  * Tells the user how many of [offeredCount] picks were added, how many did not fit and what the combined
  * [limit] is, so no path drops a pick without saying so (#2576). [detail] carries a second outcome of the
  * same pick, such as an unreadable image, in the same notice instead of a later notice replacing this one.
+ * [unreadableCount] admitted picks that could not be read are not counted as added, nor as over the limit.
  */
 internal fun WhiteNoiseAppState.presentAttachmentAdmission(
     context: Context,
@@ -85,6 +86,7 @@ internal fun WhiteNoiseAppState.presentAttachmentAdmission(
     offeredCount: Int,
     limit: Int = ATTACHMENT_COLLECTION_MAX_ITEMS,
     detail: AppText? = null,
+    unreadableCount: Int = 0,
 ) {
     val rejected = offeredCount - acceptedCount
     if (rejected <= 0) return
@@ -93,7 +95,7 @@ internal fun WhiteNoiseAppState.presentAttachmentAdmission(
             context.resources.getQuantityString(
                 R.plurals.attachment_collection_limit_result,
                 rejected,
-                acceptedCount,
+                acceptedCount - unreadableCount,
                 offeredCount,
                 rejected,
                 limit,
@@ -108,11 +110,13 @@ internal fun <T> WhiteNoiseAppState.presentAdmission(
     context: Context,
     admission: ComposerAttachmentAdmission<T>,
     detail: AppText? = null,
+    unreadableCount: Int = 0,
 ) = presentAttachmentAdmission(
     context,
     admission.accepted.size,
     admission.accepted.size + admission.droppedCount,
     detail = detail,
+    unreadableCount = unreadableCount,
 )
 
 /**

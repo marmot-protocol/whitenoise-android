@@ -42,7 +42,8 @@ internal fun AttachmentCollectionOperation.withChunkToken(
 
 /**
  * Settles items that will not be sent: [itemIds] become skipped, and a chunk left with nothing to send is
- * skipped with them. Used for unreadable picks and for the items of a failed chunk the user removed.
+ * skipped with them. Used for unreadable picks and for the items of a failed chunk the user removed. A caption
+ * whose chunk is skipped moves to the next unsent chunk, so it is still sent and the draft still clears.
  */
 internal fun AttachmentCollectionOperation.skipItems(
     itemIds: Set<String>,
@@ -56,12 +57,28 @@ internal fun AttachmentCollectionOperation.skipItems(
     return copy(
         items = skipped,
         chunks =
-            chunks.map { chunk ->
-                val allSkipped = chunk.itemIds.all { stateById[it] == CollectionItemState.SKIPPED }
-                if (!chunk.state.isSettled && allSkipped) chunk.copy(state = CollectionChunkState.SKIPPED) else chunk
-            },
+            chunks
+                .map { chunk ->
+                    val allSkipped = chunk.itemIds.all { stateById[it] == CollectionItemState.SKIPPED }
+                    val skip = !chunk.state.isSettled && allSkipped
+                    if (skip) chunk.copy(state = CollectionChunkState.SKIPPED) else chunk
+                }.withCaptionHandedOff(),
         updatedAtMs = nowMs,
     )
+}
+
+/** Moves the caption off a skipped chunk onto the first chunk still to be sent, if there is one. */
+private fun List<CollectionChunk>.withCaptionHandedOff(): List<CollectionChunk> {
+    val owner = firstOrNull { it.carriesCaption }?.takeIf { it.state == CollectionChunkState.SKIPPED }
+    val next = firstOrNull { !it.state.isSettled }
+    if (owner == null || next == null) return this
+    return map {
+        when (it.id) {
+            owner.id -> it.copy(carriesCaption = false)
+            next.id -> it.copy(carriesCaption = true)
+            else -> it
+        }
+    }
 }
 
 /**

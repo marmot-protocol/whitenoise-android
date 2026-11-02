@@ -135,4 +135,15 @@ class AttachmentCollectionJournalTest {
         registry.discard(second.id)
         assertTrue(folder.root.walkTopDown().none { it.isFile })
     }
+
+    /** A second Resume of the same operation is refused until the first one ends its claim. */
+    @Test
+    fun resumeClaimAdmitsOneResumeAtATime() {
+        val registry = AttachmentCollectionRegistry(journal(), clock = { now })
+        assertTrue(registry.claimResume("op"))
+        assertFalse(registry.claimResume("op"))
+        assertTrue(registry.claimResume("other"))
+        registry.releaseResume("op")
+        assertTrue(registry.claimResume("op"))
+    }
 }

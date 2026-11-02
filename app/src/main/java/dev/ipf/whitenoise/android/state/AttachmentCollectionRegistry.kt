@@ -16,6 +16,11 @@ internal class AttachmentCollectionRegistry(
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val state = MutableStateFlow<Map<String, AttachmentCollectionOperation>>(emptyMap())
+    private val resuming = mutableSetOf<String>()
+
+    // One owner for each transition and its journal effect, so a write from an earlier transition can never
+    // land after a later discard and bring the record back.
+    private val lock = Any()
 
     /** Every live operation by id. */
     val operations: StateFlow<Map<String, AttachmentCollectionOperation>> = state.asStateFlow()
@@ -24,46 +29,44 @@ internal class AttachmentCollectionRegistry(
     fun now(): Long = clock()
 
     /** Adds [operation] and journals it; false when the journal could not hold it, and nothing is added. */
-    fun start(operation: AttachmentCollectionOperation): Boolean {
-        if (!journal.write(operation)) return false
-        state.update { it + (operation.id to operation) }
-        return true
-    }
+    fun start(operation: AttachmentCollectionOperation): Boolean =
+        synchronized(lock) {
+            journal.write(operation).also { written ->
+                if (written) state.update { it + (operation.id to operation) }
+            }
+        }
 
     /**
-     * Applies [transform] to one operation and journals the result before returning it, so a token recorded
-     * here is on disk before its upload begins. A finished operation is removed and its record deleted.
+     * Applies [transform] to one operation and journals the result before returning it. A finished operation
+     * is removed and its record deleted. When [durable], a result the journal could not record is not applied
+     * and null is returned, as for a missing operation: a token must be on disk before its upload begins.
      */
     fun update(
         operationId: String,
+        durable: Boolean = false,
         transform: (AttachmentCollectionOperation) -> AttachmentCollectionOperation,
-    ): AttachmentCollectionOperation? {
-        var result: AttachmentCollectionOperation? = null
-        state.update { current ->
-            val operation = current[operationId] ?: return@update current
-            val next = transform(operation)
-            result = next
-            if (next.phase == CollectionOperationPhase.FINISHED) {
-                current - operationId
-            } else {
-                current + (operationId to next)
+    ): AttachmentCollectionOperation? =
+        synchronized(lock) {
+            state.value[operationId]?.let(transform)?.takeIf { next ->
+                if (next.phase == CollectionOperationPhase.FINISHED) {
+                    journal.delete(next.accountRef, next.groupIdHex, next.id)
+                    state.update { it - operationId }
+                    true
+                } else {
+                    val applied = journal.write(next) || !durable
+                    if (applied) state.update { it + (operationId to next) }
+                    applied
+                }
             }
         }
-        result?.let { next ->
-            if (next.phase == CollectionOperationPhase.FINISHED) {
-                journal.delete(next.accountRef, next.groupIdHex, next.id)
-            } else {
-                journal.write(next)
-            }
-        }
-        return result
-    }
 
     /** Forgets one operation and its record, after an explicit discard or a lost destination. */
     fun discard(operationId: String) {
-        val removed = state.value[operationId] ?: return
-        state.update { it - operationId }
-        journal.delete(removed.accountRef, removed.groupIdHex, removed.id)
+        synchronized(lock) {
+            val removed = state.value[operationId] ?: return
+            state.update { it - operationId }
+            journal.delete(removed.accountRef, removed.groupIdHex, removed.id)
+        }
     }
 
     /** Forgets every operation of a conversation whose destination is no longer valid. */
@@ -71,16 +74,20 @@ internal class AttachmentCollectionRegistry(
         accountRef: String,
         groupIdHex: String,
     ) {
-        state.update { current ->
-            current.filterValues { it.accountRef != accountRef || it.groupIdHex != groupIdHex }
+        synchronized(lock) {
+            state.update { current ->
+                current.filterValues { it.accountRef != accountRef || it.groupIdHex != groupIdHex }
+            }
+            journal.deleteConversation(accountRef, groupIdHex)
         }
-        journal.deleteConversation(accountRef, groupIdHex)
     }
 
     /** Forgets every operation of a signed-out account. */
     fun forgetAccount(accountRef: String) {
-        state.update { current -> current.filterValues { it.accountRef != accountRef } }
-        journal.deleteAccount(accountRef)
+        synchronized(lock) {
+            state.update { current -> current.filterValues { it.accountRef != accountRef } }
+            journal.deleteAccount(accountRef)
+        }
     }
 
     /**
@@ -90,15 +97,26 @@ internal class AttachmentCollectionRegistry(
     fun journaledFor(
         accountRef: String,
         groupIdHex: String,
-    ): List<AttachmentCollectionOperation> {
-        journal.sweepExpired()
-        val live = state.value.keys
-        return journal.read(accountRef, groupIdHex).filter { it.id !in live }
-    }
+    ): List<AttachmentCollectionOperation> =
+        synchronized(lock) {
+            journal.sweepExpired()
+            val live = state.value.keys
+            journal.read(accountRef, groupIdHex).filter { it.id !in live }
+        }
 
     /** Adopts a restored operation without rewriting its record until it next changes. */
     fun adopt(operation: AttachmentCollectionOperation) {
-        state.update { current -> if (operation.id in current) current else current + (operation.id to operation) }
+        synchronized(lock) {
+            state.update { current -> if (operation.id in current) current else current + (operation.id to operation) }
+        }
+    }
+
+    /** Claims the resume of [operationId]; false while another resume of it is still in progress. */
+    fun claimResume(operationId: String): Boolean = synchronized(resuming) { resuming.add(operationId) }
+
+    /** Ends a resume claim once the operation is no longer paused, or the resume gave up. */
+    fun releaseResume(operationId: String) {
+        synchronized(resuming) { resuming.remove(operationId) }
     }
 }
 
