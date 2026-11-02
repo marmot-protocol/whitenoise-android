@@ -257,6 +257,39 @@ class ChatRowPortGestureTest {
             item = ChatRowPortFixtures.item(unread = true),
         )
 
+    /** An unread chat offers Mark read with the open envelope in light theme (#3566). */
+    @Test fun readCueLight() =
+        captureCue(
+            "read_light",
+            SwipeAction.ReadUnread,
+            -1,
+            R.string.chat_row_action_mark_read,
+            item = ChatRowPortFixtures.item(unread = true),
+        )
+
+    /** The open envelope stays legible on the AMOLED cue. */
+    @Test fun readCueAmoled() =
+        captureCue(
+            "read_amoled",
+            SwipeAction.ReadUnread,
+            -1,
+            R.string.chat_row_action_mark_read,
+            dark = true,
+            amoled = true,
+            item = ChatRowPortFixtures.item(unread = true),
+        )
+
+    /** Mark read keeps its physical direction and envelope at large RTL text. */
+    @Test fun readCueLargeRtl() =
+        captureCue(
+            "read_large_rtl",
+            SwipeAction.ReadUnread,
+            -1,
+            R.string.chat_row_action_mark_read,
+            rtl = true,
+            item = ChatRowPortFixtures.item(unread = true),
+        )
+
     /** A read chat offers Mark unread in light theme. */
     @Test fun unreadCueLight() {
         captureCue(

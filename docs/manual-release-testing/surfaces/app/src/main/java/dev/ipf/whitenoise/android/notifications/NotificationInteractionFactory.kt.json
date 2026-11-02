@@ -43,6 +43,15 @@
         "test_ids": [
           "NTF-042"
         ]
+      },
+      {
+        "surface": "Mark as read action uses the shared open-envelope icon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationInteractionFactory.kt",
+        "anchor": "fun markReadNotificationAction(",
+        "test_ids": [
+          "CHL-008",
+          "NTF-042"
+        ]
       }
     ]
   }
