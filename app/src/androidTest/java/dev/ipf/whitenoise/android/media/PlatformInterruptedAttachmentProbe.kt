@@ -56,6 +56,7 @@ internal object PlatformInterruptedAttachmentProbe {
     /** Closed native scheduling facts; references, account identities and error text never enter reports. */
     private data class NativeResumeSnapshot(
         val observationIndex: Long,
+        val observedElapsedMillis: Long,
         val phase: AttachmentTransferStateFfi,
         val attempt: ULong,
         val retryAt: ULong?,
@@ -63,6 +64,22 @@ internal object PlatformInterruptedAttachmentProbe {
 
     /** Both observers belong to one probe lifetime and supply its success or failure evidence. */
     private class ResumeObservations {
+        private val startedAt = SystemClock.elapsedRealtime()
+        private val phaseTimings = mutableListOf<Pair<String, Long>>()
+
+        fun elapsedMillis(): Long = SystemClock.elapsedRealtime() - startedAt
+
+        fun mark(phase: String) {
+            phaseTimings.add(phase to elapsedMillis())
+        }
+
+        fun phaseDiagnostics(): JSONArray =
+            JSONArray(
+                phaseTimings.map { (phase, elapsed) ->
+                    JSONObject().put("phase", phase).put("elapsed_ms", elapsed)
+                },
+            )
+
         val workStates = CopyOnWriteArrayList<WorkInfo>()
         val nativeStates = CopyOnWriteArrayList<NativeResumeSnapshot>()
     }
@@ -115,6 +132,7 @@ internal object PlatformInterruptedAttachmentProbe {
                             .map {
                                 NativeResumeSnapshot(
                                     observationIndex = nativeObservationIndex.incrementAndGet(),
+                                    observedElapsedMillis = observations.elapsedMillis(),
                                     phase = it.phase,
                                     attempt = it.attempt,
                                     retryAt = it.retryAt,
@@ -167,11 +185,17 @@ internal object PlatformInterruptedAttachmentProbe {
                 awaitResumedRun(states, firstRun)
                 val runningAt = SystemClock.elapsedRealtime()
                 step = "resume-request"
+                observations.mark("resumed-acquisition-wait-start")
                 awaitResumedAcquisition(port, nativeStates, nativeObservationBeforeStop)
+                observations.mark("resumed-acquisition-wait-end")
                 val requestedAt = SystemClock.elapsedRealtime()
                 step = "resumed-completion"
+                observations.mark("resumed-local-read-start")
                 assertNull("resumed partial ciphertext cannot be published", state.openNativeAttachment(request))
+                observations.mark("resumed-local-read-end")
+                observations.mark("resumed-release-start")
                 HeldAttachmentCancellationProbe.control(port, "/__release-acquisition")
+                observations.mark("resumed-release-end")
                 withTimeout(20_000L) {
                     while (states.none { it.id == firstRun.id && it.state == WorkInfo.State.SUCCEEDED }) delay(25L)
                 }
@@ -204,6 +228,7 @@ internal object PlatformInterruptedAttachmentProbe {
                         .put("resume_running_ms", runningAt - stoppedAt)
                         .put("resume_request_ms", requestedAt - runningAt)
                         .put("native_observation_before_stop", nativeObservationBeforeStop)
+                        .put("resume_phase_timings", observations.phaseDiagnostics())
                         .put("native_resume_states", nativeResumeDiagnostics(nativeStates))
                         .put("android_process_restart_qualified", false),
                 )
@@ -264,6 +289,7 @@ internal object PlatformInterruptedAttachmentProbe {
             states.toList().takeLast(FAILURE_STATE_LIMIT).map { snapshot ->
                 JSONObject()
                     .put("observation_index", snapshot.observationIndex)
+                    .put("observed_elapsed_ms", snapshot.observedElapsedMillis)
                     .put("state", snapshot.phase.name)
                     .put("attempt", snapshot.attempt.toLong())
                     .put(
@@ -359,7 +385,8 @@ internal object PlatformInterruptedAttachmentProbe {
                 .put(
                     "work_states",
                     JSONArray(observations.workStates.takeLast(FAILURE_STATE_LIMIT).map { it.state.name }),
-                ).put("native_resume_states", nativeResumeDiagnostics(observations.nativeStates))
+                ).put("resume_phase_timings", observations.phaseDiagnostics())
+                .put("native_resume_states", nativeResumeDiagnostics(observations.nativeStates))
                 .put("ledger_kinds", JSONObject(counts.filterKeys { it.isNotEmpty() }))
                 .put("ms_since_stop", sinceStop),
         )
