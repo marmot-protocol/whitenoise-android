@@ -7,7 +7,7 @@
     "version": "9.0.2",
     "commit": "946fcce07b6dcd0331c8cc609192aeff5e1924f8",
     "filename": "ffmpeg-9.0.2.tar.xz",
-    "url": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz",
+    "url": "https://distfiles.macports.org/ffmpeg/ffmpeg-9.0.2.tar.xz",
     "bytes": 12040788,
     "sha256": "8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e",
     "license": "LGPL-2.1-or-later; GPL, version3 and nonfree components disabled"

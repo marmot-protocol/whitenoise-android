@@ -15,6 +15,9 @@ the build recipe remain available through the pinned URLs and this directory;
 application distributors must retain the source and relinking materials required
 by the included licenses.
 
+The FFmpeg archive uses the [MacPorts mirror](https://distfiles.macports.org/ffmpeg/ffmpeg-9.0.2.tar.xz).
+Its pinned size and SHA-256 match the [upstream release](https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz).
+
 ## Process restrictions
 
 Library loading installs an additional process-wide seccomp filter before any
