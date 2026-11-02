@@ -79,7 +79,9 @@ class PendingSendDraftPresentationTest {
                                     .draftSnapshotFor(ACCOUNT_REF, GROUP_ID)
                                     ?.textFieldValue
                                     ?: TextFieldValue(""),
-                            onDraftChange = { appState.setDraft(it) },
+                            onDraftChange = { draftValue, textChanged ->
+                                appState.setDraft(ACCOUNT_REF, GROUP_ID, draftValue, textChanged)
+                            },
                             draftKey = GROUP_ID,
                         )
                     }

@@ -3172,8 +3172,13 @@ internal fun MessageBubble(
                                                         .draftSnapshotFor(controller.boundAccountRef, groupIdHex)
                                                         ?.textFieldValue
                                                         ?: TextFieldValue(""),
-                                                onDraftChange = {
-                                                    appState.setDraft(controller.boundAccountRef, groupIdHex, it)
+                                                onDraftChange = { value, textChanged ->
+                                                    appState.setDraft(
+                                                        controller.boundAccountRef,
+                                                        groupIdHex,
+                                                        value,
+                                                        textChanged,
+                                                    )
                                                 },
                                                 draftKey =
                                                     composerDraftOwnerKey(controller.boundAccountRef, groupIdHex),

@@ -3024,17 +3024,19 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String,
         value: TextFieldValue,
+        textChanged: Boolean? = null,
     ) {
         accountRef ?: return
-        setDraftForAccount(accountRef, groupIdHex, value)
+        setDraftForAccount(accountRef, groupIdHex, value, textChanged)
     }
 
     private fun setDraftForAccount(
         accountRef: String,
         groupIdHex: String,
         value: TextFieldValue,
+        textChanged: Boolean? = null,
     ) {
-        composerDraftExpansionBridge.setDraft(accountRef, groupIdHex, value)
+        composerDraftExpansionBridge.setDraft(accountRef, groupIdHex, value, textChanged)
     }
 
     /** Current draft generation used to bind an explicit composer resize. */

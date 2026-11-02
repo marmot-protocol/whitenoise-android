@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationDictationDraftWriter.kt",
         "anchor": "internal fun conversationDictationDraftWriter(",
         "test_ids": [
-          "DIC-002"
+          "DIC-002",
+          "DIC-011"
         ]
       }
     ]

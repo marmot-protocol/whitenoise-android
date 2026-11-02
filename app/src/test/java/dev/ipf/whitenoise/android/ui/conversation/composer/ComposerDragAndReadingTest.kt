@@ -658,9 +658,9 @@ class ComposerDragAndReadingTest {
                                 editingInitialText = draft.takeIf { editing },
                                 onCancelEdit = { cancels++ },
                                 initialDraft = value,
-                                onDraftChange = {
-                                    value = it
-                                    observed = it
+                                onDraftChange = { draftValue, _ ->
+                                    value = draftValue
+                                    observed = draftValue
                                 },
                                 modifier = Modifier.testTag(TAG),
                             )

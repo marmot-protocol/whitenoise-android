@@ -155,7 +155,7 @@ class ComposerFabHandoffScreenshotTest {
                     onCancelReply = {},
                     onSend = { _, _ -> error("The temporal fixture must never send") },
                     initialDraft = draft,
-                    onDraftChange = { draft = it },
+                    onDraftChange = { draftValue, _ -> draft = draftValue },
                     modifier =
                         Modifier
                             .align(Alignment.BottomCenter)
