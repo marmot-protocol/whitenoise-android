@@ -111,7 +111,6 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
 import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
-import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
 import dev.ipf.whitenoise.android.diagnostics.PerformanceTrigger
 import dev.ipf.whitenoise.android.diagnostics.StartupDiagnosticStage
 import dev.ipf.whitenoise.android.diagnostics.StartupDiagnostics
@@ -1035,7 +1034,6 @@ private data class AccountActionColorSlot(
 private data class PendingAccountSwitchTrace(
     val accountRef: String,
     val startedAtMs: Long,
-    val performance: PerformanceTrace? = null,
 )
 
 private class AccountSwitchSnapshotSuperseded : RuntimeException()
@@ -6540,7 +6538,6 @@ class WhiteNoiseAppState private constructor(
         val trace = pendingAccountSwitchTrace ?: return
         if (trace.accountRef != accountRef) return
         val elapsedMs = (SystemClock.elapsedRealtime() - trace.startedAtMs).coerceAtLeast(0L)
-        recordAccountSwitchPerformance(trace.performance, stage, elapsedMs, rowCount)
         appStateDebug { "account-switch $stage +${elapsedMs}ms rows=$rowCount" }
     }
 
@@ -6806,7 +6803,6 @@ class WhiteNoiseAppState private constructor(
                 null
             }
         var accountSwitchOutcome = HostPerformanceOutcomeFfi.UNAVAILABLE
-        updatePendingAccountSwitchTrace(request.label, switchingAccounts = request.label != activeAccountRef)
         try {
             val receipt =
                 accountSession.activate(
@@ -6842,6 +6838,7 @@ class WhiteNoiseAppState private constructor(
             generation: Long,
             switchingAccounts: Boolean,
         ): PreparedAccountSessionActivation? {
+            updatePendingAccountSwitchTrace(request.label, switchingAccounts)
             val target = accounts.firstOrNull { it.label == request.label }
             if (!restoreSignedOutAccountForActivation(target, request.label, request.deferUnreadRefresh)) return null
             return PreparedAccountSessionActivation(
@@ -6922,32 +6919,18 @@ class WhiteNoiseAppState private constructor(
         override fun isInForeground(): Boolean = appInForeground
     }
 
-    /**
-     * Starts or clears the latency trace when a switch is requested, before setup routing and restoration, so its
-     * elapsed time covers the whole path from the tap. Debug builds always trace, and any build traces while a
-     * WNPerf diagnostic session is active, so release switches can be measured.
-     */
+    /** Starts or clears the debug-only latency trace without adding policy branches to activation. */
     private fun updatePendingAccountSwitchTrace(
         label: String,
         switchingAccounts: Boolean,
     ) {
-        // A first activation has no previous account, so it is not a switch and is not traced.
-        val tracked = switchingAccounts && activeAccountRef != null
-        val performance =
-            if (tracked) {
-                PerformanceDiagnostics.begin(PerformanceOperation.ACCOUNT_SWITCH)
-            } else {
-                null
-            }
-        if (tracked && (BuildConfig.DEBUG || performance != null)) {
+        if (switchingAccounts && BuildConfig.DEBUG) {
             pendingAccountSwitchTrace =
                 PendingAccountSwitchTrace(
                     accountRef = label,
                     startedAtMs = SystemClock.elapsedRealtime(),
-                    performance = performance,
                 )
-        } else {
-            // Any newer request supersedes a pending trace, so its stages cannot land on an older operation.
+        } else if (pendingAccountSwitchTrace?.accountRef != label) {
             pendingAccountSwitchTrace = null
         }
     }
@@ -7017,7 +7000,6 @@ class WhiteNoiseAppState private constructor(
         val trace = pendingAccountSwitchTrace ?: return
         if (accountRef != null && trace.accountRef != accountRef) return
         val elapsedMs = (SystemClock.elapsedRealtime() - trace.startedAtMs).coerceAtLeast(0L)
-        recordAccountSwitchPerformance(trace.performance, stage, elapsedMs)
         appStateDebug { "account-switch $stage +${elapsedMs}ms" }
     }
 
@@ -7029,7 +7011,6 @@ class WhiteNoiseAppState private constructor(
         val trace = pendingAccountSwitchTrace ?: return
         if (trace.accountRef != accountRef) return
         val elapsedMs = (SystemClock.elapsedRealtime() - trace.startedAtMs).coerceAtLeast(0L)
-        recordAccountSwitchPerformance(trace.performance, stage, elapsedMs, rowCount)
         appStateDebug { "account-switch $stage +${elapsedMs}ms rows=$rowCount" }
     }
 
@@ -7051,7 +7032,6 @@ class WhiteNoiseAppState private constructor(
         if (trace.accountRef != accountRef) return
         pendingAccountSwitchTrace = null
         val elapsedMs = (SystemClock.elapsedRealtime() - trace.startedAtMs).coerceAtLeast(0L)
-        recordAccountSwitchPerformance(trace.performance, "first-local-frame", elapsedMs, rowCount)
         appStateDebug { "account-switch first-local-frame +${elapsedMs}ms rows=$rowCount" }
     }
 
