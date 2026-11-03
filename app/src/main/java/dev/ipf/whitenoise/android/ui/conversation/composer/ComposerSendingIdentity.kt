@@ -52,8 +52,8 @@ internal fun composerSendingAccount(
  * A non-focusable confirmation keeps editor selection and the visible keyboard intact. It uses the shared
  * keyboard-safe popup, whose scrim consumes the whole outside press, so a second tap on the avatar closes
  * the confirmation instead of dismissing it and reaching the avatar's toggle again (#3553).
- * [onShowingChange] reports whether it is open, so the composer can stand its own pre-IME Back down
- * and let Back close the confirmation while the keyboard stays up.
+ * [onOpenChange] reports a close action while it is open and null once it closes, so the composer can
+ * route Back to the confirmation while the keyboard stays up.
  */
 @Composable
 internal fun ComposerSendingIdentity(
@@ -61,19 +61,19 @@ internal fun ComposerSendingIdentity(
     accountRef: String?,
     conversationKey: Any?,
     overlayBackRegistrar: ComposerOverlayBackRegistrar? = null,
-    onShowingChange: (Boolean) -> Unit = {},
+    onOpenChange: (close: (() -> Unit)?) -> Unit = {},
 ) {
     val account = composerSendingAccount(appState, accountRef) ?: return
     val title = appState.accountDisplayNameCached(account.accountIdHex)
     val picture = appState.avatarUrl(account.accountIdHex)
     key(accountRef, conversationKey, account.accountIdHex, title, picture) {
         var showing by remember { mutableStateOf(false) }
-        val currentOnShowingChange by rememberUpdatedState(onShowingChange)
+        val currentOnOpenChange by rememberUpdatedState(onOpenChange)
         val open = showing
         DisposableEffect(open) {
             // Report only the open span, so each open and each close reaches the composer exactly once.
-            if (open) currentOnShowingChange(true)
-            onDispose { if (open) currentOnShowingChange(false) }
+            if (open) currentOnOpenChange { showing = false }
+            onDispose { if (open) currentOnOpenChange(null) }
         }
         val sendingAs = stringResource(R.string.share_sending_as)
         val popupOffset = with(LocalDensity.current) { composerSendingIdentityTargetSize.roundToPx() }

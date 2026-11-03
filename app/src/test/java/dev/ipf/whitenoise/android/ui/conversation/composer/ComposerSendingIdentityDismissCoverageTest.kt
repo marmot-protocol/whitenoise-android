@@ -184,15 +184,15 @@ class ComposerSendingIdentityDismissCoverageTest {
         composeRule.onNodeWithText(DRAFT).assertIsNotFocused()
     }
 
-    /** The open state is reported on open and close, and a key change while open reports it closed. */
+    /** A close action is reported on open and null on close, and a key change while open reports it closed. */
     @Test
-    fun showingChangeTracksOpenCloseAndDisposal() {
+    fun openChangeTracksOpenCloseAndDisposal() {
         val reports = mutableListOf<Boolean>()
         var conversation by mutableStateOf<Any>("first")
         val state = emptyAppState(accounts = listOf(alice, bob), activeAccountRef = "bob")
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
-                Surface { ComposerSendingIdentity(state, "alice", conversation) { reports += it } }
+                Surface { ComposerSendingIdentity(state, "alice", conversation) { reports += it != null } }
             }
         }
         composeRule.waitForIdle()
@@ -223,6 +223,25 @@ class ComposerSendingIdentityDismissCoverageTest {
         composeRule.runOnIdle { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
         popup().assertDoesNotExist()
         composeRule.onNodeWithText(DRAFT).assertIsDisplayed()
+    }
+
+    /**
+     * Before Android 13 only the composer's pre-IME catch runs ahead of the keyboard, so with the keyboard up it
+     * closes the confirmation itself and keeps the draft focused; the next Back dismisses the keyboard as before.
+     */
+    @Test
+    @Config(sdk = [32])
+    fun preTiramisuPreImeBackClosesOnlyTheConfirmation() {
+        render()
+        tapAt(centerOf("composer-sending-identity"))
+        popup().assertIsDisplayed()
+
+        assertTrue("the composer must take Back ahead of the keyboard", preImeBack())
+        popup().assertDoesNotExist()
+        composeRule.onNodeWithText(DRAFT).assertIsFocused()
+
+        assertTrue("the composer owns Back again once the confirmation is closed", preImeBack())
+        composeRule.onNodeWithText(DRAFT).assertIsNotFocused()
     }
 
     /** The popup sits above the avatar slot, aligned to its start edge in both layout directions. */
