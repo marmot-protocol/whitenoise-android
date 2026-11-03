@@ -203,18 +203,21 @@ class ChatPinFollowToTopTest {
     }
 
     /**
-     * MDK answers the first return stale, leaving the window shifted: the follow retries the return while it still
-     * owns the viewport and settles on the real head, not on the first row of the shifted window.
+     * MDK keeps answering stale while a newer window replacement is still on its way: the follow does not spend
+     * its retries against the same cursor, waits for the replacement to be presented, then retries once and
+     * settles on the real head rather than on the first row of the shifted window.
      */
-    @Test fun staleReturnIsRetriedUntilTheHeadIsShown() {
+    @Test fun staleReturnWaitsForANewerWindowBeforeRetrying() {
         val head = List(60) { "row-$it" }
         var rows by mutableStateOf(head.drop(30))
+        var revision by mutableStateOf(0)
         var request by mutableStateOf<ChatPinFollowRequest?>(null)
         var windowReturns = 0
         val consumed = mutableListOf<ChatPinFollowRequest>()
         lateinit var listState: LazyListState
         composeRule.setContent {
             listState = rememberLazyListState(initialFirstVisibleItemIndex = 20)
+            val publisher = rememberCoroutineScope()
             ChatPinFollowToTopEffect(
                 listState = listState,
                 request = request,
@@ -225,9 +228,18 @@ class ChatPinFollowToTopTest {
                 hasEarlierRows = { rows.first() != head.first() },
                 returnWindowToTop = {
                     windowReturns += 1
-                    // The first answer is stale and installs nothing; its current frame is already presented.
-                    if (windowReturns > 1) rows = head
-                    ChatPinFollowHeadPresented { true }
+                    val mark = revision
+                    if (mark == 0) {
+                        // Stale: the newer replacement is delivered later by the window stream, still shifted.
+                        publisher.launch {
+                            delay(DELAYED_REPLACEMENT_MILLIS)
+                            rows = head.drop(29)
+                            revision = 1
+                        }
+                    } else {
+                        rows = head
+                    }
+                    frameMark(mark) { revision }
                 },
                 onScrollStarted = {},
                 onConsumed = {
@@ -243,7 +255,8 @@ class ChatPinFollowToTopTest {
         issue { request = ChatPinFollowRequest(1L, setOf("row-0"), dataset, 0L) }
         awaitConsumed(consumed)
         composeRule.waitForIdle()
-        assertEquals(2, windowReturns)
+        assertEquals("one stale return, then one retry after the replacement", 2, windowReturns)
+        assertEquals(head, rows)
         composeRule.runOnIdle {
             assertEquals(0, listState.firstVisibleItemIndex)
             assertEquals(0, listState.firstVisibleItemScrollOffset)
@@ -254,6 +267,43 @@ class ChatPinFollowToTopTest {
                     .key,
             )
         }
+    }
+
+    /** When no newer window ever arrives, a stale answer is not resent, and the follow falls back within its bound. */
+    @Test fun staleReturnWithNoNewerWindowIsNotResent() {
+        val head = List(60) { "row-$it" }
+        val rows = head.drop(30)
+        var request by mutableStateOf<ChatPinFollowRequest?>(null)
+        var windowReturns = 0
+        val consumed = mutableListOf<ChatPinFollowRequest>()
+        composeRule.setContent {
+            val listState = rememberLazyListState(initialFirstVisibleItemIndex = 20)
+            ChatPinFollowToTopEffect(
+                listState = listState,
+                request = request,
+                datasetKey = dataset,
+                userGestureGeneration = 0L,
+                unpinnedVisibleIds = emptySet(),
+                motionSettled = true,
+                hasEarlierRows = { true },
+                returnWindowToTop = {
+                    windowReturns += 1
+                    frameMark(0) { 0 }
+                },
+                onScrollStarted = {},
+                onConsumed = {
+                    consumed += it
+                    if (request == it) request = null
+                },
+            )
+            LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().height(400.dp)) {
+                items(rows, key = { it }) { Box(Modifier.fillMaxWidth().height(48.dp)) { Text(it) } }
+            }
+        }
+        composeRule.waitForIdle()
+        issue { request = ChatPinFollowRequest(1L, setOf("row-0"), dataset, 0L) }
+        awaitConsumed(consumed)
+        assertEquals(1, windowReturns)
     }
 
     /**
@@ -308,6 +358,16 @@ class ChatPinFollowToTopTest {
         }
     }
 
+    /** A returned frame mark at revision [mark], presented once [live] reaches it and superseded once it passes it. */
+    private fun frameMark(
+        mark: Int,
+        live: () -> Int,
+    ) = object : ChatPinFollowHeadPresented {
+        override fun presented() = live() >= mark
+
+        override fun superseded() = live() > mark
+    }
+
     /** Writes test state on the UI thread and publishes it, as a production snapshot write would be. */
     private fun issue(write: () -> Unit) {
         composeRule.runOnIdle {
@@ -327,5 +387,8 @@ class ChatPinFollowToTopTest {
     private companion object {
         /** Longer than two frames: the presentation lifetime's 16 ms debounce plus its Main hop. */
         const val DEBOUNCED_PUBLICATION_MILLIS = 80L
+
+        /** A window replacement the stream delivers well after the stale answer, longer than a few frames. */
+        const val DELAYED_REPLACEMENT_MILLIS = 300L
     }
 }

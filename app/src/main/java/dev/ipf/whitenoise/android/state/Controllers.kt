@@ -4883,6 +4883,13 @@ class ChatsController private constructor(
         return presented != null && presented.windows === mark.windows && presented.revision >= mark.revision
     }
 
+    /** Whether [items] shows a frame newer than [mark] from its window set, or that set was replaced or closed. */
+    internal fun chatListFrameSuperseded(mark: ChatListFrameMark): Boolean {
+        val presented = presentedChatListFrame
+        if (chatListWindows !== mark.windows) return true
+        return presented != null && presented.windows === mark.windows && presented.revision > mark.revision
+    }
+
     /**
      * Dispose every reference this controller owns. The chat-list screen calls
      * this once when it disposes the controller, which happens on every account

@@ -85,6 +85,12 @@ internal fun chatPinFollowId(id: String): String = id.lowercase(java.util.Locale
 internal fun interface ChatPinFollowHeadPresented {
     /** True once the installed head frame, or a newer one, is what the list shows. */
     fun presented(): Boolean
+
+    /**
+     * True once a frame newer than the one this return reported is shown, or its window set is gone. A stale
+     * answer reports the frame already on screen, so a retry before this would resend the same cursor.
+     */
+    fun superseded(): Boolean = false
 }
 
 /** What a pending follow request should do with the current presentation. */
@@ -141,8 +147,9 @@ internal fun chatPinFollowStep(
  * When the bounded window had earlier rows, [returnWindowToTop] reports the frame to wait for — the head
  * frame it installed, or the live window's current frame when a newer one already won or MDK answered stale —
  * and the follow waits until that frame is presented, bounded by a timeout. While the installed window
- * still has earlier rows, the return is retried a bounded number of times, so one stale answer does not
- * leave the snap on a shifted window's first row; repeated stale answers fall back to the plain snap. A null
+ * still has earlier rows, the return is retried a bounded number of times, each retry only after a newer
+ * window frame arrives, so a stale answer does not leave the snap on a shifted window's first row. If no
+ * newer frame arrives within the bound, the follow falls back to the plain snap. A null
  * report means no live window remains, so the follow settles on what is shown.
  *
  * A dataset or drag change retires the request at any point: the follow job is cancelled at once, so an old
@@ -230,17 +237,7 @@ private suspend fun followPinnedBlockToTop(
     }
     listState.animateScrollToItem(0)
     val windowWasShifted = hasEarlierRows()
-    var shifted = windowWasShifted
-    var attempts = 0
-    while (shifted && attempts < CHAT_PIN_FOLLOW_RETURN_ATTEMPTS && !retired()) {
-        attempts += 1
-        val head = returnWindowToTop() ?: break
-        // The restored head is published by the controller's debounced recompute, not on this frame.
-        withTimeoutOrNull(CHAT_PIN_FOLLOW_WINDOW_TIMEOUT_MILLIS) {
-            snapshotFlow { head.presented() || retired() }.first { it }
-        }
-        shifted = hasEarlierRows()
-    }
+    if (windowWasShifted) returnShiftedWindowToHead(retired, hasEarlierRows, returnWindowToTop)
     // Let the list measure what it now holds before checking the final position.
     withFrameNanos { }
     val atTop = listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
@@ -249,6 +246,41 @@ private suspend fun followPinnedBlockToTop(
         listState.scrollToItem(0)
     }
 }
+
+/**
+ * Returns a shifted window to its head within [CHAT_PIN_FOLLOW_RETURN_ATTEMPTS] tries, waiting for each answer's
+ * frame to be presented. A stale answer leaves the window shifted on the frame it already showed, so the next try
+ * is spent only after a newer frame arrives — resending the same cursor would be refused again at once.
+ */
+private suspend fun returnShiftedWindowToHead(
+    retired: () -> Boolean,
+    hasEarlierRows: () -> Boolean,
+    returnWindowToTop: suspend () -> ChatPinFollowHeadPresented?,
+) {
+    var attempts = 0
+    var retry = true
+    while (retry && !retired()) {
+        attempts += 1
+        val head = returnWindowToTop()
+        // The restored head is published by the controller's debounced recompute, not on this frame.
+        if (head != null) awaitOrRetired(retired) { head.presented() }
+        retry = head != null &&
+            attempts < CHAT_PIN_FOLLOW_RETURN_ATTEMPTS &&
+            hasEarlierRows() &&
+            awaitOrRetired(retired) { head.superseded() } &&
+            hasEarlierRows()
+    }
+}
+
+/** Waits, bounded, until [condition] holds or the request [retired]; true only when [condition] held. */
+private suspend fun awaitOrRetired(
+    retired: () -> Boolean,
+    condition: () -> Boolean,
+): Boolean =
+    withTimeoutOrNull(CHAT_PIN_FOLLOW_WINDOW_TIMEOUT_MILLIS) {
+        snapshotFlow { condition() || retired() }.first { it }
+    } != null &&
+        !retired()
 
 /** Same near-top snap as the jump-to-top button, so a deep follow animates only the final rows. */
 private const val CHAT_PIN_FOLLOW_SNAP_INDEX = 10

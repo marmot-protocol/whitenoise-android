@@ -750,7 +750,8 @@ class ChatListReturnToTopFrameMarkTest {
 
     /**
      * A frame counts as presented once the projection shows it or a newer frame of the same window set, never
-     * while nothing has been published; a replaced window set releases every waiter on the old one.
+     * while nothing has been published; a replaced window set releases every waiter on the old one. A frame is
+     * superseded only by a strictly newer one, so a stale return whose frame is already shown keeps waiting.
      */
     @Test
     fun framePresentedComparesRevisionsWithinOneWindowSet() {
@@ -779,12 +780,24 @@ class ChatListReturnToTopFrameMarkTest {
             val shown = windows.frame().revision
             assertTrue(controller.chatListFramePresented(ChatListFrameMark(windows, shown - 1)))
             assertFalse(controller.chatListFramePresented(ChatListFrameMark(windows, shown + 1)))
+            assertTrue(
+                "an older frame is superseded by the one shown",
+                controller.chatListFrameSuperseded(ChatListFrameMark(windows, shown - 1)),
+            )
+            assertFalse(
+                "the frame shown is presented but not superseded, so a stale retry must wait",
+                controller.chatListFrameSuperseded(ChatListFrameMark(windows, shown)),
+            )
 
             subscriptions.first.close()
             awaitChatListCondition { controller.chatListWindows.let { it != null && it !== windows } }
             assertTrue(
                 "a replaced window set never shows the old frame, so its waiter is released",
                 controller.chatListFramePresented(ChatListFrameMark(windows, shown + 1)),
+            )
+            assertTrue(
+                "a replaced window set supersedes every frame of the old one",
+                controller.chatListFrameSuperseded(ChatListFrameMark(windows, shown)),
             )
         } finally {
             controller.onCleared()

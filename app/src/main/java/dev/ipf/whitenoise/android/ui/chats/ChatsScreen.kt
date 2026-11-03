@@ -1493,7 +1493,11 @@ internal fun ChatsScreen(
         hasEarlierRows = { !unreadOnly && !advancedFolder && controller.hasEarlierChats(chatListWindowView) },
         returnWindowToTop = {
             controller.returnChatListToTopFrame(chatListWindowView)?.let { installed ->
-                ChatPinFollowHeadPresented { controller.chatListFramePresented(installed) }
+                object : ChatPinFollowHeadPresented {
+                    override fun presented() = controller.chatListFramePresented(installed)
+
+                    override fun superseded() = controller.chatListFrameSuperseded(installed)
+                }
             }
         },
         onScrollStarted = { programmaticViewportGeneration += 1L },
