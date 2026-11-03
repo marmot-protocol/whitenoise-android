@@ -8,10 +8,12 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -20,6 +22,7 @@ import dev.ipf.whitenoise.android.state.ChatListBatchCommand
 import dev.ipf.whitenoise.android.state.ChatListBatchOutcome
 import dev.ipf.whitenoise.android.state.ChatListBatchResult
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -197,6 +200,106 @@ class ChatPinFollowToTopTest {
         issue { request = ChatPinFollowRequest(1L, setOf("row-0"), dataset, 0L) }
         awaitConsumed(consumed)
         composeRule.runOnIdle { assertTrue(listState.firstVisibleItemIndex >= 20) }
+    }
+
+    /**
+     * MDK answers the first return stale, leaving the window shifted: the follow retries the return while it still
+     * owns the viewport and settles on the real head, not on the first row of the shifted window.
+     */
+    @Test fun staleReturnIsRetriedUntilTheHeadIsShown() {
+        val head = List(60) { "row-$it" }
+        var rows by mutableStateOf(head.drop(30))
+        var request by mutableStateOf<ChatPinFollowRequest?>(null)
+        var windowReturns = 0
+        val consumed = mutableListOf<ChatPinFollowRequest>()
+        lateinit var listState: LazyListState
+        composeRule.setContent {
+            listState = rememberLazyListState(initialFirstVisibleItemIndex = 20)
+            ChatPinFollowToTopEffect(
+                listState = listState,
+                request = request,
+                datasetKey = dataset,
+                userGestureGeneration = 0L,
+                unpinnedVisibleIds = emptySet(),
+                motionSettled = true,
+                hasEarlierRows = { rows.first() != head.first() },
+                returnWindowToTop = {
+                    windowReturns += 1
+                    // The first answer is stale and installs nothing; its current frame is already presented.
+                    if (windowReturns > 1) rows = head
+                    ChatPinFollowHeadPresented { true }
+                },
+                onScrollStarted = {},
+                onConsumed = {
+                    consumed += it
+                    if (request == it) request = null
+                },
+            )
+            LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().height(400.dp)) {
+                items(rows, key = { it }) { Box(Modifier.fillMaxWidth().height(48.dp)) { Text(it) } }
+            }
+        }
+        composeRule.waitForIdle()
+        issue { request = ChatPinFollowRequest(1L, setOf("row-0"), dataset, 0L) }
+        awaitConsumed(consumed)
+        composeRule.waitForIdle()
+        assertEquals(2, windowReturns)
+        composeRule.runOnIdle {
+            assertEquals(0, listState.firstVisibleItemIndex)
+            assertEquals(0, listState.firstVisibleItemScrollOffset)
+            assertEquals(
+                "row-0",
+                listState.layoutInfo.visibleItemsInfo
+                    .first()
+                    .key,
+            )
+        }
+    }
+
+    /**
+     * A folder switch while the follow is animating retires it at once: the old pin never returns the replacement
+     * list's window and never snaps it, and the request is still consumed.
+     */
+    @Test fun datasetChangeMidAnimationStopsTheFollow() {
+        var datasetKey by mutableStateOf(dataset)
+        var request by mutableStateOf<ChatPinFollowRequest?>(null)
+        var windowReturns = 0
+        var snapsAfterSwitch = 0
+        val consumed = mutableListOf<ChatPinFollowRequest>()
+        lateinit var listState: LazyListState
+        composeRule.setContent {
+            listState = rememberLazyListState(initialFirstVisibleItemIndex = 8)
+            ChatPinFollowToTopEffect(
+                listState = listState,
+                request = request,
+                datasetKey = datasetKey,
+                userGestureGeneration = 0L,
+                unpinnedVisibleIds = emptySet(),
+                motionSettled = true,
+                hasEarlierRows = { true },
+                returnWindowToTop = {
+                    windowReturns += 1
+                    ChatPinFollowHeadPresented { true }
+                },
+                onScrollStarted = { if (datasetKey != dataset) snapsAfterSwitch += 1 },
+                onConsumed = { consumed += it },
+            )
+            LaunchedEffect(listState) {
+                // The reader switches folders once the follow's animation is under way.
+                snapshotFlow { listState.isScrollInProgress }.first { it }
+                datasetKey = dataset.copy(folderId = "other")
+            }
+            LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().height(400.dp)) {
+                items(List(60) { "row-$it" }, key = { it }) { Box(Modifier.fillMaxWidth().height(48.dp)) { Text(it) } }
+            }
+        }
+        composeRule.waitForIdle()
+        issue { request = ChatPinFollowRequest(1L, setOf("row-0"), dataset, 0L) }
+        awaitConsumed(consumed)
+        composeRule.waitForIdle()
+        assertEquals("the switched dataset must already be live", dataset.copy(folderId = "other"), datasetKey)
+        assertEquals("a retired follow must not return the replacement window", 0, windowReturns)
+        assertEquals("a retired follow must not snap the replacement list", 0, snapsAfterSwitch)
     }
 
     /** Writes test state on the UI thread and publishes it, as a production snapshot write would be. */

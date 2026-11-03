@@ -1515,7 +1515,8 @@ internal fun ComposerBar(
                         // so the composer stands down. Earlier, only this pre-IME catch runs before the keyboard, so
                         // it closes the confirmation itself and the keyboard stays up (#3553).
                         preImeBackEnabled =
-                            !composerEmojiPickerOpen && !attachmentSheetState.isOpen &&
+                            !composerEmojiPickerOpen &&
+                                !attachmentSheetState.isOpen &&
                                 (closeSendingIdentity == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU),
                         onPreImeBack = {
                             val closeConfirmation = closeSendingIdentity

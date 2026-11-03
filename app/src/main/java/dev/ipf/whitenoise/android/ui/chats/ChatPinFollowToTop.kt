@@ -13,7 +13,9 @@ import androidx.compose.runtime.withFrameNanos
 import dev.ipf.whitenoise.android.state.ChatListBatchCommand
 import dev.ipf.whitenoise.android.state.ChatListBatchOutcome
 import dev.ipf.whitenoise.android.state.ChatListBatchResult
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -137,11 +139,15 @@ internal fun chatPinFollowStep(
  * button. [onScrollStarted] marks each programmatic move for the head-motion owner.
  *
  * When the bounded window had earlier rows, [returnWindowToTop] reports the frame to wait for — the head
- * frame it installed, or the live window's current frame when a newer one already won — and the final snap
- * waits until that frame is presented, bounded by a timeout. A null report means no live window remains, so
- * the follow settles on what is shown. A stale MDK answer can leave the window shifted; the follow then
- * settles on the current frame rather than retrying. A user cancellation still consumes the request, so a
- * stale follow never outlives its gesture.
+ * frame it installed, or the live window's current frame when a newer one already won or MDK answered stale —
+ * and the follow waits until that frame is presented, bounded by a timeout. While the presented window still
+ * has earlier rows, the return is retried a bounded number of times, so a stale answer cannot leave the snap
+ * on a shifted window's first row. A null report means no live window remains, so the follow settles on what
+ * is shown.
+ *
+ * A dataset or drag change retires the request at any point, including mid-animation or mid-return: the
+ * follow job is cancelled at once, so an old pin never scrolls or returns the window of the list that
+ * replaced its own. A retired or cancelled follow still consumes the request.
  */
 @Composable
 @Suppress("FunctionNaming", "LongParameterList") // Effect composable; one request plus the live gates it reads.
@@ -177,27 +183,27 @@ internal fun ChatPinFollowToTopEffect(
                 unpinnedVisibleIds = liveUnpinnedIds,
                 motionSettled = liveMotionSettled && !listState.isScrollInProgress,
             )
+
+        /** True once the request's dataset or drag generation is gone. */
+        fun retired() = step() == ChatPinFollowStep.RETIRE
         try {
             if (snapshotFlow(::step).first { it != ChatPinFollowStep.WAIT } == ChatPinFollowStep.FOLLOW) {
-                liveScrollStarted()
-                if (listState.firstVisibleItemIndex > CHAT_PIN_FOLLOW_SNAP_INDEX) {
-                    listState.scrollToItem(CHAT_PIN_FOLLOW_SNAP_INDEX)
-                }
-                listState.animateScrollToItem(0)
-                val windowWasShifted = liveHasEarlierRows()
-                val head = liveReturnWindowToTop()
-                if (windowWasShifted && head != null) {
-                    // The restored head is published by the controller's debounced recompute, not on this frame.
-                    withTimeoutOrNull(CHAT_PIN_FOLLOW_WINDOW_TIMEOUT_MILLIS) {
-                        snapshotFlow { head.presented() || step() == ChatPinFollowStep.RETIRE }.first { it }
-                    }
-                }
-                // Let the list measure what it now holds before checking the final position.
-                withFrameNanos { }
-                val atTop = listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
-                if ((windowWasShifted || !atTop) && step() != ChatPinFollowStep.RETIRE) {
-                    liveScrollStarted()
-                    listState.scrollToItem(0)
+                coroutineScope {
+                    val follow =
+                        launch {
+                            followPinnedBlockToTop(
+                                listState = listState,
+                                retired = ::retired,
+                                hasEarlierRows = { liveHasEarlierRows() },
+                                returnWindowToTop = { liveReturnWindowToTop() },
+                                onScrollStarted = { liveScrollStarted() },
+                            )
+                        }
+                    // The list keeps its state across folder and query changes, so the follow must stop the moment
+                    // its dataset or drag generation goes, not only at its next check.
+                    val retirement = launch { snapshotFlow(::retired).first { it }.also { follow.cancel() } }
+                    follow.join()
+                    retirement.cancel()
                 }
             }
         } finally {
@@ -206,8 +212,48 @@ internal fun ChatPinFollowToTopEffect(
     }
 }
 
+/**
+ * Scrolls [listState] to the top, returns a shifted window to its head — retrying while a stale or racing answer
+ * leaves earlier rows presented — and snaps to item zero, offset zero unless the request [retired] meanwhile.
+ */
+private suspend fun followPinnedBlockToTop(
+    listState: LazyListState,
+    retired: () -> Boolean,
+    hasEarlierRows: () -> Boolean,
+    returnWindowToTop: suspend () -> ChatPinFollowHeadPresented?,
+    onScrollStarted: () -> Unit,
+) {
+    onScrollStarted()
+    if (listState.firstVisibleItemIndex > CHAT_PIN_FOLLOW_SNAP_INDEX) {
+        listState.scrollToItem(CHAT_PIN_FOLLOW_SNAP_INDEX)
+    }
+    listState.animateScrollToItem(0)
+    val windowWasShifted = hasEarlierRows()
+    var shifted = windowWasShifted
+    var attempts = 0
+    while (shifted && attempts < CHAT_PIN_FOLLOW_RETURN_ATTEMPTS && !retired()) {
+        attempts += 1
+        val head = returnWindowToTop() ?: break
+        // The restored head is published by the controller's debounced recompute, not on this frame.
+        withTimeoutOrNull(CHAT_PIN_FOLLOW_WINDOW_TIMEOUT_MILLIS) {
+            snapshotFlow { head.presented() || retired() }.first { it }
+        }
+        shifted = hasEarlierRows()
+    }
+    // Let the list measure what it now holds before checking the final position.
+    withFrameNanos { }
+    val atTop = listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
+    if ((windowWasShifted || !atTop) && !retired()) {
+        onScrollStarted()
+        listState.scrollToItem(0)
+    }
+}
+
 /** Same near-top snap as the jump-to-top button, so a deep follow animates only the final rows. */
 private const val CHAT_PIN_FOLLOW_SNAP_INDEX = 10
+
+/** Returns tried while a stale or racing answer leaves the presented window with earlier rows. */
+private const val CHAT_PIN_FOLLOW_RETURN_ATTEMPTS = 3
 
 /** Upper bound on waiting for a restored head window to be published before snapping anyway. */
 private const val CHAT_PIN_FOLLOW_WINDOW_TIMEOUT_MILLIS = 1_000L
