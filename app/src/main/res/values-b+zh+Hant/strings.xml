@@ -920,6 +920,7 @@
     <string name="scan_to_connect">掃描即可連線。</string>
     <string name="not_copied">未複製</string>
     <string name="copy_public_key">複製公鑰</string>
+    <string name="public_key_copy_action_with_value">複製公鑰 %1$s</string>
     <string name="button_in_progress">進行中</string>
     <string name="private_key">私鑰</string>
     <string name="profile_public_key_help">分享此金鑰，讓他人能夠找到並連線你。</string>

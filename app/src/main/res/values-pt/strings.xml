@@ -933,6 +933,7 @@
     <string name="scan_to_connect">Digitalize para conectar.</string>
     <string name="not_copied">Não copiado</string>
     <string name="copy_public_key">Copiar chave pública</string>
+    <string name="public_key_copy_action_with_value">Copiar chave pública %1$s</string>
     <string name="button_in_progress">Em andamento</string>
     <string name="private_key">Chave privada</string>
     <string name="profile_public_key_help">Compartilhe esta chave para que as pessoas possam encontrar e se conectar com você.</string>

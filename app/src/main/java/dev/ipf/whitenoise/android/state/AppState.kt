@@ -957,6 +957,7 @@ internal fun networkDisplayNameFallback(
     return shortNpub(accountIdHex)
 }
 
+/** The cached or freshly encoded npub for [accountIdHex], or empty rather than a non-npub or the raw hex. */
 internal fun npubPresentation(
     accountIdHex: String,
     cachedNpub: String?,
@@ -970,8 +971,8 @@ internal fun npubPresentation(
 
 /**
  * Fail-closed npub for visible/copy profile and message surfaces. Keeps an
- * already-canonical [reference] when it is not the raw account hex; otherwise
- * derives through [npubForDisplay] from [resolvedAccountIdHex].
+ * already-canonical [reference] when it is not the raw account hex, lowercasing an
+ * all-uppercase key; otherwise derives through [npubForDisplay] from [resolvedAccountIdHex].
  */
 internal fun presentationNpubFromReference(
     reference: String,
@@ -982,7 +983,8 @@ internal fun presentationNpubFromReference(
         reference.startsWith("npub1", ignoreCase = true) &&
         resolvedAccountIdHex?.equals(reference, ignoreCase = true) != true
     ) {
-        return reference
+        // Bech32 allows one case; an all-uppercase key is the same key, so show and copy its canonical lowercase.
+        return if (reference == reference.uppercase(Locale.ROOT)) reference.lowercase(Locale.ROOT) else reference
     }
     return resolvedAccountIdHex?.let(npubForDisplay).orEmpty()
 }
@@ -11572,13 +11574,21 @@ class WhiteNoiseAppState private constructor(
         )
     }
 
+    /** The active account's name for [accountIdHex]: its private nickname, else its network display name. */
     fun displayName(accountIdHex: String): String = displayNameForAccount(activeAccountRef, accountIdHex)
 
+    /** The account's published or local name, or its short npub when only the key can name it. */
     fun networkDisplayName(accountIdHex: String): String {
+        val name = networkDisplayNameOrNull(accountIdHex)
+        return name ?: shortNpub(accountIdHex)
+    }
+
+    /** The published or local account name for [accountIdHex], or null when only its public key could name it. */
+    fun networkDisplayNameOrNull(accountIdHex: String): String? {
         profileDisplayName(accountIdHex)?.let { return it }
         requestProfile(accountIdHex)
         val accountLabel = accounts.firstOrNull { it.accountIdHex == accountIdHex }?.label
-        return networkDisplayNameFallback(accountLabel, accountIdHex, ::shortNpub)
+        return networkDisplayNameFallback(accountLabel, accountIdHex) { "" }.takeIf(String::isNotEmpty)
     }
 
     fun chatMemberTitle(accountIdHex: String): String {

@@ -124,6 +124,7 @@ internal fun AccountSelectorSheet(
             state = accountSelectorState(appState.accounts, appState.activeAccountRef, refreshing),
             displayName = appState::accountDisplayNameCached,
             shortNpub = appState::shortNpub,
+            npub = appState::npubForDisplay,
             avatarUrl = appState::avatarUrl,
             unreadCountForAccount = appState::confirmedUnreadCountForAccount,
             hasUnreadForAccount = appState::accountShowsUnreadDot,

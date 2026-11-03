@@ -969,6 +969,7 @@
     <string name="scan_to_connect">Сканируйте для подключения.</string>
     <string name="not_copied">Не скопировано</string>
     <string name="copy_public_key">Скопировать открытый ключ</string>
+    <string name="public_key_copy_action_with_value">Скопировать открытый ключ %1$s</string>
     <string name="button_in_progress">В процессе</string>
     <string name="private_key">Закрытый ключ</string>
     <string name="profile_public_key_help">Поделитесь этим ключом, чтобы люди могли найти вас и связаться с вами.</string>

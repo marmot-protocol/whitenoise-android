@@ -43,6 +43,8 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.PersonAvatar
+import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
+import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Search
@@ -164,6 +166,10 @@ internal fun TransferAdminSheet(
                         Modifier.fillMaxWidth().heightIn(max = 360.dp).fadingVerticalScroll(rememberScrollState()),
                     ) {
                         GroupMemberIdentityRows(filtered) { _, member ->
+                            val memberName = controller.memberDisplayName(member)
+                            val memberNpub = appState.npubForDisplay(member.memberIdHex)
+                            // A nameless member is titled by their own short key, so that title is the copy target.
+                            val nameIsKey = abbreviatesPublicKey(memberName, memberNpub)
                             Row(
                                 modifier =
                                     Modifier
@@ -173,7 +179,7 @@ internal fun TransferAdminSheet(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Avatar(
-                                    title = controller.memberDisplayName(member),
+                                    title = memberName,
                                     seed = member.memberIdHex,
                                     size = 40.dp,
                                     pictureUrl = controller.memberAvatarUrl(member),
@@ -181,19 +187,23 @@ internal fun TransferAdminSheet(
                                 )
                                 Spacer(Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    EmojiLabel(
-                                        controller.memberDisplayName(member),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    Text(
-                                        controller.memberSubtitle(member),
-                                        fontFamily = FontFamily.Monospace,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
+                                    val keyModifier = Modifier.testTag("transfer_admin.key.${member.memberIdHex}")
+                                    if (nameIsKey) {
+                                        PublicKeyCopyText(memberName, memberNpub, keyModifier, enabled = !busy)
+                                    } else {
+                                        EmojiLabel(memberName, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        // The short key copies the whole key; the rest of the row still picks (#3565).
+                                        PublicKeyCopyText(
+                                            controller.memberSubtitle(member),
+                                            memberNpub,
+                                            keyModifier,
+                                            style =
+                                                MaterialTheme.typography.bodySmall
+                                                    .copy(fontFamily = FontFamily.Monospace),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            enabled = !busy,
+                                        )
+                                    }
                                 }
                             }
                         }

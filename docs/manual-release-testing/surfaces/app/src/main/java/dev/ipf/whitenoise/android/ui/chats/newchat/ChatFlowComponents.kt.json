@@ -1,0 +1,165 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
+  "legacy_sha256": "67035fd38852910a5f72e4326a6062ebc7f1328ae8ac8c25f1adf0b69b51cfb9",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Custom emoji authored labels: ChatFlowComponents",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "ComingSoonBadge",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
+        "anchor": "fun ComingSoonBadge(",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "ContactRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
+        "anchor": "fun ContactRow(",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "DangerActionRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
+        "anchor": "fun DangerActionRow(",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "FlowQuickActionRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
+        "anchor": "fun FlowQuickActionRow(",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "FlowSearchField",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
+        "anchor": "fun FlowSearchField(",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "NewMessageQuickActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
+        "anchor": "fun NewMessageQuickActions(",
+        "test_ids": [
+          "NCH-001",
+          "NCH-002"
+        ]
+      },
+      {
+        "surface": "QuickActionButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
+        "anchor": "fun QuickActionButton(",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "ResolvingContactRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
+        "anchor": "fun ResolvingContactRow(",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "SectionHeader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
+        "anchor": "fun SectionHeader(",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "SelectionIndicator",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
+        "anchor": "fun SelectionIndicator(",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "SettingsActionRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
+        "anchor": "fun SettingsActionRow(",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "ContactRow public-key copy label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
+        "anchor": "PublicKeyCopyText(",
+        "test_ids": [
+          "NCH-001",
+          "ACC-002"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:coming_soon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
+        "anchor": "R.string.coming_soon",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "string:invite_friends",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
+        "anchor": "R.string.invite_friends",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "string:new_group",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
+        "anchor": "R.string.new_group",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "string:recipient_preview_resolving",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
+        "anchor": "R.string.recipient_preview_resolving",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "string:scan_qr_code",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
+        "anchor": "R.string.scan_qr_code",
+        "test_ids": [
+          "NCH-001"
+        ]
+      },
+      {
+        "surface": "string:user_search_you_follow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/ChatFlowComponents.kt",
+        "anchor": "R.string.user_search_you_follow",
+        "test_ids": [
+          "NCH-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

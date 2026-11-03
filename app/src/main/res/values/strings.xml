@@ -1307,6 +1307,7 @@
     <string name="scan_to_connect">Scan to connect.</string>
     <string name="not_copied">Not copied</string>
     <string name="copy_public_key">Copy public key</string>
+    <string name="public_key_copy_action_with_value">Copy public key %1$s</string>
     <string name="button_in_progress">In progress</string>
     <string name="private_key">Private key</string>
     <string name="profile_public_key_help">Share this key so people can find and connect with you.</string>

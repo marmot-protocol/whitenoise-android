@@ -86,31 +86,32 @@
         "test_ids": [
           "ACC-002"
         ]
-      }
-    ],
-    "settings_controls": [
-      {
-        "surface": "R.string.copied",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
-        "anchor": "R.string.copied",
-        "test_ids": [
-          "ACC-002"
-        ]
       },
       {
-        "surface": "R.string.copy",
+        "surface": "Person profile complete copyable key",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
-        "anchor": "R.string.copy",
+        "anchor": "CopyableFullPublicKey(",
         "test_ids": [
           "ACC-001",
           "ACC-002"
         ]
       },
       {
-        "surface": "R.string.copy_public_key",
+        "surface": "PersonProfileNames",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
-        "anchor": "R.string.copy_public_key",
+        "anchor": "private fun PersonProfileNames(",
         "test_ids": [
+          "ACC-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "ACC-001",
           "ACC-002"
         ]
       },
@@ -129,14 +130,6 @@
         "test_ids": [
           "ACC-002",
           "PRO-005"
-        ]
-      },
-      {
-        "surface": "R.string.not_copied",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
-        "anchor": "R.string.not_copied",
-        "test_ids": [
-          "ACC-002"
         ]
       },
       {
@@ -252,9 +245,9 @@
         ]
       },
       {
-        "surface": "Full public key caption: R.string.public_key",
+        "surface": "Nameless profile heading: R.string.profile",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/profile/PersonProfileContent.kt",
-        "anchor": "R.string.public_key",
+        "anchor": "R.string.profile",
         "test_ids": [
           "ACC-001"
         ]

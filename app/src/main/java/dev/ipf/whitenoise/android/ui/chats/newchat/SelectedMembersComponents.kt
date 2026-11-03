@@ -50,6 +50,7 @@ import dev.ipf.whitenoise.android.ui.account.StartingAccountIndicator
 import dev.ipf.whitenoise.android.ui.common.PersonAvatar
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowBack
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.KeyboardArrowRight
@@ -247,13 +248,19 @@ internal fun SelectedMembersReviewScreen(
         ) {
             items(members, key = { it.accountIdHex }) { member ->
                 val memberName = selectedMemberDisplayName(member, appState)
+                val memberNpub = appState.npubForDisplay(member.accountIdHex)
+                // Only an abbreviation of this member's own key is a key title; a name starting npub1 stays a name.
+                val nameIsKey = abbreviatesPublicKey(memberName, memberNpub)
                 Column(Modifier.fillMaxWidth()) {
                     ContactRow(
                         title = memberName,
                         subtitle =
                             appState.shortNpub(member.accountIdHex).takeIf {
-                                it.isNotBlank() && !IdentityFormatter.isNostrIdentityFallback(memberName)
+                                it.isNotBlank() && !nameIsKey
                             },
+                        // The copy reads the member's own canonical key, never the displayed short label (#3565).
+                        publicKey = memberNpub,
+                        publicKeyInTitle = nameIsKey,
                         avatarSeed = member.accountIdHex,
                         avatarUrl = selectedMemberAvatarUrl(member, appState.contactAvatarSource(member.accountIdHex)),
                         titleMaxLines = Int.MAX_VALUE,
