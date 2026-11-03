@@ -30,7 +30,6 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.BlockedDmComposerNoti
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAttachmentSheetState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOuterVerticalPadding
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.composer.DisbandedGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
@@ -126,15 +125,8 @@ internal fun ConversationBottomBar(
         Modifier
             .fillMaxWidth()
             .testTag(CONVERSATION_BOTTOM_BAR_TAG)
-            .floatingDictationAnchor(
-                topInset =
-                    if (normalComposer) {
-                        ComposerOuterVerticalPadding
-                    } else {
-                        0.dp
-                    },
-                followsComposerFab = normalComposer,
-            ).onSizeChanged { size -> onBottomChromeMeasured(size.height) },
+            .then(if (normalComposer) Modifier else Modifier.floatingDictationAnchor())
+            .onSizeChanged { size -> onBottomChromeMeasured(size.height) },
     ) {
         when {
             selectionMode ->

@@ -99,6 +99,7 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 import dev.ipf.whitenoise.android.ui.navigation.DictationComposerControlSlot
 import dev.ipf.whitenoise.android.ui.navigation.LocalShellDictationControls
 import dev.ipf.whitenoise.android.ui.navigation.composerFabContent
+import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -1358,7 +1359,7 @@ internal fun ComposerBar(
                     }
                 if (openQuery != null) {
                     MentionPicker(
-                        modifier = Modifier.layoutId(COMPOSER_SUGGESTIONS_SLOT),
+                        modifier = Modifier.layoutId(COMPOSER_SUGGESTIONS_SLOT).floatingDictationAnchor(),
                         candidates = mentionMatches,
                         onPick = { candidate ->
                             val insertion = MentionComposer.insertMention(textFieldValue.text, openQuery, candidate)
@@ -1390,12 +1391,14 @@ internal fun ComposerBar(
                 val showDictationRecovery =
                     dictationOwnedByComposer && dictationController?.recoveryHandedToComposer == true
                 if (showDictationRecovery) {
-                    ConversationDictationRecoveryStatus(
-                        checkNotNull(dictationController).composerAccess(
-                            checkNotNull(dictationAccountRef),
-                            checkNotNull(dictationGroupIdHex),
-                        ),
-                    )
+                    Box(Modifier.floatingDictationAnchor()) {
+                        ConversationDictationRecoveryStatus(
+                            checkNotNull(dictationController).composerAccess(
+                                checkNotNull(dictationAccountRef),
+                                checkNotNull(dictationGroupIdHex),
+                            ),
+                        )
+                    }
                 }
                 val activeRecordingController = voiceRecordingController?.takeIf { it.isRecording }
                 val isRecordingVoice = activeRecordingController != null

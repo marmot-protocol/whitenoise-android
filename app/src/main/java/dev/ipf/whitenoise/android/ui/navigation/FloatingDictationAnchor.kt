@@ -42,7 +42,6 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoff
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /** Visible layout obstacles owned by the current route or persistent shell chrome. */
@@ -114,20 +113,12 @@ internal class FloatingDictationAnchor {
     val topInWindow: Float? get() = topInWindow(null)
 
     /**
-     * Only a registered painted pen/composer edge follows the bridge. Additional rows above the
-     * pill and independent notices/footers retain their real clearance. One pixel allows rounded
-     * layout padding to match its density-converted anchor inset.
+     * The painted pen/pill registers its role directly, so placement rounding cannot change which
+     * clock its edge follows. Separate status rows, notices and footers keep their real clearance.
      */
-    fun topInWindow(
-        movingComposerFab: Rect?,
-        targetComposerFab: Rect? = null,
-    ): Float? =
+    fun topInWindow(movingComposerFab: Rect?): Float? =
         bounds.minOfOrNull { (token, rect) ->
-            val followsPaintedEdge =
-                composerFabObstacles[token] == true &&
-                    targetComposerFab != null &&
-                    abs(rect.top - targetComposerFab.top) <= 1f
-            if (followsPaintedEdge && movingComposerFab != null) movingComposerFab.top else rect.top
+            if (composerFabObstacles[token] == true && movingComposerFab != null) movingComposerFab.top else rect.top
         }
 
     /** Registers a visible obstacle and whether its painted edge follows the composer/FAB bridge. */
@@ -353,7 +344,7 @@ internal fun FloatingDictationLayout(
                 val movingObstacle =
                     composerFabMotion?.renderedBounds?.takeIf { !inlineControl && controlMotion?.active != true }
                 val bottom =
-                    anchor.topInWindow(movingObstacle, composerFabMotion?.targetBounds)?.minus(rootTop)?.roundToInt()
+                    anchor.topInWindow(movingObstacle)?.minus(rootTop)?.roundToInt()
                         ?: (constraints.maxHeight - fallbackInset)
                 val availableGap = (bottom - bubble.height - safeTop).coerceIn(0, 12.dp.roundToPx())
                 val scrolling = anchor.scrollingCapsule.takeIf { footerSpace?.capsuleSlot != 0.dp }

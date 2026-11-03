@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -28,10 +30,15 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
+import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoff
+import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_SUGGESTIONS_TEST_TAG
+import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiShortcodeSuggestions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
@@ -56,19 +63,36 @@ class FloatingDictationAnchorTest {
         anchor.report(composer, target, followsComposerFab = true)
         val moving = Rect(16f, 700f, 344f, 748f)
         assertEquals(600f, anchor.topInWindow)
-        assertEquals(700f, anchor.topInWindow(moving, target))
+        assertEquals(700f, anchor.topInWindow(moving))
         anchor.report(notice, Rect(0f, 650f, 360f, 690f))
-        assertEquals(650f, anchor.topInWindow(moving, target))
-        anchor.report(composer, Rect(0f, 550f, 360f, 780f), followsComposerFab = true)
+        assertEquals(650f, anchor.topInWindow(moving))
+        val precedingRow = Any()
+        anchor.report(precedingRow, Rect(0f, 550f, 360f, 590f))
         assertEquals(
             "Additional live rows above the pill keep their clearance",
             550f,
-            anchor.topInWindow(moving, target),
+            anchor.topInWindow(moving),
         )
         anchor.remove(composer)
-        assertEquals(650f, anchor.topInWindow(moving, target))
+        anchor.remove(precedingRow)
+        assertEquals(650f, anchor.topInWindow(moving))
         anchor.remove(notice)
-        assertNull(anchor.topInWindow(moving, target))
+        assertNull(anchor.topInWindow(moving))
+    }
+
+    /** Subpixel endpoint placement must not switch the persistent capsule to the final pill edge. */
+    @Test
+    fun paintedEdgeKeepsItsClockAcrossEndpointPlacementSkew() {
+        val anchor = FloatingDictationAnchor()
+        val pill = Any()
+        val measuredTops = listOf(600f, 601.25f, 600f)
+        val movingTops = listOf(700f, 690f, 680f)
+        measuredTops.zip(movingTops).forEach { (measuredTop, movingTop) ->
+            anchor.report(pill, Rect(0f, measuredTop, 360f, 780f), followsComposerFab = true)
+            assertEquals(movingTop, anchor.topInWindow(Rect(16f, movingTop, 344f, movingTop + 48f)))
+        }
+        anchor.remove(pill)
+        assertNull(anchor.topInWindow(Rect(16f, 680f, 344f, 728f)))
     }
 
     /** Keeps the highest live obstacle until its token leaves, then releases the final obstacle. */
@@ -124,6 +148,73 @@ class FloatingDictationAnchorTest {
 @Config(sdk = [36])
 class FloatingDictationFallbackTest {
     @get:Rule val rule = createComposeRule()
+
+    /** A retired route or removed painted surface cannot leave an obstacle for the next owner. */
+    @Test
+    fun paintedAnchorReleasesOnEndpointAndCompositionChanges() {
+        val anchor = FloatingDictationAnchor()
+        val current = mutableStateOf(true)
+        val painted = mutableStateOf(true)
+        val moving = Rect(16f, 700f, 64f, 748f)
+        rule.setContent {
+            CompositionLocalProvider(
+                LocalFloatingDictationAnchor provides anchor,
+                LocalControlHandoffEndpointCurrent provides current.value,
+            ) {
+                Box(
+                    Modifier
+                        .size(48.dp)
+                        .then(if (painted.value) Modifier.floatingDictationAnchor(followsComposerFab = true) else Modifier),
+                )
+            }
+        }
+        rule.waitForIdle()
+        rule.runOnIdle {
+            assertEquals(700f, anchor.topInWindow(moving))
+            current.value = false
+        }
+        rule.waitForIdle()
+        rule.runOnIdle {
+            assertNull(anchor.topInWindow(moving))
+            current.value = true
+        }
+        rule.waitForIdle()
+        rule.runOnIdle {
+            assertEquals(700f, anchor.topInWindow(moving))
+            painted.value = false
+        }
+        rule.waitForIdle()
+        rule.runOnIdle { assertNull(anchor.topInWindow(moving)) }
+    }
+
+    /** An empty suggestion component stays composed without reserving its former visible row. */
+    @Test
+    fun emojiSuggestionAnchorLeavesWhenTheSameCallSiteRendersNothing() {
+        val anchor = FloatingDictationAnchor()
+        val field = mutableStateOf(TextFieldValue(":sm", TextRange(3)))
+        rule.setContent {
+            CompositionLocalProvider(LocalFloatingDictationAnchor provides anchor) {
+                EmojiShortcodeSuggestions(field = field.value, onPick = {})
+            }
+        }
+        fun awaitSuggestions() {
+            rule.waitUntil(timeoutMillis = 5_000) {
+                rule.onAllNodes(hasTestTag(EMOJI_SUGGESTIONS_TEST_TAG)).fetchSemanticsNodes().isNotEmpty()
+            }
+        }
+        awaitSuggestions()
+        rule.runOnIdle {
+            assertTrue(anchor.topInWindow != null)
+            field.value = TextFieldValue("")
+        }
+        rule.waitForIdle()
+        rule.runOnIdle {
+            assertNull(anchor.topInWindow)
+            field.value = TextFieldValue(":sm", TextRange(3))
+        }
+        awaitSuggestions()
+        rule.runOnIdle { assertTrue(anchor.topInWindow != null) }
+    }
 
     /** Keeps one visible action set at fallback until a new inline slot is measured. */
     @Test

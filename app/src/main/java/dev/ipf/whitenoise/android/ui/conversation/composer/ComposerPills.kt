@@ -151,6 +151,7 @@ import dev.ipf.whitenoise.android.ui.navigation.LocalComposerFabHandoff
 import dev.ipf.whitenoise.android.ui.navigation.composerFabContent
 import dev.ipf.whitenoise.android.ui.navigation.composerFabGrip
 import dev.ipf.whitenoise.android.ui.navigation.composerFabSurface
+import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
@@ -1216,6 +1217,7 @@ internal fun ComposerPill(
                     .fillMaxWidth()
                     .then(expandedHeightModifier)
                     .testTag(COMPOSER_PILL_SURFACE_TAG)
+                    .floatingDictationAnchor(followsComposerFab = true)
                     .composerFabSurface(
                         ComposerFabEndpoint.Composer,
                         MaterialTheme.colorScheme.surfaceContainerHigh,
