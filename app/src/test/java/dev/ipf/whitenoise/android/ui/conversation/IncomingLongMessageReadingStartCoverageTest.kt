@@ -25,6 +25,9 @@ import dev.ipf.whitenoise.android.ui.navigation.DirectNotificationConversationHa
 import dev.ipf.whitenoise.android.ui.navigation.NotificationRouteTimelinePresentationFixture
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -128,8 +131,73 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
     }
 
     /**
+     * A row under the newest message (a pending membership row) takes space from the arrival: a message that would fit
+     * the viewport alone but not the space above that row lands at its beginning, and one that fits stays at the tail.
+     */
+    @Test
+    fun aTrailingRowBelowTheNewestMessageCountsAgainstItsSpace() =
+        runTest {
+            for ((height, revealed) in listOf(560 to false, 561 to true, 580 to true)) {
+                // Newest first: a 40 px trailing row at the tail, the incoming message, then earlier history.
+                val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(40, height, 80))
+                list.settle(index = 2)
+                val coordinator = ConversationScrollCoordinator(list)
+                val outcome =
+                    coordinator.followAppendOrRevealIncomingStart(
+                        candidates = listOf(candidate("incoming")),
+                        probeFor = { list.probe { 1 } },
+                        resolveTailIndex = { 0 },
+                        awaitFrame = list::frame,
+                    )
+                val landed = outcome is ConversationIncomingAppendOutcome.RevealedReadingStart
+                assertEquals("height $height", revealed, landed)
+                assertEquals("height $height", 0 to 0, list.writes.first())
+                if (revealed) assertEquals("height $height", 1 to height - 600, list.writes.last())
+            }
+        }
+
+    /**
+     * A second arrival that restarts the follow while the first one's landing is still measuring joins the same burst:
+     * the interrupted command leaves the scroll intent alone, so the later decision still starts at the first row.
+     */
+    @Test
+    fun aLandingInterruptedByASecondArrivalStillStartsAtTheFirstRow() =
+        runTest {
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(900, 80))
+            list.settle(index = 1)
+            val coordinator = ConversationScrollCoordinator(list)
+            val queue = ConversationIncomingAppendLandingQueue()
+            val first = queue.admit(listOf(row("first")), coordinator.intentToken)
+            val interrupted =
+                launch {
+                    coordinator.followAppendOrRevealIncomingStart(
+                        candidates = first,
+                        probeFor = { list.probe { 0 } },
+                        resolveTailIndex = { 0 },
+                        awaitFrame = { awaitCancellation() },
+                    )
+                }
+            testScheduler.runCurrent()
+            interrupted.cancelAndJoin()
+            // The second arrival is shorter and now sits at the tail, below the first message.
+            list.heightsPx.add(0, 80)
+            list.writes.clear()
+            val burst = queue.admit(listOf(row("second")), coordinator.intentToken)
+            assertEquals(listOf("first", "second"), burst.map { it.messageId })
+            val outcome =
+                coordinator.followAppendOrRevealIncomingStart(
+                    candidates = burst,
+                    probeFor = { candidate -> list.probe { if (candidate.messageId == "first") 1 else 0 } },
+                    resolveTailIndex = { 0 },
+                    awaitFrame = list::frame,
+                )
+            val revealed = outcome as ConversationIncomingAppendOutcome.RevealedReadingStart
+            assertEquals("first", revealed.anchor.messageId)
+        }
+
+    /**
      * The screen's append path classifies rows, lands through the coordinator and hands the landing to its owner, and
-     * a restart that is not an append retires any burst it interrupted.
+     * every restart that is not an append, including an empty or unanchored timeline, retires any burst it interrupted.
      */
     @Test
     fun productionAppendPathRoutesThroughTheIncomingLanding() {
@@ -145,8 +213,8 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
         assertTrue(append.contains("viewportRestorationOwner.adoptIncomingReadingStart(outcome)"))
         assertFalse("an append must not bypass the landing decision", append.contains("followTailIfAllowed("))
         assertEquals(
-            "a decided append and a non-append restart both retire the pending burst",
-            2,
+            "a decided append, an empty or unanchored restart and a non-append restart all retire the pending burst",
+            3,
             append.split("incomingAppendLanding.retire()").size - 1,
         )
         assertTrue(source.contains("remember(controller){ConversationIncomingAppendLandingQueue()}"))

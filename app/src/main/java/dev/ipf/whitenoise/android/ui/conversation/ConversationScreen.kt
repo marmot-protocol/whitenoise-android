@@ -3268,7 +3268,11 @@ internal fun ConversationScreen(
         // Survives the follow effect's restart within a burst, never a chat, account or runtime change.
         val incomingAppendLanding = remember(controller) { ConversationIncomingAppendLandingQueue() }
         LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored) {
-            if (!initialTimelineAnchored || renderedTimeline.isEmpty()) return@LaunchedEffect
+            if (!initialTimelineAnchored || renderedTimeline.isEmpty()) {
+                // A restart that cannot be an append still interrupts the burst, so its rows never join a later one.
+                incomingAppendLanding.retire()
+                return@LaunchedEffect
+            }
             val latestId = renderedTimeline.lastOrNull()?.presentationId
             val previousId = navigationState.lastFollowedLatestId
             // A genuine append: the last id changed and the row we last followed is

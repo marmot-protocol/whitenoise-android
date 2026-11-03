@@ -186,8 +186,11 @@ private suspend fun awaitHiddenIncomingStart(
     awaitFrame: suspend () -> Unit,
 ): ConversationIncomingAppendCandidate? {
     val layouts = awaitTailLayouts(candidates, probeFor, maxFrames, awaitFrame).orEmpty()
+    // Rows below the newest message (a pending membership row, a load error) are not part of the burst, but they
+    // take space from it, so an arrival that fits the viewport alone can still have its beginning clipped.
+    val trailingPx = layouts.lastOrNull { it?.isMeasured == true }?.itemOffsetPx?.coerceAtLeast(0) ?: 0
     val hidden = candidates.indices.firstOrNull { layouts.getOrNull(it)?.startHiddenAtTail == true }
-    return hidden?.takeIf { layouts.any { it?.isOversized == true } }?.let(candidates::get)
+    return hidden?.takeIf { layouts.any { it?.isOversized(trailingPx) == true } }?.let(candidates::get)
 }
 
 /**
@@ -223,6 +226,10 @@ private fun ConversationReadingStartProbe.currentLayout() = resolveTargetIndex()
 private val ConversationMentionJumpLayout.startHiddenAtTail: Boolean
     get() = !isMeasured || requireNotNull(itemOffsetPx) + requireNotNull(itemHeightPx) > viewportEndOffsetPx
 
-/** A measured row taller than the space between the tail and the viewport's far edge. A row exactly that tall fits. */
-private val ConversationMentionJumpLayout.isOversized: Boolean
-    get() = isMeasured && readingStartOffset > 0
+/**
+ * A measured row taller than the space between the [trailingPx] rows under the newest message and the viewport's far
+ * edge. A row exactly that tall fits.
+ */
+private fun ConversationMentionJumpLayout.isOversized(trailingPx: Int): Boolean =
+    isMeasured &&
+        requireNotNull(itemHeightPx) + trailingPx > viewportEndOffsetPx
