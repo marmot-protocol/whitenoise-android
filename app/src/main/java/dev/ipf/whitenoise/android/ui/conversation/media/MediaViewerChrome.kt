@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.MultiContentMeasurePolicy
 import androidx.compose.ui.unit.Constraints
@@ -12,16 +13,16 @@ internal const val MEDIA_VIEWER_BOTTOM_CHROME_TAG = "conversation.media.viewer.b
 internal const val MEDIA_VIEWER_PAGE_GESTURE_TAG = "conversation.media.viewer.pageGesture"
 internal const val MEDIA_VIEWER_CONTENT_TAG = "conversation.media.viewer.content"
 
-/** Arbitrates image single-tap chrome toggles against double-tap transform resets. */
+/** Arbitrates image single-tap chrome toggles against double-tap zoom with its viewport position. */
 internal fun Modifier.viewerTapGestureModifier(
     gestureKey: Any?,
     onSingleTap: () -> Unit,
-    onDoubleTap: () -> Unit,
+    onDoubleTap: (Offset) -> Unit,
 ): Modifier =
     pointerInput(gestureKey) {
         detectTapGestures(
             onTap = { onSingleTap() },
-            onDoubleTap = { onDoubleTap() },
+            onDoubleTap = onDoubleTap,
         )
     }
 

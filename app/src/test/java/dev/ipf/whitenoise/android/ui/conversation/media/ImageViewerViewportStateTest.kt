@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import android.content.Context
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.SideEffect
@@ -10,12 +11,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.TouchInjectionScope
+import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.R
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -264,6 +269,47 @@ class ImageViewerViewportStateTest {
                 assertEquals(180f, 30f * scale + 150f + offset.x, 0.01f)
                 assertEquals(165f, 15f * scale + 150f + offset.y, 0.01f)
             }
+        }
+    }
+
+    /** Real double taps preserve their source point, advance to the shared ceiling, and leave Fit available. */
+    @Test
+    fun doubleTapsZoomFurtherAroundTheirPointWithoutTogglingChrome() {
+        var scale by mutableFloatStateOf(1f)
+        var offset by mutableStateOf(Offset.Zero)
+        var chromeToggles = 0
+        rule.setContent {
+            Box(Modifier.size(300.dp)) {
+                ImageViewerViewport(
+                    sourceKey = "double-tap",
+                    imageWidth = 1000,
+                    imageHeight = 1000,
+                    scale = scale,
+                    offset = offset,
+                    onScaleChange = { scale = it },
+                    onOffsetChange = { offset = it },
+                    onChromeToggle = { chromeToggles++ },
+                ) { imageModifier -> Box(imageModifier) }
+            }
+        }
+        rule.waitForIdle()
+        val node = rule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG)
+        for (expected in listOf(2f, 4f, 8f, 16f, 32f, 64f, 128f, 256f, 512f, 1024f, 1024f)) {
+            node.performTouchInput { doubleClick(Offset(225f, 150f)) }
+            rule.waitForIdle()
+            rule.runOnIdle {
+                assertEquals(expected, scale, 0f)
+                assertEquals(225f, 75f * scale + 150f + offset.x, 0.1f)
+                assertEquals(0f, offset.y, 0.01f)
+                assertEquals(0, chromeToggles)
+            }
+        }
+        val label = ApplicationProvider.getApplicationContext<Context>().getString(R.string.media_viewer_fit_image)
+        val fit = node.fetchSemanticsNode().config[SemanticsActions.CustomActions].single { it.label == label }
+        rule.runOnIdle { assertTrue(fit.action()) }
+        rule.runOnIdle {
+            assertEquals(1f, scale, 0f)
+            assertEquals(Offset.Zero, offset)
         }
     }
 }

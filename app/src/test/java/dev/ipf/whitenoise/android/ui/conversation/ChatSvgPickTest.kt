@@ -67,7 +67,10 @@ class ChatSvgPickTest {
             val reader = ConversationAttachmentReader(fixture.state, context)
             for (quality in MediaQuality.entries) {
                 fixture.state.updateMediaQuality(quality)
-                val image = withContext(Dispatchers.IO) { reader.readImageAttachment(uri, 1024).attachment }
+                val image =
+                    withContext(Dispatchers.IO) {
+                        reader.readImageAttachment(uri, 1024, pick = null).attachment
+                    }
                 image?.let { assertMetadataSafeFallback(it, bytes) }
                 val document = reader.readPickedDocuments(listOf(uri))
                 assertTrue(document.attachments.size <= 1)
@@ -104,7 +107,7 @@ class ChatSvgPickTest {
             assertTrue(reader.readPickedDocuments(listOf(oversized)).attachments.isEmpty())
             val bounded =
                 withContext(Dispatchers.IO) {
-                    reader.readImageAttachment(oversized, GroupSvgPolicy.MAX_BYTES.toLong())
+                    reader.readImageAttachment(oversized, GroupSvgPolicy.MAX_BYTES.toLong(), pick = null)
                 }
             assertTrue(bounded.overflowed)
             assertNull(bounded.attachment)

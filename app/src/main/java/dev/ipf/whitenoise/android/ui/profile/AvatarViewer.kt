@@ -80,9 +80,7 @@ import dev.ipf.whitenoise.android.ui.common.ViewerGestureConsumption
 import dev.ipf.whitenoise.android.ui.common.ViewerTransform
 import dev.ipf.whitenoise.android.ui.common.applyAvatarDownwardDrag
 import dev.ipf.whitenoise.android.ui.common.applyViewerTransformGesture
-import dev.ipf.whitenoise.android.ui.common.resetViewerTransform
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
-import dev.ipf.whitenoise.android.ui.common.viewerOneToOneScale
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.conversation.media.mediaSaveSnackbarVisuals
 import dev.ipf.whitenoise.android.ui.conversation.media.saveImageToGallery
@@ -509,24 +507,20 @@ private fun ZoomableAvatarImage(
             modifier
                 .pointerInput(image) {
                     detectTapGestures(
-                        onDoubleTap = {
-                            if (latestScale > VIEWER_MIN_SCALE) {
-                                val reset = resetViewerTransform()
-                                latestOnScaleChange(reset.scale)
-                                latestOnOffsetChange(reset.offset)
-                            } else {
-                                val viewportW = size.width.toFloat()
-                                val viewportH = size.height.toFloat()
-                                val oneToOneScale =
-                                    viewerOneToOneScale(
-                                        viewportWidth = viewportW,
-                                        viewportHeight = viewportH,
-                                        imageWidth = bitmapWidth,
-                                        imageHeight = bitmapHeight,
-                                    )
-                                latestOnScaleChange(oneToOneScale)
-                                latestOnOffsetChange(Offset.Zero)
-                            }
+                        onDoubleTap = { position ->
+                            val next =
+                                applyViewerTransformGesture(
+                                    current = ViewerTransform(latestScale, latestOffset),
+                                    zoomFactor = 2f,
+                                    panDelta = Offset.Zero,
+                                    viewportWidth = size.width.toFloat(),
+                                    viewportHeight = size.height.toFloat(),
+                                    imageWidth = bitmapWidth,
+                                    imageHeight = bitmapHeight,
+                                    centroid = position,
+                                )
+                            latestOnScaleChange(next.scale)
+                            latestOnOffsetChange(next.offset)
                         },
                     )
                 }.pointerInput(image, bitmapWidth, bitmapHeight) {

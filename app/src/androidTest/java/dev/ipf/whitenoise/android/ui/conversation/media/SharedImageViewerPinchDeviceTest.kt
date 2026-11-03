@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.doubleClick
@@ -103,7 +104,7 @@ class SharedImageViewerPinchDeviceTest {
             assertTrue(abs(sourceY * fit.baseHeight * scale + bounds.height() / 2f + offset.y - localFocal.y) < 20f)
             assertTrue(requireNotNull(geometry).scale > 5f)
         }
-        assertStationaryAndJitteredDoubleTapReset(bounds, localFocal, { scale }, { offset })
+        assertStationaryAndJitteredDoubleTapZoom({ scale }, { offset })
     }
 
     /**
@@ -158,21 +159,15 @@ class SharedImageViewerPinchDeviceTest {
         }
     }
 
-    /** Resets a zoomed viewport with both stationary and slightly jittered double taps to catch pan interference. */
-    private fun assertStationaryAndJitteredDoubleTapReset(
-        bounds: Rect,
-        localFocal: Offset,
+    /** Both stationary and slightly jittered double taps increase zoom without resetting its owner. */
+    private fun assertStationaryAndJitteredDoubleTapZoom(
         scale: () -> Float,
         offset: () -> Offset,
     ) {
         val node = rule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG)
+        val before = scale()
         node.performTouchInput { doubleClick() }
-        rule.runOnIdle {
-            assertEquals(1f, scale())
-            assertEquals(Offset.Zero, offset())
-        }
-        injectPinchAndAwaitIdle(bounds, localFocal)
-        rule.runOnIdle { assertTrue(scale() > 1f) }
+        rule.runOnIdle { assertEquals(before * 2f, scale(), 0.001f) }
         node.performTouchInput {
             down(center)
             up()
@@ -182,9 +177,28 @@ class SharedImageViewerPinchDeviceTest {
             up()
         }
         rule.runOnIdle {
-            assertEquals(1f, scale())
+            assertEquals(before * 4f, scale(), 0.001f)
+            assertTrue(offset().x.isFinite() && offset().y.isFinite())
+        }
+        fitViewerToViewport()
+        rule.runOnIdle {
+            assertEquals(1f, scale(), 0f)
             assertEquals(Offset.Zero, offset())
         }
+    }
+
+    /** Invokes the same explicit Fit action available to accessibility users. */
+    private fun fitViewerToViewport() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val label = context.getString(R.string.media_viewer_fit_image)
+        val action =
+            rule
+                .onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG)
+                .fetchSemanticsNode()
+                .config[SemanticsActions.CustomActions]
+                .single { it.label == label }
+        rule.runOnIdle { assertTrue(action.action()) }
+        rule.waitForIdle()
     }
 
     /** Checks that a pinch below the panning threshold cannot displace letterboxed content off center. */
@@ -205,7 +219,7 @@ class SharedImageViewerPinchDeviceTest {
             assertEquals(-0.25f * delta, readOffset().x, 0.1f)
             assertEquals(0f, readOffset().y, 0.01f)
         }
-        rule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG).performTouchInput { doubleClick() }
+        fitViewerToViewport()
         rule.runOnIdle {
             assertEquals(1f, readScale(), 0f)
             assertEquals(Offset.Zero, readOffset())
@@ -257,6 +271,8 @@ class SharedImageViewerPinchDeviceTest {
         assertNotEquals(fitted, node.fetchSemanticsNode().config[SemanticsProperties.StateDescription])
         node.performTouchInput { doubleClick() }
         rule.waitForIdle()
+        assertNotEquals(fitted, node.fetchSemanticsNode().config[SemanticsProperties.StateDescription])
+        fitViewerToViewport()
         assertEquals(fitted, node.fetchSemanticsNode().config[SemanticsProperties.StateDescription])
         val close = InstrumentationRegistry.getInstrumentation().targetContext.getString(R.string.close)
         rule.onNodeWithContentDescription(close).assertIsDisplayed().performClick()

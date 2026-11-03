@@ -105,8 +105,11 @@ internal fun ImageViewerViewport(
     val zoomOutLabel = stringResource(R.string.media_viewer_zoom_out)
     val zoomLabel = stringResource(R.string.media_viewer_zoom_image)
 
-    /** Applies bounded zoom around the viewport center and reports the new scale and offset to its owner. */
-    fun applyZoom(factor: Float) {
+    /** Applies bounded zoom around a viewport point, or the center for accessibility actions. */
+    fun applyZoom(
+        factor: Float,
+        centroid: Offset? = null,
+    ) {
         val next =
             applyViewerTransformGesture(
                 ViewerTransform(latestScale, latestOffset),
@@ -117,7 +120,7 @@ internal fun ImageViewerViewport(
                 latestWidth,
                 latestHeight,
                 maxScale = IMAGE_VIEWER_MAX_SCALE,
-                centroid = Offset(viewportSize.width / 2f, viewportSize.height / 2f),
+                centroid = centroid ?: Offset(viewportSize.width / 2f, viewportSize.height / 2f),
             )
         latestOnScaleChange(next.scale)
         latestOnOffsetChange(next.offset)
@@ -205,7 +208,7 @@ internal fun ImageViewerViewport(
             .fillMaxSize()
             .clipToBounds()
             .onSizeChanged { viewportSize = it }
-            .viewerTapGestureModifier(sourceKey, { latestOnChromeToggle() }, reset)
+            .viewerTapGestureModifier(sourceKey, { latestOnChromeToggle() }) { position -> applyZoom(2f, position) }
             .semantics {
                 stateDescription = zoomState
                 customActions =

@@ -2,7 +2,7 @@
 
 Chat attachments and explicitly loaded public event images share the viewport, fullscreen chrome and accessibility actions. Acquisition stays source-specific. Attachment bytes retain their existing authenticated transfer and source-epoch checks. Public images retain explicit consent, safe URL acquisition and the size-keyed raster preview; deep zoom of that public preview enlarges its available pixels. Its resolution stays limited to that preview.
 
-The shared viewport uses a finite 1–1024× scale. Pinch, pan, accessible zoom and actual-size actions use the same clamped geometry. Double tap and Fit image return to the fitted source. Actual size uses inspected original chat dimensions. The existing raw-coordinate EXIF behavior is preserved for chat static base previews and detail regions. Avatar viewers retain their separate 5× default.
+The shared viewport uses a finite 1–1024× scale. Pinch, pan, accessible zoom and actual-size actions use the same clamped geometry. Each double tap doubles the current scale around the tapped point, up to the existing ceiling; tapping at the ceiling keeps that zoom. Fit image returns to the fitted source. Actual size uses inspected original chat dimensions. The existing raw-coordinate EXIF behavior is preserved for chat static base previews and detail regions. Avatar viewers use the same double-tap progression with their separate 5× ceiling and retain pinch-out to fit.
 
 ## Source and decode paths
 

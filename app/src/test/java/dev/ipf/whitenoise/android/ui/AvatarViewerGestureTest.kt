@@ -15,7 +15,6 @@ import androidx.compose.ui.test.performTouchInput
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -49,9 +48,15 @@ class AvatarViewerGestureTest {
             }
         }
         val dialog = rule.onNode(isDialog())
-        dialog.performTouchInput { doubleClick(center) }
+        val fittedCenter = stripeCenter()
+        var focalOffset = 0f
+        dialog.performTouchInput {
+            focalOffset = center.x * 0.4f
+            doubleClick(center + Offset(focalOffset, 0f))
+        }
         rule.waitForIdle()
         val before = stripeCenter()
+        assertEquals(fittedCenter - focalOffset, before, 3f)
         rule.mainClock.autoAdvance = false
         try {
             dialog.performTouchInput {
@@ -69,12 +74,9 @@ class AvatarViewerGestureTest {
         assertEquals(PAN_STEP * PAN_MOVES, stripeCenter() - before, 2f)
     }
 
-    /**
-     * Combines avatar double taps with stationary touch samples and checks that the reset survives gesture
-     * arbitration.
-     */
+    /** Repeated and slightly jittered double taps increase avatar zoom until its existing five-times ceiling. */
     @Test
-    fun doubleTapResetsAZoomedAvatarWithoutStationaryPanInterference() {
+    fun doubleTapZoomsFurtherWithoutStationaryPanInterference() {
         val source = Bitmap.createBitmap(SOURCE_EDGE, SOURCE_EDGE, Bitmap.Config.ARGB_8888)
         source.eraseColor(Color.BLACK)
         Canvas(source).drawRect(
@@ -96,16 +98,12 @@ class AvatarViewerGestureTest {
         }
         val dialog = rule.onNode(isDialog())
         rule.waitForIdle()
-        val fittedWidth = stripeWidth()
-        dialog.performTouchInput { doubleClick(center) }
-        rule.waitForIdle()
-        assertTrue(stripeWidth() > fittedWidth * 2)
-        dialog.performTouchInput { doubleClick(center) }
-        rule.waitForIdle()
-        assertEquals(fittedWidth.toFloat(), stripeWidth().toFloat(), 2f)
-        dialog.performTouchInput { doubleClick(center) }
-        rule.waitForIdle()
-        assertTrue(stripeWidth() > fittedWidth * 2)
+        val fittedWidth = stripeWidth().toFloat()
+        for (expectedScale in listOf(2f, 4f)) {
+            dialog.performTouchInput { doubleClick(center) }
+            rule.waitForIdle()
+            assertEquals(fittedWidth * expectedScale, stripeWidth().toFloat(), 3f)
+        }
         dialog.performTouchInput {
             down(center)
             up()
@@ -115,7 +113,11 @@ class AvatarViewerGestureTest {
             up()
         }
         rule.waitForIdle()
-        assertEquals(fittedWidth.toFloat(), stripeWidth().toFloat(), 2f)
+        assertEquals(fittedWidth * 5f, stripeWidth().toFloat(), 4f)
+        val cappedWidth = stripeWidth()
+        dialog.performTouchInput { doubleClick(center) }
+        rule.waitForIdle()
+        assertEquals(cappedWidth.toFloat(), stripeWidth().toFloat(), 2f)
     }
 
     /** Measures the red stripe in captured dialog pixels to observe the effect of avatar zoom gestures. */
