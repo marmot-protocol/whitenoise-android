@@ -427,8 +427,10 @@ private fun PersonProfileNames(
 ) {
     if (person.titleIsPublicKey && keyShown) {
         val heading = stringResource(R.string.profile)
+        // Nonzero width keeps the heading's bounds visible to TalkBack's heading navigation.
         Spacer(
             Modifier
+                .fillMaxWidth()
                 .height(WhiteNoiseSpacing.FormField)
                 .testTag("person_profile.key_heading")
                 .semantics {

@@ -1127,6 +1127,7 @@ internal fun GroupDetailsScreen(
                 if (!currentReview && pendingReview.ticket === reviewTicket) pendingConfirm = null
             }
 
+            /** Claims the pending review only while its ticket, account, runtime and roster still match. */
             fun claimReview(): Boolean {
                 val liveMembers = controller.members.map { it.memberIdHex.lowercase(Locale.ROOT) }.toSet()
                 val liveAdmins =

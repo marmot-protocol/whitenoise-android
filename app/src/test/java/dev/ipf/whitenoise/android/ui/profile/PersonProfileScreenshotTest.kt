@@ -232,7 +232,7 @@ class PersonProfileScreenshotTest {
                                 null,
                                 false,
                                 "Building useful things with friends.",
-                                "npub1" + "a".repeat(58),
+                                "npub1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaasyujmmd",
                                 "alice@example.com",
                                 true,
                                 "alice@example.com",

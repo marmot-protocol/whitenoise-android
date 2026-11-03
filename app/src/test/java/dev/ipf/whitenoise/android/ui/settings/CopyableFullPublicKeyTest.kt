@@ -73,7 +73,7 @@ class CopyableFullPublicKeyTest {
     }
 
     private companion object {
-        const val NPUB = "npub1qqqqqqqqqqqqqqqqqqqqqqqqqppppppppqqqqqqqqqqqqqqqqqqqqqqqqq"
+        const val NPUB = "npub1qqqqqqqqqqqqqqqqqqqqqppppppppqqqqqqqqqqqqqqqqqqqqqqqkrvh2t"
         const val TARGET = "key.target"
         const val TEXT = "key.text"
     }

@@ -62,6 +62,7 @@ import dev.ipf.whitenoise.android.ui.theme.PillShape
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 
+/** The new-chat flows' search field. */
 @Composable
 internal fun FlowSearchField(
     value: String,

@@ -102,7 +102,7 @@ class GroupMemberKeyCopyTest {
         val SELF = ConversationTimelineTestIds.ACCOUNT_ID
         val PEER = "9".repeat(64)
         const val SELF_REF = "alice"
-        const val PEER_NPUB = "npub1qqqqqqqqqqqqqqqqqqqqqqqqqppppppppqqqqqqqqqqqqqqqqqqqqqqqqq"
+        const val PEER_NPUB = "npub1qqqqqqqqqqqqqqqqqqqqqppppppppqqqqqqqqqqqqqqqqqqqqqqqkrvh2t"
 
         object EmptyDraftPersistence : DraftPersistence {
             /** No stored drafts. */

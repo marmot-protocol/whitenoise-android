@@ -228,6 +228,7 @@ class SelectedMembersReviewScreenTest {
         assertEquals(emptyList<String>(), roles.toList())
     }
 
+    /** While busy, a role switch cannot change any member's privileges. */
     @Test
     fun busyRoleSwitchCannotChangePrivileges() {
         var changes = 0
@@ -323,9 +324,9 @@ class SelectedMembersReviewScreenTest {
         )
 
     private companion object {
-        const val NAMELESS_NPUB = "npub1qqqqqqqqqqqqqqqqqqqqqqqqqppppppppqqqqqqqqqqqqqqqqqqqqqqqqq"
-        const val NAMELESS_SHORT = "npub1qqqqq...qqqqqqqq"
-        const val HUMAN_NPUB = "npub1pppppppppppppppppppppppppzzzzzzzzppppppppppppppppppppppppp"
+        const val NAMELESS_NPUB = "npub1qqqqqqqqqqqqqqqqqqqqqppppppppqqqqqqqqqqqqqqqqqqqqqqqkrvh2t"
+        const val NAMELESS_SHORT = "npub1qqqqq...qqkrvh2t"
+        const val HUMAN_NPUB = "npub1pppppppppppppppppppppzzzzzzzzppppppppppppppppppppppq4yh33n"
 
         val members =
             listOf(

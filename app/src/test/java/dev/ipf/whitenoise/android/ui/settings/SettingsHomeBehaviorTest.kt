@@ -207,7 +207,7 @@ class SettingsHomeBehaviorTest {
     /** The active profile's short key copies the whole key, while the rest of the row still opens Share & Connect. */
     @Test
     fun activeProfileKeyCopiesWithoutOpeningShareConnect() {
-        val npub = "npub1" + "q".repeat(58)
+        val npub = "npub1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqzqujme"
         mount(profileCount = 1, npub = npub)
         val clipboard =
             ApplicationProvider

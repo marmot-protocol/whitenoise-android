@@ -957,6 +957,7 @@ internal fun networkDisplayNameFallback(
     return shortNpub(accountIdHex)
 }
 
+/** The cached or freshly encoded npub for [accountIdHex], or empty rather than a non-npub or the raw hex. */
 internal fun npubPresentation(
     accountIdHex: String,
     cachedNpub: String?,
@@ -11573,6 +11574,7 @@ class WhiteNoiseAppState private constructor(
         )
     }
 
+    /** The active account's name for [accountIdHex]: its private nickname, else its network display name. */
     fun displayName(accountIdHex: String): String = displayNameForAccount(activeAccountRef, accountIdHex)
 
     /** The account's published or local name, or its short npub when only the key can name it. */

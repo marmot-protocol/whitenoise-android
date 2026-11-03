@@ -13,6 +13,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
@@ -159,9 +160,10 @@ class PersonProfileRouteTest {
     @Test fun namelessProfileShowsTheCompleteKeyInsteadOfAShortenedTitle() {
         show(metadata = profile.copy(name = null))
         composeRule.onNodeWithTag("person_profile.name").assertDoesNotExist()
-        composeRule
-            .onNodeWithTag("person_profile.key_heading", useUnmergedTree = true)
-            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
+        val heading = composeRule.onNodeWithTag("person_profile.key_heading", useUnmergedTree = true)
+        heading.assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
+        val bounds = heading.getUnclippedBoundsInRoot()
+        assertTrue("the heading has empty bounds", bounds.right > bounds.left && bounds.bottom > bounds.top)
         composeRule.onAllNodesWithTag("person_profile.full_public_key", useUnmergedTree = true).assertCountEquals(1)
         composeRule
             .onAllNodes(hasText(IdentityFormatter.short(publicKey, prefix = 12, suffix = 8)), useUnmergedTree = true)

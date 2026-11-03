@@ -28,7 +28,10 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.ui.chats.newchat.CandidateKeyPlacement
 import dev.ipf.whitenoise.android.ui.chats.newchat.ContactRow
+import dev.ipf.whitenoise.android.ui.chats.newchat.candidateKeyPlacement
 import dev.ipf.whitenoise.android.ui.conversation.share.SharedUser
 import dev.ipf.whitenoise.android.ui.conversation.share.UserMessageBubble
 import dev.ipf.whitenoise.android.ui.search.GlobalPersonRow
@@ -266,6 +269,9 @@ class PublicKeyCopyPresentationCoverageTest {
         assertFalse(isCanonicalNpub(FIRST_KEY.chunked(5).joinToString(" ")))
         assertFalse(isCanonicalNpub("ab".repeat(32)))
         assertFalse(isCanonicalNpub(FIRST_KEY.dropLast(1) + "b"))
+        assertFalse("a broken checksum", isCanonicalNpub(FIRST_KEY.dropLast(1) + "q"))
+        assertFalse("nonzero padding bits", isCanonicalNpub(NONZERO_PADDING))
+        assertFalse("a shape-only key", isCanonicalNpub("npub1" + "q".repeat(58)))
         assertFalse(isCanonicalNpub(""))
     }
 
@@ -281,6 +287,20 @@ class PublicKeyCopyPresentationCoverageTest {
         assertFalse(abbreviatesPublicKey("npub1424242…zzzzzz", npub))
         assertFalse(abbreviatesPublicKey("npub14242424...4qamrcaj", FIRST_KEY))
         assertFalse(abbreviatesPublicKey("Alice", npub))
+    }
+
+    /**
+     * A picker candidate titled by its own key copies from the title and drops the duplicate key subtitle, even when a
+     * key subtitle would otherwise show; a named candidate keeps its key subtitle, and a label-only row copies nothing.
+     */
+    @Test
+    fun pickerKeyTitleIsCopyableWhateverTheSubtitle() {
+        val keyTitle = IdentityFormatter.short(FIRST_KEY, prefix = 10, suffix = 8)
+
+        assertEquals(CandidateKeyPlacement(FIRST_KEY, true, false), candidateKeyPlacement(keyTitle, FIRST_KEY, true))
+        assertEquals(CandidateKeyPlacement(FIRST_KEY, true, false), candidateKeyPlacement(keyTitle, FIRST_KEY, false))
+        assertEquals(CandidateKeyPlacement(FIRST_KEY, false, true), candidateKeyPlacement("Alice", FIRST_KEY, true))
+        assertEquals(CandidateKeyPlacement(null, false, false), candidateKeyPlacement("Alice", FIRST_KEY, false))
     }
 
     /** Supplement: each route call site still hands its canonical key to the shared presentation. */
@@ -372,10 +392,13 @@ class PublicKeyCopyPresentationCoverageTest {
         ).firstOrNull(File::exists)?.readText() ?: error("Missing $path")
 
     private companion object {
-        const val FIRST_KEY = "npub1qqqqqqqqqqqqqqqqqqqqqqqqqppppppppqqqqqqqqqqqqqqqqqqqqqqqqq"
-        const val SECOND_KEY = "npub1qqqqqqqqqqqqqqqqqqqqqqqqqzzzzzzzzqqqqqqqqqqqqqqqqqqqqqqqqq"
+        const val FIRST_KEY = "npub1qqqqqqqqqqqqqqqqqqqqqppppppppqqqqqqqqqqqqqqqqqqqqqqqkrvh2t"
+        const val SECOND_KEY = "npub1qqqqqqqqqqqqqqqqqqqqqzzzzzzzzqqqqqqqqqqqqqqqqqqqqqqqrx4cs5"
         const val SHORT_KEY = "npub1qqqqqqqqqq...qqqqqqqq"
         const val UNRESOLVED = "npub1unresolvedprofile"
+
+        /** Checksum-valid, but its last data group sets padding bits, so it decodes to no key. */
+        const val NONZERO_PADDING = "npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkw3eyr0ng"
         const val ROW = "row"
         const val SECOND_ROW = "second_row"
         const val KEY_TEXT = "key_text"
@@ -396,7 +419,7 @@ class PublicKeyCopyPresentationCoverageTest {
                 "ui/group/GroupDetailsScreen.kt" to """publicKey = profileNpub\.takeIf \{ titleIsKey \}""",
                 "ui/chats/newchat/SelectedMembersComponents.kt" to """publicKey = memberNpub,""",
                 "ui/chats/newchat/ContactPickerScreen.kt" to
-                    """publicKey = candidateNpub\.takeIf \{ subtitleIsKey \|\| titleIsKey \}""",
+                    """candidateKeyPlacement\(candidate\.displayName, candidateNpub, subtitleIsKey\)""",
             )
     }
 }

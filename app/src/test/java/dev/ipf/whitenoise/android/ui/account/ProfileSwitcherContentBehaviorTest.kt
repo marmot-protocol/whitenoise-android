@@ -59,8 +59,9 @@ class ProfileSwitcherContentBehaviorTest {
     /** A profile's short key copies its whole key and does not switch, while the row itself still switches. */
     @Test fun shortKeyCopiesWithoutSwitchingProfiles() {
         val selected = mutableListOf<String>()
-        val keyB = "npub1" + "p".repeat(58)
-        render(onSelect = { selected += it }, npub = { if (it.startsWith("b")) keyB else "npub1" + "q".repeat(58) })
+        val keyB = "npub1pppppppppppppppppppppppppppppppppppppppppppppppppppqqpw7tv"
+        val other = "npub1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqzqujme"
+        render(onSelect = { selected += it }, npub = { if (it.startsWith("b")) keyB else other })
         val clipboard =
             ApplicationProvider
                 .getApplicationContext<android.content.Context>()

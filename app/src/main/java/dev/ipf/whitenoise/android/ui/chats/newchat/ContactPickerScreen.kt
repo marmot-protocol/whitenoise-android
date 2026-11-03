@@ -313,20 +313,29 @@ internal fun ContactPickerScreen(
                                 toggle(candidate)
                             }
                         }
+                        val keys =
+                            candidateKeyPlacement(
+                                candidate.displayName,
+                                appState.npubForDisplay(resolvedAccountIdHex),
+                                keySubtitle = !alreadyMember,
+                            )
                         ContactRow(
                             title = candidate.displayName,
                             subtitle =
                                 if (alreadyMember) {
                                     stringResource(R.string.add_member_already_in_group, candidate.displayName)
                                 } else {
-                                    appState.shortNpub(resolvedAccountIdHex).takeIf { it.isNotBlank() }
+                                    appState
+                                        .shortNpub(resolvedAccountIdHex)
+                                        .takeIf { it.isNotBlank() && keys.showKeySubtitle }
                                 },
                             avatarSeed = resolvedAccountIdHex,
                             avatarUrl = appState.contactAvatarSource(resolvedAccountIdHex),
                             enabled = !busy && !alreadyMember,
                             onClick = { toggle(candidate) },
                             onLongClick = { appState.presentProfile(candidate.npub) },
-                            publicKey = appState.npubForDisplay(resolvedAccountIdHex).takeUnless { alreadyMember },
+                            publicKey = keys.publicKey,
+                            publicKeyInTitle = keys.inTitle,
                             trailing = {
                                 SelectionIndicator(selected = isSelected, dimmed = alreadyMember)
                             },
@@ -360,8 +369,7 @@ internal fun ContactPickerScreen(
                         val subtitleIsKey =
                             !addressQuery && !candidate.isFollowing && candidate.searchProfile == null
                         val candidateNpub = appState.npubForDisplay(candidate.accountIdHex)
-                        // A followed or search-result contact without a name is titled by its key fallback (#3565).
-                        val titleIsKey = !subtitleIsKey && abbreviatesPublicKey(candidate.displayName, candidateNpub)
+                        val keys = candidateKeyPlacement(candidate.displayName, candidateNpub, subtitleIsKey)
                         ContactRow(
                             title = candidate.displayName,
                             subtitle =
@@ -369,10 +377,13 @@ internal fun ContactPickerScreen(
                                     addressQuery -> stringResource(R.string.user_search_address_result)
                                     candidate.isFollowing -> stringResource(R.string.user_search_you_follow)
                                     candidate.searchProfile != null -> stringResource(R.string.user_search_result)
-                                    else -> appState.shortNpub(candidate.accountIdHex).takeIf { it.isNotBlank() }
+                                    else ->
+                                        appState
+                                            .shortNpub(candidate.accountIdHex)
+                                            .takeIf { it.isNotBlank() && keys.showKeySubtitle }
                                 },
-                            publicKey = candidateNpub.takeIf { subtitleIsKey || titleIsKey },
-                            publicKeyInTitle = titleIsKey,
+                            publicKey = keys.publicKey,
+                            publicKeyInTitle = keys.inTitle,
                             avatarSeed = candidate.accountIdHex,
                             avatarUrl =
                                 appState.contactAvatarSource(candidate.accountIdHex)
@@ -426,9 +437,34 @@ internal fun ContactPickerScreen(
     }
 }
 
+/** Auto-selects a resolved identifier only when asked and the row is idle, not a member and not yet selected. */
 internal fun shouldAutoSelectResolvedIdentifier(
     autoSelectResolvedIdentifier: Boolean,
     busy: Boolean,
     alreadyMember: Boolean,
     isSelected: Boolean,
 ): Boolean = autoSelectResolvedIdentifier && !busy && !alreadyMember && !isSelected
+
+/** Where a candidate row shows and copies its key (#3565). */
+internal data class CandidateKeyPlacement(
+    val publicKey: String?,
+    val inTitle: Boolean,
+    val showKeySubtitle: Boolean,
+)
+
+/**
+ * A candidate titled by its own key fallback copies from that title and drops the duplicate key subtitle; otherwise a
+ * shown [keySubtitle] copies [npub]. The title is checked on its own, so it is copyable whatever the subtitle is.
+ */
+internal fun candidateKeyPlacement(
+    displayName: String,
+    npub: String,
+    keySubtitle: Boolean,
+): CandidateKeyPlacement {
+    val inTitle = abbreviatesPublicKey(displayName, npub)
+    return CandidateKeyPlacement(
+        publicKey = npub.takeIf { inTitle || keySubtitle },
+        inTitle = inTitle,
+        showKeySubtitle = keySubtitle && !inTitle,
+    )
+}

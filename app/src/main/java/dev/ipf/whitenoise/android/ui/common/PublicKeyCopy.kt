@@ -29,18 +29,80 @@ import dev.ipf.whitenoise.android.R
 private const val NPUB_PREFIX = "npub1"
 private const val NPUB_LENGTH = 63
 private const val BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+private const val NPUB_HRP = "npub"
+private const val NPUB_KEY_BYTES = 32
+private const val BECH32_CHECKSUM_LENGTH = 6
+private const val BECH32_GROUP_BITS = 5
+private const val BECH32_GROUP_MASK = 31
+private const val BECH32_HRP_HIGH_SHIFT = 5
+private const val BECH32_POLYMOD_TOP_SHIFT = 25
+private const val BECH32_POLYMOD_MASK = 0x1ffffff
+private const val BECH32_ACCUMULATOR_MASK = 0xfff
+private const val BYTE_MASK = 0xff
+private val BECH32_GENERATORS = intArrayOf(0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3)
 private const val MIN_ABBREVIATION_HEAD = 8
 private const val MIN_ABBREVIATION_TAIL = 4
 private val ELLIPSIS_PATTERN = Regex("…|\\.\\.\\.")
 
 /**
- * True only for a complete lowercase bech32 npub. A middle-ellipsized or grouped label never qualifies, so a
- * truncated string can never establish the identity a copy hands out (#3565).
+ * True only for a complete lowercase bech32 npub: the right length and alphabet, a valid checksum, and a payload that
+ * decodes to exactly 32 bytes with zero padding bits. A middle-ellipsized, grouped or corrupted label never qualifies,
+ * so a string that is not a real key can never establish the identity a copy hands out (#3565).
  */
-internal fun isCanonicalNpub(value: String): Boolean =
-    value.length == NPUB_LENGTH &&
-        value.startsWith(NPUB_PREFIX) &&
-        value.drop(NPUB_PREFIX.length).all { it in BECH32_CHARSET }
+internal fun isCanonicalNpub(value: String): Boolean {
+    val wellFormed =
+        value.length == NPUB_LENGTH &&
+            value.startsWith(NPUB_PREFIX) &&
+            value.drop(NPUB_PREFIX.length).all { it in BECH32_CHARSET }
+    return wellFormed && hasDecodableNpubPayload(value)
+}
+
+/** Checks the bech32 checksum and that the data groups, less the checksum, decode to a 32-byte key. */
+private fun hasDecodableNpubPayload(npub: String): Boolean {
+    val groups = npub.drop(NPUB_PREFIX.length).map(BECH32_CHARSET::indexOf)
+    val checksumValid = bech32Polymod(bech32HrpExpand(NPUB_HRP) + groups) == 1
+    return checksumValid && fiveBitGroupsToBytes(groups.dropLast(BECH32_CHECKSUM_LENGTH))?.size == NPUB_KEY_BYTES
+}
+
+/** BIP-173 human-readable-part expansion used by the checksum. */
+private fun bech32HrpExpand(hrp: String): List<Int> {
+    val high = hrp.map { it.code shr BECH32_HRP_HIGH_SHIFT }
+    val low = hrp.map { it.code and BECH32_GROUP_MASK }
+    return high + 0 + low
+}
+
+/** BIP-173 checksum polynomial; a valid string yields 1. */
+private fun bech32Polymod(values: List<Int>): Int {
+    var checksum = 1
+    for (value in values) {
+        val top = checksum ushr BECH32_POLYMOD_TOP_SHIFT
+        checksum = ((checksum and BECH32_POLYMOD_MASK) shl BECH32_GROUP_BITS) xor value
+        BECH32_GENERATORS.forEachIndexed { bit, generator ->
+            if ((top shr bit) and 1 == 1) checksum = checksum xor generator
+        }
+    }
+    return checksum
+}
+
+/**
+ * BIP-173 `convertbits(5, 8, pad = false)`: the five-bit [groups] as bytes, or null when the leftover padding is a
+ * whole group or holds a nonzero bit.
+ */
+private fun fiveBitGroupsToBytes(groups: List<Int>): ByteArray? {
+    var accumulator = 0
+    var bits = 0
+    val bytes = ArrayList<Byte>()
+    for (group in groups) {
+        accumulator = ((accumulator shl BECH32_GROUP_BITS) or group) and BECH32_ACCUMULATOR_MASK
+        bits += BECH32_GROUP_BITS
+        while (bits >= Byte.SIZE_BITS) {
+            bits -= Byte.SIZE_BITS
+            bytes += ((accumulator shr bits) and BYTE_MASK).toByte()
+        }
+    }
+    val cleanPadding = bits < BECH32_GROUP_BITS && ((accumulator shl (Byte.SIZE_BITS - bits)) and BYTE_MASK) == 0
+    return bytes.toByteArray().takeIf { cleanPadding }
+}
 
 /**
  * True when [name] is [npub] itself or an abbreviation of exactly that key, such as `npub1abcdefg…wxyz`, rather than

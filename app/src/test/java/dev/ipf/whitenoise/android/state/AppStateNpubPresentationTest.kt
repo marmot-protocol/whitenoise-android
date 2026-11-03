@@ -60,6 +60,7 @@ class AppStateNpubPresentationTest {
         assertNotEquals(ACCOUNT_HEX, presented)
     }
 
+    /** An already-canonical key reference is kept without consulting the display boundary. */
     @Test
     fun presentationFromReferenceKeepsCanonicalNpubInput() {
         val presented =
@@ -110,6 +111,7 @@ class AppStateNpubPresentationTest {
         assertNotEquals(ACCOUNT_HEX, presented)
     }
 
+    /** A raw-hex reference derives its npub through the display boundary. */
     @Test
     fun presentationFromOperationalHexFallbackUsesDisplayBoundary() {
         val presented =
@@ -125,6 +127,6 @@ class AppStateNpubPresentationTest {
     private companion object {
         const val ACCOUNT_HEX = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
         const val CANONICAL_NPUB = "npub1abcdefghijklmnopqrstuvwxyz234567"
-        const val UPPER_KEY = "npub1qqqqqqqqqqqqqqqqqqqqqqqqqppppppppqqqqqqqqqqqqqqqqqqqqqqqqq"
+        const val UPPER_KEY = "npub1qqqqqqqqqqqqqqqqqqqqqppppppppqqqqqqqqqqqqqqqqqqqqqqqkrvh2t"
     }
 }
