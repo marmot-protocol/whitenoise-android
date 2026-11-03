@@ -34,6 +34,7 @@ def tone(name, notes, duration):
 
 
 def soft_ding():
+    """Write the approved soft Ding waveform as mono PCM16 at 48 kHz."""
     duration = 0.8
     samples = []
     for i in range(int(RATE * duration)):

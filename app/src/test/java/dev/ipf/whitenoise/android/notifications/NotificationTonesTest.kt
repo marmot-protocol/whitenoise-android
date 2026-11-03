@@ -155,6 +155,7 @@ class NotificationTonesTest {
         assertEquals(NotificationTone.DING.uri(context), manager.getNotificationChannel(profile).sound)
     }
 
+    /** Checks retained tone URIs against the current bundled waveform digests. */
     @Test
     fun retainedToneUrisResolveToTheCurrentBundledWaveforms() {
         val provider =
