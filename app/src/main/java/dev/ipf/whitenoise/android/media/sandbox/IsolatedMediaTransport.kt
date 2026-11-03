@@ -17,6 +17,9 @@ import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
+// One transport owns the shared worker lifecycle across decode formats and AV.
+// Splitting it would fragment that contract.
+@Suppress("TooManyFunctions")
 internal interface MediaDecodeTransport {
     fun decode(
         bytes: ByteArray,

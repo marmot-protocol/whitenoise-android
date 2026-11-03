@@ -27,6 +27,8 @@ import java.io.File
 @RunWith(AndroidJUnit4::class)
 @PullRequestDeviceSmoke
 @MediaContainmentAcceptance
+// These scenarios share real Binder lifecycle probes; added function docs must not force a fixture split.
+@Suppress("LargeClass")
 class IsolatedMediaDecoderDeviceTest {
     /** Each still input gets a fresh generation whose exact Binder death precedes its pixels and the next input. */
     @Test

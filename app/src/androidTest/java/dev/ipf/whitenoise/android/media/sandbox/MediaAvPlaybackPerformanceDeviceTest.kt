@@ -48,7 +48,10 @@ class MediaAvPlaybackPerformanceDeviceTest {
         try {
             check(canary.createNewFile()) { "Another fixture owns the canary" }
             canaryOwned = true
-            val outputDirectory = File(requireNotNull(InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")))
+            val outputDirectory =
+                File(
+                    requireNotNull(InstrumentationRegistry.getArguments().getString("additionalTestOutputDir")),
+                )
             check(outputDirectory.isDirectory || outputDirectory.mkdirs())
             val output = File(outputDirectory, "media-av-paced-performance.jsonl")
             check(output.createNewFile()) { "Preserve prior paced evidence" }
@@ -97,7 +100,9 @@ class MediaAvPlaybackPerformanceDeviceTest {
             check(failures == 0) { "Paced observations failed; inspect retained JSONL" }
         } finally {
             // Player release is synchronous in every row; trace must independently prove worker retirement.
-            check(staged.map { it.file !in heldSources && it.file.delete() }.all { it }) { "Paced fixture cleanup incomplete" }
+            check(staged.map { it.file !in heldSources && it.file.delete() }.all { it }) {
+                "Paced fixture cleanup incomplete"
+            }
             if (canaryOwned) check(canary.delete()) { "Paced canary cleanup incomplete" }
         }
     }
@@ -172,7 +177,9 @@ class MediaAvPlaybackPerformanceDeviceTest {
                 live.play()
             }
             row.put("prepare_play_return_ns", SystemClock.elapsedRealtimeNanos())
-            await(player, failure, calls, probe, "initial_progress") { it.currentPosition > 20 || it.playbackState == Player.STATE_ENDED }
+            await(player, failure, calls, probe, "initial_progress") {
+                it.currentPosition > 20 || it.playbackState == Player.STATE_ENDED
+            }
             row.put("first_media_progress_observed_ns", SystemClock.elapsedRealtimeNanos())
             val preparation = requireNotNull(IsolatedMediaDecoder.lastAvIsolation)
             check(preparation !== previousPreparation && preparation.isolated && preparation.uid != Process.myUid())
@@ -363,7 +370,11 @@ class MediaAvPlaybackPerformanceDeviceTest {
             next += 20
             val now = SystemClock.elapsedRealtime()
             val skipped = ((now - next).coerceAtLeast(0) / 20).toInt()
-            if (skipped > 0) calls.put(JSONObject().put("operation", "skipped_probe_periods").put("phase", phase).put("count", skipped))
+            if (skipped > 0) {
+                calls.put(
+                    JSONObject().put("operation", "skipped_probe_periods").put("phase", phase).put("count", skipped),
+                )
+            }
             next += skipped * 20L
             SystemClock.sleep((next - SystemClock.elapsedRealtime()).coerceAtLeast(1))
             check(!probe.overflow) { "Bounded scalar observation overflow" }
@@ -449,8 +460,12 @@ private class PacedObservation : RawAvPlaybackObservation {
         frames[offset + 7] = if (submitted) 1 else 0
     }
 
+    // All identity and head comparisons are required to count advancement within one actual sink lifetime.
+
     /** Retains the actual AudioTrack counter and detects advancement only within the same sink lifetime. */
-    @Synchronized override fun audio(
+    @Suppress("ComplexCondition")
+    @Synchronized
+    override fun audio(
         activation: Long,
         seek: Long,
         lifetime: Int,
@@ -489,8 +504,12 @@ private class PacedObservation : RawAvPlaybackObservation {
     /** Reads the actual currently sampled renderer activation for operation-to-output association. */
     @Synchronized fun latestAudioActivation(): Long = if (audioCount == 0) -1 else audio[(audioCount - 1) * 6]
 
+    // Keep the causal audio/video proof together; early failures retain every activation, seek and clock check.
+
     /** Requires advancing audio and an optional matching video post after this exact control request. */
-    @Synchronized fun hasCausalControlOutput(
+    @Suppress("CyclomaticComplexMethod", "ReturnCount")
+    @Synchronized
+    fun hasCausalControlOutput(
         requestNs: Long,
         previousActivation: Long,
         previousSeek: Long,
@@ -513,7 +532,10 @@ private class PacedObservation : RawAvPlaybackObservation {
         repeat(audioCount) { index ->
             val offset = index * 6
             if (audio[offset] == activation && audio[offset + 1] == seek && audio[offset + 3] >= requestNs) {
-                if (audio[offset + 2] == earlierLifetime && audio[offset + 3] > earlierTime && audio[offset + 4] > earlierHead) {
+                if (audio[offset + 2] == earlierLifetime &&
+                    audio[offset + 3] > earlierTime &&
+                    audio[offset + 4] > earlierHead
+                ) {
                     progressed = true
                 }
                 earlierLifetime = audio[offset + 2]
@@ -574,8 +596,10 @@ private class PacedObservation : RawAvPlaybackObservation {
             .put("workers", workerRows)
             .put("worker_retirement", "external_exact_lifetime_trace_required")
         row
-            .put("submission_columns", "activation,seek,pts_us,media_before_us,media_after_us,start_ns,end_ns,submitted")
-            .put("submissions", frameRows)
+            .put(
+                "submission_columns",
+                "activation,seek,pts_us,media_before_us,media_after_us,start_ns,end_ns,submitted",
+            ).put("submissions", frameRows)
             .put("audio_columns", "activation,seek,sink_lifetime,time_ns,extended_head_frames,underruns")
             .put("audio", audioRows)
             .put("audio_head_advances", advances)

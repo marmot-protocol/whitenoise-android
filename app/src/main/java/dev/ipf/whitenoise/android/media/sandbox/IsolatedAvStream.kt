@@ -105,7 +105,9 @@ internal class IsolatedAvStream private constructor(
         activation: Long,
     ) {
         synchronized(stateLock) {
-            readyIdentity?.let { observation.worker(activation, it.first, it.second, SystemClock.elapsedRealtimeNanos()) }
+            readyIdentity?.let {
+                observation.worker(activation, it.first, it.second, SystemClock.elapsedRealtimeNanos())
+            }
         }
     }
 

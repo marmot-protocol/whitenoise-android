@@ -757,9 +757,15 @@ class AutomaticMediaBindingRecoveryTest {
 
     /** Wait within the fixture deadline for the exact owner to satisfy all admission-release predicates. */
     private fun awaitAutomaticRelease(transport: IsolatedAutomaticAvTransport): Boolean {
-        val owner = IsolatedAutomaticAvTransport::class.java.getDeclaredField("bindingLock").apply { isAccessible = true }
+        val owner =
+            IsolatedAutomaticAvTransport::class.java.getDeclaredField("bindingLock").apply {
+                isAccessible = true
+            }
         val worker = IsolatedAutomaticAvTransport::class.java.getDeclaredField("worker").apply { isAccessible = true }
-        val field = IsolatedAutomaticAvTransport::class.java.getDeclaredField("callbackThread").apply { isAccessible = true }
+        val field =
+            IsolatedAutomaticAvTransport::class.java.getDeclaredField("callbackThread").apply {
+                isAccessible = true
+            }
 
         @Suppress("UNCHECKED_CAST")
         val observer = field.get(transport) as Lazy<HandlerThread>
@@ -776,7 +782,10 @@ class AutomaticMediaBindingRecoveryTest {
 
     /** Stop only the fixture observation executor after the assertion has finished. */
     private fun stopAutomaticObserver(transport: IsolatedAutomaticAvTransport) {
-        val field = IsolatedAutomaticAvTransport::class.java.getDeclaredField("callbackThread").apply { isAccessible = true }
+        val field =
+            IsolatedAutomaticAvTransport::class.java.getDeclaredField("callbackThread").apply {
+                isAccessible = true
+            }
 
         @Suppress("UNCHECKED_CAST")
         val observer = field.get(transport) as Lazy<android.os.HandlerThread>

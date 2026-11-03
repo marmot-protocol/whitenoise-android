@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.media.sandbox
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.SurfaceTexture
 import android.net.Uri
 import android.view.Surface
 import com.google.common.util.concurrent.SettableFuture
@@ -48,50 +49,72 @@ class RawAvSeekPublicationTest {
 
     /** Surface reattachment while a paused poster is pending must not redraw the old seek's retained pixels. */
     @Test fun pausedSeekReattachmentRejectsOldPosterAndAcceptsMatchingPoster() {
-        withEngine { engine ->
-            val old = bitmap()
-            adopt(engine, old)
-            val completion = engine.seekToAsync(1500) as SettableFuture<Void>
-            engine.attachVideo(Surface())
-            RecordingCanvasSurface.posts = 0 // Attachment clears are separate from retained-frame publication.
-            render(engine)
-            assertEquals(0, RecordingCanvasSurface.posts)
-            assertEquals(0L, engine.snapshot().renderedFrame)
-            val intent = engine.intent()
-            val request = RawAvPausedSeekRequest(RawAvPosterTarget(RawAvGeneration(intent.activation, intent.seek), 1500), completion)
-            val matching = bitmap()
-            assertTrue(engine.posterResult(request, MediaProbe(2, 2, 4000, matching)))
-            assertTrue(completion.isDone)
-            render(engine)
-            assertEquals(1, RecordingCanvasSurface.posts)
-            assertEquals(1L, engine.snapshot().renderedFrame)
-            assertTrue(old.isRecycled)
-            assertFalse(matching.isRecycled)
-            engine.close()
-            assertTrue(matching.isRecycled)
+        withSurface { surface ->
+            withEngine { engine ->
+                val old = bitmap()
+                adopt(engine, old)
+                val completion = engine.seekToAsync(1500) as SettableFuture<Void>
+                engine.attachVideo(surface)
+                RecordingCanvasSurface.posts = 0 // Attachment clears are separate from retained-frame publication.
+                render(engine)
+                assertEquals(0, RecordingCanvasSurface.posts)
+                assertEquals(0L, engine.snapshot().renderedFrame)
+                val intent = engine.intent()
+                val request =
+                    RawAvPausedSeekRequest(
+                        RawAvPosterTarget(RawAvGeneration(intent.activation, intent.seek), 1500),
+                        completion,
+                    )
+                val matching = bitmap()
+                assertTrue(engine.posterResult(request, MediaProbe(2, 2, 4000, matching)))
+                assertTrue(completion.isDone)
+                render(engine)
+                assertEquals(1, RecordingCanvasSurface.posts)
+                assertEquals(1L, engine.snapshot().renderedFrame)
+                assertTrue(old.isRecycled)
+                assertFalse(matching.isRecycled)
+                engine.close()
+                assertTrue(matching.isRecycled)
+            }
         }
     }
 
     /** Stops background consumers so the test explicitly schedules the real private adoption/render boundary. */
-    private fun withEngine(block: (RawAvPlaybackEngine) -> Unit) {
-        val engine =
-            RawAvPlaybackEngine(
-                RuntimeEnvironment.getApplication(),
-                Uri.parse("file:///synthetic.mp4"),
-                listener =
-                    object : RawAvPlaybackEngine.Listener {
-                        override fun onChanged() = Unit
-                    },
-                prepareProbe = { null },
-            )
-        (field(engine, "scope") as CoroutineScope).cancel()
-        set(engine, "durationUs", 4_000_000L)
-        engine.attachVideo(Surface())
-        RecordingCanvasSurface.posts = 0
+    private fun withEngine(block: (RawAvPlaybackEngine) -> Unit) =
+        withSurface { surface ->
+            val engine =
+                RawAvPlaybackEngine(
+                    RuntimeEnvironment.getApplication(),
+                    Uri.parse("file:///synthetic.mp4"),
+                    listener =
+                        object : RawAvPlaybackEngine.Listener {
+                            override fun onChanged() = Unit
+                        },
+                    prepareProbe = { null },
+                )
+            (field(engine, "scope") as CoroutineScope).cancel()
+            set(engine, "durationUs", 4_000_000L)
+            try {
+                engine.attachVideo(surface)
+                RecordingCanvasSurface.posts = 0
+                block(engine)
+            } finally {
+                engine.close()
+            }
+        }
+
+    /** Keeps each platform target alive until the engine using it has closed. */
+    private fun withSurface(block: (Surface) -> Unit) {
+        val texture = SurfaceTexture(0)
         try {
-            block(engine)
+            val surface = Surface(texture)
+            try {
+                block(surface)
+            } finally {
+                surface.release()
+            }
         } finally {
-            engine.close()
+            texture.release()
         }
     }
 
@@ -143,15 +166,31 @@ class RawAvSeekPublicationTest {
 /** A deterministic platform canvas, leaving RawVideoOutput and all ownership fences in the path. */
 @Implements(Surface::class)
 class RecordingCanvasSurface {
-    /** Reports an attached valid platform target for the sink. */
-    @Implementation fun isValid(): Boolean = true
+    private var canvasBitmap: Bitmap? = null
+
+    /** Matches the platform method; this fixture always provides a valid render target. */
+    @Suppress("FunctionOnlyReturningConstant")
+    @Implementation
+    fun isValid(): Boolean = true
 
     /** Supplies a tiny real software canvas to the production CPU draw operation. */
-    @Implementation fun lockCanvas(dirty: android.graphics.Rect?): Canvas = Canvas(Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888))
+    @Suppress("UnusedParameter") // Required platform signature; the sink requests a full canvas.
+    @Implementation
+    fun lockCanvas(dirty: android.graphics.Rect?): Canvas {
+        val bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        canvasBitmap = bitmap
+        return Canvas(bitmap)
+    }
 
     /** Counts actual sink posts, including explicit clears separately reset by the fixture. */
     @Implementation fun unlockCanvasAndPost(canvas: Canvas) {
         posts++
+        try {
+            canvas.setBitmap(null)
+        } finally {
+            canvasBitmap?.recycle()
+            canvasBitmap = null
+        }
     }
 
     companion object {

@@ -333,7 +333,14 @@ internal class RawAvRenderSession(
                             progress.lastVideoDelta = nextVideo.timestampUs - progress.lastVideoPts
                         }
                         progress.lastVideoPts = nextVideo.timestampUs
-                        val adopted = owner.frame(nextVideo.bitmap, info.rotationDegrees, activation, appliedSeek, nextVideo.timestampUs)
+                        val adopted =
+                            owner.frame(
+                                nextVideo.bitmap,
+                                info.rotationDegrees,
+                                activation,
+                                appliedSeek,
+                                nextVideo.timestampUs,
+                            )
                         if (!adopted) nextVideo.bitmap.recycle()
                     }
                 } else if (!progress.audioEnded || progress.audio != null) {

@@ -141,7 +141,10 @@ internal class RawAvPlaybackEngine(
             firstFrameForOutput = false
             signal.trySend(Unit)
         }
-    private val renderer = RawAvRenderSession(this.context, uri, wantVideo, wantAudio, this).also { it.observation = observation }
+    private val renderer =
+        RawAvRenderSession(this.context, uri, wantVideo, wantAudio, this).also {
+            it.observation = observation
+        }
 
     /** Explicit background instrumentation sampling; no device reads occur when the observer is absent. */
     fun observeAudio() {

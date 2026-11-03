@@ -163,7 +163,16 @@ class InstrumentedDispatchTest(unittest.TestCase):
         for api in ("30", "36"):
             _, command, required = trace.selection("av", api)
             self.assertEqual(case, required)
-            self.assertIn("-Pandroid.testInstrumentationRunnerArguments.class=" + case, command)
+            expected_cases = [
+                case,
+                "dev.ipf.whitenoise.android.media.sandbox.MediaAvPlaybackPerformanceDeviceTest#"
+                "characterizePacedProductionPlaybackOnUnchangedCorpus",
+                "dev.ipf.whitenoise.android.media.sandbox.IsolatedAttachmentPlayerDeviceTest#"
+                "pausedSeekingSpeedPauseAndRepeatUseRealRawPlayback",
+            ]
+            prefix = "-Pandroid.testInstrumentationRunnerArguments.class="
+            selectors = [value.removeprefix(prefix).split(",") for value in command if value.startswith(prefix)]
+            self.assertEqual([expected_cases], selectors)
 
     def test_actual_checker_rejects_missing_or_skipped_selected_native_case(self):
         """Actual checker rejects missing or skipped selected native case."""
