@@ -54,7 +54,7 @@ internal class TrustedShareSource(
     val size: Long,
     val sha256: ByteArray,
     val open: () -> InputStream,
-    /** Called once the verified copy is owned by the share request, so the producer can retire its handle. */
+    /** Called once the share request retains the verified copy, so the producer can retire its handle. */
     val onAdmitted: () -> Unit = {},
 ) {
     /** Fails the import unless the private copy holds exactly the bytes the producer recorded. */
@@ -136,7 +136,7 @@ internal class ShareFileImporter(
                         ),
                 )
             } finally {
-                if (!retained) batch.accepted.forEach(files::delete)
+                if (retained) batch.onRetained.forEach { it() } else batch.accepted.forEach(files::delete)
             }
         }
 
@@ -198,6 +198,7 @@ internal class ShareFileImporter(
     private class ImportedBatch {
         val accepted = mutableListOf<Uri>()
         val errors = mutableListOf<ShareImportError>()
+        val onRetained = mutableListOf<() -> Unit>()
         var used = 0L
 
         /**
@@ -210,6 +211,7 @@ internal class ShareFileImporter(
                 errors += requireNotNull(result.error)
             } else {
                 accepted += uri
+                result.onRetained?.let(onRetained::add)
                 used += result.size + dev.ipf.whitenoise.android.ui.conversation.media.FILE_BACKED_TAG_BYTES
             }
         }
@@ -240,8 +242,7 @@ internal class ShareFileImporter(
             trusted?.verify(file)
             files.finish(uri, copied.name, resolveShareMime(copied.mime, intentMime), copied.size)
             staged = null
-            trusted?.onAdmitted()
-            ImportedFile(uri, copied.size)
+            ImportedFile(uri, copied.size, onRetained = trusted?.onAdmitted)
         } catch (cancel: kotlinx.coroutines.CancellationException) {
             throw cancel
         } catch (_: EmptyShareSource) {
@@ -311,6 +312,8 @@ internal class ShareFileImporter(
         val uri: Uri? = null,
         val size: Long = 0,
         val error: ShareImportError? = null,
+        /** Runs only once the request retains this copy, so a cancelled batch leaves its producer handle bound. */
+        val onRetained: (() -> Unit)? = null,
     )
 }
 

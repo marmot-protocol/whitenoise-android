@@ -11,6 +11,8 @@ import dev.ipf.whitenoise.android.state.auditLogShareChooserIntent
 import dev.ipf.whitenoise.android.state.clearPreparedAuditLogShares
 import dev.ipf.whitenoise.android.state.prepareAuditLogArchive
 import dev.ipf.whitenoise.android.state.stagedDiagnosticExportSource
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
@@ -22,8 +24,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.nio.file.Files
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * Invariant gate for #3556: a diagnostic ZIP this process staged can be shared back into White Noise
@@ -102,6 +107,45 @@ class DiagnosticZipSelfShareCoverageTest {
             val replayed = importer().import(request)
             assertEquals(listOf(ShareImportError.Scheme), replayed.payload.importErrors)
             assertTrue(replayed.payload.streamUris.isEmpty())
+        }
+
+    /**
+     * Cancelling a batch after the archive was copied but before the request kept it discards the copy and leaves
+     * the binding in place, so the same export can still be shared into White Noise afterwards.
+     */
+    @Test
+    fun aCancelledBatchLeavesTheBindingForARetry() =
+        runBlocking<Unit> {
+            val archive = stage("cancelled")
+            val bound = chooserRequest(archive).payload.streamUris.single()
+            val external = Uri.parse("content://media.example/slow")
+            val reachedSecond = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val slowImporter =
+                ShareFileImporter(
+                    files,
+                    { _, _ -> ShareSourceMetadata("slow.bin", "application/octet-stream", null) },
+                    { uri, _ ->
+                        check(uri == external) { "Must not open the app's own provider" }
+                        reachedSecond.countDown()
+                        release.await(5, TimeUnit.SECONDS)
+                        ByteArrayInputStream(byteArrayOf(1))
+                    },
+                    isAppOwnedProvider = { it.authority == authority },
+                    trustedSource = { stagedDiagnosticExportSource(context, it) },
+                )
+
+            val batch = async(Dispatchers.Default) { slowImporter.import(request(listOf(bound, external))) }
+            assertTrue(reachedSecond.await(5, TimeUnit.SECONDS))
+            batch.cancel()
+            release.countDown()
+            runCatching { batch.await() }
+            val kept = privateRoot.listFiles().orEmpty().filter { it.extension == "bin" }
+            assertTrue("the cancelled batch kept no copy", kept.isEmpty())
+
+            val retried = importer().import(request(listOf(bound)))
+            assertEquals(emptyList<ShareImportError>(), retried.payload.importErrors)
+            assertEquals(1, retried.payload.streamUris.size)
         }
 
     /** Any self-provider URI that is not the exact bound one is rejected before metadata or open. */
