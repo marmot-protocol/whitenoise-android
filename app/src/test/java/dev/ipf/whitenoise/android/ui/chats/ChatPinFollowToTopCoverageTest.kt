@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.chats
 
 import android.content.Context
 import androidx.activity.ComponentActivity
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -12,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
+import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.ChatListRowFfi
@@ -21,13 +23,17 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
 import dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ChatsController
+import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.SwipeAction
 import dev.ipf.whitenoise.android.state.SwipeBinding
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.chatRow
+import dev.ipf.whitenoise.android.state.hasEarlierChats
 import dev.ipf.whitenoise.android.state.noChatRowActions
 import dev.ipf.whitenoise.android.state.presentedRow
+import dev.ipf.whitenoise.android.ui.navigation.MainShell
+import dev.ipf.whitenoise.android.ui.navigation.MainShellStateHolder
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -36,6 +42,7 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -140,6 +147,53 @@ class ChatPinFollowToTopCoverageTest {
         assertTrue("unpin must not return the list to the top", scrollPosition() > 0f)
     }
 
+    /**
+     * A pin made while the bound native window is shifted below the head returns the window to its head
+     * (no earlier rows remain), and the list settles at its absolute first item with zero offset, with the
+     * restored pinned block and the new pin shown. The restored head row differs from the shifted window's
+     * first row, so this fails if the final snap runs before the debounced head projection lands.
+     */
+    @Test fun pinInShiftedWindowRestoresHeadWindowAndSettlesAtZero() {
+        val shifted = ChatPinFollowShiftedWindowFixture()
+        val mounted = mutableStateOf(true)
+        val holder = MainShellStateHolder(shifted.appState, SavedStateHandle())
+        val controller =
+            holder.chatsController(ConversationTimelineTestIds.ACCOUNT_REF, shifted.appState.runtimeGeneration)
+        shifted.appState.swipePreferences.set(SwipeBinding.ChatRight, SwipeAction.PinUnpin)
+        shifted.appState.setAppInForeground(true)
+        rule.setContent {
+            if (mounted.value) WhiteNoiseTheme { MainShell(appState = shifted.appState, stateHolder = holder) }
+        }
+        try {
+            val retained = ChatPinFollowShiftedWindowFixture.ROW_COUNT - ChatPinFollowShiftedWindowFixture.SHIFT
+            awaitProgress { controller.items.size == retained && !controller.isLoading }
+            rule.mainClock.advanceTimeBy(CHAT_LIST_HEAD_INPUT_GATE_MILLIS + 500L)
+            rule.waitForIdle()
+            assertTrue("the window must start shifted", controller.hasEarlierChats())
+            val target = shifted.initialRowId(ChatPinFollowShiftedWindowFixture.SHIFT + 2)
+            awaitInteractive(target)
+            swipe(target)
+            awaitProgress { "pin:true:$target" in shifted.calls }
+            awaitProgress {
+                shifted.window.returnedToTop && controller.items.size == ChatPinFollowShiftedWindowFixture.ROW_COUNT
+            }
+            awaitProgress { scrollPosition() == 0f }
+            settle()
+            assertFalse("the head window must be installed", controller.hasEarlierChats())
+            assertEquals(0f, scrollPosition())
+            assertEquals(shifted.initialRowId(0), controller.items.first().id)
+            rule.onNodeWithTag("chat.row.${shifted.initialRowId(0)}").assertIsDisplayed()
+            rule.onNodeWithTag("chat.row.$target").assertIsDisplayed()
+            assertTrue(controller.items.first { it.id == target }.pinned())
+        } finally {
+            rule.runOnIdle {
+                mounted.value = false
+                holder.release()
+            }
+            rule.waitForIdle()
+        }
+    }
+
     /** Scrolls programmatically (no user drag) well below the top and returns a fully visible unpinned row. */
     private fun scrollDeep(): String {
         rule.onNodeWithTag("chats.list").performScrollToIndex(DEEP_INDEX)
@@ -186,6 +240,7 @@ class ChatPinFollowToTopCoverageTest {
         assertEquals("a consumed follow replayed", deep, scrollPosition())
     }
 
+    /** Drags [target]'s row body right, past the swipe threshold, as a finger would. */
     private fun swipe(target: String) {
         rule.onNodeWithTag("chat.row.$target").performTouchInput {
             // Start on the row body, clear of the independently clickable avatar.
@@ -196,6 +251,7 @@ class ChatPinFollowToTopCoverageTest {
         rule.waitForIdle()
     }
 
+    /** Long-presses [target]'s row until its context menu shows, then lifts. */
     private fun openMenu(target: String) {
         val row = rule.onNodeWithTag("chat.row.$target")
         row.performTouchInput {
@@ -207,12 +263,14 @@ class ChatPinFollowToTopCoverageTest {
         row.performTouchInput { up() }
     }
 
+    /** Waits until [target]'s row accepts long presses again after list motion, and is on screen. */
     private fun awaitInteractive(target: String) {
         val row = rule.onNodeWithTag("chat.row.$target")
         awaitProgress { row.fetchSemanticsNode().config.contains(SemanticsActions.OnLongClick) }
         row.assertIsDisplayed()
     }
 
+    /** Mounts the production chat list over a fresh fixture with [action] bound to a right swipe. */
     private fun mount(
         action: SwipeAction = SwipeAction.Off,
         prePinned: Int = 0,
@@ -240,6 +298,7 @@ class ChatPinFollowToTopCoverageTest {
         }
     }
 
+    /** Runs pending test-scheduler work and Android Main twice, then waits for Compose to idle. */
     private fun settle() {
         repeat(2) {
             scope.testScheduler.runCurrent()
@@ -308,12 +367,14 @@ class ChatPinFollowToTopCoverageTest {
             controller.setChatListVisible(true)
         }
 
+        /** The presented row for [value] with pin, unpin and mark-read allowed. */
         private fun presented(value: ChatListRowFfi) =
             presentedRow(value.groupIdHex).copy(
                 row = value,
                 actions = noChatRowActions().copy(canPin = true, canUnpin = true, canMarkRead = true),
             )
 
+        /** Native `setChatPinned`: moves the chat to the front of the pin order, or fails when [failPins]. */
         private fun pinCommand(args: Array<out Any?>?): ChatPinStateFfi {
             check(args!![0] == ACCOUNT)
             val id = args[1] as String
@@ -336,6 +397,7 @@ class ChatPinFollowToTopCoverageTest {
             }
         }
 
+        /** The native runtime: pin commands and row reads; any other call fails loudly. */
         private fun native(): MarmotInterface =
             Proxy.newProxyInstance(
                 MarmotInterface::class.java.classLoader,

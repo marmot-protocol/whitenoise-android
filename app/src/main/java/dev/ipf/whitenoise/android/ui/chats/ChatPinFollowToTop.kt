@@ -14,6 +14,7 @@ import dev.ipf.whitenoise.android.state.ChatListBatchCommand
 import dev.ipf.whitenoise.android.state.ChatListBatchOutcome
 import dev.ipf.whitenoise.android.state.ChatListBatchResult
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * One confirmed explicit pin's request to show the pinned block from the absolute list top (#3555).
@@ -125,6 +126,10 @@ internal fun chatPinFollowStep(
  * the jump-to-top button's bounded scroll and window return, then finishes at item zero, offset zero.
  * Motion uses the list's animated scroll, so the system animation scale applies as it does for the
  * button. [onScrollStarted] marks each programmatic move for the head-motion owner.
+ *
+ * When the bounded window had earlier rows, the restored head reaches the list on a later debounced
+ * projection, so the final snap waits for [firstRowId] to change rather than for a fixed frame count.
+ * A user cancellation still consumes the request, so a stale follow never outlives its gesture.
  */
 @Composable
 @Suppress("FunctionNaming", "LongParameterList") // Effect composable; one request plus the live gates it reads.
@@ -135,6 +140,7 @@ internal fun ChatPinFollowToTopEffect(
     userGestureGeneration: Long,
     unpinnedVisibleIds: Set<String>,
     motionSettled: Boolean,
+    firstRowId: String?,
     hasEarlierRows: () -> Boolean,
     returnWindowToTop: suspend () -> Unit,
     onScrollStarted: () -> Unit,
@@ -144,6 +150,7 @@ internal fun ChatPinFollowToTopEffect(
     val liveGestureGeneration by rememberUpdatedState(userGestureGeneration)
     val liveUnpinnedIds by rememberUpdatedState(unpinnedVisibleIds)
     val liveMotionSettled by rememberUpdatedState(motionSettled)
+    val liveFirstRowId by rememberUpdatedState(firstRowId)
     val liveHasEarlierRows by rememberUpdatedState(hasEarlierRows)
     val liveReturnWindowToTop by rememberUpdatedState(returnWindowToTop)
     val liveScrollStarted by rememberUpdatedState(onScrollStarted)
@@ -159,28 +166,39 @@ internal fun ChatPinFollowToTopEffect(
                 unpinnedVisibleIds = liveUnpinnedIds,
                 motionSettled = liveMotionSettled && !listState.isScrollInProgress,
             )
-        if (snapshotFlow(::step).first { it != ChatPinFollowStep.WAIT } == ChatPinFollowStep.FOLLOW) {
-            liveScrollStarted()
-            if (listState.firstVisibleItemIndex > CHAT_PIN_FOLLOW_SNAP_INDEX) {
-                listState.scrollToItem(CHAT_PIN_FOLLOW_SNAP_INDEX)
-            }
-            listState.animateScrollToItem(0)
-            val windowWasShifted = liveHasEarlierRows()
-            liveReturnWindowToTop()
-            // The restored head window reaches the list on the controller's next projection frame.
-            repeat(CHAT_PIN_FOLLOW_WINDOW_FRAMES) { withFrameNanos { } }
-            val atTop = listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
-            if ((windowWasShifted || !atTop) && step() != ChatPinFollowStep.RETIRE) {
+        try {
+            if (snapshotFlow(::step).first { it != ChatPinFollowStep.WAIT } == ChatPinFollowStep.FOLLOW) {
                 liveScrollStarted()
-                listState.scrollToItem(0)
+                if (listState.firstVisibleItemIndex > CHAT_PIN_FOLLOW_SNAP_INDEX) {
+                    listState.scrollToItem(CHAT_PIN_FOLLOW_SNAP_INDEX)
+                }
+                listState.animateScrollToItem(0)
+                val windowWasShifted = liveHasEarlierRows()
+                val headBeforeReturn = liveFirstRowId
+                liveReturnWindowToTop()
+                if (windowWasShifted) {
+                    // The restored head is published by the controller's debounced recompute, not on this frame.
+                    withTimeoutOrNull(CHAT_PIN_FOLLOW_WINDOW_TIMEOUT_MILLIS) {
+                        snapshotFlow { liveFirstRowId != headBeforeReturn || step() == ChatPinFollowStep.RETIRE }
+                            .first { it }
+                    }
+                }
+                // Let the list measure what it now holds before checking the final position.
+                withFrameNanos { }
+                val atTop = listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
+                if ((windowWasShifted || !atTop) && step() != ChatPinFollowStep.RETIRE) {
+                    liveScrollStarted()
+                    listState.scrollToItem(0)
+                }
             }
+        } finally {
+            liveConsumed(pending)
         }
-        liveConsumed(pending)
     }
 }
 
 /** Same near-top snap as the jump-to-top button, so a deep follow animates only the final rows. */
 private const val CHAT_PIN_FOLLOW_SNAP_INDEX = 10
 
-/** Frames for the controller's one-frame projection debounce plus the measure that installs it. */
-private const val CHAT_PIN_FOLLOW_WINDOW_FRAMES = 2
+/** Upper bound on waiting for a restored head window to be published before snapping anyway. */
+private const val CHAT_PIN_FOLLOW_WINDOW_TIMEOUT_MILLIS = 1_000L

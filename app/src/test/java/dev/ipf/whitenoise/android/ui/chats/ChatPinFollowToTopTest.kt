@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
@@ -18,6 +19,8 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.ChatListBatchCommand
 import dev.ipf.whitenoise.android.state.ChatListBatchOutcome
 import dev.ipf.whitenoise.android.state.ChatListBatchResult
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -103,7 +106,8 @@ class ChatPinFollowToTopTest {
 
     /**
      * A bounded window that has rows before its front: the follow scrolls, returns the window to its
-     * head, and settles at the absolute first item with zero offset, consuming the request once.
+     * head, and settles at the absolute first item with zero offset, consuming the request once. The
+     * restored head is published several frames later, as the controller's debounced recompute does.
      */
     @Test fun shiftedWindowFollowRestoresHeadWindowAndSettlesAtZero() {
         val head = List(60) { "row-$it" }
@@ -114,6 +118,7 @@ class ChatPinFollowToTopTest {
         lateinit var listState: LazyListState
         composeRule.setContent {
             listState = rememberLazyListState(initialFirstVisibleItemIndex = 20)
+            val publisher = rememberCoroutineScope()
             ChatPinFollowToTopEffect(
                 listState = listState,
                 request = request,
@@ -121,10 +126,14 @@ class ChatPinFollowToTopTest {
                 userGestureGeneration = 0L,
                 unpinnedVisibleIds = emptySet(),
                 motionSettled = true,
+                firstRowId = rows.firstOrNull(),
                 hasEarlierRows = { rows.first() != head.first() },
                 returnWindowToTop = {
                     windowReturns += 1
-                    rows = head
+                    publisher.launch {
+                        delay(DEBOUNCED_PUBLICATION_MILLIS)
+                        rows = head
+                    }
                 },
                 onScrollStarted = {},
                 onConsumed = {
@@ -140,6 +149,7 @@ class ChatPinFollowToTopTest {
         val issued = ChatPinFollowRequest(1L, setOf("row-0"), dataset, 0L)
         issue { request = issued }
         awaitConsumed(consumed)
+        composeRule.waitUntil(5_000) { rows == head }
         composeRule.waitForIdle()
         assertEquals(listOf(issued), consumed)
         assertEquals(1, windowReturns)
@@ -170,6 +180,7 @@ class ChatPinFollowToTopTest {
                 userGestureGeneration = 0L,
                 unpinnedVisibleIds = emptySet(),
                 motionSettled = true,
+                firstRowId = "row-0",
                 hasEarlierRows = { false },
                 returnWindowToTop = { error("a retired request must not move the window") },
                 onScrollStarted = {},
@@ -199,5 +210,10 @@ class ChatPinFollowToTopTest {
             ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
             consumed.isNotEmpty()
         }
+    }
+
+    private companion object {
+        /** Longer than two frames: the presentation lifetime's 16 ms debounce plus its Main hop. */
+        const val DEBOUNCED_PUBLICATION_MILLIS = 80L
     }
 }

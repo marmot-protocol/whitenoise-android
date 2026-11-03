@@ -1490,6 +1490,7 @@ internal fun ChatsScreen(
         userGestureGeneration = userGestureGeneration,
         unpinnedVisibleIds = unpinnedVisibleIds,
         motionSettled = !headScrollCorrectionInProgress && !headReorderInProgress && pendingHeadDemotion == null,
+        firstRowId = orderedVisibleChatIds.firstOrNull(),
         hasEarlierRows = { controller.hasEarlierChats(chatListWindowView) },
         returnWindowToTop = { controller.returnChatListToTop(chatListWindowView) },
         onScrollStarted = { programmaticViewportGeneration += 1L },
