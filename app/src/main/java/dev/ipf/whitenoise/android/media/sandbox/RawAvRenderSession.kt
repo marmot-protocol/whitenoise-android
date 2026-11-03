@@ -447,8 +447,7 @@ internal class RawAvRenderSession(
                     audioAnchorUs + (sink?.bufferedPositionUs() ?: 0) >= targetUs ||
                         audioAnchorUs + (sink?.writtenPositionUs() ?: 0) >= targetUs
                 }
-            if (covered) return
-            if (!feedAudioStep(progress, activation, read, waitOnBackpressure = false)) return
+            if (covered || !feedAudioStep(progress, activation, read, waitOnBackpressure = false)) return
         }
     }
 
@@ -663,15 +662,16 @@ internal class RawAvRenderSession(
         read: (Int) -> AvStreamFrame,
     ): Boolean {
         while (valid(activation, appliedSeek)) {
-            val tolerance = pumpAudio(progress)
-            val clock = positionUs()
+            var tolerance = pumpAudio(progress)
+            var clock = positionUs()
+            if (timestampUs > clock + tolerance) {
+                refillAudioReserve(progress, reserveTargetUs, activation, read)
+                if (!valid(activation, appliedSeek)) break
+                tolerance = pumpAudio(progress)
+                clock = positionUs()
+            }
             if (timestampUs <= clock + tolerance) return true
-            refillAudioReserve(progress, reserveTargetUs, activation, read)
-            if (!valid(activation, appliedSeek)) return false
-            val refreshedTolerance = pumpAudio(progress)
-            val refreshedClock = positionUs()
-            if (timestampUs <= refreshedClock + refreshedTolerance) return true
-            delay(((timestampUs - refreshedClock) / 1000).coerceIn(1, 10))
+            delay(((timestampUs - clock) / 1000).coerceIn(1, 10))
         }
         return false
     }

@@ -167,7 +167,8 @@ class RawAvAudioReserveTest {
             if (playing && started) {
                 val elapsedFrames = (now - lastUs) * sampleRate * speed / 1_000_000.0
                 val available = writtenFrames - playedFrames
-                if (elapsedFrames > available && writtenFrames < expectedFrames && !ending && !starving) {
+                val canRecordUnderrun = writtenFrames < expectedFrames && !ending && !starving
+                if (elapsedFrames > available && canRecordUnderrun) {
                     underruns++
                     starving = true
                 }
