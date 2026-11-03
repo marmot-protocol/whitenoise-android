@@ -289,6 +289,29 @@ class PublicKeyCopyPresentationCoverageTest {
         )
     }
 
+    /** A row with no action of its own, like the selected-members review, lets the keyboard reach and copy its key. */
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun anActionlessRowLetsTheKeyboardCopyItsKey() {
+        composeRule.setContent {
+            Themed {
+                ContactRow(
+                    title = "Member",
+                    subtitle = SHORT_KEY,
+                    avatarSeed = "member",
+                    avatarUrl = null,
+                    publicKey = FIRST_KEY,
+                    modifier = Modifier.testTag(ROW),
+                )
+            }
+        }
+
+        keyText(ROW).requestFocus()
+        keyText(ROW).assertIsFocused()
+        keyText(ROW).performKeyInput { pressKey(Key.Enter) }
+        assertEquals(FIRST_KEY, clipText())
+    }
+
     /** Global search copies from the short key alone and still opens the profile from the rest of the row. */
     @Test
     fun globalPersonRowCopiesWithoutOpening() {
@@ -525,8 +548,7 @@ class PublicKeyCopyPresentationCoverageTest {
                 "ui/conversation/share/UserShare.kt" to
                     """UserShareIdentity\(title, shortened, resolvedName, user\.npub\)""",
                 "ui/group/GroupMembers.kt" to
-                    """PublicKeyCopyText\(\s*controller\.memberSubtitle\(member\),""" +
-                    """\s*appState\.npubForDisplay\(member\.memberIdHex\)""",
+                    """val memberNpub = appState\.npubForDisplay\(member\.memberIdHex\)""",
                 "ui/group/GroupDetailsScreen.kt" to """publicKey = profileNpub\.takeIf \{ titleIsKey \}""",
                 "ui/chats/newchat/ContactPickerScreen.kt" to
                     """enabled = !busy && !alreadyMember,[\s\S]*?publicKeyCopyEnabled = !busy,""",

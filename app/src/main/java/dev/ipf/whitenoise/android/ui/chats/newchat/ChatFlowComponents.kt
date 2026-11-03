@@ -163,6 +163,8 @@ internal fun ContactRow(
             null
         }
     val rowRole = if (selectionState == null) Role.Button else Role.Checkbox
+    // The key takes its own focus stop only when the row offers none, so a selectable row keeps one stop.
+    val keyFocusable = publicKeyCopyEnabled && (onClick == null || !enabled)
     Row(
         modifier =
             modifier
@@ -213,7 +215,7 @@ internal fun ContactRow(
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = titleMaxLines,
                     enabled = publicKeyCopyEnabled,
-                    keyboardFocusable = publicKeyCopyEnabled && !enabled,
+                    keyboardFocusable = keyFocusable,
                 )
             } else {
                 EmojiLabel(
@@ -229,7 +231,7 @@ internal fun ContactRow(
                     stateOnly = followedStateDescription != null && subtitle == followedStateDescription,
                     publicKey = publicKey?.takeUnless { publicKeyInTitle },
                     enabled = publicKeyCopyEnabled,
-                    keyboardFocusable = publicKeyCopyEnabled && !enabled,
+                    keyboardFocusable = keyFocusable,
                 )
             }
             secondaryContent?.invoke()
