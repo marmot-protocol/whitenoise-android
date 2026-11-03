@@ -9,11 +9,13 @@ import org.junit.runner.RunWith
 /**
  * Collects the packaged profiles from the prepared, populated dev fixture.
  *
- * Only cold launch-to-surface journeys enter the Startup Profile. Chat open,
- * conversation scrolling, group details and warm share delivery stay in the
- * broader Baseline Profile so they cannot crowd startup code out of the
- * primary DEX. Regenerate when any covered hot path changes — see
- * `docs/performance.md`.
+ * Only cold launch-to-surface journeys enter the Startup Profile, which is what
+ * R8 lays out in the primary DEX. Chat open, conversation scrolling, group
+ * details and warm share delivery stay in the broader Baseline Profile so they
+ * cannot crowd startup code out of the primary DEX. Their rules may still carry
+ * the `S` flag, since every journey begins with a cold launch — that flag only
+ * guides ART compilation, not R8 layout. Regenerate when any covered hot path
+ * changes — see `docs/performance.md`.
  */
 @RunWith(AndroidJUnit4::class)
 class BaselineProfileGenerator {
@@ -85,7 +87,7 @@ class BaselineProfileGenerator {
         ) {
             journeys.run {
                 launchToChatList()
-                pressHome()
+                check(device.pressHome()) { "Failed to return home before the warm share." }
                 deliverShareToRunningApp()
                 returnToChatList()
             }

@@ -970,7 +970,11 @@ APK in place.
 conversation must hold enough history to scroll several screens. Only cold launch-to-surface rules (populated startup to the
 chat list and a cold share to the recipient picker) enter the Startup Profile.
 Chat open, conversation scroll, member roster and warm share delivery remain in
-the Baseline Profile so they cannot crowd startup code out of the primary DEX:
+the Baseline Profile so they cannot crowd startup code out of the primary DEX,
+which R8 lays out from the Startup Profile alone. Their Baseline Profile rules
+may still carry the `S` flag, because each journey begins with a cold launch;
+that flag guides ART compilation only. The Startup Profile also keeps the
+`P`-only rules the startup journeys' own dumps contain:
 
 ```bash
 ./gradlew :app:generateBaselineProfile \
@@ -1029,8 +1033,9 @@ bash scripts/verify-baseline-profile.sh \
   app/build/outputs/apk/devZapstore/benchmarkRelease/app-dev-zapstore-universal-benchmarkRelease.apk
 ```
 
-Pass the merged text profile as a second argument to also require the app's own
-rules, which the compiled assets alone cannot show (CI does this for
+Pass the merged text profile as a second argument to also require every rule
+identity of the committed Baseline Profile in it, which the compiled assets alone
+cannot show (CI does this for
 `devZapstoreBenchmarkRelease`). Both arguments must come from the same assemble:
 running only the merge task leaves an older APK beside a newer text profile, and
 the check would vouch for an APK it did not inspect.
