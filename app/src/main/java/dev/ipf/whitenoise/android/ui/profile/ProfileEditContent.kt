@@ -369,8 +369,13 @@ internal fun ProfileAvatar(
     owner: String,
     url: String?,
 ) {
-    val bitmap by key(owner, url) {
-        rememberRecoverableAvatar(initialImage = AvatarImageLoader.peek(url), enabled = url != null) {
+    val lifetime = AvatarImageLoader.currentCacheLifetime()
+    val bitmap by key(owner, url, lifetime) {
+        rememberRecoverableAvatar(
+            initialImage = AvatarImageLoader.peek(url),
+            enabled = url != null,
+            awaitCached = { AvatarImageLoader.awaitCached(checkNotNull(url), lifetime) },
+        ) {
             AvatarImageLoader.load(checkNotNull(url), AvatarImageLoader.publicProfiles())
         }
     }
