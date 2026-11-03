@@ -164,7 +164,13 @@ class FloatingDictationFallbackTest {
                 Box(
                     Modifier
                         .size(48.dp)
-                        .then(if (painted.value) Modifier.floatingDictationAnchor(followsComposerFab = true) else Modifier),
+                        .then(
+                            if (painted.value) {
+                                Modifier.floatingDictationAnchor(followsComposerFab = true)
+                            } else {
+                                Modifier
+                            },
+                        ),
                 )
             }
         }
