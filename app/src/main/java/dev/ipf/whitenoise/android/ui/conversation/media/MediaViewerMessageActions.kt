@@ -29,12 +29,30 @@ internal class MediaViewerActionGate(
     private val owner: ConversationMediaViewerOwner,
 ) {
     var currentPage: MediaViewerPage? = null
-    private var attached = true
+
+    @Volatile private var attached = true
 
     /** Detaches the actions from the viewer. */
     fun close() {
         attached = false
     }
+
+    /** Owner lifetime remains independent of page changes during an explicit export. */
+    fun ownerIsCurrent(currentOwner: ConversationMediaViewerOwner): Boolean {
+        val account = owner.accountRef
+        return attached && account != null && currentOwner == owner
+    }
+
+    /** A cross-chat export follows its source controller's retained account/runtime and teardown lifetime. */
+    fun sourceOwnerIsCurrent(
+        page: MediaViewerPage,
+        currentOwner: ConversationMediaViewerOwner,
+        sourceController: ConversationController,
+    ): Boolean =
+        ownerIsCurrent(currentOwner) &&
+            sourceController.ownsRetainedForegroundPresentation &&
+            sourceController.boundAccountRef == owner.accountRef &&
+            sourceController.group.groupIdHex.equals(page.groupIdHex ?: owner.conversationId, ignoreCase = true)
 
     /** Runs [action] for the page when the owner is still current. */
     fun dispatch(
@@ -42,7 +60,7 @@ internal class MediaViewerActionGate(
         currentOwner: ConversationMediaViewerOwner,
         action: (MediaViewerPage) -> Unit,
     ) {
-        val ownerMatches = attached && owner.accountRef != null && currentOwner == owner
+        val ownerMatches = ownerIsCurrent(currentOwner)
         if (ownerMatches && currentPage == page) action(page)
     }
 }

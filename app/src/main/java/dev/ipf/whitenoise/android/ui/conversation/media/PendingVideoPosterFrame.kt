@@ -39,3 +39,19 @@ internal fun pendingVideoPosterFrame(
             .probeBytes(bytes, maxEdgePx, extractPoster)
     return PendingVideoPosterFrame(result?.poster, result?.durationMs ?: 0L)
 }
+
+/** Owns a poster until the pending tile can accept it, including cancellation at dispatcher handoff. */
+internal suspend fun decodePendingVideoPosterBitmap(
+    bytes: ByteArray,
+    extract: (ByteArray) -> Bitmap? = ::extractPendingVideoPosterBitmap,
+): Bitmap? =
+    dev.ipf.whitenoise.android.media.decodeOwnedMedia(
+        decode = { extract(bytes) },
+        discard = { it.recycle() },
+    )
+
+private fun extractPendingVideoPosterBitmap(bytes: ByteArray): Bitmap? =
+    pendingVideoPosterFrame(
+        bytes,
+        extractPoster = true,
+    ).bitmap

@@ -161,6 +161,33 @@ class MediaAttachmentSaveTest {
         assertEquals(1, provider.deleteCount)
     }
 
+    /** Revoking the owner during the write leaves no publicly readable gallery entry. */
+    @Test
+    fun ownerChangedDuringImageWriteDeletesPendingEntryBeforePublication() {
+        var ownerCurrent = true
+        val source =
+            object : AttachmentPlaintext {
+                override val size = PAYLOAD.size.toLong()
+
+                override fun copyTo(output: OutputStream) {
+                    output.write(PAYLOAD)
+                    ownerCurrent = false
+                }
+
+                override fun close() = Unit
+            }
+        val failure =
+            runCatching {
+                saveImageToGallery(context(), source, "photo.png", "image/png") {
+                    if (!ownerCurrent) throw CancellationException("owner changed")
+                }
+            }.exceptionOrNull()
+
+        assertTrue(failure is CancellationException)
+        assertEquals(null, provider.updatedValues)
+        assertEquals(1, provider.deleteCount)
+    }
+
     @Test
     fun unknownDocumentMetadataUsesSafeGenericFallbackOnSaveAndPicker() {
         assertTrue(saveAttachmentToMediaStore(context(), AttachmentPlaintext.Bytes(PAYLOAD), "../..", "*/*"))

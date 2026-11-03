@@ -34,6 +34,7 @@ internal class IsolatedAnimationSession private constructor(
     private val awaitSignal: (CountDownLatch, Long) -> Boolean = { signal, remaining ->
         signal.await(remaining, TimeUnit.NANOSECONDS)
     },
+    private val viewerOutput: ViewerAnimationOutput? = null,
 ) : AnimationSessionControl {
     private val viewerPreemption = MutableStateFlow(false)
     private val terminalReason = MutableStateFlow<AnimationTermination?>(null)
@@ -43,7 +44,11 @@ internal class IsolatedAnimationSession private constructor(
     override val preempted = viewerPreemption.asStateFlow()
 
     private val id = ids.incrementAndGet()
-    private val output = SharedMemory.create("animation-pixels", requireNotNull(MediaDecodePolicy.outputCapacity(edge)))
+    private val output =
+        SharedMemory.create(
+            "animation-pixels",
+            viewerOutput?.capacityBytes ?: requireNotNull(MediaDecodePolicy.outputCapacity(edge)),
+        )
     private val lock = Any()
     private val connected = CountDownLatch(1)
     private val firstFrame = CountDownLatch(1)
@@ -145,7 +150,7 @@ internal class IsolatedAnimationSession private constructor(
                 return@synchronized null
             }
             val count =
-                MediaDecodePolicy.pixelBytes(frame.width, frame.height, edge, output.size)
+                animationFrameByteCount(frame.width, frame.height, edge, output.size, viewerOutput)
                     ?: return@synchronized null
             val bitmap = copyFrame(frame, count)
             workerUid = uid
@@ -324,6 +329,11 @@ internal class IsolatedAnimationSession private constructor(
                     data =
                         android.os.Bundle().apply {
                             putInt("edge", edge)
+                            viewerOutput?.let {
+                                putBoolean("viewerOriginal", true)
+                                putInt("viewerWidth", it.width)
+                                putInt("viewerHeight", it.height)
+                            }
                             putParcelable("input", input)
                             putParcelable("output", output)
                             if (dev.ipf.whitenoise.android.BuildConfig.DEBUG) {
@@ -469,6 +479,26 @@ internal class IsolatedAnimationSession private constructor(
                 createAdmitted(context, bytes, edge, decorative, null)
             }
 
+        /** Viewer output preserves the admitted original canvas without a square maximum-edge allocation. */
+        fun createViewer(
+            context: Context,
+            bytes: ByteArray,
+        ): IsolatedAnimationDrawable? {
+            if (Looper.myLooper() == Looper.getMainLooper() ||
+                bytes.size !in 1..MediaDecodePolicy.MAX_INPUT_BYTES
+            ) {
+                return null
+            }
+            val output =
+                ViewerAnimationOutput.fromAdmission(
+                    dev.ipf.whitenoise.android.media
+                        .admitAnimationSource(bytes),
+                )
+            return output?.let {
+                createAdmitted(context, bytes, maxOf(it.width, it.height), false, null, it)
+            }
+        }
+
         /** Only the existing group seam carries a persistent pending ticket. */
         fun createGroup(
             context: Context,
@@ -489,10 +519,15 @@ internal class IsolatedAnimationSession private constructor(
         private fun validSource(
             bytes: ByteArray,
             edge: Int,
+            viewerOutput: ViewerAnimationOutput? = null,
         ): Boolean =
             Looper.myLooper() != Looper.getMainLooper() &&
                 bytes.size in 1..MediaDecodePolicy.MAX_INPUT_BYTES &&
-                edge in 1..AnimationFrameProtocol.MAX_EDGE
+                if (viewerOutput == null) {
+                    edge in 1..AnimationFrameProtocol.MAX_EDGE
+                } else {
+                    edge == maxOf(viewerOutput.width, viewerOutput.height)
+                }
 
         /**
          * Runs [openAdmitted] under admission with one total startup deadline. A non-null [demand] marks a waiting
@@ -504,10 +539,11 @@ internal class IsolatedAnimationSession private constructor(
             edge: Int,
             decorative: Boolean,
             demand: AnimationAdmission.GroupDemand?,
+            viewerOutput: ViewerAnimationOutput? = null,
         ): IsolatedAnimationDrawable? {
-            if (!validSource(bytes, edge)) return null
+            if (!validSource(bytes, edge, viewerOutput)) return null
             return admission.decode(decorative, demand != null, MediaDecodePolicy.DEADLINE_MS, demand) { lease ->
-                openAdmitted(context, bytes, edge, lease)
+                openAdmitted(context, bytes, edge, lease, viewerOutput)
             }
         }
 
@@ -517,11 +553,18 @@ internal class IsolatedAnimationSession private constructor(
             bytes: ByteArray,
             edge: Int,
             admissionLease: AnimationAdmission.Lease,
+            viewerOutput: ViewerAnimationOutput? = null,
         ): IsolatedAnimationDrawable? {
             var session: IsolatedAnimationSession? = null
             var delivered: IsolatedAnimationDrawable? = null
             return try {
-                val created = IsolatedAnimationSession(context.applicationContext, edge, admissionLease)
+                val created =
+                    IsolatedAnimationSession(
+                        context.applicationContext,
+                        edge,
+                        admissionLease,
+                        viewerOutput = viewerOutput,
+                    )
                 session = created
                 active.set(created)
                 admissionLease.onRetire { created.yieldToViewer() }
