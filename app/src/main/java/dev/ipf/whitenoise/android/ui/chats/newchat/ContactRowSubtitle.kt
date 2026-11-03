@@ -10,7 +10,7 @@ import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 
 /**
  * The row's second line: a [stateOnly] subtitle is already announced by the row, a [publicKey] subtitle copies that
- * whole key on its own tap, and anything else is plain text.
+ * whole key on its own tap (and by keyboard when [keyboardFocusable]), and anything else is plain text.
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -19,11 +19,19 @@ internal fun ContactRowSubtitle(
     stateOnly: Boolean,
     publicKey: String?,
     enabled: Boolean,
+    keyboardFocusable: Boolean = false,
 ) {
     val style = MaterialTheme.typography.bodyMedium
     val color = MaterialTheme.colorScheme.onSurfaceVariant
     if (publicKey != null && !stateOnly) {
-        PublicKeyCopyText(subtitle, publicKey, style = style, color = color, enabled = enabled)
+        PublicKeyCopyText(
+            subtitle,
+            publicKey,
+            style = style,
+            color = color,
+            enabled = enabled,
+            keyboardFocusable = keyboardFocusable,
+        )
     } else {
         Text(
             subtitle,

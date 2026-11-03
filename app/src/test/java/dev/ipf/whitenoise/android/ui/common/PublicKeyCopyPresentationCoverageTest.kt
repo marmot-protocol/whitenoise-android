@@ -9,12 +9,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
@@ -24,7 +27,10 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
@@ -185,7 +191,11 @@ class PublicKeyCopyPresentationCoverageTest {
         assertNull(composeRule.onNodeWithTag(ROW).fetchSemanticsNode().customActions())
     }
 
-    /** An existing member's disabled picker row still copies its key title, and the tap never selects the row. */
+    /**
+     * An existing member's disabled picker row still copies its key title by pointer and by keyboard, and neither ever
+     * selects the row.
+     */
+    @OptIn(ExperimentalTestApi::class)
     @Test
     fun aDisabledRowStillCopiesItsKeyTitle() {
         var rowTaps = 0
@@ -209,7 +219,39 @@ class PublicKeyCopyPresentationCoverageTest {
         keyText(ROW).performClick()
         assertEquals(FIRST_KEY, clipText())
         assertEquals(listOf(copyLabel(FIRST_KEY)), copyActionLabels(composeRule.onNodeWithTag(ROW)))
+        clearClipboard()
+        keyText(ROW).requestFocus()
+        keyText(ROW).assertIsFocused()
+        keyText(ROW).performKeyInput { pressKey(Key.Enter) }
+        assertEquals(FIRST_KEY, clipText())
+        clearClipboard()
+        keyText(ROW).performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals(FIRST_KEY, clipText())
         assertEquals(0, rowTaps)
+    }
+
+    /** A key in an enabled row stays out of keyboard focus: the row is the single focus stop for its own action. */
+    @Test
+    fun anEnabledRowKeepsTheKeyOutOfKeyboardFocus() {
+        composeRule.setContent {
+            Themed {
+                ContactRow(
+                    title = SHORT_KEY,
+                    subtitle = "Member",
+                    avatarSeed = "member",
+                    avatarUrl = null,
+                    onClick = {},
+                    publicKey = FIRST_KEY,
+                    publicKeyInTitle = true,
+                    modifier = Modifier.testTag(ROW),
+                )
+            }
+        }
+
+        assertFalse(
+            "an enabled row's key must not be its own focus stop",
+            keyText(ROW).fetchSemanticsNode().config.contains(SemanticsProperties.Focused),
+        )
     }
 
     /** Global search copies from the short key alone and still opens the profile from the rest of the row. */

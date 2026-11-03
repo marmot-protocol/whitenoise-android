@@ -128,7 +128,8 @@ internal fun FlowSearchField(
  * row passes [dev.ipf.whitenoise.android.core.AvatarImageLoader.publicProfiles], a group row its presentation's.
  * [publicKey] is the person's complete canonical npub: when the subtitle, or with [publicKeyInTitle] the nameless
  * title, displays that key, its own text copies the whole value while the row keeps its action (#3565).
- * [publicKeyCopyEnabled] defaults to [enabled]; a row that refuses selection can still offer its key for copying.
+ * [publicKeyCopyEnabled] defaults to [enabled]; a row that refuses selection can still offer its key for copying,
+ * and then the key takes its own keyboard focus, since the disabled row cannot.
  */
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
@@ -212,6 +213,7 @@ internal fun ContactRow(
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = titleMaxLines,
                     enabled = publicKeyCopyEnabled,
+                    keyboardFocusable = publicKeyCopyEnabled && !enabled,
                 )
             } else {
                 EmojiLabel(
@@ -227,6 +229,7 @@ internal fun ContactRow(
                     stateOnly = followedStateDescription != null && subtitle == followedStateDescription,
                     publicKey = publicKey?.takeUnless { publicKeyInTitle },
                     enabled = publicKeyCopyEnabled,
+                    keyboardFocusable = publicKeyCopyEnabled && !enabled,
                 )
             }
             secondaryContent?.invoke()

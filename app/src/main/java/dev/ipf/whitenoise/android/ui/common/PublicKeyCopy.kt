@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui.common
 
 import android.os.Build
 import android.widget.Toast
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -13,6 +14,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -130,7 +136,8 @@ internal fun abbreviatesPublicKey(
  * label alone, so a surrounding row keeps its navigation, selection or account-switch action, and a long press is
  * left to the row. The label adds no semantics boundary: its short text stays in the row's spoken label, and the row
  * gains a Copy public key action whose label carries the full key. Without a canonical [npub], or while not
- * [enabled], it is plain text.
+ * [enabled], it is plain text. With [keyboardFocusable] — for a disabled row that cannot hold focus itself — the
+ * label becomes its own focus stop, and Enter, D-pad centre or Space copies the key.
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
@@ -142,6 +149,7 @@ internal fun PublicKeyCopyText(
     color: Color = Color.Unspecified,
     maxLines: Int = 1,
     enabled: Boolean = true,
+    keyboardFocusable: Boolean = false,
 ) {
     val copy = rememberPublicKeyCopy(npub)
     val copyLabel = stringResource(R.string.public_key_copy_action_with_value, npub)
@@ -151,6 +159,7 @@ internal fun PublicKeyCopyText(
             if (enabled && isCanonicalNpub(npub)) {
                 modifier
                     .pointerInput(npub) { copyOnShortTap(copy) }
+                    .then(if (keyboardFocusable) Modifier.copyOnKeyActivation(copy) else Modifier)
                     .semantics {
                         customActions =
                             listOf(
@@ -169,6 +178,18 @@ internal fun PublicKeyCopyText(
         overflow = TextOverflow.Ellipsis,
     )
 }
+
+/** Makes the label a focus stop whose Enter, D-pad centre or Space release runs [copy]. */
+private fun Modifier.copyOnKeyActivation(copy: () -> Unit): Modifier =
+    onKeyEvent { event ->
+        val activates =
+            event.key == Key.Enter ||
+                event.key == Key.NumPadEnter ||
+                event.key == Key.DirectionCenter ||
+                event.key == Key.Spacebar
+        if (activates && event.type == KeyEventType.KeyUp) copy()
+        activates
+    }.focusable()
 
 /**
  * Runs [copy] for a tap released before the long-press timeout and consumes only that release, so the row's own tap
