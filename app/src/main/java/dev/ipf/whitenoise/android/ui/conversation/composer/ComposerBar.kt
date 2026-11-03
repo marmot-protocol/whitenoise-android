@@ -518,6 +518,7 @@ internal fun ComposerBar(
     val density = LocalDensity.current
     val editorLineHeight = rememberComposerEditorLineHeight()
     var composerEmojiPickerOpen by remember { mutableStateOf(false) }
+    var sendingIdentityOpen by remember { mutableStateOf(false) }
     var composerEmojiPickerRequested by remember { mutableStateOf(false) }
     var composerEmojiSearchActive by remember { mutableStateOf(false) }
     var composerKeyboardRestorePending by remember { mutableStateOf(false) }
@@ -1420,7 +1421,11 @@ internal fun ComposerBar(
                     ComposerPill(
                         sendingIdentity =
                             if (appState != null && composerSendingAccount(appState, draftAccountRef) != null) {
-                                { ComposerSendingIdentity(appState, draftAccountRef, draftKey, overlayBackRegistrar) }
+                                {
+                                    ComposerSendingIdentity(appState, draftAccountRef, draftKey, overlayBackRegistrar) {
+                                        sendingIdentityOpen = it
+                                    }
+                                }
                             } else {
                                 null
                             },
@@ -1505,7 +1510,8 @@ internal fun ComposerBar(
                                 onPoll = onCreatePoll,
                             )
                         },
-                        preImeBackEnabled = !composerEmojiPickerOpen && !attachmentSheetState.isOpen,
+                        preImeBackEnabled =
+                            !composerEmojiPickerOpen && !attachmentSheetState.isOpen && !sendingIdentityOpen,
                         onPreImeBack = {
                             if (onComposerPreImeBack != null) {
                                 onComposerPreImeBack()

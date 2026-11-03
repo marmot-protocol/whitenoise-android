@@ -2,7 +2,9 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import android.os.SystemClock
 import android.view.InputDevice
+import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.View
 import android.window.OnBackInvokedCallback
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
@@ -10,12 +12,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalCursorBlinkEnabled
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -58,6 +65,7 @@ class ComposerSendingIdentityDismissCoverageTest {
     private val bob = testAccount("bob", "bb".repeat(32))
     private var sends = 0
     private val backCallbacks = mutableListOf<OnBackInvokedCallback>()
+    private lateinit var hostView: View
 
     /** The confirmation goes through the shared keyboard-safe owner, not a raw popup with its own dismissal. */
     @Test
@@ -135,20 +143,72 @@ class ComposerSendingIdentityDismissCoverageTest {
         composeRule.onNodeWithText(DRAFT).assertIsDisplayed().assertIsFocused()
     }
 
-    /** One overlay Back callback is registered while open; invoking it closes the popup and unregisters it. */
+    /**
+     * While open, the popup holds the only overlay Back callback — the focused composer stands its own down —
+     * and invoking it closes the popup, after which the composer's callback returns.
+     */
     @Test
     fun backClosesTheConfirmationThroughOneOverlayCallback() {
         render()
-        val before = backCallbacks.size
+        val composerCallbacks = backCallbacks.toList()
 
         tapAt(centerOf("composer-sending-identity"))
         popup().assertIsDisplayed()
-        assertEquals("exactly one overlay Back owner while open", before + 1, backCallbacks.size)
+        assertEquals("exactly one overlay Back owner while open", 1, backCallbacks.size)
+        assertFalse("the composer's own Back must stand down", backCallbacks.single() in composerCallbacks)
 
         composeRule.runOnIdle { backCallbacks.last().onBackInvoked() }
         popup().assertDoesNotExist()
-        assertEquals(before, backCallbacks.size)
+        assertEquals(composerCallbacks.size, backCallbacks.size)
         composeRule.onNodeWithText(DRAFT).assertIsDisplayed()
+    }
+
+    /**
+     * With the keyboard up, the composer's pre-IME Back interceptor must let a Back key pass while the
+     * confirmation is open, so Back closes only the confirmation and the draft keeps focus; once it is
+     * closed, the interceptor owns Back again and dismisses the keyboard as before.
+     */
+    @Test
+    fun preImeBackWhileOpenLeavesTheKeyboardAndClosesOnlyTheConfirmation() {
+        render()
+        tapAt(centerOf("composer-sending-identity"))
+        popup().assertIsDisplayed()
+
+        assertFalse("the composer must not consume Back while the confirmation is open", preImeBack())
+        composeRule.onNodeWithText(DRAFT).assertIsFocused()
+        composeRule.runOnIdle { backCallbacks.last().onBackInvoked() }
+        popup().assertDoesNotExist()
+        composeRule.onNodeWithText(DRAFT).assertIsFocused()
+
+        assertTrue("the composer owns Back again once the confirmation is closed", preImeBack())
+        composeRule.onNodeWithText(DRAFT).assertIsNotFocused()
+    }
+
+    /** The open state is reported on open and close, and a key change while open reports it closed. */
+    @Test
+    fun showingChangeTracksOpenCloseAndDisposal() {
+        val reports = mutableListOf<Boolean>()
+        var conversation by mutableStateOf<Any>("first")
+        val state = emptyAppState(accounts = listOf(alice, bob), activeAccountRef = "bob")
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                Surface { ComposerSendingIdentity(state, "alice", conversation) { reports += it } }
+            }
+        }
+        assertEquals(listOf(false), reports.collapsed())
+
+        tapAt(centerOf("composer-sending-identity"))
+        assertEquals(true, reports.last())
+        tapAt(centerOf("composer-sending-identity"))
+        assertEquals(false, reports.last())
+
+        tapAt(centerOf("composer-sending-identity"))
+        assertEquals(true, reports.last())
+        composeRule.runOnIdle { conversation = "second" }
+        composeRule.waitForIdle()
+        assertEquals(false, reports.last())
+        popup().assertDoesNotExist()
+        assertEquals(listOf(false, true, false, true, false), reports.collapsed())
     }
 
     /** Before Android 13 the popup's BackHandler owns Back, and the activity dispatcher closes it first. */
@@ -190,6 +250,7 @@ class ComposerSendingIdentityDismissCoverageTest {
                 unregister
             }
         composeRule.setContent {
+            hostView = LocalView.current
             CompositionLocalProvider(LocalCursorBlinkEnabled provides false) {
                 WhiteNoiseTheme(darkTheme = false) {
                     Surface(Modifier.width(360.dp)) {
@@ -214,6 +275,21 @@ class ComposerSendingIdentityDismissCoverageTest {
         // Focus the draft with a real tap so focus is held the way a user would hold it.
         tapAt(centerOf(composeRule.onNodeWithText(DRAFT)))
     }
+
+    /** Sends a Back down/up pair through the host view's pre-IME path; true when the composer consumed it. */
+    private fun preImeBack(): Boolean {
+        var consumed = false
+        composeRule.runOnUiThread {
+            listOf(KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP).forEach { action ->
+                consumed = hostView.dispatchKeyEventPreIme(KeyEvent(action, KeyEvent.KEYCODE_BACK)) || consumed
+            }
+        }
+        composeRule.waitForIdle()
+        return consumed
+    }
+
+    /** The values with consecutive repeats collapsed, since an effect may restate an unchanged state. */
+    private fun List<Boolean>.collapsed(): List<Boolean> = filterIndexed { i, v -> i == 0 || this[i - 1] != v }
 
     /** The confirmation popup's content node. */
     private fun popup() = composeRule.onNodeWithTag("composer-sending-identity-popup")
