@@ -140,14 +140,15 @@ internal fun chatPinFollowStep(
  *
  * When the bounded window had earlier rows, [returnWindowToTop] reports the frame to wait for — the head
  * frame it installed, or the live window's current frame when a newer one already won or MDK answered stale —
- * and the follow waits until that frame is presented, bounded by a timeout. While the presented window still
- * has earlier rows, the return is retried a bounded number of times, so a stale answer cannot leave the snap
- * on a shifted window's first row. A null report means no live window remains, so the follow settles on what
- * is shown.
+ * and the follow waits until that frame is presented, bounded by a timeout. While the installed window
+ * still has earlier rows, the return is retried a bounded number of times, so one stale answer does not
+ * leave the snap on a shifted window's first row; repeated stale answers fall back to the plain snap. A null
+ * report means no live window remains, so the follow settles on what is shown.
  *
- * A dataset or drag change retires the request at any point, including mid-animation or mid-return: the
- * follow job is cancelled at once, so an old pin never scrolls or returns the window of the list that
- * replaced its own. A retired or cancelled follow still consumes the request.
+ * A dataset or drag change retires the request at any point: the follow job is cancelled at once, so an old
+ * pin's animation stops and it never starts a window return or a snap after retirement. A native return already
+ * in flight still completes in MDK, and the receive loop applies its frame. A retired or cancelled follow still
+ * consumes the request.
  */
 @Composable
 @Suppress("FunctionNaming", "LongParameterList") // Effect composable; one request plus the live gates it reads.
@@ -214,7 +215,7 @@ internal fun ChatPinFollowToTopEffect(
 
 /**
  * Scrolls [listState] to the top, returns a shifted window to its head — retrying while a stale or racing answer
- * leaves earlier rows presented — and snaps to item zero, offset zero unless the request [retired] meanwhile.
+ * leaves earlier rows installed — and snaps to item zero, offset zero unless the request [retired] meanwhile.
  */
 private suspend fun followPinnedBlockToTop(
     listState: LazyListState,

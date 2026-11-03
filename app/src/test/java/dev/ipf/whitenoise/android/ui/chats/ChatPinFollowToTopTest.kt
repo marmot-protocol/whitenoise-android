@@ -300,6 +300,12 @@ class ChatPinFollowToTopTest {
         assertEquals("the switched dataset must already be live", dataset.copy(folderId = "other"), datasetKey)
         assertEquals("a retired follow must not return the replacement window", 0, windowReturns)
         assertEquals("a retired follow must not snap the replacement list", 0, snapsAfterSwitch)
+        composeRule.runOnIdle {
+            assertTrue(
+                "the animation must stop short of the top once retired",
+                listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0,
+            )
+        }
     }
 
     /** Writes test state on the UI thread and publishes it, as a production snapshot write would be. */
