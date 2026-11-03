@@ -26,6 +26,12 @@ internal data class GroupAvatarPresentation(
     val readOriginalBytes: (suspend () -> ByteArray?)? = null,
     val animationKey: String? = null,
     val groupAnimation: GroupAvatarAnimation? = null,
+    /**
+     * The worker domain for loading [pictureUrl]: single-use for a group's URL picture, whose host chooses its bytes,
+     * and the public profiles for a person's published picture. A private contact handle decodes in its own domain.
+     */
+    val pictureDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
+        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
 )
 
 /** Maximum local read for an evicted animated source, matching the existing encoded avatar budget. */
@@ -108,6 +114,55 @@ internal fun WhiteNoiseAppState.ownsPrivateAvatarSource(
     accounts.any { it.label == accountRef && !it.signedOut } &&
         PrivateContactAvatarLoader.belongsToAccount(source, accountRef)
 
+/** [groupAvatarDecodeDomain] for [group]'s durable selection, member-pinned only when it is the encrypted image. */
+internal fun durableGroupPictureDomain(
+    group: AppGroupRecordFfi,
+    ownsGroupPicture: Boolean,
+    accountRef: String?,
+): dev.ipf.whitenoise.android.media.MediaTrustDomain =
+    groupAvatarDecodeDomain(
+        ownsGroupPicture,
+        dev.ipf.whitenoise.android.core.GroupProjector
+            .pictureIsMemberPinned(group),
+        accountRef,
+        group.groupIdHex,
+    )
+
+/**
+ * The worker domain of a legacy presentation's URL: a group's URL picture has host-chosen bytes, so it decodes
+ * single-use, and otherwise the URL is a person's published fallback.
+ */
+internal fun legacyGroupPictureDomain(
+    legacyUrl: String?,
+    accountRef: String?,
+): dev.ipf.whitenoise.android.media.MediaTrustDomain =
+    if (legacyUrl != null) {
+        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique
+    } else {
+        dev.ipf.whitenoise.android.media.MediaTrustDomain
+            .publicProfiles(accountRef)
+    }
+
+/**
+ * A group's member-pinned (encrypted) picture decodes in its conversation's worker, any other picture a group owns
+ * single-use, as its URL's host chooses the bytes, and a person's in the account's public profiles.
+ */
+internal fun groupAvatarDecodeDomain(
+    ownsGroupPicture: Boolean,
+    memberPinned: Boolean,
+    accountRef: String?,
+    groupIdHex: String,
+): dev.ipf.whitenoise.android.media.MediaTrustDomain =
+    when {
+        ownsGroupPicture && memberPinned ->
+            dev.ipf.whitenoise.android.media.MediaTrustDomain
+                .conversation(accountRef, groupIdHex)
+        ownsGroupPicture -> dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique
+        else ->
+            dev.ipf.whitenoise.android.media.MediaTrustDomain
+                .publicProfiles(accountRef)
+    }
+
 /** Classification travels with the exact displayed pixels through decoded-cache capacity eviction. */
 @Composable
 internal fun rememberGroupAvatarClassification(
@@ -130,7 +185,10 @@ internal fun rememberGroupAvatarClassification(
     }
 }
 
-/** Keeps selected native pixels and their exact retained classification under the same presentation owner. */
+/**
+ * Keeps selected native pixels and their exact retained classification under the same presentation owner. The
+ * pixels decode in [domain], the selection's [durableGroupPictureDomain].
+ */
 @Composable
 @Suppress("LongParameterList") // Mirrors the existing selected durable-avatar inputs.
 internal fun rememberSelectedDurableGroupAvatar(
@@ -140,10 +198,11 @@ internal fun rememberSelectedDurableGroupAvatar(
     accountRef: String?,
     seed: ChatListAvatarSeed?,
     personPicture: Boolean,
+    domain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
 ): GroupAvatarPresentation {
     val key = accountRef?.let { asset.takeIf { it.isRenderable() }?.cacheKey(it) }
     val ownedSeed = seed?.takeIf { it.source == ChatListAvatarSource.DURABLE && it.key == key }
-    val image = rememberDurableAvatar(appState, asset, accountRef) ?: ownedSeed?.image
+    val image = rememberDurableAvatar(appState, asset, accountRef, domain) ?: ownedSeed?.image
     val classification = rememberGroupAvatarClassification(appState, asset, accountRef, image, ownedSeed)
     return appState.durableGroupAvatarPresentation(group, asset, accountRef, image, personPicture, classification)
 }

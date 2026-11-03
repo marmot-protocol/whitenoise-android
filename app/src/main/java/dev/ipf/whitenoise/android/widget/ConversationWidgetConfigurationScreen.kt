@@ -26,6 +26,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
@@ -157,7 +158,14 @@ private fun WidgetAccountChoice(
                 .testTag("widget.profile.${profile.reference}")
                 .semantics { role = Role.RadioButton },
         leadingContent = {
-            Avatar(profile.name, profile.seed, 48.dp, pictureUrl = profile.pictureUrl, picture = profile.picture)
+            Avatar(
+                profile.name,
+                profile.seed,
+                48.dp,
+                pictureUrl = profile.pictureUrl,
+                picture = profile.picture,
+                pictureDomain = AvatarImageLoader.publicProfiles(),
+            )
         },
         supportingContent = if (profile.active) ({ Text(stringResource(R.string.active)) }) else null,
         trailingContent = {

@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AgentOperationPresentation
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.formatAgentOperationArguments
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -208,6 +209,7 @@ internal fun AgentOperationRow(
                         seed = sender.seed,
                         size = 32.dp,
                         pictureUrl = sender.avatarUrl,
+                        pictureDomain = AvatarImageLoader.publicProfiles(),
                     )
                 }
                 Spacer(Modifier.width(8.dp))

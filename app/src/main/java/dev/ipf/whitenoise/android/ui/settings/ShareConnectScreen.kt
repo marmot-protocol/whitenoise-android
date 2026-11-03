@@ -430,7 +430,13 @@ private fun ShareProfileContent(
                     ),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Avatar(title = profile.name, seed = profile.seed, size = avatarSize, pictureUrl = profile.pictureUrl)
+            Avatar(
+                title = profile.name,
+                seed = profile.seed,
+                size = avatarSize,
+                pictureUrl = profile.pictureUrl,
+                pictureDomain = AvatarImageLoader.publicProfiles(),
+            )
             EmojiLabel(
                 text = profile.name,
                 modifier = Modifier.padding(top = WhiteNoiseSpacing.FormField),

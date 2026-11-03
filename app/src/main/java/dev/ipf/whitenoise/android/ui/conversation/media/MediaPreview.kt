@@ -42,6 +42,7 @@ import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.decodeAdmittedAttachmentImage
 import dev.ipf.whitenoise.android.media.decodeLocalPreviewStill
 import dev.ipf.whitenoise.android.media.readLocalPreviewSource
+import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
@@ -107,17 +108,22 @@ internal sealed interface MediaPreviewImage {
     data object Failed : MediaPreviewImage
 }
 
-/** The decoded preview, or null while it is loading and after it failed. */
+/** The decoded preview of [pick], or null while it is loading and after it failed. */
 @Composable
 internal fun rememberMediaPreviewBitmap(
     uri: android.net.Uri,
     isVideo: Boolean,
     maxEdgePx: Int,
+    pick: String,
     prepared: PreparedPhotoPreview? = null,
-): ImageBitmap? = (rememberMediaPreviewImage(uri, isVideo, maxEdgePx, prepared) as? MediaPreviewImage.Ready)?.bitmap
+): ImageBitmap? {
+    val image = rememberMediaPreviewImage(uri, isVideo, maxEdgePx, pick, prepared)
+    return (image as? MediaPreviewImage.Ready)?.bitmap
+}
 
 /**
- * Decode the prepared send artifact when available, otherwise the original local Uri.
+ * Decode the prepared send artifact when available, otherwise the original local Uri, in the outgoing worker of
+ * [pick]'s draft, which no other draft's picks reach.
  *
  * A GIF or WebP reaches a decoder only after content admission, whatever its provider MIME type claims,
  * and a refused or unreadable source ends as [MediaPreviewImage.Failed] rather than a permanent spinner.
@@ -127,9 +133,11 @@ internal fun rememberMediaPreviewImage(
     uri: android.net.Uri,
     isVideo: Boolean,
     maxEdgePx: Int,
+    pick: String,
     prepared: PreparedPhotoPreview? = null,
 ): MediaPreviewImage {
     val context = LocalContext.current
+    val domain = LocalPickMediaDomains.current(pick)
     var bitmap by
         remember(uri, isVideo, maxEdgePx, prepared?.revision) {
             mutableStateOf<android.graphics.Bitmap?>(null)
@@ -138,7 +146,7 @@ internal fun rememberMediaPreviewImage(
     LaunchedEffect(uri, isVideo, maxEdgePx, prepared?.revision) {
         var decoded: android.graphics.Bitmap? = null
         try {
-            withContext(Dispatchers.IO) {
+            withContext(Dispatchers.IO + MediaTrustScope.element(domain)) {
                 decoded =
                     decodeStagedPreviewBitmap(context, uri, isVideo, maxEdgePx, prepared) { ensureActive() }
             }
@@ -232,17 +240,23 @@ private fun decodeStagedPreviewBitmap(
 internal sealed class StagedPreviewItem {
     abstract val uri: android.net.Uri
 
+    /** The pick whose draft's outgoing worker decodes this item: the slot id, or the document's URI. */
+    abstract val pick: String
+
     data class Media(
         val slot: PendingMediaSlot,
     ) : StagedPreviewItem() {
         override val uri: android.net.Uri = slot.uri
+        override val pick: String = slot.id
     }
 
     /** A staged document; [occurrence] tells repeated picks of one URI apart, starting at 1. */
     data class Document(
         override val uri: android.net.Uri,
         val occurrence: Int = 1,
-    ) : StagedPreviewItem()
+    ) : StagedPreviewItem() {
+        override val pick: String = uri.toString()
+    }
 }
 
 /** The preview's items in send order, numbering repeated document URIs so each keeps its own key. */
