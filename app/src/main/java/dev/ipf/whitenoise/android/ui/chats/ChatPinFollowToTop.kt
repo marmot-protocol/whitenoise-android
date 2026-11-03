@@ -148,9 +148,11 @@ internal fun chatPinFollowStep(
  * frame it installed, or the live window's current frame when a newer one already won or MDK answered stale —
  * and the follow waits until that frame is presented, bounded by a timeout. While the installed window
  * still has earlier rows, the return is retried a bounded number of times, each retry only after a newer
- * window frame arrives, so a stale answer does not leave the snap on a shifted window's first row. If no
- * newer frame arrives within the bound, the follow falls back to the plain snap. A null
- * report means no live window remains, so the follow settles on what is shown.
+ * window frame arrives, so a stale answer does not leave the snap on a shifted window's first row. If the
+ * window is still shifted once those bounded tries end, the follow snaps to what is shown but keeps the
+ * request: the next newer frame starts another round, and only a frame without earlier rows, a missing
+ * live window or retirement ends it. A null report means no live window remains, so the follow settles on
+ * what is shown.
  *
  * A dataset or drag change retires the request at any point: the follow job is cancelled at once, so an old
  * pin's animation stops and it never starts a window return or a snap after retirement. A native return already
@@ -222,7 +224,8 @@ internal fun ChatPinFollowToTopEffect(
 
 /**
  * Scrolls [listState] to the top, returns a shifted window to its head — retrying while a stale or racing answer
- * leaves earlier rows installed — and snaps to item zero, offset zero unless the request [retired] meanwhile.
+ * leaves earlier rows installed — and snaps to item zero, offset zero unless the request [retired] meanwhile. A
+ * window still shifted after the bounded tries parks the follow until a newer frame, which starts another round.
  */
 private suspend fun followPinnedBlockToTop(
     listState: LazyListState,
@@ -237,11 +240,27 @@ private suspend fun followPinnedBlockToTop(
     }
     listState.animateScrollToItem(0)
     val windowWasShifted = hasEarlierRows()
-    if (windowWasShifted) returnShiftedWindowToHead(retired, hasEarlierRows, returnWindowToTop)
-    // Let the list measure what it now holds before checking the final position.
+    var shifted = if (windowWasShifted) returnShiftedWindowToHead(retired, hasEarlierRows, returnWindowToTop) else null
+    settleAtTop(listState, windowWasShifted, retired, onScrollStarted)
+    while (shifted != null && !retired()) {
+        // Parked rather than consumed: the request still owns the viewport, so the next frame resumes the return.
+        val parked = shifted
+        snapshotFlow { parked.superseded() || retired() }.first { it }
+        shifted = if (hasEarlierRows()) returnShiftedWindowToHead(retired, hasEarlierRows, returnWindowToTop) else null
+        settleAtTop(listState, force = true, retired, onScrollStarted)
+    }
+}
+
+/** After the list measures what it now holds, snaps to item zero, offset zero when [force]d or not already there. */
+private suspend fun settleAtTop(
+    listState: LazyListState,
+    force: Boolean,
+    retired: () -> Boolean,
+    onScrollStarted: () -> Unit,
+) {
     withFrameNanos { }
     val atTop = listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
-    if ((windowWasShifted || !atTop) && !retired()) {
+    if ((force || !atTop) && !retired()) {
         onScrollStarted()
         listState.scrollToItem(0)
     }
@@ -250,26 +269,30 @@ private suspend fun followPinnedBlockToTop(
 /**
  * Returns a shifted window to its head within [CHAT_PIN_FOLLOW_RETURN_ATTEMPTS] tries, waiting for each answer's
  * frame to be presented. A stale answer leaves the window shifted on the frame it already showed, so the next try
- * is spent only after a newer frame arrives — resending the same cursor would be refused again at once.
+ * is spent only after a newer frame arrives — resending the same cursor would be refused again at once. Reports the
+ * last answer while earlier rows remain, or null once the head is shown or no live window remains.
  */
 private suspend fun returnShiftedWindowToHead(
     retired: () -> Boolean,
     hasEarlierRows: () -> Boolean,
     returnWindowToTop: suspend () -> ChatPinFollowHeadPresented?,
-) {
+): ChatPinFollowHeadPresented? {
     var attempts = 0
+    var head: ChatPinFollowHeadPresented? = null
     var retry = true
     while (retry && !retired()) {
         attempts += 1
-        val head = returnWindowToTop()
+        val answer = returnWindowToTop()
+        head = answer
         // The restored head is published by the controller's debounced recompute, not on this frame.
-        if (head != null) awaitOrRetired(retired) { head.presented() }
-        retry = head != null &&
+        if (answer != null) awaitOrRetired(retired) { answer.presented() }
+        retry = answer != null &&
             attempts < CHAT_PIN_FOLLOW_RETURN_ATTEMPTS &&
             hasEarlierRows() &&
-            awaitOrRetired(retired) { head.superseded() } &&
+            awaitOrRetired(retired) { answer.superseded() } &&
             hasEarlierRows()
     }
+    return head?.takeIf { hasEarlierRows() }
 }
 
 /** Waits, bounded, until [condition] holds or the request [retired]; true only when [condition] held. */
@@ -288,5 +311,5 @@ private const val CHAT_PIN_FOLLOW_SNAP_INDEX = 10
 /** Returns tried while a stale or racing answer leaves the presented window with earlier rows. */
 private const val CHAT_PIN_FOLLOW_RETURN_ATTEMPTS = 3
 
-/** Upper bound on waiting for a restored head window to be published before snapping anyway. */
+/** Upper bound on each wait for a returned frame, so a missing one ends the round instead of holding the snap. */
 private const val CHAT_PIN_FOLLOW_WINDOW_TIMEOUT_MILLIS = 1_000L

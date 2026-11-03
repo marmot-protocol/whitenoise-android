@@ -161,16 +161,7 @@ class ChatPinFollowToTopTest {
         assertEquals(listOf(issued), consumed)
         assertEquals(1, windowReturns)
         assertEquals(head, rows)
-        composeRule.runOnIdle {
-            assertEquals(0, listState.firstVisibleItemIndex)
-            assertEquals(0, listState.firstVisibleItemScrollOffset)
-            assertEquals(
-                "row-0",
-                listState.layoutInfo.visibleItemsInfo
-                    .first()
-                    .key,
-            )
-        }
+        assertSettledOnHead(listState)
     }
 
     /** A request whose dataset changed before it could follow is retired without moving the viewport. */
@@ -257,37 +248,38 @@ class ChatPinFollowToTopTest {
         composeRule.waitForIdle()
         assertEquals("one stale return, then one retry after the replacement", 2, windowReturns)
         assertEquals(head, rows)
-        composeRule.runOnIdle {
-            assertEquals(0, listState.firstVisibleItemIndex)
-            assertEquals(0, listState.firstVisibleItemScrollOffset)
-            assertEquals(
-                "row-0",
-                listState.layoutInfo.visibleItemsInfo
-                    .first()
-                    .key,
-            )
-        }
+        assertSettledOnHead(listState)
     }
 
-    /** When no newer window ever arrives, a stale answer is not resent, and the follow falls back within its bound. */
-    @Test fun staleReturnWithNoNewerWindowIsNotResent() {
+    /**
+     * When no newer window arrives, a stale answer is not resent and the request is not consumed on the shifted
+     * window: it stays pending past every bounded wait, and only retirement ends it.
+     */
+    @Test fun staleReturnWithNoNewerWindowKeepsTheRequestUntilRetired() {
         val head = List(60) { "row-$it" }
         val rows = head.drop(30)
+        var datasetKey by mutableStateOf(dataset)
         var request by mutableStateOf<ChatPinFollowRequest?>(null)
         var windowReturns = 0
+        var pastEveryBound = false
         val consumed = mutableListOf<ChatPinFollowRequest>()
         composeRule.setContent {
             val listState = rememberLazyListState(initialFirstVisibleItemIndex = 20)
+            val clock = rememberCoroutineScope()
             ChatPinFollowToTopEffect(
                 listState = listState,
                 request = request,
-                datasetKey = dataset,
+                datasetKey = datasetKey,
                 userGestureGeneration = 0L,
                 unpinnedVisibleIds = emptySet(),
                 motionSettled = true,
                 hasEarlierRows = { true },
                 returnWindowToTop = {
                     windowReturns += 1
+                    clock.launch {
+                        delay(PAST_EVERY_WAIT_MILLIS)
+                        pastEveryBound = true
+                    }
                     frameMark(0) { 0 }
                 },
                 onScrollStarted = {},
@@ -302,8 +294,74 @@ class ChatPinFollowToTopTest {
         }
         composeRule.waitForIdle()
         issue { request = ChatPinFollowRequest(1L, setOf("row-0"), dataset, 0L) }
+        composeRule.waitUntil(5_000) {
+            ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
+            pastEveryBound
+        }
+        assertEquals("a stale answer must not be resent without a newer frame", 1, windowReturns)
+        assertEquals("a still-shifted window must not consume the request", emptyList<ChatPinFollowRequest>(), consumed)
+        issue { datasetKey = dataset.copy(folderId = "other") }
         awaitConsumed(consumed)
         assertEquals(1, windowReturns)
+    }
+
+    /**
+     * A replacement the stream delivers only after the bounded wait expired still resumes the follow: the request
+     * was kept, so that later frame retries the return and the list settles on the real head.
+     */
+    @Test fun replacementAfterTheWaitDeadlineResumesTheFollow() {
+        val head = List(60) { "row-$it" }
+        var rows by mutableStateOf(head.drop(30))
+        var revision by mutableStateOf(0)
+        var request by mutableStateOf<ChatPinFollowRequest?>(null)
+        var windowReturns = 0
+        var consumedBeforeReplacement = -1
+        val consumed = mutableListOf<ChatPinFollowRequest>()
+        lateinit var listState: LazyListState
+        composeRule.setContent {
+            listState = rememberLazyListState(initialFirstVisibleItemIndex = 20)
+            val publisher = rememberCoroutineScope()
+            ChatPinFollowToTopEffect(
+                listState = listState,
+                request = request,
+                datasetKey = dataset,
+                userGestureGeneration = 0L,
+                unpinnedVisibleIds = emptySet(),
+                motionSettled = true,
+                hasEarlierRows = { rows.first() != head.first() },
+                returnWindowToTop = {
+                    windowReturns += 1
+                    val mark = revision
+                    if (mark == 0) {
+                        publisher.launch {
+                            delay(PAST_EVERY_WAIT_MILLIS)
+                            consumedBeforeReplacement = consumed.size
+                            rows = head.drop(29)
+                            revision = 1
+                        }
+                    } else {
+                        rows = head
+                    }
+                    frameMark(mark) { revision }
+                },
+                onScrollStarted = {},
+                onConsumed = {
+                    consumed += it
+                    if (request == it) request = null
+                },
+            )
+            LazyColumn(state = listState, modifier = Modifier.fillMaxWidth().height(400.dp)) {
+                items(rows, key = { it }) { Box(Modifier.fillMaxWidth().height(48.dp)) { Text(it) } }
+            }
+        }
+        composeRule.waitForIdle()
+        issue { request = ChatPinFollowRequest(1L, setOf("row-0"), dataset, 0L) }
+        awaitConsumed(consumed)
+        composeRule.waitForIdle()
+        assertEquals("the request must still be pending when the late frame arrives", 0, consumedBeforeReplacement)
+        assertEquals("one stale return, then one retry after the late replacement", 2, windowReturns)
+        assertEquals(head, rows)
+        assertSettledOnHead(listState)
     }
 
     /**
@@ -368,6 +426,20 @@ class ChatPinFollowToTopTest {
         override fun superseded() = live() > mark
     }
 
+    /** The list rests on the real head's first row at item zero, offset zero. */
+    private fun assertSettledOnHead(listState: LazyListState) {
+        composeRule.runOnIdle {
+            assertEquals(0, listState.firstVisibleItemIndex)
+            assertEquals(0, listState.firstVisibleItemScrollOffset)
+            assertEquals(
+                "row-0",
+                listState.layoutInfo.visibleItemsInfo
+                    .first()
+                    .key,
+            )
+        }
+    }
+
     /** Writes test state on the UI thread and publishes it, as a production snapshot write would be. */
     private fun issue(write: () -> Unit) {
         composeRule.runOnIdle {
@@ -390,5 +462,8 @@ class ChatPinFollowToTopTest {
 
         /** A window replacement the stream delivers well after the stale answer, longer than a few frames. */
         const val DELAYED_REPLACEMENT_MILLIS = 300L
+
+        /** Longer than both bounded waits of one round (1 s each), so the round has ended without a newer frame. */
+        const val PAST_EVERY_WAIT_MILLIS = 2_500L
     }
 }
