@@ -19,6 +19,9 @@ import kotlinx.coroutines.sync.withPermit
 
 internal const val GROUP_AVATAR_MAX_PAYLOAD_BYTES = REMOTE_PROFILE_IMAGE_MAX_BYTES
 
+/** An [encryptedGroupAvatarCacheKey] is account, group and image hash. */
+private const val ENCRYPTED_GROUP_AVATAR_KEY_PARTS = 3
+
 internal fun isGroupAvatarPayloadAccepted(bytes: ByteArray): Boolean = bytes.size <= GROUP_AVATAR_MAX_PAYLOAD_BYTES
 
 internal fun encryptedGroupAvatarCacheKey(
@@ -26,6 +29,20 @@ internal fun encryptedGroupAvatarCacheKey(
     groupIdHex: String,
     imageHashHex: String,
 ): String = "$accountRef|${groupIdHex.lowercase()}|${imageHashHex.lowercase()}"
+
+/**
+ * A group's image belongs to its conversation: the worker domain named by an [encryptedGroupAvatarCacheKey]'s
+ * account and group, or single-use for any other key.
+ */
+internal fun encryptedGroupAvatarDomain(key: String): dev.ipf.whitenoise.android.media.MediaTrustDomain {
+    val parts = key.split('|')
+    return if (parts.size == ENCRYPTED_GROUP_AVATAR_KEY_PARTS) {
+        dev.ipf.whitenoise.android.media.MediaTrustDomain
+            .conversation(parts[0], parts[1])
+    } else {
+        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique
+    }
+}
 
 internal fun encryptedGroupAvatarCacheKey(
     accountRef: String?,
@@ -107,12 +124,16 @@ internal object GroupAvatarImageLoader {
         }
     }
 
-    /** Loads one group avatar and publishes it only within the current cache lifetime. */
+    /**
+     * Loads one group avatar and publishes it only within the current cache lifetime. The decoding worker
+     * serves only the group's conversation, named by the key.
+     */
     suspend fun load(
         key: String,
         fetchBytes: suspend () -> ByteArray,
     ): ImageBitmap? {
         peek(key)?.let { return it }
+        val domain = encryptedGroupAvatarDomain(key)
         val request =
             synchronized(lock) {
                 cache.get(key)?.let {
@@ -142,7 +163,7 @@ internal object GroupAvatarImageLoader {
                                 animation = profileAvatarAnimationSource(bytes)
                                 AvatarCacheDiagnostics.decode(AvatarCacheKind.GROUP)
                                 MediaPipeline
-                                    .decodeSampledBitmap(bytes, MAX_EDGE_PX)
+                                    .decodeSampledBitmap(bytes, MAX_EDGE_PX, domain = domain)
                                     ?.asImageBitmap()
                             }
                         }.getOrNull()

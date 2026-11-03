@@ -22,6 +22,15 @@
         ]
       },
       {
+        "surface": "PersonAvatar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Avatar.kt",
+        "anchor": "fun PersonAvatar(",
+        "test_ids": [
+          "MED-031",
+          "PRO-006"
+        ]
+      },
+      {
         "surface": "AvatarAnimationLayers",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/Avatar.kt",
         "anchor": "fun AvatarAnimationLayers(",

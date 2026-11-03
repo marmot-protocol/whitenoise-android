@@ -53,6 +53,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.decodeLocalPreviewAnimation
 import dev.ipf.whitenoise.android.media.readLocalPreviewSource
+import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
 import dev.ipf.whitenoise.android.ui.common.AppDivider
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAccessoryRemoveButton
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
@@ -187,7 +188,8 @@ private fun ComposerAttachmentShelfItem(
     val media = item as? StagedPreviewItem.Media
     val bitmap =
         if (media != null && metadata != null && !metadata.isGif) {
-            rememberMediaPreviewBitmap(item.uri, metadata.isVideo, PREVIEW_DECODE_EDGE, prepared[media.slot.id])
+            val preparedPreview = prepared[media.slot.id]
+            rememberMediaPreviewBitmap(item.uri, metadata.isVideo, PREVIEW_DECODE_EDGE, item.pick, preparedPreview)
         } else {
             null
         }
@@ -198,7 +200,7 @@ private fun ComposerAttachmentShelfItem(
         kind = if (media != null) ComposerAttachmentCardKind.Visual else ComposerAttachmentCardKind.File,
         video = metadata?.isVideo == true,
         bitmap = bitmap,
-        animation = if (media != null && metadata?.isGif == true) rememberShelfAnimation(item.uri) else null,
+        animation = if (media != null && metadata?.isGif == true) rememberShelfAnimation(item.uri, item.pick) else null,
         gif = metadata?.isGif == true,
         onPreview = onPreview,
         onRemove = onRemove,
@@ -356,13 +358,17 @@ private fun ComposerAttachmentFilename(
  * source stays on the still tile, and a replaced or removed preview never receives a late drawable.
  */
 @Composable
-private fun rememberShelfAnimation(uri: Uri): Drawable? {
+private fun rememberShelfAnimation(
+    uri: Uri,
+    pick: String,
+): Drawable? {
     val resolver = LocalContext.current.contentResolver
     val resources = LocalContext.current.resources
+    val domain = LocalPickMediaDomains.current(pick)
     return key(resolver, uri) {
         val drawable by produceState<Drawable?>(null, resolver, uri) {
             value =
-                withContext(Dispatchers.IO) {
+                withContext(Dispatchers.IO + MediaTrustScope.element(domain)) {
                     val source =
                         readLocalPreviewSource(
                             open = { resolver.openInputStream(uri) },

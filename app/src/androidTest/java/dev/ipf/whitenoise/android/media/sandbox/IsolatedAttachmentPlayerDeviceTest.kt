@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicReference
 @MediaContainmentAcceptance
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class IsolatedAttachmentPlayerDeviceTest {
+    /** Tiny Raw Sonic Eos Produces Nonzero Pcm And Drains The Unity Device At Quarter Speed. */
     @Test
     fun tinyRawSonicEosProducesNonzeroPcmAndDrainsTheUnityDeviceAtQuarterSpeed() {
         val source = byteArrayOf(0, 32, 0, 32)
@@ -73,6 +74,7 @@ class IsolatedAttachmentPlayerDeviceTest {
         }
     }
 
+    /** Quarter Speed Raw Pcm Refills After An Interior Underrun Without Resetting The Media Clock. */
     @Test
     fun quarterSpeedRawPcmRefillsAfterAnInteriorUnderrunWithoutResettingTheMediaClock() {
         RawPcmOutput(
@@ -120,6 +122,7 @@ class IsolatedAttachmentPlayerDeviceTest {
         }
     }
 
+    /** Paused Seeking Speed Pause And Repeat Use Real Raw Playback. */
     @Test
     @Suppress("LongMethod") // One fixture owns the player, display and selected file through controls and cleanup.
     fun pausedSeekingSpeedPauseAndRepeatUseRealRawPlayback() {
@@ -161,7 +164,7 @@ class IsolatedAttachmentPlayerDeviceTest {
             await("paused preparation", failure) { player.get()?.playbackState == Player.STATE_READY }
             val view = checkNotNull(surface.get())
             awaitColor(view, Color.RED, failure)
-            pausedSeek(player, view, failure, BLUE_POSITION_MS, Color.BLUE)
+            pausedSeekWithReattachment(player, view, failure, BLUE_POSITION_MS, Color.BLUE)
             pausedSeek(player, view, failure, RED_POSITION_MS, Color.RED)
             onMain {
                 checkNotNull(player.get()).setPlaybackSpeed(2f)
@@ -232,6 +235,7 @@ class IsolatedAttachmentPlayerDeviceTest {
         }
     }
 
+    /** Pixel Copy Buffer Outlives Timed Out Request Until Its Callback. */
     @Test
     fun pixelCopyBufferOutlivesTimedOutRequestUntilItsCallback() {
         val timedOut = PixelSample()
@@ -346,6 +350,27 @@ class IsolatedAttachmentPlayerDeviceTest {
         }
     }
 
+    /** Reattaches the actual output during a paused seek and verifies queued pixels, not physical presentation. */
+    private fun pausedSeekWithReattachment(
+        player: AtomicReference<IsolatedAttachmentPlayer?>,
+        view: SurfaceView,
+        failure: AtomicReference<androidx.media3.common.PlaybackException?>,
+        positionMs: Long,
+        color: Int,
+    ) {
+        onMain {
+            val live = checkNotNull(player.get())
+            live.clearVideoSurfaceView(view)
+            live.seekTo(positionMs)
+            live.setVideoSurfaceView(view)
+        }
+        await("reattached paused seek target", failure) {
+            player.get()?.let { !it.playWhenReady && kotlin.math.abs(it.currentPosition - positionMs) <= 20 } == true
+        }
+        awaitColor(view, color, failure)
+    }
+
+    /** Requests a seek while playback is paused and waits for the expected visible frame. */
     private fun pausedSeek(
         player: AtomicReference<IsolatedAttachmentPlayer?>,
         view: SurfaceView,
@@ -361,6 +386,7 @@ class IsolatedAttachmentPlayerDeviceTest {
         onMain { assertFalse(checkNotNull(player.get()).isPlaying) }
     }
 
+    /** Assert Double Speed Progression. */
     private fun assertDoubleSpeedProgression(
         player: AtomicReference<IsolatedAttachmentPlayer?>,
         failure: AtomicReference<androidx.media3.common.PlaybackException?>,
@@ -375,6 +401,7 @@ class IsolatedAttachmentPlayerDeviceTest {
         assertTrue("Actual audio-master position did not advance near 2x: $rate", rate in 1.4..2.6)
     }
 
+    /** Captures a playback-position sample for bounded progression assertions. */
     private fun positionSample(player: AtomicReference<IsolatedAttachmentPlayer?>): Pair<Long, Long> {
         val sample = AtomicReference<Pair<Long, Long>>()
         onMain {
@@ -385,6 +412,10 @@ class IsolatedAttachmentPlayerDeviceTest {
         return sample.get()
     }
 
+    /**
+     * Waits for the fixture condition within its finite test deadline and fails when the expected event never
+     * arrives.
+     */
     private fun await(
         operation: String,
         failure: AtomicReference<androidx.media3.common.PlaybackException?>,
@@ -401,6 +432,10 @@ class IsolatedAttachmentPlayerDeviceTest {
         throw AssertionError("Timed out: $operation")
     }
 
+    /**
+     * Waits for the expected rendered fixture color rather than assuming the first callback already displayed
+     * it.
+     */
     private fun awaitColor(
         view: SurfaceView,
         expected: Int,
@@ -418,6 +453,10 @@ class IsolatedAttachmentPlayerDeviceTest {
         throw AssertionError("Expected synthetic frame color was not rendered on the actual Surface")
     }
 
+    /**
+     * Compares sampled channels with the fixture tolerance instead of requiring byte-identical display
+     * conversion.
+     */
     private fun matchesColor(
         pixel: Int?,
         expected: Int,
@@ -443,16 +482,19 @@ class IsolatedAttachmentPlayerDeviceTest {
             if (abandoned.get()) recycleOnce()
         }
 
+        /** Defers fixture-buffer release until the asynchronous callback can no longer access it. */
         fun releaseWhenSafe(requested: Boolean) {
             abandoned.set(true)
             if (!requested || finished.get()) recycleOnce()
         }
 
+        /** Recycles the owned bitmap at most once, preserving callbacks that still retain it. */
         private fun recycleOnce() {
             if (recycled.compareAndSet(false, true)) bitmap.recycle()
         }
     }
 
+    /** Samples the rendered center pixel through PixelCopy without assuming synchronous completion. */
     private fun copyCenter(view: SurfaceView): Int? {
         val rectangle = AtomicReference<Rect?>()
         onMain {
@@ -478,6 +520,7 @@ class IsolatedAttachmentPlayerDeviceTest {
         }
     }
 
+    /** Runs the fixture action on the Android main thread and returns its completed result. */
     private fun onMain(block: () -> Unit) = InstrumentationRegistry.getInstrumentation().runOnMainSync(block)
 
     private companion object {

@@ -93,7 +93,12 @@ class MediaAvPlaybackService : Service() {
                                                 engine.nativeReadPreferred(handle, videoBuffer, audioBuffer, preferred)
                                             }
                                         result.also {
-                                            AvStreamOutput.from(it, edge, videoBuffer != null, audioBuffer != null)
+                                            AvStreamOutput.from(
+                                                checkedNativeRead(it),
+                                                edge,
+                                                videoBuffer != null,
+                                                audioBuffer != null,
+                                            )
                                         }
                                     }
                                     else -> {
@@ -139,6 +144,12 @@ class MediaAvPlaybackService : Service() {
         flags: Int,
     ): Boolean {
         if (reply == null || flags and IBinder.FLAG_ONEWAY != 0) return false
+        val killer =
+            watchdog.schedule(
+                { Process.killProcess(Process.myPid()) },
+                AvStreamProtocol.WATCHDOG_MS,
+                TimeUnit.MILLISECONDS,
+            )
         return try {
             require(data.dataSize() <= AvStreamProtocol.MAX_REPLY_BYTES && !data.hasFileDescriptors())
             data.enforceInterface(AvStreamProtocol.DESCRIPTOR)
@@ -157,6 +168,8 @@ class MediaAvPlaybackService : Service() {
             true
         } catch (_: Exception) {
             false
+        } finally {
+            killer.cancel(false)
         }
     }
 

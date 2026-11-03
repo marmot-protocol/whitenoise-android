@@ -76,11 +76,19 @@ internal class RawPcmOutput(
         }
     }
 
+    /**
+     * Accepts whole interleaved PCM frames in bounded quanta; zero means the current segment must drain
+     * first.
+     */
     @Synchronized override fun write(
         bytes: ByteArray,
         offset: Int,
     ): Int = write(bytes, offset, bytes.size - offset)
 
+    /**
+     * Accepts whole interleaved PCM frames in bounded quanta; zero means the current segment must drain
+     * first.
+     */
     @Synchronized override fun write(
         bytes: ByteArray,
         offset: Int,
@@ -99,6 +107,9 @@ internal class RawPcmOutput(
             consumed
         }
 
+    /**
+     * Flushes a declared input tail and pumps queued output before returning the renderer polling tolerance.
+     */
     @Synchronized override fun prepareForWait(endOfStream: Boolean): Long =
         checked {
             if (endOfStream) inputEnded = true
@@ -117,11 +128,16 @@ internal class RawPcmOutput(
         return closed || finished
     }
 
+    /**
+     * Records the latest supported rate without resuming playback; the renderer drains the old segment before
+     * adopting it.
+     */
     @Synchronized override fun speed(value: Float) {
         require(value.isFinite() && value in RawPcmCapacity.MIN_SPEED..RawPcmCapacity.MAX_SPEED)
         if (!closed) requestedSpeed = value // One latest scalar; the renderer drains the old segment off Main.
     }
 
+    /** Starts the existing unity-rate device and clears its stalled-output deadline. */
     @Synchronized override fun play() =
         checked {
             device.play()
@@ -129,6 +145,7 @@ internal class RawPcmOutput(
             stalledSinceMs = null
         }
 
+    /** Pauses the exact device; a hardware refusal is retained as the original typed output fault. */
     @Suppress("TooGenericExceptionCaught", "SwallowedException") // Preserve the typed deferred output cause.
     @Synchronized
     override fun pause() {
@@ -143,12 +160,17 @@ internal class RawPcmOutput(
         }
     }
 
+    /** Applies a finite unit-range gain through the serialized device boundary. */
     @Synchronized override fun volume(value: Float) =
         checked {
             require(value.isFinite() && value in 0f..1f)
             device.volume(value)
         }
 
+    /**
+     * Refuses route capacities outside the byte budget rather than silently shrinking the promised speed
+     * margin.
+     */
     private fun checkCapacity() {
         val capacity = device.capacityFrames
         if (capacity <= 0 || capacity.toLong() * frameBytes > RawPcmCapacity.MAX_BUFFER_BYTES) {
@@ -156,6 +178,7 @@ internal class RawPcmOutput(
         }
     }
 
+    /** Requires the device to acknowledge the single-frame start threshold used by the bounded queue. */
     private fun checkThreshold() {
         if (!device.startThresholdOne()) {
             throw RawOutputFailure("Raw audio start threshold refused")
@@ -218,6 +241,9 @@ internal class RawPcmOutput(
         return tolerance
     }
 
+    /**
+     * Carries source and hardware frame anchors across a drained rate change without replacing the device.
+     */
     private fun completeRateSegment() {
         sourceBaseFrames += segment.acceptedInputFrames
         val endpoint = framesToUs(sourceBaseFrames)
@@ -230,6 +256,25 @@ internal class RawPcmOutput(
         segmentEnding = false
     }
 
+    /** Captures hardware diagnostics under this sink's existing device ownership monitor. */
+    @Synchronized fun observeAudio(
+        observation: RawAvPlaybackObservation,
+        activation: Long,
+        seek: Long,
+    ) {
+        if (!closed) {
+            observation.audio(
+                activation,
+                seek,
+                System.identityHashCode(this),
+                SystemClock.elapsedRealtimeNanos(),
+                hardwareFrames(),
+                device.underruns,
+            )
+        }
+    }
+
+    /** Extends the unsigned 32-bit playback head across wraparound before source-clock conversion. */
     private fun hardwareFrames(): Long {
         val head = device.headPosition().toLong() and 0xffff_ffffL
         if (head < lastHead) headWrap += 1L shl 32
@@ -237,19 +282,29 @@ internal class RawPcmOutput(
         return headWrap + head
     }
 
+    /**
+     * Converts source-frame counts with the fixed sample rate; channel interleaving does not change elapsed
+     * time.
+     */
     private fun framesToUs(frames: Long): Long = frames * 1_000_000L / sampleRate
 
+    /**
+     * Retains the first typed output cause so later cleanup failures cannot replace the failure reported to
+     * callers.
+     */
     private fun remember(failure: Exception) {
         if (fault == null) {
             fault = failure as? RawOutputFailure ?: RawOutputFailure("Raw audio processing refused", failure)
         }
     }
 
+    /** Replays the retained output fault before refusing a closed sink. */
     private fun checkActive() {
         fault?.let { throw it }
         if (closed) throw RawOutputFailure("Raw audio output retired")
     }
 
+    /** Converts device/DSP failures into one retained output fault while preserving the original cause. */
     @Suppress("TooGenericExceptionCaught", "SwallowedException") // Store the original cause in the typed fault.
     private inline fun <T> checked(operation: () -> T): T {
         checkActive()
@@ -261,6 +316,9 @@ internal class RawPcmOutput(
         }
     }
 
+    /**
+     * Retires the segment and exact device idempotently, attempting every owned cleanup even after a refusal.
+     */
     @Synchronized override fun close() {
         if (closed) return
         closed = true

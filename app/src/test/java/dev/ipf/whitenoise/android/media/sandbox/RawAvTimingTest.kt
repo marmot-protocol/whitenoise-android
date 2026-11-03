@@ -6,6 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RawAvTimingTest {
+    /** Quarter Speed Clock Reanchors After Maximum Rate Pause And Seek Without Audio Hardware. */
     @Test
     fun quarterSpeedClockReanchorsAfterMaximumRatePauseAndSeekWithoutAudioHardware() {
         val atMaximum = RawAvTiming.wallPosition(2_000_000, 0, 1000, RawPcmCapacity.MAX_SPEED)
@@ -22,6 +23,7 @@ class RawAvTimingTest {
         assertFalse(RawAvTiming.videoIsDue(5_300_000, 5_250_000))
     }
 
+    /** Seek Keeps The Pcm Suffix Crossing The Target. */
     @Test
     fun seekKeepsThePcmSuffixCrossingTheTarget() {
         val slice = RawAvTiming.clipPcm(48000 * 4, 48000, 2, 0, 250_000)
@@ -30,6 +32,7 @@ class RawAvTimingTest {
         assertEquals(250_000L, slice.timestampUs)
     }
 
+    /** Negative Preroll And Whole Buffers Before Target Do Not Reset The Timeline. */
     @Test
     fun negativePrerollAndWholeBuffersBeforeTargetDoNotResetTheTimeline() {
         val crossing = RawAvTiming.clipPcm(4800 * 2, 48000, 1, -50_000, 0)
@@ -41,6 +44,7 @@ class RawAvTimingTest {
         assertEquals(0L, before.timestampUs)
     }
 
+    /** Fractional Seek Skips Whole Frames Without Dropping The Rest Of The Buffer. */
     @Test
     fun fractionalSeekSkipsWholeFramesWithoutDroppingTheRestOfTheBuffer() {
         val slice = RawAvTiming.clipPcm(4410 * 4, 44100, 2, 0, 1)
@@ -49,12 +53,14 @@ class RawAvTimingTest {
         assertTrue(slice.timestampUs >= 1)
     }
 
+    /** Sample Rounded Clock Cannot Stall At A Video Boundary. */
     @Test
     fun sampleRoundedClockCannotStallAtAVideoBoundary() {
         assertTrue(RawAvTiming.videoIsDue(33_333, 33_250))
         assertFalse(RawAvTiming.videoIsDue(33_333, 32_000))
     }
 
+    /** Silent Video Clock Preserves Anchor And Playback Speed. */
     @Test
     fun silentVideoClockPreservesAnchorAndPlaybackSpeed() {
         assertEquals(250_000L, RawAvTiming.wallPosition(250_000, 100, 100, 1f))
@@ -64,6 +70,7 @@ class RawAvTimingTest {
         assertTrue(runCatching { RawAvTiming.wallPosition(0, 0, 100, Float.NaN) }.isFailure)
     }
 
+    /** Old Playback And Seek Outputs Cannot Drive A Replacement. */
     @Test
     fun oldPlaybackAndSeekOutputsCannotDriveAReplacement() {
         val requested = RawAvGeneration(4, 2)
@@ -75,6 +82,7 @@ class RawAvTimingTest {
         assertTrue(requested.accepts(RawAvGeneration(4, 3), true, true, includeSeek = false))
     }
 
+    /** Paused Poster Cannot Replace A Playing New Seek Or Retired Account. */
     @Test
     fun pausedPosterCannotReplaceAPlayingNewSeekOrRetiredAccount() {
         val target = RawAvPosterTarget(RawAvGeneration(4, 2), 1250)
@@ -88,6 +96,7 @@ class RawAvTimingTest {
         assertFalse(target.matches(RawAvGeneration(4, 2), false, false))
     }
 
+    /** Paused Poster Uses The Same Bounded Seek Target As The Playback Clock. */
     @Test
     fun pausedPosterUsesTheSameBoundedSeekTargetAsThePlaybackClock() {
         assertEquals(0L, RawAvPosterTarget.positionUs(-1, 2_000_000))
@@ -97,6 +106,7 @@ class RawAvTimingTest {
         assertEquals(AvStreamProtocol.MAX_DURATION_US, RawAvPosterTarget.positionUs(Long.MAX_VALUE, 0))
     }
 
+    /** Paused Seek Acknowledges Only The Completed Current Attempt. */
     @Test
     fun pausedSeekAcknowledgesOnlyTheCompletedCurrentAttempt() {
         val completion =

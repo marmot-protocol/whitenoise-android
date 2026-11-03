@@ -42,22 +42,26 @@ NINJA_RELATIVE_PATH = Path("ninja-1.13.2.data/scripts/ninja")
 
 
 def require(condition, reason):
+    """Reject an unproven build precondition before any later compiler or transport step can run."""
     if not condition:
         raise ValueError(reason)
 
 
 def sha(path):
+    """Hash the complete file bytes used to bind a dependency or emitted artifact."""
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
 def verify_seccomp_header():
     # run_path executes the reviewed pure generator without writing source-tree bytecode.
+    """Require the committed filter bytes to equal the reviewed pure generator output before cache reuse."""
     generator = runpy.run_path(str(NATIVE / "generate_seccomp_filter.py"))
     require((NATIVE / "seccomp_filter.h").read_text() == generator["header"](),
             "seccomp header differs from reviewed generator")
 
 
 def cache_key(abis):
+    """Bind the requested ABI set, pinned native inputs and builder bytes into one reusable artifact identity."""
     require(abis and len(set(abis)) == len(abis) and all(abi in ABIS for abi in abis), "unique supported ABIs required")
     verify_seccomp_header()
     values = {"abis": sorted(abis), "inputs": {name: sha(NATIVE / name)
@@ -66,10 +70,12 @@ def cache_key(abis):
 
 
 def run(command, *, cwd, env):
+    """Run one explicit tool command with its supplied working directory and environment; propagate a nonzero exit."""
     subprocess.run([str(value) for value in command], cwd=cwd, env=env, check=True)
 
 
 def load_lock():
+    """Validate the fixed NDK/API identity and every HTTPS source/tool size and digest before downloading."""
     value = json.loads((NATIVE / "lock.json").read_text())
     require(value.get("schema") == 1 and value.get("ndk") == "29.0.14206865" and value.get("api") == 30,
             "unsupported decoder toolchain lock")
@@ -114,6 +120,7 @@ def fetch(item, directory, opener=urllib.request.urlopen):
 
 
 def extract_source(archive, destination, prefix):
+    """Reject traversal, links, unexpected prefixes and extraction-budget overflow before unpacking pinned source."""
     with tarfile.open(archive, "r:xz") as source:
         members = source.getmembers()
         require(0 < len(members) <= 20000, "source archive entry count refused")
@@ -128,6 +135,7 @@ def extract_source(archive, destination, prefix):
 
 
 def extract_tools(wheels, destination):
+    """Unpack only bounded, non-traversing wheel entries and require the exact pinned Ninja executable layout."""
     destination.mkdir()
     for wheel in wheels:
         with zipfile.ZipFile(wheel) as source:
@@ -146,6 +154,7 @@ def extract_tools(wheels, destination):
 
 def write_meson_launcher(tools):
     # A persistent non-.py entrypoint keeps Meson's internal/regen command executable.
+    """Create a persistent isolated entrypoint that imports only the extracted pinned Meson implementation."""
     for name in ("__init__.py", "mesonmain.py"):
         require((tools / "mesonbuild" / name).is_file(), "pinned Meson module missing")
     launcher = tools / "meson-pinned"
@@ -167,6 +176,7 @@ sys.exit(mesonmain.main())
 
 
 def toolchain(ndk, abi, lock):
+    """Verify the exact NDK revision and required ABI-specific LLVM tools before returning compiler coordinates."""
     require(abi in ABIS, "unsupported Android ABI")
     require(ndk.is_dir() and not ndk.is_symlink(), "real pinned NDK directory required")
     properties = (ndk / "source.properties").read_text()
@@ -181,6 +191,7 @@ def toolchain(ndk, abi, lock):
 
 
 def configuration(ndk, abi, lock, build, prefix, dav1d_prefix, pkg_config):
+    """Build the explicit software-only component recipe, with network, hardware parsing and ambient autodetection disabled."""
     binary, compiler, arch, cpu = toolchain(ndk, abi, lock)
     flags = "-O2 -fPIC -fstack-protector-strong -D_FORTIFY_SOURCE=2 " + \
             "-ffile-prefix-map=" + str(build) + "=/media-build -fdebug-prefix-map=" + str(build) + "=/media-build " + \
@@ -212,6 +223,7 @@ def configuration(ndk, abi, lock, build, prefix, dav1d_prefix, pkg_config):
 
 
 def audit_components(path):
+    """Require exact decoder/demuxer/parser allowlists and reject any enabled output, protocol or hardware capability."""
     text = path.read_text()
     enabled = set(re.findall(r"^#define CONFIG_([A-Z0-9_]+) 1$", text, re.M))
     for suffix, allowed in (("_DECODER", DECODERS), ("_DEMUXER", DEMUXERS), ("_PARSER", PARSERS)):
@@ -222,6 +234,7 @@ def audit_components(path):
 
 
 def audit_elf(path, abi, dynamic):
+    """Require the expected ELF machine/class and permit only the reviewed dynamic-library dependency set."""
     header = path.read_bytes()[:20]
     require(len(header) == 20 and header[:4] == b"\x7fELF" and header[4] == ABIS[abi][4] and header[5] == 1 and
             struct.unpack_from("<H", header, 18)[0] == ABIS[abi][3], "decoder ELF ABI differs")
@@ -231,6 +244,7 @@ def audit_elf(path, abi, dynamic):
 
 def write_pkg_config(path, dav1d_prefix, version):
     # Exact queries from pinned FFmpeg's presence probe and dav1d test_pkg_config.
+    """Create the finite dav1d query shim; unknown libraries, constraints and queries fail closed."""
     require(re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version) and
             tuple(map(int, version.split("."))) >= (1, 0, 0), "dav1d version below required minimum")
     program = """#!PYTHON
@@ -267,6 +281,7 @@ def normalize_configuration(path, arguments, work, ndk):
 
 
 def build_abi(ndk, abi, lock, sources, tools, output, jobs, command=run):
+    """Build one fresh ABI output from pinned inputs, audit its components and ELF, then record exact output provenance."""
     destination = output / "jniLibs" / abi
     require(not destination.exists(), "ABI output already exists; inspect provenance before rebuilding")
     with tempfile.TemporaryDirectory(prefix="media-" + abi + "-", dir=output) as temporary:
@@ -327,6 +342,7 @@ def build_abi(ndk, abi, lock, sources, tools, output, jobs, command=run):
 
 
 def prepare(ndk, output, abis, *, jobs=2, opener=urllib.request.urlopen, command=run):
+    """Serialize artifact preparation and reuse only complete matching manifests whose library bytes still verify."""
     lock = load_lock()
     require(platform.system() == "Linux" and platform.machine() == "x86_64", "Linux x86_64 build host required")
     import fcntl  # Linux-only locking is unnecessary for portable --cache-key/--plan inspection.
@@ -370,6 +386,7 @@ def prepare(ndk, output, abis, *, jobs=2, opener=urllib.request.urlopen, command
 
 
 def main():
+    """Dispatch read-only cache/plan inspection or explicit native preparation from the validated command-line inputs."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ndk", type=Path)
     parser.add_argument("--output", type=Path)

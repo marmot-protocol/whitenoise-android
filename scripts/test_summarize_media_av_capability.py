@@ -15,6 +15,7 @@ else:
 
 
 def capture():
+    """Create one complete synthetic capture with the fixed header and ordered case matrix."""
     token = "a" * 32
     rows = [{"type": "header", "capture_schema": 3, "run_token": token, "api": 30,
              "app_uid": 10001, "fingerprint": "synthetic-api30", "package": "fixture.app",
@@ -54,10 +55,12 @@ def capture():
 
 
 def encode(rows):
+    """Encode the synthetic rows as JSONL for the actual bounded parser."""
     return ("\n".join(json.dumps(row) for row in rows) + "\n").encode()
 
 
 def succeed(row):
+    """Turn the selected synthetic case into a successful observation with matching required receipts."""
     row["outcome"] = "success"
     row["observation"]["success"] = True
     phase = {"retriever_source": "retriever_metadata", "extractor": "extractor_tracks",
@@ -67,10 +70,12 @@ def succeed(row):
 
 class CapabilitySummaryTests(unittest.TestCase):
     def reject(self, rows):
+        """Require the real summary validator to refuse the selected malformed capture."""
         with self.assertRaises(ValueError):
             report.summarize(encode(rows))
 
     def test_complete_negative_matrix_preserves_exceptions_without_claiming_support(self):
+        """Complete negative matrix preserves exceptions without claiming support."""
         result = report.summarize(encode(capture()))
         self.assertTrue(result["capture_complete"])
         self.assertTrue(result["characterization_complete"])
@@ -81,6 +86,7 @@ class CapabilitySummaryTests(unittest.TestCase):
                          [item["status"] for item in result["matrix"]])
 
     def test_soft_refusal_is_complete_negative_characterization(self):
+        """Soft refusal is complete negative characterization."""
         rows = capture()
         row = rows[1]
         row.update(outcome="worker_soft_timeout_no_result", capability_status="unqualified_timeout",
@@ -95,6 +101,7 @@ class CapabilitySummaryTests(unittest.TestCase):
         self.reject(rows)
 
     def test_deadline_retains_capture_but_fails_characterization(self):
+        """Deadline retains capture but fails characterization."""
         rows = capture()
         row = rows[1]
         row["outcome"] = "reply_deadline_unqualified"
@@ -129,6 +136,7 @@ class CapabilitySummaryTests(unittest.TestCase):
         self.reject(rows)
 
     def test_healthy_operation_success_is_separate_from_production_qualification(self):
+        """Healthy operation success is separate from production qualification."""
         rows = capture()
         for row in rows[1:8]:
             succeed(row)
@@ -142,6 +150,7 @@ class CapabilitySummaryTests(unittest.TestCase):
         self.reject(rows)
 
     def test_successful_metadata_without_poster_does_not_claim_full_support(self):
+        """Successful metadata without poster does not claim full support."""
         rows = capture()
         for row in rows[1:8]:
             succeed(row)
@@ -153,6 +162,7 @@ class CapabilitySummaryTests(unittest.TestCase):
         self.assertFalse(result["matrix"][2]["required_output_present"])
 
     def test_rejects_forged_early_phase_success_and_successful_truncated_input(self):
+        """Rejects forged early phase success and successful truncated input."""
         for index, phase in ((2, "retriever_construct"), (4, "extractor_source"),
                              (6, "codec_create"), (7, "extractor_tracks"), (8, "probe")):
             with self.subTest(index=index):
@@ -164,6 +174,7 @@ class CapabilitySummaryTests(unittest.TestCase):
                 self.reject(rows)
 
     def test_rejects_missing_duplicate_reordered_or_unknown_cases(self):
+        """Rejects missing duplicate reordered or unknown cases."""
         for mutate in (lambda rows: rows.pop(), lambda rows: rows.append(rows[1]),
                        lambda rows: rows.__setitem__(2, rows[1]),
                        lambda rows: rows[1].update(case="other"),
@@ -174,6 +185,7 @@ class CapabilitySummaryTests(unittest.TestCase):
             self.reject(rows)
 
     def test_rejects_legacy_header_and_mixed_runtime_or_corpus(self):
+        """Rejects legacy header and mixed runtime or corpus."""
         changes = [(0, "capture_schema", 2), (0, "app_uid", True), (0, "api", 29),
                    (0, "production_route", True), (1, "run_token", "b" * 32),
                    (1, "input_sha256", "bad"), (2, "input_sha256", "b" * 64),
@@ -186,6 +198,7 @@ class CapabilitySummaryTests(unittest.TestCase):
                 self.reject(rows)
 
     def test_requires_every_lifetime_and_isolation_receipt(self):
+        """Requires every lifetime and isolation receipt."""
         changes = [(name, False) for name in report.RECEIPTS]
         changes += [("isolated", False), ("internet_granted", True), ("runtime_initialized", True),
                     ("private_canary_denied", False), ("private_canary_errno", 0),
@@ -199,6 +212,7 @@ class CapabilitySummaryTests(unittest.TestCase):
                 self.reject(rows)
 
     def test_diagnostics_cannot_fabricate_identity_or_terminal(self):
+        """Diagnostics cannot fabricate identity or terminal."""
         changes = [("worker_reported_uid", 99002), ("ready_kernel_pid", 9), ("phase", "unknown"),
                    ("outcome", "success"), ("error_class", "none"), ("worker_elapsed_ns", 0)]
         for key, value in changes:
@@ -213,11 +227,13 @@ class CapabilitySummaryTests(unittest.TestCase):
             self.reject(rows)
 
     def test_parent_rejections_cannot_include_worker_output(self):
+        """Parent rejections cannot include worker output."""
         rows = capture()
         rows[9]["observation"] = copy.deepcopy(rows[1]["observation"])
         self.reject(rows)
 
     def test_json_duplicates_invalid_input_and_byte_bound(self):
+        """Json duplicates invalid input and byte bound."""
         raw = encode(capture())
         for invalid in (raw.replace(b'"api": 30', b'"api": 30, "api": 36'),
                         b'[]\n' * 11, b'\xff', b' ' * (report.MAX_BYTES + 1)):
@@ -225,6 +241,7 @@ class CapabilitySummaryTests(unittest.TestCase):
                 report.summarize(invalid)
 
     def test_cli_outputs_deterministic_json_and_rejects_partial_capture(self):
+        """Cli outputs deterministic json and rejects partial capture."""
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "capture.jsonl"
             path.write_bytes(encode(capture()))

@@ -67,6 +67,7 @@ class LocalNoticesTest(unittest.TestCase):
         self.assertIn(data, (output / 'third_party_licenses').read_bytes())
 
     def test_bundled_native_attribution_cannot_name_missing_or_duplicate_notices(self):
+        """Bundled native attribution cannot name missing or duplicate notices."""
         for value in (['missing'], ['0', '0'], '0', [True], [{}], [[]]):
             with self.subTest(value=value):
                 self.catalog['bundled_notice_ids'] = value

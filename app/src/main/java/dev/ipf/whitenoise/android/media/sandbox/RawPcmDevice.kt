@@ -11,30 +11,42 @@ import java.nio.ByteBuffer
 
 /** Synchronous parent PCM-only hardware operations; the output owns this exact device through close. */
 internal interface RawPcmDevice : AutoCloseable {
+    /** Unavailable on synthetic devices; Android reports the actual AudioTrack counter. */
+    val underruns: Int get() = -1
     val normalFrames: Int
     val capacityFrames: Int
     val legacyPriming: Boolean
 
+    /**
+     * Acknowledges a one-frame start threshold where supported; older devices use the explicit priming path.
+     */
     fun startThresholdOne(): Boolean
 
+    /** Returns the device-accepted frame capacity so the queue can reject an incomplete resize. */
     fun resize(frames: Int): Int
 
+    /** Returns the hardware playback-head counter; the owning sink extends its unsigned wraparound. */
     fun headPosition(): Int
 
+    /** Attempts a nonblocking PCM-buffer write and reports only the bytes the device accepted. */
     fun write(
         buffer: ByteBuffer,
         byteCount: Int,
     ): Int
 
+    /** Attempts a nonblocking write of queue-owned priming silence, separate from source PCM accounting. */
     fun writeSilence(
         bytes: ByteArray,
         byteCount: Int,
     ): Int
 
+    /** Starts the owned raw-PCM device without enabling a compressed-media parser. */
     fun play()
 
+    /** Pauses the owned raw-PCM device while retaining its buffers and clock for a later resume. */
     fun pause()
 
+    /** Sets the device gain; the Android implementation reports a rejected gain as a typed output fault. */
     fun volume(value: Float)
 }
 
@@ -44,6 +56,7 @@ internal class AndroidRawPcmDevice(
     channels: Int,
     attributes: AudioAttributes,
 ) : RawPcmDevice {
+    override val underruns: Int get() = track.underrunCount
     private val track: AudioTrack
     override val legacyPriming: Boolean get() = Build.VERSION.SDK_INT < 31
     override val normalFrames: Int
@@ -81,33 +94,44 @@ internal class AndroidRawPcmDevice(
         }
     }
 
+    /**
+     * Acknowledges a one-frame start threshold where supported; older devices use the explicit priming path.
+     */
     override fun startThresholdOne(): Boolean {
         if (Build.VERSION.SDK_INT < 31) return true
         return track.setStartThresholdInFrames(1) == 1
     }
 
+    /** Returns the device-accepted frame capacity so the queue can reject an incomplete resize. */
     override fun resize(frames: Int): Int = track.setBufferSizeInFrames(frames)
 
+    /** Returns the hardware playback-head counter; the owning sink extends its unsigned wraparound. */
     override fun headPosition(): Int = track.playbackHeadPosition
 
+    /** Attempts a nonblocking PCM-buffer write and reports only the bytes the device accepted. */
     override fun write(
         buffer: ByteBuffer,
         byteCount: Int,
     ): Int = track.write(buffer, byteCount, AudioTrack.WRITE_NON_BLOCKING)
 
+    /** Attempts a nonblocking write of queue-owned priming silence, separate from source PCM accounting. */
     override fun writeSilence(
         bytes: ByteArray,
         byteCount: Int,
     ): Int = track.write(bytes, 0, byteCount, AudioTrack.WRITE_NON_BLOCKING)
 
+    /** Starts the owned raw-PCM device without enabling a compressed-media parser. */
     override fun play() = track.play()
 
+    /** Pauses the owned raw-PCM device while retaining its buffers and clock for a later resume. */
     override fun pause() = track.pause()
 
+    /** Sets the device gain; the Android implementation reports a rejected gain as a typed output fault. */
     override fun volume(value: Float) {
         if (track.setVolume(value) != AudioTrack.SUCCESS) throw RawOutputFailure("Raw audio volume refused")
     }
 
+    /** Flushes and releases the exact AudioTrack, with release attempted even if flushing fails. */
     override fun close() {
         try {
             track.flush()

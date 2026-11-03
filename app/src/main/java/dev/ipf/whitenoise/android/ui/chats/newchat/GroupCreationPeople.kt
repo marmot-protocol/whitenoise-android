@@ -38,6 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
@@ -74,7 +75,13 @@ internal fun GroupCreationPersonRow(
             .testTag("new_group.person.${candidate.accountIdHex}")
             .recipientRelationshipSemantics(followed, selected)
     val leading: @Composable () -> Unit = {
-        Avatar(candidate.displayName, candidate.accountIdHex, 48.dp, pictureUrl = person.avatarUrl)
+        Avatar(
+            candidate.displayName,
+            candidate.accountIdHex,
+            48.dp,
+            pictureUrl = person.avatarUrl,
+            pictureDomain = AvatarImageLoader.publicProfiles(),
+        )
     }
     val supporting: (@Composable () -> Unit)? =
         person.subtitle?.let { subtitle ->
@@ -147,7 +154,13 @@ internal fun GroupSelectedPerson(
     ) {
         Box(Modifier.size(72.dp)) {
             Box(Modifier.align(Alignment.BottomStart)) {
-                Avatar(candidate.displayName, candidate.accountIdHex, 64.dp, pictureUrl = person.avatarUrl)
+                Avatar(
+                    candidate.displayName,
+                    candidate.accountIdHex,
+                    64.dp,
+                    pictureUrl = person.avatarUrl,
+                    pictureDomain = AvatarImageLoader.publicProfiles(),
+                )
             }
             Surface(
                 Modifier.size(24.dp).align(Alignment.TopEnd),

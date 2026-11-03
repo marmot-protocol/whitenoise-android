@@ -50,6 +50,7 @@ def supplemental_campaigns(event, base, head):
 
 class CiChangesTest(unittest.TestCase):
     def test_native_build_inputs_keep_full_supplemental_and_tooling_validation(self):
+        """Native build inputs keep full supplemental and tooling validation."""
         for path in ('native/media-decoder/media_decoder.cpp', 'native/media-decoder/lock.json',
                      'native/media-decoder/exports.map', 'scripts/prepare_media_decoder.py'):
             for event in ('pull_request', 'merge_group', 'push', 'schedule', 'workflow_dispatch'):

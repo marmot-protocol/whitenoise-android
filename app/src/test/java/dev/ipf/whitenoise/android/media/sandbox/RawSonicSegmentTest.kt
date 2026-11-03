@@ -16,6 +16,7 @@ import java.nio.ByteOrder
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [30])
 class RawSonicSegmentTest {
+    /** Tiny Streams Flush Real Nonzero Output At Every Offered Rate. */
     @Test
     fun tinyStreamsFlushRealNonzeroOutputAtEveryOfferedRate() {
         val expectedFrames = mapOf(0.25f to 8L, 0.5f to 4L, 1f to 2L, 2f to 1L)
@@ -36,6 +37,7 @@ class RawSonicSegmentTest {
         }
     }
 
+    /** Partial Output Retains Its Exact Owned View And Blocks Input And Eos. */
     @Test
     fun partialOutputRetainsItsExactOwnedViewAndBlocksInputAndEos() {
         RawSonicSegment(8_000, 1, 1f).use { segment ->
@@ -53,6 +55,7 @@ class RawSonicSegmentTest {
         }
     }
 
+    /** Eos Is Idempotent But Never Discards Pending Tail. */
     @Test
     fun eosIsIdempotentButNeverDiscardsPendingTail() {
         RawSonicSegment(8_000, 1, 0.25f).use { segment ->
@@ -71,6 +74,7 @@ class RawSonicSegmentTest {
         }
     }
 
+    /** Real Processed Output Matches Whole And Partial Reads. */
     @Test
     fun realProcessedOutputMatchesWholeAndPartialReads() {
         val pcm = samples(12_000, 12_000)
@@ -90,6 +94,7 @@ class RawSonicSegmentTest {
         }
     }
 
+    /** Consumes processor output in partial slices so the test can detect discarded unconsumed tails. */
     private fun drainPartially(segment: RawSonicSegment): List<Short> {
         val actual = mutableListOf<Short>()
         val output = segment.output()
@@ -100,6 +105,7 @@ class RawSonicSegmentTest {
         return actual
     }
 
+    /** Rate And Input Guards Reject Before Growing The Processor. */
     @Test
     fun rateAndInputGuardsRejectBeforeGrowingTheProcessor() {
         for (speed in listOf(Float.NaN, Float.POSITIVE_INFINITY, 0.125f, 2.01f)) {
@@ -117,6 +123,7 @@ class RawSonicSegmentTest {
         }
     }
 
+    /** Maximum Rate Stereo Uses Bounded Quanta And Clamped Source Mapping. */
     @Test
     fun maximumRateStereoUsesBoundedQuantaAndClampedSourceMapping() {
         RawSonicSegment(96_000, 2, 0.25f).use { segment ->
@@ -136,6 +143,7 @@ class RawSonicSegmentTest {
         }
     }
 
+    /** Unity Bypasses Inactive Processor Without Changing Samples Or Clock. */
     @Test
     fun unityBypassesInactiveProcessorWithoutChangingSamplesOrClock() {
         RawSonicSegment(44_100, 1, 1f).use { segment ->
@@ -150,6 +158,7 @@ class RawSonicSegmentTest {
         }
     }
 
+    /** Closed Segments Cannot Be Reused And Changed Output Limits Are Rejected. */
     @Test
     fun closedSegmentsCannotBeReusedAndChangedOutputLimitsAreRejected() {
         val segment = RawSonicSegment(8_000, 1, 1f)
@@ -164,6 +173,7 @@ class RawSonicSegmentTest {
         assertThrows(IllegalStateException::class.java) { segment.endOfInput() }
     }
 
+    /** Creates deterministic nonzero PCM samples so output tests can detect dropped audio tails. */
     private fun samples(vararg values: Int): ByteArray =
         ByteBuffer
             .allocate(values.size * 2)
@@ -172,6 +182,7 @@ class RawSonicSegmentTest {
                 values.forEach { putShort(it.toShort()) }
             }.array()
 
+    /** Collects processed output until its terminal boundary, respecting the segment-owned output view. */
     private fun drain(segment: RawSonicSegment): List<Short> {
         val samples = mutableListOf<Short>()
         val output = segment.output()

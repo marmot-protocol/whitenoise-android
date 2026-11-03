@@ -45,6 +45,7 @@ class RawAvControlsTest {
         engines.forEach { it.close() }
     }
 
+    /** Stop Then Prepare Keeps Position And Restores Ready Without Replaying The Parser. */
     @Test
     fun stopThenPrepareKeepsPositionAndRestoresReadyWithoutReplayingTheParser() {
         val calls = AtomicInteger()
@@ -76,6 +77,7 @@ class RawAvControlsTest {
         assertTrue(engine.snapshot().playWhenReady)
     }
 
+    /** Stopped Video Retains Matching Seek Pixels Without Starting Another Poster Request. */
     @Test
     fun stoppedVideoRetainsMatchingSeekPixelsWithoutStartingAnotherPosterRequest() {
         val calls = AtomicInteger()
@@ -107,6 +109,7 @@ class RawAvControlsTest {
         assertEquals(2250L, engine.positionMs())
     }
 
+    /** Stopped Held Initial Probe Cannot Restore Ready Or Publish Its Metadata. */
     @Test
     fun stoppedHeldInitialProbeCannotRestoreReadyOrPublishItsMetadata() {
         val entered = CountDownLatch(1)
@@ -131,6 +134,7 @@ class RawAvControlsTest {
         assertFalse(engine.snapshot().prepared)
     }
 
+    /** Old Probe Cannot Complete New Preparation Future While Its Own Successor Is Held. */
     @Test
     fun oldProbeCannotCompleteNewPreparationFutureWhileItsOwnSuccessorIsHeld() {
         val firstEntered = CountDownLatch(1)
@@ -172,6 +176,7 @@ class RawAvControlsTest {
         }
     }
 
+    /** Prepare After Renderer Failure Clears Only That Error And Later Current Failure Still Publishes. */
     @Test
     fun prepareAfterRendererFailureClearsOnlyThatErrorAndLaterCurrentFailureStillPublishes() {
         val engine = newEngine()
@@ -196,6 +201,7 @@ class RawAvControlsTest {
         assertSame(second, engine.snapshot().error)
     }
 
+    /** Adapter Speed Refusal Does Not Throw To Ui Or Falsely Publish The Requested Rate. */
     @Test
     fun adapterSpeedRefusalDoesNotThrowToUiOrFalselyPublishTheRequestedRate() {
         for (rate in listOf(RawPcmCapacity.MIN_SPEED, RawPcmCapacity.MAX_SPEED)) {
@@ -220,6 +226,7 @@ class RawAvControlsTest {
         }
     }
 
+    /** Unsupported Public Playback Parameters Leave Accepted Rate And Healthy Output Unchanged. */
     @Test
     fun unsupportedPublicPlaybackParametersLeaveAcceptedRateAndHealthyOutputUnchanged() {
         val player = IsolatedAttachmentPlayer(RuntimeEnvironment.getApplication(), Uri.parse("file:///fixture.mp4"))
@@ -253,6 +260,7 @@ class RawAvControlsTest {
         }
     }
 
+    /** Default Video Quarter And Maximum Choices Are Accepted And Rejected Changes Preserve Them. */
     @Test
     fun defaultVideoQuarterAndMaximumChoicesAreAcceptedAndRejectedChangesPreserveThem() {
         val player = IsolatedAttachmentPlayer(RuntimeEnvironment.getApplication(), Uri.parse("file:///fixture.mp4"))
@@ -292,6 +300,7 @@ class RawAvControlsTest {
         }
     }
 
+    /** Noisy Receiver Reports Its Real Pause Reason And Later User Play Resets It. */
     @Test
     fun noisyReceiverReportsItsRealPauseReasonAndLaterUserPlayResetsIt() {
         val context = RuntimeEnvironment.getApplication()
@@ -336,6 +345,7 @@ class RawAvControlsTest {
         }
     }
 
+    /** Focus Loss Reports Focus Reason Without Becoming Noisy Or User Pause. */
     @Test
     fun focusLossReportsFocusReasonWithoutBecomingNoisyOrUserPause() {
         val engine = newEngine()
@@ -350,6 +360,7 @@ class RawAvControlsTest {
         assertEquals(Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS, engine.snapshot().playWhenReadyChangeReason)
     }
 
+    /** Volume And Focus Duck Refusals Retire Only The Exact Output Without Committing Rejected Gain. */
     @Test
     fun volumeAndFocusDuckRefusalsRetireOnlyTheExactOutputWithoutCommittingRejectedGain() {
         for (change in listOf(null, AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK, AudioManager.AUDIOFOCUS_GAIN)) {
@@ -371,6 +382,7 @@ class RawAvControlsTest {
         }
     }
 
+    /** Valid Pause Refusal Cannot Escape Ui And Still Retires The Output. */
     @Test
     fun validPauseRefusalCannotEscapeUiAndStillRetiresTheOutput() {
         val engine = newEngine()
@@ -384,6 +396,7 @@ class RawAvControlsTest {
         assertTrue(sink.closed)
     }
 
+    /** Stale Renderer Failure Cannot Replace The Current Generation State. */
     @Test
     fun staleRendererFailureCannotReplaceTheCurrentGenerationState() {
         val engine = newEngine()
@@ -395,6 +408,7 @@ class RawAvControlsTest {
         assertTrue(engine.snapshot().playWhenReady)
     }
 
+    /** Held Seek Acknowledgement Uses Latest Accepted Speed And Gain For Its New Sink. */
     @Test
     fun heldSeekAcknowledgementUsesLatestAcceptedSpeedAndGainForItsNewSink() {
         val owner = FakeOwner()
@@ -428,6 +442,7 @@ class RawAvControlsTest {
         }
     }
 
+    /** Refused New Sink Closes Before Any Adoption For Speed Volume Or Play Failure. */
     @Test
     fun refusedNewSinkClosesBeforeAnyAdoptionForSpeedVolumeOrPlayFailure() {
         for (kind in listOf("speed", "volume", "play")) {
@@ -497,6 +512,10 @@ class RawAvControlsTest {
         throw AssertionError("Held probe did not release its generation")
     }
 
+    /**
+     * Reads a private fixture field so assertions can inspect the exact owner rather than a replacement
+     * instance.
+     */
     private fun field(
         target: Any,
         name: String,
@@ -506,6 +525,10 @@ class RawAvControlsTest {
             it.get(target)
         }
 
+    /**
+     * Installs controlled fixture state through reflection; production visibility and synchronization stay
+     * unchanged.
+     */
     private fun setField(
         target: Any,
         name: String,

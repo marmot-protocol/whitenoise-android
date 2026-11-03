@@ -19,6 +19,7 @@ import java.io.IOException
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [30, 36])
 class RawAvPreferredRenderTest {
+    /** Long Gop Preroll Drains The Actual Bounded Reader And Retains Crossing Pcm Once. */
     @Test fun longGopPrerollDrainsTheActualBoundedReaderAndRetainsCrossingPcmOnce() =
         runBlocking<Unit> {
             val legacy = PrerollPackets()
@@ -54,6 +55,7 @@ class RawAvPreferredRenderTest {
             renderer.pause()
         }
 
+    /** Revoked Video Preroll Never Starts Another Audio Read. */
     @Test fun revokedVideoPrerollNeverStartsAnotherAudioRead() =
         runBlocking {
             for (replaceGeneration in listOf(false, true)) {
@@ -74,6 +76,7 @@ class RawAvPreferredRenderTest {
             }
         }
 
+    /** Revoked Preroll Audio Reply Cannot Adopt Its Crossing Suffix Or Read Again. */
     @Test fun revokedPrerollAudioReplyCannotAdoptItsCrossingSuffixOrReadAgain() =
         runBlocking {
             val owner = Owner().apply { targetUs = 100_000 }
@@ -111,6 +114,7 @@ class RawAvPreferredRenderTest {
             assertTrue(owner.displayed.isEmpty())
         }
 
+    /** Revoked Seek Acknowledgment Cannot Start Preroll Reads. */
     @Test fun revokedSeekAcknowledgmentCannotStartPrerollReads() =
         runBlocking {
             val owner = Owner().apply { targetUs = 100_000 }
@@ -120,6 +124,7 @@ class RawAvPreferredRenderTest {
             assertFalse(owner.ended)
         }
 
+    /** Audio Only Initial Timestamp Gap And Seek Gap Retain The Selected Source Anchor. */
     @Test fun audioOnlyInitialTimestampGapAndSeekGapRetainTheSelectedSourceAnchor() =
         runBlocking {
             for (target in listOf(0L, 20_000L)) {
@@ -153,6 +158,7 @@ class RawAvPreferredRenderTest {
             }
         }
 
+    /** Large Pcm Packet Feeds In Ten Millisecond Chunks Without Dropping Ordinary Video Frames. */
     @Test fun largePcmPacketFeedsInTenMillisecondChunksWithoutDroppingOrdinaryVideoFrames() =
         runBlocking {
             val owner = Owner()
@@ -176,6 +182,7 @@ class RawAvPreferredRenderTest {
             assertTrue(owner.ended)
         }
 
+    /** Real Quarter Speed Coordinator Paces Every Video Across One Large Native Pcm Block. */
     @Test fun realQuarterSpeedCoordinatorPacesEveryVideoAcrossOneLargeNativePcmBlock() =
         runBlocking {
             val owner = Owner()
@@ -208,6 +215,7 @@ class RawAvPreferredRenderTest {
             assertTrue(device.closeAttempted)
         }
 
+    /** Failing Wait Recycles Only The Unadopted Bitmap. */
     @Test fun failingWaitRecyclesOnlyTheUnadoptedBitmap() =
         runBlocking {
             val owner = Owner()
@@ -231,6 +239,7 @@ class RawAvPreferredRenderTest {
             }
         }
 
+    /** Cancellation During Wait Recycles The Unadopted Frame. */
     @Test fun cancellationDuringWaitRecyclesTheUnadoptedFrame() =
         runBlocking {
             val owner = Owner()
@@ -253,6 +262,7 @@ class RawAvPreferredRenderTest {
             }
         }
 
+    /** Callback Adopted Bitmap Survives Exceptional Owner Return. */
     @Test fun callbackAdoptedBitmapSurvivesExceptionalOwnerReturn() =
         runBlocking {
             val owner = Owner().apply { throwAfterAdoption = true }

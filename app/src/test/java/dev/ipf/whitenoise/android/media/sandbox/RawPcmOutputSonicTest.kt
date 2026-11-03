@@ -15,6 +15,7 @@ import java.nio.ByteBuffer
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [30, 36])
 class RawPcmOutputSonicTest {
+    /** Public Video And Voice Position Getters Retain The Last Good Clock After Device Fault. */
     @Test fun publicVideoAndVoicePositionGettersRetainTheLastGoodClockAfterDeviceFault() {
         val context =
             androidx.test.core.app.ApplicationProvider
@@ -73,6 +74,10 @@ class RawPcmOutputSonicTest {
         }
     }
 
+    /**
+     * Reads a private fixture field so assertions can inspect the exact owner rather than a replacement
+     * instance.
+     */
     private fun field(
         target: Any,
         name: String,
@@ -82,6 +87,10 @@ class RawPcmOutputSonicTest {
             it.get(target)
         }
 
+    /**
+     * Installs controlled fixture state through reflection; production visibility and synchronization stay
+     * unchanged.
+     */
     private fun setField(
         target: Any,
         name: String,
@@ -93,6 +102,7 @@ class RawPcmOutputSonicTest {
         }
     }
 
+    /** Tiny Nonzero Audio Is Flushed At Every Supported Representative Rate. */
     @Test fun tinyNonzeroAudioIsFlushedAtEverySupportedRepresentativeRate() {
         for (rate in listOf(.25f, .5f, 1f, 2f)) {
             val device = Device()
@@ -115,6 +125,7 @@ class RawPcmOutputSonicTest {
         }
     }
 
+    /** Partial And Zero Writes Retain Actual Processor Output Until Accepted. */
     @Test fun partialAndZeroWritesRetainActualProcessorOutputUntilAccepted() {
         val device = Device().apply { maxWrite = 0 }
         val output = RawPcmOutput(8000, 1, device)
@@ -134,6 +145,7 @@ class RawPcmOutputSonicTest {
         output.close()
     }
 
+    /** Snapshots Perform No Hardware Operations And Typed Fault Retires At Render Boundary. */
     @Test fun snapshotsPerformNoHardwareOperationsAndTypedFaultRetiresAtRenderBoundary() {
         val device = Device()
         val output = RawPcmOutput(8000, 1, device)
@@ -155,6 +167,7 @@ class RawPcmOutputSonicTest {
         assertTrue(device.closeAttempted)
     }
 
+    /** Restoration Refusal Never Runs Inside Clock Snapshots. */
     @Test fun restorationRefusalNeverRunsInsideClockSnapshots() {
         val device = Device().apply { autoAdvance = false }
         val output = RawPcmOutput(8000, 1, device)
@@ -173,6 +186,7 @@ class RawPcmOutputSonicTest {
         assertTrue(device.closeAttempted)
     }
 
+    /** Impossible Hardware Head Is Typed Only At The Serialized Boundary. */
     @Test fun impossibleHardwareHeadIsTypedOnlyAtTheSerializedBoundary() {
         val device = Device()
         val output = RawPcmOutput(8000, 1, device)
@@ -189,6 +203,7 @@ class RawPcmOutputSonicTest {
         assertTrue(device.closeAttempted)
     }
 
+    /** Rate Transition Keeps Physical Device And Monotone Source Clock. */
     @Test fun rateTransitionKeepsPhysicalDeviceAndMonotoneSourceClock() {
         val device = Device()
         val output = RawPcmOutput(8000, 1, device)

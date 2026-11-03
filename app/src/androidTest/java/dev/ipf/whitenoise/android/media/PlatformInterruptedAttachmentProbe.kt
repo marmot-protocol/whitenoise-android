@@ -67,12 +67,17 @@ internal object PlatformInterruptedAttachmentProbe {
         private val startedAt = SystemClock.elapsedRealtime()
         private val phaseTimings = mutableListOf<Pair<String, Long>>()
 
+        /** Returns the monotonic elapsed interval used by the interruption probe diagnostics. */
         fun elapsedMillis(): Long = SystemClock.elapsedRealtime() - startedAt
 
+        /** Records a phase boundary with its monotonic time for the interruption probe. */
         fun mark(phase: String) {
             phaseTimings.add(phase to elapsedMillis())
         }
 
+        /**
+         * Summarizes observed probe phases without promoting diagnostics to a successful execution receipt.
+         */
         fun phaseDiagnostics(): JSONArray =
             JSONArray(
                 phaseTimings.map { (phase, elapsed) ->

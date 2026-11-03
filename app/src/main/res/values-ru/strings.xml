@@ -121,6 +121,12 @@
     <string name="library_loading">Загрузка файлов и медиа…</string>
     <string name="library_empty">Файлы и медиа не найдены</string>
     <string name="library_source">Из: %1$s · %2$s</string>
+    <string name="library_section_this_week">На этой неделе</string>
+    <string name="library_section_this_month">В этом месяце</string>
+    <string name="library_sender_in_chat">%1$s в %2$s</string>
+    <string name="library_item_description">%1$s, %2$s, от %3$s в %4$s, %5$s</string>
+    <string name="library_load_more_failed">Не удалось загрузить больше файлов и медиа</string>
+    <string name="library_filters_unsupported">Эти фильтры нельзя использовать для просмотра файлов и медиа</string>
     <string name="chat_list_search_filter_remove">Удалить фильтр: %1$s</string>
     <string name="chat_list_filter_all">Все</string>
     <string name="chat_list_filter_unread">Непрочитанные</string>
@@ -963,6 +969,7 @@
     <string name="scan_to_connect">Сканируйте для подключения.</string>
     <string name="not_copied">Не скопировано</string>
     <string name="copy_public_key">Скопировать открытый ключ</string>
+    <string name="public_key_copy_action_with_value">Скопировать открытый ключ %1$s</string>
     <string name="button_in_progress">В процессе</string>
     <string name="private_key">Закрытый ключ</string>
     <string name="profile_public_key_help">Поделитесь этим ключом, чтобы люди могли найти вас и связаться с вами.</string>
@@ -1746,6 +1753,27 @@
         <item quantity="many">Осталось ~%1$d с</item>
         <item quantity="other">Осталось ~%1$d с</item>
     </plurals>
+    <plurals name="tts_bar_minutes_remaining">
+        <item quantity="one">Осталось ~%1$d мин</item>
+        <item quantity="few">Осталось ~%1$d мин</item>
+        <item quantity="many">Осталось ~%1$d мин</item>
+        <item quantity="other">Осталось ~%1$d мин</item>
+    </plurals>
+    <string name="tts_bar_minutes_seconds_remaining">Осталось ~%1$d мин %2$d с</string>
+    <string name="tts_bar_remaining_spoken">Осталось примерно %1$s</string>
+    <plurals name="tts_bar_spoken_minutes">
+        <item quantity="one">%1$d минута</item>
+        <item quantity="few">%1$d минуты</item>
+        <item quantity="many">%1$d минут</item>
+        <item quantity="other">%1$d минуты</item>
+    </plurals>
+    <plurals name="tts_bar_spoken_seconds">
+        <item quantity="one">%1$d секунда</item>
+        <item quantity="few">%1$d секунды</item>
+        <item quantity="many">%1$d секунд</item>
+        <item quantity="other">%1$d секунды</item>
+    </plurals>
+    <string name="tts_bar_spoken_minutes_seconds">%1$s %2$s</string>
     <string name="tts_bar_stop">Остановить чтение</string>
     <string name="tts_bar_return_to_source">Вернуться к озвученному сообщению</string>
     <string name="tts_source_unavailable">Озвученное сообщение больше недоступно</string>
@@ -2592,6 +2620,8 @@
     <string name="notification_tone_added">Добавлено. Откройте категорию ниже, затем «Звук», чтобы выбрать мелодию. На некоторых устройствах они находятся в разделе «Мои звуки».</string>
     <string name="notification_tone_add_failed">Не удалось добавить звуки. Попробуйте ещё раз или сохраните текущий звук Android.</string>
     <string name="notification_tone_scope">Прослушивание и добавление звуков не меняет ваши оповещения. Выберите звук в Android для каждой категории, беседы или человека. Беседы и люди с явно назначенным собственным звуком сохраняют этот звук. Новые категории сообщений используют Ding; беззвучные и настроенные категории не изменяются. При прослушивании используется громкость уведомлений с учётом беззвучного режима и режима «Не беспокоить».</string>
+    <string name="notification_quiet_during_spoken_audio">Тихо во время подкастов</string>
+    <string name="notification_quiet_during_spoken_audio_detail">Сообщения приходят без звука и вибрации, пока другое приложение воспроизводит подкаст или аудиокнигу, чтобы воспроизведение не прерывалось. Упоминания по-прежнему оповещают.</string>
     <string name="notification_tone_android">Звук Android</string>
     <string name="notification_tone_silent">Без звука</string>
     <string name="notification_tone_off">Выключено</string>

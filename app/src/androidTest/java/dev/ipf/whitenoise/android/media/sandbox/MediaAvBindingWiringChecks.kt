@@ -313,6 +313,7 @@ private class AvWiringEndpoint(
         }
     }
 
+    /** Joins the selected fixture thread within a finite deadline and rejects leaked background work. */
     fun join() {
         deathThread?.let {
             it.join(2_000)

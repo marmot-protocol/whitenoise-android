@@ -21,6 +21,7 @@ import java.io.File
 @PullRequestDeviceSmoke
 @MediaContainmentAcceptance
 class MediaAvNativeCorpusDeviceTest {
+    /** Common Video Formats Return Red Pixels From Fresh Restricted Workers. */
     @Test
     fun commonVideoFormatsReturnRedPixelsFromFreshRestrictedWorkers() {
         for (name in listOf("red-h264.mp4", "red-vp9.webm", "red-av1.webm", "red-hevc.mp4")) {
@@ -44,6 +45,7 @@ class MediaAvNativeCorpusDeviceTest {
         }
     }
 
+    /** Common Audio Formats Return Finite Waveforms And Durations. */
     @Test
     fun commonAudioFormatsReturnFiniteWaveformsAndDurations() {
         for (name in listOf("tone-aac.m4a", "tone-opus.ogg", "tone-mp3.mp3", "tone-pcm.wav")) {
@@ -66,6 +68,7 @@ class MediaAvNativeCorpusDeviceTest {
         }
     }
 
+    /** Silent Audio Returns No Waveform From Fresh Restricted Worker. */
     @Test
     fun silentAudioReturnsNoWaveformFromFreshRestrictedWorker() {
         // This unchanged video contains decoded silent AAC; silence has no normalized waveform.
@@ -77,6 +80,7 @@ class MediaAvNativeCorpusDeviceTest {
         }
     }
 
+    /** Copies and closes one pinned corpus fixture around the selected device assertion. */
     private fun withFixture(
         name: String,
         verifiedBytes: ByteArray? = null,
@@ -107,6 +111,7 @@ class MediaAvNativeCorpusDeviceTest {
         }
     }
 
+    /** Checks the observed worker identity and capability restrictions for this exact corpus operation. */
     private fun restricted(previous: WorkerIsolation?) {
         val worker = requireNotNull(IsolatedMediaDecoder.lastAvIsolation)
         assertNotSame(previous, worker)

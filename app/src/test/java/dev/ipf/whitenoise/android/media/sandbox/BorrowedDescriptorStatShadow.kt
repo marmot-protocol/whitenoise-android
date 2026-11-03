@@ -14,6 +14,7 @@ class BorrowedDescriptorStatShadow : ShadowParcelFileDescriptor() {
     // Keep the metadata view alive; only inherited ParcelFileDescriptor.close owns descriptor retirement.
     private var borrowed: FileInputStream? = null
 
+    /** Returns the scripted descriptor length without closing or replacing the borrowed descriptor. */
     @Implementation
     @Synchronized
     override fun getStatSize(): Long =

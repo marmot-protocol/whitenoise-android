@@ -169,6 +169,7 @@ class AttachmentPcmDecoderDeviceTest {
         withPcmBytes(rate, channels, 16, pcm.array()) { file -> block(file, pcm.array()) }
     }
 
+    /** Stages the supplied PCM bytes in a temporary attachment and cleans that exact fixture afterward. */
     private suspend fun withPcmBytes(
         rate: Int,
         channels: Int,

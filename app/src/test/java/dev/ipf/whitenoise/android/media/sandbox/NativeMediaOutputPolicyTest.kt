@@ -8,6 +8,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 class NativeMediaOutputPolicyTest {
+    /** Scalar Metadata Accepts Audio And Rotated Video Without Integer Truncation. */
     @Test
     fun scalarMetadataAcceptsAudioAndRotatedVideoWithoutIntegerTruncation() {
         assertEquals(2, NativeMediaOutputPolicy.info(longArrayOf(0, 0, 1000000, 0, 48000, 2)).channels)
@@ -27,6 +28,7 @@ class NativeMediaOutputPolicyTest {
         }
     }
 
+    /** Decoded Buffers Require Exact Pixels And Whole Interleaved Pcm Frames. */
     @Test
     fun decodedBuffersRequireExactPixelsAndWholeInterleavedPcmFrames() {
         assertEquals(16, NativeMediaOutputPolicy.frame(longArrayOf(1, 2, 2, 0, 0, 0, 16), 2).bytes)
@@ -44,6 +46,7 @@ class NativeMediaOutputPolicyTest {
         }
     }
 
+    /** Eof Irrelevant Fields And Preroll Must Match The Native Protocol. */
     @Test
     fun eofIrrelevantFieldsAndPrerollMustMatchTheNativeProtocol() {
         assertEquals(0, NativeMediaOutputPolicy.frame(longArrayOf(0, 0, 0, 0, 0, 0, 0), 1).kind)
@@ -61,6 +64,7 @@ class NativeMediaOutputPolicyTest {
         }
     }
 
+    /** Rgba Rotation Preserves Opaque Byte Order And All Non Square Pixels. */
     @Test
     fun rgbaRotationPreservesOpaqueByteOrderAndAllNonSquarePixels() {
         val source = ByteBuffer.allocate(24).order(ByteOrder.LITTLE_ENDIAN)

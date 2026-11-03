@@ -16,6 +16,7 @@ import java.util.UUID
 @RunWith(AndroidJUnit4::class)
 @MediaContainmentAcceptance
 class MediaAvCapabilityDeviceTest {
+    /** Characterize Selected Descriptor Platform Media From An Isolated Uid. */
     @Test
     fun characterizeSelectedDescriptorPlatformMediaFromAnIsolatedUid() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()

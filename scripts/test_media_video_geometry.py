@@ -15,6 +15,7 @@ SOURCE = (NATIVE / "media_decoder.cpp").read_text()
 
 
 def expression(name):
+    """Read the selected native arithmetic expression for evaluation by the restricted geometry fixture."""
     match = re.search(r"(?:const int(?:64_t)?|const bool) " + name + r"\s*=\s*(.*?);", SOURCE, re.S)
     if not match:
         raise ValueError("native expression missing: " + name)
@@ -29,6 +30,7 @@ def calculate(text, **values):
     tree = ast.parse(" ".join(text.split()), mode="eval")
 
     def visit(node):
+        """Interpret only the arithmetic syntax admitted by this source-expression fixture."""
         if isinstance(node, ast.Expression):
             return visit(node.body)
         if isinstance(node, ast.Constant) and type(node.value) is int:
@@ -59,12 +61,14 @@ def calculate(text, **values):
 
 
 def constant(name):
+    """Extract the named production constant rather than maintaining a second guessed budget."""
     return int(re.search(r"constexpr (?:int64_t|int) " + name + r" = (\d+);", SOURCE)[1])
 
 
 def dependency_guess(stream, frame, codec):
     """Model pinned av_guess_sample_aspect_ratio's av_reduce/sanitize/selection chain, not native execution."""
     def normalized(pair):
+        """Return the canonical fixture form used to compare selected source expressions."""
         num, den = pair
         if den == 0:
             return 0, 1
@@ -77,6 +81,7 @@ def dependency_guess(stream, frame, codec):
 
 
 def display_chain(width, height, stream, frame=None, codec=(0, 1)):
+    """Apply the source-derived display-size chain used by the geometry checks."""
     if not (0 < width <= constant("kMaxDimension") and 0 < height <= constant("kMaxDimension") and
             width * height <= constant("kMaxSourcePixels")):
         raise ValueError("source refused")
@@ -98,10 +103,12 @@ def display_chain(width, height, stream, frame=None, codec=(0, 1)):
 
 
 def display(width, height, num, den):
+    """Evaluate source display geometry for the selected dimensions and sample-aspect ratio."""
     return display_chain(width, height, (num, den))
 
 
 def fit(size, edge):
+    """Evaluate the bounded conversion-fit expression without compiling or decoding native media."""
     dw, dh = size
     longest = max(size)
     low, high = 1, min(edge, longest)
@@ -127,6 +134,7 @@ def fit(size, edge):
 
 class MediaVideoGeometryTests(unittest.TestCase):
     def test_anamorphic_display_geometry_and_rotated_poster_dimensions(self):
+        """Anamorphic display geometry and rotated poster dimensions."""
         for coded, sar, expected in [((720, 576), (16, 15), (768, 576)),
                                      ((720, 576), (64, 45), (1024, 576)),
                                      ((720, 480), (8, 9), (640, 480))]:
@@ -136,11 +144,13 @@ class MediaVideoGeometryTests(unittest.TestCase):
         self.assertEqual((384, 512), tuple(reversed(fit(display(720, 576, 16, 15), 512))))
 
     def test_ordinary_square_pixels_and_common_four_k_retain_resolution(self):
+        """Ordinary square pixels and common four k retain resolution."""
         for width, height in ((1920, 1080), (3840, 2160), (2160, 3840)):
             self.assertEqual((width, height), fit(display(width, height, 1, 1), 4096))
         self.assertEqual((720, 576), display(720, 576, 0, 1))
 
     def test_conversion_budget_reduces_texture_without_cropping_display_aspect(self):
+        """Conversion budget reduces texture without cropping display aspect."""
         for size, expected in [((4096, 2160), (3968, 2092)), ((4096, 4096), (2880, 2880))]:
             fitted = fit(size, 4096)
             self.assertEqual(expected, fitted)
@@ -154,12 +164,14 @@ class MediaVideoGeometryTests(unittest.TestCase):
                     self.assertLessEqual(result[0] * result[1], 8388608)
 
     def test_invalid_and_extreme_sar_cannot_overflow_or_invent_display_dimensions(self):
+        """Invalid and extreme sar cannot overflow or invent display dimensions."""
         for values in ((720, 576, -1, 1), (720, 576, 1, 0), (32768, 1, 2147483647, 1),
                        (32768, 1, 1, 2147483647), (32769, 1, 1, 1)):
             with self.subTest(values=values), self.assertRaises(ValueError):
                 display(*values)
 
     def test_raw_validation_precedes_dependency_normalization_in_the_actual_chain(self):
+        """Raw validation precedes dependency normalization in the actual chain."""
         body = SOURCE.split("DisplayGeometry displayGeometry", 1)[1].split("DisplayGeometry conversionGeometry", 1)[0]
         self.assertLess(body.index('"sample_aspect_ratio_refused"'), body.index("av_guess_sample_aspect_ratio"))
         self.assertIn("rawSar = stream->sample_aspect_ratio", body)
@@ -185,6 +197,7 @@ class MediaVideoGeometryTests(unittest.TestCase):
         self.assertEqual((768, 576), display_chain(720, 576, (16, 15), frame=(1, 0)))
 
     def test_info_and_render_use_the_same_display_geometry_before_rotation(self):
+        """Info and render use the same display geometry before rotation."""
         info = SOURCE.split("NativeMediaEngine_nativeInfo", 1)[1].split("NativeMediaEngine_nativeRead", 1)[0]
         self.assertIn("const auto display = displayGeometry(s, nullptr)", info)
         video = SOURCE.split("jlongArray video(", 1)[1].split("void configureResampler", 1)[0]
@@ -195,6 +208,7 @@ class MediaVideoGeometryTests(unittest.TestCase):
         self.assertNotIn("sws_scale(", SOURCE)
 
     def test_perceptual_cms_follows_bounded_same_encoding_scale_and_emits_srgb(self):
+        """Perceptual cms follows bounded same encoding scale and emits srgb."""
         video = SOURCE.split("jlongArray video(", 1)[1].split("void configureResampler", 1)[0]
         self.assertIn("av_frame_copy_props(converted.scaled, frame)", video)
         self.assertLess(video.index("sws_scale_frame(dynamicScaler(s.scale)"),
@@ -212,6 +226,7 @@ class MediaVideoGeometryTests(unittest.TestCase):
         self.assertIn("size_t(width) * 4", video)
 
     def test_dolby_vision_base_layer_policy_rejects_profile_five_and_unknown_matrices(self):
+        """Dolby vision base layer policy rejects profile five and unknown matrices."""
         condition = re.search(r"check\((config->dv_profile.*?), \"unsupported_dolby_vision_profile\"\);", SOURCE, re.S)[1]
         for profile, compatibility, transfer, matrix, enhancement, expected in (
                 (8, 1, 16, 9, 0, True), (8, 4, 18, 9, 0, True), (5, 1, 16, 9, 0, False),
@@ -229,6 +244,7 @@ class MediaVideoGeometryTests(unittest.TestCase):
         self.assertIn('"underspecified_hdr_color_metadata"', SOURCE)
 
     def test_color_recipe_change_invalidates_native_artifact_cache(self):
+        """Color recipe change invalidates native artifact cache."""
         spec = importlib.util.spec_from_file_location("video_cache_fixture", Path(__file__).with_name("prepare_media_decoder.py"))
         build = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(build)

@@ -8,6 +8,7 @@ import java.io.File
 
 /** Guards the selected attachment routes; remote embedded videos and debug experiments are separate. */
 class AttachmentMediaContainmentCoverageTest {
+    /** Attachment Entry Points Cannot Instantiate Privileged Compressed Parsers. */
     @Test
     fun attachmentEntryPointsCannotInstantiatePrivilegedCompressedParsers() {
         val files =
@@ -38,6 +39,7 @@ class AttachmentMediaContainmentCoverageTest {
         )
     }
 
+    /** Automatic Media Uses Its Dedicated Isolated Service Without Fallback. */
     @Test
     fun automaticMediaUsesItsDedicatedIsolatedServiceWithoutFallback() {
         val facade = source("media/sandbox/IsolatedMediaDecoder.kt").readText()
@@ -71,6 +73,7 @@ class AttachmentMediaContainmentCoverageTest {
         )
     }
 
+    /** Local Video And Transcription Enter Only The Isolated Raw Stream. */
     @Test
     fun localVideoAndTranscriptionEnterOnlyTheIsolatedRawStream() {
         val video = source("ui/conversation/media/LocalVideoSource.kt").readText()
@@ -110,6 +113,7 @@ class AttachmentMediaContainmentCoverageTest {
         )
     }
 
+    /** Voice Playback Factory Uses Audio Only Raw Output With Controller Owned Focus. */
     @Test
     fun voicePlaybackFactoryUsesAudioOnlyRawOutputWithControllerOwnedFocus() {
         val controller = source("audio/VoicePlaybackController.kt").readText()
@@ -129,6 +133,7 @@ class AttachmentMediaContainmentCoverageTest {
         )
     }
 
+    /** Parser Guard Rejects Aliased Imports And Qualified Factories But Allows Raw Output. */
     @Test
     fun parserGuardRejectsAliasedImportsAndQualifiedFactoriesButAllowsRawOutput() {
         for (source in listOf(
@@ -150,6 +155,7 @@ class AttachmentMediaContainmentCoverageTest {
         )
     }
 
+    /** Sonic Allocation Proof Requires The Exact Reviewed Media3 Implementation. */
     @Test
     fun sonicAllocationProofRequiresTheExactReviewedMedia3Implementation() {
         val catalog =
@@ -168,6 +174,9 @@ class AttachmentMediaContainmentCoverageTest {
         assertTrue("Platform time stretching must remain unity", ".setSpeed(1f).setPitch(1f)" in device)
     }
 
+    /**
+     * Checks source text for forbidden compressed-parser factories, including qualified and aliased forms.
+     */
     private fun containsPrivilegedParser(source: String): Boolean {
         // Import declarations are included, so aliases cannot hide a platform parser.
         val executable =
@@ -182,6 +191,7 @@ class AttachmentMediaContainmentCoverageTest {
         ).containsMatchIn(executable)
     }
 
+    /** Loads the checked-in source text used by the containment wiring assertion. */
     private fun source(path: String): File =
         listOf(
             File("src/main/java/dev/ipf/whitenoise/android/$path"),

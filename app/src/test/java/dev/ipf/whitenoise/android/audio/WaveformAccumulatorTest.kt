@@ -8,6 +8,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 class WaveformAccumulatorTest {
+    /** Pcm And Existing Chunk Summary Produce Exactly The Same Signal. */
     @Test
     fun pcmAndExistingChunkSummaryProduceExactlyTheSameSignal() {
         val samples = ByteBuffer.allocate(16).order(ByteOrder.LITTLE_ENDIAN)
@@ -26,6 +27,7 @@ class WaveformAccumulatorTest {
         assertArrayEquals(FloatArray(64) { if (it < 32) 0.525f else 1f }, pcm.finish(), 0.000001f)
     }
 
+    /** Short Stereo Clip Fills Every Bar And Silence Remains Unavailable. */
     @Test
     fun shortStereoClipFillsEveryBarAndSilenceRemainsUnavailable() {
         val pcm =
@@ -43,6 +45,7 @@ class WaveformAccumulatorTest {
         assertNull(silence.finish())
     }
 
+    /** Partial Frames And Non Finite Summaries Are Refused. */
     @Test
     fun partialFramesAndNonFiniteSummariesAreRefused() {
         val signal = WaveformAccumulator()

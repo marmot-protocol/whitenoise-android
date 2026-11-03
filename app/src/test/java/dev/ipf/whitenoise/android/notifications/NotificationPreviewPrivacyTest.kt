@@ -128,6 +128,8 @@ class NotificationPreviewPrivacyTest {
         assertNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(card))
         assertGenericShortcut(card)
         assertSafeActions(card)
+        val markRead = NotificationCompat.getAction(card, 0)
+        assertEquals(NotificationCompat.Action.SEMANTIC_ACTION_MARK_AS_READ, markRead?.semanticAction)
         assertGenericConversation(card)
     }
 
@@ -308,9 +310,13 @@ class NotificationPreviewPrivacyTest {
         assertEquals(context.getString(R.string.app_name), published.longLabel)
     }
 
+    /** Only Mark read survives a hidden preview, drawn with the same open envelope as the rich card (#3566). */
     private fun assertSafeActions(card: Notification) {
         val markRead = NotificationCompat.Action.SEMANTIC_ACTION_MARK_AS_READ
         assertTrue(card.actions.orEmpty().all { it.semanticAction == markRead })
+        repeat(NotificationCompat.getActionCount(card)) { index ->
+            assertEquals(R.drawable.ic_mark_read, NotificationCompat.getAction(card, index)?.iconCompat?.resId)
+        }
     }
 
     private fun assertGenericConversation(card: Notification) {

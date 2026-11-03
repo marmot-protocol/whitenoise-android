@@ -66,12 +66,14 @@ namespace {
 std::atomic<bool> sandboxInstalled{false};
 std::atomic<unsigned> diagnosticCalls{0};
 
+/** Reserve one of the fixed diagnostic slots atomically; exhausted diagnostics cannot grow without bound. */
 bool reserveDiagnosticCall() {
     unsigned calls = diagnosticCalls.load();
     while (calls < 8 && !diagnosticCalls.compare_exchange_weak(calls, calls + 1)) {}
     return calls < 8;
 }
 
+/** Install the reviewed seccomp filter for all existing threads; only an exact TSYNC success admits JNI loading. */
 bool installProcessRestriction() {
     if (prctl(PR_SET_NO_NEW_PRIVS, 1L, 0L, 0L, 0L) != 0) return false;
     sock_fprog program{static_cast<unsigned short>(sizeof(kMediaProcessFilter) / sizeof(sock_filter)),
@@ -82,6 +84,7 @@ bool installProcessRestriction() {
     return true;
 }
 
+/** Probe exec denial with null arguments so the diagnostic cannot execute another program. */
 int deniedExecErrno() {
     errno = 0;
     const long result = syscall(__NR_execve, nullptr, nullptr, nullptr);
@@ -94,6 +97,7 @@ struct SandboxThreadStatus {
     long execErrno = -1;
 };
 
+/** Capture no-new-privileges, seccomp mode and harmless exec-denial results from the selected diagnostic thread. */
 void* collectSandboxThreadStatus(void* opaque) {
     auto* status = static_cast<SandboxThreadStatus*>(opaque);
     status->noNewPrivileges = prctl(PR_GET_NO_NEW_PRIVS, 0L, 0L, 0L, 0L);
@@ -103,6 +107,7 @@ void* collectSandboxThreadStatus(void* opaque) {
 }
 } // namespace
 
+/** Refuse library loading unless the process-creation restriction was successfully synchronized across threads. */
 extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM*, void*) {
     return installProcessRestriction() ? JNI_VERSION_1_6 : JNI_ERR;
 }
@@ -135,15 +140,37 @@ constexpr int kIoBytes = 32768;
 constexpr int kMaxReadSteps = 8192;
 constexpr int64_t kCallMs = 1500;
 
+/** Read the monotonic millisecond clock used by native parsing and conversion deadlines. */
 int64_t monotonicMs() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now().time_since_epoch()).count();
 }
 
 struct Failure : std::runtime_error {
+    /** Retain the bounded worker failure marker for translation at the JNI boundary. */
     explicit Failure(const char* reason) : std::runtime_error(reason) {}
 };
 
+struct MalformedContainerRead : Failure {
+    /**
+     * Preserve the definite demuxer invalid-data category as the exact marker translated at the JNI read
+     * boundary.
+     */
+    MalformedContainerRead() : Failure("media_container_read_invalid") {}
+};
+
+// Only a definite demuxer INVALIDDATA result attributes READ failure to container bytes.
+/**
+ * Classify only the demuxer invalid-data marker as a malformed-container read; other failures retain their
+ * category.
+ */
+constexpr bool invalidContainerRead(int result) { return result == AVERROR_INVALIDDATA; }
+static_assert(invalidContainerRead(AVERROR_INVALIDDATA) && !invalidContainerRead(AVERROR_EOF) &&
+              !invalidContainerRead(AVERROR(EIO)) && !invalidContainerRead(AVERROR(ENOMEM)) &&
+              !invalidContainerRead(AVERROR(ENOSYS)) && !invalidContainerRead(0),
+              "container READ classification changed");
+
+/** Raise the explicit worker failure marker when a required native precondition is not proven. */
 void check(bool condition, const char* reason) {
     if (!condition) throw Failure(reason);
 }
@@ -152,12 +179,14 @@ constexpr size_t kMaxQueuedBytes = 8U * 1024 * 1024;
 
 // Charge copied packet data and referenced buffer view bytes retained by clone.
 // Allocator bookkeeping is bounded separately by the 512-packet limit.
+/** Add retained queue bytes only after subtraction-based overflow and aggregate-budget checks. */
 constexpr bool addRetainedBytes(size_t bytes, size_t& total) {
     if (total > kMaxQueuedBytes || bytes > kMaxQueuedBytes - total) return false;
     total += bytes;
     return true;
 }
 
+/** Count copied side data, padding, metadata and referenced buffer views before cloning a queued packet. */
 constexpr bool packetRetainedBytes(const AVPacket& packet, size_t& total) {
     total = sizeof(AVPacket);
     if (packet.size < 0 || packet.side_data_elems < 0 ||
@@ -184,6 +213,10 @@ constexpr bool packetRetainedBytes(const AVPacket& packet, size_t& total) {
 
 // These exercise the production accounting against the pinned FFmpeg structs in
 // every CI native compilation; no independent model of the algorithm is used.
+/**
+ * Check production accounting at compile time with the pinned FFmpeg types; this is not device execution
+ * evidence.
+ */
 constexpr bool packetRetentionRegression() {
     AVPacket packet{};
     AVPacketSideData side[2]{};
@@ -230,6 +263,7 @@ struct Track {
     bool hasFrame = false;
     AVFrame* frame = nullptr;
     std::deque<QueuedPacket> packets;
+    /** Free every retained packet and its exact decoded-frame/codec owners when this track retires. */
     ~Track() {
         for (auto& queued : packets) av_packet_free(&queued.packet);
         av_frame_free(&frame);
@@ -268,6 +302,7 @@ struct Session {
     bool playbackAudioClock = false;
     int64_t playbackSeekTargetUs = 0;
     int64_t playbackAudioEndSample = 0;
+    /** Release resampling, packet, demuxer, custom-I/O and duplicated descriptor resources for this exact session. */
     ~Session() {
         sws_free_context(&scale);
         sws_free_context(&colors);
@@ -288,10 +323,12 @@ std::unique_ptr<Session> active;
 int64_t activeHandle = 0;
 uint64_t nextHandle = 1;
 
+/** Stop native I/O when the selected session reaches its monotonic operation deadline. */
 int interrupted(void* opaque) {
     return monotonicMs() >= static_cast<Session*>(opaque)->deadline;
 }
 
+/** Read only within the selected descriptor range, retrying interrupted reads without extending the deadline. */
 int readSelected(void* opaque, uint8_t* destination, int count) {
     auto& s = *static_cast<Session*>(opaque);
     if (interrupted(&s)) return AVERROR_EXIT;
@@ -309,6 +346,7 @@ int readSelected(void* opaque, uint8_t* destination, int count) {
     return static_cast<int>(got);
 }
 
+/** Implement bounded virtual-file seeking with signed-overflow checks; no seek may escape the selected range. */
 int64_t seekSelected(void* opaque, int64_t offset, int whence) {
     auto& s = *static_cast<Session*>(opaque);
     if (interrupted(&s)) return AVERROR_EXIT;
@@ -327,15 +365,18 @@ int64_t seekSelected(void* opaque, int64_t offset, int whence) {
     return selected;
 }
 
+/** Reject every demuxer request to open a secondary resource instead of granting filesystem or network access. */
 int refuseSecondary(AVFormatContext*, AVIOContext**, const char*, int, AVDictionary**) {
     return AVERROR(EACCES);
 }
 
+/** Admit only the reviewed software video codecs compiled into this worker. */
 bool allowedVideo(AVCodecID id) {
     return id == AV_CODEC_ID_H264 || id == AV_CODEC_ID_HEVC || id == AV_CODEC_ID_VP8 ||
         id == AV_CODEC_ID_VP9 || id == AV_CODEC_ID_AV1;
 }
 
+/** Admit only the reviewed audio codecs and PCM sample encodings compiled into this worker. */
 bool allowedAudio(AVCodecID id) {
     switch (id) {
         case AV_CODEC_ID_AAC: case AV_CODEC_ID_OPUS: case AV_CODEC_ID_VORBIS:
@@ -351,6 +392,7 @@ bool allowedAudio(AVCodecID id) {
     }
 }
 
+/** Select a supported stream of the requested media type without opening an unapproved decoder. */
 void selectTrack(Session& s, Track& track, AVMediaType type) {
     int best = av_find_best_stream(s.format, type, -1, -1, nullptr, 0);
     if (best < 0) return;
@@ -358,6 +400,7 @@ void selectTrack(Session& s, Track& track, AVMediaType type) {
     track.index = best;
 }
 
+/** Open the selected bounded software decoder and validate its video/audio resource limits. */
 void openTrack(Session& s, Track& track, AVMediaType type) {
     if (track.index < 0 || track.codec) return;
     auto* parameters = s.format->streams[track.index]->codecpar;
@@ -392,18 +435,21 @@ void openTrack(Session& s, Track& track, AVMediaType type) {
     check(track.frame, "track_frame_allocation_refused");
 }
 
+/** Resolve only the current opaque positive handle; stale handles cannot access a replacement session. */
 Session& session(jlong handle) {
     check(active && handle > 0 && activeHandle == handle, "stale_media_session");
     active->deadline = monotonicMs() + kCallMs;
     return *active;
 }
 
+/** Copy a bounded scalar reply into a new JNI array owned by the caller. */
 jlongArray longs(JNIEnv* env, std::initializer_list<jlong> values) {
     auto result = env->NewLongArray(static_cast<jsize>(values.size()));
     if (result) env->SetLongArrayRegion(result, 0, static_cast<jsize>(values.size()), values.begin());
     return result;
 }
 
+/** Translate the native failure marker into the Java exception boundary without returning a successful payload. */
 void fail(JNIEnv* env, const char* message) {
     if (!env->ExceptionCheck()) {
         auto type = env->FindClass("java/io/IOException");
@@ -411,6 +457,7 @@ void fail(JNIEnv* env, const char* message) {
     }
 }
 
+/** Map decoded timestamps to the selected source timeline while retaining explicit missing-timestamp handling. */
 int64_t timestamp(Session& s, Track& track, AVFrame* frame) {
     if (frame->best_effort_timestamp == AV_NOPTS_VALUE) return 0;
     const auto time = av_rescale_q(frame->best_effort_timestamp, s.format->streams[track.index]->time_base, AV_TIME_BASE_Q);
@@ -427,6 +474,7 @@ struct DisplayGeometry {
     int height;
 };
 
+/** Validate dimensions and sample aspect ratio before deriving source display geometry. */
 DisplayGeometry displayGeometry(Session& s, const AVFrame* frame) {
     auto* stream = s.format->streams[s.video.index];
     const int width = frame ? frame->width : stream->codecpar->width;
@@ -450,6 +498,7 @@ DisplayGeometry displayGeometry(Session& s, const AVFrame* frame) {
     return {static_cast<int>(displayWidth), height};
 }
 
+/** Fit conversion dimensions to the pixel budget without cropping or changing the display aspect ratio. */
 DisplayGeometry conversionGeometry(DisplayGeometry display, int edge) {
     const int longest = std::max(display.width, display.height);
     int low = 1, high = std::min(edge, longest);
@@ -473,6 +522,7 @@ DisplayGeometry conversionGeometry(DisplayGeometry display, int edge) {
     return fitted;
 }
 
+/** Refuse color metadata outside the reviewed conversion policy before publishing output pixels. */
 void validateVideoColor(Session& s, const AVFrame* frame) {
     check(sws_test_colorspace(frame->colorspace, 0) && sws_test_transfer(frame->color_trc, 0) &&
           sws_test_primaries(frame->color_primaries, 0), "unsupported_video_color_metadata");
@@ -500,6 +550,7 @@ void validateVideoColor(Session& s, const AVFrame* frame) {
     }
 }
 
+/** Create the reusable scaler context with the required bounded conversion and color-management configuration. */
 SwsContext* dynamicScaler(SwsContext*& context) {
     if (!context) {
         context = sws_alloc_context();
@@ -515,9 +566,11 @@ SwsContext* dynamicScaler(SwsContext*& context) {
 struct ConversionFrames {
     AVFrame* scaled = av_frame_alloc();
     AVFrame* rgba = av_frame_alloc();
+    /** Free both temporary conversion frames on every normal or exceptional exit. */
     ~ConversionFrames() { av_frame_free(&scaled); av_frame_free(&rgba); }
 };
 
+/** Convert one validated video frame to bounded packed RGBA and copy only the declared output rows. */
 jlongArray video(JNIEnv* env, Session& s, jobject destination) {
     auto* frame = s.video.frame;
     check(frame->width > 0 && frame->height > 0 && frame->width <= kMaxDimension && frame->height <= kMaxDimension &&
@@ -568,6 +621,7 @@ jlongArray video(JNIEnv* env, Session& s, jobject destination) {
     return longs(env, {1, width, height, 0, 0, timestamp(s, s.video, frame), bytes});
 }
 
+/** Reconfigure raw audio conversion only for validated sample rates, layouts and channel bounds. */
 void configureResampler(Session& s) {
     auto* frame = s.audio.frame;
     check(frame->sample_rate >= 8000 && frame->sample_rate <= 96000 && frame->ch_layout.nb_channels > 0 &&
@@ -593,11 +647,13 @@ void configureResampler(Session& s) {
     s.resampleFormat = frame->format;
 }
 
+/** Restrict timeline padding to the selected playback policy rather than ordinary metadata analysis. */
 bool playbackPaddingEnabled(const Session& s) {
     // Waveforms/transcription and audio-only playback retain their original PCM.
     return s.wantVideo && s.wantAudio && s.video.codec && s.audio.codec;
 }
 
+/** Anchor playback PCM to the selected source timeline before applying any initial silence padding. */
 void initializePlaybackAudioClock(Session& s) {
     if (s.playbackAudioClock || !playbackPaddingEnabled(s)) return;
     if (s.audio.hasFrame) {
@@ -614,6 +670,7 @@ void initializePlaybackAudioClock(Session& s) {
     s.playbackAudioClock = true;
 }
 
+/** Advance the source audio clock by the whole frames actually produced by the converter. */
 void recordPlaybackAudio(Session& s, int64_t ptsUs, int frames) {
     if (!playbackPaddingEnabled(s)) return;
     initializePlaybackAudioClock(s);
@@ -623,6 +680,7 @@ void recordPlaybackAudio(Session& s, int64_t ptsUs, int frames) {
     s.playbackAudioEndSample = std::max(s.playbackAudioEndSample, start + frames);
 }
 
+/** Emit a bounded PCM silence block toward the selected source anchor without resetting its timeline. */
 jlongArray playbackPadding(JNIEnv* env, Session& s, jobject destination, int64_t targetUs) {
     if (!playbackPaddingEnabled(s)) return nullptr;
     initializePlaybackAudioClock(s);
@@ -641,6 +699,7 @@ jlongArray playbackPadding(JNIEnv* env, Session& s, jobject destination, int64_t
     return longs(env, {2, 0, 0, s.outputRate, s.outputChannels, pts, bytes});
 }
 
+/** Convert one raw audio frame or resampler tail into a bounded whole PCM16 output block. */
 jlongArray audio(JNIEnv* env, Session& s, jobject destination, bool draining) {
     if (!draining) configureResampler(s);
     if (!s.resample) return nullptr;
@@ -667,6 +726,10 @@ jlongArray audio(JNIEnv* env, Session& s, jobject destination, bool draining) {
     return longs(env, {2, 0, 0, s.outputRate, s.outputChannels, pts, int64_t(produced) * s.outputChannels * 2});
 }
 
+/**
+ * Drive one codec through bounded receive/send steps and dequeue a retained packet only after successful
+ * acceptance.
+ */
 bool pump(Session& s, Track& track) {
     if (!track.codec || track.ended || track.hasFrame) return track.hasFrame;
     for (int step = 0; step < kMaxReadSteps; ++step) {
@@ -701,8 +764,10 @@ bool pump(Session& s, Track& track) {
     throw Failure("media_decode_work_budget_refused");
 }
 
+/** Admit a cloned packet only after the complete retained-view cost and packet-count budgets pass. */
 void queuePacket(Session& s) {
     const int result = av_read_frame(s.format, s.packet);
+    if (invalidContainerRead(result)) throw MalformedContainerRead();
     check(result >= 0 || result == AVERROR_EOF, "media_container_read_failed");
     if (result == AVERROR_EOF) { s.inputEnded = true; return; }
     Track* track = nullptr;
@@ -729,6 +794,7 @@ void queuePacket(Session& s) {
 
 // Playback may hold one video while requesting the PCM needed by its bounded raw processor.
 // The other track keeps at most its existing decoded frame; compressed queues retain their old limits.
+/** Advance the requested track while preserving its separate EOF and bounded inter-track compressed lookahead. */
 jlongArray readPreferred(JNIEnv* env, Session& s, jobject videoOut, jobject audioOut, int preferred) {
     check(preferred == 1 || preferred == 2, "preferred_track_refused");
     const bool wantVideo = videoOut != nullptr;
@@ -772,6 +838,7 @@ jlongArray readPreferred(JNIEnv* env, Session& s, jobject videoOut, jobject audi
     throw Failure("media_decode_work_budget_refused");
 }
 
+/** Return the next bounded audio/video result while retaining the global EOF contract for legacy any-track reads. */
 jlongArray read(JNIEnv* env, Session& s, jobject videoOut, jobject audioOut) {
     const bool wantVideo = videoOut != nullptr;
     const bool wantAudio = audioOut != nullptr;
@@ -839,6 +906,10 @@ jlongArray read(JNIEnv* env, Session& s, jobject videoOut, jobject audioOut) {
 }
 } // namespace
 
+/**
+ * Admit the selected descriptor range and publish an opaque session handle only after bounded demuxer
+ * initialization.
+ */
 extern "C" JNIEXPORT jlong JNICALL
 Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeOpen(
     JNIEnv* env, jobject, jint fd, jlong offset, jlong length, jint edge) {
@@ -906,12 +977,14 @@ Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeOpen(
     } catch (const std::exception& error) { fail(env, error.what()); return 0; }
 }
 
+/** Retire only the session matching this handle; a stale close cannot destroy its replacement. */
 extern "C" JNIEXPORT void JNICALL
 Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeClose(JNIEnv*, jobject, jlong handle) {
     std::lock_guard<std::mutex> guard(sessionMutex);
     if (active && activeHandle == handle) { active.reset(); activeHandle = 0; }
 }
 
+/** Return validated scalar stream metadata from the current session without exposing native object ownership. */
 extern "C" JNIEXPORT jlongArray JNICALL
 Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeInfo(JNIEnv* env, jobject, jlong handle) {
     std::lock_guard<std::mutex> guard(sessionMutex);
@@ -943,22 +1016,30 @@ Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeInfo(JNIEn
     } catch (const std::exception& error) { fail(env, error.what()); return nullptr; }
 }
 
+/** Serialize one any-track read and translate worker failures before returning a JNI payload. */
 extern "C" JNIEXPORT jlongArray JNICALL
 Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeRead(
     JNIEnv* env, jobject, jlong handle, jobject videoOut, jobject audioOut) {
     std::lock_guard<std::mutex> guard(sessionMutex);
     try { return read(env, session(handle), videoOut, audioOut); }
+    catch (const MalformedContainerRead&) { return longs(env, {-1}); }
     catch (const std::exception& error) { fail(env, error.what()); return nullptr; }
 }
 
+/** Serialize one explicitly selected-track read with the same bounded native failure boundary. */
 extern "C" JNIEXPORT jlongArray JNICALL
 Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeReadPreferred(
     JNIEnv* env, jobject, jlong handle, jobject videoOut, jobject audioOut, jint preferred) {
     std::lock_guard<std::mutex> guard(sessionMutex);
     try { return readPreferred(env, session(handle), videoOut, audioOut, preferred); }
+    catch (const MalformedContainerRead&) { return longs(env, {-1}); }
     catch (const std::exception& error) { fail(env, error.what()); return nullptr; }
 }
 
+/**
+ * Flush retained packets and decoder state before moving the current session to the bounded requested source
+ * time.
+ */
 extern "C" JNIEXPORT void JNICALL
 Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeSeek(
     JNIEnv* env, jobject, jlong handle, jlong timeUs) {
@@ -990,6 +1071,7 @@ Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeSeek(
 // Bounded diagnostics only: null exec/clone3 arguments cannot create a process even without this filter.
 // Layout v1: [version, installed, callerNNP, callerMode, execErrno,
 //             pthreadCreateResult, threadNNP, threadMode, threadExecErrno].
+/** Return bounded observations from existing and newly created threads without claiming device qualification. */
 extern "C" JNIEXPORT jlongArray JNICALL
 Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeSandboxDiagnostics(JNIEnv* env, jobject) {
     try {
@@ -1008,6 +1090,7 @@ Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeSandboxDia
 }
 
 // Only a dedicated disposable diagnostic worker calls this: an existing Android filter may SIGSYS clone3.
+/** Probe clone3 denial within the diagnostic budget; unsupported or fatal platform behavior remains observable. */
 extern "C" JNIEXPORT jint JNICALL
 Java_dev_ipf_whitenoise_android_media_sandbox_NativeMediaEngine_nativeSandboxClone3Errno(JNIEnv* env, jobject) {
     try {

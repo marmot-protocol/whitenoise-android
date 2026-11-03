@@ -10,6 +10,7 @@ import org.junit.Test
 import java.io.IOException
 
 class VoicePlaybackFailurePolicyTest {
+    /** Only Explicit Device Output Failure Keeps The Compressed Voice Cache. */
     @Test
     fun onlyExplicitDeviceOutputFailureKeepsTheCompressedVoiceCache() {
         val output = voicePlaybackErrorCode(RawOutputFailure("device speed refused", IllegalArgumentException()))
@@ -22,6 +23,7 @@ class VoicePlaybackFailurePolicyTest {
         assertTrue(voicePlaybackErrorInvalidatesCache(voicePlaybackErrorCode(IOException(RawOutputFailure("nested")))))
     }
 
+    /** Unresolved Prior Admission Retains An Unopened Healthy Source And Generic Io Still Invalidates. */
     @Test
     fun unresolvedPriorAdmissionRetainsAnUnopenedHealthySourceAndGenericIoStillInvalidates() {
         val admission = MediaAdmissionFailure("Previous media worker lifetime is unresolved")

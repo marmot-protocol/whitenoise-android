@@ -24,6 +24,7 @@ import org.robolectric.annotation.Config
 class LocalVideoSourceTest {
     @get:Rule val composeRule = createComposeRule()
 
+    /** Only File And Content Uris Can Create Isolated Players. */
     @Test
     fun onlyFileAndContentUrisCanCreateIsolatedPlayers() {
         val context = ApplicationProvider.getApplicationContext<Context>()
@@ -40,6 +41,7 @@ class LocalVideoSourceTest {
         }
     }
 
+    /** Restored Unsupported Uri Stays Playerless Across Foreground Transitions. */
     @Test
     fun restoredUnsupportedUriStaysPlayerlessAcrossForegroundTransitions() {
         val lifecycle = FixtureLifecycleOwner()

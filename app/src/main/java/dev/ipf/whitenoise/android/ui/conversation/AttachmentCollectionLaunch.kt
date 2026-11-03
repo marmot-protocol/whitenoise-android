@@ -74,14 +74,17 @@ internal fun WhiteNoiseAppState.mdkCollectionTokenStatus(
 /**
  * Starts a collection operation for a non-reply Send of more than one item. Private share sources are leased
  * for the whole operation, the plan is journaled, and only then does the shelf settle and chunk 1 begin.
- * [onAfterSend] runs once, when the first chunk's bubble appears.
+ * [onAfterSend] runs once, when the first chunk's bubble appears. [send] keeps the items' outgoing draft open
+ * until the operation stops running here, so its later chunks and their thumbnails decode in that draft's worker.
  */
 internal fun ConversationMediaSender.startCollectionSend(
     request: CollectionSendRequest,
     completion: StagedMediaSendCompletion,
     onAfterSend: () -> Unit,
+    send: dev.ipf.whitenoise.android.media.OutgoingSend,
 ) {
-    val account = controller.boundAccountRef ?: return completion.reject()
+    val account =
+        controller.boundAccountRef ?: return completion.reject().also { controller.endOutgoingSend(send) }
     val groupIdHex = controller.group.groupIdHex
     val sessionEpoch = appState.mediaUploadSessionEpoch()
     val sourceAccount = appState.accounts.firstOrNull { it.label == account }?.accountIdHex
@@ -118,6 +121,7 @@ internal fun ConversationMediaSender.startCollectionSend(
             val held = lease.also { lease = null }
             AttachmentCollectionSender { latestCollectionSender(account, groupIdHex) ?: original }.drive(run, held)
         } finally {
+            controller.endOutgoingSend(send)
             lease?.let { withContext(NonCancellable + Dispatchers.IO) { it.release() } }
             if (!started) completion.reject()
         }
@@ -292,10 +296,7 @@ internal fun ConversationMediaSender.resumeCollection(
                 return@launchMutation appState.present(R.string.share_import_storage)
             }
         if (skipped > 0) appState.presentSkippedAttachments(skipped, R.string.attachment_collection_reselect)
-        val run = CollectionRun(operationId, resumed.accountRef, resumed.groupIdHex, sessionEpoch, caption = null)
-        AttachmentCollectionSender {
-            latestCollectionSender(resumed.accountRef, resumed.groupIdHex) ?: original
-        }.drive(run, lease)
+        driveResumedCollection(resumed, sessionEpoch, lease, original)
     }
 }
 

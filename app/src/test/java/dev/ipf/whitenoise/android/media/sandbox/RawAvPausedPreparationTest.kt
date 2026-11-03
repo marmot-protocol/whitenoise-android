@@ -32,6 +32,7 @@ class RawAvPausedPreparationTest {
         IsolatedMediaDecoder.installTestTransport(null)
     }
 
+    /** Player Prepare Then Repeated False Retains The Held Initial Poster. */
     @Test
     fun playerPrepareThenRepeatedFalseRetainsTheHeldInitialPoster() {
         val entered = CountDownLatch(1)
@@ -78,6 +79,7 @@ class RawAvPausedPreparationTest {
         }
     }
 
+    /** Real Play Then Pause Still Rejects The Earlier Held Preparation Poster. */
     @Test
     fun realPlayThenPauseStillRejectsTheEarlierHeldPreparationPoster() {
         val entered = CountDownLatch(1)
@@ -118,6 +120,7 @@ class RawAvPausedPreparationTest {
         }
     }
 
+    /** Repeated False Acknowledges The Current Held Paused Seek Instead Of Cancelling It. */
     @Test
     fun repeatedFalseAcknowledgesTheCurrentHeldPausedSeekInsteadOfCancellingIt() {
         val entered = CountDownLatch(1)
@@ -175,6 +178,7 @@ class RawAvPausedPreparationTest {
         }
     }
 
+    /** Real Pause Still Revokes Playing Generation And Repeated Pause Clears Transient Resume. */
     @Test
     fun realPauseStillRevokesPlayingGenerationAndRepeatedPauseClearsTransientResume() {
         val player = player()
@@ -223,6 +227,10 @@ class RawAvPausedPreparationTest {
         throw AssertionError("Held probe did not release its generation")
     }
 
+    /**
+     * Reads a private fixture field so assertions can inspect the exact owner rather than a replacement
+     * instance.
+     */
     private fun field(
         target: Any,
         name: String,
@@ -232,6 +240,10 @@ class RawAvPausedPreparationTest {
             it.get(target)
         }
 
+    /**
+     * Installs controlled fixture state through reflection; production visibility and synchronization stay
+     * unchanged.
+     */
     private fun setField(
         target: Any,
         name: String,

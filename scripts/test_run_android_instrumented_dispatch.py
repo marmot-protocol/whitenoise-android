@@ -107,6 +107,7 @@ class InstrumentedDispatchTest(unittest.TestCase):
             self.run_dispatch("workflow_dispatch", "false", "false", "false", "true", fail_required=True)
 
     def test_native_sandbox_player_and_corpus_are_selected_and_required(self):
+        """Native sandbox player and corpus are selected and required."""
         directory = ROOT / "app/src/androidTest/java/dev/ipf/whitenoise/android/media/sandbox"
         methods = {
             "NativeMediaSandboxDeviceTest": (
@@ -165,6 +166,7 @@ class InstrumentedDispatchTest(unittest.TestCase):
             self.assertIn("-Pandroid.testInstrumentationRunnerArguments.class=" + case, command)
 
     def test_actual_checker_rejects_missing_or_skipped_selected_native_case(self):
+        """Actual checker rejects missing or skipped selected native case."""
         for api in ("30", "36"):
             focused = self.run_dispatch("workflow_dispatch", "false", "false", "false", "true", "false", "false", "false", api)
             cases = [line for line in focused.splitlines() if line.startswith("dev.ipf.") and "#" in line]
@@ -183,6 +185,7 @@ class InstrumentedDispatchTest(unittest.TestCase):
                 required.write_text("\n".join(cases) + "\n")
 
                 def run(missing=None, skipped=None):
+                    """Invoke the real selected-case checker on task-owned fixture files and retain its result."""
                     suite = ET.Element("testsuite")
                     for case in cases:
                         if case == missing:
@@ -221,13 +224,24 @@ class InstrumentedDispatchTest(unittest.TestCase):
         required = (ROOT / "config/instrumented-required-cases.txt").read_text().splitlines()
         for line in required:
             if any("." + name + "#" in line for name in (
-                "IsolatedMediaDecoderDeviceTest", "AnimationSourceAdmissionDeviceTest", "MediaCodecCorpusDeviceTest"
+                "IsolatedMediaDecoderDeviceTest", "AnimationSourceAdmissionDeviceTest", "MediaCodecCorpusDeviceTest",
+                "MediaWorkerDomainDeviceTest", "MediaWorkerUiDeviceTest",
             )):
                 self.assertIn(line, focused)
         smoke = self.run_dispatch("pull_request")
         self.assertIn("RunnerArguments.annotation=dev.ipf.whitenoise.android.PullRequestDeviceSmoke", smoke)
         self.assertNotIn("MediaContainmentAcceptance", smoke)
         self.assertNotIn(case, smoke)
+
+    def test_domain_canary_runs_on_pull_requests_and_in_containment(self):
+        """The cross- versus same-domain canary is quick enough for every PR and stays in the focused lane."""
+        directory = ROOT / "app/src/androidTest/java/dev/ipf/whitenoise/android/media/sandbox"
+        source = (directory / "MediaWorkerDomainDeviceTest.kt").read_text()
+        self.assertIn("@PullRequestDeviceSmoke", source)
+        self.assertIn("@MediaContainmentAcceptance", source)
+        case = ("dev.ipf.whitenoise.android.media.sandbox.MediaWorkerDomainDeviceTest#"
+                "retainedStateReachesTheSameDomainOnlyNeverAnotherDomain")
+        self.assertIn(case, (ROOT / "config/instrumented-required-cases.txt").read_text())
 
     def test_healthy_timing_fixture_is_excluded_from_all_existing_suites(self):
         directory=ROOT/'app/src/androidTest/java/dev/ipf/whitenoise/android/media/sandbox'

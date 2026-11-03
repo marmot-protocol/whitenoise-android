@@ -163,6 +163,28 @@ The phase contains no account, conversation, message identity or content. An abs
 phase can mean a below-threshold gate or inactive diagnostics; it does not prove
 that no candidate was checked.
 
+### Account switching
+
+`op=account_switch` follows one switch to a different account, from the
+request (`elapsed_ms` is measured from it, including setup routing) through local
+preparation, publication and the target chat list's first frame (#3496):
+
+| Phase | Stage |
+| --- | --- |
+| `cached_chat_rows_ready` | The target's local chat rows were read, before publication. A second line follows when the bound controller sees them. |
+| `member_derived_local_ready` / `account_switch_member_derived_deferred` | First-frame member projections were complete, or deferred to the controller. |
+| `account_switch_top_bar_profiles_ready` | Top-bar identities were read, when member seeds are skipped. |
+| `account_switch_persisted_profiles_ready` | Top-bar and direct-peer profile seeds were read. |
+| `account_switch_shortcuts_hidden` | The previous account's Direct Share targets were withdrawn. |
+| `account_switch_published` | The target became the active account. |
+| `account_switch_bind_start` / `account_switch_seed_bound` | The chat-list controller began binding the target, and bound its seeded rows. |
+| `first_local_frame` | The target's local snapshot drew; the trace ends here. |
+
+Row phases carry `count=` rows. Lines carry no account, conversation or
+profile identity. Switching back to the current account, sign-in and first
+activation are not traced. Debug builds also log the same stages to Logcat as
+`account-switch <stage> +<ms>`, so release and debug runs can be compared.
+
 ### Send and attachment diagnosis
 
 `op=text_send` and `op=media_send` follow one process-local operation from the
@@ -382,6 +404,21 @@ stalled-locator failover, per-request native phase attribution, internal HTTP
 concurrency, or a signed release candidate. Those require their own fixtures and representative-device runs;
 passing this diagnostic must not be treated as proof that all field latency
 tails are eliminated.
+
+### Still-image worker lane throughput
+
+`MediaWorkerThroughputDeviceTest` compares still-image transport variants on one
+APK, device and synthetic corpus: cold first thumbnails, first images in new
+conversations, idle thumbnails and viewer decodes, the six-operation mix,
+24/48/96-request bursts within one conversation, a mixed burst across
+conversations, a cold chat list and overlapping scroll rounds. It records latency, admission wait, eight-second admission
+timeouts, worker starts, live worker processes and caller FD/RSS. It is an
+opt-in `ManualDeviceFixture`; run it with `am instrument` on a disposable
+emulator or dedicated device, in ABBA order. The procedure and record format are
+in [the still-worker baseline](media-worker-baseline.md#matched-throughput-comparison);
+the #3373 results and accepted budget are recorded with the
+[domain-bound worker generations](media-containment.md#domain-bound-worker-generations). Measure worker
+PSS separately with `dumpsys meminfo`; RSS counts shared zygote pages per process.
 
 ### Deterministic Android media regressions
 

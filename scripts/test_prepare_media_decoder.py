@@ -20,6 +20,7 @@ else:
 
 
 def archive(prefix, entries):
+    """Create a deterministic small source archive so extraction guards run without downloading dependencies."""
     output = io.BytesIO()
     with tarfile.open(fileobj=output, mode="w:xz") as result:
         for name, data in entries.items():
@@ -31,6 +32,7 @@ def archive(prefix, entries):
 
 
 def wheel(entries):
+    """Build synthetic wheel bytes for exact path, permission and extraction-budget assertions."""
     output = io.BytesIO()
     with zipfile.ZipFile(output, "w") as result:
         for name, data in entries.items():
@@ -40,15 +42,18 @@ def wheel(entries):
 
 class Response(io.BytesIO):
     def __init__(self, data, url="https://fixture.invalid/file"):
+        """Wrap synthetic dependency bytes with the response URL used by the real download guard."""
         super().__init__(data)
         self.url = url
 
     def geturl(self):
+        """Return the scripted final response URL so redirect admission is tested without network access."""
         return self.url
 
 
 class PortableInspectionTests(unittest.TestCase):
     def test_cache_key_and_plan_do_not_import_unavailable_fcntl(self):
+        """Cache key and plan do not import unavailable fcntl."""
         probe = """import importlib.abc, runpy, sys
 class NoFcntl(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
@@ -71,12 +76,14 @@ runpy.run_path(script, run_name='__main__')
 
 class ToolWheelTests(unittest.TestCase):
     def extract(self, directory, entries):
+        """Stage one synthetic wheel and exercise the real pinned-tool extraction boundary."""
         path = directory / "ninja.whl"
         path.write_bytes(wheel(entries))
         return build.extract_tools([path], directory / "tools")
 
     def test_pinned_ninja_wheel_script_layout_and_permissions(self):
         # This literal is independently checked against the SHA-pinned wheel's RECORD.
+        """Pinned ninja wheel script layout and permissions."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             binary = self.extract(root, {"ninja-1.13.2.data/scripts/ninja": b"synthetic executable"})
@@ -85,6 +92,7 @@ class ToolWheelTests(unittest.TestCase):
             self.assertEqual(0o755, binary.stat().st_mode & 0o777)
 
     def test_missing_old_or_other_version_paths_never_fall_back(self):
+        """Missing old or other version paths never fall back."""
         for entries in ({}, {"ninja/data/bin/ninja": b"old layout"},
                         {"ninja-1.13.3.data/scripts/ninja": b"different version"}):
             with self.subTest(entries=entries), tempfile.TemporaryDirectory() as temporary:
@@ -92,6 +100,7 @@ class ToolWheelTests(unittest.TestCase):
                     self.extract(Path(temporary), entries)
 
     def test_tool_wheel_traversal_absolute_and_symlink_entries_refused(self):
+        """Tool wheel traversal absolute and symlink entries refused."""
         for name, mode in (("../outside", 0o100644), ("/outside", 0o100644),
                            ("ninja-1.13.2.data/scripts/ninja", 0o120777)):
             with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
@@ -106,6 +115,7 @@ class ToolWheelTests(unittest.TestCase):
                 self.assertFalse((root / "outside").exists())
 
     def test_tool_extraction_budget_still_refused_before_extract(self):
+        """Tool extraction budget still refused before extract."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             path = root / "ninja.whl"
@@ -120,6 +130,7 @@ class ToolWheelTests(unittest.TestCase):
 
 class MesonLauncherTests(unittest.TestCase):
     def test_persistent_launcher_isolates_initial_and_repeated_invocation(self):
+        """Persistent launcher isolates initial and repeated invocation."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             tools = root / "tools"
@@ -146,6 +157,7 @@ class MesonLauncherTests(unittest.TestCase):
                 build.write_meson_launcher(tools)
 
     def test_missing_pinned_modules_refuse_before_creating_launcher(self):
+        """Missing pinned modules refuse before creating launcher."""
         with tempfile.TemporaryDirectory() as temporary:
             tools = Path(temporary)
             with self.assertRaisesRegex(ValueError, "pinned Meson module missing"):
@@ -153,6 +165,7 @@ class MesonLauncherTests(unittest.TestCase):
             self.assertFalse((tools / "meson-pinned").exists())
 
     def test_deleted_pinned_module_cannot_fall_back_to_poisoned_environment(self):
+        """Deleted pinned module cannot fall back to poisoned environment."""
         with tempfile.TemporaryDirectory() as temporary:
             tools = Path(temporary)
             module = tools / "mesonbuild"
@@ -169,6 +182,7 @@ class MesonLauncherTests(unittest.TestCase):
 
 class NativeBuildTests(unittest.TestCase):
     def setUp(self):
+        """Install task-owned synthetic native inputs and restore patched build dependencies during fixture cleanup."""
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
@@ -211,14 +225,17 @@ class NativeBuildTests(unittest.TestCase):
         self.commands = []
 
     def save_lock(self):
+        """Persist the fixture lock under the same path consumed by the real build-policy loader."""
         (self.native / "lock.json").write_text(json.dumps(self.lock))
 
     def opener(self, url, timeout):
+        """Serve only the fixture dependency bytes through the real bounded download interface."""
         self.assertEqual(timeout, 120)
         self.downloads.append(url)
         return Response(self.data[url.rsplit("/", 1)[1]], url)
 
     def fake_command(self, command, *, cwd, env):
+        """Model tool outputs beneath real build guards; this fixture does not compile Android or native code."""
         command = [str(value) for value in command]
         self.commands.append(command)
         self.assertEqual("1789687190", env["SOURCE_DATE_EPOCH"])
@@ -247,11 +264,13 @@ class NativeBuildTests(unittest.TestCase):
             destination.write_bytes(header)
 
     def prepare(self, output=None, abis=None):
+        """Call the real preparation orchestrator with synthetic transport/compiler seams and its actual input guards."""
         with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}):
             return build.prepare(self.ndk, output or self.root / "output", abis or ["arm64-v8a"],
                                  opener=self.opener, command=self.fake_command)
 
     def test_stale_or_changed_seccomp_program_cannot_reuse_a_build_identity(self):
+        """Stale or changed seccomp program cannot reuse a build identity."""
         first = build.cache_key(["arm64-v8a"])
         self.assertFalse((self.native / "__pycache__").exists())
         with (self.native / "generate_seccomp_filter.py").open("a") as output:
@@ -265,6 +284,7 @@ class NativeBuildTests(unittest.TestCase):
         self.assertEqual([], self.commands)
 
     def test_compiled_pcm_decoders_have_matching_runtime_codec_admission(self):
+        """Compiled pcm decoders have matching runtime codec admission."""
         source = (Path(__file__).resolve().parents[1] / "native/media-decoder/media_decoder.cpp").read_text()
         admission = source.split("bool allowedAudio(AVCodecID id) {", 1)[1].split("void selectTrack", 1)[0]
         for decoder in build.DECODERS:
@@ -272,6 +292,7 @@ class NativeBuildTests(unittest.TestCase):
                 self.assertIn("case AV_CODEC_ID_" + decoder.upper() + ":", admission)
 
     def test_fake_compiler_builds_all_abis_without_github_credentials(self):
+        """Fake compiler builds all abis without github credentials."""
         with patch.dict(os.environ, {"GITHUB_ACTIONS": "false"}):
             manifest = build.prepare(self.ndk, self.root / "output", list(build.ABIS), opener=self.opener,
                                      command=self.fake_command)
@@ -280,6 +301,7 @@ class NativeBuildTests(unittest.TestCase):
         self.assertEqual(4, len(self.downloads))
 
     def test_invalid_platform_is_refused_before_any_transport_or_compiler(self):
+        """Invalid platform is refused before any transport or compiler."""
         for system, machine in (("Darwin", "x86_64"), ("Linux", "aarch64")):
             with self.subTest(system=system, machine=machine), \
                     patch.object(build.platform, "system", return_value=system), \
@@ -291,6 +313,7 @@ class NativeBuildTests(unittest.TestCase):
         self.assertEqual([], self.commands)
 
     def test_malformed_source_pin_is_refused_before_any_transport_or_compiler(self):
+        """Malformed source pin is refused before any transport or compiler."""
         self.lock["ffmpeg"]["sha256"] = "invalid-source-digest"
         self.save_lock()
         with self.assertRaisesRegex(ValueError, "invalid pinned source"):
@@ -300,6 +323,7 @@ class NativeBuildTests(unittest.TestCase):
         self.assertEqual([], self.commands)
 
     def test_pinned_ndk_and_abi_required_before_any_transport(self):
+        """Pinned ndk and abi required before any transport."""
         (self.ndk / "source.properties").write_text("Pkg.Revision = 28.0.0\n")
         with self.assertRaisesRegex(ValueError, "revision differs"):
             self.prepare()
@@ -310,6 +334,7 @@ class NativeBuildTests(unittest.TestCase):
                     build.prepare(self.ndk, self.root / "out", abis)
 
     def test_all_abi_real_recipes_keep_runtime_capabilities_disabled(self):
+        """All abi real recipes keep runtime capabilities disabled."""
         for abi in build.ABIS:
             args, flags = build.configuration(self.ndk, abi, self.lock, self.root / "build", self.root / "install",
                                               self.root / "dav1d", self.root / "pkg-config")
@@ -323,6 +348,7 @@ class NativeBuildTests(unittest.TestCase):
             self.assertEqual(abi in {"x86", "x86_64"}, "--disable-x86asm" in args)
 
     def test_only_32bit_x86_disables_inline_assembly_for_shared_pic_output(self):
+        """Only 32bit x86 disables inline assembly for shared pic output."""
         for abi in build.ABIS:
             with self.subTest(abi=abi):
                 args, flags = build.configuration(self.ndk, abi, self.lock, self.root / "build",
@@ -337,6 +363,7 @@ class NativeBuildTests(unittest.TestCase):
                 self.assertIn("--extra-ldflags=-Wl,-z,max-page-size=16384", args)
 
     def test_fake_compiler_beneath_real_build_guards_produces_and_reuses_bound_output(self):
+        """Fake compiler beneath real build guards produces and reuses bound output."""
         manifest = self.prepare()
         self.assertEqual(1, len(manifest["artifacts"]))
         self.assertEqual("arm64-v8a", manifest["artifacts"][0]["abi"])
@@ -352,6 +379,7 @@ class NativeBuildTests(unittest.TestCase):
             self.prepare()
 
     def test_changed_wrapper_or_abi_cannot_reuse_cached_native_outputs(self):
+        """Changed wrapper or abi cannot reuse cached native outputs."""
         self.prepare()
         (self.native / "media_decoder.cpp").write_text("changed wrapper")
         with self.assertRaisesRegex(ValueError, "input identity differs"):
@@ -360,6 +388,7 @@ class NativeBuildTests(unittest.TestCase):
             self.prepare(abis=["x86_64"])
 
     def test_existing_partial_build_refuses_to_regenerate(self):
+        """Existing partial build refuses to regenerate."""
         output = self.root / "output"
         (output / "tools").mkdir(parents=True)
         with self.assertRaisesRegex(ValueError, "unfinished decoder build"):
@@ -367,6 +396,7 @@ class NativeBuildTests(unittest.TestCase):
         self.assertEqual([], self.commands)
 
     def test_fetch_checks_exact_digest_size_https_and_preserves_partial_intent(self):
+        """Fetch checks exact digest size https and preserves partial intent."""
         for mode in ("digest", "oversize", "short", "http"):
             with self.subTest(mode=mode):
                 directory = self.root / mode
@@ -384,6 +414,7 @@ class NativeBuildTests(unittest.TestCase):
                     build.fetch(item, directory, opener)
 
     def test_cached_download_is_hashed_before_reuse(self):
+        """Cached download is hashed before reuse."""
         directory = self.root / "downloads"
         directory.mkdir()
         item = self.lock["dav1d"]
@@ -395,6 +426,7 @@ class NativeBuildTests(unittest.TestCase):
             build.fetch(item, directory, self.opener)
 
     def test_archive_traversal_and_links_refused(self):
+        """Archive traversal and links refused."""
         for name, link in (("../outside", False), ("safe/link", True)):
             path = self.root / ("link.xz" if link else "traversal.xz")
             with tarfile.open(path, "w:xz") as result:
@@ -408,6 +440,7 @@ class NativeBuildTests(unittest.TestCase):
         self.assertFalse((self.root / "outside").exists())
 
     def test_component_audit_rejects_added_codec_or_protocol_and_missing_required_codec(self):
+        """Component audit rejects added codec or protocol and missing required codec."""
         path = self.root / "config_components.h"
         original = "\n".join("#define CONFIG_" + name.upper() + suffix + " 1"
                              for suffix, names in (("_DECODER", build.DECODERS), ("_DEMUXER", build.DEMUXERS),
@@ -421,6 +454,7 @@ class NativeBuildTests(unittest.TestCase):
                 build.audit_components(path)
 
     def test_elf_audit_refuses_wrong_machine_and_unplanned_shared_library(self):
+        """Elf audit refuses wrong machine and unplanned shared library."""
         self.prepare()
         library = self.root / "output/jniLibs/arm64-v8a/libmedia_decoder.so"
         with self.assertRaisesRegex(ValueError, "ELF ABI"):
@@ -429,6 +463,7 @@ class NativeBuildTests(unittest.TestCase):
             build.audit_elf(library, "arm64-v8a", "Shared library: [libavformat.so]")
 
     def test_configuration_string_normalized_without_removing_enabled_flags(self):
+        """Configuration string normalized without removing enabled flags."""
         path = self.root / "config.h"
         path.write_text('#define FFMPEG_CONFIGURATION "host"\n#define OTHER 1\n')
         build.normalize_configuration(path, ["--disable-network", "--prefix=" + str(self.root / "work/install"),
@@ -439,6 +474,7 @@ class NativeBuildTests(unittest.TestCase):
         self.assertIn("#define OTHER 1", text)
 
     def test_bounded_pkg_config_accepts_only_pinned_dav1d(self):
+        """Bounded pkg config accepts only pinned dav1d."""
         script = self.root / "pkg-config"
         prefix = self.root / "dav1d-install"
         build.write_pkg_config(script, prefix, "1.5.4")
@@ -458,6 +494,7 @@ class NativeBuildTests(unittest.TestCase):
                 self.assertEqual(stdout, result.stdout)
 
     def test_bounded_pkg_config_refuses_unknown_queries_libraries_and_constraints(self):
+        """Bounded pkg config refuses unknown queries libraries and constraints."""
         script = self.root / "pkg-config"
         build.write_pkg_config(script, self.root / "dav1d-install", "1.5.4")
         for query in ([], ["--libs", "libnetwork"], ["--libs", "dav1d", "libnetwork"],
@@ -471,6 +508,7 @@ class NativeBuildTests(unittest.TestCase):
                 self.assertEqual(b"", denied.stdout)
 
     def test_bounded_pkg_config_checks_the_advertised_dav1d_minimum(self):
+        """Bounded pkg config checks the advertised dav1d minimum."""
         for version in ("0.9.9", "1.5.4-custom", "invalid"):
             with self.subTest(version=version):
                 path = self.root / ("pkg-config-" + version)

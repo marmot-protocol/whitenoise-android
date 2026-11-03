@@ -282,4 +282,79 @@ class NotificationAlertBudgetTest {
             budget.reserve(nowMs = now + 60_000L, isMention = false, accountRef = "a").decision,
         )
     }
+
+    /** Speech from another app silences a message but never a mention, and a spent cohort stays spent. */
+    @Test
+    fun spokenAudioSilencesMessagesButNotMentions() {
+        assertEquals(
+            NotificationAlertDecision.SilentSpokenAudio,
+            notificationAlertDecision(
+                catchUpGeneration = null,
+                alertedCatchUpGeneration = null,
+                msSinceLastAlert = null,
+                isMention = false,
+                spokenAudioPlaying = true,
+            ),
+        )
+        assertEquals(
+            "a cohort's first card is silenced too",
+            NotificationAlertDecision.SilentSpokenAudio,
+            notificationAlertDecision(
+                catchUpGeneration = 3L,
+                alertedCatchUpGeneration = null,
+                msSinceLastAlert = null,
+                isMention = false,
+                spokenAudioPlaying = true,
+            ),
+        )
+        assertEquals(
+            "a mention still rings over speech",
+            NotificationAlertDecision.Alert,
+            notificationAlertDecision(
+                catchUpGeneration = null,
+                alertedCatchUpGeneration = null,
+                msSinceLastAlert = null,
+                isMention = true,
+                spokenAudioPlaying = true,
+            ),
+        )
+        assertEquals(
+            NotificationAlertDecision.SilentCatchUp,
+            notificationAlertDecision(
+                catchUpGeneration = 3L,
+                alertedCatchUpGeneration = 3L,
+                msSinceLastAlert = null,
+                isMention = false,
+                spokenAudioPlaying = true,
+            ),
+        )
+    }
+
+    /** A post silenced for speech holds no ring, so the first arrival after the speech stops rings. */
+    @Test
+    fun aPostSilencedForSpeechLeavesTheRingForTheNextArrival() {
+        val budget = NotificationAlertBudget(catchUpWindow = NotificationCatchUpWindow(clock = { 0L }))
+        val now = 1_000_000_000_000L
+        var speaking = true
+
+        val quiet = budget.reserve(nowMs = now, isMention = false, accountRef = "a") { speaking }
+        assertEquals(NotificationAlertDecision.SilentSpokenAudio, quiet.decision)
+        quiet.commit()
+        speaking = false
+        assertEquals(
+            NotificationAlertDecision.Alert,
+            budget.reserve(nowMs = now + 1_000L, isMention = false, accountRef = "a") { speaking }.decision,
+        )
+    }
+
+    /** A mention never asks whether speech is playing, so it costs no platform query. */
+    @Test
+    fun aMentionDoesNotQuerySpokenAudio() {
+        val budget = NotificationAlertBudget(catchUpWindow = NotificationCatchUpWindow(clock = { 0L }))
+        val reservation =
+            budget.reserve(nowMs = 1_000L, isMention = true, accountRef = "a") {
+                throw AssertionError("queried for a mention")
+            }
+        assertEquals(NotificationAlertDecision.Alert, reservation.decision)
+    }
 }

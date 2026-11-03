@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicReference
 @RunWith(RobolectricTestRunner::class)
 @Config(application = android.app.Application::class)
 class MediaSourceRegistrationTest {
+    /** Close Before Timeout Registration Cannot Create A Late Executor. */
     @Test
     fun closeBeforeTimeoutRegistrationCannotCreateALateExecutor() {
         val resources = MediaParentResources()

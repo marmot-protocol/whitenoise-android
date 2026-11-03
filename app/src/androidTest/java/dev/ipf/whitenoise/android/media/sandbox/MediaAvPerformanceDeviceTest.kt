@@ -22,6 +22,7 @@ import java.util.UUID
 @RunWith(AndroidJUnit4::class)
 @MediaContainmentAcceptance
 class MediaAvPerformanceDeviceTest {
+    /** Measure Production Costs On Unchanged Corpus. */
     @Test(timeout = 600_000) // One finite 85-observation campaign; other device cases keep the runner default.
     fun measureProductionCostsOnUnchangedCorpus() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -75,7 +76,8 @@ class MediaAvPerformanceDeviceTest {
             }
         }.exceptionOrNull()
 
-    private fun stageInputs(staged: MutableList<PerformanceInput>) {
+    /** Shares the exact hash-verified baseline corpus with the paced production-player campaign. */
+    internal fun stageInputs(staged: MutableList<PerformanceInput>) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val native =
             linkedMapOf(
@@ -128,7 +130,7 @@ class MediaAvPerformanceDeviceTest {
     }
 }
 
-private data class PerformanceInput(
+internal data class PerformanceInput(
     val name: String,
     val file: File,
     val sha: String,

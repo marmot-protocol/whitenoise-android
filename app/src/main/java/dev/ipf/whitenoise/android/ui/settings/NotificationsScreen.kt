@@ -148,6 +148,7 @@ internal fun NotificationsScreen(
             item { SettingsSection(stringResource(R.string.notification_tones)) }
             item { NotificationToneControl() }
             item { SettingsExplainer(stringResource(R.string.notification_tone_scope)) }
+            item { SpokenAudioAlertControl() }
             item { SettingsSection(stringResource(R.string.notification_categories)) }
             item {
                 GlobalNotificationCategories(

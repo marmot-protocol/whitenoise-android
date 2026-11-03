@@ -113,6 +113,12 @@
     <string name="library_loading">Cargando archivos y contenido multimedia…</string>
     <string name="library_empty">No se encontraron archivos ni contenido multimedia</string>
     <string name="library_source">De: %1$s · %2$s</string>
+    <string name="library_section_this_week">Esta semana</string>
+    <string name="library_section_this_month">Este mes</string>
+    <string name="library_sender_in_chat">%1$s en %2$s</string>
+    <string name="library_item_description">%1$s, %2$s, de %3$s en %4$s, %5$s</string>
+    <string name="library_load_more_failed">No se pudieron cargar más archivos y contenido multimedia</string>
+    <string name="library_filters_unsupported">Estos filtros no se pueden usar para explorar archivos y contenido multimedia</string>
     <string name="chat_list_search_filter_remove">Quitar filtro: %1$s</string>
     <string name="chat_list_filter_all">Todos</string>
     <string name="chat_list_filter_unread">No leídos</string>
@@ -927,6 +933,7 @@
     <string name="scan_to_connect">Escanea para conectar.</string>
     <string name="not_copied">No copiado</string>
     <string name="copy_public_key">Copiar clave pública</string>
+    <string name="public_key_copy_action_with_value">Copiar clave pública %1$s</string>
     <string name="button_in_progress">En curso</string>
     <string name="private_key">Clave privada</string>
     <string name="profile_public_key_help">Comparte esta clave para que otros puedan encontrarte y conectar contigo.</string>
@@ -1673,6 +1680,24 @@
         <item quantity="one">Queda ~%1$d s</item>
         <item quantity="other">Quedan ~%1$d s</item>
     </plurals>
+    <plurals name="tts_bar_minutes_remaining">
+        <item quantity="one">Queda ~%1$d min</item>
+        <item quantity="many">Quedan ~%1$d min</item>
+        <item quantity="other">Quedan ~%1$d min</item>
+    </plurals>
+    <string name="tts_bar_minutes_seconds_remaining">Quedan ~%1$d min %2$d s</string>
+    <string name="tts_bar_remaining_spoken">Tiempo restante aproximado: %1$s</string>
+    <plurals name="tts_bar_spoken_minutes">
+        <item quantity="one">%1$d minuto</item>
+        <item quantity="many">%1$d minutos</item>
+        <item quantity="other">%1$d minutos</item>
+    </plurals>
+    <plurals name="tts_bar_spoken_seconds">
+        <item quantity="one">%1$d segundo</item>
+        <item quantity="many">%1$d segundos</item>
+        <item quantity="other">%1$d segundos</item>
+    </plurals>
+    <string name="tts_bar_spoken_minutes_seconds">%1$s y %2$s</string>
     <string name="tts_bar_stop">Detener lectura</string>
     <string name="tts_bar_return_to_source">Volver al mensaje leído</string>
     <string name="tts_source_unavailable">El mensaje leído ya no está disponible</string>
@@ -2520,6 +2545,8 @@
     <string name="notification_tone_added">Añadidos. Abre una categoría a continuación y luego Sonido para elegir un tono. Algunos dispositivos los muestran en Mis sonidos.</string>
     <string name="notification_tone_add_failed">No se pudieron añadir los sonidos. Inténtalo de nuevo o conserva tu sonido actual de Android.</string>
     <string name="notification_tone_scope">Escuchar o añadir sonidos no cambia tus alertas. Elige un sonido en Android para cada categoría, conversación o persona. Las conversaciones y personas con un sonido propio asignado explícitamente conservan ese sonido. Las nuevas categorías de mensajes usan Ding; las categorías silenciosas y personalizadas no cambian. Las vistas previas usan el volumen de las notificaciones y respetan el modo silencioso y No molestar.</string>
+    <string name="notification_quiet_during_spoken_audio">Silencio durante pódcasts</string>
+    <string name="notification_quiet_during_spoken_audio_detail">Los mensajes llegan sin sonido ni vibración mientras otra app reproduce un pódcast o un audiolibro, para que siga sonando. Las menciones siguen avisando.</string>
     <string name="notification_tone_android">Sonido de Android</string>
     <string name="notification_tone_silent">Silencio</string>
     <string name="notification_tone_off">Desactivado</string>

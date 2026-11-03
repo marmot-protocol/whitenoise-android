@@ -109,6 +109,12 @@
     <string name="library_loading">正在加载文件和媒体…</string>
     <string name="library_empty">未找到文件或媒体</string>
     <string name="library_source">来自：%1$s · %2$s</string>
+    <string name="library_section_this_week">本周</string>
+    <string name="library_section_this_month">本月</string>
+    <string name="library_sender_in_chat">%1$s · %2$s</string>
+    <string name="library_item_description">%1$s，%2$s，来自 %4$s 中的 %3$s，%5$s</string>
+    <string name="library_load_more_failed">无法加载更多文件和媒体</string>
+    <string name="library_filters_unsupported">这些筛选条件无法用于浏览文件和媒体</string>
     <string name="chat_list_search_filter_remove">移除筛选：%1$s</string>
     <string name="chat_list_filter_all">全部</string>
     <string name="chat_list_filter_unread">未读</string>
@@ -914,6 +920,7 @@
     <string name="scan_to_connect">扫码即可连接。</string>
     <string name="not_copied">未复制</string>
     <string name="copy_public_key">复制公钥</string>
+    <string name="public_key_copy_action_with_value">复制公钥 %1$s</string>
     <string name="button_in_progress">进行中</string>
     <string name="private_key">私钥</string>
     <string name="profile_public_key_help">分享此密钥，让他人能够找到并联系你。</string>
@@ -1658,6 +1665,18 @@
     <plurals name="tts_bar_seconds_remaining">
         <item quantity="other">约剩 %1$d 秒</item>
     </plurals>
+    <plurals name="tts_bar_minutes_remaining">
+        <item quantity="other">约剩 %1$d 分钟</item>
+    </plurals>
+    <string name="tts_bar_minutes_seconds_remaining">约剩 %1$d 分 %2$d 秒</string>
+    <string name="tts_bar_remaining_spoken">大约还剩 %1$s</string>
+    <plurals name="tts_bar_spoken_minutes">
+        <item quantity="other">%1$d 分钟</item>
+    </plurals>
+    <plurals name="tts_bar_spoken_seconds">
+        <item quantity="other">%1$d 秒</item>
+    </plurals>
+    <string name="tts_bar_spoken_minutes_seconds">%1$s %2$s</string>
     <string name="tts_bar_stop">停止朗读</string>
     <string name="tts_bar_return_to_source">返回正在朗读的消息</string>
     <string name="tts_source_unavailable">正在朗读的消息已不可用</string>
@@ -2486,6 +2505,8 @@
     <string name="notification_tone_added">已添加。打开下方的类别，然后选择“声音”来选取提示音。部分设备会将其列在“我的声音”中。</string>
     <string name="notification_tone_add_failed">无法添加提示音。请重试或保留当前的 Android 提示音。</string>
     <string name="notification_tone_scope">试听或添加提示音不会更改通知提醒。请在 Android 中为每个类别、对话或联系人选择声音。已明确指定专属声音的对话和联系人会保留该声音。新的消息类别使用 Ding；静音和自定义类别保持不变。试听使用通知音量，并遵循静音模式和勿扰模式。</string>
+    <string name="notification_quiet_during_spoken_audio">播客播放时静音</string>
+    <string name="notification_quiet_during_spoken_audio_detail">当其他应用播放播客或有声书时，消息到达不响铃也不振动，以免播放暂停。提及仍会提醒。</string>
     <string name="notification_tone_android">Android 提示音</string>
     <string name="notification_tone_silent">静音</string>
     <string name="notification_tone_off">关闭</string>

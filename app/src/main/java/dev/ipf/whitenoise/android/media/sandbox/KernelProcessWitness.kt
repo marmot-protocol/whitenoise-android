@@ -28,8 +28,10 @@ internal class KernelProcessWitness(
         return calibrated
     }
 
+    /** Matches the authenticated isolated UID; an uncalibrated witness cannot accept it. */
     @Synchronized fun acceptsUid(uid: Int): Boolean = calibrated && identity?.first == uid
 
+    /** Matches both authenticated UID and PID so another process cannot reuse the reply capability. */
     @Synchronized fun acceptsCaller(
         uid: Int,
         pid: Int,
@@ -44,6 +46,10 @@ internal class KernelProcessWitness(
         return gone
     }
 
+    /**
+     * Observes the exact calibrated process with the kernel witness; Binder death alone is not process
+     * absence.
+     */
     private fun observe(pid: Int): Presence =
         try {
             signal(pid, 0)

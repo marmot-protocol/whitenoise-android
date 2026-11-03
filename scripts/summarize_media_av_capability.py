@@ -36,15 +36,18 @@ RECEIPTS = (
 
 
 def require(condition, message):
+    """Reject incomplete or inconsistent capture evidence instead of inferring a successful observation."""
     if not condition:
         raise ValueError(message)
 
 
 def integer(value, minimum=0):
+    """Accept only genuine bounded integers, excluding booleans that Python otherwise treats as integers."""
     return type(value) is int and value >= minimum
 
 
 def object_pairs(pairs):
+    """Reject duplicate JSON keys before a later field can replace an earlier observation."""
     result = {}
     for key, value in pairs:
         require(key not in result, "duplicate JSON field: " + key)
@@ -53,6 +56,7 @@ def object_pairs(pairs):
 
 
 def load(raw):
+    """Decode exactly one bounded header and the fixed ten-case matrix from UTF-8 JSONL."""
     require(len(raw) <= MAX_BYTES, "capture exceeds byte bound")
     text = raw.decode("utf-8")
     lines = text.splitlines()
@@ -63,6 +67,7 @@ def load(raw):
 
 
 def diagnostics(row, observation, deadline):
+    """Bind bounded worker phase diagnostics to the same authenticated READY identity and terminal outcome."""
     logs = row.get("worker_diagnostics")
     require(row.get("diagnostics_qualified") is True, "diagnostics were not qualified")
     require(type(logs) is list and (1 if deadline else 2) <= len(logs) <= 32,
@@ -94,6 +99,7 @@ def diagnostics(row, observation, deadline):
 
 
 def observe(row, header):
+    """Require matching source, caller, timing and cleanup receipts for one operation observation."""
     observation = row.get("observation")
     require(type(observation) is dict, "worker observation required")
     require(type(observation.get("request")) is int and observation["request"] == row["request"],
@@ -162,6 +168,7 @@ def observe(row, header):
 
 
 def summarize(raw):
+    """Validate every case against one runtime/corpus header without promoting support observations to release approval."""
     rows = load(raw)
     header = rows[0]
     require(header.get("type") == "header" and type(header.get("capture_schema")) is int and
@@ -222,6 +229,7 @@ def summarize(raw):
 
 
 def main():
+    """Parse the bounded capture and emit deterministic summary JSON, refusing malformed or partial evidence."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("capture", type=Path)
     args = parser.parse_args()

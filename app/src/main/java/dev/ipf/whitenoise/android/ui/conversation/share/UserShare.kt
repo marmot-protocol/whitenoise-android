@@ -22,7 +22,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileLink
-import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.PersonAvatar
+import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Person
 
@@ -99,7 +100,7 @@ internal fun UserMessageBubble(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (resolvedName != null || pictureUrl != null) {
-                Avatar(title = title, seed = user.npub, size = 44.dp, pictureUrl = pictureUrl)
+                PersonAvatar(title = title, seed = user.npub, size = 44.dp, pictureUrl = pictureUrl)
             } else {
                 // An unresolved reference gets a neutral glyph: an initial taken from "npub1"
                 // would read as a name the sender never supplied.
@@ -114,22 +115,7 @@ internal fun UserMessageBubble(
             }
             Spacer(Modifier.width(12.dp))
             Column {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (resolvedName != null) {
-                    Text(
-                        shortened,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
+                UserShareIdentity(title, shortened, resolvedName, user.npub)
                 Text(
                     stringResource(R.string.share_user_view),
                     style = MaterialTheme.typography.labelMedium,
@@ -137,5 +123,41 @@ internal fun UserMessageBubble(
                 )
             }
         }
+    }
+}
+
+/**
+ * The card's name and key lines. The shortened key, as the subtitle or the nameless title, copies the whole [npub]
+ * on its own tap, while the rest of the card still opens the profile (#3565).
+ */
+@Composable
+@Suppress("FunctionNaming")
+private fun UserShareIdentity(
+    title: String,
+    shortened: String,
+    resolvedName: String?,
+    npub: String,
+) {
+    if (resolvedName == null) {
+        PublicKeyCopyText(
+            title,
+            npub,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    } else {
+        Text(
+            title,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        PublicKeyCopyText(
+            shortened,
+            npub,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }

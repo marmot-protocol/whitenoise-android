@@ -136,9 +136,9 @@ private fun BoxScope.ChatSwipeCue(
         when (action) {
             SwipeAction.ReadUnread ->
                 if (hasUnread) {
-                    R.drawable.ic_check to R.string.chat_row_action_mark_read
+                    chatReadIcon(markRead = true) to R.string.chat_row_action_mark_read
                 } else {
-                    R.drawable.ic_mark_unread to R.string.chat_row_action_mark_unread
+                    chatReadIcon(markRead = false) to R.string.chat_row_action_mark_unread
                 }
             SwipeAction.MuteUnmute ->
                 if (isMuted) {

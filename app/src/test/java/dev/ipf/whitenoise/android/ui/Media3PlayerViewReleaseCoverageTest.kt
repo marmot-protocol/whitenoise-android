@@ -66,6 +66,7 @@ class Media3PlayerViewReleaseCoverageTest {
         )
     }
 
+    /** Checks the local video factory delegates compressed parsing to the isolated raw-output player. */
     private fun assertLocalFactory(source: String) {
         assertEquals(1, Regex("IsolatedAttachmentPlayer\\(").findAll(source).count())
         assertTrue(source.contains("if (isLocalVideoUri(uri)) IsolatedAttachmentPlayer(context, uri) else null"))
@@ -73,8 +74,10 @@ class Media3PlayerViewReleaseCoverageTest {
         assertTrue(!source.contains("ExoPlayer"))
     }
 
+    /** Loads the video presentation source inspected by the release/ownership regression. */
     private fun mediaVideoSource(): File = mediaSource("MediaVideo.kt")
 
+    /** Loads the selected media source fixture for source-level ownership assertions. */
     private fun mediaSource(name: String): File = sourceFile("ui/conversation/media/$name")
 
     /** Resolves production source from repository-root and app-module test working directories. */

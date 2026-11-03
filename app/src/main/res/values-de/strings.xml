@@ -113,6 +113,12 @@
     <string name="library_loading">Dateien und Medien werden geladen…</string>
     <string name="library_empty">Keine Dateien oder Medien gefunden</string>
     <string name="library_source">Von: %1$s · %2$s</string>
+    <string name="library_section_this_week">Diese Woche</string>
+    <string name="library_section_this_month">Dieser Monat</string>
+    <string name="library_sender_in_chat">%1$s im Chat %2$s</string>
+    <string name="library_item_description">%1$s, %2$s, von %3$s in %4$s, %5$s</string>
+    <string name="library_load_more_failed">Weitere Dateien und Medien konnten nicht geladen werden</string>
+    <string name="library_filters_unsupported">Diese Filter können nicht zum Durchsuchen von Dateien und Medien verwendet werden</string>
     <string name="chat_list_search_filter_remove">Filter entfernen: %1$s</string>
     <string name="chat_list_filter_all">Alle</string>
     <string name="chat_list_filter_unread">Ungelesen</string>
@@ -927,6 +933,7 @@
     <string name="scan_to_connect">Zum Verbinden scannen.</string>
     <string name="not_copied">Nicht kopiert</string>
     <string name="copy_public_key">Öffentlichen Schlüssel kopieren</string>
+    <string name="public_key_copy_action_with_value">Öffentlichen Schlüssel %1$s kopieren</string>
     <string name="button_in_progress">In Bearbeitung</string>
     <string name="private_key">Privater Schlüssel</string>
     <string name="profile_public_key_help">Teile diesen Schlüssel, damit andere dich finden und sich mit dir verbinden können.</string>
@@ -1684,6 +1691,21 @@
         <item quantity="one">Noch ~%1$d s</item>
         <item quantity="other">Noch ~%1$d s</item>
     </plurals>
+    <plurals name="tts_bar_minutes_remaining">
+        <item quantity="one">Noch ~%1$d min</item>
+        <item quantity="other">Noch ~%1$d min</item>
+    </plurals>
+    <string name="tts_bar_minutes_seconds_remaining">Noch ~%1$d min %2$d s</string>
+    <string name="tts_bar_remaining_spoken">Noch etwa %1$s</string>
+    <plurals name="tts_bar_spoken_minutes">
+        <item quantity="one">%1$d Minute</item>
+        <item quantity="other">%1$d Minuten</item>
+    </plurals>
+    <plurals name="tts_bar_spoken_seconds">
+        <item quantity="one">%1$d Sekunde</item>
+        <item quantity="other">%1$d Sekunden</item>
+    </plurals>
+    <string name="tts_bar_spoken_minutes_seconds">%1$s %2$s</string>
     <string name="tts_bar_stop">Vorlesen beenden</string>
     <string name="tts_bar_return_to_source">Zur vorgelesenen Nachricht zurückkehren</string>
     <string name="tts_source_unavailable">Die vorgelesene Nachricht ist nicht mehr verfügbar</string>
@@ -2537,6 +2559,8 @@
     <string name="notification_tone_added">Hinzugefügt. Öffne unten eine Kategorie und dann „Ton“, um einen Ton auszuwählen. Auf manchen Geräten findest du sie unter „Meine Töne“.</string>
     <string name="notification_tone_add_failed">Die Töne konnten nicht hinzugefügt werden. Versuche es erneut oder behalte deinen aktuellen Android-Ton.</string>
     <string name="notification_tone_scope">Das Anhören oder Hinzufügen von Tönen ändert deine Benachrichtigungen nicht. Wähle in Android für jede Kategorie, Unterhaltung oder Person einen Ton aus. Unterhaltungen und Personen, denen ausdrücklich ein eigener Ton zugewiesen wurde, behalten diesen Ton. Neue Nachrichtenkategorien verwenden Ding; stumme und angepasste Kategorien bleiben unverändert. Vorschauen verwenden die Benachrichtigungslautstärke und beachten den Lautlosmodus und „Nicht stören“.</string>
+    <string name="notification_quiet_during_spoken_audio">Leise bei Podcasts</string>
+    <string name="notification_quiet_during_spoken_audio_detail">Nachrichten kommen ohne Ton und Vibration an, während eine andere App einen Podcast oder ein Hörbuch abspielt, damit die Wiedergabe weiterläuft. Erwähnungen melden sich weiterhin.</string>
     <string name="notification_tone_android">Android-Ton</string>
     <string name="notification_tone_silent">Lautlos</string>
     <string name="notification_tone_off">Aus</string>

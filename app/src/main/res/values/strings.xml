@@ -118,6 +118,12 @@
     <string name="library_loading">Loading files and media…</string>
     <string name="library_empty">No files or media found</string>
     <string name="library_source">From: %1$s · %2$s</string>
+    <string name="library_section_this_week">This week</string>
+    <string name="library_section_this_month">This month</string>
+    <string name="library_sender_in_chat">%1$s in %2$s</string>
+    <string name="library_item_description">%1$s, %2$s, from %3$s in %4$s, %5$s</string>
+    <string name="library_load_more_failed">Couldn\'t load more files and media</string>
+    <string name="library_filters_unsupported">These filters can\'t be used to browse files and media</string>
     <string name="chat_list_search_filter_remove">Remove filter: %1$s</string>
     <string name="chat_list_filter_all">All</string>
     <string name="chat_list_filter_unread">Unread</string>
@@ -1301,6 +1307,7 @@
     <string name="scan_to_connect">Scan to connect.</string>
     <string name="not_copied">Not copied</string>
     <string name="copy_public_key">Copy public key</string>
+    <string name="public_key_copy_action_with_value">Copy public key %1$s</string>
     <string name="button_in_progress">In progress</string>
     <string name="private_key">Private key</string>
     <string name="profile_public_key_help">Share this key so people can find and connect with you.</string>
@@ -1961,6 +1968,21 @@
         <item quantity="one">~%1$ds left</item>
         <item quantity="other">~%1$ds left</item>
     </plurals>
+    <plurals name="tts_bar_minutes_remaining">
+        <item quantity="one">~%1$dm left</item>
+        <item quantity="other">~%1$dm left</item>
+    </plurals>
+    <string name="tts_bar_minutes_seconds_remaining">~%1$dm %2$ds left</string>
+    <string name="tts_bar_remaining_spoken">About %1$s remaining</string>
+    <plurals name="tts_bar_spoken_minutes">
+        <item quantity="one">%1$d minute</item>
+        <item quantity="other">%1$d minutes</item>
+    </plurals>
+    <plurals name="tts_bar_spoken_seconds">
+        <item quantity="one">%1$d second</item>
+        <item quantity="other">%1$d seconds</item>
+    </plurals>
+    <string name="tts_bar_spoken_minutes_seconds">%1$s %2$s</string>
     <string name="tts_bar_stop">Stop reading</string>
     <string name="tts_bar_return_to_source">Return to spoken message</string>
     <string name="tts_source_unavailable">The spoken message is no longer available</string>
@@ -2687,6 +2709,8 @@
     <string name="notification_tone_added">Added. Open a category below, then Sound to choose a tone. Some devices list these under My Sounds.</string>
     <string name="notification_tone_add_failed">Could not add the sounds. Try again or keep your current Android sound.</string>
     <string name="notification_tone_scope">Previewing or adding sounds does not change your alerts. Choose a sound in Android for each category, conversation or person. Conversations and people explicitly assigned their own sound keep that sound. New message categories use Ding; silent and customized categories stay unchanged. Previews use notification volume and respect Silent mode and Do Not Disturb.</string>
+    <string name="notification_quiet_during_spoken_audio">Quiet during podcasts</string>
+    <string name="notification_quiet_during_spoken_audio_detail">Messages arrive without sound or vibration while another app plays a podcast or audiobook, so it keeps playing. Mentions still alert.</string>
     <string name="notification_tone_android">Android sound</string>
     <string name="notification_tone_silent">Silent</string>
     <string name="notification_tone_off">Off</string>

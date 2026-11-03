@@ -35,8 +35,16 @@ internal class RawVoicePlaybackPlayer private constructor(
             externalAudioFocus = true,
             listener =
                 object : RawAvPlaybackEngine.Listener {
+                    /**
+                     * Publishes state only through the owning playback listener; it does not transfer
+                     * compressed media ownership.
+                     */
                     override fun onChanged() = engineChanged()
 
+                    /**
+                     * Reports completion of the current playback owner without selecting a new compressed
+                     * source.
+                     */
                     override fun onCompleted() {
                         if (!released) completion?.invoke(this@RawVoicePlaybackPlayer)
                     }

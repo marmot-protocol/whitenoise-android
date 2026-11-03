@@ -15,6 +15,9 @@ enum class NotificationAlertDecision(
 
     /** Another alert rang moments ago; this arrival joins it on screen without ringing again. */
     SilentBurst(true),
+
+    /** Another app is playing speech, which pauses for any alert sound, so the card is written without ringing. */
+    SilentSpokenAudio(true),
 }
 
 /**
@@ -23,6 +26,10 @@ enum class NotificationAlertDecision(
  * backlog produces one attention event per signed-in account however many cards it writes. Outside a
  * cohort, a message rings unless another alert rang within the burst window, so a flood of live arrivals
  * rings once; a mention of the reader breaks the burst rule, never the cohort rule.
+ *
+ * While another app plays speech (#1717), a message that is not a mention stays silent: Android does not
+ * duck a podcast or audiobook for a notification sound, it hands the player a focus loss and most pause.
+ * Such a post holds no ring, so the next arrival after the speech stops rings normally.
  */
 internal fun notificationAlertDecision(
     catchUpGeneration: Long?,
@@ -30,10 +37,12 @@ internal fun notificationAlertDecision(
     msSinceLastAlert: Long?,
     isMention: Boolean,
     burstWindowMs: Long = NOTIFICATION_ALERT_BURST_WINDOW_MS,
+    spokenAudioPlaying: Boolean = false,
 ): NotificationAlertDecision =
     when {
         catchUpGeneration != null && catchUpGeneration == alertedCatchUpGeneration ->
             NotificationAlertDecision.SilentCatchUp
+        !isMention && spokenAudioPlaying -> NotificationAlertDecision.SilentSpokenAudio
         catchUpGeneration != null -> NotificationAlertDecision.Alert
         !isMention && msSinceLastAlert != null && msSinceLastAlert < burstWindowMs ->
             NotificationAlertDecision.SilentBurst
@@ -90,13 +99,19 @@ class NotificationAlertBudget(
     private val alertedCatchUpGenerations = mutableMapOf<String, Long>()
     private val pendingClaims = mutableMapOf<String, PendingClaim>()
 
-    /** Decides for [accountRef]'s first post being written at [nowMs] and, when it may ring, holds the ring. */
+    /**
+     * Decides for [accountRef]'s first post being written at [nowMs] and, when it may ring, holds the ring.
+     * [spokenAudioPlaying] is read only for a post that is not a mention.
+     */
     fun reserve(
         nowMs: Long,
         isMention: Boolean,
         accountRef: String,
-    ): NotificationAlertReservation =
-        synchronized(lock) {
+        spokenAudioPlaying: () -> Boolean = { false },
+    ): NotificationAlertReservation {
+        // A platform query, so it runs before the lock rather than holding every other first post behind it.
+        val speechPlaying = !isMention && spokenAudioPlaying()
+        return synchronized(lock) {
             // Read once: the window has its own lock, and a cohort opening between two reads would let
             // a live post charge the cohort it never belonged to.
             val generation = catchUpWindow.currentGeneration()
@@ -107,6 +122,7 @@ class NotificationAlertBudget(
                     msSinceLastAlert = lastAlertAtMs?.let { nowMs - it },
                     isMention = isMention,
                     burstWindowMs = burstWindowMs,
+                    spokenAudioPlaying = speechPlaying,
                 )
             val reservation = NotificationAlertReservation(decision, accountRef, nowMs, this)
             if (decision == NotificationAlertDecision.Alert) {
@@ -121,6 +137,7 @@ class NotificationAlertBudget(
             }
             reservation
         }
+    }
 
     internal fun commit(reservation: NotificationAlertReservation) {
         synchronized(lock) {

@@ -15,11 +15,15 @@ internal fun decodeHistoricalWaveformFromDescriptor(descriptor: java.io.FileDesc
 private class AndroidAudioDecoderResources(
     private val descriptor: java.io.FileDescriptor,
 ) : AudioDecoderResources<MediaFormat> {
+    /** Creates the platform extractor only for the historical debug comparison path. */
     override fun createExtractor(): AudioDecoderExtractor<MediaFormat> {
         val extractor = MediaExtractor()
         return AndroidAudioDecoderExtractor(extractor, descriptor)
     }
 
+    /**
+     * Creates the platform codec used by the historical debug reference, not the production isolated path.
+     */
     override fun createCodec(mime: String): AudioDecoderCodec<MediaFormat> {
         val codec = MediaCodec.createDecoderByType(mime)
         return AndroidAudioDecoderCodec(codec)

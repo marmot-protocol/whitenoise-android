@@ -29,6 +29,7 @@ import java.io.IOException
 internal class IsolatedAttachmentPlayer(
     context: Context,
     uri: Uri,
+    observation: RawAvPlaybackObservation? = null,
 ) : SimpleBasePlayer(Looper.getMainLooper()) {
     private val itemUid = Any()
     private val mediaItem = MediaItem.fromUri(uri)
@@ -42,6 +43,7 @@ internal class IsolatedAttachmentPlayer(
         RawAvPlaybackEngine(
             context,
             uri,
+            observation = observation,
             listener =
                 object : RawAvPlaybackEngine.Listener {
                     /** Publishes engine changes on the player contract while refusing callbacks after release. */
@@ -50,6 +52,9 @@ internal class IsolatedAttachmentPlayer(
                     }
                 },
         )
+
+    /** Samples the engine-owned AudioTrack from the bounded instrumentation driver, outside Main. */
+    internal fun observeAudio() = engine.observeAudio()
 
     /** Projects the engine snapshot into Player state without parsing the selected compressed source. */
     override fun getState(): State {

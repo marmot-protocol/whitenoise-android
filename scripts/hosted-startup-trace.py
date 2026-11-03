@@ -88,23 +88,27 @@ def full_bounded_stdout(row, label):
 
 
 AV_CASE = 'dev.ipf.whitenoise.android.media.sandbox.MediaAvPerformanceDeviceTest#measureProductionCostsOnUnchangedCorpus'
+AV_SURFACE_CASE = 'dev.ipf.whitenoise.android.media.sandbox.IsolatedAttachmentPlayerDeviceTest#pausedSeekingSpeedPauseAndRepeatUseRealRawPlayback'
+AV_PLAYBACK_CASE = 'dev.ipf.whitenoise.android.media.sandbox.MediaAvPlaybackPerformanceDeviceTest#characterizePacedProductionPlaybackOnUnchangedCorpus'
 LEGACY_CASE = 'dev.ipf.whitenoise.android.media.sandbox.MediaWorkerHealthyBaselineDeviceTest#characterizeHealthyDirectStillTransportWithFixedSyntheticCorpus'
 
 
 def selection(mode='healthy', api='30'):
+    """Choose only the reviewed trace mode and supported API before any device command is admitted."""
     if mode == 'healthy' and api == '30':
         return CONFIG, list(COMMAND), LEGACY_CASE
     if mode != 'av' or api not in ('30', '36'):
         raise ValueError('fixed trace mode/API required')
     config = CONFIG.replace('duration_ms: 120000', 'duration_ms: 600000').replace(
         'scan_all_processes_on_start: true', 'scan_all_processes_on_start: true\n proc_stats_poll_ms: 100')
-    command = [value.replace('BenchmarkRelease', 'Debug').replace(LEGACY_CASE, AV_CASE).replace(
+    command = [value.replace('BenchmarkRelease', 'Debug').replace(LEGACY_CASE, AV_CASE + "," + AV_PLAYBACK_CASE + "," + AV_SURFACE_CASE).replace(
         'timeout_msec=120000', 'timeout_msec=600000') for value in COMMAND]
     command.insert(1, '-PmediaAvStartupTrace=true')
     return config, command, AV_CASE
 
 
 def start():
+    """Persist the exact trace intent before starting Perfetto once; retain failed or uncertain starts without retry."""
     state = json.loads(STATE.read_text())
     config, _, _ = selection(state.get('trace_mode', 'healthy'), state.get('android_api', '30'))
     marker = OUT / 'start.intent'
@@ -177,6 +181,7 @@ def finish(state):
 
 
 def run(mode='healthy', api='30'):
+    """Run the selected instrumentation command while preserving trace, exit and cleanup evidence on failure."""
     config, selected_command, required_case = selection(mode, api)
     if os.environ.get('GITHUB_EVENT_NAME') != 'workflow_dispatch':
         raise RuntimeError('hosted explicit dispatch required')
@@ -189,7 +194,8 @@ def run(mode='healthy', api='30'):
                  job_key=os.environ.get('GITHUB_JOB'), source=os.environ.get('GITHUB_SHA'),
                  effect='hosted-only raw diagnostic capture; no qualification',
                  trace_mode=mode, android_api=api, required_case=required_case,
-                 memory_scope='sampled RSS only; no PSS or exact peak' if mode == 'av' else 'legacy trace')
+                 additional_required_cases=[AV_PLAYBACK_CASE, AV_SURFACE_CASE] if mode == 'av' else [],
+                 memory_scope='caller and worker sampled RSS only; authenticated lifetime join required; no PSS or exact peak' if mode == 'av' else 'legacy trace')
     save(STATE, state)
     test_code = None
     try:
@@ -224,11 +230,23 @@ def run(mode='healthy', api='30'):
         test_code = r['code'] if r['code'] is not None else 124
         if test_code == 0:
             required = OUT / 'required-cases.txt'
-            required.write_text(required_case + '\n')
+            required.write_text('\n'.join([required_case, *state['additional_required_cases']]) + '\n')
             checked = command(['python3', 'scripts/check_instrumented_required_cases.py',
                                'app/build/outputs/androidTest-results/connected', '--required', str(required)], 'required-case', 10)
             test_code = checked['code'] if checked['code'] is not None else 124
+            if test_code == 0 and mode == 'av':
+                reports = list(Path('app/build/outputs/connected_android_test_additional_output').rglob('media-av-paced-performance.jsonl'))
+                if len(reports) != 1:
+                    raise RuntimeError('exactly one retained paced performance report required')
+                state['paced_report'] = str(reports[0])
+                state['paced_report_sha256'] = hashlib.sha256(reports[0].read_bytes()).hexdigest()
+                validated = command(['python3', 'scripts/check_media_av_paced_report.py', str(reports[0])],
+                                    'paced-report-validation', 10)
+                test_code = validated['code'] if validated['code'] is not None else 124
+
     except Exception as error:
+        if test_code == 0:
+            test_code = 2
         state['setup_error'] = str(error)
         state['setup_error_class'] = type(error).__name__
     finally:

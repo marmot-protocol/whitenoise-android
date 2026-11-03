@@ -155,6 +155,7 @@ internal class AvStreamLifetime {
     private var bindingAttempted = false
     private var processGone = false
     private var definitiveNoWorker = false
+    private var unbindReady = false
     private var unbinding = false
     private var unbound = false
     private var cleanupFailed = false
@@ -203,6 +204,12 @@ internal class AvStreamLifetime {
     /** Revokes a dead Binder endpoint without claiming that its OS process has disappeared. */
     @Synchronized fun deathObserved() {
         closed = true // Binder death revokes the endpoint but supplies no OS process-absence proof.
+        unbindReady = true
+    }
+
+    /** Allows framework cleanup after a terminal callback without asserting that its process disappeared. */
+    @Synchronized fun bindingUnavailable() {
+        unbindReady = true
     }
 
     /** Records the separately calibrated kernel absence proof required before admission release. */
@@ -239,14 +246,16 @@ internal class AvStreamLifetime {
         activeRetirement = true
     }
 
-    /** Settles retirement work without treating a successful send as process absence. */
+    /** Settles endpoint retirement/identification before forgetting an unexposed binding; absence stays separate. */
     @Synchronized fun endRetirement() {
         activeRetirement = false
+        unbindReady = true
     }
 
-    /** Grants one framework cleanup attempt only after close and a known bind completion. */
+    /** Keeps unresolved unexposed callbacks registered; only resolved or possibly exposed bindings may unbind. */
     @Synchronized fun beginUnbind(): Boolean {
-        val lifetime = closed && bindCompleted
+        val resolved = unbindReady || openMayHaveBeenDelivered || processGone || definitiveNoWorker
+        val lifetime = closed && bindCompleted && resolved
         val connection = bindingAttempted && !unbinding && !unbound && !cleanupFailed
         if (!lifetime || !connection) return false
         unbinding = true

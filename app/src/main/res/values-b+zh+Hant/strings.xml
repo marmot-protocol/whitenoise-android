@@ -109,6 +109,12 @@
     <string name="library_loading">正在載入檔案與媒體…</string>
     <string name="library_empty">找不到檔案或媒體</string>
     <string name="library_source">來自：%1$s · %2$s</string>
+    <string name="library_section_this_week">本週</string>
+    <string name="library_section_this_month">本月</string>
+    <string name="library_sender_in_chat">%1$s · %2$s</string>
+    <string name="library_item_description">%1$s，%2$s，來自 %4$s 中的 %3$s，%5$s</string>
+    <string name="library_load_more_failed">無法載入更多檔案和媒體</string>
+    <string name="library_filters_unsupported">這些篩選條件無法用於瀏覽檔案和媒體</string>
     <string name="chat_list_search_filter_remove">移除篩選：%1$s</string>
     <string name="chat_list_filter_all">全部</string>
     <string name="chat_list_filter_unread">未讀</string>
@@ -914,6 +920,7 @@
     <string name="scan_to_connect">掃描即可連線。</string>
     <string name="not_copied">未複製</string>
     <string name="copy_public_key">複製公鑰</string>
+    <string name="public_key_copy_action_with_value">複製公鑰 %1$s</string>
     <string name="button_in_progress">進行中</string>
     <string name="private_key">私鑰</string>
     <string name="profile_public_key_help">分享此金鑰，讓他人能夠找到並連線你。</string>
@@ -1658,6 +1665,18 @@
     <plurals name="tts_bar_seconds_remaining">
         <item quantity="other">約剩 %1$d 秒</item>
     </plurals>
+    <plurals name="tts_bar_minutes_remaining">
+        <item quantity="other">約剩 %1$d 分鐘</item>
+    </plurals>
+    <string name="tts_bar_minutes_seconds_remaining">約剩 %1$d 分 %2$d 秒</string>
+    <string name="tts_bar_remaining_spoken">大約還剩 %1$s</string>
+    <plurals name="tts_bar_spoken_minutes">
+        <item quantity="other">%1$d 分鐘</item>
+    </plurals>
+    <plurals name="tts_bar_spoken_seconds">
+        <item quantity="other">%1$d 秒</item>
+    </plurals>
+    <string name="tts_bar_spoken_minutes_seconds">%1$s %2$s</string>
     <string name="tts_bar_stop">停止朗讀</string>
     <string name="tts_bar_return_to_source">返回正在朗讀的訊息</string>
     <string name="tts_source_unavailable">正在朗讀的訊息已無法使用</string>
@@ -2486,6 +2505,8 @@
     <string name="notification_tone_added">已新增。開啟下方的類別，然後選擇「音效」來選取提示音。部分裝置會將其列在「我的音效」中。</string>
     <string name="notification_tone_add_failed">無法新增提示音。請重試或保留目前的 Android 提示音。</string>
     <string name="notification_tone_scope">試聽或新增提示音不會變更通知提醒。請在 Android 中為每個類別、對話或聯絡人選擇聲音。已明確指定專屬聲音的對話和聯絡人會保留該聲音。新的訊息類別使用 Ding；靜音和自訂類別維持不變。試聽使用通知音量，並遵循靜音模式和勿擾模式。</string>
+    <string name="notification_quiet_during_spoken_audio">播客播放時靜音</string>
+    <string name="notification_quiet_during_spoken_audio_detail">當其他應用程式播放播客或有聲書時，訊息送達不響鈴也不震動，以免播放暫停。提及仍會提醒。</string>
     <string name="notification_tone_android">Android 提示音</string>
     <string name="notification_tone_silent">靜音</string>
     <string name="notification_tone_off">關閉</string>

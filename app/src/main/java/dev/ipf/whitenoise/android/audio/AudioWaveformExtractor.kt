@@ -74,6 +74,10 @@ object AudioWaveformExtractor {
 
     internal fun waveformCacheKey(file: File): String = "${file.absolutePath}:${file.length()}:${file.lastModified()}"
 
+    /**
+     * Performs waveform extraction off the caller-facing suspension boundary and retains the selected source
+     * scope.
+     */
     internal fun <FormatT> decodeBlocking(
         filePath: String,
         resources: AudioDecoderResources<FormatT>,

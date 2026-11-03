@@ -792,6 +792,7 @@ private fun setControllerField(
     field.set(VoicePlaybackController, value)
 }
 
+/** Assert Fresh Audio For New Account. */
 private fun assertFreshAudioForNewAccount() {
     VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
     val player = TrackingVoicePlayer()
@@ -826,6 +827,7 @@ private fun assertFreshAudioForNewAccount() {
     assertNull(VoicePlaybackController.state.value.source)
 }
 
+/** Assert New Source Prepared Off Main. */
 private fun assertNewSourcePreparedOffMain() {
     val context = RuntimeEnvironment.getApplication()
     VoicePlaybackController.attach(context)
@@ -854,6 +856,7 @@ private fun assertNewSourcePreparedOffMain() {
     assertEquals(player.durationMs, VoicePlaybackController.state.value.durationMs)
 }
 
+/** Assert Failed Resume Retires Player And Focus. */
 private fun assertFailedResumeRetiresPlayerAndFocus() {
     val context = RuntimeEnvironment.getApplication()
     val audioManager = context.getSystemService(AudioManager::class.java)

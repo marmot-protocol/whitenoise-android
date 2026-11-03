@@ -57,6 +57,9 @@ class HostedStartupTraceTests(unittest.TestCase):
         for name in ('hosted-startup-trace.py','hosted-startup-trace.init.gradle'):
             shutil.copyfile(ROOT/'scripts'/name, root/'scripts'/name)
         (root/'scripts/check_instrumented_required_cases.py').write_text("import os,sys\nsys.exit(29 if os.environ.get('FAKE_MODE')=='missing-case' else 0)\n")
+        (root/'scripts/check_media_av_paced_report.py').write_text("import os,sys\nsys.exit(31 if os.environ.get('FAKE_MODE')=='paced-invalid' else 0)\n")
+        report=root/'app/build/outputs/connected_android_test_additional_output/fake/media-av-paced-performance.jsonl'
+        report.parent.mkdir(parents=True);report.write_text('{}\n')
         (root/'bin').mkdir()
         adb = root/'bin/adb';adb.write_text(FAKE_ADB);adb.chmod(0o755)
         git=root/'bin/git';git.write_text('#!/bin/sh\nprintf \"%s\\n\" \"$GITHUB_SHA\"\n');git.chmod(0o755)
@@ -206,6 +209,7 @@ class HostedStartupTraceTests(unittest.TestCase):
         self.assertIn('scripts/test_hosted_startup_trace.py',ci)
 
     def test_static_workflow_expressions_reject_overlap_flags_and_retain_failure_apks(self):
+        """Static workflow expressions reject overlap flags and retain failure apks."""
         workflow=(ROOT/'.github/workflows/android-instrumented.yml').read_text()
         marker='      - name: Reject incompatible startup trace inputs\n'
         condition=workflow.split(marker,1)[1].splitlines()[0].strip().removeprefix('if: ')
@@ -214,8 +218,10 @@ class HostedStartupTraceTests(unittest.TestCase):
                       mdk_adoption_only=False,mdk_qualification=False,mdk_preview_qualification=False,
                       review_demo_e2e=False,document_provider_matrix=False)
         def evaluate(expression,event='workflow_dispatch',status='failure',**changes):
+            """Evaluate the actual workflow expression with the supplied synthetic dispatch state."""
             values={**defaults,**changes}
             def normalized(text):
+                """Normalize the selected workflow expression for comparison without replacing its admission conditions."""
                 text=text.strip().removeprefix('${{').removesuffix('}}').replace('&&',' and ').replace('||',' or ')
                 return re.sub(r'!(?!=)','not ',text).strip()
             context=dict(github=SimpleNamespace(event_name=event),
@@ -412,6 +418,7 @@ class HostedStartupTraceTests(unittest.TestCase):
 
 
     def test_fixed_av_actual_cli_both_supported_apis(self):
+        """Fixed av actual cli both supported apis."""
         for api in ('30', '36'):
             with self.subTest(api=api):
                 root, env = self.fixture()
@@ -429,8 +436,14 @@ class HostedStartupTraceTests(unittest.TestCase):
                 self.assertIn('-PmediaAvStartupTrace=true', args)
                 self.assertIn('-Pandroid.testInstrumentationRunnerArguments.timeout_msec=600000', args)
                 case='dev.ipf.whitenoise.android.media.sandbox.MediaAvPerformanceDeviceTest#measureProductionCostsOnUnchangedCorpus'
-                self.assertIn('-Pandroid.testInstrumentationRunnerArguments.class='+case,args)
-                self.assertEqual((report/'required-cases.txt').read_text(),case+'\n')
+                paced='dev.ipf.whitenoise.android.media.sandbox.MediaAvPlaybackPerformanceDeviceTest#characterizePacedProductionPlaybackOnUnchangedCorpus'
+                surface='dev.ipf.whitenoise.android.media.sandbox.IsolatedAttachmentPlayerDeviceTest#pausedSeekingSpeedPauseAndRepeatUseRealRawPlayback'
+                self.assertIn('-Pandroid.testInstrumentationRunnerArguments.class='+case+','+paced+','+surface,args)
+                self.assertEqual(receipt['required_case'],case)
+                self.assertEqual(receipt['additional_required_cases'],[paced,surface])
+                self.assertIn('paced_report_sha256',receipt)
+                self.assertTrue((report/'paced-report-validation.json').exists())
+                self.assertEqual((report/'required-cases.txt').read_text(),case+'\n'+paced+'\n'+surface+'\n')
                 config=(root/'config-stdin.bin').read_text()
                 self.assertEqual(config,(report/'config.pbtxt').read_text())
                 self.assertIn('duration_ms: 600000',config)
@@ -438,7 +451,20 @@ class HostedStartupTraceTests(unittest.TestCase):
                 self.assertIn('max_file_size_bytes: 134217728',config)
                 self.assertIn('sched/sched_process_exit',config)
 
+    def test_av_requires_retained_valid_paced_report(self):
+        """A successful JUnit selection cannot hide missing or malformed paced evidence."""
+        for mode in ('paced-invalid', 'paced-missing'):
+            root, env = self.fixture(mode)
+            if mode == 'paced-missing':
+                (root/'app/build/outputs/connected_android_test_additional_output/fake/media-av-paced-performance.jsonl').unlink()
+            result = subprocess.run(['python3','scripts/hosted-startup-trace.py','run-av','30'],
+                cwd=root,env=env,capture_output=True,timeout=35)
+            self.assertNotEqual(result.returncode,0)
+            receipt=json.loads((root/'app/build/reports/media-startup-trace/capture-receipt.json').read_text())
+            self.assertFalse(receipt['capture_qualified'])
+
     def test_av_wrong_api_and_non_dispatch_never_start(self):
+        """Av wrong api and non dispatch never start."""
         for args,event in [(['run-av','34'],'workflow_dispatch'),(['run-av','30'],'pull_request'),(['run-av','36'],'push')]:
             root,env=self.fixture();env['GITHUB_EVENT_NAME']=event
             result=subprocess.run(['python3','scripts/hosted-startup-trace.py',*args],cwd=root,env=env,capture_output=True,timeout=10)
@@ -446,6 +472,7 @@ class HostedStartupTraceTests(unittest.TestCase):
             self.assertFalse((root/'adb-calls.jsonl').exists())
 
     def test_av_failures_preserve_holds_and_instrumentation_result(self):
+        """Av failures preserve holds and instrumentation result."""
         for mode,code in [('start-fail',0),('flush-fail',0),('oversize',0),('missing-case',0),('ok',23)]:
             root,env=self.fixture(mode,code)
             result=subprocess.run(['python3','scripts/hosted-startup-trace.py','run-av','30'],cwd=root,env=env,capture_output=True,timeout=35)
@@ -459,6 +486,7 @@ class HostedStartupTraceTests(unittest.TestCase):
             if code: self.assertEqual(result.returncode,code)
 
     def test_av_shell_selection_and_backward_compatible_default(self):
+        """Av shell selection and backward compatible default."""
         for api,target,event,trace,expected in [('30','av','workflow_dispatch','true',0),('36','av','workflow_dispatch','true',0),('34','av','workflow_dispatch','true',2),('30','other','workflow_dispatch','true',2),('30','av','pull_request','true',2),('30','av','workflow_dispatch','false',2),('30','healthy','workflow_dispatch','true',0),('36','healthy','workflow_dispatch','true',2)]:
             with self.subTest(api=api,target=target,event=event,trace=trace),tempfile.TemporaryDirectory() as td:
                 root=Path(td);(root/'scripts').mkdir();(root/'scripts/hosted-startup-trace.py').write_text('import sys;print(sys.argv[1:])')
@@ -468,6 +496,7 @@ class HostedStartupTraceTests(unittest.TestCase):
                 if expected==0:self.assertIn("['run-av', '"+api+"']" if target=='av' else "['run']",result.stdout)
 
     def test_av_init_branch_keeps_real_debug_closure_and_fixed_task_hook(self):
+        """Av init branch keeps real debug closure and fixed task hook."""
         init=(ROOT/'scripts/hosted-startup-trace.init.gradle').read_text()
         av=init.split("} else {",1)[1]
         self.assertIn("selected.tasks.named('connectedDevZapstoreDebugAndroidTest')",av)
@@ -479,6 +508,7 @@ class HostedStartupTraceTests(unittest.TestCase):
 
 
     def test_workflow_av_selection_defaults_and_concurrency_are_explicit(self):
+        """Workflow av selection defaults and concurrency are explicit."""
         import yaml
         workflow=(ROOT/'.github/workflows/android-instrumented.yml').read_text()
         parsed=yaml.safe_load(workflow)
@@ -496,6 +526,7 @@ class HostedStartupTraceTests(unittest.TestCase):
 
 
     def test_all_job_admission_rejects_invalid_av_and_preserves_legacy(self):
+        """All job admission rejects invalid av and preserves legacy."""
         import yaml
         current=yaml.safe_load((ROOT/'.github/workflows/android-instrumented.yml').read_text())['jobs']
         # Golden selectors from the pre-AV workflow; independent of the current selectors.
@@ -544,7 +575,9 @@ class HostedStartupTraceTests(unittest.TestCase):
                       mdk_qualification=False,mdk_preview_qualification=False,review_demo_e2e=False,
                       document_provider_matrix=False,maestro_suite='onboarding')
         def evaluate(expr,event='workflow_dispatch',draft=False,changes_output=None,cancelled=False,runtime_build_result='success',**values):
+            """Evaluate the actual workflow expression with the supplied synthetic dispatch state."""
             def normalized(expression):
+                """Normalize the selected workflow expression for comparison without replacing its admission conditions."""
                 expression=expression.strip().removeprefix('${{').removesuffix('}}').replace('&&',' and ').replace('||',' or ')
                 return re.sub(r'!(?!=)','not ',expression).strip()
             context=dict(
@@ -629,6 +662,7 @@ class HostedStartupTraceTests(unittest.TestCase):
         def admitted(job,results,**values):
             # GitHub adds success() when a job expression has no status check. Model that
             # dependency gate as well as evaluating the actual checked-in condition.
+            """Return whether the actual workflow admission expression accepts this synthetic input combination."""
             definition=current[job]
             expression=definition['if']
             dependencies=definition.get('needs',[])

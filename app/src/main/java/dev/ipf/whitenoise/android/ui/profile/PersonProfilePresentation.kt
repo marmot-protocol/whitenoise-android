@@ -71,7 +71,11 @@ internal fun personSharedGroups(
     )
 }
 
-/** Public fields and local display name are separate; private notes never enter this share/copy presentation. */
+/**
+ * Public fields and local display name are separate; private notes never enter this share/copy presentation.
+ * [titleIsPublicKey] and [publishedNameIsPublicKey] record that the name came from the key fallback rather than a
+ * person's name, so the complete key block can replace it without guessing from its shape (#3565).
+ */
 internal data class PersonProfilePresentation(
     val title: String,
     val publishedName: String,
@@ -86,6 +90,8 @@ internal data class PersonProfilePresentation(
     val lightningAddress: String?,
     val hasTarget: Boolean,
     val self: Boolean,
+    val titleIsPublicKey: Boolean = false,
+    val publishedNameIsPublicKey: Boolean = false,
 )
 
 /**

@@ -20,6 +20,7 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36])
 class RawVideoOutputScreenshotTest {
+    /** Landscape Frame Fits Landscape Surface With Black Letterbox. */
     @Test
     fun landscapeFrameFitsLandscapeSurfaceWithBlackLetterbox() {
         capture(
@@ -32,6 +33,7 @@ class RawVideoOutputScreenshotTest {
         )
     }
 
+    /** Landscape Frame Fits Portrait Surface Without Stretching. */
     @Test
     fun landscapeFrameFitsPortraitSurfaceWithoutStretching() {
         capture(
@@ -44,6 +46,7 @@ class RawVideoOutputScreenshotTest {
         )
     }
 
+    /** Clockwise Quarter Turn Fits Portrait Surface With Black Pillarbox. */
     @Test
     fun clockwiseQuarterTurnFitsPortraitSurfaceWithBlackPillarbox() {
         capture(
@@ -56,6 +59,7 @@ class RawVideoOutputScreenshotTest {
         )
     }
 
+    /** Counter Clockwise Quarter Turn Fits Landscape Surface With Black Pillarbox. */
     @Test
     fun counterClockwiseQuarterTurnFitsLandscapeSurfaceWithBlackPillarbox() {
         capture(
@@ -68,6 +72,7 @@ class RawVideoOutputScreenshotTest {
         )
     }
 
+    /** Captures the rendered fixture into the deterministic screenshot assertion path. */
     @Suppress("LongParameterList") // Independent expected geometry and colors for each renderer case.
     private fun capture(
         width: Int,
@@ -102,6 +107,7 @@ class RawVideoOutputScreenshotTest {
         }
     }
 
+    /** Checks displayed pixels and black unused bounds rather than only verifying view dimensions. */
     private fun assertPixels(
         bitmap: Bitmap,
         content: Rect,

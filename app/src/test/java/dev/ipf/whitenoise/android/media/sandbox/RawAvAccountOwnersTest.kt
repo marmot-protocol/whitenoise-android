@@ -7,6 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RawAvAccountOwnersTest {
+    /** Account Reset Revokes Paused And Active Owners And Preserves Later Owners. */
     @Test
     fun accountResetRevokesPausedAndActiveOwnersAndPreservesLaterOwners() {
         val owners = RawAvAccountOwners<Any>()
@@ -35,6 +36,7 @@ class RawAvAccountOwnersTest {
         assertTrue(replacementStillActive)
     }
 
+    /** Constructor Finishing After Reset Cannot Register Its Old Epoch. */
     @Test
     fun constructorFinishingAfterResetCannotRegisterItsOldEpoch() {
         val owners = RawAvAccountOwners<Any>()
@@ -47,6 +49,7 @@ class RawAvAccountOwnersTest {
         assertTrue(owners.register(newOwner, owners.epoch()))
     }
 
+    /** Final Render Gate Rejects Revocation After The Earlier Readiness Check. */
     @Test
     fun finalRenderGateRejectsRevocationAfterTheEarlierReadinessCheck() {
         val owners = RawAvAccountOwners<Any>()

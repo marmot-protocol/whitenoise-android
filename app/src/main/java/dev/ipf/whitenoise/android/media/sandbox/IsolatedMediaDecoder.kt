@@ -15,7 +15,7 @@ internal object IsolatedMediaDecoder {
     @Volatile private var mediaTransport: MediaDecodeTransport? = null
     private var installedContext: Context? = null
     private var imageOwner: IsolatedMediaTransport? = null
-    private var mediaOwner: IsolatedMediaTransport? = null
+    private var mediaOwner: IsolatedAutomaticAvTransport? = null
 
     @Volatile internal var lastIsolation: WorkerIsolation? = null
         private set
@@ -23,14 +23,17 @@ internal object IsolatedMediaDecoder {
     @Volatile internal var lastAvIsolation: WorkerIsolation? = null
         private set
 
+    /** Stores the attested automatic A/V isolation receipt without treating it as device qualification. */
     internal fun recordAvIsolation(result: android.os.Bundle) {
         lastAvIsolation = isolationReceipt(result)
     }
 
+    /** Stores the latest accepted isolation receipt for diagnostics without granting a new source capability. */
     internal fun recordIsolation(result: android.os.Bundle) {
         lastIsolation = isolationReceipt(result)
     }
 
+    /** Returns the retained diagnostic receipt rather than probing or parsing another source. */
     private fun isolationReceipt(result: android.os.Bundle): WorkerIsolation =
         WorkerIsolation(
             result.getInt("uid"),
@@ -42,36 +45,26 @@ internal object IsolatedMediaDecoder {
             result.getInt("inputWriteErrno", -1),
         )
 
+    /**
+     * Installs domain-bound still-image worker generations (#3373), owned for the process's lifetime: a worker
+     * serves one data-access domain only, and an undeclared input gets a single-use one.
+     */
     @Synchronized
-    fun install(context: Context) = installSelected(context, lifetimeQualification = false)
-
-    /** Explicit debug qualification only; normal installation keeps the existing reusable worker. */
-    @Synchronized
-    internal fun installForLifetimeQualification(context: Context) {
-        check(dev.ipf.whitenoise.android.BuildConfig.DEBUG)
-        installSelected(context, lifetimeQualification = true)
-    }
-
-    private fun installSelected(
-        context: Context,
-        lifetimeQualification: Boolean,
-    ) {
+    fun install(context: Context) {
         if (!Process.isIsolated()) {
             clear()
             installedContext = context.applicationContext
-            transport =
-                if (lifetimeQualification) {
-                    val owner =
-                        imageOwner ?: IsolatedMediaTransport(context.applicationContext, "lifetime_images").also {
-                            imageOwner = it
-                        }
-                    owner.activateSession()
-                    owner
-                } else {
-                    ReusableMediaTransport(context.applicationContext, "images")
-                }
+            val owner =
+                imageOwner ?: IsolatedMediaTransport(
+                    context.applicationContext,
+                    "images",
+                    MediaWorkerPool.DOMAIN_SPARES,
+                    liveLimit = MediaWorkerPool.MAX_LIVE_GENERATIONS,
+                ).also { imageOwner = it }
+            owner.activateSession()
+            transport = owner
             val automaticOwner =
-                mediaOwner ?: IsolatedMediaTransport(
+                mediaOwner ?: IsolatedAutomaticAvTransport(
                     context.applicationContext,
                     "automatic_av",
                     MediaAvDecodeService::class.java,
@@ -91,16 +84,17 @@ internal object IsolatedMediaDecoder {
         mediaTransport = next
     }
 
+    /** After an account change, puts the production image lane in place of a real image transport; fakes stay. */
     @Synchronized
     internal fun resetForAccount() {
         if (transport is IsolatedMediaTransport || transport is ReusableMediaTransport) {
             val currentContext = installedContext ?: return
-            val lifetimeQualification = transport === imageOwner
             clear()
-            installSelected(currentContext, lifetimeQualification)
+            install(currentContext)
         }
     }
 
+    /** Revokes the selected transport without inventing a worker-death observation. */
     @Synchronized
     fun clear() {
         IsolatedAnimationSession.retireActive()
@@ -117,6 +111,11 @@ internal object IsolatedMediaDecoder {
         }
         transport = null
         mediaTransport = null
+    }
+
+    /** Retires [domain]'s still-image worker, such as a draft that was sent or emptied. */
+    fun retireDomain(domain: dev.ipf.whitenoise.android.media.MediaTrustDomain) {
+        transport?.retireDomain(domain)
     }
 
     fun decode(

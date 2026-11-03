@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.state.MAX_TOP_BAR_OTHER_ACCOUNTS
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
@@ -85,6 +86,7 @@ fun AccountAvatarButton(
                 seed = seed,
                 size = size,
                 pictureUrl = safePictureUrl,
+                pictureDomain = AvatarImageLoader.publicProfiles(),
             )
             if (showUnreadDot) {
                 Box(
@@ -326,6 +328,7 @@ private fun OtherAccountAvatar(
                     seed = seed,
                     size = TOP_BAR_OTHER_ACCOUNT_SIZE - TOP_BAR_OTHER_ACCOUNT_RING * 2,
                     pictureUrl = pictureUrl,
+                    pictureDomain = AvatarImageLoader.publicProfiles(),
                 )
             }
             if (showUnreadDot) {

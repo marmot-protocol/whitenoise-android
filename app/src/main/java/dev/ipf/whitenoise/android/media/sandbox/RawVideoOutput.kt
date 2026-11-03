@@ -125,17 +125,23 @@ internal class RawVideoOutput(
     fun render(
         bitmap: Bitmap,
         rotation: Int,
+        observation: RawAvPlaybackObservation? = null,
     ): Boolean =
         synchronized(lock) {
             require(rotation in setOf(0, 90, 180, 270))
             val target = surface?.takeIf { it.isValid } ?: return false
             try {
+                val start = if (observation == null) 0L else android.os.SystemClock.elapsedRealtimeNanos()
                 val canvas = target.lockCanvas(null)
+                val acquired = if (observation == null) 0L else android.os.SystemClock.elapsedRealtimeNanos()
+                var drawn = 0L
                 try {
                     drawRawVideoFrame(canvas, bitmap, rotation, paint)
+                    if (observation != null) drawn = android.os.SystemClock.elapsedRealtimeNanos()
                 } finally {
                     target.unlockCanvasAndPost(canvas)
                 }
+                observation?.canvas(start, acquired, drawn, android.os.SystemClock.elapsedRealtimeNanos())
                 true
             } catch (_: Surface.OutOfResourcesException) {
                 false

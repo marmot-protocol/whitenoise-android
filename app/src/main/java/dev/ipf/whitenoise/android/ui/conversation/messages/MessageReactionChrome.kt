@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.HorizontalAlignmentLine
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ReactionTally
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionPillRow
@@ -81,6 +82,7 @@ internal fun RowScope.MessageSenderAvatarSlot(
                                     .isPrivate(it)
                         },
                     picture = picture,
+                    pictureDomain = AvatarImageLoader.publicProfiles(),
                 )
             }
         }

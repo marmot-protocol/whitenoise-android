@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 @RunWith(RobolectricTestRunner::class)
 @Config(application = android.app.Application::class)
 class AvStreamRetirementTest {
+    /** Unavailable Endpoint Unbinds And Observes Process Before Blocked Retirement Returns. */
     @Test
     @Suppress("LongMethod") // The blocked-RPC ordering and exact owner cleanup form one causal fixture.
     fun unavailableEndpointUnbindsAndObservesProcessBeforeBlockedRetirementReturns() {
@@ -76,6 +77,7 @@ class AvStreamRetirementTest {
             }
         assertTrue(witness.admit(101, 201))
         setField(stream, "processWitness", witness)
+        setField(stream, "identity", 101 to 201) // Match the already calibrated witness used by this fixture.
         setField(stream, "endpoint", endpoint)
         setField(stream, "bindingAttempted", true)
         setField(stream, "deathRegistered", true)
@@ -116,6 +118,10 @@ class AvStreamRetirementTest {
         }
     }
 
+    /**
+     * Reads a private fixture field so assertions can inspect the exact owner rather than a replacement
+     * instance.
+     */
     private fun field(
         owner: IsolatedAvStream?,
         name: String,
@@ -125,6 +131,10 @@ class AvStreamRetirementTest {
             .apply { isAccessible = true }
             .get(owner)
 
+    /**
+     * Installs controlled fixture state through reflection; production visibility and synchronization stay
+     * unchanged.
+     */
     private fun setField(
         owner: IsolatedAvStream,
         name: String,

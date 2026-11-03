@@ -1,0 +1,35 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PublicKeyCopy.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "PublicKeyCopyText",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PublicKeyCopy.kt",
+        "anchor": "internal fun PublicKeyCopyText(",
+        "test_ids": [
+          "ACC-002"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "R.string.copied",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PublicKeyCopy.kt",
+        "anchor": "R.string.copied",
+        "test_ids": [
+          "ACC-002"
+        ]
+      },
+      {
+        "surface": "R.string.public_key_copy_action_with_value",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/PublicKeyCopy.kt",
+        "anchor": "R.string.public_key_copy_action_with_value",
+        "test_ids": [
+          "ACC-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

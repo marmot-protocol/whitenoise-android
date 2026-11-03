@@ -29,6 +29,9 @@ import kotlin.math.abs
 internal class VoicePlaybackRequestSerializer {
     private val mutex = Mutex()
 
+    /**
+     * Runs playback state transitions with the controller mutex so a stale session cannot adopt a new player.
+     */
     suspend fun <T> withSerializedPlayback(block: suspend () -> T): T = mutex.withLock { block() }
 }
 
@@ -198,6 +201,9 @@ object VoicePlaybackController {
         return currentSpeed
     }
 
+    /**
+     * Applies the accepted speed to the current player and preserves refusal handling for that exact owner.
+     */
     private fun applySpeedToActive() {
         val mp = player ?: return
         runCatching {
@@ -381,12 +387,17 @@ object VoicePlaybackController {
         return PlaybackStartResult.Started
     }
 
+    /** Starts only the currently owned player, preserving its source identity across resume. */
     private fun startCurrentPlayer(mp: VoicePlaybackPlayer): Boolean =
         startPlayer(mp, "Voice playback resume failed") {
             releasePlayerInternal()
             _state.value = PlaybackState()
         }
 
+    /**
+     * Starts a prepared player; failure abandons focus, releases that unassigned player and clears playback
+     * state.
+     */
     private fun startPreparedNewPlayer(mp: VoicePlaybackPlayer): Boolean =
         startPlayer(mp, "Voice playback start failed") {
             abandonFocus()
@@ -394,6 +405,7 @@ object VoicePlaybackController {
             _state.value = PlaybackState()
         }
 
+    /** Starts the selected player with failure cleanup before reporting playback as active. */
     private fun startPlayer(
         mp: VoicePlaybackPlayer,
         failureMessage: String,
@@ -427,6 +439,7 @@ object VoicePlaybackController {
         }
     }
 
+    /** Remembers the interrupted playback intent while pausing the exact focus-losing player. */
     private fun pauseForTransientAudioFocusLoss() {
         val mp = player ?: return
         val wasPlaying =
@@ -449,6 +462,9 @@ object VoicePlaybackController {
         stopTicker()
     }
 
+    /**
+     * Attempts temporary volume reduction and falls back to the transient-pause policy if the player refuses.
+     */
     private fun duckForTransientAudioFocusLoss() {
         val mp = player ?: return
         val wasPlaying =
@@ -464,6 +480,10 @@ object VoicePlaybackController {
         }
     }
 
+    /**
+     * Restores only the still-current interrupted player; later user actions invalidate the saved resume
+     * intent.
+     */
     private fun restoreAfterAudioFocusGain() {
         val mp = player
         if (duckedForAudioFocusLoss) {
@@ -485,6 +505,7 @@ object VoicePlaybackController {
         startTicker()
     }
 
+    /** Revokes saved transient-focus state so a later gain cannot restart obsolete playback. */
     private fun clearAudioFocusInterruption(restoreVolume: Boolean) {
         if (restoreVolume && duckedForAudioFocusLoss) {
             val restoreFailure = player?.runCatching { setVolume(1f, 1f) }?.exceptionOrNull()

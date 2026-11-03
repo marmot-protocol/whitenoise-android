@@ -466,6 +466,7 @@ class MaestroWorkflowTest(unittest.TestCase):
                                          not (event == 'workflow_dispatch' and (fields['maestro_pilot'] or trace)))
 
     def test_av_trace_job_admission_uses_complete_explicit_inputs(self):
+        """Av trace job admission uses complete explicit inputs."""
         jobs=('attachment-fixture','instrumented','maestro-pilot','maestro-runtime-build',
               'maestro-runtime','maestro-runtime-summary','mdk-qualification','mdk-signed-preview')
         for api in ('30','36'):
@@ -493,6 +494,7 @@ class MaestroWorkflowTest(unittest.TestCase):
                              self.enabled(job,'workflow_dispatch',False,trace_target='healthy'))
 
     def test_av_trace_step_refusal_and_cancellation_use_actual_expressions(self):
+        """Av trace step refusal and cancellation use actual expressions."""
         rejection=self.job('instrumented').split('      - name: Reject incompatible startup trace inputs',1)[1]
         reject=re.search(r'^        if: (.+)$',rejection,re.MULTILINE).group(1)
         cancel=re.search(r'^  cancel-in-progress: \$\{\{ (.+) \}\}$',self.workflow,re.MULTILINE).group(1)
@@ -501,6 +503,7 @@ class MaestroWorkflowTest(unittest.TestCase):
                       outbound_share_only=False,mdk_adoption_only=False,mdk_qualification=False,
                       mdk_preview_qualification=False,review_demo_e2e=False,document_provider_matrix=False)
         def evaluate(expression,event,fields):
+            """Evaluate the actual selected workflow condition against synthetic event and job outcomes."""
             expression=expression.replace('&&',' and ').replace('||',' or ')
             expression=re.sub(r'!(?!=)','not ',expression).strip()
             return bool(eval(expression,{'__builtins__':{}},

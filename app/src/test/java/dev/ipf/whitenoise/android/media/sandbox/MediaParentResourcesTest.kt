@@ -9,6 +9,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 class MediaParentResourcesTest {
+    /** Cancel Cannot Release An Already Running Cleanup Task. */
     @Test
     fun cancelCannotReleaseAnAlreadyRunningCleanupTask() {
         val resources = MediaParentResources()
@@ -24,6 +25,7 @@ class MediaParentResourcesTest {
         assertTrue(resources.available())
     }
 
+    /** Concurrent Close Cannot Acknowledge Before The Actual Close Returns. */
     @Test
     fun concurrentCloseCannotAcknowledgeBeforeTheActualCloseReturns() {
         val resources = MediaParentResources()
@@ -52,6 +54,7 @@ class MediaParentResourcesTest {
         assertTrue(resources.available())
     }
 
+    /** Failed Close Remains Held Without Retry Or Reset. */
     @Test
     fun failedCloseRemainsHeldWithoutRetryOrReset() {
         val resources = MediaParentResources()

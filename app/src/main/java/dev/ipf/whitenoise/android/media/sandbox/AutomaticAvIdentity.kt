@@ -13,9 +13,11 @@ internal object AutomaticAvIdentity {
     const val QUICK_POLLS = 80
     const val HELD_POLL_MS = 1000L
 
+    /** Returns the bounded backoff used by process-absence observation rather than an admission timeout. */
     fun observationDelay(attempt: Int): Long = if (attempt < QUICK_POLLS) POLL_MS else HELD_POLL_MS
 }
 
+/** Sends the input-free identity callback before any automatic media descriptor is exposed. */
 internal fun sendAutomaticAvIdentity(
     callback: IBinder,
     request: Int,

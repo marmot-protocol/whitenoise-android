@@ -83,14 +83,6 @@
         ]
       },
       {
-        "surface": "Global attachment lookup Retry",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
-        "anchor": "onRetry = { libraryRetry++ }",
-        "test_ids": [
-          "FIND-015"
-        ]
-      },
-      {
         "surface": "string:chat_list_startup_slow",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "R.string.chat_list_startup_slow",

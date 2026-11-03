@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicReference
 @Config(application = android.app.Application::class, shadows = [BorrowedDescriptorStatShadow::class])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class AvStreamSourceOwnershipTest {
+    /** Duplicated Descriptors Report Their Actual File Length Without Replacing Original Objects. */
     @Test
     fun duplicatedDescriptorsReportTheirActualFileLengthWithoutReplacingOriginalObjects() {
         for (length in listOf(7, 4097)) {
@@ -56,12 +57,14 @@ class AvStreamSourceOwnershipTest {
         }
     }
 
+    /** Original File Close Retains Admission Until Ack And Holds On Failure. */
     @Test
     fun originalFileCloseRetainsAdmissionUntilAckAndHoldsOnFailure() {
         exercise(staged = false, fails = false)
         exercise(staged = false, fails = true)
     }
 
+    /** Staged Writer Close Retains Admission Until Ack And Holds On Failure. */
     @Test
     fun stagedWriterCloseRetainsAdmissionUntilAckAndHoldsOnFailure() {
         exercise(staged = true, fails = false)
@@ -277,6 +280,10 @@ class AvStreamSourceOwnershipTest {
             .set(resources, closer)
     }
 
+    /**
+     * Reads a private fixture field so assertions can inspect the exact owner rather than a replacement
+     * instance.
+     */
     private fun field(
         owner: IsolatedAvStream?,
         name: String,

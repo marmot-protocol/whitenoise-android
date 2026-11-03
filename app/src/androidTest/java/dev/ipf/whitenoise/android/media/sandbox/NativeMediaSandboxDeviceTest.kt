@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicReference
 @PullRequestDeviceSmoke
 @MediaContainmentAcceptance
 class NativeMediaSandboxDeviceTest {
+    /** Installer Covers Existing And New Java And Native Threads. */
     @Test
     fun installerCoversExistingAndNewJavaAndNativeThreads() {
         val result = runProbe(NativeSandboxProbe.THREADS)
@@ -43,6 +44,7 @@ class NativeMediaSandboxDeviceTest {
         result.rows.forEach { row -> assertArrayEquals(expected, row) }
     }
 
+    /** Clone3 Is Denied Or The Platform Terminates Its Dedicated Worker. */
     @Test
     fun clone3IsDeniedOrThePlatformTerminatesItsDedicatedWorker() {
         val result = runProbe(NativeSandboxProbe.CLONE3)
@@ -54,6 +56,7 @@ class NativeMediaSandboxDeviceTest {
         }
     }
 
+    /** Blocked Native Read Ends With Observed Os Process Disappearance. */
     @Test
     fun blockedNativeReadEndsWithObservedOsProcessDisappearance() {
         val result = runProbe(NativeSandboxProbe.BLOCKED_NATIVE)

@@ -1,13 +1,8 @@
 package dev.ipf.whitenoise.android.media.sandbox
 
-import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
-import android.content.ServiceConnection
 import android.graphics.Bitmap
 import android.os.Bundle
-import android.os.Handler
-import android.os.HandlerThread
 import android.os.IBinder
 import android.os.Message
 import android.os.Messenger
@@ -15,6 +10,7 @@ import android.os.ParcelFileDescriptor
 import android.os.Process
 import android.os.SharedMemory
 import android.system.OsConstants
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Semaphore
@@ -76,148 +72,135 @@ internal interface MediaDecodeTransport {
     ): MediaProbe? = null
 
     fun waveform(file: File): FloatArray? = null
+
+    /**
+     * Retires [domain]'s worker, such as a draft that was sent or emptied. A lane without domain-bound workers
+     * has nothing to retire.
+     */
+    fun retireDomain(domain: MediaTrustDomain) = Unit
 }
 
-/** One serialized image lane; each admitted input retains its worker until exact Binder death. */
-@Suppress("TooManyFunctions", "LargeClass") // Keep one lock owner for binding, admission and exact-death retirement.
+/**
+ * Still-image worker generations bound to data-access domains (#3373). Each request carries the
+ * [MediaTrustDomain] set by its caller through [MediaTrustScope]. Requests of one domain are serialized
+ * on that domain's own admission and reuse its generation, which never serves another domain; different
+ * domains run in parallel within the pool's live limit. A [MediaTrustDomain.Unique] request gets a
+ * single-use generation: its reply capability is revoked before retirement, and its exact Binder death
+ * precedes both the parent pixel copy and the next single-use input. See [MediaWorkerPool] for the bounds.
+ */
+@Suppress("TooManyFunctions") // Cohesive admission, session and descriptor lifecycle for one decoder lane.
 internal class IsolatedMediaTransport(
     private val context: Context,
-    private val instanceName: String = "images",
-    private val serviceClass: Class<out android.app.Service> = MediaDecodeService::class.java,
-    private val processWitnessFactory: () -> KernelProcessWitness = ::KernelProcessWitness,
-    private val refusalClock: () -> Long = android.os.SystemClock::elapsedRealtime,
+    instanceName: String = "images",
+    spares: Int = MediaWorkerPool.DEFAULT_SPARES,
+    private val deadlineMs: Long = MediaDecodePolicy.DEADLINE_MS,
+    liveLimit: Int = 1 + spares.coerceIn(0, MediaWorkerPool.MAX_SPARES),
+    /**
+     * How much of a request's deadline may pass before dispatch, waiting for a worker, while a missed deadline still
+     * counts against its source: a worker then had at least its own watchdog's time to answer.
+     */
+    private val claimAllowanceMs: Long = MediaDecodePolicy.DEADLINE_MS - MediaDecodePolicy.WATCHDOG_MS,
 ) : MediaDecodeTransport,
     java.io.Closeable {
+    /** Admission for single-use requests, which share one serialized lane. */
     private val gate = Semaphore(1)
+
+    /** Admission per reusable domain, held only while a request of that domain is queued or running. */
+    private val lanes = HashMap<MediaTrustDomain, Lane>()
+
+    /** Requests whose output buffer exists; a request waiting for a worker has none yet. */
+    private val descriptorHolders = AtomicInteger()
     private val bindingLock = Any()
-    private val ids = AtomicInteger()
-    private val automaticIds = AtomicInteger()
-    private val automaticAv = serviceClass == MediaAvDecodeService::class.java
-    private val parentResources = MediaParentResources()
     private var epoch = 0L
 
-    @Volatile private var session: Session? = Session(epoch, sourceAccess(), refusalClock)
+    @Volatile private var session: Session? = Session(epoch, MediaSourceAccess(context))
 
     @Volatile private var closed = false
 
-    @Volatile private var requestDispatched = false
-
-    @Volatile private var pending: Reply? = null
-    private var worker: Worker? = null
-    private val callbackThread = lazy { HandlerThread("media-decoder-ipc").apply { start() } }
-    private val callbacks by callbackThread
-    private val handler by lazy { Handler(callbacks.looper) }
-    private val callbackExecutor = java.util.concurrent.Executor { command -> handler.post(command) }
-    private val retirementThread =
-        lazy {
-            java.util.concurrent.Executors
-                .newSingleThreadExecutor()
+    /** Generations with a request in flight, each holding that request's reply capability. */
+    private val pending = HashSet<MediaWorker>()
+    private val pool =
+        MediaWorkerPool(context, instanceName, spares, bindingLock, liveLimit) { ended ->
+            // Called under bindingLock: a disconnected or dead generation can never complete a reply.
+            revoke(ended)
         }
-    private val retirementExecutor by retirementThread
 
-    /** Account invalidation never discards the process-death witness. */
+    /** Measurement-only queue observer, used by matched lane characterization. */
+    @Volatile internal var admissionObserver: MediaAdmissionObserver? = null
+
+    /** Account invalidation never discards a process-death witness. */
     internal fun activateSession() = replaceSession(true)
 
     internal fun invalidateSession() = replaceSession(false)
 
+    /**
+     * Retires [domain]'s worker generation, such as a draft that was sent or emptied: at once when idle, after
+     * its request in flight otherwise. A later input of [domain] waits for that generation's death as usual.
+     */
+    override fun retireDomain(domain: MediaTrustDomain) {
+        if (domain != MediaTrustDomain.Unique) pool.retireDomain(domain)
+    }
+
     private fun replaceSession(active: Boolean) {
-        val (previous, retiringWorker) =
+        val (previous, retiring) =
             synchronized(bindingLock) {
                 check(!closed || !active) { "A closed decoder cannot be reactivated" }
                 val previous = session
-                val retiringWorker = worker
-                session = if (active) Session(++epoch, sourceAccess(), refusalClock) else null
-                revokePending()
-                previous to retiringWorker
+                session = if (active) Session(++epoch, MediaSourceAccess(context)) else null
+                pending.toList().forEach(::revoke)
+                // Captured with the session swap, so a generation started for the new session is never retired here.
+                // Spares carry no input, but every captured generation predates the new session.
+                previous to pool.detachAll()
             }
-        if (automaticAv) {
-            try {
-                previous?.sources?.close()
-            } finally {
-                retiringWorker?.let(::retire)
-            }
-        } else {
-            previous?.sources?.close()
-            retiringWorker?.let(::retire)
-        }
+        previous?.sources?.close()
+        retiring.forEach { pool.retire(it) }
     }
 
-    private fun revokePending() {
-        pending?.let {
-            it.completed.set(true)
-            it.result = null
-            it.ready.countDown()
-            it.connected.countDown()
-            worker?.takeIf { candidate -> candidate.reply === it }?.identityReady?.countDown()
-        }
-        pending = null
-    }
-
-    private fun sourceAccess(): MediaSourceAccess {
-        val access = MediaSourceAccess(context, if (automaticAv) parentResources else null)
-        return access
-    }
-
-    private fun <T : AutoCloseable, R> withParentResource(
-        value: T,
-        block: (T) -> R,
-    ): R {
-        val owner = if (automaticAv) parentResources.own(value) else MediaParentResource(value)
-        return owner.use { block(it.value) }
+    /** Revokes [worker]'s in-flight reply capability. Called under bindingLock. */
+    private fun revoke(worker: MediaWorker) {
+        worker.exchange?.abort()
+        worker.exchange = null
+        pending.remove(worker)
     }
 
     private fun current(ticket: Operation): Boolean = !closed && session?.epoch == ticket.session.epoch
 
+    /** A reply capability that accepts exactly one well-formed reply for [exchange] on [worker]. */
     private fun responseCapability(
-        selected: Worker,
-        reply: Reply,
+        worker: MediaWorker,
+        exchange: MediaExchange,
     ): Messenger =
         Messenger(
             object : android.os.Binder() {
-                // Keep identity and final-reply admission with the exact capability.
-                @Suppress("ReturnCount", "CyclomaticComplexMethod")
+                @Suppress("ReturnCount") // Reject unrelated, oversized or retired callback capabilities before parsing.
                 override fun onTransact(
                     code: Int,
                     data: android.os.Parcel,
                     response: android.os.Parcel?,
                     flags: Int,
                 ): Boolean {
-                    if (automaticAv && code == AutomaticAvIdentity.CALLBACK) {
-                        return acceptIdentity(selected, data, response, flags)
-                    }
-                    if (automaticAv) {
-                        val invalidReply = response == null || flags and IBinder.FLAG_ONEWAY != 0
-                        if (invalidReply ||
-                            !selected.processWitness.acceptsCaller(
-                                android.os.Binder.getCallingUid(),
-                                android.os.Binder.getCallingPid(),
-                            )
-                        ) {
-                            return false
-                        }
-                    }
                     if (code != IBinder.FIRST_CALL_TRANSACTION) return super.onTransact(code, data, response, flags)
-                    if (pending !== reply || data.dataAvail() > MediaDecodePolicy.MAX_REPLY_BYTES) return false
+                    if (worker.exchange !== exchange || data.dataAvail() > MediaDecodePolicy.MAX_REPLY_BYTES) {
+                        return false
+                    }
                     val result =
                         try {
                             data.enforceInterface(MEDIA_REPLY_DESCRIPTOR)
-                            if (data.readInt() != reply.id) return false
+                            if (data.readInt() != exchange.id) return false
                             readMediaDecodeReply(data).apply { putInt("uid", android.os.Binder.getCallingUid()) }
                         } catch (_: RuntimeException) {
                             null
                         }
                     synchronized(bindingLock) {
-                        if (closed || session?.epoch != reply.session.epoch || pending !== reply) return false
-                        if (reply.completed.compareAndSet(false, true)) {
-                            reply.result = result
-                            pending = null // Revoke the capability before retirement or another callback.
-                            result?.let { receipt ->
-                                IsolatedMediaDecoder.recordIsolation(receipt)
-                                if (serviceClass == MediaAvDecodeService::class.java) {
-                                    IsolatedMediaDecoder.recordAvIsolation(receipt)
-                                }
-                            }
-                            reply.ready.countDown()
+                        // A retiring generation's capability is already dead, whatever its id.
+                        if (closed || worker.exchange !== exchange || worker.retiring) return false
+                        if (exchange.completed.compareAndSet(false, true)) {
+                            exchange.result = result
+                            // Revoke the capability before retirement, reuse or another callback.
+                            worker.exchange = null
+                            pending.remove(worker)
+                            result?.let(IsolatedMediaDecoder::recordIsolation)
+                            exchange.ready.countDown()
                         }
                     }
                     return true
@@ -225,191 +208,25 @@ internal class IsolatedMediaTransport(
             },
         )
 
-    private fun acceptIdentity(
-        selected: Worker,
-        data: android.os.Parcel,
-        response: android.os.Parcel?,
-        flags: Int,
-    ): Boolean {
-        val accepted =
-            try {
-                require(response != null && flags and IBinder.FLAG_ONEWAY == 0)
-                require(data.dataSize() <= AutomaticAvIdentity.MAX_BYTES && !data.hasFileDescriptors())
-                data.enforceInterface(AutomaticAvIdentity.DESCRIPTOR)
-                require(
-                    data.dataAvail() == Int.SIZE_BYTES && data.readInt() == selected.reply.id && selected.reply.id > 0,
-                )
-                synchronized(bindingLock) {
-                    // Even a late exact callback can identify the retired process for cleanup; it cannot admit input.
-                    val exact = worker === selected && selected.linked
-                    val calibrated =
-                        exact &&
-                            selected.processWitness.admit(
-                                android.os.Binder.getCallingUid(),
-                                android.os.Binder.getCallingPid(),
-                            )
-                    val current =
-                        !closed &&
-                            session?.epoch == selected.reply.session.epoch &&
-                            pending === selected.reply &&
-                            !selected.retiring
-                    calibrated && current
-                }
-            } catch (_: RuntimeException) {
-                false
-            }
-        selected.identityAccepted = accepted
-        selected.identityReady.countDown()
-        if (accepted) response?.writeInt(1) else retire(selected)
-        return accepted
-    }
-
-    private fun connection(selected: Worker): ServiceConnection =
-        object : ServiceConnection {
-            override fun onServiceConnected(
-                name: ComponentName,
-                service: IBinder,
-            ) {
-                synchronized(bindingLock) {
-                    if (worker !== selected || selected.binder != null) return
-                    selected.binder = service
-                    selected.bound = true
-                    selected.remote = Messenger(service)
-                    try {
-                        service.linkToDeath(selected.deathRecipient, 0)
-                        selected.linked = true
-                    } catch (_: android.os.RemoteException) {
-                        // linkToDeath can report an already-dead remote; never infer death from send failure.
-                        if (!service.isBinderAlive) {
-                            selected.dead.countDown()
-                        } else {
-                            warnLifetimeHold(selected, "death-registration")
-                        }
-                        selected.retiring = true
-                    } catch (_: RuntimeException) {
-                        selected.retiring = true
-                        warnLifetimeHold(selected, "death-registration")
-                    }
-                    if (closed || session?.epoch != selected.reply.session.epoch) selected.retiring = true
-                    selected.reply.connected.countDown()
-                }
-                if (selected.retiring) retire(selected)
-                dispose(selected)
-            }
-
-            override fun onServiceDisconnected(name: ComponentName) = disconnected(selected)
-
-            override fun onBindingDied(name: ComponentName) = disconnected(selected)
-
-            override fun onNullBinding(name: ComponentName) = disconnected(selected)
-        }
-
-    private fun disconnected(selected: Worker) {
-        synchronized(bindingLock) {
-            if (worker !== selected) return
-            selected.retiring = true
-            if (pending === selected.reply) revokePending()
-            selected.reply.connected.countDown()
-        }
-        // A binding notification is not a process-death receipt.
-        retire(selected)
-    }
-
-    private fun died(selected: Worker) {
-        synchronized(bindingLock) {
-            selected.dead.countDown()
-            if (worker === selected && pending === selected.reply) revokePending()
-            selected.reply.ready.countDown()
-            selected.reply.connected.countDown()
-        }
-        dispose(selected)
-    }
-
-    private fun dispose(selected: Worker) {
-        if (automaticAv) {
-            disposeAutomatic(selected)
-            return
-        }
-        synchronized(bindingLock) {
-            if (selected.dead.count != 0L || !selected.bindComplete || selected.disposed) return
-            selected.disposed = true
-            if (worker === selected) worker = null
-        }
-        // A definitive false bind still registers a connection that must be released.
-        runCatching { context.unbindService(selected.connection) }
-        selected.binder?.let { binder -> runCatching { binder.unlinkToDeath(selected.deathRecipient, 0) } }
-        if (closed && callbackThread.isInitialized()) callbacks.quitSafely()
-    }
-
-    @Suppress("ReturnCount", "CyclomaticComplexMethod") // One atomic process/unbind/caller retirement decision.
-    private fun disposeAutomatic(selected: Worker) {
-        val unbind =
-            synchronized(bindingLock) {
-                if (selected.disposed || !selected.bindComplete || !selected.retiring) return
-                if (!selected.unbindStarted) true.also { selected.unbindStarted = true } else false
-            }
-        if (unbind) {
-            handler.post {
-                val success =
-                    try {
-                        context.unbindService(selected.connection)
-                        true
-                    } catch (_: RuntimeException) {
-                        false
-                    }
-                synchronized(bindingLock) { selected.unbound = success }
-                disposeAutomatic(selected)
-            }
-        }
-        val gone = selected.definitiveNoWorker || selected.processWitness.confirmedGone()
-        synchronized(bindingLock) {
-            val detached = gone && selected.unbound
-            if (detached) selected.safeToCopy.countDown()
-            val operationIdle = !selected.operationActive && !selected.retireRpcActive
-            if (detached && operationIdle && parentResources.available()) {
-                if (selected.disposed) return
-                selected.disposed = true
-                if (worker === selected) worker = null
-            } else {
-                if (!selected.observationScheduled) {
-                    selected.observationScheduled = true
-                    val delay = AutomaticAvIdentity.observationDelay(selected.observationPolls++)
-                    handler.postDelayed({
-                        synchronized(bindingLock) { selected.observationScheduled = false }
-                        disposeAutomatic(selected)
-                    }, delay)
-                }
-                return
-            }
-        }
-        selected.binder?.let { binder -> runCatching { binder.unlinkToDeath(selected.deathRecipient, 0) } }
-        if (closed && callbackThread.isInitialized()) callbacks.quitSafely()
-        if (closed && retirementThread.isInitialized()) retirementExecutor.shutdown()
-    }
-
     override fun decode(
         bytes: ByteArray,
         edge: Int,
         oriented: Boolean,
         operation: Int,
     ): Bitmap? =
-        serialized { ticket ->
+        serialized(MediaTrustScope.current()) { ticket ->
             val capacity = MediaDecodePolicy.outputCapacity(edge) ?: return@serialized null
-            SharedMemory.create("media-pixels", capacity).use { output ->
-                val spec = MediaDecodeRequest(edge, oriented, operation)
-                val result = request(ticket, bytes, spec, output) ?: return@serialized null
+            val spec = MediaDecodeRequest(edge, oriented, operation)
+            request(ticket, bytes, spec, "media-pixels", capacity) { result, output ->
                 copyPixels(ticket, result, output, edge)
             }
         }
 
     override fun exif(bytes: ByteArray): Int? =
-        serialized { ticket ->
-            SharedMemory.create("media-exif", Int.SIZE_BYTES).use { output ->
-                val spec = MediaDecodeRequest(1, false, MediaDecodePolicy.EXIF)
-                request(ticket, bytes, spec, output)?.getInt("orientation")?.takeIf {
-                    it in
-                        1..MediaDecodePolicy.MAX_EXIF_ORIENTATION
-                }
+        serialized(MediaTrustScope.current()) { ticket ->
+            val spec = MediaDecodeRequest(1, false, MediaDecodePolicy.EXIF)
+            request(ticket, bytes, spec, "media-exif", Int.SIZE_BYTES) { result, _ ->
+                result.getInt("orientation").takeIf { it in 1..MediaDecodePolicy.MAX_EXIF_ORIENTATION }
             }
         }
 
@@ -418,9 +235,10 @@ internal class IsolatedMediaTransport(
         region: MediaImageRegion,
         edge: Int,
     ): Bitmap? =
-        serialized { ticket ->
+        serialized(MediaTrustScope.current()) { ticket ->
             val capacity = MediaDecodePolicy.outputCapacity(edge) ?: return@serialized null
-            SharedMemory.create("media-region", capacity).use { output ->
+            if (!claimWorker(ticket)) return@serialized null
+            withOutput("media-region", capacity) { output ->
                 ticket.session.sources.withInput(bytes) { input ->
                     val request = MediaDecodeRequest(edge, false, MediaDecodePolicy.REGION, region = region)
                     exchange(ticket, input, output, request)
@@ -430,19 +248,21 @@ internal class IsolatedMediaTransport(
         }
 
     override fun inspect(bytes: ByteArray): ImageInspection? =
-        serialized { ticket ->
-            SharedMemory.create("media-inspection", Int.SIZE_BYTES).use { output ->
-                val spec = MediaDecodeRequest(1, false, MediaDecodePolicy.INSPECT)
-                val result = request(ticket, bytes, spec, output) ?: return@serialized null
+        serialized(MediaTrustScope.current()) { ticket ->
+            val spec = MediaDecodeRequest(1, false, MediaDecodePolicy.INSPECT)
+            request(ticket, bytes, spec, "media-inspection", Int.SIZE_BYTES) { result, _ ->
                 val width = result.getInt("width")
                 val height = result.getInt("height")
-                if (width <= 0 || height <= 0) return@serialized null
-                ImageInspection(
-                    width,
-                    height,
-                    result.getString("mime").orEmpty().take(MediaDecodePolicy.MAX_MIME_CHARS),
-                    result.getInt("orientation"),
-                )
+                if (width <= 0 || height <= 0) {
+                    null
+                } else {
+                    ImageInspection(
+                        width,
+                        height,
+                        result.getString("mime").orEmpty().take(MediaDecodePolicy.MAX_MIME_CHARS),
+                        result.getInt("orientation"),
+                    )
+                }
             }
         }
 
@@ -451,11 +271,13 @@ internal class IsolatedMediaTransport(
         uri: android.net.Uri,
         edge: Int,
     ): Bitmap? {
+        val domain = MediaTrustScope.current()
         val selected = session ?: return null
         return selected.sources.withUriInput(resolver, uri) { input ->
-            serialized(selected) { ticket ->
+            serialized(domain, selected) { ticket ->
                 val capacity = MediaDecodePolicy.outputCapacity(edge) ?: return@serialized null
-                SharedMemory.create("media-pixels", capacity).use { output ->
+                if (!claimWorker(ticket)) return@serialized null
+                withOutput("media-pixels", capacity) { output ->
                     exchange(ticket, input, output, MediaDecodeRequest(edge, true, MediaDecodePolicy.DECODE))
                         ?.let { copyPixels(ticket, it, output, edge) }
                 }
@@ -463,178 +285,120 @@ internal class IsolatedMediaTransport(
         }
     }
 
-    override fun probe(
-        file: File,
-        edge: Int,
-        poster: Boolean,
-    ): MediaProbe? =
-        serialized { ticket ->
-            withMediaFile(ticket, file, "probe:$edge:$poster") { input ->
-                probeInput(ticket, input, edge, poster)
-            }
-        }
-
-    override fun probeBytes(
+    /** Debug-only worker canary: the reply's bounded text field, from one ordinary single-use generation. */
+    internal fun debugProbeForTest(
         bytes: ByteArray,
-        edge: Int,
-        poster: Boolean,
-    ): MediaProbe? =
-        serialized { ticket ->
-            if (bytes.size.toLong() !in 1..MAX_MEDIA_SOURCE_BYTES) return@serialized null
-            val digest =
-                java.security.MessageDigest
-                    .getInstance("SHA-256")
-                    .digest(bytes)
-                    .joinToString("") { "%02x".format(it) }
-            mediaAttempt(ticket, "probe:$edge:$poster:$digest") {
-                ticket.session.sources.withInput(bytes) { input -> probeInput(ticket, input, edge, poster) }
-            }
-        }
-
-    override fun probeUri(
-        resolver: android.content.ContentResolver,
-        uri: android.net.Uri,
-        edge: Int,
-    ): MediaProbe? {
-        val selected = session ?: return null
-        return if (!automaticAv) {
-            selected.sources.withMediaUriInput(resolver, uri) { input ->
-                serialized(selected) { ticket -> probeInput(ticket, input, edge, true) }
-            }
-        } else {
-            serialized(selected) { ticket ->
-                selected.sources.withMediaUriInput(resolver, uri) { input ->
-                    ticket.deadline = android.os.SystemClock.elapsedRealtime() + MediaDecodePolicy.DEADLINE_MS
-                    probeInput(ticket, input, edge, true)
-                }
-            }
+        operation: Int,
+    ): String? {
+        check(dev.ipf.whitenoise.android.BuildConfig.DEBUG)
+        check(operation == MediaDecodePolicy.DEBUG_CANARY || operation == MediaDecodePolicy.DEBUG_IGNORE_RETIRE)
+        return serialized(MediaTrustScope.current()) { ticket ->
+            val spec = MediaDecodeRequest(1, false, operation)
+            request(ticket, bytes, spec, "media-canary", Int.SIZE_BYTES) { result, _ -> result.getString("mime") }
         }
     }
 
-    override fun probeUriAt(
-        resolver: android.content.ContentResolver,
-        uri: android.net.Uri,
-        positionMs: Long,
-        edge: Int,
-    ): MediaProbe? {
-        val selected = session?.takeIf { positionMs in 0..MAX_MEDIA_DURATION_MS } ?: return null
-        return if (!automaticAv) {
-            selected.sources.withMediaUriInput(resolver, uri) { input ->
-                serialized(selected) { ticket ->
-                    probeInput(ticket, input, edge, true, TimeUnit.MILLISECONDS.toMicros(positionMs))
-                }
-            }
-        } else {
-            serialized(selected) { ticket ->
-                selected.sources.withMediaUriInput(resolver, uri) { input ->
-                    ticket.deadline = android.os.SystemClock.elapsedRealtime() + MediaDecodePolicy.DEADLINE_MS
-                    probeInput(ticket, input, edge, true, TimeUnit.MILLISECONDS.toMicros(positionMs))
-                }
-            }
-        }
-    }
-
-    private fun probeInput(
-        ticket: Operation,
-        input: ParcelFileDescriptor,
-        edge: Int,
-        poster: Boolean,
-        positionUs: Long = 0L,
-    ): MediaProbe? {
-        val capacity = MediaDecodePolicy.outputCapacity(edge) ?: return null
-        return withParentResource(
-            SharedMemory.create("media-av-pixels", if (poster) capacity else Int.SIZE_BYTES),
-        ) { output ->
-            val spec = MediaDecodeRequest(edge, poster, MediaDecodePolicy.PROBE, positionUs = positionUs)
-            val result = exchange(ticket, input, output, spec) ?: return@withParentResource null
-            val bitmap =
-                if (result.getBoolean("pixels")) {
-                    copyPixels(ticket, result, output, edge) ?: return@withParentResource null
-                } else {
-                    null
-                }
-            validateMediaProbe(
-                MediaProbe(
-                    result.getInt("sourceWidth"),
-                    result.getInt("sourceHeight"),
-                    result.getLong("duration"),
-                    bitmap,
-                ),
-                edge,
-            )
-        }
-    }
-
-    override fun waveform(file: File): FloatArray? =
-        serialized(deadlineMs = MediaDecodePolicy.WAVEFORM_DEADLINE_MS) { ticket ->
-            withMediaFile(ticket, file, "waveform") { input ->
-                withParentResource(SharedMemory.create("media-av-waveform", Int.SIZE_BYTES)) { output ->
-                    val spec = MediaDecodeRequest(1, false, MediaDecodePolicy.WAVEFORM)
-                    exchange(ticket, input, output, spec)?.getFloatArray("waveform")?.takeIf {
-                        it.size == dev.ipf.whitenoise.android.audio.AudioWaveformExtractor.BARS &&
-                            it.all { value -> value.isFinite() && value in 0f..1f }
-                    }
-                }
-            }
-        }
-
-    private fun <T> withMediaFile(
-        ticket: Operation,
-        file: File,
-        operation: String,
-        block: (ParcelFileDescriptor) -> T?,
-    ): T? {
-        if (!file.isFile || file.length() !in 1..MAX_MEDIA_SOURCE_BYTES) return null
-        val key = "$operation:${file.absolutePath}:${file.length()}:${file.lastModified()}"
-        return mediaAttempt(ticket, key) {
-            withParentResource(ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)) { input ->
-                if (input.statSize !in 1..MAX_MEDIA_SOURCE_BYTES) null else block(input)
-            }
-        }
-    }
-
-    private fun <T> mediaAttempt(
-        ticket: Operation,
-        key: String,
-        block: () -> T?,
-    ): T? =
-        ticket.session.mediaRefusals.attempt(
-            key,
-            { check(current(ticket) && remaining(ticket) > 0) { "Media session retired or expired" } },
-            { ticket.workerRefused },
-            block,
-        )
-
+    /**
+     * Admits one request of [domain]: single-use requests share one serialized lane, each reusable domain
+     * has its own, so a queue in one conversation never delays another domain's admission.
+     */
+    @Suppress("ReturnCount") // Closed, unadmitted, stale and completed requests leave separately.
     private fun <T> serialized(
+        domain: MediaTrustDomain,
         selected: Session? = session,
-        deadlineMs: Long = MediaDecodePolicy.DEADLINE_MS,
         block: (Operation) -> T?,
     ): T? {
         if (selected == null || closed) return null
-        // Queue admission has its own bound; it never spends the admitted exchange's budget.
-        return if (!gate.tryAcquire(MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)) {
-            null
-        } else {
-            val ticket = Operation(selected, android.os.SystemClock.elapsedRealtime() + deadlineMs)
-            try {
-                if (!current(ticket) || (automaticAv && !parentResources.available())) {
-                    null
-                } else {
-                    val result = block(ticket)
-                    if (current(ticket)) {
-                        result
-                    } else {
-                        (result as? Bitmap)?.recycle()
-                        (result as? MediaProbe)?.let(::disposeProbe)
-                        null
-                    }
-                }
-            } finally {
-                synchronized(bindingLock) { ticket.worker?.operationActive = false }
-                ticket.worker?.let(::dispose)
-                gate.release()
+        val lane = if (domain == MediaTrustDomain.Unique) null else synchronized(lanes) { enterLane(domain) }
+        val admission = lane?.gate ?: gate
+        try {
+            // Queue admission has its own bound; it never spends the admitted exchange's budget.
+            val queued = System.nanoTime()
+            if (!admission.tryAcquire(deadlineMs, TimeUnit.MILLISECONDS)) {
+                admissionObserver?.admission(System.nanoTime() - queued, false)
+                return null
             }
+            admissionObserver?.admission(System.nanoTime() - queued, true)
+            try {
+                return admittedRequest(selected, domain, block)
+            } finally {
+                admission.release()
+            }
+        } finally {
+            lane?.let { synchronized(lanes) { leaveLane(domain, it) } }
         }
+    }
+
+    /**
+     * Runs one admitted request under its own exchange deadline, discarding a result from a replaced session. A
+     * worker the request claimed but never sent input to goes back unused.
+     */
+    private fun <T> admittedRequest(
+        selected: Session,
+        domain: MediaTrustDomain,
+        block: (Operation) -> T?,
+    ): T? {
+        val ticket = Operation(selected, domain, android.os.SystemClock.elapsedRealtime() + deadlineMs)
+        if (!current(ticket)) return null
+        try {
+            val result = block(ticket)
+            return if (current(ticket)) {
+                result
+            } else {
+                (result as? Bitmap)?.recycle()
+                null
+            }
+        } finally {
+            ticket.worker?.let { worker -> if (!ticket.dispatched) pool.unclaim(worker) }
+        }
+    }
+
+    /**
+     * Claims the request's worker before it creates any descriptor, so a request waiting for a worker holds none
+     * however many domains wait. A reusable domain gets its own generation, Unique a single-use one.
+     */
+    private fun claimWorker(ticket: Operation): Boolean {
+        val reusable = ticket.domain != MediaTrustDomain.Unique
+        val key: Any = if (reusable) ticket.domain else SingleUseInput()
+        val worker = pool.claim(key, reusable, remaining(ticket)) { current(ticket) } ?: return false
+        ticket.worker = worker
+        return true
+    }
+
+    /** Creates one request's output buffer, counted for as long as it exists. */
+    private fun <T> withOutput(
+        name: String,
+        capacity: Int,
+        block: (SharedMemory) -> T?,
+    ): T? {
+        descriptorHolders.incrementAndGet()
+        try {
+            return SharedMemory.create(name, capacity).use(block)
+        } finally {
+            descriptorHolders.decrementAndGet()
+        }
+    }
+
+    /** Joins [domain]'s admission lane, creating it on first use. Called under the lanes lock. */
+    private fun enterLane(domain: MediaTrustDomain): Lane = lanes.getOrPut(domain, ::Lane).also { it.users++ }
+
+    /** Leaves [lane], dropping it once no request of [domain] is queued or running. Called under the lanes lock. */
+    private fun leaveLane(
+        domain: MediaTrustDomain,
+        lane: Lane,
+    ) {
+        if (--lane.users == 0) lanes.remove(domain)
+    }
+
+    /**
+     * Whether a request of the current session failed after dispatch in a way that says something about its source:
+     * always, unless its reply wait ran out after waiting for a worker had used more than [claimAllowanceMs] of its
+     * deadline.
+     */
+    private fun failureIsEvidence(ticket: Operation): Boolean {
+        if (!ticket.dispatched || !current(ticket)) return false
+        val waitedMs = deadlineMs - ticket.dispatchBudgetMs
+        return !ticket.replyTimedOut || waitedMs <= claimAllowanceMs
     }
 
     private fun remaining(ticket: Operation): Long {
@@ -647,13 +411,20 @@ internal class IsolatedMediaTransport(
         ticket: Operation,
     ): Boolean = latch.await(remaining(ticket), TimeUnit.MILLISECONDS)
 
-    @Suppress("ReturnCount") // Reject resource and cooldown failures before binding.
-    private fun request(
+    /**
+     * Runs one byte-sourced request under the session's refusal cooldown and records new failures. A refused
+     * source claims no worker; otherwise the worker is claimed before the [outputName] buffer and input exist,
+     * and [use] reads a valid result while the buffer is still mapped.
+     */
+    @Suppress("ReturnCount", "LongParameterList") // Reject resource and cooldown failures before binding.
+    private fun <T> request(
         ticket: Operation,
         bytes: ByteArray,
         spec: MediaDecodeRequest,
-        output: SharedMemory,
-    ): Bundle? {
+        outputName: String,
+        capacity: Int,
+        use: (Bundle, SharedMemory) -> T?,
+    ): T? {
         val limit = MediaDecodePolicy.MAX_INPUT_BYTES.toLong()
         if (bytes.size.toLong() !in 1..limit || !current(ticket)) return null
         val digest =
@@ -662,120 +433,95 @@ internal class IsolatedMediaTransport(
                 .digest(bytes)
         val key = "${spec.operation}:${spec.edge}:${spec.option}:" + digest.joinToString("") { "%02x".format(it) }
         val now = android.os.SystemClock.elapsedRealtime()
-        if ((ticket.session.refusals[key] ?: 0L) > now) return null
-        val result =
-            ticket.session.sources.withInput(bytes) { input ->
-                exchange(ticket, input, output, spec)
+        if (ticket.session.refusals.refused(key, now)) return null
+        if (!claimWorker(ticket)) return null
+        return withOutput(outputName, capacity) { output ->
+            val result =
+                ticket.session.sources.withInput(bytes) { input ->
+                    exchange(ticket, input, output, spec)
+                }
+            // Any dispatched request without a valid result (crash, watchdog kill, deadline miss or refusal)
+            // quarantines these bytes, as the reusable lane does. Interruption and reset never reach here. A missed
+            // deadline counts only when the worker had its full time: a long wait for a worker is not the source's.
+            if (result == null && failureIsEvidence(ticket)) {
+                recordRefusal(ticket.session, key, android.os.SystemClock.elapsedRealtime())
             }
-        if (ticket.workerRefused && current(ticket)) {
-            recordRefusal(ticket.session, key, android.os.SystemClock.elapsedRealtime())
+            result?.let { use(it, output) }
         }
-        return result
     }
 
-    @Suppress("ReturnCount", "CyclomaticComplexMethod")
-    // One input capability owns READY, exact reply, deadline and retirement; every refusal stays fail-closed.
+    /**
+     * Sends one request to its domain's generation and waits for the reply. A reusable domain keeps its
+     * generation after a valid reply, and the pixels are copied while it lives, as only that domain's own
+     * worker can touch them. Any other outcome retires it. A single-use generation is retired after its reply,
+     * and its exact Binder death precedes the pixel copy.
+     */
+    @Suppress("ReturnCount") // Admission, deadline, death and exact reply shape are separate fail-closed boundaries.
     private fun exchange(
         ticket: Operation,
         input: ParcelFileDescriptor,
         output: SharedMemory,
         request: MediaDecodeRequest,
     ): Bundle? {
-        requestDispatched = false
-        val id =
-            if (automaticAv) {
-                automaticIds.updateAndGet {
-                    if (it ==
-                        Int.MAX_VALUE
-                    ) {
-                        1
-                    } else {
-                        it + 1
-                    }
-                }
-            } else {
-                ids.incrementAndGet()
-            }
-        val reply = Reply(id, ticket.session)
-        val selected = reserveWorker(reply, ticket) ?: return null
+        if (!current(ticket)) return null
+        val reusable = ticket.domain != MediaTrustDomain.Unique
+        val selected = checkNotNull(ticket.worker)
+        val exchange = MediaExchange(requestSequence.incrementAndGet())
+        var keep = false
         try {
-            if (!connect(selected, ticket)) return null
-            val target = admittedTarget(selected, ticket, dispatch = !automaticAv) ?: return null
-            val capability = responseCapability(selected, reply)
-            if (automaticAv) {
-                target.send(
-                    Message.obtain().apply {
-                        what = AutomaticAvIdentity.MESSAGE
-                        arg1 = reply.id
-                        replyTo = capability
-                    },
-                )
-                if (!await(selected.identityReady, ticket) ||
-                    !selected.identityAccepted ||
-                    !current(ticket)
-                ) {
-                    return null
-                }
-            }
-            // Only the calibrated READY permits selected-descriptor admission.
-            if (automaticAv && admittedTarget(selected, ticket) == null) return null
+            val target = admittedTarget(selected, exchange, ticket) ?: return null
             target.send(
                 Message.obtain().apply {
                     what = MediaDecodePolicy.DECODE
-                    arg1 = reply.id
-                    replyTo = capability
+                    arg1 = exchange.id
+                    replyTo = responseCapability(selected, exchange)
                     data = requestPayload(input, output, request)
                 },
             )
-            if (!await(reply.ready, ticket)) return null
-            retire(selected)
-            val lifetime = if (automaticAv) selected.safeToCopy else selected.dead
-            if (!await(lifetime, ticket) || !current(ticket)) return null
-            val result = reply.result ?: return null
-            ticket.workerRefused = validIsolation(result) && !result.getBoolean("success")
+            // Warm a spare while this generation serves, a new domain or single-use input takes it.
+            pool.refill()
+            if (!await(exchange.ready, ticket)) {
+                ticket.replyTimedOut = true
+                return null
+            }
+            val result = exchange.result ?: return null
+            if (reusable) {
+                keep = validResult(result) && current(ticket)
+                return result.takeIf { keep }
+            }
+            pool.retire(selected)
+            // The death barrier precedes the pixel copy, a worker ignoring RETIRE is stopped by Android.
+            if (!pool.awaitDeath(selected, remaining(ticket)) || !current(ticket)) return null
             return result.takeIf(::validResult)
         } finally {
-            synchronized(bindingLock) { if (pending === reply) revokePending() }
-            retire(selected)
-            dispose(selected)
+            synchronized(bindingLock) { if (selected.exchange === exchange) revoke(selected) }
+            // An undispatched worker received no input; the admitted request returns it unused.
+            if (keep) {
+                pool.release(selected)
+            } else if (ticket.dispatched) {
+                pool.retire(selected)
+                pool.dispose(selected)
+            }
         }
     }
 
-    private fun reserveWorker(
-        reply: Reply,
-        ticket: Operation,
-    ): Worker? =
-        synchronized(bindingLock) {
-            if (!current(ticket)) {
-                null
-            } else {
-                val occupied = worker != null || remaining(ticket) == 0L
-                if (occupied || (automaticAv && !parentResources.healthy())) {
-                    null
-                } else {
-                    Worker(reply).also {
-                        it.connection = connection(it)
-                        worker = it
-                        ticket.worker = it
-                        pending = reply
-                    }
-                }
-            }
-        }
-
+    /** The live target for [selected], or null, marking the ticket dispatched once descriptors may leave. */
     private fun admittedTarget(
-        selected: Worker,
+        selected: MediaWorker,
+        exchange: MediaExchange,
         ticket: Operation,
-        dispatch: Boolean = true,
     ): Messenger? =
         synchronized(bindingLock) {
-            val matching = current(ticket) && worker === selected
-            val usable = selected.linked && !selected.retiring && (!automaticAv || parentResources.healthy())
-            if (!matching || !usable || remaining(ticket) == 0L) {
+            val usable = selected.linked && !selected.retiring && selected.dead.count != 0L
+            if (!current(ticket) || !usable || remaining(ticket) == 0L) {
                 null
             } else {
                 // Descriptor admission linearizes before a concurrent reset.
-                if (dispatch) requestDispatched = true
+                ticket.dispatched = true
+                ticket.dispatchBudgetMs = remaining(ticket)
+                selected.served = true
+                selected.exchange = exchange
+                pending += selected
                 selected.remote
             }
         }
@@ -788,56 +534,21 @@ internal class IsolatedMediaTransport(
         return isolated && restricted
     }
 
-    private fun retire(selected: Worker) {
-        val target =
-            synchronized(bindingLock) {
-                selected.retiring = true
-                if (selected.retireSent || selected.dead.count == 0L) {
-                    null
-                } else {
-                    selected.remote?.also {
-                        selected.retireSent = true
-                        if (automaticAv) selected.retireRpcActive = true
-                    }
-                }
-            }
-        if (automaticAv) {
-            if (target != null) {
-                try {
-                    retirementExecutor.execute {
-                        try {
-                            runCatching { target.send(Message.obtain().apply { what = MediaDecodePolicy.RETIRE }) }
-                        } finally {
-                            synchronized(bindingLock) { selected.retireRpcActive = false }
-                            disposeAutomatic(selected)
-                        }
-                    }
-                } catch (_: RuntimeException) {
-                    synchronized(bindingLock) { selected.retireRpcActive = false }
-                }
-            }
-            // AMS unbinding and process observation never queue behind a hostile endpoint transaction.
-            disposeAutomatic(selected)
-        } else {
-            runCatching { target?.send(Message.obtain().apply { what = MediaDecodePolicy.RETIRE }) }
-        }
-    }
-
-    /** One input-free diagnostic per held worker; this never supplies a death witness. */
-    private fun warnLifetimeHold(
-        selected: Worker,
-        reason: String,
-    ) {
-        val first =
-            synchronized(bindingLock) {
-                if (selected.holdReported) false else true.also { selected.holdReported = true }
-            }
-        if (first) android.util.Log.w("MediaDecode", "Worker lifetime unresolved: $reason")
-    }
-
     internal fun isRequestDispatchedForTest(): Boolean {
         check(dev.ipf.whitenoise.android.BuildConfig.DEBUG)
-        return requestDispatched && pending != null
+        return synchronized(bindingLock) { pending.isNotEmpty() }
+    }
+
+    /** Requests now holding an output buffer; only a request that already has its worker holds one. */
+    internal fun descriptorHoldersForTest(): Int {
+        check(dev.ipf.whitenoise.android.BuildConfig.DEBUG)
+        return descriptorHolders.get()
+    }
+
+    /** Live generations, held ones included, never more than the live limit. */
+    internal fun liveGenerationsForTest(): Int {
+        check(dev.ipf.whitenoise.android.BuildConfig.DEBUG)
+        return pool.liveGenerationsForTest()
     }
 
     private fun requestPayload(
@@ -854,7 +565,6 @@ internal class IsolatedMediaTransport(
             putInt("operation", request.operation)
             putInt("edge", request.edge)
             putBoolean("oriented", request.option)
-            putLong("positionUs", request.positionUs)
             putLong("offset", request.offset)
             putLong("length", request.length ?: input.statSize)
             request.region?.let {
@@ -867,56 +577,12 @@ internal class IsolatedMediaTransport(
             putParcelable("output", output)
         }
 
+    /** Quarantines [key] in [selected] for the refusal period from [now]; the ledger holds its own lock. */
     private fun recordRefusal(
         selected: Session,
         key: String,
         now: Long,
-    ) {
-        selected.refusals[key] = now + MediaDecodePolicy.REFUSAL_TTL_MS
-        while (selected.refusals.size > MediaDecodePolicy.MAX_REFUSALS) {
-            selected.refusals.remove(selected.refusals.keys.first())
-        }
-    }
-
-    @Suppress("ReturnCount") // Current, late and unsuccessful binding paths have distinct ownership outcomes.
-    private fun connect(selected: Worker, ticket: Operation): Boolean {
-        val accepted =
-            try {
-                context.bindIsolatedService(
-                    Intent(context, serviceClass),
-                    Context.BIND_AUTO_CREATE,
-                    workerInstanceName(instanceName, bindingSequence.incrementAndGet()),
-                    callbackExecutor,
-                    selected.connection,
-                )
-            } catch (_: RuntimeException) {
-                // A throwing bind has no authenticated lifetime outcome; retain the generation.
-                synchronized(bindingLock) {
-                    selected.bindComplete = true
-                    selected.retiring = true
-                }
-                warnLifetimeHold(selected, "bind-outcome")
-                return false
-            }
-        val bound =
-            synchronized(bindingLock) {
-                selected.bindComplete = true
-                selected.bound = selected.bound || accepted
-                if (!selected.bound) {
-                    selected.definitiveNoWorker = true
-                    selected.retiring = true
-                    selected.dead.countDown() // Framework definitively refused this binding.
-                }
-                selected.bound
-            }
-        dispose(selected)
-        if (!bound || !await(selected.reply.connected, ticket)) return false
-        return synchronized(bindingLock) {
-            val matching = current(ticket) && worker === selected
-            val usable = selected.linked && !selected.retiring
-            matching && usable
-        }
-    }
+    ) = selected.refusals.refuse(key, now + MediaDecodePolicy.REFUSAL_TTL_MS)
 
     // Failed copies recycle their allocation before propagation.
     @Suppress("ReturnCount", "TooGenericExceptionCaught")
@@ -956,73 +622,44 @@ internal class IsolatedMediaTransport(
     override fun close() {
         synchronized(bindingLock) { closed = true }
         invalidateSession()
-        if (synchronized(bindingLock) { worker == null }) {
-            if (callbackThread.isInitialized()) callbacks.quitSafely()
-            if (retirementThread.isInitialized()) retirementExecutor.shutdown()
-        }
-    }
-
-    companion object {
-        private val bindingSequence = AtomicInteger()
+        pool.close()
     }
 
     private class Session(
         val epoch: Long,
         val sources: MediaSourceAccess,
-        refusalClock: () -> Long,
     ) {
-        val mediaRefusals = MediaRefusalCache(refusalClock)
-        val refusals = LinkedHashMap<String, Long>()
+        // Shared by every domain lane of the session, so it is a locked ledger rather than a bare map.
+        val refusals = MediaRefusalLedger()
     }
 
-    private inner class Operation(
+    private data class Operation(
         val session: Session,
-        var deadline: Long,
-        var workerRefused: Boolean = false,
+        val domain: MediaTrustDomain,
+        val deadline: Long,
+        var dispatched: Boolean = false,
     ) {
-        var worker: Worker? = null
+        /** The generation this request claimed before creating any descriptor. */
+        var worker: MediaWorker? = null
+
+        /** What was left of [deadline] when the request was dispatched. */
+        var dispatchBudgetMs: Long = 0L
+
+        /** Whether the worker's reply did not arrive before [deadline]. */
+        var replyTimedOut: Boolean = false
     }
 
-    private inner class Worker(
-        val reply: Reply,
-    ) {
-        lateinit var connection: ServiceConnection
-        var binder: IBinder? = null
-        var remote: Messenger? = null
-        var linked = false
-        var bound = false
-        var bindComplete = false
-        var retiring = false
-        var retireSent = false
-        var disposed = false
-        var holdReported = false
-        val processWitness = processWitnessFactory()
-        val identityReady = CountDownLatch(1)
-
-        @Volatile var identityAccepted = false
-        val safeToCopy = CountDownLatch(1)
-        var definitiveNoWorker = false
-        var unbindStarted = false
-        var unbound = false
-        var observationScheduled = false
-        var observationPolls = 0
-        var operationActive = true
-        var retireRpcActive = false
-        val dead = CountDownLatch(1)
-        val deathRecipient = IBinder.DeathRecipient { died(this) }
+    /** One reusable domain's admission, kept while any of its requests is queued or running. */
+    private class Lane {
+        val gate = Semaphore(1)
+        var users = 0
     }
 
-    private class Reply(
-        val id: Int,
-        val session: Session,
-    ) {
-        val connected = CountDownLatch(1)
-        val ready = CountDownLatch(1)
-        val completed =
-            java.util.concurrent.atomic
-                .AtomicBoolean(false)
+    /** A pool key no other request shares, so a single-use generation is never claimed again. */
+    private class SingleUseInput
 
-        @Volatile var result: Bundle? = null
+    private companion object {
+        val requestSequence = AtomicInteger()
     }
 }
 

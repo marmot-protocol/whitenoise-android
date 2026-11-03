@@ -35,7 +35,6 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
@@ -46,6 +45,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.GroupAvatarAnimation
+import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.CheckCircle
 import dev.ipf.whitenoise.android.ui.icons.filled.Group
@@ -62,6 +62,7 @@ import dev.ipf.whitenoise.android.ui.theme.PillShape
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorder
 
+/** The new-chat flows' search field. */
 @Composable
 internal fun FlowSearchField(
     value: String,
@@ -123,6 +124,12 @@ internal fun FlowSearchField(
  * state once from the row. [selectionState] remains separate so multi-select pickers can expose
  * selected and followed at the same time without making the badge look like a selection control.
  * [avatarAnimationKey] lets a stored person picture in [avatarImage] animate under the profile policy.
+ * [avatarDomain] is the worker domain that decodes [avatarUrl], single-use unless the caller names one: a person
+ * row passes [dev.ipf.whitenoise.android.core.AvatarImageLoader.publicProfiles], a group row its presentation's.
+ * [publicKey] is the person's complete canonical npub: when the subtitle, or with [publicKeyInTitle] the nameless
+ * title, displays that key, its own text copies the whole value while the row keeps its action (#3565).
+ * [publicKeyCopyEnabled] defaults to [enabled]; a row that refuses selection can still offer its key for copying,
+ * and then the key takes its own keyboard focus, since the disabled row cannot.
  */
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
@@ -139,13 +146,16 @@ internal fun ContactRow(
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
-    onSubtitleClick: (() -> Unit)? = null,
+    publicKey: String? = null,
+    publicKeyInTitle: Boolean = false,
+    publicKeyCopyEnabled: Boolean = enabled,
     trailing: (@Composable () -> Unit)? = null,
     titleMaxLines: Int = 1,
     groupAnimation: GroupAvatarAnimation? = null,
     secondaryContent: (@Composable () -> Unit)? = null,
+    avatarDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
+        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
 ) {
-    val copyLabel = stringResource(R.string.copy)
     val followedStateDescription =
         if (isFollowed) {
             stringResource(R.string.user_search_you_follow)
@@ -153,6 +163,8 @@ internal fun ContactRow(
             null
         }
     val rowRole = if (selectionState == null) Role.Button else Role.Checkbox
+    // The key takes its own focus stop only when the row offers none, so a selectable row keeps one stop.
+    val keyFocusable = publicKeyCopyEnabled && (onClick == null || !enabled)
     Row(
         modifier =
             modifier
@@ -189,40 +201,37 @@ internal fun ContactRow(
                 picture = avatarImage,
                 animationKey = avatarAnimationKey,
                 groupAnimation = groupAnimation,
+                pictureDomain = avatarDomain,
             )
             if (isFollowed) {
                 FollowedPersonBadge(modifier = Modifier.align(Alignment.BottomEnd))
             }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Dimens.spaceXxs)) {
-            EmojiLabel(
-                title,
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = titleMaxLines,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (subtitle != null) {
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+            if (publicKey != null && publicKeyInTitle) {
+                PublicKeyCopyText(
+                    title,
+                    publicKey,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = titleMaxLines,
+                    enabled = publicKeyCopyEnabled,
+                    keyboardFocusable = keyFocusable,
+                )
+            } else {
+                EmojiLabel(
+                    title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    maxLines = titleMaxLines,
                     overflow = TextOverflow.Ellipsis,
-                    modifier =
-                        if (followedStateDescription != null && subtitle == followedStateDescription) {
-                            Modifier.clearAndSetSemantics { }
-                        } else if (onSubtitleClick == null) {
-                            Modifier
-                        } else {
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable(
-                                    enabled = enabled,
-                                    onClickLabel = copyLabel,
-                                    role = Role.Button,
-                                    onClick = onSubtitleClick,
-                                )
-                        },
+                )
+            }
+            if (subtitle != null) {
+                ContactRowSubtitle(
+                    subtitle,
+                    stateOnly = followedStateDescription != null && subtitle == followedStateDescription,
+                    publicKey = publicKey?.takeUnless { publicKeyInTitle },
+                    enabled = publicKeyCopyEnabled,
+                    keyboardFocusable = keyFocusable,
                 )
             }
             secondaryContent?.invoke()

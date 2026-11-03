@@ -37,6 +37,7 @@ private const val MAX_DECODE_NANOS = 60_000_000_000L
 // Process-owned admission remains held through cleanup, including a blocked native call.
 private val attachmentDecodeGate = Semaphore(1)
 
+/** Streams selected attachment audio through the isolated decoder into the caller-owned PCM consumer. */
 @Suppress("TooGenericExceptionCaught") // Android exposes heterogeneous runtime failures for invalid media.
 internal suspend fun decodeAttachmentPcm(
     file: File,
@@ -82,6 +83,7 @@ private class AttachmentAudioDecoder(
         }
     }
 
+    /** Allocates the bounded PCM conversion buffer owned by the current attachment decode. */
     private fun createBuffer(info: AvStreamInfo): AttachmentPcmBuffer {
         if (!info.hasAudio || info.durationUs > MAX_PCM_DURATION_SECONDS * MICROS_PER_SECOND) {
             throw IOException("Attachment contains no supported audio within the duration limit")
@@ -89,6 +91,10 @@ private class AttachmentAudioDecoder(
         return AttachmentPcmBuffer(info.sampleRate, info.channels)
     }
 
+    /**
+     * Accepts audio or terminal EOF; an unexpected video frame is recycled before the audio-only stream is
+     * refused.
+     */
     private fun audioFrame(frame: AvStreamFrame): AvStreamFrame.Audio? =
         when (frame) {
             is AvStreamFrame.Audio -> frame
@@ -100,6 +106,7 @@ private class AttachmentAudioDecoder(
             AvStreamFrame.VideoEnd -> throw IOException("Unexpected video EOF from an audio-only worker")
         }
 
+    /** Appends the decoded PCM contribution while retaining the conversion state across chunk boundaries. */
     private suspend fun append(
         frame: AvStreamFrame.Audio,
         pcm: AttachmentPcmBuffer,

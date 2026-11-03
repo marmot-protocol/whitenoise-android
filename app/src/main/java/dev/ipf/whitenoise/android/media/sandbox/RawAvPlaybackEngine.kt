@@ -40,6 +40,7 @@ internal class RawAvPlaybackEngine(
     private val externalAudioFocus: Boolean = false,
     private val listener: Listener,
     prepareProbe: (() -> MediaProbe?)? = null,
+    private val observation: RawAvPlaybackObservation? = null,
 ) : AutoCloseable,
     RawAvRenderOwner,
     RawAvPausedPosterOwner {
@@ -129,6 +130,7 @@ internal class RawAvPlaybackEngine(
     private var lastBitmap: Bitmap? = null
     private var lastBitmapRotation = 0
     private var lastBitmapSeek = -1L
+    private var lastBitmapPtsUs = -1L
 
     @Volatile private var redraw = false
 
@@ -139,7 +141,13 @@ internal class RawAvPlaybackEngine(
             firstFrameForOutput = false
             signal.trySend(Unit)
         }
-    private val renderer = RawAvRenderSession(this.context, uri, wantVideo, wantAudio, this)
+    private val renderer = RawAvRenderSession(this.context, uri, wantVideo, wantAudio, this).also { it.observation = observation }
+
+    /** Explicit background instrumentation sampling; no device reads occur when the observer is absent. */
+    fun observeAudio() {
+        observation?.let(renderer::observeAudio)
+    }
+
     private val pausedPoster = RawAvPausedPoster(this.context, uri, scope, this)
     private val focus =
         RawAvAudioFocus(
@@ -691,6 +699,15 @@ internal class RawAvPlaybackEngine(
         rotation: Int,
         activation: Long,
         seek: Long,
+    ): Boolean = frame(bitmap, rotation, activation, seek, -1L)
+
+    /** Adopts the matching frame and retains its media timestamp for optional submission measurements. */
+    override fun frame(
+        bitmap: Bitmap,
+        rotation: Int,
+        activation: Long,
+        seek: Long,
+        timestampUs: Long,
     ): Boolean {
         val accepted =
             synchronized(lock) {
@@ -698,6 +715,7 @@ internal class RawAvPlaybackEngine(
                     false
                 } else {
                     retainFrame(bitmap, rotation)
+                    lastBitmapPtsUs = timestampUs
                     true
                 }
             }
@@ -829,6 +847,7 @@ internal class RawAvPlaybackEngine(
             lastBitmap = bitmap
             lastBitmapRotation = frameRotation
             lastBitmapSeek = seekRevision
+            lastBitmapPtsUs = -1L
         }
         redraw = true
     }
@@ -845,7 +864,30 @@ internal class RawAvPlaybackEngine(
                 redraw = false
                 val rendered =
                     synchronized(frameLock) {
-                        lastBitmap?.let { video.render(it, lastBitmapRotation) } == true
+                        // A seek can supersede adoption before this second engine-lock acquisition.
+                        // Consume stale redraw; a matching new frame or surface event requests its own redraw.
+                        lastBitmap?.takeIf { lastBitmapSeek == seekRevision }?.let {
+                            val probe = observation
+                            if (probe == null) {
+                                video.render(it, lastBitmapRotation)
+                            } else {
+                                val mediaBefore = renderer.positionUs()
+                                val before = android.os.SystemClock.elapsedRealtimeNanos()
+                                val submitted = video.render(it, lastBitmapRotation, probe)
+                                val after = android.os.SystemClock.elapsedRealtimeNanos()
+                                probe.submission(
+                                    activation,
+                                    seekRevision,
+                                    lastBitmapPtsUs,
+                                    mediaBefore,
+                                    renderer.positionUs(),
+                                    before,
+                                    after,
+                                    submitted,
+                                )
+                                submitted
+                            }
+                        } == true
                     }
                 if (rendered && !firstFrameForOutput) {
                     firstFrameForOutput = true

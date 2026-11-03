@@ -29,13 +29,14 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.ManualUnreadDot
+import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.UnreadCountBadge
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
@@ -59,7 +60,10 @@ private val PROFILE_SWITCHER_RELATED_GAP = 8.dp
 internal fun profileSwitcherPresentation(state: AccountSelectorState): List<AccountSelectorAccountState> =
     state.accounts.filter { it.isActive } + state.accounts.filterNot { it.isActive }
 
-/** Shared sheet composition consumes native account snapshots and callbacks without deriving account eligibility. */
+/**
+ * Shared sheet composition consumes native account snapshots and callbacks without deriving account eligibility.
+ * [npub] supplies each account's complete key for its short key's copy target.
+ */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Suppress("LongMethod", "LongParameterList", "FunctionNaming")
 @Composable
@@ -78,6 +82,7 @@ internal fun ProfileSwitcherSheet(
     pendingLabel: String? = null,
     hasUnreadForAccount: (String) -> Boolean = { false },
     actionColorsForAccount: @Composable (String) -> AccountActionColors? = { null },
+    npub: (String) -> String = { "" },
 ) {
     val profiles = profileSwitcherPresentation(state)
     Column(modifier.fillMaxWidth().testTag(ACCOUNT_SELECTOR_CONTENT_TAG)) {
@@ -113,7 +118,12 @@ internal fun ProfileSwitcherSheet(
                         },
                         supportingContent = {
                             Column {
-                                Text(shortNpub(account.accountIdHex), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                // The short key copies the whole key; the rest of the row still switches (#3565).
+                                PublicKeyCopyText(
+                                    shortNpub(account.accountIdHex),
+                                    npub(account.accountIdHex),
+                                    enabled = enabled,
+                                )
                                 if (account.isReadOnly) Text(stringResource(R.string.read_only))
                                 if (account.isSignedOut) Text(stringResource(R.string.signed_out))
                             }
@@ -124,6 +134,7 @@ internal fun ProfileSwitcherSheet(
                                 account.accountIdHex,
                                 size = PROFILE_SWITCHER_AVATAR_SIZE,
                                 pictureUrl = avatarUrl(account.accountIdHex),
+                                pictureDomain = AvatarImageLoader.publicProfiles(),
                             )
                         },
                         trailingContent = {

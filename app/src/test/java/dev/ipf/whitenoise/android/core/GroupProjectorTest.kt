@@ -1072,6 +1072,16 @@ class GroupProjectorTest {
         assertFalse(GroupProjector.ownsGroupPicture(withUrl, selectedAsset = asset, peerSourced = true))
     }
 
+    /** Only an encrypted, hash-pinned group image is member-pinned; a URL, alone or beside a hash, is not (#3373). */
+    @Test
+    fun onlyAnEncryptedGroupImageIsMemberPinned() {
+        val url = "https://img.example/group.png"
+        assertTrue(GroupProjector.pictureIsMemberPinned(group().copy(imageHashHex = "ab")))
+        assertFalse(GroupProjector.pictureIsMemberPinned(group().copy(avatarUrl = url)))
+        assertFalse(GroupProjector.pictureIsMemberPinned(group().copy(avatarUrl = url, imageHashHex = "ab")))
+        assertFalse(GroupProjector.pictureIsMemberPinned(group()))
+    }
+
     private fun member(
         memberId: String,
         account: String?,

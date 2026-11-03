@@ -59,6 +59,15 @@ internal interface RawAvRenderOwner {
         seek: Long,
     ): Boolean
 
+    /** Carries frame PTS without changing existing test owners' four-argument ownership contract. */
+    fun frame(
+        bitmap: Bitmap,
+        rotation: Int,
+        activation: Long,
+        seek: Long,
+        timestampUs: Long,
+    ): Boolean = frame(bitmap, rotation, activation, seek)
+
     /**
      * Offers terminal position in microseconds for the exact activation/seek pair.
      */
@@ -88,6 +97,9 @@ internal class RawAvRenderSession(
     private val owner: RawAvRenderOwner,
     private val pcmFactory: (Int, Int, AudioAttributes) -> RawPcmSink = ::RawPcmOutput,
 ) {
+    /** Set once by the engine before its worker starts; null leaves ordinary playback diagnostics disabled. */
+    var observation: RawAvPlaybackObservation? = null
+
     private val clockLock = Any()
     private var audioAnchorUs = 0L
     private var wallAnchorUs = 0L
@@ -108,6 +120,11 @@ internal class RawAvRenderSession(
 
     @Volatile var appliedSeek = -1L
         private set
+
+    /** Samples only the currently owned real PCM sink, without exposing the device through UI getters. */
+    fun observeAudio(observation: RawAvPlaybackObservation) {
+        synchronized(clockLock) { (pcm as? RawPcmOutput)?.observeAudio(observation, activeRun, appliedSeek) }
+    }
 
     /**
      * Reads media time in microseconds under the clock lock.
@@ -192,6 +209,7 @@ internal class RawAvRenderSession(
             owner.awaitPrepared()
             if (!valid(activation)) return
             selected = IsolatedAvStream.openUri(context, uri, wantVideo, wantAudio)
+            observation?.let { selected?.observeReady(it, activation) }
             stream = selected
             activeRun = activation
             val info = selected.info
@@ -315,7 +333,7 @@ internal class RawAvRenderSession(
                             progress.lastVideoDelta = nextVideo.timestampUs - progress.lastVideoPts
                         }
                         progress.lastVideoPts = nextVideo.timestampUs
-                        val adopted = owner.frame(nextVideo.bitmap, info.rotationDegrees, activation, appliedSeek)
+                        val adopted = owner.frame(nextVideo.bitmap, info.rotationDegrees, activation, appliedSeek, nextVideo.timestampUs)
                         if (!adopted) nextVideo.bitmap.recycle()
                     }
                 } else if (!progress.audioEnded || progress.audio != null) {

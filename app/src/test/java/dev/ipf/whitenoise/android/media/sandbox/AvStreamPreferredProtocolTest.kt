@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class, sdk = [30])
 class AvStreamPreferredProtocolTest {
+    /** Legacy Read Writes Explicit Any Selector And Retains Global Eof Session. */
     @Test
     fun legacyReadWritesExplicitAnySelectorAndRetainsGlobalEofSession() {
         assertEquals("dev.ipf.whitenoise.media.av.stream.v2", AvStreamProtocol.DESCRIPTOR)
@@ -40,6 +41,7 @@ class AvStreamPreferredProtocolTest {
         }
     }
 
+    /** Selected Track Eof Is Strict And Does Not Retire The Other Track. */
     @Test
     fun selectedTrackEofIsStrictAndDoesNotRetireTheOtherTrack() {
         StreamFixture().use { fixture ->
@@ -54,6 +56,7 @@ class AvStreamPreferredProtocolTest {
         }
     }
 
+    /** Any Selector Rejects Both Selected End Kinds And Selected Reads Reject Global End. */
     @Test
     fun anySelectorRejectsBothSelectedEndKindsAndSelectedReadsRejectGlobalEnd() {
         for ((selector, kind) in listOf(0 to 3L, 0 to 4L, 1 to 0L, 2 to 0L, 1 to 4L, 2 to 3L)) {
@@ -67,6 +70,7 @@ class AvStreamPreferredProtocolTest {
         }
     }
 
+    /** Wrong Track Data Is Rejected Before Reading Shared Memory. */
     @Test
     fun wrongTrackDataIsRejectedBeforeReadingSharedMemory() {
         val wrongTracks =
@@ -83,6 +87,7 @@ class AvStreamPreferredProtocolTest {
         }
     }
 
+    /** Selected End Requires Every Other Scalar Zero And Requested Track. */
     @Test
     fun selectedEndRequiresEveryOtherScalarZeroAndRequestedTrack() {
         for (kind in listOf(3L, 4L)) {
@@ -98,6 +103,7 @@ class AvStreamPreferredProtocolTest {
         }
     }
 
+    /** Malformed Wire Count Trailing Data And Oversized Reply Retire The Exact Session. */
     @Test
     fun malformedWireCountTrailingDataAndOversizedReplyRetireTheExactSession() {
         for (mode in listOf("short", "long", "trailing", "oversized", "tuple")) {
@@ -110,6 +116,7 @@ class AvStreamPreferredProtocolTest {
         }
     }
 
+    /** Invalid Or Unrequested Selector Never Reaches The Binder. */
     @Test
     fun invalidOrUnrequestedSelectorNeverReachesTheBinder() {
         for ((video, audio, selector) in listOf(
@@ -126,6 +133,7 @@ class AvStreamPreferredProtocolTest {
         }
     }
 
+    /** Retired Session Cannot Issue Another Preferred Read. */
     @Test
     fun retiredSessionCannotIssueAnotherPreferredRead() {
         StreamFixture().use { fixture ->
@@ -135,6 +143,7 @@ class AvStreamPreferredProtocolTest {
         }
     }
 
+    /** Ready Requires Prior Identity And Refuses Oneway Without Losing Identity. */
     @Test
     fun readyRequiresPriorIdentityAndRefusesOnewayWithoutLosingIdentity() {
         for (flags in listOf(0x10, 0x10 or IBinder.FLAG_ONEWAY)) {
@@ -150,6 +159,7 @@ class AvStreamPreferredProtocolTest {
         }
     }
 
+    /** Identity Refuses Wrong Token Trailing Data And Duplicates Before Ready. */
     @Test
     fun identityRefusesWrongTokenTrailingDataAndDuplicatesBeforeReady() {
         for (mode in listOf("token", "trailing", "fd")) {
@@ -164,6 +174,7 @@ class AvStreamPreferredProtocolTest {
         }
     }
 
+    /** Exact Late Identity After Close Or Account Revocation Only Aids Cleanup And Never Commits Open. */
     @Test
     fun exactLateIdentityAfterCloseOrAccountRevocationOnlyAidsCleanupAndNeverCommitsOpen() {
         for (accountRevoked in listOf(false, true)) {
@@ -179,6 +190,7 @@ class AvStreamPreferredProtocolTest {
         }
     }
 
+    /** Ready From Different Caller Cannot Replace The Input Free Identity. */
     @Test
     fun readyFromDifferentCallerCannotReplaceTheInputFreeIdentity() {
         StreamFixture(ready = false).use { fixture ->
@@ -191,6 +203,7 @@ class AvStreamPreferredProtocolTest {
         }
     }
 
+    /** Binder Throw After Open Commit Retains Sticky Exposure. */
     @Test
     fun binderThrowAfterOpenCommitRetainsStickyExposure() {
         StreamFixture().use { fixture ->
@@ -201,6 +214,7 @@ class AvStreamPreferredProtocolTest {
         }
     }
 
+    /** Only Exact Open Container Refusal With Ready Retains Its Typed Cause. */
     @Test
     fun onlyExactOpenContainerRefusalWithReadyRetainsItsTypedCause() {
         for (mode in listOf("container", "container-token", "container-sequence", "container-trailing")) {
@@ -218,7 +232,7 @@ class AvStreamPreferredProtocolTest {
     }
 
     @Test
-    fun containerStatusOnReadOrBeforeReadyNeverBecomesCacheInvalidationEvidence() {
+    fun containerStatusBeforeReadyOrOpenNeverBecomesCacheInvalidationEvidence() {
         StreamFixture(ready = false).use { fixture ->
             assertTrue(fixture.deliverIdentity(0))
             fixture.replyMode = "container"
@@ -238,6 +252,7 @@ class AvStreamPreferredProtocolTest {
         }
     }
 
+    /** Identify Reply Without Synchronous Identity Cannot Authorize Open. */
     @Test
     fun identifyReplyWithoutSynchronousIdentityCannotAuthorizeOpen() {
         StreamFixture(ready = false).use { fixture ->
@@ -251,11 +266,77 @@ class AvStreamPreferredProtocolTest {
         }
     }
 
+    /** READ invalidation needs a prior OPEN exposure and the exact admitted endpoint tuple. */
+    @Test
+    fun onlyExactReadContainerRefusalAfterOpenRetainsItsTypedCause() {
+        for (mode in listOf("container", "container-token", "container-sequence", "container-trailing")) {
+            StreamFixture(ready = false).use { fixture ->
+                assertTrue(fixture.deliverIdentity(0))
+                assertTrue(fixture.deliverReady(0))
+                assertTrue(fixture.lifetime.commitOpen())
+                fixture.replyMode = mode
+                val failure = fixture.transactionFailure(AvStreamProtocol.READ)
+                assertTrue(failure is IOException)
+                assertEquals(mode == "container", hasContainerCause(failure))
+                assertTrue(fixture.lifetime.openMayHaveBeenDelivered)
+            }
+        }
+    }
+
+    /** A late trusted endpoint can provide its PID before retirement without receiving OPEN or any FD. */
+    @Test
+    fun lateUnexposedConnectionIdentifiesBeforeRetiring() {
+        StreamFixture(ready = false, retirementIdentity = true, pendingBinding = true).use { fixture ->
+            fixture.closeAndDrainBeforeConnecting()
+            assertTrue(fixture.awaitRetire())
+            assertEquals(
+                listOf(AvStreamProtocol.IDENTIFY, AvStreamProtocol.RETIRE),
+                fixture.retirementTransactions.toList(),
+            )
+            assertTrue(fixture.identityCalibrated())
+            assertFalse(fixture.lifetime.openMayHaveBeenDelivered)
+            assertEquals(null, fixture.stream.isolation)
+            fixture.finishRetiredBinding()
+        }
+    }
+
+    /** Failure of cleanup-only identity cannot skip RETIRE or invent a process identity. */
+    @Test
+    fun refusedLateIdentityStillRetiresWithoutInventingWitness() {
+        StreamFixture(ready = false, pendingBinding = true).use { fixture ->
+            fixture.replyMode = "retirement-identity-refused"
+            fixture.closeAndDrainBeforeConnecting()
+            assertTrue(fixture.awaitRetire())
+            assertEquals(
+                listOf(AvStreamProtocol.IDENTIFY, AvStreamProtocol.RETIRE),
+                fixture.retirementTransactions.toList(),
+            )
+            assertFalse(fixture.identityCalibrated())
+            assertFalse(fixture.lifetime.openMayHaveBeenDelivered)
+            assertFalse(fixture.lifetime.releasable())
+        }
+    }
+
+    /** A possibly exposed endpoint stays on the existing immediate-retirement path. */
+    @Test
+    fun possibleOpenExposureNeverTriggersCleanupIdentification() {
+        StreamFixture(ready = false).use { fixture ->
+            assertTrue(fixture.lifetime.commitOpen())
+            fixture.connectAfterClose()
+            assertTrue(fixture.awaitRetire())
+            assertEquals(listOf(AvStreamProtocol.RETIRE), fixture.retirementTransactions.toList())
+            assertFalse(fixture.identityCalibrated())
+            assertTrue(fixture.lifetime.openMayHaveBeenDelivered)
+        }
+    }
+
+    /** Inspects the causal chain for the typed container failure used by cache invalidation policy. */
     private fun hasContainerCause(failure: Throwable?): Boolean {
         val causes = generateSequence(failure) { it.cause }.take(8)
         return causes.any { it is RawContainerFailure }
     }
 
+    /** Exercises a malformed read reply and returns the resulting failure for precise policy assertions. */
     private fun readFailure(action: () -> AvStreamFrame): Throwable? {
         val failure = runCatching(action).exceptionOrNull()
         assertTrue("Expected a completed caller RPC failure, not a test deadline", failure is ExecutionException)
@@ -267,9 +348,18 @@ class AvStreamPreferredProtocolTest {
         video: Boolean = true,
         audio: Boolean = true,
         ready: Boolean = true,
+        private val retirementIdentity: Boolean = false,
+        private val pendingBinding: Boolean = false,
     ) : AutoCloseable {
         val selectors = CopyOnWriteArrayList<Int>()
         val transactions = CopyOnWriteArrayList<Int>()
+        val retirementTransactions = CopyOnWriteArrayList<Int>()
+        private val retired = CountDownLatch(1)
+        private val forgotten = AtomicBoolean()
+        private val unbindCalls =
+            java.util.concurrent.atomic
+                .AtomicInteger()
+        private val workerGone = AtomicBoolean()
         var values = LongArray(7)
         var replyMode = "valid"
         private val caller = Executors.newSingleThreadExecutor()
@@ -281,7 +371,8 @@ class AvStreamPreferredProtocolTest {
         private val pid = android.os.Process.myPid() + 1
         private val witness =
             KernelProcessWitness { _, _ ->
-                throw android.system.ErrnoException("kill", android.system.OsConstants.EPERM)
+                val error = if (workerGone.get()) android.system.OsConstants.ESRCH else android.system.OsConstants.EPERM
+                throw android.system.ErrnoException("kill", error)
             }
 
         init {
@@ -294,21 +385,30 @@ class AvStreamPreferredProtocolTest {
                 IsolatedAvStream::class.java.declaredConstructors
                     .single { it.parameterCount == 6 }
                     .apply { isAccessible = true }
-            val context = ApplicationProvider.getApplicationContext<Context>()
+            val context =
+                object : android.content.ContextWrapper(ApplicationProvider.getApplicationContext<Context>()) {
+                    /** Models dispatcher forget so a queued late callback cannot bypass successful unbind. */
+                    override fun unbindService(conn: android.content.ServiceConnection) {
+                        // Android's ServiceDispatcher drops all later callbacks once it is forgotten.
+                        unbindCalls.incrementAndGet()
+                        forgotten.set(true)
+                    }
+                }
             stream = constructor.newInstance(context, video, audio, 1, epoch, AvStreamLane.Analysis) as IsolatedAvStream
             lifetime = field(stream, "lifetime") as AvStreamLifetime
-            // This fixture created no AMS binding; preserve normal cleanup without asserting kernel death.
-            lifetime.neverBound()
+            // Pending mode models an accepted dispatcher registration; no actual AMS worker is started.
+            if (pendingBinding) lifetime.bindCompleted(true) else lifetime.neverBound()
             if (ready) {
                 setField("readyIdentity", uid to pid)
                 setField("identity", uid to pid)
             }
             setField("processWitness", witness)
-            setField("deathRegistered", true)
-            setField("endpoint", endpoint())
+            setField("deathRegistered", !pendingBinding)
+            setField("endpoint", if (pendingBinding) null else endpoint())
             assertSame(stream, admissions.reserve(AvStreamLane.Analysis, epoch) { stream })
         }
 
+        /** Creates the scripted Binder endpoint used to control protocol reply ordering and identity. */
         private fun endpoint(): Binder =
             object : Binder() {
                 @Suppress("ReturnCount") // Each simulated reply mode terminates at its exact protocol boundary.
@@ -318,7 +418,24 @@ class AvStreamPreferredProtocolTest {
                     reply: Parcel?,
                     flags: Int,
                 ): Boolean {
-                    if (code == AvStreamProtocol.RETIRE) return true
+                    if (code == AvStreamProtocol.RETIRE) {
+                        retirementTransactions += code
+                        retired.countDown()
+                        return true
+                    }
+                    if (code == AvStreamProtocol.IDENTIFY && lifetime.closed) {
+                        retirementTransactions += code
+                        assertFalse(data.hasFileDescriptors())
+                        data.enforceInterface(AvStreamProtocol.DESCRIPTOR)
+                        val tuple = AvStreamProtocol.readTuple(data)
+                        assertEquals(1L, tuple.second)
+                        assertSame(field(stream, "readyCallback"), data.readStrongBinder())
+                        assertEquals(0, data.dataAvail())
+                        if (replyMode == "retirement-identity-refused") throw android.os.DeadObjectException()
+                        if (retirementIdentity) assertTrue(deliverIdentity(0))
+                        checkNotNull(reply).writeInt(0)
+                        return true
+                    }
                     transactions += code
                     if (code == AvStreamProtocol.OPEN && replyMode == "valid") throw android.os.DeadObjectException()
                     assertTrue(code in listOf(AvStreamProtocol.OPEN, AvStreamProtocol.IDENTIFY, AvStreamProtocol.READ))
@@ -360,22 +477,91 @@ class AvStreamPreferredProtocolTest {
                 }
             }
 
+        /** Delivers the real ServiceConnection callback after close using this fixture's input-free Binder. */
+        fun connectAfterClose() {
+            lifetime.beginCall() // Model the startup caller while its late connection callback arrives.
+            try {
+                setField("endpoint", null)
+                setField("deathRegistered", false)
+                stream.close()
+                val connection = field(stream, "connection") as android.content.ServiceConnection
+                connection.onServiceConnected(android.content.ComponentName("test", "worker"), endpoint())
+            } finally {
+                lifetime.endCall()
+                stream.close()
+            }
+        }
+
+        /** Drains real cleanup before a queued framework callback, rejecting any premature dispatcher forget. */
+        fun closeAndDrainBeforeConnecting() {
+            check(pendingBinding)
+            stream.close()
+            val callbacks = field(stream, "callbacks") as HandlerThread
+            shadowOf(callbacks.looper).idleFor(Duration.ofMillis(50))
+            assertEquals("Closing a pending accepted bind must retain its late callback", 0, unbindCalls.get())
+            val connection = field(stream, "connection") as android.content.ServiceConnection
+            val callbackHandler = field(stream, "callbackHandler") as android.os.Handler
+            callbackHandler.post {
+                if (!forgotten.get()) {
+                    connection.onServiceConnected(android.content.ComponentName("test", "worker"), endpoint())
+                }
+            }
+            shadowOf(callbacks.looper).idleFor(Duration.ofMillis(50))
+        }
+
+        /** Supplies a fake calibrated exit only after IDENTIFY and RETIRE, then requires exactly one unbind. */
+        fun finishRetiredBinding() {
+            assertTrue(identityCalibrated())
+            val retirement = field(stream, "retirement") as java.util.concurrent.ExecutorService
+            retirement.submit(Runnable {}).get(2, TimeUnit.SECONDS)
+            workerGone.set(true)
+            stream.close()
+            val released = field(stream, "released") as CountDownLatch
+            val callbacks = field(stream, "callbacks") as HandlerThread
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+            while (released.count != 0L && System.nanoTime() < deadline) {
+                try {
+                    shadowOf(callbacks.looper).idleFor(Duration.ofMillis(50))
+                } catch (failure: IllegalStateException) {
+                    // Accept a quit race only if real cleanup already won and its release ACK arrives.
+                    val cleaned = field(stream, "cleaned") as AtomicBoolean
+                    val remaining = deadline - System.nanoTime()
+                    if (!cleaned.get() || remaining <= 0 || !released.await(remaining, TimeUnit.NANOSECONDS)) {
+                        throw failure
+                    }
+                }
+                released.await(5, TimeUnit.MILLISECONDS)
+            }
+            assertEquals("Calibrated late-worker exit must complete the real release", 0L, released.count)
+            assertEquals(1, unbindCalls.get())
+        }
+
+        fun awaitRetire(): Boolean = retired.await(2, TimeUnit.SECONDS)
+
+        /** Invalidates the fixture account epoch while preserving the prior worker witness. */
         fun revokeAccount() {
             assertTrue(admissions.invalidateAll().any { it === stream })
         }
 
+        /** Checks whether the fixture has established the exact worker identity before descriptor admission. */
         fun identityCalibrated(): Boolean = witness.acceptsCaller(uid, pid)
 
+        /** Delivers the scripted READY callback through the same Binder admission path as the worker. */
         fun deliverReady(
             flags: Int,
             mode: String = "valid",
         ): Boolean = deliverCallback(AvStreamProtocol.READY, flags, mode)
 
+        /** Delivers the scripted identity callback with the selected caller UID/PID and transaction flags. */
         fun deliverIdentity(
             flags: Int,
             mode: String = "valid",
         ): Boolean = deliverCallback(AvStreamProtocol.IDENTITY, flags, mode)
 
+        /**
+         * Runs the scripted callback transaction so malformed or stale replies exercise the real decoder
+         * boundary.
+         */
         private fun deliverCallback(
             code: Int,
             flags: Int,
@@ -436,6 +622,7 @@ class AvStreamPreferredProtocolTest {
                     }
                 }.get(2, TimeUnit.SECONDS)
 
+        /** Models a failure after OPEN exposure commits, retaining the sticky descriptor-delivery uncertainty. */
         fun openFailureAfterCommit(): Throwable? =
             runCatching {
                 caller
@@ -454,6 +641,8 @@ class AvStreamPreferredProtocolTest {
                 }.get(2, TimeUnit.SECONDS)
 
         override fun close() {
+            // Cleanup-only fixture proof: this test never created an actual AMS process.
+            if (pendingBinding) lifetime.processGoneObserved()
             stream.close()
             caller.shutdownNow()
             val released = field(stream, "released") as CountDownLatch
@@ -476,9 +665,13 @@ class AvStreamPreferredProtocolTest {
             assertEquals(null, admissions.current(AvStreamLane.Analysis, admissions.epoch()))
         }
 
+        /**
+         * Installs controlled fixture state through reflection; production visibility and synchronization stay
+         * unchanged.
+         */
         private fun setField(
             name: String,
-            value: Any,
+            value: Any?,
         ) {
             IsolatedAvStream::class.java
                 .getDeclaredField(name)
@@ -486,6 +679,10 @@ class AvStreamPreferredProtocolTest {
                 .set(stream, value)
         }
 
+        /**
+         * Reads a private fixture field so assertions can inspect the exact owner rather than a replacement
+         * instance.
+         */
         private fun field(
             owner: IsolatedAvStream?,
             name: String,

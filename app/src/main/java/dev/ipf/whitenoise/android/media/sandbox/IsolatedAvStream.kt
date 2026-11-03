@@ -99,6 +99,16 @@ internal class IsolatedAvStream private constructor(
     @Volatile var isolation: WorkerIsolation? = null
         private set
 
+    /** Exports only authenticated READY scalars for an explicitly enabled diagnostic observer. */
+    fun observeReady(
+        observation: RawAvPlaybackObservation,
+        activation: Long,
+    ) {
+        synchronized(stateLock) {
+            readyIdentity?.let { observation.worker(activation, it.first, it.second, SystemClock.elapsedRealtimeNanos()) }
+        }
+    }
+
     val info: AvStreamInfo get() = checkNotNull(sessionInfo)
 
     private val death =
@@ -280,8 +290,9 @@ internal class IsolatedAvStream private constructor(
 
     /** Revokes operations and starts independent retirement/cleanup without waiting for codec RPC. */
     private fun unavailable() {
-        // Disconnect/null callbacks are availability information, not an exact endpoint death witness.
+        // A terminal binding callback permits unbind, not process-credit release without kernel evidence.
         lifetime.close()
+        lifetime.bindingUnavailable()
         connected.countDown()
         retire()
         finishIfPossible()
@@ -417,11 +428,8 @@ internal class IsolatedAvStream private constructor(
         }
 
     /**
-
      * Serializes caller work and rejects stale-account publication while retaining all in-flight
-
      * cleanup credits.
-
      */
     @Suppress("TooGenericExceptionCaught", "ThrowsCount") // Every failed IPC/copy revokes this capability.
     private fun <T> call(action: () -> T): T {
@@ -453,8 +461,8 @@ internal class IsolatedAvStream private constructor(
         }
     }
 
+    /** One RPC owns tuple validation, deadline, parcel recycling and its lifetime credit on every failure. */
     @Suppress("CyclomaticComplexMethod", "ThrowsCount", "TooGenericExceptionCaught", "LongMethod")
-    // One RPC owns tuple validation, deadline, parcel recycling and its lifetime credit on every failure.
     private fun transact(
         code: Int,
         resultCount: Int,
@@ -492,11 +500,18 @@ internal class IsolatedAvStream private constructor(
                         require(reply.dataSize() <= AvStreamProtocol.MAX_REPLY_BYTES && !reply.hasFileDescriptors())
                         val status = reply.readInt()
                         if (status != 0) {
-                            if (code == AvStreamProtocol.OPEN && status == AvStreamProtocol.CONTAINER_MALFORMED) {
+                            if (code in setOf(AvStreamProtocol.OPEN, AvStreamProtocol.READ) &&
+                                status == AvStreamProtocol.CONTAINER_MALFORMED
+                            ) {
                                 val refused = AvStreamProtocol.readTuple(reply)
                                 require(refused.first == token && refused.second == request && reply.dataAvail() == 0)
                                 synchronized(stateLock) {
-                                    require(endpoint === remote && readyIdentity != null && !lifetime.closed)
+                                    require(
+                                        endpoint === remote &&
+                                            readyIdentity != null &&
+                                            !lifetime.closed &&
+                                            lifetime.openMayHaveBeenDelivered,
+                                    )
                                     require(admissions.isCurrent(lane, ownerEpoch, this))
                                 }
                                 throw RawContainerFailure()
@@ -558,14 +573,27 @@ internal class IsolatedAvStream private constructor(
     }
 
     /**
-
      * Revokes source acquisition and records uncertain parent cleanup instead of dropping its
-
      * resource credit.
-
      */
     private fun closeSources() {
         runCatching { sources.close() }.onFailure { parentResources.uncertain() }
+    }
+
+    /** Sends only the existing input-free identity request; its callback may establish retirement evidence. */
+    private fun identifyForRetirement(remote: IBinder) {
+        val data = Parcel.obtain()
+        val reply = Parcel.obtain()
+        try {
+            data.writeInterfaceToken(AvStreamProtocol.DESCRIPTOR)
+            AvStreamProtocol.writeTuple(data, token, 1L)
+            data.writeStrongBinder(readyCallback)
+            remote.transact(AvStreamProtocol.IDENTIFY, data, reply, 0)
+            // No reply grants admission: only the authenticated callback may supply the PID witness.
+        } finally {
+            reply.recycle()
+            data.recycle()
+        }
     }
 
     /** Uses an independent executor so blocked codec work cannot queue ahead of the termination request. */
@@ -578,14 +606,24 @@ internal class IsolatedAvStream private constructor(
             }
         try {
             retirement.execute {
-                val data = Parcel.obtain()
                 try {
-                    data.writeInterfaceToken(AvStreamProtocol.DESCRIPTOR)
-                    remote.transact(AvStreamProtocol.RETIRE, data, null, IBinder.FLAG_ONEWAY)
+                    if (identity == null && !lifetime.openMayHaveBeenDelivered) {
+                        try {
+                            identifyForRetirement(remote)
+                        } catch (_: Exception) {
+                            // Failed identification supplies no absence proof; still request retirement.
+                        }
+                    }
+                    val data = Parcel.obtain()
+                    try {
+                        data.writeInterfaceToken(AvStreamProtocol.DESCRIPTOR)
+                        remote.transact(AvStreamProtocol.RETIRE, data, null, IBinder.FLAG_ONEWAY)
+                    } finally {
+                        data.recycle()
+                    }
                 } catch (_: android.os.RemoteException) {
                     // Endpoint loss is not a process-absence acknowledgement.
                 } finally {
-                    data.recycle()
                     lifetime.endRetirement()
                     finishIfPossible()
                 }
@@ -596,11 +634,8 @@ internal class IsolatedAvStream private constructor(
     }
 
     /**
-
      * Releases admission only after process absence, connection cleanup, settled work and parent
-
      * resource closure.
-
      */
     @Suppress("TooGenericExceptionCaught") // Each selected capability is closed once before admission release.
     private fun finishIfPossible() {

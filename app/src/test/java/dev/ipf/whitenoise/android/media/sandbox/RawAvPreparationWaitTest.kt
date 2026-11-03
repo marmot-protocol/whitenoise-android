@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class, sdk = [36])
 class RawAvPreparationWaitTest {
+    /** Selected Render Activation Held Before Wait Cannot Prepare Or Open After Stop. */
     @Test
     fun selectedRenderActivationHeldBeforeWaitCannotPrepareOrOpenAfterStop() {
         val context = RuntimeEnvironment.getApplication()
@@ -75,6 +76,10 @@ class RawAvPreparationWaitTest {
         }
     }
 
+    /**
+     * Queued Paused Seek Held Before Wait Cannot Restart Stopped Preparation And Producer Still Accepts Later
+     * Targets.
+     */
     @Test
     fun queuedPausedSeekHeldBeforeWaitCannotRestartStoppedPreparationAndProducerStillAcceptsLaterTargets() {
         val context = RuntimeEnvironment.getApplication()
@@ -135,6 +140,7 @@ class RawAvPreparationWaitTest {
         }
     }
 
+    /** Seek Before First Prepare Waits For The Same Promise Until An Explicit Control Admits It. */
     @Test
     fun seekBeforeFirstPrepareWaitsForTheSamePromiseUntilAnExplicitControlAdmitsIt() {
         val context = RuntimeEnvironment.getApplication()
@@ -206,6 +212,10 @@ class RawAvPreparationWaitTest {
         )
     }
 
+    /**
+     * Reads a private fixture field so assertions can inspect the exact owner rather than a replacement
+     * instance.
+     */
     private fun field(
         target: Any,
         name: String,
@@ -215,6 +225,10 @@ class RawAvPreparationWaitTest {
             it.get(target)
         }
 
+    /**
+     * Installs controlled fixture state through reflection; production visibility and synchronization stay
+     * unchanged.
+     */
     private fun setField(
         target: Any,
         name: String,

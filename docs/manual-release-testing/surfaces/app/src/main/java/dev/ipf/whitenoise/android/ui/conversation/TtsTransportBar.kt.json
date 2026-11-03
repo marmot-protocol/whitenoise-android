@@ -1,0 +1,136 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+  "legacy_sha256": "48ffed0ba25673e99d4d8b3069140a97037cc27202df843d91e2e52bac0630fd",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "TTS transport error label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "R.string.tts_bar_error",
+        "test_ids": [
+          "TTS-001",
+          "TTS-004"
+        ]
+      },
+      {
+        "surface": "TTS transport preparing label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "R.string.tts_bar_preparing",
+        "test_ids": [
+          "TTS-001",
+          "TTS-004"
+        ]
+      },
+      {
+        "surface": "TTS transport remaining-time label",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "ttsRemainingLabel(resources, remainingSeconds)",
+        "test_ids": [
+          "TTS-001",
+          "TTS-004"
+        ]
+      },
+      {
+        "surface": "HistoryEdgeStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "fun HistoryEdgeStatus(",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "TtsTransportBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "fun TtsTransportBar(",
+        "test_ids": [
+          "TTS-001",
+          "TTS-004"
+        ]
+      },
+      {
+        "surface": "TtsTransportBarContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "fun TtsTransportBarContent(",
+        "test_ids": [
+          "TTS-001",
+          "TTS-004"
+        ]
+      },
+      {
+        "surface": "TtsTransportProgress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "fun TtsTransportProgress(",
+        "test_ids": [
+          "TTS-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.tts_bar_next_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "R.string.tts_bar_next_message",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "R.string.tts_bar_pause",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "R.string.tts_bar_pause",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "R.string.tts_bar_play",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "R.string.tts_bar_play",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "R.string.tts_bar_previous_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "R.string.tts_bar_previous_message",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "R.string.tts_bar_return_to_source",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "R.string.tts_bar_return_to_source",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "R.string.tts_bar_skip_next",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "R.string.tts_bar_skip_next",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "R.string.tts_bar_skip_previous",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "R.string.tts_bar_skip_previous",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "R.string.tts_bar_stop",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsTransportBar.kt",
+        "anchor": "R.string.tts_bar_stop",
+        "test_ids": [
+          "TTS-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

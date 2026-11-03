@@ -8,8 +8,14 @@ internal class RawOutputFailure(
     cause: Throwable? = null,
 ) : IOException(message, cause)
 
-/** Coarse OPEN-only invalid-container refusal; MDK remains the cache invalidation owner. */
+/** Coarse demuxer invalid-container refusal from OPEN or READ; MDK owns cache invalidation. */
 internal class RawContainerFailure : IOException("Selected media container is malformed")
+
+/** Converts only the native demuxer INVALIDDATA marker; all other layouts retain normal validation. */
+internal fun checkedNativeRead(values: LongArray): LongArray {
+    if (values.size == 1 && values[0] == -1L) throw RawContainerFailure()
+    return values
+}
 
 /** Reservation failed before this request acquired or handed off any source descriptor. */
 internal class MediaAdmissionFailure(

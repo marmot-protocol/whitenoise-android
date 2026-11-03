@@ -14,6 +14,7 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(application = android.app.Application::class)
 class KernelProcessWitnessTest {
+    /** Only Calibrated Esrch Releases The Exact Process. */
     @Test
     fun onlyCalibratedEsrchReleasesTheExactProcess() {
         var errno = OsConstants.EPERM
@@ -40,6 +41,7 @@ class KernelProcessWitnessTest {
         assertFalse(witness.admit(102, 202))
     }
 
+    /** Calibration Refuses Vendor Always Esrch And Unknown Syscalls. */
     @Test
     fun calibrationRefusesVendorAlwaysEsrchAndUnknownSyscalls() {
         for (errno in listOf(OsConstants.ESRCH, OsConstants.ENOSYS, OsConstants.EINVAL)) {
@@ -50,6 +52,7 @@ class KernelProcessWitnessTest {
         }
     }
 
+    /** Invalid And Own Identities Never Invoke A Kernel Signal. */
     @Test
     fun invalidAndOwnIdentitiesNeverInvokeAKernelSignal() {
         var calls = 0
@@ -61,6 +64,7 @@ class KernelProcessWitnessTest {
         assertFalse(witness.confirmedGone())
     }
 
+    /** Binder Death And Account Replacement Wait For Kernel Absence And Cleanup. */
     @Test
     fun binderDeathAndAccountReplacementWaitForKernelAbsenceAndCleanup() {
         var alive = true

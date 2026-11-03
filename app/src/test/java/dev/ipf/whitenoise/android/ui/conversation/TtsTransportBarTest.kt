@@ -124,6 +124,49 @@ class TtsTransportBarTest {
             .assertIsDisplayed()
     }
 
+    /** A multi-minute estimate reads as minutes and seconds, and TalkBack hears it in words (#3563). */
+    @Test
+    fun multiMinuteEstimateShowsMinutesAndSecondsWithASpokenDescription() {
+        renderBar(
+            state = speakingTts(4, 20, 1, 12, "Preview", sentenceIndex = 2, sentenceCount = 8),
+            remainingSeconds = 312,
+        )
+
+        composeRule.onNodeWithText("~5m 12s left").assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("About 5 minutes 12 seconds remaining").assertIsDisplayed()
+        composeRule.onNodeWithText("~312s left").assertDoesNotExist()
+    }
+
+    /** Error and Preparing labels still replace the estimate, however long it is. */
+    @Test
+    fun errorAndPreparingLabelsTakePrecedenceOverAMultiMinuteEstimate() {
+        var state: TtsState by mutableStateOf(errorTts(TtsError.Synthesis, 2, 4, 1, 3, "Preview"))
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) {
+                TtsTransportBarContent(
+                    state = state,
+                    rateOverride = 1.0f,
+                    activeRate = 1.0f,
+                    onPause = {},
+                    onResume = {},
+                    onPreviousSentence = {},
+                    onNextSentence = {},
+                    onPreviousMessage = {},
+                    onNextMessage = {},
+                    onRateSelected = {},
+                    onStop = {},
+                    remainingSeconds = 312,
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(label(R.string.tts_bar_error)).assertIsDisplayed()
+        composeRule.onNodeWithText("~5m 12s left").assertDoesNotExist()
+        state = TtsState.Preparing(speakingTts(4, 20, 1, 12, "Preview", sentenceIndex = 2, sentenceCount = 8))
+        composeRule.onNodeWithText(label(R.string.tts_bar_preparing)).assertIsDisplayed()
+        composeRule.onNodeWithText("~5m 12s left").assertDoesNotExist()
+    }
+
     @Test
     fun progressAnimationFramesAreHiddenFromAccessibility() {
         renderBar(
@@ -476,6 +519,7 @@ class TtsTransportBarTest {
         onStop: () -> Unit = {},
         historyEdge: TtsHistoryEdgeState? = null,
         onBodyClick: (() -> Unit)? = null,
+        remainingSeconds: Int = 12,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false, fontScale = fontScale) {
@@ -491,7 +535,7 @@ class TtsTransportBarTest {
                     onNextMessage = onNextMessage,
                     onRateSelected = onRateSelected,
                     onStop = onStop,
-                    remainingSeconds = 12,
+                    remainingSeconds = remainingSeconds,
                     modifier = Modifier.width(barWidth.dp).testTag(BAR_TAG),
                     historyEdge = historyEdge,
                     onBodyClick = onBodyClick,

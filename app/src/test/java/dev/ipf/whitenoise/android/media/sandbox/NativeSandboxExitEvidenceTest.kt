@@ -11,12 +11,14 @@ class NativeSandboxExitEvidenceTest {
     private val started = 1793519360000L
     private val ended = 1793519380000L
 
+    /** Exact Kernel Signal Records Cover Kill And Fatal Syscall. */
     @Test
     fun exactKernelSignalRecordsCoverKillAndFatalSyscall() {
         assertTrue(NativeSandboxExitEvidence.matches(killed, 7941, 9, started, ended))
         assertTrue(NativeSandboxExitEvidence.matches(syscall, 7979, 31, started, ended))
     }
 
+    /** Another Worker Signal Or Time Cannot Qualify This Probe. */
     @Test
     fun anotherWorkerSignalOrTimeCannotQualifyThisProbe() {
         assertFalse(NativeSandboxExitEvidence.matches(killed, 7979, 9, started, ended))
@@ -26,6 +28,7 @@ class NativeSandboxExitEvidenceTest {
         assertFalse(NativeSandboxExitEvidence.matches(killed, 7941, 9, ended, started))
     }
 
+    /** Malformed Other Tags And Unbounded Output Are Not Signal Evidence. */
     @Test
     fun malformedOtherTagsAndUnboundedOutputAreNotSignalEvidence() {
         for (output in listOf(
