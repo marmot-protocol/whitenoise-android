@@ -61,17 +61,24 @@ internal fun conversationAppendedRows(
  * beginning, not the latest arrival, gets the reading start. The rows belong to the scroll intent they were admitted
  * under, so a drag, a navigation or any other settled intent change since then discards them. An own row in the burst
  * is the reader's accepted send, which keeps the established tail reveal, so it retires the incoming landing as well.
+ *
+ * A cancelled landing may already have seen an oversized row at the tail. Later short arrivals can push that row out
+ * of the layout, where it can no longer be measured, so the burst keeps [oversizedSeen] alongside its rows.
  */
 internal class ConversationIncomingAppendLandingQueue {
     private var pending: List<ConversationIncomingAppendCandidate> = emptyList()
     private var intentRevision: Long? = null
+
+    /** True once a decision over this burst measured an oversized row at the tail, even if it was later cancelled. */
+    var oversizedSeen: Boolean = false
+        private set
 
     /** Adds [appended] to the burst still pending under [intent] and returns every incoming row to decide over. */
     fun admit(
         appended: List<ConversationAppendedRow>,
         intent: ConversationScrollIntentToken,
     ): List<ConversationIncomingAppendCandidate> {
-        if (intent.revision != intentRevision) pending = emptyList()
+        if (intent.revision != intentRevision || appended.any { it.mine }) clear()
         intentRevision = intent.revision
         pending =
             if (appended.any { it.mine }) {
@@ -83,10 +90,21 @@ internal class ConversationIncomingAppendLandingQueue {
         return pending
     }
 
+    /** Records that a decision over the pending burst measured an oversized row at the tail. */
+    fun markOversized() {
+        if (pending.isNotEmpty()) oversizedSeen = true
+    }
+
     /** Forgets the burst once an append has reached a decision, completed or superseded. */
     fun retire() {
-        pending = emptyList()
+        clear()
         intentRevision = null
+    }
+
+    /** Drops the pending rows and what was seen of them. */
+    private fun clear() {
+        pending = emptyList()
+        oversizedSeen = false
     }
 }
 
@@ -104,11 +122,17 @@ internal class ConversationIncomingAppendLandingQueue {
  * newer command supersedes it before a stale correction can be written. Only a reader who was following the tail is
  * moved, and a history reader is left exactly where they are. [probeFor] resolves each row by message identity on
  * every read, so paging or structural rows that move its index cannot misplace the landing.
+ *
+ * [oversizedSeen] carries an oversized row an earlier, cancelled decision over the same burst measured, and
+ * [onOversized] reports one this decision measures before it starts placing, so a cancellation cannot lose it.
  */
+@Suppress("LongParameterList") // The burst, its probes and tail, plus the frame source and the burst's observation.
 internal suspend fun ConversationScrollCoordinator.followAppendOrRevealIncomingStart(
     candidates: List<ConversationIncomingAppendCandidate>,
     probeFor: (ConversationIncomingAppendCandidate) -> ConversationReadingStartProbe,
     resolveTailIndex: () -> Int,
+    oversizedSeen: Boolean = false,
+    onOversized: () -> Unit = {},
     maxMeasureFrames: Int = INCOMING_APPEND_MEASURE_FRAMES,
     awaitFrame: suspend () -> Unit = { withFrameNanos { } },
 ): ConversationIncomingAppendOutcome {
@@ -124,7 +148,8 @@ internal suspend fun ConversationScrollCoordinator.followAppendOrRevealIncomingS
         ) {
             awaitFrame()
             scrollToTail(resolveTailIndex())
-            val target = awaitHiddenIncomingStart(candidates, probeFor, maxMeasureFrames, awaitFrame)
+            val target =
+                awaitHiddenIncomingStart(candidates, probeFor, maxMeasureFrames, awaitFrame, oversizedSeen, onOversized)
             if (target != null) {
                 val placement =
                     placeReadingStart(
@@ -163,9 +188,10 @@ private fun ConversationScrollCoordinator.settleRevealedReadingStart(
 /**
  * Waits at most [maxFrames] frames for the newest appended row still in the timeline to be measured after the tail
  * write, then returns the oldest appended row whose beginning that write left above the clear reading viewport — but
- * only when a row laid out in that same tail layout is oversized. A burst of rows that each fit keeps tail following,
- * however far it overflows the viewport in total, so a catch-up of short messages behaves exactly as it always has and
- * no extra write is made for it.
+ * only when a row laid out in that same tail layout is oversized, or [oversizedSeen] says an earlier, cancelled
+ * decision over the burst measured one, which [onOversized] records. A burst of rows that each fit keeps tail
+ * following, however far it overflows the viewport in total, so a catch-up of short messages behaves exactly as it
+ * always has and no extra write is made for it.
  *
  * The newest row sits at the tail that was just written, so once it is measured the layout pass is complete. An older
  * row of the burst that is not laid out by then was pushed past the far edge by newer rows, so its beginning is hidden
@@ -175,22 +201,26 @@ private fun ConversationScrollCoordinator.settleRevealedReadingStart(
  * composer's overlap, so the keyboard is not subtracted a second time.
  *
  * Only the tail layout is consulted, never a measuring scroll, so a row that is not laid out never counts as oversized.
- * Known limit: an oversized row hidden entirely behind newer rows that each fit and together fill the viewport (a tall
- * message followed by several short ones, or by one that fills the screen) is not detected, and that burst keeps the
- * tail.
+ * Known limit: an oversized row that no decision over the burst saw at the tail, because it arrived together with newer
+ * rows that each fit and together fill the viewport (a tall message followed by several short ones, or by one that
+ * fills the screen), is not detected, and that burst keeps the tail.
  */
 private suspend fun awaitHiddenIncomingStart(
     candidates: List<ConversationIncomingAppendCandidate>,
     probeFor: (ConversationIncomingAppendCandidate) -> ConversationReadingStartProbe,
     maxFrames: Int,
     awaitFrame: suspend () -> Unit,
+    oversizedSeen: Boolean,
+    onOversized: () -> Unit,
 ): ConversationIncomingAppendCandidate? {
     val layouts = awaitTailLayouts(candidates, probeFor, maxFrames, awaitFrame).orEmpty()
     // Rows below the newest message (a pending membership row, a load error) are not part of the burst, but they
     // take space from it, so an arrival that fits the viewport alone can still have its beginning clipped.
     val trailingPx = layouts.lastOrNull { it?.isMeasured == true }?.itemOffsetPx?.coerceAtLeast(0) ?: 0
+    val oversized = layouts.any { it?.isOversized(trailingPx) == true }
+    if (oversized) onOversized()
     val hidden = candidates.indices.firstOrNull { layouts.getOrNull(it)?.startHiddenAtTail == true }
-    return hidden?.takeIf { layouts.any { it?.isOversized(trailingPx) == true } }?.let(candidates::get)
+    return hidden?.takeIf { oversized || oversizedSeen }?.let(candidates::get)
 }
 
 /**

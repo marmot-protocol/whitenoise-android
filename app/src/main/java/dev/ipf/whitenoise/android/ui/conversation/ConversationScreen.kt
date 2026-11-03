@@ -3304,6 +3304,8 @@ internal fun ConversationScreen(
                             )
                         },
                         resolveTailIndex = { currentTailIndex },
+                        oversizedSeen = incomingAppendLanding.oversizedSeen,
+                        onOversized = incomingAppendLanding::markOversized,
                     )
                 incomingAppendLanding.retire()
                 if (outcome is ConversationIncomingAppendOutcome.RevealedReadingStart) {

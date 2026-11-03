@@ -196,6 +196,53 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
         }
 
     /**
+     * A landing that measured an oversized row and was then cancelled by short arrivals that push that row out of the
+     * layout still starts at it: the burst keeps what the cancelled decision saw, and an own send clears it.
+     */
+    @Test
+    fun anOversizedRowSeenBeforeACancelledLandingKeepsTheLanding() =
+        runTest {
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(900, 80))
+            list.settle(index = 1)
+            val coordinator = ConversationScrollCoordinator(list)
+            val queue = ConversationIncomingAppendLandingQueue()
+            val first = queue.admit(listOf(row("first")), coordinator.intentToken)
+            var frames = 0
+            val interrupted =
+                launch {
+                    coordinator.followAppendOrRevealIncomingStart(
+                        candidates = first,
+                        probeFor = { list.probe { 0 } },
+                        resolveTailIndex = { 0 },
+                        oversizedSeen = queue.oversizedSeen,
+                        onOversized = queue::markOversized,
+                        // Cancelled while placing, after the tail layout measured the oversized row.
+                        awaitFrame = { if (++frames > 2) awaitCancellation() else list.frame() },
+                    )
+                }
+            testScheduler.runCurrent()
+            interrupted.cancelAndJoin()
+            assertTrue("the cancelled decision measured the oversized row", queue.oversizedSeen)
+            // Two short arrivals fill the viewport, so the first row is no longer laid out at the tail.
+            list.heightsPx.addAll(0, listOf(300, 300))
+            val ids = listOf("first", "second", "third")
+            val burst = queue.admit(listOf(row("second"), row("third")), coordinator.intentToken)
+            assertEquals(ids, burst.map { it.messageId })
+            val outcome =
+                coordinator.followAppendOrRevealIncomingStart(
+                    candidates = burst,
+                    probeFor = { candidate -> list.probe { ids.lastIndex - ids.indexOf(candidate.messageId) } },
+                    resolveTailIndex = { 0 },
+                    oversizedSeen = queue.oversizedSeen,
+                    onOversized = queue::markOversized,
+                    awaitFrame = list::frame,
+                )
+            assertEquals("first", (outcome as ConversationIncomingAppendOutcome.RevealedReadingStart).anchor.messageId)
+            queue.admit(listOf(row("own", mine = true)), coordinator.intentToken)
+            assertFalse("an own send clears what the burst saw", queue.oversizedSeen)
+        }
+
+    /**
      * The screen's append path classifies rows, lands through the coordinator and hands the landing to its owner, and
      * every restart that is not an append, including an empty or unanchored timeline, retires any burst it interrupted.
      */
