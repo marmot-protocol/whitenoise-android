@@ -336,6 +336,7 @@ internal fun ContactPickerScreen(
                             onLongClick = { appState.presentProfile(candidate.npub) },
                             publicKey = keys.publicKey,
                             publicKeyInTitle = keys.inTitle,
+                            publicKeyCopyEnabled = !busy,
                             trailing = {
                                 SelectionIndicator(selected = isSelected, dimmed = alreadyMember)
                             },

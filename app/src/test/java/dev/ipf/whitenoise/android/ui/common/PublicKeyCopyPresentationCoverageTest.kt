@@ -185,6 +185,33 @@ class PublicKeyCopyPresentationCoverageTest {
         assertNull(composeRule.onNodeWithTag(ROW).fetchSemanticsNode().customActions())
     }
 
+    /** An existing member's disabled picker row still copies its key title, and the tap never selects the row. */
+    @Test
+    fun aDisabledRowStillCopiesItsKeyTitle() {
+        var rowTaps = 0
+        composeRule.setContent {
+            Themed {
+                ContactRow(
+                    title = SHORT_KEY,
+                    subtitle = "Already in this group",
+                    avatarSeed = "member",
+                    avatarUrl = null,
+                    enabled = false,
+                    onClick = { rowTaps += 1 },
+                    publicKey = FIRST_KEY,
+                    publicKeyInTitle = true,
+                    publicKeyCopyEnabled = true,
+                    modifier = Modifier.testTag(ROW),
+                )
+            }
+        }
+
+        keyText(ROW).performClick()
+        assertEquals(FIRST_KEY, clipText())
+        assertEquals(listOf(copyLabel(FIRST_KEY)), copyActionLabels(composeRule.onNodeWithTag(ROW)))
+        assertEquals(0, rowTaps)
+    }
+
     /** Global search copies from the short key alone and still opens the profile from the rest of the row. */
     @Test
     fun globalPersonRowCopiesWithoutOpening() {
@@ -417,6 +444,8 @@ class PublicKeyCopyPresentationCoverageTest {
                     """PublicKeyCopyText\(\s*controller\.memberSubtitle\(member\),""" +
                     """\s*appState\.npubForDisplay\(member\.memberIdHex\)""",
                 "ui/group/GroupDetailsScreen.kt" to """publicKey = profileNpub\.takeIf \{ titleIsKey \}""",
+                "ui/chats/newchat/ContactPickerScreen.kt" to
+                    """enabled = !busy && !alreadyMember,[\s\S]*?publicKeyCopyEnabled = !busy,""",
                 "ui/chats/newchat/SelectedMembersComponents.kt" to """publicKey = memberNpub,""",
                 "ui/chats/newchat/ContactPickerScreen.kt" to
                     """candidateKeyPlacement\(candidate\.displayName, candidateNpub, subtitleIsKey\)""",

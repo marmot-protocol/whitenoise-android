@@ -128,6 +128,7 @@ internal fun FlowSearchField(
  * row passes [dev.ipf.whitenoise.android.core.AvatarImageLoader.publicProfiles], a group row its presentation's.
  * [publicKey] is the person's complete canonical npub: when the subtitle, or with [publicKeyInTitle] the nameless
  * title, displays that key, its own text copies the whole value while the row keeps its action (#3565).
+ * [publicKeyCopyEnabled] defaults to [enabled]; a row that refuses selection can still offer its key for copying.
  */
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
@@ -146,6 +147,7 @@ internal fun ContactRow(
     onLongClick: (() -> Unit)? = null,
     publicKey: String? = null,
     publicKeyInTitle: Boolean = false,
+    publicKeyCopyEnabled: Boolean = enabled,
     trailing: (@Composable () -> Unit)? = null,
     titleMaxLines: Int = 1,
     groupAnimation: GroupAvatarAnimation? = null,
@@ -209,7 +211,7 @@ internal fun ContactRow(
                     publicKey,
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = titleMaxLines,
-                    enabled = enabled,
+                    enabled = publicKeyCopyEnabled,
                 )
             } else {
                 EmojiLabel(
@@ -224,7 +226,7 @@ internal fun ContactRow(
                     subtitle,
                     stateOnly = followedStateDescription != null && subtitle == followedStateDescription,
                     publicKey = publicKey?.takeUnless { publicKeyInTitle },
-                    enabled = enabled,
+                    enabled = publicKeyCopyEnabled,
                 )
             }
             secondaryContent?.invoke()
