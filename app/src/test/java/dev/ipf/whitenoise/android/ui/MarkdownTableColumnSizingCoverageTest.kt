@@ -1,7 +1,10 @@
 package dev.ipf.whitenoise.android.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +35,7 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownLinkDestinationKindFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
+import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicWidth
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageFullScreenBody
 import dev.ipf.whitenoise.android.ui.conversation.messages.SwipeTestBubbleHost
 import dev.ipf.whitenoise.android.ui.conversation.messages.swipeTestSurface
@@ -217,6 +221,80 @@ class MarkdownTableColumnSizingCoverageTest {
         }
     }
 
+    /** A quoted table's intrinsic height covers every wrapped row, so the following block starts below it. */
+    @Test
+    fun blockQuotedTablesReportTheirFullStackedHeight() {
+        renderDocument(quotedTablesDoc(), Modifier.width(260.dp))
+
+        assertBlockFollowsCells("After the wide quote", listOf("ID", "Q1", "Q2", DESCRIPTION_A, DESCRIPTION_B))
+        assertBlockFollowsCells("After the short quote", listOf("K", "V", "k1", "v1"))
+        assertTrue(textLayout(DESCRIPTION_A).lineCount > 1)
+    }
+
+    /** A width-hugging bubble column sizes to a short table's demand with every cell inside it. */
+    @Test
+    fun intrinsicWidthHostHugsAShortTable() {
+        renderDocument(
+            MarkdownDocumentFfi(listOf(shortTable()), false, byteArrayOf()),
+            Modifier.widthIn(max = 260.dp).boundedIntrinsicWidth(IntrinsicSize.Max),
+        )
+        val host = composeRule.onNodeWithTag(HOST_TAG).fetchSemanticsNode().boundsInRoot
+        assertTrue("a short table hugs its content", host.width < 260f - EDGE_TOLERANCE)
+        assertEquals(host.right, bounds("V").right, EDGE_TOLERANCE)
+        assertCellsInside(host, listOf("K", "V", "k1", "v1"))
+        listOf("K", "V", "k1", "v1").forEach { text ->
+            assertEquals("$text stays on one line", 1, textLayout(text).lineCount)
+        }
+    }
+
+    /** A width-hugging bubble column clamps a wide table to the bubble and keeps wrapped cells inside it. */
+    @Test
+    fun intrinsicWidthHostClampsAWideTable() {
+        renderDocument(idDescriptionDoc(), Modifier.widthIn(max = 260.dp).boundedIntrinsicWidth(IntrinsicSize.Max))
+        val host = composeRule.onNodeWithTag(HOST_TAG).fetchSemanticsNode().boundsInRoot
+        assertEquals(260f, host.width, EDGE_TOLERANCE)
+        assertCellsInside(host, listOf("ID", "Q1", DESCRIPTION_A, DESCRIPTION_B))
+        assertTrue(textLayout(DESCRIPTION_A).lineCount > 1)
+    }
+
+    /** Requires the paragraph [after] to start at or below the bottom of every listed table cell. */
+    private fun assertBlockFollowsCells(
+        after: String,
+        cells: List<String>,
+    ) {
+        val next = bounds(after)
+        cells.forEach { text ->
+            val bottom = bounds(text).bottom
+            assertTrue("$after (${next.top}) starts below $text ($bottom)", next.top >= bottom)
+        }
+    }
+
+    /** Requires every listed cell to lie horizontally and vertically inside [host]. */
+    private fun assertCellsInside(
+        host: Rect,
+        cells: List<String>,
+    ) {
+        cells.forEach { text ->
+            val cell = bounds(text)
+            assertTrue("$text $cell inside $host", cell.left >= host.left - EDGE_TOLERANCE)
+            assertTrue("$text $cell inside $host", cell.right <= host.right + EDGE_TOLERANCE)
+            assertTrue("$text $cell inside $host", cell.bottom <= host.bottom + EDGE_TOLERANCE)
+        }
+    }
+
+    /** Renders [document] through the production body inside a tagged column carrying [hostModifier]. */
+    private fun renderDocument(
+        document: MarkdownDocumentFfi,
+        hostModifier: Modifier,
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Column(hostModifier.testTag(HOST_TAG)) { MarkdownMessageBody(document = document) }
+            }
+        }
+        composeRule.waitForIdle()
+    }
+
     /** Shared assertions for the ID/Description fixture in whichever caller rendered it. */
     private fun assertShortColumnYieldsToTheLongColumn() {
         val id = bounds("ID")
@@ -293,6 +371,28 @@ class MarkdownTableColumnSizingCoverageTest {
 
         /** One plain-text cell. */
         fun cell(text: String) = MarkdownTableCellFfi(listOf(MarkdownInlineFfi.Text(text)))
+
+        /** A compact two-by-two table. */
+        fun shortTable() =
+            MarkdownBlockFfi.Table(
+                alignments = listOf(MarkdownAlignmentFfi.NONE, MarkdownAlignmentFfi.NONE),
+                header = listOf(cell("K"), cell("V")),
+                rows = listOf(listOf(cell("k1"), cell("v1"))),
+            )
+
+        /** A quoted wrapping table and a quoted short table, each followed by a paragraph. */
+        fun quotedTablesDoc() =
+            MarkdownDocumentFfi(
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.BlockQuote(idDescriptionDoc().blocks, blankLinesBefore = byteArrayOf()),
+                        MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text("After the wide quote"))),
+                        MarkdownBlockFfi.BlockQuote(listOf(shortTable()), blankLinesBefore = byteArrayOf()),
+                        MarkdownBlockFfi.Paragraph(listOf(MarkdownInlineFfi.Text("After the short quote"))),
+                    ),
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+            )
 
         /** The issue's two-column fixture: short labels beside paragraph descriptions. */
         fun idDescriptionDoc() =
