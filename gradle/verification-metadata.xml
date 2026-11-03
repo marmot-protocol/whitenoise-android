@@ -5059,6 +5059,17 @@
             <sha256 value="e8bcc230283b4ca4c949d149f343204cba55efca538916dbd7b4bb5527458085" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="com.squareup.okhttp3" name="mockwebserver3" version="5.5.1">
+         <artifact name="mockwebserver3-5.5.1.jar">
+            <sha256 value="0a93a4882bd8a7c5c707146d143cb73e7acb29a20f5f75a9767400d19368421c" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="mockwebserver3-5.5.1.module">
+            <sha256 value="d3e9eb16c3205ee73e7239d51f0323112d9605fe47777e3730517ca53aad1a42" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="mockwebserver3-5.5.1.pom">
+            <sha256 value="c37e2d3701e917d929d969e65850c414d95f981bdf0d1c5ed05475ccec1cd146" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="com.squareup.okhttp3" name="mockwebserver" version="5.5.0">
          <artifact name="mockwebserver-5.5.0.jar">
             <sha256 value="64bcf0a79c42213bb3380939727d3cd6028ba3dbfcb9df14019650107e60a87f" origin="Independent official supplier audit" />
@@ -5068,6 +5079,17 @@
          </artifact>
          <artifact name="mockwebserver-5.5.0.pom">
             <sha256 value="6ce8fc317cea228799cdcf671a9d82d711b24b4a36dfd03694a0ee12eafaba54" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="com.squareup.okhttp3" name="mockwebserver" version="5.5.1">
+         <artifact name="mockwebserver-5.5.1.jar">
+            <sha256 value="c54b91cd312371a4739e8836cfe2353c04f11b13cc2df55a018e48db0ca882ba" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="mockwebserver-5.5.1.module">
+            <sha256 value="ecc4866dcce20aef1e163b1d75186bb76e823437ac47946c4a7cc9b9e7ca22bf" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="mockwebserver-5.5.1.pom">
+            <sha256 value="3d909e56dc15f0e579e68e46a981d5f3034a019eb5751a49b0bf9621b124e3b1" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="com.squareup.okhttp3" name="okhttp-android" version="5.5.0">
@@ -5081,6 +5103,17 @@
             <sha256 value="6c7fd12f092e64ca2eae0b8a8023900c0d7ffec57888cf8abc8085c6f42e1dcc" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="com.squareup.okhttp3" name="okhttp-android" version="5.5.1">
+         <artifact name="okhttp-android-5.5.1.module">
+            <sha256 value="67a1f222960668845bb00002aa63424ff804584000bde84f1269ae188184e496" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="okhttp-android-5.5.1.pom">
+            <sha256 value="d9aa6a615a54146f08ce0e298b382e79ebe310161992040b07ed52ed29de8c3b" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="okhttp.aar">
+            <sha256 value="ce00fd7751cf7e4f28ba73a0287b3cc0c62b8b83f038e428592eeef189513ee1" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="com.squareup.okhttp3" name="okhttp-jvm" version="5.5.0">
          <artifact name="okhttp-jvm-5.5.0.jar">
             <sha256 value="234194a04aac54858df0a750d243af7b2e39df5e4eb86e9912043ad33a9f9a52" origin="Independent official supplier audit" />
@@ -5092,12 +5125,31 @@
             <sha256 value="e72ea7261789a91b5a60920c8fd2ee860d0584765aadde249548c2ed1dba4631" origin="Independent official supplier audit" />
          </artifact>
       </component>
+      <component group="com.squareup.okhttp3" name="okhttp-jvm" version="5.5.1">
+         <artifact name="okhttp-jvm-5.5.1.jar">
+            <sha256 value="4039527bd1f2e40b66e20b0e52c689cf56074b938ea02678141495f5160f1047" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="okhttp-jvm-5.5.1.module">
+            <sha256 value="7050e29ffb6337322c1c73f29105cef67221c0234ebea869a127362a23be5023" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="okhttp-jvm-5.5.1.pom">
+            <sha256 value="146234d3d3554709dc77e99d25dcd74c6e1dc00d9a33aa55010090b566a7bfd2" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
       <component group="com.squareup.okhttp3" name="okhttp" version="5.5.0">
          <artifact name="okhttp-5.5.0.module">
             <sha256 value="1d667d70d7c4994927afd46d840e31e4a454935fa58f0c3429a26b425dc0abe0" origin="Independent official supplier audit" />
          </artifact>
          <artifact name="okhttp-5.5.0.pom">
             <sha256 value="1e5299d973d19a225d741795d28c64298105fffe2e060f07282d2b24a4a1da37" origin="Independent official supplier audit" />
+         </artifact>
+      </component>
+      <component group="com.squareup.okhttp3" name="okhttp" version="5.5.1">
+         <artifact name="okhttp-5.5.1.module">
+            <sha256 value="1c5b0837a46d13aec4493b97066c896f0f8f26e5c6b3535bec4355bce2a8e1bb" origin="Independent official supplier audit" />
+         </artifact>
+         <artifact name="okhttp-5.5.1.pom">
+            <sha256 value="a834a8f02cbcaaf6a3968b439596e14d528a32160d4b235d95f2ab51163bbf2f" origin="Independent official supplier audit" />
          </artifact>
       </component>
       <component group="com.squareup.okio" name="okio-jvm" version="3.17.0">
