@@ -6,8 +6,11 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -137,7 +140,7 @@ internal fun abbreviatesPublicKey(
  * left to the row. The label adds no semantics boundary: its short text stays in the row's spoken label, and the row
  * gains a Copy public key action whose label carries the full key. Without a canonical [npub], or while not
  * [enabled], it is plain text. With [keyboardFocusable] — for a disabled row that cannot hold focus itself — the
- * label becomes its own focus stop, and Enter, D-pad centre or Space copies the key.
+ * label becomes its own focus stop with the theme's focus highlight, and Enter, D-pad centre or Space copies the key.
  */
 @Suppress("FunctionNaming", "LongParameterList")
 @Composable
@@ -153,14 +156,22 @@ internal fun PublicKeyCopyText(
 ) {
     val copy = rememberPublicKeyCopy(npub)
     val copyLabel = stringResource(R.string.public_key_copy_action_with_value, npub)
+    val focusInteractions = remember { MutableInteractionSource() }
     Text(
         label,
         modifier =
             if (enabled && isCanonicalNpub(npub)) {
                 modifier
                     .pointerInput(npub) { copyOnShortTap(copy) }
-                    .then(if (keyboardFocusable) Modifier.copyOnKeyActivation(copy) else Modifier)
-                    .semantics {
+                    .then(
+                        if (keyboardFocusable) {
+                            Modifier
+                                .indication(focusInteractions, ripple())
+                                .copyOnKeyActivation(copy, focusInteractions)
+                        } else {
+                            Modifier
+                        },
+                    ).semantics {
                         customActions =
                             listOf(
                                 CustomAccessibilityAction(copyLabel) {
@@ -179,8 +190,14 @@ internal fun PublicKeyCopyText(
     )
 }
 
-/** Makes the label a focus stop whose Enter, D-pad centre or Space release runs [copy]. */
-private fun Modifier.copyOnKeyActivation(copy: () -> Unit): Modifier =
+/**
+ * Makes the label a focus stop whose Enter, D-pad centre or Space release runs [copy]; focus is reported through
+ * [interactions] so the caller's indication can highlight it.
+ */
+private fun Modifier.copyOnKeyActivation(
+    copy: () -> Unit,
+    interactions: MutableInteractionSource,
+): Modifier =
     onKeyEvent { event ->
         val activates =
             event.key == Key.Enter ||
@@ -189,7 +206,7 @@ private fun Modifier.copyOnKeyActivation(copy: () -> Unit): Modifier =
                 event.key == Key.Spacebar
         if (activates && event.type == KeyEventType.KeyUp) copy()
         activates
-    }.focusable()
+    }.focusable(interactionSource = interactions)
 
 /**
  * Runs [copy] for a tap released before the long-press timeout and consumes only that release, so the row's own tap

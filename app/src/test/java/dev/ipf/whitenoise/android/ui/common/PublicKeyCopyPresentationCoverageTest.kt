@@ -9,6 +9,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
@@ -18,6 +20,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
@@ -46,6 +49,7 @@ import dev.ipf.whitenoise.android.ui.settings.publicKeyDisplayGroups
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -54,6 +58,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
@@ -228,6 +233,36 @@ class PublicKeyCopyPresentationCoverageTest {
         keyText(ROW).performKeyInput { pressKey(Key.DirectionCenter) }
         assertEquals(FIRST_KEY, clipText())
         assertEquals(0, rowTaps)
+    }
+
+    /**
+     * A keyboard-focused key in a disabled row draws a visible focus highlight, so the user can see what Enter copies.
+     */
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    @Test
+    fun aKeyboardFocusedKeyIsVisiblyHighlighted() {
+        composeRule.setContent {
+            Themed {
+                ContactRow(
+                    title = SHORT_KEY,
+                    subtitle = "Already in this group",
+                    avatarSeed = "member",
+                    avatarUrl = null,
+                    enabled = false,
+                    onClick = {},
+                    publicKey = FIRST_KEY,
+                    publicKeyInTitle = true,
+                    publicKeyCopyEnabled = true,
+                    modifier = Modifier.testTag(ROW),
+                )
+            }
+        }
+
+        val unfocused = keyPixels()
+        keyText(ROW).requestFocus()
+        composeRule.mainClock.advanceTimeBy(FOCUS_SETTLE_MILLIS)
+        val focused = keyPixels()
+        assertNotEquals("focusing the key drew no highlight", unfocused, focused)
     }
 
     /** A key in an enabled row stays out of keyboard focus: the row is the single focus stop for its own action. */
@@ -407,6 +442,12 @@ class PublicKeyCopyPresentationCoverageTest {
         assertFalse("the row label speaks the full key", spoken.contains(npub))
     }
 
+    /** Every pixel of the key text in the row, row-major, for before/after comparisons. */
+    private fun keyPixels(): List<Color> {
+        val map = keyText(ROW).captureToImage().toPixelMap()
+        return List(map.width * map.height) { map[it % map.width, it / map.width] }
+    }
+
     /** The unmerged key text inside the node tagged [tag]. */
     private fun keyText(tag: String): SemanticsNodeInteraction =
         composeRule.onNode(hasText("npub1qqqq", substring = true) and hasAnyAncestor(hasTestTag(tag)), true)
@@ -461,6 +502,7 @@ class PublicKeyCopyPresentationCoverageTest {
         ).firstOrNull(File::exists)?.readText() ?: error("Missing $path")
 
     private companion object {
+        const val FOCUS_SETTLE_MILLIS = 500L
         const val FIRST_KEY = "npub1qqqqqqqqqqqqqqqqqqqqqppppppppqqqqqqqqqqqqqqqqqqqqqqqkrvh2t"
         const val SECOND_KEY = "npub1qqqqqqqqqqqqqqqqqqqqqzzzzzzzzqqqqqqqqqqqqqqqqqqqqqqqrx4cs5"
         const val SHORT_KEY = "npub1qqqqqqqqqq...qqqqqqqq"
