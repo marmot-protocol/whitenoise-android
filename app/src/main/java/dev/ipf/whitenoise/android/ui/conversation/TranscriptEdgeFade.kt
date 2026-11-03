@@ -90,18 +90,18 @@ internal class TranscriptEdgeFadeGeometry {
     /** The interval, in px from the top of a [heightPx]-tall transcript, left at full opacity. */
     fun opaqueRangePx(heightPx: Float): ClosedFloatingPointRange<Float>? {
         val spec = spec
-        val listState = spec?.listState
         return when {
             heightPx <= 0f -> null
-            spec == null || listState == null -> 0f..heightPx
+            spec == null -> 0f..heightPx
             spec.composerOverlapPx > 0f ->
                 verticalEdgeFadeOpaqueRange(
                     heightPx = heightPx,
-                    topFadePx = if (listState.transcriptTopFadeActive()) spec.fadeHeightPx else 0f,
+                    topFadePx = if (spec.listState.transcriptTopFadeActive()) spec.fadeHeightPx else 0f,
                     bottomFadePx = spec.composerOverlapPx,
                 )
             else -> {
                 // The ordinary reversed-list cues: the same edge policy and band cap scrollEdgeFade paints with.
+                val listState = spec.listState
                 val edges = scrollEdgeFadeState(listState.canScrollBackward, listState.canScrollForward, true)
                 verticalEdgeFadeOpaqueRange(
                     heightPx = heightPx,

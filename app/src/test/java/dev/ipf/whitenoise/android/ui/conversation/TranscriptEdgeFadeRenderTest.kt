@@ -116,13 +116,39 @@ class TranscriptEdgeFadeRenderTest {
     }
 
     /**
+     * Without a composer overlap the transcript falls back to the ordinary edge cues. The interval it
+     * publishes must still match that painted mask, with both 28 px bands while history lies both ways.
+     */
+    @Test
+    fun theNoOverlapFallbackPublishesTheIntervalItPaints() {
+        val geometry = TranscriptEdgeFadeGeometry()
+        render(geometry, composerOverlapDp = 0)
+        rule.runOnIdle { scope.launch { list.scrollToItem(MIDDLE_ROW) } }
+        rule.waitForIdle()
+        val pixels = rule.onNodeWithTag(FRAME).captureToImage().toPixelMap()
+        val opaque = rule.runOnIdle { checkNotNull(geometry.opaqueRangePx(480f)) }
+
+        assertEquals(TOP_BAND_MIDPOINT * 2f, opaque.start)
+        assertEquals(480f - TOP_BAND_MIDPOINT * 2f, opaque.endInclusive)
+        val top = opaque.start.toInt()
+        val bottom = opaque.endInclusive.toInt()
+        assertEquals("the opaque edge must be at full strength", ROW, pixels[COLUMN, top])
+        assertNotEquals("just above the edge the band is still dimming", ROW, pixels[COLUMN, top - 2])
+        assertEquals("the last opaque line must be at full strength", ROW, pixels[COLUMN, bottom - 1])
+        assertNotEquals("past the bottom edge the band is dimming", ROW, pixels[COLUMN, bottom + 2])
+    }
+
+    /**
      * True when the sample sits between the row and the background. The two differ only in red, so
      * that channel alone reports how far the mask has dissolved the row towards the page.
      */
     private fun Color.isPartlyFaded(): Boolean = red > 0.3f && red < 0.7f
 
     /** Mirrors the transcript's geometry: reversed rows, a covered strip, and a known background. */
-    private fun render(geometry: TranscriptEdgeFadeGeometry? = null) {
+    private fun render(
+        geometry: TranscriptEdgeFadeGeometry? = null,
+        composerOverlapDp: Int = COVERED_STRIP_DP,
+    ) {
         rule.setContent {
             list = rememberLazyListState()
             scope = rememberCoroutineScope()
@@ -135,7 +161,7 @@ class TranscriptEdgeFadeRenderTest {
                             .fillMaxSize()
                             .transcriptEdgeFade(
                                 listState = list,
-                                composerOverlap = COVERED_STRIP_DP.dp,
+                                composerOverlap = composerOverlapDp.dp,
                                 geometry = geometry,
                             ),
                 ) {

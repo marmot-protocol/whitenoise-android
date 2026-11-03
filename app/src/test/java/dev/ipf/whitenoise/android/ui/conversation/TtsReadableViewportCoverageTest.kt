@@ -71,6 +71,7 @@ class TtsReadableViewportCoverageTest {
     private val sentenceLayouts = ConversationTtsSentenceLayoutRegistry()
     private val target = ConversationTtsFollowTarget(7L, "message-$TARGET_ROW", 0, 1, "readable-sentence", 42uL)
     private var leafHeight by mutableIntStateOf(COMPACT_LEAF_DP)
+    private var frameHeight by mutableIntStateOf(FRAME_DP)
     private var frameTop = 0f
 
     /**
@@ -142,6 +143,28 @@ class TtsReadableViewportCoverageTest {
         assertTrue("the sentence must not fit, or this proves nothing", sentence.height > speech.height)
         assertTrue("sentence $sentence must begin at $speech", abs(sentence.top - speech.top) <= 1f)
         assertTrue(ttsSentenceWasRevealed(sentence, speech))
+    }
+
+    /**
+     * A window so short that the top fade and the composer band meet leaves no opaque interval. Speech
+     * then uses the reading bounds, so follow settles once and stays still instead of retrying a
+     * reveal an empty interval could never confirm.
+     */
+    @Test
+    fun aWindowWithNoOpaqueIntervalStillSettlesFollowOnce() {
+        frameHeight = HEADER_DP + SHORT_LIST_DP
+        leafHeight = SHORT_LEAF_DP
+        render()
+        rule.runOnIdle { assertTrue("older history keeps the top fade active", list.canScrollForward) }
+        assertTrue("the fade and composer band must cover the list", FADE_DP + OVERLAP_DP >= SHORT_LIST_DP)
+
+        assertTrue("follow must verify its reveal in a short window", follow(anchorAtTop = true))
+        assertEquals(readingBounds(), speechBounds())
+        assertFalse("a landed sentence must not keep asking for a reveal", sentenceLayouts.needsReveal(target))
+
+        val settled = scrollPosition()
+        assertTrue(follow(anchorAtTop = false))
+        assertEquals("the settled sentence must not move again", settled, scrollPosition())
     }
 
     /** Once history runs out the fade switches off, and the whole reading interval is readable again. */
@@ -257,7 +280,7 @@ class TtsReadableViewportCoverageTest {
             }
             Column(
                 Modifier
-                    .size(320.dp, 480.dp)
+                    .size(320.dp, frameHeight.dp)
                     .background(BACKGROUND)
                     .testTag(FRAME)
                     .onGloballyPositioned { frameTop = it.positionInWindow().y },
@@ -362,6 +385,13 @@ class TtsReadableViewportCoverageTest {
         const val OVERLAP_DP = 60f
         const val COMPACT_LEAF_DP = 24
         const val OVERSIZED_LEAF_DP = 220
+        const val FRAME_DP = 480
+
+        /** A list exactly as tall as the top fade plus the composer band, so nothing is fully opaque. */
+        const val SHORT_LIST_DP = 88
+
+        /** Two leaves that together fit the 28 px reading interval left in the short window. */
+        const val SHORT_LEAF_DP = 8
 
         /** The production fade height at mdpi, where one dp is one pixel. */
         val FADE_DP = TRANSCRIPT_EDGE_FADE_HEIGHT.value
