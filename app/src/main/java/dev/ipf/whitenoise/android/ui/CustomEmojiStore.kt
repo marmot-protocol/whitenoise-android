@@ -81,6 +81,10 @@ internal fun emojiCodeForFileName(name: String): String = sanitizeEmojiCode(name
  */
 internal class CustomEmojiStore(
     private val directory: File,
+    /** The domain whose worker decodes the device's own emoji files, read at each decode. */
+    private val domain: () -> dev.ipf.whitenoise.android.media.MediaTrustDomain = {
+        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique
+    },
 ) {
     private val mutex = Mutex()
     private var loaded = false
@@ -128,7 +132,7 @@ internal class CustomEmojiStore(
         code: String,
         bytes: ByteArray,
     ): CustomEmojiSaveResult {
-        val extension = imageExtension(bytes) ?: return CustomEmojiSaveResult.NotAnImage
+        val extension = imageExtension(bytes, domain()) ?: return CustomEmojiSaveResult.NotAnImage
         val written =
             try {
                 write(code, extension, bytes)
@@ -179,7 +183,7 @@ internal class CustomEmojiStore(
                     if (code.isEmpty() || sanitizeEmojiCode(code) != code || file.length() > MAX_BYTES) {
                         return@mapNotNull null
                     }
-                    val image = decodeEmojiImage(file.readBytes()) ?: return@mapNotNull null
+                    val image = decodeEmojiImage(file.readBytes(), domain()) ?: return@mapNotNull null
                     CustomEmoji(":$code:", file, image)
                 }.distinctBy { it.shortcode }
                 .sortedBy { it.shortcode }
@@ -210,18 +214,39 @@ private const val EMOJI_DECODE_PX = 128
 
 /**
  * Emoji artwork downsampled so its longer edge is under twice [EMOJI_DECODE_PX]; null when not an image.
- * Sampling by the longer edge bounds memory for extreme aspect ratios (e.g. 100000x255).
+ * Sampling by the longer edge bounds memory for extreme aspect ratios (e.g. 100000x255). The decoding
+ * worker serves only [domain].
  */
-internal fun decodeEmojiImage(bytes: ByteArray): ImageBitmap? =
+internal fun decodeEmojiImage(
+    bytes: ByteArray,
+    domain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
+        dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
+            .current(),
+): ImageBitmap? =
     dev.ipf.whitenoise.android.media.MediaPipeline
-        .decodeSampledBitmap(bytes, EMOJI_DECODE_PX)
+        .decodeSampledBitmap(bytes, EMOJI_DECODE_PX, domain = domain)
         ?.asImageBitmap()
 
-/** File extension for a decodable image, from its content rather than its name. */
-private fun imageExtension(bytes: ByteArray): String? {
+/**
+ * The domain of the device's own custom-emoji files: [dev.ipf.whitenoise.android.media.MediaTrustDomain.Local]
+ * of the active account. The store is device-wide, so every account's user already holds these files.
+ */
+internal fun customEmojiDomain(context: android.content.Context): dev.ipf.whitenoise.android.media.MediaTrustDomain {
+    val app = context.applicationContext as? dev.ipf.whitenoise.android.WhiteNoiseApplication
+    return dev.ipf.whitenoise.android.media.MediaTrustDomain
+        .local(app?.initializedAppState()?.activeAccountRef)
+}
+
+/** File extension for a decodable image, from its content rather than its name, inspected in [domain]. */
+private fun imageExtension(
+    bytes: ByteArray,
+    domain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
+): String? {
     val info =
-        dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
-            .inspect(bytes) ?: return null
+        dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope.within(domain) {
+            dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                .inspect(bytes)
+        } ?: return null
     return when (info.mime) {
         "image/png" -> "png"
         "image/gif" -> "gif"

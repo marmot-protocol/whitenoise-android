@@ -71,7 +71,10 @@ open class WhiteNoiseApplication :
     }
 
     internal val customEmojiStore by lazy {
-        CustomEmojiStore(File(filesDir, CustomEmojiStore.DIRECTORY))
+        CustomEmojiStore(File(filesDir, CustomEmojiStore.DIRECTORY)) {
+            dev.ipf.whitenoise.android.ui
+                .customEmojiDomain(this)
+        }
     }
 
     private val mainShellProcessStateDelegate =

@@ -79,13 +79,21 @@ internal object PrivateContactAvatarLoader {
         val current = currentReference(selection.first, accountRef)
         val image =
             current?.let { ref ->
-                AvatarImageLoader.loadStored(ref.cacheKey, lifetime) {
+                // A stored private contact picture is only drawn on this device, so it decodes in the local domain.
+                val domain =
+                    dev.ipf.whitenoise.android.media.MediaTrustDomain
+                        .local(accountRef ?: activeAccount?.invoke())
+                AvatarImageLoader.loadStored(ref.cacheKey, lifetime, domain) {
                     withContext(Dispatchers.IO) { store?.read(ref) }
                 }
             }
         val expired = AvatarImageLoader.currentCacheLifetime() != lifetime
         if (expired || current != currentReference(selection.first, accountRef)) return null
-        return image ?: selection.second?.let { AvatarImageLoader.load(it) }
+        // The fallback is the contact's published picture.
+        val published =
+            dev.ipf.whitenoise.android.media.MediaTrustDomain
+                .publicProfiles(accountRef ?: activeAccount?.invoke())
+        return image ?: selection.second?.let { AvatarImageLoader.load(it, published) }
     }
 
     /** Revalidates display ownership before resolving a newer immutable selection for a captured handle. */

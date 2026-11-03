@@ -123,6 +123,8 @@ internal fun FlowSearchField(
  * state once from the row. [selectionState] remains separate so multi-select pickers can expose
  * selected and followed at the same time without making the badge look like a selection control.
  * [avatarAnimationKey] lets a stored person picture in [avatarImage] animate under the profile policy.
+ * [avatarDomain] is the worker domain that decodes [avatarUrl], single-use unless the caller names one: a person
+ * row passes [dev.ipf.whitenoise.android.core.AvatarImageLoader.publicProfiles], a group row its presentation's.
  */
 @Composable
 @Suppress("FunctionNaming", "LongMethod")
@@ -144,6 +146,8 @@ internal fun ContactRow(
     titleMaxLines: Int = 1,
     groupAnimation: GroupAvatarAnimation? = null,
     secondaryContent: (@Composable () -> Unit)? = null,
+    avatarDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
+        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
 ) {
     val copyLabel = stringResource(R.string.copy)
     val followedStateDescription =
@@ -189,6 +193,7 @@ internal fun ContactRow(
                 picture = avatarImage,
                 animationKey = avatarAnimationKey,
                 groupAnimation = groupAnimation,
+                pictureDomain = avatarDomain,
             )
             if (isFollowed) {
                 FollowedPersonBadge(modifier = Modifier.align(Alignment.BottomEnd))

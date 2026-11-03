@@ -177,11 +177,12 @@ internal suspend fun renderIdentityImageDraft(
     quality: MediaQuality,
     renderer: PhotoEditorRenderer = PhotoEditorRenderer(),
 ): ImageUploadDraft {
-    val inspected = renderer.inspect(sourceBytes)
+    // An identity picture is no outgoing pick: it inspects and renders single-use.
+    val inspected = renderer.inspect(sourceBytes, MediaTrustDomain.Unique)
     val oriented =
         (inspected as? PhotoEditorInspectResult.Success)?.source?.orientedSize
             ?: throw ImageUploadPreparationException.UnsupportedImage
-    val rendered = renderer.render(sourceBytes, crop.recipeFor(oriented), quality)
+    val rendered = renderer.render(sourceBytes, crop.recipeFor(oriented), quality, MediaTrustDomain.Unique)
     if (rendered !is PhotoEditorRenderResult.Success) throw rendered.asPreparationFailure()
     return rendered.image.asUploadDraft()
 }

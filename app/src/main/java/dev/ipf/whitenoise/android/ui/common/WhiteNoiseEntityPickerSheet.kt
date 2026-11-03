@@ -185,7 +185,14 @@ private fun PickerRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.FormField),
         ) {
-            Avatar(title = item.title, seed = item.avatarSeed, size = PickerAvatarSize, pictureUrl = item.avatarUrl)
+            // Items may be groups or people, so a picture this starts decoding stays single-use.
+            Avatar(
+                title = item.title,
+                seed = item.avatarSeed,
+                size = PickerAvatarSize,
+                pictureUrl = item.avatarUrl,
+                pictureDomain = dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
+            )
             EmojiLabel(item.title, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (multiple && onSelect != null) {
                 Checkbox(

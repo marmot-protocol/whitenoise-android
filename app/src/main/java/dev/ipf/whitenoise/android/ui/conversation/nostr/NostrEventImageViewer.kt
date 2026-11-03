@@ -48,7 +48,10 @@ import kotlinx.coroutines.CancellationException
 @Composable
 internal fun NostrEventImagePane(
     url: String,
-    loadImage: suspend (String, Int) -> ImageBitmap? = AvatarImageLoader::retryBanner,
+    // A Nostr event's image is chosen by its author and host, never by a member, so it decodes single-use.
+    loadImage: suspend (String, Int) -> ImageBitmap? = { url, width ->
+        AvatarImageLoader.retryBanner(url, width, dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique)
+    },
     compact: Boolean = false,
     initiallyRequested: Boolean = false,
     onFullscreenDismiss: (() -> Unit)? = null,

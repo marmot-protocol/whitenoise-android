@@ -306,7 +306,13 @@ private fun PrepareSelectedEmoji(
                 -> return@LaunchedEffect failSelection(R.string.custom_emoji_not_image)
             }
         val preview =
-            withContext(Dispatchers.Default) { decodeEmojiImage(bytes) }
+            withContext(Dispatchers.Default) {
+                decodeEmojiImage(
+                    bytes,
+                    dev.ipf.whitenoise.android.media.MediaTrustDomain
+                        .local(selectionAccount),
+                )
+            }
                 ?: return@LaunchedEffect failSelection(R.string.custom_emoji_not_image)
         if (appState.activeAccountRef != selectionAccount || appState.runtimeGeneration != selectionRuntime) {
             return@LaunchedEffect

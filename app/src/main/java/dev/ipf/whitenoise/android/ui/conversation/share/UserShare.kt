@@ -22,7 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ProfileLink
-import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.PersonAvatar
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Person
 
@@ -99,7 +99,7 @@ internal fun UserMessageBubble(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (resolvedName != null || pictureUrl != null) {
-                Avatar(title = title, seed = user.npub, size = 44.dp, pictureUrl = pictureUrl)
+                PersonAvatar(title = title, seed = user.npub, size = 44.dp, pictureUrl = pictureUrl)
             } else {
                 // An unresolved reference gets a neutral glyph: an initial taken from "npub1"
                 // would read as a name the sender never supplied.

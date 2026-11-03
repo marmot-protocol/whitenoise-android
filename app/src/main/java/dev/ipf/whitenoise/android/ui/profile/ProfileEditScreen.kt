@@ -200,7 +200,10 @@ internal fun ProfileBannerControl(
     isUploading: Boolean,
     isProfileLoaded: Boolean = true,
     showValidationError: Boolean = true,
-    imageLoader: suspend (String, Int) -> ImageBitmap? = AvatarImageLoader::loadBanner,
+    imageLoader: suspend (String, Int) -> ImageBitmap? = { url, width ->
+        // The user's own kind-0 banner is published, so it decodes in the public profiles.
+        AvatarImageLoader.loadBanner(url, width, AvatarImageLoader.publicProfiles())
+    },
     onClick: () -> Unit,
 ) {
     // A 2:1 banner fills the screen's width, so it is decoded for that box
@@ -341,7 +344,7 @@ internal fun ProfileHeroHeader(
         }
     LaunchedEffect(pictureUrl, contentReady) {
         if (contentReady && avatarImage == null && pictureUrl != null) {
-            avatarImage = AvatarImageLoader.load(pictureUrl)
+            avatarImage = AvatarImageLoader.load(pictureUrl, AvatarImageLoader.publicProfiles())
             avatarLoadFinished = true
         }
     }
@@ -624,7 +627,7 @@ internal fun ProfileEditScreen(
     val context = LocalContext.current
     val safePictureUrl = ProfileSanitizer.protocolImageUrl(picture)
     val safeBannerUrl = ProfileSanitizer.protocolImageUrl(banner)
-    val avatarImageAvailable = rememberAvatarImageAvailable(safePictureUrl)
+    val avatarImageAvailable = rememberAvatarImageAvailable(safePictureUrl, AvatarImageLoader.publicProfiles())
     val pictureValid = ProfileFieldValidation.isAcceptablePictureUrl(picture)
     val bannerValid = ProfileFieldValidation.isAcceptablePictureUrl(banner)
     val nip05Valid = ProfileFieldValidation.isAcceptableNip05(nip05)

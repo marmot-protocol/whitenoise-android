@@ -10,6 +10,7 @@ import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.media.VideoMetadataScrubber
 import dev.ipf.whitenoise.android.media.aviVideoBytes
 import dev.ipf.whitenoise.android.media.containsAscii
@@ -29,6 +30,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -165,6 +167,31 @@ class ConversationAttachmentReaderFileBackedTest {
         }
 
     /**
+     * An image picked as a document decodes under the pick its caller names, as a resumed collection scopes its items,
+     * never under the bare URI a composer document with the same file would use.
+     */
+    @Test
+    fun anImageDocumentDecodesUnderTheCallersPick() {
+        val uri = pick("photo.png", "image/png", PNG_SIGNATURE + ByteArray(64), declaredSize = null)
+        val picks = java.util.Collections.synchronizedList(mutableListOf<String?>())
+        runBlocking {
+            reader(domain = { pick -> MediaTrustDomain.Unique.also { picks += pick } })
+                .readPickedDocuments(listOf(uri), pickKey = { "collection:operation:$it" })
+        }
+        assertEquals(listOf("collection:operation:$uri"), picks.toList())
+    }
+
+    /** A named pick is one picked file: reading two URIs under one pick fails before any worker decodes them. */
+    @Test
+    fun aNamedPickReadsAtMostOneFile() {
+        val first = pick("first.mp4", "video/mp4", minimalMp4(1024), declaredSize = 1024)
+        val second = pick("second.mp4", "video/mp4", minimalMp4(1024), declaredSize = 1024)
+        assertThrows(IllegalArgumentException::class.java) {
+            runBlocking { reader().readPickedImages(listOf(first, second), pick = "slot-a") }
+        }
+    }
+
+    /**
      * A video small enough for memory that follows a staged one still uploads from a file, so its two
      * disk copies must fit beside the staged copy owed to the first, or it is left out for storage.
      */
@@ -257,7 +284,10 @@ class ConversationAttachmentReaderFileBackedTest {
     private fun stagedBytes(directory: File): Long = directory.walk().filter(File::isFile).sumOf(File::length)
 
     /** Builds the production reader with inert draft persistence and scripted native limits. */
-    private fun reader(perFileBytes: Long = 64L * MIB): ConversationAttachmentReader {
+    private fun reader(
+        perFileBytes: Long = 64L * MIB,
+        domain: (String?) -> MediaTrustDomain = { MediaTrustDomain.Unique },
+    ): ConversationAttachmentReader {
         val persistence =
             object : DraftPersistence {
                 /** Starts every reader with no saved drafts. */
@@ -282,6 +312,7 @@ class ConversationAttachmentReaderFileBackedTest {
             state,
             context,
             fileBackedLimits = { FileBackedSendLimits(perFileBytes = perFileBytes, batchCiphertextBytes = 900L * MIB) },
+            domain = domain,
         )
     }
 
@@ -373,6 +404,9 @@ class ScriptedPickProvider : ContentProvider() {
 
 private const val AUTHORITY = "dev.ipf.whitenoise.test.largepicks"
 private const val MIB = 1024L * 1024L
+
+/** The eight-byte PNG signature, enough for the document path to treat a pick as an image. */
+private val PNG_SIGNATURE = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
 
 // The free space every file-backed staging check leaves to the rest of the app.
 private const val APP_RESERVE_BYTES = 64L * 1024L * 1024L

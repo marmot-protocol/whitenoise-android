@@ -99,13 +99,22 @@ import java.util.Locale
 
 private const val AVATAR_VIEWER_MAX_BYTES = 8 * 1024 * 1024
 
+/**
+ * Whether [pictureUrl] has a viewable image, loading it on a cache miss. That decode runs in [domain]'s worker:
+ * the public profiles for a person's published picture, single-use for a group's URL picture.
+ */
 @Composable
-internal fun rememberAvatarImageAvailable(pictureUrl: String?): Boolean {
+internal fun rememberAvatarImageAvailable(
+    pictureUrl: String?,
+    domain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
+): Boolean {
     val available by produceState(
         initialValue = pictureUrl?.let { AvatarImageLoader.peek(it) != null } == true,
         key1 = pictureUrl,
+        key2 = domain,
     ) {
-        value = pictureUrl?.let { AvatarImageLoader.load(it) != null } == true
+        value =
+            pictureUrl?.let { url -> AvatarImageLoader.load(url, domain) != null } == true
     }
     return available
 }
@@ -137,8 +146,9 @@ internal fun AvatarFullScreenViewer(
                     ?.let(AvatarViewerImageState::Local) ?: AvatarViewerImageState.Loading,
         ) {
             if (privateSource) {
+                // A private contact handle decodes in its account's local domain inside the private loader.
                 value = AvatarImageLoader
-                    .load(checkNotNull(pictureUrl))
+                    .load(checkNotNull(pictureUrl), dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique)
                     ?.let(AvatarViewerImageState::Local) ?: AvatarViewerImageState.Failed
             }
         }

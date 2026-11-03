@@ -1244,6 +1244,8 @@ class WhiteNoiseAppState private constructor(
             .also {
                 dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
                     .attach(it) { activeAccountRef }
+                dev.ipf.whitenoise.android.core.AvatarImageLoader
+                    .attachActiveAccount { activeAccountRef }
             }
     internal val localGroupDeleteCleanupJournal =
         LocalGroupDeleteCleanupJournal(appContext.noBackupFilesDir.resolve("local-group-delete-cleanup"))
@@ -1319,6 +1321,11 @@ class WhiteNoiseAppState private constructor(
 
     private val legacyDraftMigrationSource by lazy { LegacyDraftMigrationSource(appContext) }
     internal val editorSourceStore: EditorSourceStore = EditorSourceStore.create(appContext)
+
+    /** Which draft each picked file belongs to, per account and conversation, so its outgoing worker never changes. */
+    internal val outgoingDrafts =
+        dev.ipf.whitenoise.android.media
+            .OutgoingDraftRegistry()
     internal val editorSessionStore: EditorSessionStore = EditorSessionStore.create(appContext)
     internal val messageDraftRepository: MessageDraftRepository =
         messageDraftRepositoryOverride
@@ -3621,6 +3628,9 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String,
     ): String = "${accountRef.orEmpty()}\u0000$groupIdHex"
+
+    /** The attached chat list's current rows, read to name the worker domain of a durable avatar. */
+    internal fun chatListItemsForAvatarDomains(): List<ChatListItem> = chatsController?.items.orEmpty()
 
     /** Attaches or permanently detaches the chat-list projection without transferring private row state. */
     fun attachChatsController(controller: ChatsController?) {
@@ -11800,7 +11810,10 @@ class WhiteNoiseAppState private constructor(
         val ref = contactPictureStore.reference(account, contact) ?: return
         val lifetime = AvatarImageLoader.currentCacheLifetime()
         runCatchingCancellable {
-            AvatarImageLoader.loadStored(ref.cacheKey, lifetime) {
+            val domain =
+                dev.ipf.whitenoise.android.media.MediaTrustDomain
+                    .local(account)
+            AvatarImageLoader.loadStored(ref.cacheKey, lifetime, domain) {
                 withContext(Dispatchers.IO) { contactPictureStore.read(ref) }
             }
         }
@@ -11938,26 +11951,32 @@ class WhiteNoiseAppState private constructor(
 
     /**
      * Start local profile materialization and image decoding without waiting for
-     * either. Chat/message projections call this before notification delivery;
-     * [applyProfilePresentation] queues the image as soon as local storage (or a
-     * relay refresh) yields a sanitized URL.
+     * either. Chat/message projections call this before notification delivery,
+     * and [applyProfilePresentation] queues the image as soon as local storage (or
+     * a relay refresh) yields a sanitized URL. The decode runs in [domain], the
+     * caller's account's public profiles. Only the active account's caller queues
+     * that later warm, which runs in the active account's worker.
      */
-    internal fun preWarmProfileAvatar(accountIdHex: String) {
+    internal fun preWarmProfileAvatar(
+        accountIdHex: String,
+        domain: dev.ipf.whitenoise.android.media.MediaTrustDomain = AvatarImageLoader.publicProfiles(),
+    ) {
         val id = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return
+        val deferrable = domain == AvatarImageLoader.publicProfiles()
         val cachedAvatar =
             synchronized(profilePresentationLock) {
                 val avatar = profilePresentations[id]?.avatarUrl
                 if (avatar != null) {
                     pendingAvatarPreWarmAccountIds.remove(id)
-                } else {
-                    // Reinsert to keep the set in recent-conversation order; a
-                    // live sender must not sit behind old avatarless profiles.
+                } else if (deferrable) {
+                    // Reinsert to keep the set in recent-conversation order, so a
+                    // live sender never sits behind old avatarless profiles.
                     pendingAvatarPreWarmAccountIds.remove(id)
                     pendingAvatarPreWarmAccountIds.add(id)
                 }
                 avatar
             }
-        AvatarImageLoader.preWarm(cachedAvatar)
+        AvatarImageLoader.preWarm(cachedAvatar, domain)
         // Starts an ungated local materialization on a miss and observes its
         // revision; applyProfilePresentation consumes the pending warm above once
         // the URL lands. The relay refresh remains independently cooldown-gated.
@@ -13274,7 +13293,15 @@ class WhiteNoiseAppState private constructor(
         content: LocalNotificationContent?,
     ): LateNotificationIdentity? {
         val warmed = notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)
-        val urlSources = firstPost.avatars.lateIdentitySources(warmed, update.isDm)
+        val urlSources =
+            firstPost.avatars.lateIdentitySources(
+                warmed,
+                update.isDm,
+                dev.ipf.whitenoise.android.notifications
+                    .notificationConversationDomain(update),
+                dev.ipf.whitenoise.android.notifications
+                    .notificationSenderDomain(update),
+            )
         val sources =
             if (!update.isDm && urlSources.conversationBitmap == null && urlSources.conversationUrl.isNullOrBlank()) {
                 urlSources.copy(conversationLoader = encryptedGroupIdentityLoader(update))
@@ -14298,7 +14325,7 @@ class WhiteNoiseAppState private constructor(
                 changed to shouldPreWarm
             }
         if (shouldPreWarm) {
-            AvatarImageLoader.preWarm(presentation.avatarUrl)
+            AvatarImageLoader.preWarm(presentation.avatarUrl, AvatarImageLoader.publicProfiles())
         }
         if (changed) {
             profileRevision += 1

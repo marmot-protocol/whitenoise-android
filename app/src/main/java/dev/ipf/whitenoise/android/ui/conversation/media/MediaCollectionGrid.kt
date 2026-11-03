@@ -214,7 +214,9 @@ private fun MediaCollectionCell(
     ) {
         val bitmap =
             (item as? StagedPreviewItem.Media)?.let { media ->
-                metadata?.let { rememberMediaPreviewBitmap(media.uri, it.isVideo, CELL_DECODE_EDGE_PX, prepared) }
+                metadata?.let { meta ->
+                    rememberMediaPreviewBitmap(media.uri, meta.isVideo, CELL_DECODE_EDGE_PX, media.pick, prepared)
+                }
             }
         if (bitmap != null) {
             Image(bitmap, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
