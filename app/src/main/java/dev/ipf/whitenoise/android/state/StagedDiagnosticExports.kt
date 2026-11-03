@@ -23,9 +23,11 @@ import java.nio.file.Path
  *   through the provider, and keeps the copy only if its length and digest equal the recorded ones,
  *   so a replaced or rotated archive is rejected.
  *
- * An app that already received this archive from the chooser could send the same URI back. It then
- * reaches only that archive, which the user has already shared with it, and the draft still needs the
- * user to pick a chat and press Send. After process death the registry is empty, so a late or
+ * Admission rests on knowing the exact URI string, not on holding a read grant, since the importer
+ * reads the file itself. Any app that learns the string — normally one the user shared the archive
+ * with — can send it back, but only while this process still retains that archive among the most
+ * recent exports, it reaches only that archive, and the draft still needs the user to pick a chat and
+ * press Send. After process death the registry is empty, so a late or
  * recovered intent gets the ordinary recoverable rejection rather than a crash.
  */
 internal object StagedDiagnosticExports {

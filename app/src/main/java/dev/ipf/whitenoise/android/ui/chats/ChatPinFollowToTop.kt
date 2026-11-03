@@ -128,7 +128,7 @@ internal fun chatPinFollowStep(
  * button. [onScrollStarted] marks each programmatic move for the head-motion owner.
  *
  * When the bounded window had earlier rows, the restored head reaches the list on a later debounced
- * projection, so the final snap waits for [firstRowId] to change rather than for a fixed frame count.
+ * projection, so the final snap waits for [rowIds] to change rather than for a fixed frame count.
  * A user cancellation still consumes the request, so a stale follow never outlives its gesture.
  */
 @Composable
@@ -140,7 +140,7 @@ internal fun ChatPinFollowToTopEffect(
     userGestureGeneration: Long,
     unpinnedVisibleIds: Set<String>,
     motionSettled: Boolean,
-    firstRowId: String?,
+    rowIds: List<String>,
     hasEarlierRows: () -> Boolean,
     returnWindowToTop: suspend () -> Unit,
     onScrollStarted: () -> Unit,
@@ -150,7 +150,7 @@ internal fun ChatPinFollowToTopEffect(
     val liveGestureGeneration by rememberUpdatedState(userGestureGeneration)
     val liveUnpinnedIds by rememberUpdatedState(unpinnedVisibleIds)
     val liveMotionSettled by rememberUpdatedState(motionSettled)
-    val liveFirstRowId by rememberUpdatedState(firstRowId)
+    val liveRowIds by rememberUpdatedState(rowIds)
     val liveHasEarlierRows by rememberUpdatedState(hasEarlierRows)
     val liveReturnWindowToTop by rememberUpdatedState(returnWindowToTop)
     val liveScrollStarted by rememberUpdatedState(onScrollStarted)
@@ -174,12 +174,12 @@ internal fun ChatPinFollowToTopEffect(
                 }
                 listState.animateScrollToItem(0)
                 val windowWasShifted = liveHasEarlierRows()
-                val headBeforeReturn = liveFirstRowId
+                val rowsBeforeReturn = liveRowIds
                 liveReturnWindowToTop()
                 if (windowWasShifted) {
                     // The restored head is published by the controller's debounced recompute, not on this frame.
                     withTimeoutOrNull(CHAT_PIN_FOLLOW_WINDOW_TIMEOUT_MILLIS) {
-                        snapshotFlow { liveFirstRowId != headBeforeReturn || step() == ChatPinFollowStep.RETIRE }
+                        snapshotFlow { liveRowIds != rowsBeforeReturn || step() == ChatPinFollowStep.RETIRE }
                             .first { it }
                     }
                 }

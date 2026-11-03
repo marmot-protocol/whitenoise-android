@@ -126,7 +126,7 @@ class ChatPinFollowToTopTest {
                 userGestureGeneration = 0L,
                 unpinnedVisibleIds = emptySet(),
                 motionSettled = true,
-                firstRowId = rows.firstOrNull(),
+                rowIds = rows,
                 hasEarlierRows = { rows.first() != head.first() },
                 returnWindowToTop = {
                     windowReturns += 1
@@ -180,7 +180,7 @@ class ChatPinFollowToTopTest {
                 userGestureGeneration = 0L,
                 unpinnedVisibleIds = emptySet(),
                 motionSettled = true,
-                firstRowId = "row-0",
+                rowIds = listOf("row-0"),
                 hasEarlierRows = { false },
                 returnWindowToTop = { error("a retired request must not move the window") },
                 onScrollStarted = {},
