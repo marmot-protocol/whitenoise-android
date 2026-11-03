@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.core.namecoin
 
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
@@ -452,6 +453,40 @@ class NamecoinResolverCoreTest {
                     .awaitAll()
             assertTrue(results.all { it is NamecoinResolver.NamecoinResult.Resolved })
             assertEquals(1, historyCalls.get())
+        }
+
+    @Test
+    fun cancelledOwnerReleasesSharedWaitersAndNextResolveStartsFreshLookup() =
+        runBlocking {
+            val pubkey = "8".repeat(64)
+            val happy = happyPath("d/example", """{"nostr":{"pubkey":"$pubkey"}}""")
+            val transport =
+                FakeTransport(latencyMillis = 200) { server, id, method, params ->
+                    happy(server, id, method, params)
+                }
+            val core = coreFor(transport)
+            val owner = async { core.resolve("example.bit") }
+            delay(50)
+            val waiters =
+                listOf(
+                    async { core.resolve("Example.BIT") },
+                    async { core.resolve(" example.bit ") },
+                )
+            delay(50)
+
+            owner.cancelAndJoin()
+            assertEquals(
+                listOf(
+                    NamecoinResolver.NamecoinResult.Unavailable,
+                    NamecoinResolver.NamecoinResult.Unavailable,
+                ),
+                waiters.awaitAll(),
+            )
+
+            val requestsBeforeRetry = transport.startedAt.size
+            val retry = core.resolve("example.bit")
+            assertEquals(pubkey, (retry as NamecoinResolver.NamecoinResult.Resolved).pubkeyHex)
+            assertTrue("Retry must issue a new request", transport.startedAt.size > requestsBeforeRetry)
         }
 
     @Test
