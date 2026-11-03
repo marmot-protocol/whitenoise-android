@@ -1162,8 +1162,13 @@ internal fun ConversationScreen(
             if (bounds != null) {
                 transcriptWindowTop = bounds.top
                 transcriptHeightPx = bounds.height
-                ttsFollowHandle.sentenceLayouts.updateViewportBounds(bounds)
             }
+        }
+    }
+    // Speech rests sentences below the painted top fade, unlike the drag and reaction consumers above.
+    LaunchedEffect(timelineViewport, ttsFollowHandle) {
+        snapshotFlow { timelineViewport.speechBoundsInWindow }.collect { bounds ->
+            if (bounds != null) ttsFollowHandle.sentenceLayouts.updateViewportBounds(bounds)
         }
     }
 
@@ -4435,6 +4440,7 @@ internal fun ConversationScreen(
                                             .transcriptEdgeFade(
                                                 listState = listState,
                                                 composerOverlap = overlayPadding,
+                                                geometry = timelineViewport.edgeFade,
                                             ),
                                     // Bottom-anchored like every established chat
                                     // client: the viewport shrinking under the keyboard

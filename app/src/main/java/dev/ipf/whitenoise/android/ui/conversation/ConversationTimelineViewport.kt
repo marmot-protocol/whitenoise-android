@@ -151,6 +151,27 @@ internal class ConversationTimelineViewport(
             paintBoundsInWindow?.let { bounds ->
                 bounds.copy(bottom = (bounds.top + readingHeightPx()).coerceAtMost(bounds.bottom))
             }
+
+    /** The transcript's edge mask, published by the modifier that paints it over these paint bounds. */
+    val edgeFade = TranscriptEdgeFadeGeometry()
+
+    /**
+     * The interval where read aloud may rest a sentence: the clear reading interval, further narrowed
+     * to where the painted edge mask is fully opaque.
+     *
+     * Only speech uses this. Touch, selection, reactions and the read watermark keep
+     * [readingBoundsInWindow], where a row dimmed by the fade is still a real, visible target; a
+     * sentence being read, however, has to be legible from its first line.
+     */
+    val speechBoundsInWindow: Rect?
+        get() {
+            val paint = paintBoundsInWindow ?: return null
+            val reading = readingBoundsInWindow ?: return null
+            val opaque = edgeFade.opaqueRangePx(paint.height) ?: return reading.copy(top = reading.bottom)
+            val top = (paint.top + opaque.start).coerceIn(reading.top, reading.bottom)
+            val bottom = (paint.top + opaque.endInclusive).coerceIn(top, reading.bottom)
+            return reading.copy(top = top, bottom = bottom)
+        }
 }
 
 /**

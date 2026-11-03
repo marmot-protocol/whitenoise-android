@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.ui.graphics.Color
+import dev.ipf.whitenoise.android.ui.common.verticalEdgeFadeOpaqueRange
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -95,5 +96,42 @@ class TranscriptEdgeFadeTest {
         assertNull(
             transcriptEdgeFadeStops(heightPx = 400f, topFadePx = 28f, bottomFadePx = 28f, bottomInsetPx = 400f),
         )
+    }
+
+    /** The opaque interval starts exactly where the painted top stop reaches full opacity. */
+    @Test
+    fun theOpaqueIntervalBeginsAtThePaintedTopStop() {
+        val stops = transcriptEdgeFadeStops(heightPx = 600f, topFadePx = 28f, bottomFadePx = 60f)!!
+        val opaque = verticalEdgeFadeOpaqueRange(heightPx = 600f, topFadePx = 28f, bottomFadePx = 60f)!!
+
+        assertEquals(stops[1].first * 600f, opaque.start, 0.001f)
+        assertEquals(Color.Black, stops[1].second)
+        assertEquals("the bottom band begins at the composer edge", stops[2].first * 600f, opaque.endInclusive, 0.001f)
+    }
+
+    /** Without an active top band the whole span above the composer is opaque, with no duplicate inset. */
+    @Test
+    fun anInactiveTopFadeLeavesTheTopOpaque() {
+        assertEquals(0f..540f, verticalEdgeFadeOpaqueRange(heightPx = 600f, topFadePx = 0f, bottomFadePx = 60f))
+        assertEquals(0f..600f, verticalEdgeFadeOpaqueRange(heightPx = 600f, topFadePx = 0f, bottomFadePx = 0f))
+    }
+
+    /** Bands squeezed into a short window shrink together, and the opaque interval follows the painted stops. */
+    @Test
+    fun aShortWindowShrinksTheOpaqueEdgeWithTheBands() {
+        val stops = transcriptEdgeFadeStops(heightPx = 100f, topFadePx = 90f, bottomFadePx = 90f)!!
+        val opaque = verticalEdgeFadeOpaqueRange(heightPx = 100f, topFadePx = 90f, bottomFadePx = 90f)
+
+        assertEquals("the bands meet, leaving nothing at full opacity", stops[1].first, stops[2].first, 0.001f)
+        assertNull(opaque)
+    }
+
+    /** The ordinary-viewport band cap limits the opaque edge exactly as it limits the paint. */
+    @Test
+    fun theBandCapLimitsTheOpaqueEdge() {
+        val opaque =
+            verticalEdgeFadeOpaqueRange(heightPx = 80f, topFadePx = 28f, bottomFadePx = 0f, maxBandFraction = 0.25f)
+
+        assertEquals(20f..80f, opaque)
     }
 }
