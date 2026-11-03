@@ -68,6 +68,18 @@ class TileTransferCheckerTest(unittest.TestCase):
             with self.subTest(text=text):
                 self.assertFalse(check_tile_transfer(altered, ledger())["passed"])
 
+    def test_grouped_thousands_are_read_as_their_value(self):
+        """A grouped amount such as 1,008.0 KB is real progress, and its value, not its digits, is compared."""
+        altered = rows()
+        altered[0]["bytes_text"] = "1,008.0 KB of 3.0 MB"
+        altered[2]["bytes_text"] = "1,008.0 KB received"
+        self.assertTrue(check_tile_transfer(altered, ledger())["passed"])
+        for text in ("3,072.0 KB of 3.0 MB", "1,008.0 KB of 1,000.0 KB", "1,00.0 KB of 3.0 MB", "1008,0 KB of 3.0 MB"):
+            altered = rows()
+            altered[0]["bytes_text"] = text
+            with self.subTest(text=text):
+                self.assertFalse(check_tile_transfer(altered, ledger())["passed"])
+
     def test_the_wrong_media_kind_or_a_late_cancel_fails(self):
         """The scenarios are bound to their tile kind, and a cancel acknowledgement must be timely."""
         altered = rows()

@@ -10,15 +10,17 @@ SCENARIOS = {
     "failed-then-retried": ("video", ("idle_download_seen", "failed_seen", "completed")),
     "unknown-length": ("image", ("idle_download_seen", "no_total", "completed")),
 }
-KNOWN_BYTES = re.compile(r"^(\d+(?:\.\d+)?) ([KMG]?B) of (\d+(?:\.\d+)?) ([KMG]?B)$")
-UNKNOWN_BYTES = re.compile(r"^(\d+(?:\.\d+)?) ([KMG]?B) received$")
+# The tile's NumberFormat groups thousands for 1,000 to 1,023 of a unit, as in "1,008.0 KB".
+NUMBER = r"((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)"
+KNOWN_BYTES = re.compile(rf"^{NUMBER} ([KMG]?B) of {NUMBER} ([KMG]?B)$")
+UNKNOWN_BYTES = re.compile(rf"^{NUMBER} ([KMG]?B) received$")
 UNITS = {"B": 1, "KB": 1024, "MB": 1024 ** 2, "GB": 1024 ** 3}
 CANCEL_ACK_LIMIT_MS = 30_000
 
 
 def _bytes(value, unit):
-    """A rendered size in bytes."""
-    return float(value) * UNITS[unit]
+    """A rendered size in bytes, read without its thousands separators."""
+    return float(value.replace(",", "")) * UNITS[unit]
 
 
 def _finite(value):
