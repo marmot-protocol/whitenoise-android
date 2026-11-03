@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.chats.chatReadIcon
 
 /** Builds notification actions and navigation intents using the presenter's existing tap-token owner. */
 internal class NotificationInteractionFactory(
@@ -60,11 +61,15 @@ internal class NotificationInteractionFactory(
             .build()
     }
 
+    /**
+     * Mark read without opening the app, drawn with the same open envelope as the in-app Mark read commands
+     * (#3566). SystemUI may hide action artwork, and the card's small app icon is unchanged.
+     */
     fun markReadNotificationAction(actionTarget: NotificationActionTarget): NotificationCompat.Action =
         NotificationCompat
             .Action
             .Builder(
-                R.drawable.ic_stat_whitenoise,
+                chatReadIcon(markRead = true),
                 context.getString(R.string.chat_row_action_mark_read),
                 actionPendingIntent(actionTarget, NotificationActionKind.MARK_READ),
             ).setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_MARK_AS_READ)

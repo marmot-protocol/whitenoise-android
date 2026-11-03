@@ -7,6 +7,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.content.pm.ShortcutInfoCompat
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.chats.chatReadIcon
 
 /**
  * Rebuilds generic OS cards from allowlisted routing fields, never from a recovered rich builder.
@@ -50,6 +51,10 @@ internal fun notificationWithoutPreview(
     return builder.build().also { it.publicVersion = genericPublicVersion(context, original) }
 }
 
+/**
+ * Re-adds only the background Mark read action, rebuilt with the shared open envelope, never the
+ * rich card's other actions.
+ */
 private fun addSafeNotificationActions(
     context: Context,
     original: Notification,
@@ -63,7 +68,7 @@ private fun addSafeNotificationActions(
             builder.addAction(
                 NotificationCompat.Action
                     .Builder(
-                        R.drawable.ic_stat_whitenoise,
+                        chatReadIcon(markRead = true),
                         context.getString(R.string.chat_row_action_mark_read),
                         action.actionIntent,
                     ).setSemanticAction(NotificationCompat.Action.SEMANTIC_ACTION_MARK_AS_READ)

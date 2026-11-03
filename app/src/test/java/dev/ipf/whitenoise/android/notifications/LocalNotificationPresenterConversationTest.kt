@@ -1292,6 +1292,31 @@ class LocalNotificationPresenterConversationTest {
         assertEquals(listOf(first, "second"), style.messages.map { it.text.toString() })
     }
 
+    /**
+     * Mark read carries the same open envelope as the in-app commands, keeps its semantic action and background
+     * delivery, and leaves the card's small app icon alone (#3566).
+     */
+    @Test
+    fun markReadActionUsesTheOpenEnvelopeAndKeepsItsSemantics() {
+        presenter.ensureChannels()
+
+        runBlocking {
+            presenter.show(update(isMention = false), previewTextOverride = "hello", shortNpub = { "npub1test" })
+        }
+
+        val notification = manager.activeNotifications.single().notification
+        val markReadTitle = context.getString(R.string.chat_row_action_mark_read)
+        val markRead =
+            (0 until NotificationCompat.getActionCount(notification))
+                .map { NotificationCompat.getAction(notification, it)!! }
+                .single { it.title.toString() == markReadTitle }
+        assertEquals(R.drawable.ic_mark_read, markRead.iconCompat?.resId)
+        assertNotEquals(R.drawable.ic_check, markRead.iconCompat?.resId)
+        assertEquals(NotificationCompat.Action.SEMANTIC_ACTION_MARK_AS_READ, markRead.semanticAction)
+        assertFalse(markRead.showsUserInterface)
+        assertEquals(R.drawable.ic_stat_whitenoise, notification.smallIcon.resId)
+    }
+
     /** A long newest message behind history keeps the conversation template, every earlier line and its actions. */
     @Test
     fun longNewestMessageAfterHistoryKeepsConversationStyleHistoryActionsAndPublicVersion() {

@@ -52,13 +52,21 @@ internal fun ChatContextMenu(
         buildList {
             if (hasUnread && actions?.canMarkRead != false) {
                 add(
-                    chatMenuItem(R.string.chat_row_action_mark_read, R.drawable.ic_check, "Read") {
+                    chatMenuItem(
+                        R.string.chat_row_action_mark_read,
+                        chatReadIcon(markRead = true),
+                        "Read",
+                    ) {
                         onMarkRead()
                     },
                 )
             } else if (canMarkUnread && actions?.canMarkUnread != false) {
                 add(
-                    chatMenuItem(R.string.chat_row_action_mark_unread, R.drawable.ic_mark_unread, "Unread") {
+                    chatMenuItem(
+                        R.string.chat_row_action_mark_unread,
+                        chatReadIcon(markRead = false),
+                        "Unread",
+                    ) {
                         onMarkUnread()
                     },
                 )

@@ -24,6 +24,10 @@
 *.BubbleCollapsibleFooterLayoutTest.overflowingBodyIsClippedBeforeFooterRow
 *.ChatActionSheetTest.actionSheetDarkScreenshot
 *.ChatActionSheetTest.actionSheetLightScreenshot
+*.ChatActionSheetTest.actionSheetMarkReadAmoledScreenshot
+*.ChatActionSheetTest.actionSheetMarkReadDarkScreenshot
+*.ChatActionSheetTest.actionSheetMarkReadLightScreenshot
+*.ChatActionSheetTest.actionSheetMarkReadRtlLargeScreenshot
 *.ChatListPinnedBoundaryTest.pinnedBoundaryAmoled
 *.ChatListPinnedBoundaryTest.pinnedBoundaryDark
 *.ChatListPinnedBoundaryTest.pinnedBoundaryLight
@@ -153,6 +157,9 @@
 
 # Current chat swipe cues.
 *.ChatRowPortGestureTest.readCueDark
+*.ChatRowPortGestureTest.readCueAmoled
+*.ChatRowPortGestureTest.readCueLargeRtl
+*.ChatRowPortGestureTest.readCueLight
 *.ChatRowPortGestureTest.muteCueAmoled
 *.ChatRowPortGestureTest.pinCueLargeRtl
 *.ChatRowPortGestureTest.unreadCueLight

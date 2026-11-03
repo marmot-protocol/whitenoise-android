@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
@@ -341,6 +342,7 @@ class ChatListSelectionBarTest {
         val pinnedTargets = mutableListOf<Boolean>()
         val folderTargets = mutableListOf<String>()
         val deleteTargets = mutableListOf<String>()
+        val readTargets = mutableListOf<Boolean>()
         composeRule.setContent {
             WhiteNoiseTheme {
                 ChatListSelectionControls(
@@ -356,8 +358,8 @@ class ChatListSelectionBarTest {
                     onArchive = {},
                     onDelete = { deleteTargets += "leave" },
                     onAddToFolder = { folderTargets += "add" },
-                    onMarkRead = {},
-                    onMarkUnread = {},
+                    onMarkRead = { readTargets += true },
+                    onMarkUnread = { readTargets += false },
                     onMovePinned = {},
                     onSelectAll = {},
                     onDeselectAll = {},
@@ -373,7 +375,17 @@ class ChatListSelectionBarTest {
             }
         }
 
-        composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_mark_read)).assertIsDisplayed()
+        // A mixed selection keeps both envelope commands, each enabled and routed to its own desired state (#3566).
+        composeRule
+            .onNodeWithContentDescription(string(R.string.chat_row_action_mark_read))
+            .assertIsDisplayed()
+            .assertIsEnabled()
+            .performClick()
+        composeRule
+            .onNodeWithContentDescription(string(R.string.chat_row_action_mark_unread))
+            .assertIsDisplayed()
+            .assertIsEnabled()
+            .performClick()
         composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_mute)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.chat_row_action_unmute)).assertIsDisplayed()
         composeRule.onNodeWithContentDescription(string(R.string.archive)).assertIsDisplayed()
@@ -399,6 +411,7 @@ class ChatListSelectionBarTest {
         assertEquals(listOf("local", "leave"), deleteTargets)
         assertEquals(listOf(true, false), mutedTargets)
         assertEquals(listOf(true, false), pinnedTargets)
+        assertEquals(listOf(true, false), readTargets)
     }
 
     /** Direct multi-selection bar routes add to folder. */
