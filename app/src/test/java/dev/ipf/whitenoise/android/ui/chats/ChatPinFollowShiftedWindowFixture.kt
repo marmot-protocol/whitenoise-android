@@ -159,12 +159,15 @@ internal class ChatPinFollowShiftedWindowFixture {
 }
 
 /**
- * Starts [SHIFT][ChatPinFollowShiftedWindowFixture.SHIFT] rows below the head and stays there: backward
- * pages answer with the unchanged frame, so only [returnToTop] installs the true head.
+ * Starts [SHIFT][ChatPinFollowShiftedWindowFixture.SHIFT] rows below the head. After a pin, each backward
+ * page moves the window up by [PAGE_ROWS] rows without reaching the head, and [returnToTop] answers only
+ * after the controller's projection debounce, so a page published during the return races the head frame.
  */
 internal class ShiftedPinWindow(
     private val fixture: ChatPinFollowShiftedWindowFixture,
 ) : ChatListWindowHandle {
+    @Volatile private var shift = ChatPinFollowShiftedWindowFixture.SHIFT
+
     @Volatile private var frame = shifted(0uL)
     private val updates = Channel<ChatListWindowSnapshotFfi>(Channel.UNLIMITED)
 
@@ -173,8 +176,10 @@ internal class ShiftedPinWindow(
         private set
 
     /** The current native order minus its first rows, with earlier rows retained by MDK. */
-    private fun shifted(sequence: ULong): ChatListWindowSnapshotFfi =
-        frame(fixture.headOrder.drop(ChatPinFollowShiftedWindowFixture.SHIFT), sequence).copy(hasMoreBefore = true)
+    private fun shifted(sequence: ULong): ChatListWindowSnapshotFfi {
+        val retained = fixture.headOrder.drop(shift)
+        return frame(retained, sequence).copy(hasMoreBefore = true)
+    }
 
     /** A window snapshot of [rows] whose rows allow pinning and unpinning. */
     private fun frame(
@@ -199,12 +204,22 @@ internal class ShiftedPinWindow(
     /** Holds the live stream until its owner cancels it. */
     override suspend fun next(): ChatListWindowSnapshotFfi? = updates.receiveCatching().getOrNull()
 
-    /** Paging leaves the window where it is, so the follow's own return to top is what restores the head. */
+    /**
+     * A backward page after a pin moves the window [PAGE_ROWS] rows nearer the head but never onto it, so
+     * only the follow's own return to top restores the head; any other page keeps the frame.
+     */
     override suspend fun page(
         sequence: ULong,
         direction: ChatListPageDirectionFfi,
         count: UInt,
-    ): ChatListWindowSnapshotFfi = frame
+    ): ChatListWindowSnapshotFfi {
+        val roomToPage = direction == ChatListPageDirectionFfi.BACKWARD && !returnedToTop && shift > PAGE_ROWS
+        if (roomToPage && fixture.calls.any { it.startsWith("pin:true") }) {
+            shift -= PAGE_ROWS
+            frame = shifted(frame.sequence + 1uL)
+        }
+        return frame
+    }
 
     /** The viewport anchor keeps the same retained rows. */
     override suspend fun setVisibleAnchor(
@@ -212,8 +227,9 @@ internal class ShiftedPinWindow(
         groupIdHex: String,
     ): ChatListWindowSnapshotFfi = frame
 
-    /** Installs the true head window, pinned block first. */
+    /** Installs the true head window, pinned block first, answering later than the projection debounce. */
     override suspend fun returnToTop(sequence: ULong): ChatListWindowSnapshotFfi {
+        Thread.sleep(RETURN_TO_TOP_LATENCY_MILLIS)
         returnedToTop = true
         frame = frame(fixture.headOrder, frame.sequence + 1uL)
         return frame
@@ -222,6 +238,14 @@ internal class ShiftedPinWindow(
     /** The controller cancels the only pending receive. */
     override fun close() {
         updates.close()
+    }
+
+    private companion object {
+        /** Rows one backward page moves the window by. */
+        const val PAGE_ROWS = 2
+
+        /** Longer than the controller's 16 ms projection debounce, so a page can publish first. */
+        const val RETURN_TO_TOP_LATENCY_MILLIS = 60L
     }
 }
 

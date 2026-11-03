@@ -106,8 +106,9 @@ class ChatPinFollowToTopTest {
 
     /**
      * A bounded window that has rows before its front: the follow scrolls, returns the window to its
-     * head, and settles at the absolute first item with zero offset, consuming the request once. The
-     * restored head is published several frames later, as the controller's debounced recompute does.
+     * head, and settles at the absolute first item with zero offset, consuming the request once. A backward
+     * page changes the rows first, and the restored head is published several frames later, as the
+     * controller's debounced recompute does, so only the installed head frame may release the snap.
      */
     @Test fun shiftedWindowFollowRestoresHeadWindowAndSettlesAtZero() {
         val head = List(60) { "row-$it" }
@@ -126,14 +127,16 @@ class ChatPinFollowToTopTest {
                 userGestureGeneration = 0L,
                 unpinnedVisibleIds = emptySet(),
                 motionSettled = true,
-                rowIds = rows,
                 hasEarlierRows = { rows.first() != head.first() },
                 returnWindowToTop = {
                     windowReturns += 1
+                    // A backward page published while the return was in flight: new rows, still not the head.
+                    rows = head.drop(28)
                     publisher.launch {
                         delay(DEBOUNCED_PUBLICATION_MILLIS)
                         rows = head
                     }
+                    ChatPinFollowHeadPresented { rows == head }
                 },
                 onScrollStarted = {},
                 onConsumed = {
@@ -180,7 +183,6 @@ class ChatPinFollowToTopTest {
                 userGestureGeneration = 0L,
                 unpinnedVisibleIds = emptySet(),
                 motionSettled = true,
-                rowIds = listOf("row-0"),
                 hasEarlierRows = { false },
                 returnWindowToTop = { error("a retired request must not move the window") },
                 onScrollStarted = {},

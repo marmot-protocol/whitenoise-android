@@ -76,6 +76,15 @@ internal class ChatPinFollowOwner {
 /** Batch outcomes are keyed by lowercase group id; rows may carry either case. */
 internal fun chatPinFollowId(id: String): String = id.lowercase(java.util.Locale.ROOT)
 
+/**
+ * Reads, from snapshot state, whether the head window one return installed has reached the list. A
+ * backward page published during the return can change the rows first, so row changes alone prove nothing.
+ */
+internal fun interface ChatPinFollowHeadPresented {
+    /** True once the installed head frame, or a newer one, is what the list shows. */
+    fun presented(): Boolean
+}
+
 /** What a pending follow request should do with the current presentation. */
 internal enum class ChatPinFollowStep { WAIT, FOLLOW, RETIRE }
 
@@ -127,9 +136,11 @@ internal fun chatPinFollowStep(
  * Motion uses the list's animated scroll, so the system animation scale applies as it does for the
  * button. [onScrollStarted] marks each programmatic move for the head-motion owner.
  *
- * When the bounded window had earlier rows, the restored head reaches the list on a later debounced
- * projection, so the final snap waits for [rowIds] to change rather than for a fixed frame count.
- * A user cancellation still consumes the request, so a stale follow never outlives its gesture.
+ * When the bounded window had earlier rows, [returnWindowToTop] reports the head frame it installed and
+ * the final snap waits until that frame is presented, bounded by a timeout. A null report means no head was
+ * installed (closed window, stale command): a newer frame already owns the list, so the follow settles on
+ * what is shown instead of waiting. A user cancellation still consumes the request, so a stale follow never
+ * outlives its gesture.
  */
 @Composable
 @Suppress("FunctionNaming", "LongParameterList") // Effect composable; one request plus the live gates it reads.
@@ -140,9 +151,8 @@ internal fun ChatPinFollowToTopEffect(
     userGestureGeneration: Long,
     unpinnedVisibleIds: Set<String>,
     motionSettled: Boolean,
-    rowIds: List<String>,
     hasEarlierRows: () -> Boolean,
-    returnWindowToTop: suspend () -> Unit,
+    returnWindowToTop: suspend () -> ChatPinFollowHeadPresented?,
     onScrollStarted: () -> Unit,
     onConsumed: (ChatPinFollowRequest) -> Unit,
 ) {
@@ -150,7 +160,6 @@ internal fun ChatPinFollowToTopEffect(
     val liveGestureGeneration by rememberUpdatedState(userGestureGeneration)
     val liveUnpinnedIds by rememberUpdatedState(unpinnedVisibleIds)
     val liveMotionSettled by rememberUpdatedState(motionSettled)
-    val liveRowIds by rememberUpdatedState(rowIds)
     val liveHasEarlierRows by rememberUpdatedState(hasEarlierRows)
     val liveReturnWindowToTop by rememberUpdatedState(returnWindowToTop)
     val liveScrollStarted by rememberUpdatedState(onScrollStarted)
@@ -158,6 +167,7 @@ internal fun ChatPinFollowToTopEffect(
     LaunchedEffect(listState, request) {
         val pending = request ?: return@LaunchedEffect
 
+        /** This request's step against the live dataset, drag generation, pinned rows and list motion. */
         fun step() =
             chatPinFollowStep(
                 request = pending,
@@ -174,13 +184,11 @@ internal fun ChatPinFollowToTopEffect(
                 }
                 listState.animateScrollToItem(0)
                 val windowWasShifted = liveHasEarlierRows()
-                val rowsBeforeReturn = liveRowIds
-                liveReturnWindowToTop()
-                if (windowWasShifted) {
+                val head = liveReturnWindowToTop()
+                if (windowWasShifted && head != null) {
                     // The restored head is published by the controller's debounced recompute, not on this frame.
                     withTimeoutOrNull(CHAT_PIN_FOLLOW_WINDOW_TIMEOUT_MILLIS) {
-                        snapshotFlow { liveRowIds != rowsBeforeReturn || step() == ChatPinFollowStep.RETIRE }
-                            .first { it }
+                        snapshotFlow { head.presented() || step() == ChatPinFollowStep.RETIRE }.first { it }
                     }
                 }
                 // Let the list measure what it now holds before checking the final position.

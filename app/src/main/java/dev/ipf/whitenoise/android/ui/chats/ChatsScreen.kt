@@ -1490,9 +1490,12 @@ internal fun ChatsScreen(
         userGestureGeneration = userGestureGeneration,
         unpinnedVisibleIds = unpinnedVisibleIds,
         motionSettled = !headScrollCorrectionInProgress && !headReorderInProgress && pendingHeadDemotion == null,
-        rowIds = orderedVisibleChatIds,
-        hasEarlierRows = { controller.hasEarlierChats(chatListWindowView) },
-        returnWindowToTop = { controller.returnChatListToTop(chatListWindowView) },
+        hasEarlierRows = { !unreadOnly && !advancedFolder && controller.hasEarlierChats(chatListWindowView) },
+        returnWindowToTop = {
+            controller.returnChatListToTopFrame(chatListWindowView)?.let { installed ->
+                ChatPinFollowHeadPresented { controller.chatListFramePresented(installed) }
+            }
+        },
         onScrollStarted = { programmaticViewportGeneration += 1L },
         onConsumed = pinFollow::consume,
     )

@@ -3172,6 +3172,7 @@ class ChatsController private constructor(
             else -> {
                 windows.publishIfCurrent(frame) { rows ->
                     replacePresentedChatRows(rows)
+                    stagedChatListFrame = ChatListFrameMark(windows, frame.revision)
                     scheduleRecompute()
                 }
                 !windows.closed
@@ -4841,6 +4842,35 @@ class ChatsController private constructor(
     /** Keeps folded native updates synchronous while coalescing only their visible publication. */
     private fun scheduleRecompute() = presentationLifetime.schedule()
 
+    /** The window frame whose rows wait for the next visible projection. */
+    @Volatile private var stagedChatListFrame: ChatListFrameMark? = null
+
+    /** The window frame whose rows [items] last published; snapshot state, so a pin follow can wait on it. */
+    private var presentedChatListFrame by mutableStateOf<ChatListFrameMark?>(null)
+
+    /**
+     * Returns [view] to its top and marks the frame that holds the restored head, so a caller can wait for
+     * [chatListFramePresented]; null means no head window was installed, because the window was closed or
+     * the command was stale or answered nothing new.
+     */
+    internal suspend fun returnChatListToTopFrame(view: ChatListViewFfi): ChatListFrameMark? {
+        val windows = chatListWindows
+        val account = accountRef
+        if (windows == null || account == null || windows.returnToTop(view) == null) return null
+        val installed = ChatListFrameMark(windows, windows.frame().revision)
+        return installed.takeIf { applyChatListWindowRows(account, windows) }
+    }
+
+    /**
+     * Whether [items] now shows [mark]'s frame or a newer one from the same window set. A replaced or
+     * closed window set also counts, since that frame will never be shown and the caller must not wait on it.
+     */
+    internal fun chatListFramePresented(mark: ChatListFrameMark): Boolean {
+        val presented = presentedChatListFrame
+        if (chatListWindows !== mark.windows) return true
+        return presented != null && presented.windows === mark.windows && presented.revision >= mark.revision
+    }
+
     /**
      * Dispose every reference this controller owns. The chat-list screen calls
      * this once when it disposes the controller, which happens on every account
@@ -4955,6 +4985,7 @@ class ChatsController private constructor(
         val avatarWarmTargets = visible.take(CHAT_LIST_AVATAR_WARM_ROWS)
         items = visible
         archivedItems = archived
+        presentedChatListFrame = stagedChatListFrame
         val recoveryGeneration = pendingRecoveryProjectionGeneration.consume()
         if (recoveryGeneration > 0L) {
             if (
