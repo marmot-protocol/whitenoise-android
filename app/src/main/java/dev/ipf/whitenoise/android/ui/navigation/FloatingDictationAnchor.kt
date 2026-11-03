@@ -26,6 +26,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -34,13 +35,42 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.common.AccountActionColors
+import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
+import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoff
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/** Only visible layout obstacles, including both sides of an animated route transition. */
+/** Visible layout obstacles owned by the current route or persistent shell chrome. */
 internal class FloatingDictationAnchor {
     private val bounds = mutableStateMapOf<Any, Rect>()
+    private val composerFabObstacles = mutableStateMapOf<Any, Boolean>()
+    private val composerControls = mutableStateMapOf<Any, Rect>()
+
+    var composerControlColors: AccountActionColors? by mutableStateOf(null)
+        private set
+    val composerControlBounds: Rect? get() = composerControls.values.lastOrNull()
+
+    /** Reports inline slot styling and removes a token whose measured slot has no area. */
+    fun reportComposerControls(
+        token: Any,
+        rect: Rect,
+        colors: AccountActionColors? = null,
+    ) {
+        composerControlColors = colors
+        if (rect.width > 0f && rect.height > 0f) composerControls[token] = rect else composerControls.remove(token)
+    }
+
+    /** Releases one inline slot and clears its colors only after the final composer slot leaves. */
+    fun removeComposerControls(token: Any) {
+        composerControls.remove(token)
+        if (composerControls.isEmpty()) composerControlColors = null
+    }
+
     private val footerViewports = mutableStateMapOf<Any, Rect>()
     private val capsuleSlots = mutableStateMapOf<Any, Rect>()
     private val footerScrolls = mutableMapOf<Any, ScrollState>()
@@ -81,14 +111,34 @@ internal class FloatingDictationAnchor {
                 viewport.width > 0f && viewport.height > 0f && token in capsuleSlots && token in footerScrolls
             }.minByOrNull { it.value.top }
 
-    val topInWindow: Float? get() = bounds.values.minOfOrNull { it.top }
+    val topInWindow: Float? get() = topInWindow(null)
 
+    /**
+     * Only a registered painted pen/composer edge follows the bridge. Additional rows above the
+     * pill and independent notices/footers retain their real clearance. One pixel allows rounded
+     * layout padding to match its density-converted anchor inset.
+     */
+    fun topInWindow(
+        movingComposerFab: Rect?,
+        targetComposerFab: Rect? = null,
+    ): Float? =
+        bounds.minOfOrNull { (token, rect) ->
+            val followsPaintedEdge =
+                composerFabObstacles[token] == true &&
+                    targetComposerFab != null &&
+                    abs(rect.top - targetComposerFab.top) <= 1f
+            if (followsPaintedEdge && movingComposerFab != null) movingComposerFab.top else rect.top
+        }
+
+    /** Registers a visible obstacle and whether its painted edge follows the composer/FAB bridge. */
     fun report(
         token: Any,
         visibleBounds: Rect,
+        followsComposerFab: Boolean = false,
     ) {
         if (visibleBounds.width > 0f && visibleBounds.height > 0f) {
             bounds[token] = visibleBounds
+            composerFabObstacles[token] = followsComposerFab
         } else {
             remove(token)
         }
@@ -96,6 +146,7 @@ internal class FloatingDictationAnchor {
 
     fun remove(token: Any) {
         bounds.remove(token)
+        composerFabObstacles.remove(token)
         footerViewports.remove(token)
         capsuleSlots.remove(token)
         footerScrolls.remove(token)
@@ -106,13 +157,32 @@ internal val LocalFloatingDictationAnchor = staticCompositionLocalOf<FloatingDic
 
 /** Attach to the actual bottom chrome, including its IME layout, rather than guessing its height. */
 @Composable
-internal fun Modifier.floatingDictationAnchor(): Modifier {
+internal fun Modifier.floatingDictationAnchor(
+    topInset: Dp = 0.dp,
+    followsComposerFab: Boolean = false,
+): Modifier {
+    val insetPx = with(LocalDensity.current) { topInset.toPx() }
     val anchor = LocalFloatingDictationAnchor.current
+    val current = LocalControlHandoffEndpointCurrent.current
     val token = remember(anchor) { Any() }
-    DisposableEffect(anchor, token) { onDispose { anchor?.remove(token) } }
+    DisposableEffect(anchor, token, current) {
+        if (!current) anchor?.remove(token)
+        onDispose { anchor?.remove(token) }
+    }
     // The shell places content before its overlay. Publish during that same placement pass,
     // before the capsule reads the obstacle, including the first navigation frame.
-    return onPlaced { coordinates -> anchor?.report(token, coordinates.boundsInWindow()) }
+    return if (current) {
+        onPlaced { coordinates ->
+            val bounds = coordinates.boundsInWindow()
+            anchor?.report(
+                token,
+                bounds.copy(top = (bounds.top + insetPx).coerceAtMost(bounds.bottom)),
+                followsComposerFab,
+            )
+        }
+    } else {
+        this
+    }
 }
 
 /** Insets are consumed outside the action viewport; a short viewport scrolls the capsule slot too. */
@@ -156,9 +226,13 @@ private class DictationContentSlots(
 internal fun Modifier.floatingDictationFooter(): Modifier {
     val space = LocalDictationFooterSpace.current
     val anchor = LocalFloatingDictationAnchor.current
+    val current = LocalControlHandoffEndpointCurrent.current
     val token = remember(anchor, space?.capsuleSlot) { Any() }
     val scroll = rememberScrollState()
-    DisposableEffect(anchor, token) { onDispose { anchor?.remove(token) } }
+    DisposableEffect(anchor, token, current) {
+        if (!current) anchor?.remove(token)
+        onDispose { anchor?.remove(token) }
+    }
     val boundedActions =
         if (space == null) {
             Modifier
@@ -167,12 +241,12 @@ internal fun Modifier.floatingDictationFooter(): Modifier {
                 .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
                 .heightIn(max = space.height)
                 .onPlaced {
-                    if (space.capsuleSlot > 0.dp) {
+                    if (current && space.capsuleSlot > 0.dp) {
                         anchor?.reportFooter(token, viewport = it.boundsInWindow(), scroll = scroll)
                     }
                 }.verticalScroll(scroll)
                 .onPlaced {
-                    if (space.capsuleSlot > 0.dp) {
+                    if (current && space.capsuleSlot > 0.dp) {
                         val origin = it.positionInWindow()
                         anchor?.reportFooter(
                             token,
@@ -199,11 +273,16 @@ internal fun FloatingDictationLayout(
     anchor: FloatingDictationAnchor,
     content: @Composable () -> Unit,
     control: @Composable () -> Unit,
+    inlineControl: Boolean = false,
+    controlMotion: MeasuredControlHandoff? = null,
+    composerFabMotion: MeasuredControlHandoff? = null,
 ) {
     val statusBars = WindowInsets.statusBars
     val ime = WindowInsets.ime
     val navigationBars = WindowInsets.navigationBars
     var rootTop by remember { mutableStateOf(0f) }
+    var rootLeft by remember { mutableStateOf(0f) }
+    val controlToken = remember(controlMotion) { Any() }
     val idleScroll = rememberScrollState()
     val controlSlot: @Composable () -> Unit =
         remember(anchor, control) {
@@ -222,7 +301,11 @@ internal fun FloatingDictationLayout(
         }
     val contentSlots = remember(content) { DictationContentSlots(content) }
     SubcomposeLayout(
-        modifier = Modifier.fillMaxSize().onPlaced { rootTop = it.positionInWindow().y },
+        modifier =
+            Modifier.fillMaxSize().onPlaced {
+                rootTop = it.positionInWindow().y
+                rootLeft = it.positionInWindow().x
+            },
     ) { constraints ->
         // Insets are read while measuring, so a keyboard frame remeasures the shell without recomposing it.
         val statusBarTop = statusBars.getTop(this)
@@ -230,11 +313,25 @@ internal fun FloatingDictationLayout(
         val bubble =
             subcompose("control", controlSlot)
                 .single()
-                .measure(constraints.copy(minWidth = 0, minHeight = 0))
-                .takeIf { it.width > 0 && it.height > 0 }
+                .measure(
+                    constraints.copy(
+                        minWidth = 0,
+                        minHeight = 0,
+                        maxWidth =
+                            if (inlineControl) {
+                                anchor.composerControlBounds
+                                    ?.width
+                                    ?.roundToInt()
+                                    ?.coerceIn(0, constraints.maxWidth)
+                                    ?: constraints.maxWidth
+                            } else {
+                                constraints.maxWidth
+                            },
+                    ),
+                ).takeIf { it.width > 0 && it.height > 0 }
         val safeTop = (statusBarTop - rootTop).roundToInt().coerceAtLeast(0)
         val footerSpace =
-            bubble?.let {
+            bubble?.takeUnless { inlineControl }?.let {
                 val available = (constraints.maxHeight - fallbackInset - safeTop).coerceAtLeast(0)
                 val slot = it.height + 12.dp.roundToPx()
                 if (available < slot + 48.dp.roundToPx()) {
@@ -247,19 +344,65 @@ internal fun FloatingDictationLayout(
         layout(constraints.maxWidth, constraints.maxHeight) {
             body.place(0, 0)
             if (bubble != null) {
-                val bottom = anchor.topInWindow?.minus(rootTop)?.roundToInt() ?: (constraints.maxHeight - fallbackInset)
+                val inlineBounds = anchor.composerControlBounds.takeIf { inlineControl }
+                // The composer slot reports during body placement, before its shell controls are placed.
+                // Missing current slot geometry uses the existing safe capsule position, never stale bounds.
+                // Chats and another chat share the Persistent owner, so there is no action
+                // handoff to animate. Follow the already-drawn container on its existing clock.
+                // Inline owner changes retain their own captured command trajectory instead.
+                val movingObstacle =
+                    composerFabMotion?.renderedBounds?.takeIf { !inlineControl && controlMotion?.active != true }
+                val bottom =
+                    anchor.topInWindow(movingObstacle, composerFabMotion?.targetBounds)?.minus(rootTop)?.roundToInt()
+                        ?: (constraints.maxHeight - fallbackInset)
                 val availableGap = (bottom - bubble.height - safeTop).coerceIn(0, 12.dp.roundToPx())
                 val scrolling = anchor.scrollingCapsule.takeIf { footerSpace?.capsuleSlot != 0.dp }
-                val x = (constraints.maxWidth - bubble.width - 16.dp.roundToPx()).coerceAtLeast(0)
-                if (scrolling == null) {
-                    bubble.place(x, (bottom - bubble.height - availableGap).coerceAtLeast(safeTop))
-                } else {
-                    val (slot, viewport) = scrolling
-                    val y = (slot.top - rootTop).roundToInt()
-                    val localClip = viewport.translate(-x.toFloat(), -rootTop - y)
-                    bubble.placeWithLayer(x, y) {
+                val x =
+                    inlineBounds?.let { (it.right - rootLeft - bubble.width).roundToInt() }
+                        ?: (constraints.maxWidth - bubble.width - 16.dp.roundToPx()).coerceAtLeast(0)
+                val y =
+                    if (scrolling != null && !inlineControl) {
+                        (scrolling.first.top - rootTop).roundToInt()
+                    } else {
+                        inlineBounds?.let { (it.top - rootTop).roundToInt() }
+                            ?: (bottom - bubble.height - availableGap).coerceAtLeast(safeTop)
+                    }
+                val owner =
+                    if (inlineControl) {
+                        ConversationDictationControlOwner.Composer
+                    } else {
+                        ConversationDictationControlOwner.Persistent
+                    }
+                // Registration reads its previous geometry before writing it. Those bookkeeping
+                // reads must not subscribe this placement to the map it updates every motion frame.
+                Snapshot.withoutReadObservation {
+                    controlMotion?.report(
+                        owner,
+                        controlToken,
+                        Rect(rootLeft + x, rootTop + y, rootLeft + x + bubble.width, rootTop + y + bubble.height),
+                    )
+                }
+                val localClip =
+                    scrolling?.takeUnless { inlineControl }?.second?.translate(-rootLeft - x, -rootTop - y)
+                bubble.placeWithLayer(x, y) {
+                    val target = controlMotion?.targetBounds
+                    val moving = controlMotion?.renderedBounds
+                    if (controlMotion?.active == true && target != null && moving != null) {
+                        // Commands keep their logical trailing edge while recovery text changes
+                        // the container width. No command, session or editor is duplicated.
+                        translationX =
+                            if (layoutDirection == LayoutDirection.Rtl) {
+                                moving.left - target.left
+                            } else {
+                                moving.right - target.right
+                            }
+                        translationY = moving.center.y - target.center.y
+                    }
+                    if (localClip != null) {
                         clip = true
-                        shape = GenericShape { _, _ -> addRect(localClip) }
+                        // Layer motion must not move the footer viewport in window coordinates.
+                        val fixedClip = localClip.translate(-translationX, -translationY)
+                        shape = GenericShape { _, _ -> addRect(fixedClip) }
                     }
                 }
             }

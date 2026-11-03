@@ -30,6 +30,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.BlockedDmComposerNoti
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerAttachmentSheetState
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOuterVerticalPadding
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.composer.DisbandedGroupComposerNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.FrozenGroupComposerNotice
@@ -37,8 +38,6 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.RemovedMemberComposer
 import dev.ipf.whitenoise.android.ui.conversation.composer.VoiceRecordingReview
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberReplyReceivedEmoji
-import dev.ipf.whitenoise.android.ui.navigation.ComposerFabEndpoint
-import dev.ipf.whitenoise.android.ui.navigation.composerFabEndpoint
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 
 private val ConversationTopInteractionClearance = 64.dp
@@ -120,14 +119,22 @@ internal fun ConversationBottomBar(
     onBottomChromeMeasured: (heightPx: Int) -> Unit,
     onTimelineComposerMeasured: (foregroundHeightPx: Int, compactHeightPx: Int) -> Unit = { _, _ -> },
 ) {
+    val normalComposer = !selectionMode && !searchOpen && !hasError && composerGate == ComposerGate.COMPOSER
     val renderedInviteGroupIdHex = controller.group.groupIdHex
     val renderedInviteWelcomeMessageIdHex = controller.group.viaWelcomeMessageIdHex
     Box(
         Modifier
             .fillMaxWidth()
             .testTag(CONVERSATION_BOTTOM_BAR_TAG)
-            .floatingDictationAnchor()
-            .onSizeChanged { size -> onBottomChromeMeasured(size.height) },
+            .floatingDictationAnchor(
+                topInset =
+                    if (normalComposer) {
+                        ComposerOuterVerticalPadding
+                    } else {
+                        0.dp
+                    },
+                followsComposerFab = normalComposer,
+            ).onSizeChanged { size -> onBottomChromeMeasured(size.height) },
     ) {
         when {
             selectionMode ->
@@ -217,7 +224,6 @@ internal fun ConversationBottomBar(
                                 controller.timeline.firstOrNull { it.record.messageIdHex == id }?.record
                             }
                         ComposerBar(
-                            modifier = Modifier.composerFabEndpoint(ComposerFabEndpoint.Composer),
                             replyingToEmoji =
                                 rememberReplyReceivedEmoji(
                                     controller.replyingTo?.messageIdHex,

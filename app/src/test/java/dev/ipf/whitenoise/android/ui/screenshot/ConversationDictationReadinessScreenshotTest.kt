@@ -1,19 +1,25 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import android.content.Context
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
@@ -75,6 +81,7 @@ class ConversationDictationReadinessScreenshotTest {
         val fixture = fixture(appOwned = true)
         fixture.platform.listener.onReady()
         capture(fixture, "dictation_bottom_bar_listening_large_font_rtl_dark.png", darkTheme = true)
+        assertCompletionIconsContrastWithDarkSurface()
     }
 
     @Test
@@ -89,6 +96,7 @@ class ConversationDictationReadinessScreenshotTest {
             fontScale = 1f,
             rtl = false,
         )
+        assertCompletionIconsContrastWithDarkSurface()
     }
 
     @Test
@@ -298,6 +306,29 @@ class ConversationDictationReadinessScreenshotTest {
                 .boundsInRoot.height
         assertTrue("All tested capture/recovery states retain a 48dp capsule: $height", height <= 48f)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshotName")
+    }
+
+    /** Sample glyph centers, excluding the capsule outline and neighbouring send disc. */
+    private fun assertCompletionIconsContrastWithDarkSurface() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        listOf(R.string.cancel, R.string.paste_dictation_transcript).forEach { label ->
+            val image =
+                composeRule
+                    .onNodeWithContentDescription(context.getString(label))
+                    .captureToImage()
+                    .asAndroidBitmap()
+            val brightPixels =
+                (image.height / 4 until image.height * 3 / 4).sumOf { y ->
+                    (image.width / 4 until image.width * 3 / 4).count { x ->
+                        val pixel = image.getPixel(x, y)
+                        val red = (pixel shr 16) and 0xff
+                        val green = (pixel shr 8) and 0xff
+                        val blue = pixel and 0xff
+                        red + green + blue > 3 * 128
+                    }
+                }
+            assertTrue("Standalone dark completion glyph must remain visibly contrasted", brightPixels > 8)
+        }
     }
 
     private data class Fixture(

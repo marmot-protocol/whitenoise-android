@@ -1,0 +1,54 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/RouteTransitionSurfaces.kt",
+  "legacy_sha256": "870b574f015a8de2b031865732348361e0d224190201a021d1b10626c91ff107",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Authored emoji prompt: RouteTransitionSurfaces",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/RouteTransitionSurfaces.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "ConversationRouteAnimatedContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/RouteTransitionSurfaces.kt",
+        "anchor": "fun <T> ConversationRouteAnimatedContent(",
+        "test_ids": [
+          "NAV-005",
+          "NAV-006"
+        ]
+      },
+      {
+        "surface": "QuickAccountSwitchCue",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/RouteTransitionSurfaces.kt",
+        "anchor": "fun QuickAccountSwitchCue(",
+        "test_ids": [
+          "NAV-005",
+          "NAV-006"
+        ]
+      },
+      {
+        "surface": "QuickAccountSwitchTransitionOverlay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/RouteTransitionSurfaces.kt",
+        "anchor": "fun QuickAccountSwitchTransitionOverlay(",
+        "test_ids": [
+          "NAV-005",
+          "NAV-006"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Measured control morph ownership and presentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/RouteTransitionSurfaces.kt",
+        "anchor": "package dev.ipf.whitenoise.android",
+        "test_ids": [
+          "NCH-008"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
