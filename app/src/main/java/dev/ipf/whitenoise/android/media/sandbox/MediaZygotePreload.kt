@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.media.sandbox
 
 import android.content.pm.ApplicationInfo
+import androidx.annotation.Keep
 import dev.ipf.whitenoise.android.media.MediaPipeline
 
 /**
@@ -8,8 +9,10 @@ import dev.ipf.whitenoise.android.media.MediaPipeline
  * The zygote has its own isolated UID and never receives descriptors, account state or untrusted
  * bytes, each generation forks from it into a fresh isolated process, skipping APK class-loader setup.
  * An OS that exec-spawns isolated services instead (GrapheneOS by default) runs this in each new
- * worker before its service starts, still before any input.
+ * worker before its service starts, still before any input. The manifest names it only through
+ * android:zygotePreloadName, so it keeps its exact name and entry point in minified builds through [Keep].
  */
+@Keep
 class MediaZygotePreload : android.app.ZygotePreload {
     /**
      * Initializes the worker's codec-path classes so each fork starts warm. Their static state is
