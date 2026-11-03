@@ -1692,6 +1692,24 @@
         <item quantity="one">~%1$d s restante</item>
         <item quantity="other">~%1$d s restantes</item>
     </plurals>
+    <plurals name="tts_bar_minutes_remaining">
+        <item quantity="one">~%1$d min restante</item>
+        <item quantity="many">~%1$d min restantes</item>
+        <item quantity="other">~%1$d min restantes</item>
+    </plurals>
+    <string name="tts_bar_minutes_seconds_remaining">~%1$d min %2$d s restantes</string>
+    <string name="tts_bar_remaining_spoken">Temps restant : environ %1$s</string>
+    <plurals name="tts_bar_spoken_minutes">
+        <item quantity="one">%1$d minute</item>
+        <item quantity="many">%1$d minutes</item>
+        <item quantity="other">%1$d minutes</item>
+    </plurals>
+    <plurals name="tts_bar_spoken_seconds">
+        <item quantity="one">%1$d seconde</item>
+        <item quantity="many">%1$d secondes</item>
+        <item quantity="other">%1$d secondes</item>
+    </plurals>
+    <string name="tts_bar_spoken_minutes_seconds">%1$s et %2$s</string>
     <string name="tts_bar_stop">Arrêter la lecture</string>
     <string name="tts_bar_return_to_source">Revenir au message lu</string>
     <string name="tts_source_unavailable">Le message lu n’est plus disponible</string>
