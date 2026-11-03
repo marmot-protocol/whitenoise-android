@@ -44,6 +44,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -269,6 +270,8 @@ internal fun ChatsScreen(
     val resources = LocalResources.current
     val batchScope = remember(controller, appState.activeAccountRef, appState.runtimeGeneration) { AtomicBoolean(true) }
     DisposableEffect(batchScope) { onDispose { batchScope.set(false) } }
+    // A confirmed explicit pin returns this list to its top once the pinned row is projected (#3555).
+    val pinFollow = remember(batchScope) { ChatPinFollowOwner() }
     var pendingStateBatch by remember(batchScope) { mutableStateOf<PendingChatListBatch?>(null) }
     var directBatchResult by remember(batchScope) {
         mutableStateOf<ChatListBatchResult?>(null)
@@ -286,7 +289,13 @@ internal fun ChatsScreen(
         directBatchAttempt = 0
         directBatchChecking = false
         directBatchRunning = true
-        pendingStateBatch = PendingChatListBatch(selectedChatIds.toList(), command, owner)
+        pendingStateBatch =
+            PendingChatListBatch(
+                selectedChatIds.toList(),
+                command,
+                owner,
+                followScope = pinFollow.currentScope.takeIf { command == ChatListBatchCommand.PIN },
+            )
     }
     pendingStateBatch?.let { request ->
         if (request.command == ChatListBatchCommand.EXCLUDE_FOLDER) {
@@ -319,6 +328,7 @@ internal fun ChatsScreen(
                                 (previous ?: ChatListBatchResult(emptyMap())).withAttempt(attempt)
                             }
                         directBatchResult = result
+                        pinFollow.issue(request.followScope, newlyConfirmedPins(request.command, previous, attempt))
                         if (!result.needsRecovery) {
                             directBatchResult = null
                             pendingStateBatch = null
@@ -1160,6 +1170,8 @@ internal fun ChatsScreen(
         } else if (nextPinned && pendingHeadDemotion?.chatId == item.id) {
             pendingHeadDemotion = null
         }
+        // Captured at the gesture: a pin that commits after a folder/query/account change follows nothing.
+        val followScope = pinFollow.currentScope.takeIf { nextPinned }
         clearSelection()
         appState.launchMutation {
             val current = if (resolvedOwner != null) item else controller.resolveChatListActionItem(item.id, owner)
@@ -1168,6 +1180,9 @@ internal fun ChatsScreen(
             val succeeded = eligible && current != null && controller.setPinned(current, nextPinned, owner)
             if (!succeeded && pendingHeadDemotion == headDemotion) {
                 pendingHeadDemotion = null
+            }
+            if (succeeded && nextPinned && controller.chatListActionSessionIsCurrent(owner)) {
+                pinFollow.issue(followScope, setOf(item.id))
             }
         }
     }
@@ -1463,6 +1478,23 @@ internal fun ChatsScreen(
             isActiveList = ordinaryActiveList,
             scrollCorrectionInProgress = headScrollCorrectionInProgress,
         )
+    SideEffect { pinFollow.currentScope = ChatPinFollowScope(chatListDatasetKey, userGestureGeneration) }
+    val unpinnedVisibleIds =
+        remember(visibleItems) {
+            visibleItems.filterNot { it.pinned() }.mapTo(mutableSetOf()) { chatPinFollowId(it.id) }
+        }
+    ChatPinFollowToTopEffect(
+        listState = chatListState,
+        request = pinFollow.request,
+        datasetKey = chatListDatasetKey,
+        userGestureGeneration = userGestureGeneration,
+        unpinnedVisibleIds = unpinnedVisibleIds,
+        motionSettled = !headScrollCorrectionInProgress && !headReorderInProgress && pendingHeadDemotion == null,
+        hasEarlierRows = { controller.hasEarlierChats(chatListWindowView) },
+        returnWindowToTop = { controller.returnChatListToTop(chatListWindowView) },
+        onScrollStarted = { programmaticViewportGeneration += 1L },
+        onConsumed = pinFollow::consume,
+    )
     val headPromotionMotionEligible by
         remember(chatListState, ordinaryActiveList) {
             derivedStateOf {
