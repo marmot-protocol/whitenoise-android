@@ -10,7 +10,7 @@ SCENARIOS = {
     "failed-then-retried": ("video", ("idle_download_seen", "failed_seen", "completed")),
     "unknown-length": ("image", ("idle_download_seen", "no_total", "completed")),
 }
-# The tile's NumberFormat groups thousands for 1,000 to 1,023 of a unit, as in "1,008.0 KB".
+# The fixture emulator renders en-US, whose NumberFormat groups 1,000 to 1,023 of a unit, as in "1,008.0 KB".
 NUMBER = r"((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?)"
 KNOWN_BYTES = re.compile(rf"^{NUMBER} ([KMG]?B) of {NUMBER} ([KMG]?B)$")
 UNKNOWN_BYTES = re.compile(rf"^{NUMBER} ([KMG]?B) received$")
