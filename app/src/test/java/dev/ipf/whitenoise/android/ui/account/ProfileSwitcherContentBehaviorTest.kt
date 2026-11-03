@@ -56,11 +56,35 @@ class ProfileSwitcherContentBehaviorTest {
         assertEquals(1, settings)
     }
 
+    /** A profile's short key copies its whole key and does not switch, while the row itself still switches. */
+    @Test fun shortKeyCopiesWithoutSwitchingProfiles() {
+        val selected = mutableListOf<String>()
+        val keyB = "npub1" + "p".repeat(58)
+        render(onSelect = { selected += it }, npub = { if (it.startsWith("b")) keyB else "npub1" + "q".repeat(58) })
+        val clipboard =
+            ApplicationProvider
+                .getApplicationContext<android.content.Context>()
+                .getSystemService(android.content.ClipboardManager::class.java)
+
+        composeRule.onNodeWithText("npub…bbbb", useUnmergedTree = true).performClick()
+        assertEquals(
+            keyB,
+            clipboard.primaryClip
+                ?.getItemAt(0)
+                ?.text
+                ?.toString(),
+        )
+        assertEquals(emptyList<String>(), selected)
+        composeRule.onNodeWithText("b", useUnmergedTree = true).performClick()
+        assertEquals(listOf("b"), selected)
+    }
+
     /** Composes the surface under test with the given fixture. */
     private fun render(
         onSelect: (String) -> Unit = {},
         onAdd: () -> Unit = {},
         onSettings: () -> Unit = {},
+        npub: (String) -> String = { "" },
     ) {
         val accounts =
             listOf("a", "b", "c", "d").map {
@@ -86,6 +110,7 @@ class ProfileSwitcherContentBehaviorTest {
                         onSelectProfile = onSelect,
                         onAddProfile = onAdd,
                         onSettings = onSettings,
+                        npub = npub,
                     )
                 }
             }

@@ -118,6 +118,7 @@ import dev.ipf.whitenoise.android.ui.common.ConfirmDialog
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseScaffold
+import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.conversationGroupAvatarAsset
 import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
@@ -1504,19 +1505,24 @@ internal fun GroupDetailsScreen(
                             val profileNpub =
                                 if (isSelfRow) "" else appState.npubForDisplay(member.memberIdHex)
                             val opensProfile = profileNpub.isNotBlank()
+                            val memberTitle =
+                                if (isSelfRow) {
+                                    stringResource(R.string.you)
+                                } else {
+                                    controller.memberDisplayName(member)
+                                }
+                            // The title actually shown decides: a member titled by their own key copies it (#3565).
+                            val titleIsKey = opensProfile && abbreviatesPublicKey(memberTitle, profileNpub)
                             ChatInfoMemberCard(
                                 index = index,
                                 count = visibleMembers.size,
                                 modifier = Modifier.testTag("chat_info.member.${member.memberIdHex}"),
                             ) {
                                 ContactRow(
-                                    title =
-                                        if (isSelfRow) {
-                                            stringResource(R.string.you)
-                                        } else {
-                                            controller.memberDisplayName(member)
-                                        },
+                                    title = memberTitle,
                                     subtitle = memberRoleLabel(controller.isAdmin(member), rowMutationPending),
+                                    publicKey = profileNpub.takeIf { titleIsKey },
+                                    publicKeyInTitle = true,
                                     avatarSeed = member.memberIdHex,
                                     avatarUrl = controller.memberAvatarUrl(member),
                                     modifier =

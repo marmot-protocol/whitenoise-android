@@ -920,6 +920,7 @@
     <string name="scan_to_connect">扫码即可连接。</string>
     <string name="not_copied">未复制</string>
     <string name="copy_public_key">复制公钥</string>
+    <string name="public_key_copy_action_with_value">复制公钥 %1$s</string>
     <string name="button_in_progress">进行中</string>
     <string name="private_key">私钥</string>
     <string name="profile_public_key_help">分享此密钥，让他人能够找到并联系你。</string>

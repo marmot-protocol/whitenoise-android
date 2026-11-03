@@ -933,6 +933,7 @@
     <string name="scan_to_connect">Zum Verbinden scannen.</string>
     <string name="not_copied">Nicht kopiert</string>
     <string name="copy_public_key">Öffentlichen Schlüssel kopieren</string>
+    <string name="public_key_copy_action_with_value">Öffentlichen Schlüssel %1$s kopieren</string>
     <string name="button_in_progress">In Bearbeitung</string>
     <string name="private_key">Privater Schlüssel</string>
     <string name="profile_public_key_help">Teile diesen Schlüssel, damit andere dich finden und sich mit dir verbinden können.</string>

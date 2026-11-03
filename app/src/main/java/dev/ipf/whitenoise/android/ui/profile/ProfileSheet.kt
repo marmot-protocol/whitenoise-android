@@ -113,6 +113,7 @@ import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseTextFieldContainerCol
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
@@ -541,10 +542,13 @@ internal fun ProfileSheet(
         presentationNpub.takeIf { it.isNotBlank() }?.let {
             IdentityFormatter.short(it, prefix = 12, suffix = 8)
         }
-    val title =
-        profile.displayName
-            ?: hex?.let { appState.networkDisplayName(it) }
-            ?: presentationNpubShort.orEmpty()
+    // The shortened key names a nameless person only as a fallback, so record where the title came from (#3565).
+    // A name source that itself answers with this key's abbreviation is the same fallback, not a person's name.
+    val personName =
+        (profile.displayName ?: hex?.let { appState.networkDisplayNameOrNull(it) })
+            ?.takeUnless { abbreviatesPublicKey(it, presentationNpub) }
+    val title = personName ?: presentationNpubShort.orEmpty()
+    val titleIsPublicKey = personName == null && presentationNpubShort != null
     val contactNickname = hex?.let { appState.contactNickname(it) }
     val contactNotes = hex?.let { appState.contactNotes(it) }
     // #1226: the header + identity surfaces show the nickname when one is set;
@@ -821,6 +825,8 @@ internal fun ProfileSheet(
                     lightningAddress,
                     hasTarget = hex != null,
                     self = targetIsSelf,
+                    titleIsPublicKey = contactNickname == null && titleIsPublicKey,
+                    publishedNameIsPublicKey = titleIsPublicKey,
                 ),
             scroll = contentScrollState,
             follow = followRow,

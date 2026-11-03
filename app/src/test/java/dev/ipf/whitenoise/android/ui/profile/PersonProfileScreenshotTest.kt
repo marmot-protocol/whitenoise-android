@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.ExperimentalRoborazziApi
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -59,6 +60,22 @@ class PersonProfileScreenshotTest {
     @Test
     @Config(qualifiers = "en-w780dp-h360dp-mdpi")
     fun shortLargeRtl() = profile("short_rtl_200", rtl = true, scale = 2f)
+
+    /** A nameless person shows one complete copyable key and no shortened key title (#3565). */
+    @Test fun namelessLight() = profile("nameless_light", nameless = true)
+
+    /** The nameless profile in the dark theme. */
+    @Test fun namelessDark() = profile("nameless_dark", nameless = true, dark = true)
+
+    /** The nameless profile in the AMOLED theme. */
+    @Test fun namelessAmoled() = profile("nameless_amoled", nameless = true, dark = true, amoled = true)
+
+    /** Every key character stays visible and left to right at double font scale in RTL on a narrow screen. */
+    @Test
+    @Config(qualifiers = "en-w320dp-h780dp-mdpi")
+    fun namelessNarrowLargeRtl() {
+        profile("nameless_narrow_rtl_200", nameless = true, rtl = true, scale = 2f, scrollToKey = true)
+    }
 
     /** Authoritative shared groups remain separate from Add. */
     @Test fun sharedGroups() = groups("groups", false)
@@ -191,6 +208,8 @@ class PersonProfileScreenshotTest {
         busy: Boolean = false,
         self: Boolean = false,
         follow: ProfileFollowRowState = ProfileFollowRowState(true, false, true),
+        nameless: Boolean = false,
+        scrollToKey: Boolean = false,
     ) {
         composeRule.setContent {
             CompositionLocalProvider(
@@ -206,8 +225,8 @@ class PersonProfileScreenshotTest {
                             },
                         person =
                             PersonProfilePresentation(
-                                "Alice",
-                                "Alice",
+                                if (nameless) NAMELESS_TITLE else "Alice",
+                                if (nameless) NAMELESS_TITLE else "Alice",
                                 "public-person",
                                 null,
                                 null,
@@ -219,6 +238,8 @@ class PersonProfileScreenshotTest {
                                 "alice@example.com",
                                 true,
                                 self,
+                                titleIsPublicKey = nameless,
+                                publishedNameIsPublicKey = nameless,
                             ),
                         scroll = rememberScrollState(),
                         follow = follow,
@@ -243,6 +264,7 @@ class PersonProfileScreenshotTest {
                 }
             }
         }
+        if (scrollToKey) composeRule.onNodeWithTag("person_profile.copy_public_key").performScrollTo()
         capture(name)
     }
 
@@ -273,4 +295,9 @@ class PersonProfileScreenshotTest {
             PersonSharedGroupRow("design", "Design", 7),
             PersonSharedGroupRow("local", "Local community", 12),
         )
+
+    private companion object {
+        /** The shortened key a nameless person is titled by before the profile replaces it with the full key. */
+        const val NAMELESS_TITLE = "npub1aaaaaaa…aaaaaaaa"
+    }
 }

@@ -204,12 +204,36 @@ class SettingsHomeBehaviorTest {
         composeRule.onNodeWithTag("settings.app_updates").assertDoesNotExist()
     }
 
+    /** The active profile's short key copies the whole key, while the rest of the row still opens Share & Connect. */
+    @Test
+    fun activeProfileKeyCopiesWithoutOpeningShareConnect() {
+        val npub = "npub1" + "q".repeat(58)
+        mount(profileCount = 1, npub = npub)
+        val clipboard =
+            ApplicationProvider
+                .getApplicationContext<android.content.Context>()
+                .getSystemService(android.content.ClipboardManager::class.java)
+
+        composeRule.onNodeWithTag("settings.active_profile_public_key", useUnmergedTree = true).performClick()
+        assertEquals(
+            npub,
+            clipboard.primaryClip
+                ?.getItemAt(0)
+                ?.text
+                ?.toString(),
+        )
+        assertEquals(0, shareConnectCount)
+        composeRule.onNodeWithText("Alice", useUnmergedTree = true).performClick()
+        assertEquals(1, shareConnectCount)
+    }
+
     /** Mounts the composable under test. */
     private fun mount(
         profileCount: Int,
         hasActiveAccount: Boolean = true,
         selfUpdateEnabled: Boolean = true,
         updateInfo: AppUpdateInfo = updateInfo(),
+        npub: String = "",
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) {
@@ -221,7 +245,13 @@ class SettingsHomeBehaviorTest {
                         ),
                     account =
                         if (hasActiveAccount) {
-                            SettingsHomeAccount("Alice", "npub1alice…9x2k", "alice-account-id", pictureUrl = null)
+                            SettingsHomeAccount(
+                                "Alice",
+                                "npub1alice…9x2k",
+                                "alice-account-id",
+                                pictureUrl = null,
+                                npub = npub,
+                            )
                         } else {
                             null
                         },

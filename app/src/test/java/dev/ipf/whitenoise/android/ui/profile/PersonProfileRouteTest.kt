@@ -5,11 +5,20 @@ import android.content.Context
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -17,11 +26,14 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.window.SecureFlagPolicy
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.RecipientSearch
 import dev.ipf.whitenoise.android.notifications.ProfileNotificationMode
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -94,6 +106,77 @@ class PersonProfileRouteTest {
                 ?.toString(),
         )
         composeRule.onNodeWithText("Private contact note").assertDoesNotExist()
+    }
+
+    /** A named profile shows the complete key exactly once, as one copy button, with no shortened capsule (#3565). */
+    @Test fun namedProfileShowsOneCompleteCopyableKey() {
+        show()
+        composeRule.onNodeWithTag("person_profile.name").assertExists()
+        composeRule.onAllNodesWithTag("person_profile.full_public_key", useUnmergedTree = true).assertCountEquals(1)
+        composeRule.onNodeWithTag("person_profile.copy_public_key.visual", useUnmergedTree = true).assertDoesNotExist()
+        composeRule
+            .onNodeWithTag("person_profile.copy_public_key")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Text, listOf(AnnotatedString(publicKey))))
+            .assert(
+                SemanticsMatcher("Copy public key action") {
+                    it.config.getOrNull(SemanticsActions.OnClick)?.label == context.getString(R.string.copy_public_key)
+                },
+            )
+    }
+
+    /** Taps on the key text and on the copy glyph both copy the exact contiguous key, without grouping spaces. */
+    @Test fun keyTextAndGlyphCopyTheContiguousKey() {
+        show()
+        val clipboard = context.getSystemService(ClipboardManager::class.java)
+        composeRule.onNodeWithTag("person_profile.copy_public_key").performScrollTo()
+        composeRule.onNodeWithTag("person_profile.full_public_key", useUnmergedTree = true).performClick()
+        assertEquals(
+            publicKey,
+            clipboard.primaryClip
+                ?.getItemAt(0)
+                ?.text
+                ?.toString(),
+        )
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("", ""))
+        composeRule.onNodeWithTag("person_profile.copy_public_key").performTouchInput {
+            click(Offset(width - 24f, height / 2f))
+        }
+        assertEquals(
+            publicKey,
+            clipboard.primaryClip
+                ?.getItemAt(0)
+                ?.text
+                ?.toString(),
+        )
+        composeRule
+            .onNodeWithTag("person_profile.copy_public_key")
+            .assert(
+                SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, context.getString(R.string.copied)),
+            )
+    }
+
+    /** A nameless profile keeps an accessible heading and the one complete key, never a shortened key title. */
+    @Test fun namelessProfileShowsTheCompleteKeyInsteadOfAShortenedTitle() {
+        show(metadata = profile.copy(name = null))
+        composeRule.onNodeWithTag("person_profile.name").assertDoesNotExist()
+        composeRule
+            .onNodeWithTag("person_profile.key_heading", useUnmergedTree = true)
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
+        composeRule.onAllNodesWithTag("person_profile.full_public_key", useUnmergedTree = true).assertCountEquals(1)
+        composeRule
+            .onAllNodes(hasText(IdentityFormatter.short(publicKey, prefix = 12, suffix = 8)), useUnmergedTree = true)
+            .assertCountEquals(0)
+    }
+
+    /** A private nickname over a nameless profile titles the person, and the key fallback is not repeated. */
+    @Test fun nicknameOverANamelessProfileOmitsTheKeyFallbackLine() {
+        show(initialNickname = "Local name", metadata = profile.copy(name = null))
+        composeRule.onNodeWithTag("person_profile.name").assertExists()
+        composeRule.onNodeWithText("Local name", useUnmergedTree = true).assertExists()
+        composeRule
+            .onAllNodes(hasText(IdentityFormatter.short(publicKey, prefix = 12, suffix = 8)), useUnmergedTree = true)
+            .assertCountEquals(0)
+        composeRule.onAllNodesWithTag("person_profile.full_public_key", useUnmergedTree = true).assertCountEquals(1)
     }
 
     /** Closing and reopening before disposal never revives an earlier private editor's captured Save. */
@@ -262,6 +345,7 @@ class PersonProfileRouteTest {
     private fun show(
         initialNickname: String? = null,
         onStartGroup: (RecipientSearch.Candidate) -> Unit = {},
+        metadata: UserProfileMetadataFfi = profile,
     ): WhiteNoiseAppState {
         val app =
             WhiteNoiseAppState(
@@ -286,7 +370,7 @@ class PersonProfileRouteTest {
                 "alice",
             )
         initialNickname?.let { app.setContactNickname(target, it) }
-        app.presentDiscoveredProfile(publicKey, profile)
+        app.presentDiscoveredProfile(publicKey, metadata)
         composeRule.setContent {
             WhiteNoiseTheme {
                 if (shown.value) {

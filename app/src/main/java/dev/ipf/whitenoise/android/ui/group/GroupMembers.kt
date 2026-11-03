@@ -43,6 +43,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.PersonAvatar
+import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Search
@@ -186,13 +187,16 @@ internal fun TransferAdminSheet(
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
-                                    Text(
+                                    // The short key copies the whole key; the rest of the row still picks (#3565).
+                                    PublicKeyCopyText(
                                         controller.memberSubtitle(member),
-                                        fontFamily = FontFamily.Monospace,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        style = MaterialTheme.typography.bodySmall,
+                                        appState.npubForDisplay(member.memberIdHex),
+                                        Modifier.testTag("transfer_admin.key.${member.memberIdHex}"),
+                                        style =
+                                            MaterialTheme.typography.bodySmall
+                                                .copy(fontFamily = FontFamily.Monospace),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        enabled = !busy,
                                     )
                                 }
                             }

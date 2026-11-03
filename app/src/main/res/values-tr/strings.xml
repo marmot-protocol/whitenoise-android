@@ -933,6 +933,7 @@
     <string name="scan_to_connect">Bağlanmak için tarayın.</string>
     <string name="not_copied">Kopyalanmadı</string>
     <string name="copy_public_key">Genel anahtarı kopyala</string>
+    <string name="public_key_copy_action_with_value">Genel anahtarı kopyala: %1$s</string>
     <string name="button_in_progress">Devam ediyor</string>
     <string name="private_key">Özel anahtar</string>
     <string name="profile_public_key_help">İnsanların sizi bulup sizinle bağlantı kurabilmesi için bu anahtarı paylaşın.</string>

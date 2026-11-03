@@ -1,8 +1,12 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.whitenoise.android.ui.common.isCanonicalNpub
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Locale
 
 class AppStateNpubPresentationTest {
     @Test
@@ -68,6 +72,31 @@ class AppStateNpubPresentationTest {
         assertEquals(CANONICAL_NPUB, presented)
     }
 
+    /** An all-uppercase key reference is the same bech32 key, so it is shown and copied in lowercase (#3565). */
+    @Test
+    fun presentationFromAnUppercaseReferenceUsesItsCanonicalLowercase() {
+        val upper = UPPER_KEY.uppercase(Locale.ROOT)
+
+        val presented =
+            presentationNpubFromReference(
+                reference = upper,
+                resolvedAccountIdHex = null,
+                npubForDisplay = { error("must not run for a key reference") },
+            )
+
+        assertEquals(UPPER_KEY, presented)
+        assertTrue(isCanonicalNpub(presented))
+    }
+
+    /** A mixed-case reference is not a valid bech32 key and is kept as written, so it stays uncopyable. */
+    @Test
+    fun presentationKeepsAMixedCaseReferenceAsWritten() {
+        val mixed = "NPUB1" + UPPER_KEY.drop(5)
+
+        assertEquals(mixed, presentationNpubFromReference(mixed, null) { "" })
+        assertFalse(isCanonicalNpub(mixed))
+    }
+
     @Test
     fun presentationFromOperationalHexFallbackDoesNotReturnHex() {
         val presented =
@@ -96,5 +125,6 @@ class AppStateNpubPresentationTest {
     private companion object {
         const val ACCOUNT_HEX = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
         const val CANONICAL_NPUB = "npub1abcdefghijklmnopqrstuvwxyz234567"
+        const val UPPER_KEY = "npub1qqqqqqqqqqqqqqqqqqqqqqqqqppppppppqqqqqqqqqqqqqqqqqqqqqqqqq"
     }
 }

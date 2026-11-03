@@ -6,16 +6,16 @@ import org.junit.Test
 import java.io.File
 
 /**
- * Invariant gate for #3321: every full-screen identity view shows the whole public key through [FullPublicKey], so
- * the middle of a key can always be compared, and the five-character grouping stays display only, so it never
- * reaches a copy, a share or a QR code.
+ * Invariant gate for #3321: every full-screen identity view shows the whole public key through [FullPublicKey], or
+ * the profile's copyable [CopyableFullPublicKey] (#3565), so the middle of a key can always be compared, and the
+ * five-character grouping stays display only, so it never reaches a copy, a share or a QR code.
  */
 class FullPublicKeyPresentationCoverageTest {
     /** Each identity-verification surface renders its own public key in full. */
     @Test
     fun everyIdentitySurfaceShowsTheWholeKey() {
         SURFACES.forEach { (path, value) ->
-            val call = Regex("""FullPublicKey\(\s*npub = ${Regex.escape(value)},""")
+            val call = Regex("""(?:Copyable)?FullPublicKey\(\s*npub = ${Regex.escape(value)},""")
             assertTrue("$path no longer shows the whole key for $value", call.containsMatchIn(source(path)))
         }
     }

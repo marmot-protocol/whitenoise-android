@@ -13,9 +13,13 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 
-/** A resolved public identifier opens the existing profile owner; no unavailable metadata is invented. */
+/**
+ * A resolved public identifier opens the existing profile owner; no unavailable metadata is invented. The shortened
+ * key copies the complete [npub] on its own tap (#3565).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming")
 @Composable
@@ -31,8 +35,9 @@ internal fun GlobalPersonRow(
     ) {
         Column {
             Text(stringResource(R.string.chat_list_search_open_profile))
-            Text(
+            PublicKeyCopyText(
                 IdentityFormatter.short(npub, prefix = 12, suffix = 8),
+                npub,
                 style = MaterialTheme.typography.bodySmall,
             )
         }
