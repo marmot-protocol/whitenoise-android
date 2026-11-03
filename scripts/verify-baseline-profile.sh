@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-apk_path="${1:?usage: bash scripts/verify-baseline-profile.sh <apk-path>}"
+apk_path="${1:?usage: bash scripts/verify-baseline-profile.sh <apk-path> [merged-art-profile]}"
+merged_profile="${2:-}"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 require_command() {
@@ -31,5 +32,21 @@ for required_entry in assets/dexopt/baseline.prof assets/dexopt/baseline.profm; 
     exit 1
   fi
 done
+
+# The compiled assets exist even when only library rules were merged, so a
+# variant that silently drops the app's own profile passes the check above.
+# The merged text profile shows whether the app's rules actually went in.
+if [[ -n "$merged_profile" ]]; then
+  app_rule='Ldev/ipf/whitenoise/android/MainActivity;'
+  if [[ ! -f "$merged_profile" ]]; then
+    echo "Merged ART profile not found: $merged_profile" >&2
+    exit 1
+  fi
+  if ! grep -Fq "$app_rule" "$merged_profile"; then
+    echo "Merged ART profile lacks the app's own rules ($app_rule): $merged_profile" >&2
+    exit 1
+  fi
+  echo "Verified the app's rules in $merged_profile"
+fi
 
 echo "Verified Baseline Profile assets in $apk_path"

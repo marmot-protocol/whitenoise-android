@@ -960,8 +960,12 @@ Device limits found while regenerating (2026-11-01):
 
 The generated profile is merged into and committed from
 `app/src/main/generated/baselineProfiles/`. It is consumed by every supported
-release variant; generation does not run implicitly during ordinary release
-assembly. The leave-APKs-installed property prevents AGP teardown from removing
+release variant and by `benchmarkRelease`; generation does not run implicitly
+during ordinary release assembly. The plugin wires the merged-into-main profile
+only into shipping variants, so `app/build.gradle.kts` adds it to the
+`benchmarkRelease` source set explicitly. Before that wiring (2026-11-03),
+`benchmarkRelease` packaged only the library rules, and "Baseline Profile"
+Macrobenchmark results measured none of the app's own profile. The leave-APKs-installed property prevents AGP teardown from removing
 the authenticated target. After collection, replace the profileable variant
 with the normal dev build in place—never uninstall first:
 
@@ -975,6 +979,16 @@ Build a release-like APK and verify both compiled profile assets:
 ./gradlew :app:assembleDevZapstoreBenchmarkRelease
 bash scripts/verify-baseline-profile.sh \
   app/build/outputs/apk/devZapstore/benchmarkRelease/app-dev-zapstore-universal-benchmarkRelease.apk
+```
+
+Pass the merged text profile as a second argument to also require the app's own
+rules, which the compiled assets alone cannot show (CI does this for
+`devZapstoreBenchmarkRelease`):
+
+```bash
+bash scripts/verify-baseline-profile.sh \
+  app/build/outputs/apk/devZapstore/benchmarkRelease/app-dev-zapstore-universal-benchmarkRelease.apk \
+  app/build/intermediates/merged_art_profile/devZapstoreBenchmarkRelease/mergeDevZapstoreBenchmarkReleaseArtProfile/baseline-prof.txt
 ```
 
 The verifier uses `apkanalyzer` when available and falls back to the ZIP table.

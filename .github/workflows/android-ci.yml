@@ -389,7 +389,10 @@ jobs:
             | if length == 1 then .[0].outputFile else empty end
           ' "$metadata")
           app_apk="$(dirname "$metadata")/$output_file"
-          bash scripts/verify-baseline-profile.sh "$app_apk"
+          # Macrobenchmarks measure this variant, so it must carry the app's
+          # generated profile and not just the library rules.
+          merged=app/build/intermediates/merged_art_profile/devZapstoreBenchmarkRelease/mergeDevZapstoreBenchmarkReleaseArtProfile/baseline-prof.txt
+          bash scripts/verify-baseline-profile.sh "$app_apk" "$merged"
           printf 'apk=%s\n' "$app_apk" >> "$GITHUB_OUTPUT"
 
       # benchmarkRelease is unminified D8 output. Its budget warns when a benchmarked

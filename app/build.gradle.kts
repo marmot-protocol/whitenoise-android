@@ -649,6 +649,13 @@ android {
         getByName("androidTest") {
             kotlin.directories.add("src/testSupport/kotlin")
         }
+        // The Baseline Profile plugin wires the merged-into-main profile only into
+        // shipping release variants, so without this benchmarkRelease carries just
+        // the library rules and "BaselineProfile" Macrobenchmarks never measure
+        // the app's own profile.
+        getByName("benchmarkRelease") {
+            baselineProfiles.directories.add("src/main/generated/baselineProfiles")
+        }
     }
     packaging {
         jniLibs {
