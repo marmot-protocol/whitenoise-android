@@ -2,7 +2,7 @@
 """Reproduce the original notification WAV assets using only Python's standard library.
 
 SPDX-License-Identifier: AGPL-3.0-only
-No recordings or third-party samples are used. Mono PCM16, 48 kHz; peak < -6 dBFS.
+No recordings or third-party samples are used. Mono PCM16, 48 kHz; Ding peaks at -3.7 dBFS, Pulse below -6 dBFS.
 """
 import math
 import struct
@@ -33,6 +33,26 @@ def tone(name, notes, duration):
         target.writeframes(struct.pack("<" + "h" * len(samples), *samples))
 
 
+def soft_ding():
+    """Write the approved soft Ding waveform as mono PCM16 at 48 kHz."""
+    duration = 0.8
+    samples = []
+    for i in range(int(RATE * duration)):
+        time = i / RATE
+        envelope = ((1 - math.exp(-time / 0.014)) * math.exp(-time / 0.155)
+                    * min(1, max(0, (duration - time) / 0.10)) ** 2)
+        value = envelope * (math.sin(2 * math.pi * 220 * time)
+                            + 0.24 * math.sin(2 * math.pi * 440 * time)
+                            + 0.055 * math.sin(2 * math.pi * 660 * time))
+        samples.append(value)
+    scale = 0.65 / max(map(abs, samples))
+    pcm = [round(value * scale * 32767) for value in samples]
+    OUT.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(OUT / "notification_ding_v1.wav"), "wb") as target:
+        target.setparams((1, 2, RATE, 0, "NONE", "not compressed"))
+        target.writeframes(struct.pack("<" + "h" * len(pcm), *pcm))
+
+
 if __name__ == "__main__":
-    tone("notification_ding_v1.wav", [(0.0, 1046.502, 0.44)], 0.55)
+    soft_ding()
     tone("notification_pulse_v1.wav", [(0.0, 659.255, 0.35), (0.13, 783.991, 0.35)], 0.65)
