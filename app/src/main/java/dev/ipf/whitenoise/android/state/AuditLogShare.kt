@@ -12,11 +12,13 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.LinkOption
 import java.nio.file.Path
+import java.security.DigestOutputStream
+import java.security.MessageDigest
 import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
-private const val AUDIT_LOG_SHARE_DIRECTORY = "audit_logs"
+internal const val AUDIT_LOG_SHARE_DIRECTORY = "audit_logs"
 private const val MAX_DICTATION_EXPORT_ENTRY_BYTES = 256 * 1024
 private val unsafeAuditFileName = Regex("[^A-Za-z0-9._-]")
 
@@ -68,9 +70,10 @@ internal fun prepareAuditLogArchive(
     val allowedLexicalRoot = allowedSourceRoot.toPath().toAbsolutePath().normalize()
     val allowedRealRoot = if (sourcePaths.isEmpty()) null else allowedLexicalRoot.toRealPath()
     val archive = File(shareDirectory, AUDIT_LOG_ARCHIVE_NAME)
+    val digest = MessageDigest.getInstance("SHA-256")
     try {
         val usedNames = mutableSetOf<String>()
-        ZipOutputStream(archive.outputStream().buffered()).use { zip ->
+        ZipOutputStream(DigestOutputStream(archive.outputStream(), digest).buffered()).use { zip ->
             performanceLogBytes?.let { bytes ->
                 zip.putNextEntry(ZipEntry(PerformanceDiagnosticFileStore.FILE_NAME))
                 zip.write(bytes)
@@ -115,6 +118,7 @@ internal fun prepareAuditLogArchive(
         throw failure
     }
     archive.setWritable(false, false)
+    StagedDiagnosticExports.record(archive, digest.digest())
     return archive
 }
 
@@ -125,8 +129,12 @@ private fun safeAuditEntryName(sourceName: String): String =
         .trim('.', '_')
         .ifBlank { "audit-log.jsonl" }
 
+/**
+ * Resolves [candidate] only when it is a regular file inside the allowed root with no symlinked
+ * component, so neither export nor self-share intake can be steered to an unrelated file.
+ */
 @Suppress("ReturnCount") // Every path/symlink/confinement guard fails closed before copying.
-private fun confinedRegularAuditFile(
+internal fun confinedRegularAuditFile(
     candidate: File,
     allowedLexicalRoot: Path,
     allowedRealRoot: Path,
@@ -173,7 +181,9 @@ private fun pruneAuditLogShareSessions(
     entries.filter { Files.isSymbolicLink(it.toPath()) }.forEach { it.delete() }
 }
 
+/** Removes every staged export session and forgets them for self-share intake. */
 internal fun clearPreparedAuditLogShares(cacheDir: File): Boolean {
+    StagedDiagnosticExports.clear()
     val shareRoot = File(cacheDir, AUDIT_LOG_SHARE_DIRECTORY)
     if (!shareRoot.exists() && !Files.isSymbolicLink(shareRoot.toPath())) return false
     val removed =
@@ -198,7 +208,10 @@ private fun uniqueAuditFileName(
     }
 }
 
-/** Creates a read-only, user-initiated share of the single archive, logging no name or content. */
+/**
+ * Creates a read-only, user-initiated share of the single archive, logging no name or content. The
+ * issued URI is bound to the staged archive so White Noise itself can be chosen as the target.
+ */
 internal fun auditLogShareIntent(
     context: Context,
     archive: File,
@@ -209,6 +222,7 @@ internal fun auditLogShareIntent(
             "${context.packageName}.fileprovider",
             archive,
         )
+    StagedDiagnosticExports.bind(archive, uri)
     val clipData = ClipData.newUri(context.contentResolver, "Diagnostic logs", uri)
     clipData.description.extras =
         PersistableBundle().apply {

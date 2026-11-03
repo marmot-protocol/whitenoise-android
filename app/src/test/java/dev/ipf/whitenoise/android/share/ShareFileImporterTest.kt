@@ -608,6 +608,72 @@ class ShareFileImporterTest {
             assertNull(files.resolve(first))
         }
 
+    /** An external source never consults the self-share lookup, so the ordinary intake path is unchanged. */
+    @Test fun externalSourcesNeverConsultTheTrustedLookup() =
+        runBlocking {
+            val bytes = byteArrayOf(4, 5, 6)
+            val importer =
+                ShareFileImporter(
+                    files,
+                    { _, _ -> ShareSourceMetadata("a.bin", "application/octet-stream", bytes.size.toLong()) },
+                    { _, _ -> ByteArrayInputStream(bytes) },
+                    trustedSource = { error("Must not consult the trusted lookup for an external source") },
+                )
+            val imported = importer.import(request(listOf(source)))
+            assertArrayEquals(bytes, files.resolve(imported.payload.streamUris.single())!!.readBytes())
+        }
+
+    /** A trusted app-owned source is read from its own file, never through the provider callbacks. */
+    @Test fun trustedAppOwnedSourceIsCopiedFromItsVerifiedFile() =
+        runBlocking {
+            val bytes = "PK\u0003\u0004zip".toByteArray()
+            val owned = Uri.parse("content://test.fileprovider/audit_logs/session/archive.zip")
+            val importer =
+                ShareFileImporter(
+                    files,
+                    { _, _ -> error("Must not query app-owned provider") },
+                    { _, _ -> error("Must not open app-owned provider") },
+                    isAppOwnedProvider = { it.authority == "test.fileprovider" },
+                    trustedSource = { if (it == owned) trusted(bytes) else null },
+                )
+            val imported = importer.import(request(listOf(owned)))
+            val copy = imported.payload.streamUris.single()
+            assertArrayEquals(bytes, files.resolve(copy)!!.readBytes())
+            assertEquals("archive.zip", files.metadata(copy)!!.getString("name"))
+            assertEquals("application/zip", files.metadata(copy)!!.getString("mime"))
+        }
+
+    /** Bytes that differ from the producer's digest are discarded and reported as unreadable. */
+    @Test fun trustedSourceWhoseBytesDifferFromItsDigestIsDiscarded() =
+        runBlocking {
+            val owned = Uri.parse("content://test.fileprovider/audit_logs/session/archive.zip")
+            val importer =
+                ShareFileImporter(
+                    files,
+                    { _, _ -> error("Must not query app-owned provider") },
+                    { _, _ -> error("Must not open app-owned provider") },
+                    isAppOwnedProvider = { it.authority == "test.fileprovider" },
+                    trustedSource = { trusted(byteArrayOf(1, 2, 3), served = byteArrayOf(1, 2, 4)) },
+                )
+            val imported = importer.import(request(listOf(owned)))
+            assertEquals(listOf(ShareImportError.Unreadable), imported.payload.importErrors)
+            assertTrue(root.listFiles().orEmpty().none { it.extension == "bin" })
+        }
+
+    /** A producer-verified source recording [recorded], whose file now serves [served]. */
+    private fun trusted(
+        recorded: ByteArray,
+        served: ByteArray = recorded,
+    ) = TrustedShareSource(
+        name = "archive.zip",
+        mime = "application/zip",
+        size = recorded.size.toLong(),
+        sha256 =
+            java.security.MessageDigest
+                .getInstance("SHA-256")
+                .digest(recorded),
+    ) { ByteArrayInputStream(served) }
+
     /** Uses one stable request owner so lease-release assertions match the imported batch identity. */
     private fun request(uris: List<Uri>) =
         ShareRequest(

@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.CancellationSignal
 import android.provider.OpenableColumns
+import dev.ipf.whitenoise.android.state.stagedDiagnosticExportSource
 import dev.ipf.whitenoise.android.ui.conversation.media.normalizeDocumentMime
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -13,6 +14,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.io.IOException
 import java.io.InputStream
+import java.security.MessageDigest
 
 private const val MAX_SHARE_FILENAME_CHARS = 120
 
@@ -41,6 +43,24 @@ internal data class ShareSourceMetadata(
     val size: Long?,
 )
 
+/**
+ * A local file the app itself produced, admitted in place of an otherwise rejected app-owned provider
+ * URI. [open] reads the file directly, and the importer keeps the copy only when its length and
+ * SHA-256 equal [size] and [sha256].
+ */
+internal class TrustedShareSource(
+    val name: String,
+    val mime: String,
+    val size: Long,
+    val sha256: ByteArray,
+    val open: () -> InputStream,
+) {
+    /** Fails the import unless the private copy holds exactly the bytes the producer recorded. */
+    fun verify(copy: java.io.File) {
+        if (copy.length() != size || !MessageDigest.isEqual(sha256Of(copy), sha256)) throw ShareSourceUnavailable()
+    }
+}
+
 /** Copies untrusted Android streams once. No sender, relay, encryption or upload dependency. */
 internal class ShareFileImporter(
     private val files: PrivateShareFiles,
@@ -49,6 +69,7 @@ internal class ShareFileImporter(
     private val isAppOwnedProvider: (Uri) -> Boolean = { false },
     private val timeoutMs: Long? = null,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val trustedSource: (Uri) -> TrustedShareSource? = { null },
 ) {
     constructor(context: Context) : this(
         PrivateShareFiles(context),
@@ -58,6 +79,7 @@ internal class ShareFileImporter(
             val provider = context.packageManager.resolveContentProvider(uri.authority.orEmpty(), 0)
             provider?.applicationInfo?.uid == context.applicationInfo.uid
         },
+        trustedSource = { uri -> stagedDiagnosticExportSource(context, uri) },
     )
 
     /**
@@ -129,8 +151,12 @@ internal class ShareFileImporter(
     ) {
         sources.take(SHARE_STREAM_MAX_ITEMS).forEachIndexed { index, uri ->
             currentCoroutineContext().ensureActive()
+            // Only a URI the rejection rule refuses is offered to the producer-owned lookup, so the
+            // ordinary external path is unchanged and a forged self-provider URI stays rejected.
+            val rejected = isRejectedSource(uri)
+            val trusted = if (rejected) trustedSource(uri) else null
             val result =
-                if (isRejectedSource(uri)) {
+                if (rejected && trusted == null) {
                     ImportedFile(error = ShareImportError.Scheme)
                 } else {
                     importOne(
@@ -148,6 +174,7 @@ internal class ShareFileImporter(
                             )
                         },
                         onStaged = { files.leases.holdRequest(requestId, batch.accepted + it) },
+                        trusted = trusted,
                     )
                 }
             batch.add(result)
@@ -186,13 +213,18 @@ internal class ShareFileImporter(
         }
     }
 
-    /** Copies one bounded stream; cancellation propagates and every incomplete original is removed in finally. */
+    /**
+     * Copies one bounded stream; cancellation propagates and every incomplete original is removed in finally.
+     * A [trusted] source is read from its verified file and kept only when the copy matches its digest.
+     */
+    @Suppress("LongParameterList") // The trusted source shares every limit and cleanup path of a provider stream.
     private suspend fun importOne(
         source: Uri,
         intentMime: String?,
         remaining: Long,
         progress: (Long, Long?) -> Unit,
         onStaged: (Uri) -> Unit,
+        trusted: TrustedShareSource? = null,
     ): ImportedFile {
         var staged: Uri? = null
         var copyLimit = remaining
@@ -202,8 +234,8 @@ internal class ShareFileImporter(
             staged = uri
             onStaged(uri)
             copyLimit = minOf(remaining, files.availableBytes())
-            val reader = ShareSourceReader(metadata, open) { info, header -> sourceLimit(info, header, intentMime) }
-            val copied = reader.copy(source, file, copyLimit, progress)
+            val copied = readerFor(trusted, intentMime).copy(source, file, copyLimit, progress)
+            trusted?.verify(file)
             files.finish(uri, copied.name, resolveShareMime(copied.mime, intentMime), copied.size)
             staged = null
             ImportedFile(uri, copied.size)
@@ -230,6 +262,23 @@ internal class ShareFileImporter(
             importFailure(ShareImportError.Metadata)
         } finally {
             staged?.let(files::delete)
+        }
+    }
+
+    /** Reads a [trusted] source from its own file, or any other source through the provider callbacks. */
+    private fun readerFor(
+        trusted: TrustedShareSource?,
+        intentMime: String?,
+    ): ShareSourceReader {
+        val limit = { info: ShareSourceMetadata, header: ByteArray -> sourceLimit(info, header, intentMime) }
+        return if (trusted == null) {
+            ShareSourceReader(metadata, open, limit)
+        } else {
+            ShareSourceReader(
+                { _, _ -> ShareSourceMetadata(trusted.name, trusted.mime, trusted.size) },
+                { _, _ -> trusted.open() },
+                limit,
+            )
         }
     }
 
@@ -325,4 +374,18 @@ internal fun resolveShareMime(
             .lowercase(java.util.Locale.ROOT)
     val concrete = Regex("[a-z0-9!#$&^_.+-]+/[a-z0-9!#$&^_.+-]+")
     return if (concrete.matches(provider)) provider else normalizeDocumentMime(intentMime)
+}
+
+/** Streams [file] through SHA-256 without holding it in memory. */
+private fun sha256Of(file: java.io.File): ByteArray {
+    val digest = MessageDigest.getInstance("SHA-256")
+    file.inputStream().use { input ->
+        val buffer = ByteArray(16 * 1024)
+        while (true) {
+            val read = input.read(buffer)
+            if (read < 0) break
+            digest.update(buffer, 0, read)
+        }
+    }
+    return digest.digest()
 }
