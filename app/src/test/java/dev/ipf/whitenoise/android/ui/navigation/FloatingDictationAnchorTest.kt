@@ -203,6 +203,7 @@ class FloatingDictationFallbackTest {
                 EmojiShortcodeSuggestions(field = field.value, onPick = {})
             }
         }
+
         fun awaitSuggestions() {
             rule.waitUntil(timeoutMillis = 5_000) {
                 rule.onAllNodes(hasTestTag(EMOJI_SUGGESTIONS_TEST_TAG)).fetchSemanticsNodes().isNotEmpty()
