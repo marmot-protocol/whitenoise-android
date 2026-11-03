@@ -175,8 +175,9 @@ private fun ConversationScrollCoordinator.settleRevealedReadingStart(
  * composer's overlap, so the keyboard is not subtracted a second time.
  *
  * Only the tail layout is consulted, never a measuring scroll, so a row that is not laid out never counts as oversized.
- * Known limit: an oversized row hidden entirely behind newer rows that themselves fit (a tall message followed by one
- * that exactly fills the viewport) is not detected, and that burst keeps the tail.
+ * Known limit: an oversized row hidden entirely behind newer rows that each fit and together fill the viewport (a tall
+ * message followed by several short ones, or by one that fills the screen) is not detected, and that burst keeps the
+ * tail.
  */
 private suspend fun awaitHiddenIncomingStart(
     candidates: List<ConversationIncomingAppendCandidate>,

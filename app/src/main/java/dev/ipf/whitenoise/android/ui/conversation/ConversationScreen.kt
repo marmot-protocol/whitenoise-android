@@ -3305,6 +3305,9 @@ internal fun ConversationScreen(
                 if (outcome is ConversationIncomingAppendOutcome.RevealedReadingStart) {
                     viewportRestorationOwner.adoptIncomingReadingStart(outcome)
                 }
+            } else {
+                // A removal or trim restarted this effect without an append, so a burst it interrupted is over.
+                incomingAppendLanding.retire()
             }
         }
 

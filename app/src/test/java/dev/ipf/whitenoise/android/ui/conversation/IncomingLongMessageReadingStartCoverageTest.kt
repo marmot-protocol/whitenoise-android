@@ -127,7 +127,10 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
         assertEquals(listOf("fifth"), queue.admit(listOf(row("fifth")), coordinator.intentToken).map { it.messageId })
     }
 
-    /** The screen's append path classifies rows, lands through the coordinator and hands the landing to its owner. */
+    /**
+     * The screen's append path classifies rows, lands through the coordinator and hands the landing to its owner, and
+     * a restart that is not an append retires any burst it interrupted.
+     */
     @Test
     fun productionAppendPathRoutesThroughTheIncomingLanding() {
         val source = productionSource("ConversationScreen.kt").withoutWhitespace()
@@ -141,6 +144,11 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
         assertTrue(append.contains("scrollCoordinator.followAppendOrRevealIncomingStart("))
         assertTrue(append.contains("viewportRestorationOwner.adoptIncomingReadingStart(outcome)"))
         assertFalse("an append must not bypass the landing decision", append.contains("followTailIfAllowed("))
+        assertEquals(
+            "a decided append and a non-append restart both retire the pending burst",
+            2,
+            append.split("incomingAppendLanding.retire()").size - 1,
+        )
         assertTrue(source.contains("remember(controller){ConversationIncomingAppendLandingQueue()}"))
         // The physical-tail write keeps its #2627 offset-zero contract, and the landing is a separate policy.
         val writer = productionSource("ConversationScrollCoordinator.kt").withoutWhitespace()
