@@ -3265,6 +3265,8 @@ internal fun ConversationScreen(
                 )
             }
         }
+        // Survives the follow effect's restart within a burst, never a chat, account or runtime change.
+        val incomingAppendLanding = remember(controller) { ConversationIncomingAppendLandingQueue() }
         LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored) {
             if (!initialTimelineAnchored || renderedTimeline.isEmpty()) return@LaunchedEffect
             val latestId = renderedTimeline.lastOrNull()?.presentationId
@@ -3277,11 +3279,32 @@ internal fun ConversationScreen(
                     latestId != previousId &&
                     renderedTimeline.any { it.presentationId == previousId }
             navigationState.lastFollowedLatestId = latestId ?: previousId
-            if (isAppend) {
-                scrollCoordinator.followTailIfAllowed(
-                    resolveTailIndex = { currentTailIndex },
-                    reason = ConversationScrollReason.NewMessage,
-                )
+            if (isAppend && previousId != null) {
+                // #3558: an incoming row taller than the reading viewport lands at its beginning instead of its end.
+                val candidates =
+                    incomingAppendLanding.admit(
+                        appended =
+                            conversationAppendedRows(renderedTimeline, previousId) { row ->
+                                controller.isMessageMine(row.record)
+                            },
+                        intent = scrollCoordinator.intentToken,
+                    )
+                val outcome =
+                    scrollCoordinator.followAppendOrRevealIncomingStart(
+                        candidates = candidates,
+                        probeFor = { candidate ->
+                            ConversationReadingStartProbe(
+                                resolveTargetIndex = { currentTimelineListIndex(candidate.messageId) },
+                                readLayout = { index -> mentionJumpLayout(candidate.messageId, index) },
+                                traceSections = false,
+                            )
+                        },
+                        resolveTailIndex = { currentTailIndex },
+                    )
+                incomingAppendLanding.retire()
+                if (outcome is ConversationIncomingAppendOutcome.RevealedReadingStart) {
+                    viewportRestorationOwner.adoptIncomingReadingStart(outcome)
+                }
             }
         }
 

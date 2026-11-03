@@ -1,0 +1,324 @@
+package dev.ipf.whitenoise.android.ui.conversation
+
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.LayoutDirection
+import dev.ipf.marmotkit.TimelineMessageRecordFfi
+import dev.ipf.whitenoise.android.notifications.NotificationScenario
+import dev.ipf.whitenoise.android.state.ConversationTimelineTestIds
+import dev.ipf.whitenoise.android.state.ScriptedConversationLiveSubscriptions
+import dev.ipf.whitenoise.android.state.ScriptedConversationTimelineSubscription
+import dev.ipf.whitenoise.android.state.awaitConversationCondition
+import dev.ipf.whitenoise.android.state.awaitOpenedTimelineSubscriptionsClosed
+import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
+import dev.ipf.whitenoise.android.state.timelinePage
+import dev.ipf.whitenoise.android.state.timelineRecord
+import dev.ipf.whitenoise.android.ui.conversation.messages.messageBubbleRowTestTag
+import dev.ipf.whitenoise.android.ui.navigation.DirectNotificationAppearance
+import dev.ipf.whitenoise.android.ui.navigation.DirectNotificationConversationFixture
+import dev.ipf.whitenoise.android.ui.navigation.DirectNotificationConversationHarness
+import dev.ipf.whitenoise.android.ui.navigation.NotificationRouteTimelinePresentationFixture
+import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import java.io.File
+import java.util.concurrent.CopyOnWriteArrayList
+
+/**
+ * #3558 gate: a live incoming append is classified, its production row is measured in the reading viewport, an
+ * oversized row lands at its beginning, and that landing becomes a retained reading intent that later appends do not
+ * pull back to the newest edge. Short rows, own sends and history readers keep the established tail behaviour.
+ */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
+class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePresentationFixture() {
+    /** An incoming message several screens tall starts at its first line, and a later arrival keeps it there. */
+    @Test
+    fun oversizedIncomingAppendStartsAtItsBeginningAndKeepsReadingIntent() {
+        verifyAppend(AppendCase(bodyLines = TALL_BODY_LINES, expectReadingStart = true))
+    }
+
+    /** Large text and right-to-left layout reflow the bubble, and the landing still follows its beginning. */
+    @Test
+    fun largeTextRtlOversizedIncomingAppendStartsAtItsBeginning() {
+        val appearance = DirectNotificationAppearance(rtl = true, fontScale = LARGE_FONT_SCALE)
+        verifyAppend(AppendCase(bodyLines = TALL_BODY_LINES / 2, expectReadingStart = true, appearance = appearance))
+    }
+
+    /** An incoming message that fits keeps the newest edge and the tail-following intent. */
+    @Test
+    fun shortIncomingAppendKeepsFollowingTheTail() {
+        verifyAppend(AppendCase(bodyLines = 1, expectReadingStart = false))
+    }
+
+    /** Rows just below, equal to and just above the measured space are told apart by rendered height alone. */
+    @Test
+    fun measuredHeightAtTheReadingViewportBoundaryDecidesTheLanding() =
+        runTest {
+            for ((height, revealed) in listOf(599 to false, 600 to false, 601 to true)) {
+                val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(height, 80, 80))
+                list.settle(index = 1)
+                val coordinator = ConversationScrollCoordinator(list)
+                val outcome =
+                    coordinator.followAppendOrRevealIncomingStart(
+                        candidates = listOf(candidate("incoming")),
+                        probeFor = { list.probe { 0 } },
+                        resolveTailIndex = { 0 },
+                        awaitFrame = list::frame,
+                    )
+                val expectedWrites = if (revealed) listOf(0 to 0, 0 to height - 600) else listOf(0 to 0)
+                assertEquals("height $height", expectedWrites, list.writes)
+                val landed = outcome is ConversationIncomingAppendOutcome.RevealedReadingStart
+                assertEquals("height $height", revealed, landed)
+                assertEquals("height $height", !revealed, coordinator.isFollowingTail)
+            }
+        }
+
+    /**
+     * A burst decides over every incoming row it admitted, so its first oversized row keeps the landing even after a
+     * later arrival restarted the follow, and an own send or a changed scroll intent retires the burst.
+     */
+    @Test
+    fun burstKeepsItsFirstRowsUntilIntentChangesOrTheReaderSends() {
+        val coordinator = ConversationScrollCoordinator(IncomingAppendTestList(600, listOf(80)))
+        val queue = ConversationIncomingAppendLandingQueue()
+        queue.admit(listOf(row("first")), coordinator.intentToken)
+        assertEquals(
+            listOf("first", "second"),
+            queue.admit(listOf(row("second")), coordinator.intentToken).map { it.messageId },
+        )
+        assertEquals(emptyList<String>(), queue.admit(listOf(row("own", mine = true)), coordinator.intentToken))
+        queue.admit(listOf(row("third")), coordinator.intentToken)
+        coordinator.onUserGestureStarted(ConversationScrollAnchor(3, 0, "msg:older", "older"))
+        assertEquals(listOf("fourth"), queue.admit(listOf(row("fourth")), coordinator.intentToken).map { it.messageId })
+        queue.retire()
+        assertEquals(listOf("fifth"), queue.admit(listOf(row("fifth")), coordinator.intentToken).map { it.messageId })
+    }
+
+    /** The screen's append path classifies rows, lands through the coordinator and hands the landing to its owner. */
+    @Test
+    fun productionAppendPathRoutesThroughTheIncomingLanding() {
+        val source = productionSource("ConversationScreen.kt")
+        val append =
+            source
+                .substringAfter("LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored)")
+                .substringBefore("ConversationViewportStructureEffect(")
+        assertTrue(append.contains("conversationAppendedRows(renderedTimeline, previousId)"))
+        assertTrue(append.contains("controller.isMessageMine(row.record)"))
+        assertTrue(append.contains("incomingAppendLanding.admit("))
+        assertTrue(append.contains("scrollCoordinator.followAppendOrRevealIncomingStart("))
+        assertTrue(append.contains("viewportRestorationOwner.adoptIncomingReadingStart(outcome)"))
+        assertFalse("an append must not bypass the landing decision", append.contains("followTailIfAllowed("))
+        assertTrue(source.contains("remember(controller) { ConversationIncomingAppendLandingQueue() }"))
+        // The physical-tail write keeps its #2627 offset-zero contract; the landing is a separate policy.
+        val writer = productionSource("ConversationScrollCoordinator.kt")
+        assertTrue(writer.contains("override suspend fun scrollToTail(index: Int) {\n        scrollToItem(index, 0)"))
+    }
+
+    /** One mounted append: the body size it arrives with, what it must land on, and the appearance it renders in. */
+    private data class AppendCase(
+        val bodyLines: Int,
+        val expectReadingStart: Boolean,
+        val appearance: DirectNotificationAppearance = DirectNotificationAppearance(),
+    )
+
+    /** Mounts the real screen at the newest edge, appends a peer message live, then a later short one. */
+    private fun verifyAppend(case: AppendCase) {
+        val harness = DirectNotificationConversationHarness(composeRule)
+        val timeline = ScriptedConversationTimelineSubscription(timelinePage(*history().toTypedArray()))
+        val scripted = ScriptedConversationLiveSubscriptions(listOf(timeline), conversationTimelineTestGroup())
+        val row =
+            NotificationScenario.chatListRow(
+                groupIdHex = ConversationTimelineTestIds.GROUP_ID,
+                unreadCount = 0,
+                firstUnreadMessageIdHex = null,
+            )
+        val fixture = harness.create(scripted.subscriptions, row)
+        val mounted = mutableStateOf(true)
+        val evidence = ViewportEvidence()
+        try {
+            awaitConversationCondition {
+                fixture.controller.hasPublishedAuthoritativeTimeline && !fixture.controller.isLoading
+            }
+            mount(fixture, mounted, evidence, case.appearance)
+            awaitCondition(failureMessage = { "the transcript never revealed" }) { transcriptRevealed() }
+            awaitCondition(failureMessage = { "the reader never followed the tail" }) {
+                evidence.latest()?.mode == ConversationScrollMode.FollowingTail
+            }
+            val body = (1..case.bodyLines).joinToString("\n") { "incoming line $it" }
+            val appended = history() + timelineRecord(INCOMING_ID, HISTORY_COUNT + 1uL, plaintext = body)
+            timeline.emitWindow(timelinePage(*appended.toTypedArray()))
+            awaitLanding(fixture, case, evidence)
+            if (case.expectReadingStart) {
+                assertIncomingAtReadingTop()
+                val withLater = appended + timelineRecord(LATER_ID, HISTORY_COUNT + 2uL, plaintext = "later")
+                timeline.emitWindow(timelinePage(*withLater.toTypedArray()))
+                awaitCondition(
+                    failureMessage = { "the later append never published" },
+                ) { fixture.controller.timeline.any { it.record.messageIdHex == LATER_ID } }
+                composeRule.waitForIdle()
+                // The later arrival neither pulls the reader to the end nor restarts the completed landing.
+                assertIncomingAtReadingTop()
+                assertReadingIncoming(evidence.latest())
+            }
+        } finally {
+            try {
+                harness.dispose(fixture, mounted)
+            } finally {
+                awaitOpenedTimelineSubscriptionsClosed(scripted)
+            }
+        }
+    }
+
+    /** Waits for the append's settled intent, then checks the tail or reading geometry it left behind. */
+    private fun awaitLanding(
+        fixture: DirectNotificationConversationFixture,
+        case: AppendCase,
+        evidence: ViewportEvidence,
+    ) {
+        awaitCondition(failureMessage = { "the append never published" }) {
+            fixture.controller.timeline.any { it.record.messageIdHex == INCOMING_ID }
+        }
+        if (case.expectReadingStart) {
+            awaitCondition(failureMessage = { "the oversized row never became the reading anchor" }) {
+                (evidence.latest()?.mode as? ConversationScrollMode.ReadingHistory)?.anchorMessageId == INCOMING_ID
+            }
+            composeRule.waitForIdle()
+            val viewport = requireNotNull(evidence.latest())
+            assertReadingIncoming(viewport)
+            assertTrue("the preceding message stays reachable above", viewport.canScrollForward)
+            assertTrue("the newest end stays reachable below", viewport.canScrollBackward)
+        } else {
+            composeRule.waitForIdle()
+            val viewport = requireNotNull(evidence.latest())
+            assertEquals(ConversationScrollMode.FollowingTail, viewport.mode)
+            assertFalse("a fitting row keeps the newest edge", viewport.canScrollBackward)
+            val bubble = bubbleBounds(INCOMING_ID)
+            assertTrue("the whole short row is below the reading top", bubble.first >= transcriptTop())
+        }
+    }
+
+    /** Mounts the production screen with the opt-in viewport evidence sink and the case's appearance. */
+    private fun mount(
+        fixture: DirectNotificationConversationFixture,
+        mounted: MutableState<Boolean>,
+        evidence: ViewportEvidence,
+        appearance: DirectNotificationAppearance,
+    ) {
+        composeRule.setContent {
+            if (mounted.value) {
+                CompositionLocalProvider(
+                    LocalConversationScrollEvidenceSink provides evidence,
+                    LocalLayoutDirection provides if (appearance.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+                ) {
+                    WhiteNoiseTheme(fontScale = appearance.fontScale) {
+                        ConversationScreen(
+                            appState = fixture.appState,
+                            chat = fixture.chat,
+                            controller = fixture.controller,
+                            onBack = {},
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /** The settled mode is a history reading anchored on the incoming message. */
+    private fun assertReadingIncoming(viewport: ConversationViewportEvidence?) {
+        val mode = viewport?.mode
+        assertTrue("expected a retained reading intent, was $mode", mode is ConversationScrollMode.ReadingHistory)
+        assertEquals(INCOMING_ID, (mode as ConversationScrollMode.ReadingHistory).anchorMessageId)
+    }
+
+    /** The incoming bubble's first line sits at the transcript's reading top, not above it. */
+    private fun assertIncomingAtReadingTop() {
+        assertEquals(
+            "the incoming bubble must start at the transcript's reading top",
+            transcriptTop(),
+            bubbleBounds(INCOMING_ID).first,
+            1f,
+        )
+    }
+
+    /** True once the screen has committed its initial position and revealed the transcript. */
+    private fun transcriptRevealed(): Boolean =
+        composeRule
+            .onAllNodesWithTag(PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE)
+            .fetchSemanticsNodes()
+            .isNotEmpty()
+
+    /** The top of the clear reading viewport, below the header. */
+    private fun transcriptTop(): Float =
+        composeRule
+            .onNodeWithTag(PerformanceTestTags.CONVERSATION_TRANSCRIPT_VISIBLE)
+            .getUnclippedBoundsInRoot()
+            .top.value
+
+    /** The unclipped top and bottom of one bubble row, so a row taller than the viewport is still measured. */
+    private fun bubbleBounds(messageId: String): Pair<Float, Float> =
+        composeRule
+            .onNodeWithTag(messageBubbleRowTestTag(messageId), useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+            .let { it.top.value to it.bottom.value }
+
+    /** Short peer rows already read, so the screen opens at the newest edge. */
+    private fun history(): List<TimelineMessageRecordFfi> =
+        (0 until HISTORY_COUNT.toInt()).map { index ->
+            timelineRecord(index.toString(16).padStart(2, '0').repeat(32), (index + 1).toULong(), "body $index")
+        }
+
+    /** Reads a production source file from either the module or the repository root. */
+    private fun productionSource(name: String): String =
+        sequenceOf(File("src/main"), File("app/src/main"))
+            .map { File(it, "java/dev/ipf/whitenoise/android/ui/conversation/$name") }
+            .first(File::isFile)
+            .readText()
+
+    /** Builds one appended row with its presentation identity. */
+    private fun row(
+        messageId: String,
+        mine: Boolean = false,
+    ) = ConversationAppendedRow(messageId, "msg:$messageId", mine)
+
+    /** Builds one incoming landing candidate with its presentation identity. */
+    private fun candidate(messageId: String) = ConversationIncomingAppendCandidate(messageId, "msg:$messageId")
+
+    /** Records every measured production viewport in test memory only. */
+    private class ViewportEvidence : ConversationScrollEvidenceSink {
+        private val samples = CopyOnWriteArrayList<ConversationViewportEvidence>()
+
+        /** Captures one measured viewport. */
+        override fun onViewport(snapshot: ConversationViewportEvidence) {
+            samples += snapshot
+        }
+
+        /** Writes are asserted through geometry, not through the writer boundary. */
+        override fun onWrite(write: ConversationScrollWriteEvidence) = Unit
+
+        /** The newest measured viewport, or null before the first one. */
+        fun latest(): ConversationViewportEvidence? = samples.lastOrNull()
+    }
+
+    private companion object {
+        const val HISTORY_COUNT = 12uL
+        const val TALL_BODY_LINES = 60
+        const val LARGE_FONT_SCALE = 1.6f
+        val INCOMING_ID = "e1".repeat(32)
+        val LATER_ID = "e2".repeat(32)
+    }
+}

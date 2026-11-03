@@ -132,9 +132,13 @@ internal suspend fun ConversationScrollCoordinator.settleReadingStart(
     return ConversationReadingStartResult(completed, placement)
 }
 
-/** Reaches the row, repairs an estimate that overshot a collapsed row, then validates measured geometry. */
+/**
+ * Reaches the row, repairs an estimate that overshot a collapsed row, then validates measured geometry. The live
+ * incoming-append landing runs it inside its own tail command, so the tail write and the reading-start correction
+ * share one latest-wins owner.
+ */
 @Suppress("ReturnCount") // Guard clauses keep the ordered approach, repair and validation steps explicit.
-private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope.placeReadingStart(
+internal suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope.placeReadingStart(
     probe: ConversationReadingStartProbe,
     approach: ConversationReadingStartApproach,
 ): ConversationReadingStartPlacement? {

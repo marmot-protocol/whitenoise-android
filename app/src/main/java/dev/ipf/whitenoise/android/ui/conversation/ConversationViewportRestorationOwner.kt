@@ -12,6 +12,7 @@ import kotlinx.coroutines.ensureActive
 import java.util.concurrent.CancellationException
 
 /** One screen generation's presentation-only initial and post-initial restoration decisions. */
+@Suppress("TooManyFunctions") // One owner for every landing's reading start, its resettle and its release.
 internal class ConversationViewportRestorationOwner(
     private val coordinator: ConversationScrollCoordinator,
     private val reanchorGate: ConversationPostInitialReanchorGate,
@@ -134,6 +135,22 @@ internal class ConversationViewportRestorationOwner(
         readingStart = null
         reanchorGate.commit(structure, viewportHeight)
         return true
+    }
+
+    /**
+     * Takes ownership of a live incoming row whose beginning an append revealed, so a later viewport, row-height or
+     * structure change reruns the same measured settle a notification landing uses instead of replaying a stale offset,
+     * and a reader who scrolls away is handed their own position exactly as for that landing.
+     */
+    fun adoptIncomingReadingStart(revealed: ConversationIncomingAppendOutcome.RevealedReadingStart) {
+        if (!isActive) return
+        readingStart =
+            ConversationReadingStartIntent(
+                revealed.anchor,
+                revealed.probe,
+                revealed.placement,
+                coordinator.intentToken.revision,
+            )
     }
 
     /** Fresh geometry of the landing's target while it still owns the viewport, null once nothing does. */
