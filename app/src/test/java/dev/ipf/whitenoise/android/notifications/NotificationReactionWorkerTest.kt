@@ -289,6 +289,7 @@ class NotificationReactionWorkerTest {
             maintenanceDisposition = SendMaintenanceDispositionFfi.READY,
         )
 
+    /** A running account `account-a` that signs locally. */
     private fun signingAccount() =
         dev.ipf.marmotkit.AccountSummaryFfi(
             label = "account-a",
@@ -297,5 +298,6 @@ class NotificationReactionWorkerTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 }

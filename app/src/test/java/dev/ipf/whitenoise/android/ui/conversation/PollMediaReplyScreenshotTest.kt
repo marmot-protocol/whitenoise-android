@@ -90,6 +90,7 @@ class PollMediaReplyScreenshotTest : PollMessageTestFixtures() {
                                     poll.record.contentTokens,
                                     poll.record.kind,
                                     null,
+                                    null,
                                     emptyList(),
                                     null,
                                     false,

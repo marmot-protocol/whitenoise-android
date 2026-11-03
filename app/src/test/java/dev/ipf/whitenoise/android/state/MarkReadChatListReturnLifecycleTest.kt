@@ -82,6 +82,7 @@ class MarkReadChatListReturnLifecycleTest {
             .invoke(controller, row, trigger)
     }
 
+    /** Builds an app state with a single running, locally signing active account. */
     private fun testAppState(): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext(),
@@ -96,6 +97,7 @@ class MarkReadChatListReturnLifecycleTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,
@@ -115,6 +117,7 @@ class MarkReadChatListReturnLifecycleTest {
             lastReadMessageIdHex = TAIL_ID,
         )
 
+    /** Builds a member chat-list row with the given unread count and read marker. */
     private fun chatRow(
         unreadCount: ULong,
         lastReadTimelineAt: ULong?,
@@ -152,6 +155,7 @@ class MarkReadChatListReturnLifecycleTest {
                 attachmentCount = 0u,
                 groupSystem = null,
                 deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                sticker = null,
             ),
         unreadCount = unreadCount,
         hasUnread = unreadCount > 0uL,

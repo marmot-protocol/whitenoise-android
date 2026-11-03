@@ -319,6 +319,7 @@ class DetailRouteMotionScreenshotTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     /** Builds the Weekend hikers group record, administered by the local account or, if not [admin], the peer. */

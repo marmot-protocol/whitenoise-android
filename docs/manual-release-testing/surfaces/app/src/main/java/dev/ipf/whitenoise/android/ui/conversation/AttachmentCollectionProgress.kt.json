@@ -1,0 +1,193 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AttachmentCollectionProgress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "fun AttachmentCollectionProgress(",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "AttachmentCollectionStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "fun AttachmentCollectionStatus(",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "AttachmentCollectionActionRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "fun AttachmentCollectionActionRow(",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "AttachmentCollectionItemList",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "fun AttachmentCollectionItemList(",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.attachment_collection_blocked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "R.string.attachment_collection_blocked",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.attachment_collection_cancel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "R.string.attachment_collection_cancel",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.attachment_collection_hide_items",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "R.string.attachment_collection_hide_items",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.attachment_collection_item_document",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "R.string.attachment_collection_item_document",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.attachment_collection_item_media",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "R.string.attachment_collection_item_media",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.attachment_collection_paused",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "R.string.attachment_collection_paused",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.attachment_collection_progress",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "R.string.attachment_collection_progress",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.attachment_collection_resume",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "R.string.attachment_collection_resume",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.attachment_collection_show_items",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "R.string.attachment_collection_show_items",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.attachment_collection_skip_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "R.string.attachment_collection_skip_failed",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.attachment_collection_state_cancelled",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "R.string.attachment_collection_state_cancelled",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.attachment_collection_state_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "R.string.attachment_collection_state_failed",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.attachment_collection_state_preparing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "R.string.attachment_collection_state_preparing",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.attachment_collection_state_published",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "R.string.attachment_collection_state_published",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.attachment_collection_state_queued",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "R.string.attachment_collection_state_queued",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.attachment_collection_state_skipped",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "R.string.attachment_collection_state_skipped",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.attachment_collection_state_uploading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "R.string.attachment_collection_state_uploading",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.discard",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "R.string.discard",
+        "test_ids": [
+          "MED-045"
+        ]
+      },
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AttachmentCollectionProgress.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "MED-045"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

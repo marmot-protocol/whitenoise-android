@@ -426,6 +426,7 @@ class ChatListTopBarScreenshotTest {
         composeRule.onNodeWithTag(CHAT_LIST_SEARCH_FILTERS_ACTION_TAG).assertExists()
     }
 
+    /** Builds an app state holding the given number of running accounts, the first labelled personal. */
     private fun testAppState(accountCount: Int): WhiteNoiseAppState =
         WhiteNoiseAppState(
             context = context,
@@ -440,6 +441,7 @@ class ChatListTopBarScreenshotTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     )
                 },
             activeAccountRef = "personal",

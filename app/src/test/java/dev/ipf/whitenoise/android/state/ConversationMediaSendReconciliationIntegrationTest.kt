@@ -50,8 +50,14 @@ import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.DiskByteCacheKeyProvider
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.media.PresentationMemoryTrim
 import dev.ipf.whitenoise.android.media.minimalMp4Header
+import dev.ipf.whitenoise.android.media.sandbox.ImageInspection
+import dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+import dev.ipf.whitenoise.android.media.sandbox.MediaDecodeTransport
+import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
+import dev.ipf.whitenoise.android.media.sandbox.TestMediaDecodeTransport
 import dev.ipf.whitenoise.android.ui.conversation.ConversationMediaSender
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollCoordinator
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollMode
@@ -72,6 +78,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -84,6 +91,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -95,6 +103,7 @@ import org.robolectric.annotation.Config
 import java.lang.reflect.Proxy
 import java.nio.file.Files
 import java.time.Duration
+import java.util.concurrent.CopyOnWriteArrayList
 import javax.crypto.spec.SecretKeySpec
 
 @RunWith(RobolectricTestRunner::class)
@@ -722,7 +731,7 @@ class ConversationMediaSendReconciliationThumbnailTest {
                     mediaUploader = { _, _, _ -> uploadResult(reference) },
                     mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
                     mediaPublisher = { _, _, _, _ -> requireNotNull(uploadResult(reference).sent) },
-                    mediaThumbnailDecoder = {
+                    mediaThumbnailDecoder = { _, _ ->
                         val original = controller.timeline.single()
                         pendingId = original.presentationId
                         val projection =
@@ -751,6 +760,47 @@ class ConversationMediaSendReconciliationThumbnailTest {
                 )
                 assertEquals(pendingId, controller.timeline.single().presentationId)
             } finally {
+                finishMediaFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
+
+    /**
+     * A just-sent photo's poster decodes in the outgoing domain its attachment names, that of the draft it was sent
+     * from, whatever draft is current by then. The poster retires nothing: its draft's worker retires once the send
+     * that owns it has ended.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun justSentPosterDecodesInItsSentDraftsDomain() =
+        runTest {
+            Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            val reference = mediaReference()
+            val recorder = PosterDomainRecorder()
+            IsolatedMediaDecoder.installTestTransport(recorder)
+            val controller =
+                ConversationController(
+                    appState = state,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    groupRosterReader = { _, _ -> authoritativeRoster() },
+                    mediaUploader = { _, _, _ -> uploadResult(reference) },
+                    mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
+                    mediaPublisher = { _, _, _, _ -> requireNotNull(uploadResult(reference).sent) },
+                )
+            try {
+                controller.retryMembers()
+                val sentDraft = MediaTrustDomain.outgoing(ACCOUNT_REF, GROUP_ID, "sent-draft")
+                controller.sendAttachments(
+                    listOf(PendingAttachment(PHOTO_BYTES, "image/png", "photo.png", "1x1", outgoingDomain = sentDraft)),
+                    null,
+                )
+                assertNotEquals(sentDraft, controller.outgoingMediaTrustDomain(PHOTO_PICK))
+                assertEquals(listOf(sentDraft), recorder.decoded.toList())
+                assertEquals(emptyList<MediaTrustDomain>(), recorder.retired.toList())
+            } finally {
+                IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)
                 finishMediaFixture(controller, state)
                 Dispatchers.resetMain()
             }
@@ -964,6 +1014,8 @@ private fun projectedMediaMessage(
     sourceEpoch = null,
     retentionSeconds = null,
     retentionExpiresAt = null,
+    sticker = null,
+    importedFrom = null,
 )
 
 /** Builds a single account owner with process-local drafts and no real relay connection. */
@@ -981,6 +1033,7 @@ internal fun mediaSendReconciliationAppState() =
                     externalSigning = false,
                     signedOut = false,
                     running = true,
+                    unlinked = false,
                 ),
             ),
         activeAccountRef = ACCOUNT_REF,
@@ -1100,6 +1153,7 @@ private fun chatListRow() =
                 attachmentCount = 0u,
                 groupSystem = null,
                 deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                sticker = null,
             ),
         unreadCount = 0uL,
         hasUnread = false,
@@ -1145,6 +1199,33 @@ private val GROUP_ID = "b2".repeat(32)
 private val CONFIRMED_MESSAGE_ID = "c3".repeat(32)
 private const val VIDEO_MEDIA_TYPE = "video/mp4"
 private val VIDEO_BYTES = byteArrayOf(0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109)
+private const val PHOTO_PICK = "slot-photo"
+private val PHOTO_BYTES = byteArrayOf(1, 2, 3, 4)
+
+/** Decodes nothing and records the domain of every still decode and every retirement, in order. */
+private class PosterDomainRecorder : MediaDecodeTransport {
+    val decoded = CopyOnWriteArrayList<MediaTrustDomain>()
+    val retired = CopyOnWriteArrayList<MediaTrustDomain>()
+
+    /** Records the domain the decode declares and returns no pixels. */
+    override fun decode(
+        bytes: ByteArray,
+        edge: Int,
+        oriented: Boolean,
+        operation: Int,
+    ): android.graphics.Bitmap? {
+        decoded += MediaTrustScope.current()
+        return null
+    }
+
+    /** No inspection: the poster path only decodes. */
+    override fun inspect(bytes: ByteArray): ImageInspection? = null
+
+    /** Records [domain] in call order. */
+    override fun retireDomain(domain: MediaTrustDomain) {
+        retired += domain
+    }
+}
 
 /** Allocates a test-only opaque native draft token without loading the device ABI. */
 private fun mediaReplyRevisionStub(): MessageDraftRevisionFfi {
@@ -1726,22 +1807,23 @@ class ConversationFileBackedMediaSendTest {
         }
 
     /**
-     * A draft photo that follows a large video is left out once the album's native ciphertext bound is spent,
-     * so the video still sends instead of the whole album failing on every Retry.
+     * A draft photo picked with a large video no longer shares the video's album: the collection plan sends the
+     * video alone first (#2576), so the album never spends its ciphertext bound and nothing is left out.
      */
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun albumLeavesOutADraftPhotoThatNoLongerFitsAfterALargeVideo() =
+    fun aDraftPhotoPickedWithALargeVideoSendsInItsOwnMessage() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
             val state = mediaSendReconciliationAppState()
             Robolectric.setupContentProvider(ScriptedPickProvider::class.java, SENDER_PICKS_AUTHORITY)
             val video = scriptedPick(state, "clip.mp4", "video/mp4", ALBUM_VIDEO_BYTES)
             val photo = scriptedPick(state, "photo.jpg", "image/jpeg", DRAFT_PHOTO_BYTES.toLong())
-            val uploaded = CompletableDeferred<List<String>>()
+            val uploaded = ChunkUploads()
+            // The prepared draft photo goes up from memory once the video has been sent.
             val controller =
-                fileBackedController(state) { request, _ ->
-                    uploaded.complete(request.attachments.map { it.fileName })
+                fileBackedController(state, inMemoryUpload = { acceptedUploadResult(1) }) { request, _ ->
+                    uploaded.record(request.attachments.map { it.fileName })
                     oneAttachmentUpload()
                 }
             val albumLimits =
@@ -1760,11 +1842,10 @@ class ConversationFileBackedMediaSendTest {
                     preparedImageAttachments = mapOf("photo" to draftPhoto()),
                 )
 
-                assertEquals(listOf("clip.mp4"), uploaded.await())
-                assertEquals(
-                    AppText.Resource(dev.ipf.whitenoise.android.R.string.media_album_too_large),
-                    state.toast?.title,
-                )
+                assertEquals(listOf("clip.mp4"), uploaded.first.await())
+                val photoState = awaitPhotoQueuedOrSettled(state)
+                assertTrue("the photo is not left out", photoState != CollectionItemState.SKIPPED)
+                assertNull("no pick is refused or left out", state.toast)
             } finally {
                 ScriptedPickProvider.picks.clear()
                 finishMediaFixture(controller, state)
@@ -1773,22 +1854,23 @@ class ConversationFileBackedMediaSendTest {
         }
 
     /**
-     * A draft photo after a large video uploads from a file too, so its two disk copies must fit beside
-     * the staged copy still owed to the video. When they do not, the photo is left out with the storage notice
-     * and the video still sends, instead of the whole album failing during upload.
+     * A draft photo after a large video is its own chunk now (#2576), prepared only after the video's upload has
+     * released its staged copy, so it no longer competes with the video for disk and the video sends first
+     * without a storage notice.
      */
     @Test
-    fun albumLeavesOutADraftPhotoWhoseCopiesNoLongerFitBesideALargeVideo() =
+    fun aDraftPhotoWhoseCopiesDoNotFitBesideALargeVideoSendsAfterIt() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
             val state = mediaSendReconciliationAppState()
             Robolectric.setupContentProvider(ScriptedPickProvider::class.java, SENDER_PICKS_AUTHORITY)
             val video = scriptedPick(state, "clip.mp4", "video/mp4", ALBUM_VIDEO_BYTES)
             val photo = scriptedPick(state, "photo.jpg", "image/jpeg", DRAFT_PHOTO_BYTES.toLong())
-            val uploaded = CompletableDeferred<List<String>>()
+            val uploaded = ChunkUploads()
+            // The prepared draft photo goes up from memory once the video has been sent.
             val controller =
-                fileBackedController(state) { request, _ ->
-                    uploaded.complete(request.attachments.map { it.fileName })
+                fileBackedController(state, inMemoryUpload = { acceptedUploadResult(1) }) { request, _ ->
+                    uploaded.record(request.attachments.map { it.fileName })
                     oneAttachmentUpload()
                 }
             val roomyLimits =
@@ -1815,11 +1897,10 @@ class ConversationFileBackedMediaSendTest {
                     preparedImageAttachments = mapOf("photo" to draftPhoto()),
                 )
 
-                assertEquals(listOf("clip.mp4"), uploaded.await())
-                assertEquals(
-                    AppText.Resource(dev.ipf.whitenoise.android.R.string.share_import_storage),
-                    state.toast?.title,
-                )
+                assertEquals(listOf("clip.mp4"), uploaded.first.await())
+                val photoState = awaitPhotoQueuedOrSettled(state)
+                assertTrue("the photo is not left out", photoState != CollectionItemState.SKIPPED)
+                assertNull("no pick is refused or left out", state.toast)
             } finally {
                 ScriptedPickProvider.picks.clear()
                 finishMediaFixture(controller, state)
@@ -1828,21 +1909,21 @@ class ConversationFileBackedMediaSendTest {
         }
 
     /**
-     * The album and a large document picked together are separate messages of one send, so the document's
-     * snapshot must leave room for the album's upload. When it does not, the document is refused with the
-     * storage notice before anything is queued for it, and the album still sends.
+     * The album and a large document picked together are separate chunks of one collection (#2576). The
+     * document is staged only after the album's upload, so the album sends first and no storage notice is
+     * raised for a copy the album no longer holds.
      */
     @Test
-    fun aLargeDocumentCountsTheCopiesTheAlbumStillOwes() =
+    fun aLargeDocumentSendsAfterTheVideoWithoutAStorageNotice() =
         runTest {
             Dispatchers.setMain(StandardTestDispatcher(testScheduler))
             val state = mediaSendReconciliationAppState()
             val document = scriptedDocument(state)
             val video = scriptedPick(state, "clip.mp4", "video/mp4", LARGER_VIDEO_BYTES)
-            val uploaded = CompletableDeferred<List<String>>()
+            val uploaded = ChunkUploads()
             val controller =
                 fileBackedController(state) { request, _ ->
-                    uploaded.complete(request.attachments.map { it.fileName })
+                    uploaded.record(request.attachments.map { it.fileName })
                     oneAttachmentUpload()
                 }
             // After the video lands there is room for the document's two copies alone, but not for its
@@ -1867,11 +1948,9 @@ class ConversationFileBackedMediaSendTest {
                     caption = "",
                 )
 
-                assertEquals(listOf("clip.mp4"), uploaded.await())
-                assertEquals(
-                    AppText.Resource(dev.ipf.whitenoise.android.R.string.share_import_storage),
-                    state.toast?.title,
-                )
+                assertEquals(listOf("clip.mp4"), uploaded.first.await())
+                assertEquals(1, uploaded.second.await().size)
+                assertNull("no pick is refused or left out", state.toast)
             } finally {
                 ScriptedPickProvider.picks.clear()
                 finishMediaFixture(controller, state)
@@ -2033,19 +2112,23 @@ private fun scriptedDocument(state: WhiteNoiseAppState): android.net.Uri {
 
 /**
  * A controller whose file uploads run [upload] with the cancel registration the native control would
- * receive; the in-memory uploader must never be reached, and every publish reports relay acceptance.
+ * receive. The in-memory uploader runs [inMemoryUpload], which by default must never be reached, and every
+ * publish reports relay acceptance.
  */
 private fun fileBackedController(
     state: WhiteNoiseAppState,
     publish: () -> Unit = {},
     publishSummary: () -> SendSummaryFfi = { requireNotNull(uploadResult(mediaReference()).sent) },
+    inMemoryUpload: (MediaUploadRequestFfi) -> MediaUploadResultFfi = {
+        error("the in-memory upload path must not run")
+    },
     upload: suspend (MediaFileUploadRequestFfi, ((() -> Unit)?) -> Unit) -> MediaUploadResultFfi,
 ) = ConversationController(
     appState = state,
     initialGroup = group(),
     initialMemberSnapshot = memberSnapshot(),
     groupRosterReader = { _, _ -> authoritativeRoster() },
-    mediaUploader = { _, _, _ -> error("the in-memory upload path must not run") },
+    mediaUploader = { _, _, request -> inMemoryUpload(request) },
     mediaFileUploader = { _, _, request, register -> upload(request, register) },
     fileBatchCiphertextBytes = { FILE_BATCH_CIPHERTEXT_BYTES },
     mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
@@ -2148,3 +2231,61 @@ private const val SEND_RESERVE_BYTES = 64L * 1024L * 1024L
 private const val FILE_BATCH_CIPHERTEXT_BYTES = 900L * 1024L * 1024L
 private const val DELETE_POLL_ATTEMPTS = 200
 private const val DELETE_POLL_INTERVAL_MS = 10L
+
+/**
+ * A controller for collection-operation tests: each in-memory upload runs [upload] and returns one reference
+ * per attachment, and each publish runs [publish] with its caption and is accepted pending under its own
+ * canonical id, so several chunks never share a bridge. [disappearingSecs] sets the group's timer.
+ */
+internal fun collectionLifecycleController(
+    state: WhiteNoiseAppState,
+    disappearingSecs: ULong = 0uL,
+    upload: suspend (MediaUploadRequestFfi) -> Unit = {},
+    publish: suspend (String?) -> Unit = {},
+): ConversationController {
+    var published = 0
+    return ConversationController(
+        appState = state,
+        initialGroup = group().copy(disappearingMessageSecs = disappearingSecs),
+        initialMemberSnapshot = memberSnapshot(),
+        groupRosterReader = { _, _ -> authoritativeRoster() },
+        mediaUploader = { _, _, request ->
+            upload(request)
+            acceptedUploadResult(request.attachments.size)
+        },
+        mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
+        mediaPublisher = { _, _, _, caption ->
+            publish(caption)
+            published += 1
+            acceptedPendingSummary().copy(messageIds = listOf("%064x".format(published)))
+        },
+        markdownParser = { emptyMarkdownDocument() },
+    )
+}
+
+/** The attachment names of the first two uploads, in order; later uploads are ignored. */
+private class ChunkUploads {
+    val first = CompletableDeferred<List<String>>()
+    val second = CompletableDeferred<List<String>>()
+
+    /** Completes [first], then [second], with one upload's attachment names. */
+    fun record(names: List<String>) {
+        if (!first.complete(names)) second.complete(names)
+    }
+}
+
+/**
+ * Waits until the collection's draft photo is uploading or sent, or its operation has finished (a skip would
+ * also show a notice), and returns the photo's state, or null once the operation is gone.
+ */
+private suspend fun awaitPhotoQueuedOrSettled(state: WhiteNoiseAppState): CollectionItemState? {
+    val reached = setOf(CollectionItemState.UPLOADING, CollectionItemState.PUBLISHED, CollectionItemState.SKIPPED)
+    val operations =
+        state.attachmentCollections.operations.first { all ->
+            all.values.none { operation -> operation.items.any { it.id == "photo" && it.state !in reached } }
+        }
+    return operations.values
+        .flatMap { it.items }
+        .firstOrNull { it.id == "photo" }
+        ?.state
+}

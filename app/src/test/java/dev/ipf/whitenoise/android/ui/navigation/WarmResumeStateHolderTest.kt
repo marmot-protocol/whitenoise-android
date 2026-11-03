@@ -614,6 +614,7 @@ class WarmResumeStateHolderTest {
             activeAccountRef = ACCOUNT_REF,
         )
 
+    /** Builds the running, locally signing test account summary. */
     private fun activeAccount() =
         AccountSummaryFfi(
             label = ACCOUNT_REF,
@@ -622,6 +623,7 @@ class WarmResumeStateHolderTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     /** Builds one isolated local projection controller for retained-route ownership tests. */

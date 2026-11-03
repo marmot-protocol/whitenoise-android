@@ -113,6 +113,12 @@
     <string name="library_loading">Dosyalar ve medya yükleniyor…</string>
     <string name="library_empty">Dosya veya medya bulunamadı</string>
     <string name="library_source">Kaynak: %1$s · %2$s</string>
+    <string name="library_section_this_week">Bu hafta</string>
+    <string name="library_section_this_month">Bu ay</string>
+    <string name="library_sender_in_chat">%1$s, %2$s</string>
+    <string name="library_item_description">%1$s, %2$s, %3$s tarafından %4$s içinde, %5$s</string>
+    <string name="library_load_more_failed">Daha fazla dosya ve medya yüklenemedi</string>
+    <string name="library_filters_unsupported">Bu filtreler dosya ve medyaya göz atmak için kullanılamaz</string>
     <string name="chat_list_search_filter_remove">Filtreyi kaldır: %1$s</string>
     <string name="chat_list_filter_all">Tümü</string>
     <string name="chat_list_filter_unread">Okunmamış</string>
@@ -131,6 +137,7 @@
     <string name="chat_pinned_badge">Sabitlendi</string>
     <string name="chat_row_removed_badge">Çıkarıldınız</string>
     <string name="chat_row_removed_description">Bu sohbetten çıkarıldınız</string>
+    <string name="chat_row_device_removed_description">Bu cihaz bu sohbetten çıkarıldı</string>
     <string name="chat_row_action_move_up">Yukarı taşı</string>
     <string name="chat_row_action_move_down">Aşağı taşı</string>
     <string name="chat_row_action_mark_read">Okundu olarak işaretle</string>
@@ -250,6 +257,7 @@
     <string name="group_empty_only_you_title">Bu grupta yalnızca sen varsın</string>
     <string name="group_empty_invite_members">Hazır olduğunda kişileri davet et.</string>
     <string name="you_are_no_longer_a_member">Artık bu grubun üyesi olmadığınız için bu gruba mesaj gönderemezsiniz.</string>
+    <string name="device_removed_from_group_composer">Bu cihaz bu gruptan çıkarıldığı için buradan mesaj gönderemezsiniz. Diğer cihazlarınız grupta kalmaya devam ediyor.</string>
     <string name="group_unrecoverable_notice">White Noise grubun durumunu doğrulayıp onarırken bu grup geçici olarak donduruldu.</string>
     <string name="chat_row_draft_prefix">Taslak: </string>
     <string name="jump_to_newest">En yeniye atla</string>
@@ -501,10 +509,6 @@
         <item quantity="other">%1$d ek</item>
     </plurals>
     <string name="toast_share_staged_other_chats">%1$d diğer sohbette de hazırlandı</string>
-    <plurals name="toast_share_attachments_dropped">
-        <item quantity="one">%1$d ek dosya eklenemedi. Aynı anda en fazla 10 gönderebilirsiniz.</item>
-        <item quantity="other">%1$d ek dosya eklenemedi. Aynı anda en fazla 10 gönderebilirsiniz.</item>
-    </plurals>
     <string name="delete">Sil</string>
     <string name="delete_for_me">Benim için sil</string>
     <string name="delete_for_everyone">Herkes için sil</string>
@@ -836,6 +840,7 @@
     <string name="toast_couldnt_publish_profile">Profil yayınlanamadı</string>
     <string name="toast_send_failed">Gönderim başarısız oldu</string>
     <string name="toast_send_storage_full">Göndermek için yeterli depolama alanı yok. Yer açıp tekrar deneyin.</string>
+    <string name="error_storage_full">Bu cihazda yeterli depolama alanı yok. Yer açıp tekrar deneyin.</string>
     <string name="toast_send_connection_failed">Aktarıcıya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.</string>
     <string name="toast_send_queue_full">Bu sohbette gönderilmeyi bekleyen çok fazla mesaj var, bu yüzden mesajınız gönderilmedi. Sıra ilerleyince yeniden deneyin.</string>
     <string name="toast_send_chat_changed">Mesajın gönderilirken sohbet değişti, bu yüzden gönderilmedi. Tekrar dene.</string>
@@ -1672,6 +1677,21 @@
         <item quantity="one">~%1$d sn kaldı</item>
         <item quantity="other">~%1$d sn kaldı</item>
     </plurals>
+    <plurals name="tts_bar_minutes_remaining">
+        <item quantity="one">~%1$d dk kaldı</item>
+        <item quantity="other">~%1$d dk kaldı</item>
+    </plurals>
+    <string name="tts_bar_minutes_seconds_remaining">~%1$d dk %2$d sn kaldı</string>
+    <string name="tts_bar_remaining_spoken">Yaklaşık %1$s kaldı</string>
+    <plurals name="tts_bar_spoken_minutes">
+        <item quantity="one">%1$d dakika</item>
+        <item quantity="other">%1$d dakika</item>
+    </plurals>
+    <plurals name="tts_bar_spoken_seconds">
+        <item quantity="one">%1$d saniye</item>
+        <item quantity="other">%1$d saniye</item>
+    </plurals>
+    <string name="tts_bar_spoken_minutes_seconds">%1$s %2$s</string>
     <string name="tts_bar_stop">Okumayı durdur</string>
     <string name="tts_bar_return_to_source">Okunan mesaja dön</string>
     <string name="tts_source_unavailable">Okunan mesaj artık kullanılamıyor</string>
@@ -2519,6 +2539,8 @@
     <string name="notification_tone_added">Eklendi. Bir ton seçmek için aşağıdan bir kategoriyi, ardından Ses seçeneğini açın. Bazı cihazlarda bu tonlar Seslerim altında listelenir.</string>
     <string name="notification_tone_add_failed">Sesler eklenemedi. Tekrar deneyin veya mevcut Android sesinizi koruyun.</string>
     <string name="notification_tone_scope">Sesleri önizlemek veya eklemek uyarılarınızı değiştirmez. Android’de her kategori, sohbet veya kişi için bir ses seçin. Kendi sesi açıkça atanmış sohbetler ve kişiler bu sesi korur. Yeni mesaj kategorileri Ding kullanır; sessiz ve özelleştirilmiş kategoriler değişmez. Önizlemeler bildirim ses düzeyini kullanır, Sessiz ve Rahatsız Etmeyin modlarına uyar.</string>
+    <string name="notification_quiet_during_spoken_audio">Podcast sırasında sessiz</string>
+    <string name="notification_quiet_during_spoken_audio_detail">Başka bir uygulama podcast veya sesli kitap çalarken mesajlar ses ve titreşim olmadan gelir, böylece çalma devam eder. Bahsedilmeler yine bildirilir.</string>
     <string name="notification_tone_android">Android sesi</string>
     <string name="notification_tone_silent">Sessiz</string>
     <string name="notification_tone_off">Kapalı</string>

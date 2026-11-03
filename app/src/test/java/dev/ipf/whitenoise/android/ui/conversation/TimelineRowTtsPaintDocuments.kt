@@ -89,6 +89,7 @@ internal fun plainPaintDocument(text: String) =
             ),
     )
 
+/** Builds a received message record whose plain-text body is painted as a speakable document. */
 internal fun speakablePaintRecord(
     messageIdHex: String,
     plaintext: String,
@@ -108,4 +109,5 @@ internal fun speakablePaintRecord(
     retentionExpiresAt = null,
     recordedAt = 1uL,
     receivedAt = 1uL,
+    sticker = null,
 )

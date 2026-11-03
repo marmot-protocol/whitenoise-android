@@ -359,6 +359,7 @@ class GroupStateMemberRefreshGateTest {
             assertEquals(GroupRosterLoadState.INCONSISTENT, controller.memberRosterState)
         }
 
+    /** A transition from member to removed or left is detected as self-removal, while other updates are not. */
     @Test
     fun selfRemovalTransitionIsDetectedImmediately() {
         val previous = group(selfMembership = SelfMembershipFfi.MEMBER)
@@ -371,6 +372,86 @@ class GroupStateMemberRefreshGateTest {
         assertFalse(groupStateUpdateRemovesSelf(previous, previous.copy(name = "Renamed")))
     }
 
+    /** A removed device copy ends this device's membership like any removal, and is told apart from one. */
+    @Test
+    fun deviceRemovalEndsThisDevicesMembership() {
+        val previous = group(selfMembership = SelfMembershipFfi.MEMBER)
+        val deviceRemoved = previous.copy(selfMembership = SelfMembershipFfi.DEVICE_REMOVED)
+
+        assertTrue(deviceRemoved.selfMembership.isNonMember())
+        assertTrue(deviceRemoved.isDeviceRemovedCopy())
+        assertFalse(previous.copy(selfMembership = SelfMembershipFfi.REMOVED).isDeviceRemovedCopy())
+        assertTrue(groupStateUpdateRemovesSelf(previous, deviceRemoved))
+    }
+
+    /** A roster reporting this device removed keeps the account listed and ends sends; an account removal drops it. */
+    @Test
+    fun deviceRemovedRosterKeepsTheAccountWhileAccountRemovalDropsIt() =
+        runBlocking {
+            val rosterCases = listOf(SelfMembershipFfi.DEVICE_REMOVED to true, SelfMembershipFfi.REMOVED to false)
+            rosterCases.forEach { (membership, keepsAccount) ->
+                val controller =
+                    ConversationController(
+                        appState = appState(),
+                        initialGroup = group(),
+                        initialMemberSnapshot = twoMemberSnapshot(),
+                        groupRosterReader = { _, _ ->
+                            roster(
+                                member("alice", isAdmin = true, isSelf = true, local = true),
+                                member("bob", isAdmin = true),
+                                selfMembership = membership,
+                            )
+                        },
+                    )
+
+                controller.retryMembers()
+
+                assertEquals(membership, controller.group.selfMembership)
+                assertEquals(
+                    "$membership roster",
+                    if (keepsAccount) listOf("alice", "bob") else listOf("bob"),
+                    controller.members.map { it.memberIdHex },
+                )
+                assertFalse("$membership self member", controller.isSelfMember)
+                assertFalse("$membership sends", controller.canSendMessages)
+            }
+        }
+
+    /**
+     * An eviction read keeps a removed device's account in the roster and the shared snapshot, and drops a member's.
+     */
+    @Test
+    fun evictionKeepsARemovedDevicesAccountAndDropsAMembersAccount() =
+        runBlocking {
+            val evictionCases = listOf(SelfMembershipFfi.DEVICE_REMOVED to true, SelfMembershipFfi.MEMBER to false)
+            evictionCases.forEach { (membership, keepsAccount) ->
+                val appState = appState()
+                appState.cacheGroupMemberSnapshot("alice", "group", twoMemberSnapshot().members)
+                val controller =
+                    ConversationController(
+                        appState = appState,
+                        initialGroup = group().copy(selfMembership = membership),
+                        initialMemberSnapshot = twoMemberSnapshot(),
+                        groupRosterReader = { _, _ ->
+                            throw IllegalStateException("GroupStateError::UseAfterEviction")
+                        },
+                    )
+
+                controller.retryMembers()
+
+                val expected = if (keepsAccount) listOf("alice", "bob") else listOf("bob")
+                assertEquals("$membership roster", expected, controller.members.map { it.memberIdHex })
+                assertEquals(
+                    "$membership cached snapshot",
+                    expected,
+                    appState.cachedGroupMemberSnapshot("alice", "group")?.members?.map { it.memberIdHex },
+                )
+                assertFalse("$membership self member", controller.isSelfMember)
+                assertFalse("$membership sends", controller.canSendMessages)
+            }
+        }
+
+    /** Builds an app state with alice as the single active account. */
     private fun appState() =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext(),
@@ -385,6 +466,7 @@ class GroupStateMemberRefreshGateTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = "alice",

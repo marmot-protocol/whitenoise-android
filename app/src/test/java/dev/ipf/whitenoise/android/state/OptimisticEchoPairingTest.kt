@@ -70,6 +70,7 @@ class OptimisticEchoPairingTest {
             timelineOrder = 0uL,
         )
 
+    /** Builds a sent message record from alice with the given id and body. */
     private fun message(
         id: String,
         plaintext: String,
@@ -93,5 +94,6 @@ class OptimisticEchoPairingTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
+            sticker = null,
         )
 }

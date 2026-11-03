@@ -18,6 +18,7 @@ import org.junit.Test
  * read watermark or resurrect an inflated [unreadCount]. Exercises
  * [reduceSubscriptionChatListRow] directly.
  */
+@Suppress("LargeClass") // Every stale-row regression shares the one reducer fixture and its full native rows.
 class ChatListFoldUnreadRegressionTest {
     @Test
     fun delayedPreMarkReadSubscription_keepsNewerReadWatermarkAndUnread() {
@@ -613,6 +614,7 @@ class ChatListFoldUnreadRegressionTest {
                     attachmentCount = 0u,
                     groupSystem = null,
                     deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+                    sticker = null,
                 )
             } else {
                 null
@@ -638,6 +640,7 @@ class ChatListFoldUnreadRegressionTest {
         disbandRequest = null,
     )
 
+    /** Builds a received peer text message with the given id. */
     private fun received(id: String): TimelineMessage =
         TimelineMessage(
             id = "msg:$id",
@@ -661,6 +664,7 @@ class ChatListFoldUnreadRegressionTest {
                     retentionExpiresAt = null,
                     recordedAt = 1uL,
                     receivedAt = 1uL,
+                    sticker = null,
                 ),
             status = MessageStatus.Received,
         )

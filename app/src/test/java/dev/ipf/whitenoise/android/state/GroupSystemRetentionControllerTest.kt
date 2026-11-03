@@ -76,6 +76,7 @@ class GroupSystemRetentionControllerTest {
         testRefreshCurrentTimeline(ACCOUNT_REF) { page }
     }
 
+    /** Builds an app state with the test account active. */
     private fun appState() =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext(),
@@ -90,6 +91,7 @@ class GroupSystemRetentionControllerTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,
@@ -186,6 +188,8 @@ class GroupSystemRetentionControllerTest {
             sourceEpoch = null,
             retentionSeconds = null,
             retentionExpiresAt = null,
+            sticker = null,
+            importedFrom = null,
         )
 
     private class TestDraftPersistence : DraftPersistence {

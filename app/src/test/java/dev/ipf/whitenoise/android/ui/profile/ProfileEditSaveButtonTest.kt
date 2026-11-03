@@ -428,6 +428,7 @@ internal fun profilePortTestState(
                     externalSigning = false,
                     signedOut = false,
                     running = true,
+                    unlinked = false,
                 ),
             ),
         activeAccountRef = label,

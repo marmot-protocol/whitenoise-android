@@ -121,6 +121,12 @@
     <string name="library_loading">Загрузка файлов и медиа…</string>
     <string name="library_empty">Файлы и медиа не найдены</string>
     <string name="library_source">Из: %1$s · %2$s</string>
+    <string name="library_section_this_week">На этой неделе</string>
+    <string name="library_section_this_month">В этом месяце</string>
+    <string name="library_sender_in_chat">%1$s в %2$s</string>
+    <string name="library_item_description">%1$s, %2$s, от %3$s в %4$s, %5$s</string>
+    <string name="library_load_more_failed">Не удалось загрузить больше файлов и медиа</string>
+    <string name="library_filters_unsupported">Эти фильтры нельзя использовать для просмотра файлов и медиа</string>
     <string name="chat_list_search_filter_remove">Удалить фильтр: %1$s</string>
     <string name="chat_list_filter_all">Все</string>
     <string name="chat_list_filter_unread">Непрочитанные</string>
@@ -139,6 +145,7 @@
     <string name="chat_pinned_badge">Закреплено</string>
     <string name="chat_row_removed_badge">Исключены</string>
     <string name="chat_row_removed_description">Вас исключили из этого чата</string>
+    <string name="chat_row_device_removed_description">Это устройство удалено из этого чата</string>
     <string name="chat_row_action_move_up">Переместить вверх</string>
     <string name="chat_row_action_move_down">Переместить вниз</string>
     <string name="chat_row_action_mark_read">Отметить прочитанным</string>
@@ -272,6 +279,7 @@
     <string name="group_empty_only_you_title">В этой группе пока только вы</string>
     <string name="group_empty_invite_members">Пригласите людей, когда будете готовы.</string>
     <string name="you_are_no_longer_a_member">Вы не можете отправлять сообщения в эту группу, так как больше не являетесь её участником.</string>
+    <string name="device_removed_from_group_composer">С этого устройства нельзя отправлять сообщения, так как оно удалено из этой группы. Ваши другие устройства по-прежнему в ней.</string>
     <string name="group_unrecoverable_notice">Эта группа временно заморожена, пока White Noise проверяет и восстанавливает её состояние.</string>
     <string name="chat_row_draft_prefix">Черновик: </string>
     <string name="jump_to_newest">К новым</string>
@@ -535,12 +543,6 @@
         <item quantity="other">%1$d вложений</item>
     </plurals>
     <string name="toast_share_staged_other_chats">Также подготовлено ещё в %1$d чатах</string>
-    <plurals name="toast_share_attachments_dropped">
-        <item quantity="one">Не удалось добавить %1$d вложение. За раз можно отправить до 10.</item>
-        <item quantity="few">Не удалось добавить %1$d вложения. За раз можно отправить до 10.</item>
-        <item quantity="many">Не удалось добавить %1$d вложений. За раз можно отправить до 10.</item>
-        <item quantity="other">Не удалось добавить %1$d вложений. За раз можно отправить до 10.</item>
-    </plurals>
     <string name="delete">Удалить</string>
     <string name="delete_for_me">Удалить у меня</string>
     <string name="delete_for_everyone">Удалить для всех</string>
@@ -872,6 +874,7 @@
     <string name="toast_couldnt_publish_profile">Не удалось опубликовать профиль</string>
     <string name="toast_send_failed">Отправить не удалось</string>
     <string name="toast_send_storage_full">Недостаточно места для отправки. Освободите место и попробуйте снова.</string>
+    <string name="error_storage_full">Недостаточно места на этом устройстве. Освободите место и попробуйте снова.</string>
     <string name="toast_send_connection_failed">Не удалось подключиться к ретранслятору. Проверьте подключение и повторите попытку.</string>
     <string name="toast_send_queue_full">В этом чате слишком много сообщений ожидает отправки, поэтому ваше не отправлено. Повторите попытку, когда очередь разберётся.</string>
     <string name="toast_send_chat_changed">Чат изменился во время отправки, поэтому сообщение не отправлено. Повторите попытку.</string>
@@ -1749,6 +1752,27 @@
         <item quantity="many">Осталось ~%1$d с</item>
         <item quantity="other">Осталось ~%1$d с</item>
     </plurals>
+    <plurals name="tts_bar_minutes_remaining">
+        <item quantity="one">Осталось ~%1$d мин</item>
+        <item quantity="few">Осталось ~%1$d мин</item>
+        <item quantity="many">Осталось ~%1$d мин</item>
+        <item quantity="other">Осталось ~%1$d мин</item>
+    </plurals>
+    <string name="tts_bar_minutes_seconds_remaining">Осталось ~%1$d мин %2$d с</string>
+    <string name="tts_bar_remaining_spoken">Осталось примерно %1$s</string>
+    <plurals name="tts_bar_spoken_minutes">
+        <item quantity="one">%1$d минута</item>
+        <item quantity="few">%1$d минуты</item>
+        <item quantity="many">%1$d минут</item>
+        <item quantity="other">%1$d минуты</item>
+    </plurals>
+    <plurals name="tts_bar_spoken_seconds">
+        <item quantity="one">%1$d секунда</item>
+        <item quantity="few">%1$d секунды</item>
+        <item quantity="many">%1$d секунд</item>
+        <item quantity="other">%1$d секунды</item>
+    </plurals>
+    <string name="tts_bar_spoken_minutes_seconds">%1$s %2$s</string>
     <string name="tts_bar_stop">Остановить чтение</string>
     <string name="tts_bar_return_to_source">Вернуться к озвученному сообщению</string>
     <string name="tts_source_unavailable">Озвученное сообщение больше недоступно</string>
@@ -2595,6 +2619,8 @@
     <string name="notification_tone_added">Добавлено. Откройте категорию ниже, затем «Звук», чтобы выбрать мелодию. На некоторых устройствах они находятся в разделе «Мои звуки».</string>
     <string name="notification_tone_add_failed">Не удалось добавить звуки. Попробуйте ещё раз или сохраните текущий звук Android.</string>
     <string name="notification_tone_scope">Прослушивание и добавление звуков не меняет ваши оповещения. Выберите звук в Android для каждой категории, беседы или человека. Беседы и люди с явно назначенным собственным звуком сохраняют этот звук. Новые категории сообщений используют Ding; беззвучные и настроенные категории не изменяются. При прослушивании используется громкость уведомлений с учётом беззвучного режима и режима «Не беспокоить».</string>
+    <string name="notification_quiet_during_spoken_audio">Тихо во время подкастов</string>
+    <string name="notification_quiet_during_spoken_audio_detail">Сообщения приходят без звука и вибрации, пока другое приложение воспроизводит подкаст или аудиокнигу, чтобы воспроизведение не прерывалось. Упоминания по-прежнему оповещают.</string>
     <string name="notification_tone_android">Звук Android</string>
     <string name="notification_tone_silent">Без звука</string>
     <string name="notification_tone_off">Выключено</string>

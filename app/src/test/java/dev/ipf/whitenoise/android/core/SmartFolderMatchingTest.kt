@@ -381,6 +381,7 @@ class SmartFolderMatchingTest {
         )
     }
 
+    /** A pending latest message proves a pending send, but a delivered or missing one leaves its absence unknown. */
     @Test
     fun latestPendingProvesPresenceButDeliveredOrMissingLatestDoesNotProveAbsence() {
         val row = item("g")
@@ -401,6 +402,7 @@ class SmartFolderMatchingTest {
                 attachmentKind = null,
                 attachmentCount = 0u,
                 deliveryState = dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi.PENDING,
+                sticker = null,
             )
         val pending = row.copy(projection = row.projection!!.copy(lastMessage = preview))
         assertEquals(FolderTruth.TRUE, matches(condition(FolderField.PENDING_SEND), pending))

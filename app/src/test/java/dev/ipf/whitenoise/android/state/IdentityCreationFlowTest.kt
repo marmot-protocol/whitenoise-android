@@ -213,6 +213,7 @@ class IdentityCreationFlowTest {
         externalSigning = false,
         signedOut = false,
         running = running,
+        unlinked = false,
     )
 
     /** The AppState source file under either working directory. */

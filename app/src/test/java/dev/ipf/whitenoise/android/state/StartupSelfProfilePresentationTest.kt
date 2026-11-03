@@ -290,7 +290,7 @@ class StartupSelfProfilePresentationTest {
     private fun account(
         label: String,
         id: String,
-    ) = AccountSummaryFfi(label, id, true, false, false, true)
+    ) = AccountSummaryFfi(label, id, true, false, false, true, false)
 
     /** A sanitizable persisted profile carries metadata only; avatar pixels are deliberately absent. */
     private fun profile(id: String) =

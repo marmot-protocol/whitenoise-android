@@ -258,7 +258,7 @@ internal fun inviteAuthoritativeGroupAvailable(
     selfMembership: SelfMembershipFfi,
 ): Boolean =
     when (selfMembership) {
-        SelfMembershipFfi.LEFT, SelfMembershipFfi.REMOVED -> false
+        SelfMembershipFfi.LEFT, SelfMembershipFfi.REMOVED, SelfMembershipFfi.DEVICE_REMOVED -> false
         else -> pendingConfirmation || selfMembership == SelfMembershipFfi.MEMBER
     }
 

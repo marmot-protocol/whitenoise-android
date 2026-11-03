@@ -151,7 +151,7 @@ open class PollMessageTestFixtures : MessageBubbleFileAttachmentFixtures() {
                     },
                 ),
             accountIdHexResolver = { null },
-            accounts = listOf(AccountSummaryFfi("personal", "01" + "00".repeat(31), true, false, false, true)),
+            accounts = listOf(AccountSummaryFfi("personal", "01" + "00".repeat(31), true, false, false, true, false)),
             activeAccountRef = "personal",
             initialMarmotRuntime = AppMarmotRuntime("test", native),
             marmotIoDispatcher = dispatcher,

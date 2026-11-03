@@ -600,6 +600,7 @@ class ChatListProjectionReducerTest {
         attachmentCount = 0u,
         groupSystem = null,
         deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+        sticker = null,
     )
 
     /** Builds either an empty legacy document or one projected paragraph. */

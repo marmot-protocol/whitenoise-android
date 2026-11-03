@@ -27,6 +27,7 @@ class TimelineRecordProfileSendersTest {
             reactedAt = 0uL,
         )
 
+    /** Builds a reply preview quoting a message from the given sender. */
     private fun replyPreview(sender: String) =
         TimelineReplyPreviewFfi(
             messageIdHex = "reply-target",
@@ -40,8 +41,10 @@ class TimelineRecordProfileSendersTest {
             deleted = false,
             deletionSource = DeletionSourceFfi.UNKNOWN,
             invalidationStatus = null,
+            sticker = null,
         )
 
+    /** Builds a received timeline record with an optional reply preview and reactions from the given senders. */
     private fun record(
         id: String,
         sender: String,
@@ -82,6 +85,8 @@ class TimelineRecordProfileSendersTest {
         sourceEpoch = null,
         retentionSeconds = null,
         retentionExpiresAt = null,
+        sticker = null,
+        importedFrom = null,
     )
 
     @Test

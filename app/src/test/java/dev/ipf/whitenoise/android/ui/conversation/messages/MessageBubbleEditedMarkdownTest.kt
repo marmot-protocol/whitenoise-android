@@ -292,6 +292,7 @@ class MessageBubbleEditedMarkdownTest {
                 ),
         )
 
+    /** Builds a received record whose original body renders bold markdown, for edit tests. */
     private fun editedRecord() =
         AppMessageRecordFfi(
             messageIdHex = MESSAGE_ID,
@@ -321,6 +322,7 @@ class MessageBubbleEditedMarkdownTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
+            sticker = null,
         )
 
     private fun messageBubbleSource(): File =
@@ -329,6 +331,7 @@ class MessageBubbleEditedMarkdownTest {
             File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt"),
         ).first { it.exists() }
 
+    /** Builds an app state with a single running, locally signing active account. */
     private fun appState() =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext(),
@@ -343,6 +346,7 @@ class MessageBubbleEditedMarkdownTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,

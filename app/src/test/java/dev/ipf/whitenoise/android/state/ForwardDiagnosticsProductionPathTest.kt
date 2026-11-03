@@ -230,6 +230,7 @@ class ForwardDiagnosticsProductionPathTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     /** Waits for both terminal UI state and the independently scheduled terminal diagnostic before exporting. */

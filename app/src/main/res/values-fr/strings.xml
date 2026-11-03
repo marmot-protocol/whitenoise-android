@@ -113,6 +113,12 @@
     <string name="library_loading">Chargement des fichiers et médias…</string>
     <string name="library_empty">Aucun fichier ni média trouvé</string>
     <string name="library_source">De : %1$s · %2$s</string>
+    <string name="library_section_this_week">Cette semaine</string>
+    <string name="library_section_this_month">Ce mois-ci</string>
+    <string name="library_sender_in_chat">%1$s dans %2$s</string>
+    <string name="library_item_description">%1$s, %2$s, de %3$s dans %4$s, %5$s</string>
+    <string name="library_load_more_failed">Impossible de charger plus de fichiers et médias</string>
+    <string name="library_filters_unsupported">Ces filtres ne peuvent pas servir à parcourir les fichiers et médias</string>
     <string name="chat_list_search_filter_remove">Supprimer le filtre : %1$s</string>
     <string name="chat_list_filter_all">Tous</string>
     <string name="chat_list_filter_unread">Non lus</string>
@@ -131,6 +137,7 @@
     <string name="chat_pinned_badge">Épinglé</string>
     <string name="chat_row_removed_badge">Retiré</string>
     <string name="chat_row_removed_description">Vous avez été retiré de cette conversation</string>
+    <string name="chat_row_device_removed_description">Cet appareil a été retiré de cette conversation</string>
     <string name="chat_row_action_move_up">Monter</string>
     <string name="chat_row_action_move_down">Descendre</string>
     <string name="chat_row_action_mark_read">Marquer comme lu</string>
@@ -250,6 +257,7 @@
     <string name="group_empty_only_you_title">Ce groupe ne contient que vous</string>
     <string name="group_empty_invite_members">Invitez des personnes quand vous êtes prêt.</string>
     <string name="you_are_no_longer_a_member">Vous ne pouvez plus envoyer de messages à ce groupe, car vous n’en êtes plus membre.</string>
+    <string name="device_removed_from_group_composer">Vous ne pouvez pas envoyer depuis cet appareil, car il a été retiré de ce groupe. Vos autres appareils en font toujours partie.</string>
     <string name="group_unrecoverable_notice">Ce groupe est temporairement figé pendant que White Noise vérifie et répare son état.</string>
     <string name="chat_row_draft_prefix">Brouillon : </string>
     <string name="jump_to_newest">Aller au plus récent</string>
@@ -501,10 +509,6 @@
         <item quantity="other">%1$d pièces jointes</item>
     </plurals>
     <string name="toast_share_staged_other_chats">Également préparé dans %1$d autres discussions</string>
-    <plurals name="toast_share_attachments_dropped">
-        <item quantity="one">%1$d pièce jointe n\'a pas pu être ajoutée. Vous pouvez en envoyer jusqu\'à 10 à la fois.</item>
-        <item quantity="other">%1$d pièces jointes n\'ont pas pu être ajoutées. Vous pouvez en envoyer jusqu\'à 10 à la fois.</item>
-    </plurals>
     <string name="delete">Supprimer</string>
     <string name="delete_for_me">Supprimer pour moi</string>
     <string name="delete_for_everyone">Supprimer pour tout le monde</string>
@@ -836,6 +840,7 @@
     <string name="toast_couldnt_publish_profile">Impossible de publier le profil</string>
     <string name="toast_send_failed">Échec de l’envoi</string>
     <string name="toast_send_storage_full">Espace de stockage insuffisant pour envoyer. Libérez de l’espace et réessayez.</string>
+    <string name="error_storage_full">Espace de stockage insuffisant sur cet appareil. Libérez de l’espace et réessayez.</string>
     <string name="toast_send_connection_failed">Impossible de joindre le relais. Vérifiez votre connexion et réessayez.</string>
     <string name="toast_send_queue_full">Trop de messages attendent d\'être envoyés dans cette discussion, le vôtre n\'a pas été envoyé. Réessayez une fois le retard rattrapé.</string>
     <string name="toast_send_chat_changed">La conversation a changé pendant l\'envoi, votre message n\'a donc pas été envoyé. Réessayez.</string>
@@ -1687,6 +1692,24 @@
         <item quantity="one">~%1$d s restante</item>
         <item quantity="other">~%1$d s restantes</item>
     </plurals>
+    <plurals name="tts_bar_minutes_remaining">
+        <item quantity="one">~%1$d min restante</item>
+        <item quantity="many">~%1$d min restantes</item>
+        <item quantity="other">~%1$d min restantes</item>
+    </plurals>
+    <string name="tts_bar_minutes_seconds_remaining">~%1$d min %2$d s restantes</string>
+    <string name="tts_bar_remaining_spoken">Temps restant : environ %1$s</string>
+    <plurals name="tts_bar_spoken_minutes">
+        <item quantity="one">%1$d minute</item>
+        <item quantity="many">%1$d minutes</item>
+        <item quantity="other">%1$d minutes</item>
+    </plurals>
+    <plurals name="tts_bar_spoken_seconds">
+        <item quantity="one">%1$d seconde</item>
+        <item quantity="many">%1$d secondes</item>
+        <item quantity="other">%1$d secondes</item>
+    </plurals>
+    <string name="tts_bar_spoken_minutes_seconds">%1$s et %2$s</string>
     <string name="tts_bar_stop">Arrêter la lecture</string>
     <string name="tts_bar_return_to_source">Revenir au message lu</string>
     <string name="tts_source_unavailable">Le message lu n’est plus disponible</string>
@@ -2521,6 +2544,8 @@
     <string name="notification_tone_added">Ajoutés. Ouvrez une catégorie ci-dessous, puis Son pour choisir un son. Certains appareils les affichent sous Mes sons.</string>
     <string name="notification_tone_add_failed">Impossible d’ajouter les sons. Réessayez ou conservez votre son Android actuel.</string>
     <string name="notification_tone_scope">Écouter ou ajouter des sons ne modifie pas vos alertes. Choisissez un son dans Android pour chaque catégorie, conversation ou personne. Les conversations et les personnes auxquelles un son propre a été explicitement attribué conservent ce son. Les nouvelles catégories de messages utilisent Ding ; les catégories silencieuses ou personnalisées restent inchangées. Les aperçus utilisent le volume des notifications et respectent le mode silencieux et Ne pas déranger.</string>
+    <string name="notification_quiet_during_spoken_audio">Discret pendant les podcasts</string>
+    <string name="notification_quiet_during_spoken_audio_detail">Les messages arrivent sans son ni vibration pendant qu\'une autre app lit un podcast ou un livre audio, pour que la lecture continue. Les mentions vous alertent toujours.</string>
     <string name="notification_tone_android">Son Android</string>
     <string name="notification_tone_silent">Silencieux</string>
     <string name="notification_tone_off">Désactivé</string>

@@ -157,6 +157,7 @@ class AccountSetupCoordinatorTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private object EmptyDraftPersistence : DraftPersistence {

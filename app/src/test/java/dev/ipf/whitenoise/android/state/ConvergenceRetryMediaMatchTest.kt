@@ -115,6 +115,7 @@ class ConvergenceRetryMediaMatchTest {
             recordedAt = recordedAt,
         )
 
+    /** Builds a sent kind-9 record with the given id, text, tags and timestamp. */
     private fun record(
         messageIdHex: String,
         plaintext: String,
@@ -140,6 +141,7 @@ class ConvergenceRetryMediaMatchTest {
             retentionExpiresAt = null,
             recordedAt = recordedAt,
             receivedAt = recordedAt,
+            sticker = null,
         )
 
     private fun imetaProjection(
@@ -211,5 +213,7 @@ class ConvergenceRetryMediaMatchTest {
             sourceEpoch = null,
             retentionSeconds = null,
             retentionExpiresAt = null,
+            sticker = null,
+            importedFrom = null,
         )
 }

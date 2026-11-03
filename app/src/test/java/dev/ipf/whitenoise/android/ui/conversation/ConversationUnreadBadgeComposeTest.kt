@@ -291,6 +291,7 @@ class ConversationUnreadBadgeComposeTest {
                     retentionExpiresAt = null,
                     recordedAt = 1uL,
                     receivedAt = 1uL,
+                    sticker = null,
                 ),
             status = MessageStatus.Received,
         )

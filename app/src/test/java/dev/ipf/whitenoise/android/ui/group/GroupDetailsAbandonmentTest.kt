@@ -188,7 +188,7 @@ class GroupDetailsAbandonmentTest {
                 context = app,
                 draftStore = DraftStore(NoDrafts),
                 accountIdHexResolver = { SELF_HEX },
-                accounts = listOf(AccountSummaryFfi(ACCOUNT_REF, SELF_HEX, true, false, false, true)),
+                accounts = listOf(AccountSummaryFfi(ACCOUNT_REF, SELF_HEX, true, false, false, true, false)),
                 activeAccountRef = ACCOUNT_REF,
                 profileReader = { null },
             )

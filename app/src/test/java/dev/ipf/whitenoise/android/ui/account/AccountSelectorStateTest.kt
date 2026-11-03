@@ -18,6 +18,7 @@ class AccountSelectorStateTest {
         assertEquals(listOf(false, true, false), state.accounts.map { it.isActive })
     }
 
+    /** Builds a running, locally signing account summary for the given label. */
     private fun account(label: String): AccountSummaryFfi =
         AccountSummaryFfi(
             label = label,
@@ -26,5 +27,6 @@ class AccountSelectorStateTest {
             signedOut = false,
             running = true,
             externalSigning = false,
+            unlinked = false,
         )
 }

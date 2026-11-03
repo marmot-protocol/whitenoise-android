@@ -111,6 +111,7 @@ import dev.ipf.whitenoise.android.diagnostics.PerformanceLayer
 import dev.ipf.whitenoise.android.diagnostics.PerformanceOperation
 import dev.ipf.whitenoise.android.diagnostics.PerformancePhase
 import dev.ipf.whitenoise.android.diagnostics.PerformanceResult
+import dev.ipf.whitenoise.android.diagnostics.PerformanceTrace
 import dev.ipf.whitenoise.android.diagnostics.PerformanceTrigger
 import dev.ipf.whitenoise.android.diagnostics.StartupDiagnosticStage
 import dev.ipf.whitenoise.android.diagnostics.StartupDiagnostics
@@ -184,6 +185,7 @@ import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageDirectChatResolutio
 import dev.ipf.whitenoise.android.ui.chats.relaysConnectedFromHealth
 import dev.ipf.whitenoise.android.ui.conversation.media.StagedUploadSource
 import dev.ipf.whitenoise.android.ui.conversation.media.closeQuietly
+import dev.ipf.whitenoise.android.ui.conversation.presentAttachmentAdmission
 import dev.ipf.whitenoise.android.ui.onboarding.SignUpController
 import dev.ipf.whitenoise.android.ui.onboarding.setup.AccountSetupCoordinator
 import dev.ipf.whitenoise.android.ui.onboarding.setup.setupOptions
@@ -1033,6 +1035,7 @@ private data class AccountActionColorSlot(
 private data class PendingAccountSwitchTrace(
     val accountRef: String,
     val startedAtMs: Long,
+    val performance: PerformanceTrace? = null,
 )
 
 private class AccountSwitchSnapshotSuperseded : RuntimeException()
@@ -1243,6 +1246,8 @@ class WhiteNoiseAppState private constructor(
             .also {
                 dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
                     .attach(it) { activeAccountRef }
+                dev.ipf.whitenoise.android.core.AvatarImageLoader
+                    .attachActiveAccount { activeAccountRef }
             }
     internal val localGroupDeleteCleanupJournal =
         LocalGroupDeleteCleanupJournal(appContext.noBackupFilesDir.resolve("local-group-delete-cleanup"))
@@ -1318,6 +1323,11 @@ class WhiteNoiseAppState private constructor(
 
     private val legacyDraftMigrationSource by lazy { LegacyDraftMigrationSource(appContext) }
     internal val editorSourceStore: EditorSourceStore = EditorSourceStore.create(appContext)
+
+    /** Which draft each picked file belongs to, per account and conversation, so its outgoing worker never changes. */
+    internal val outgoingDrafts =
+        dev.ipf.whitenoise.android.media
+            .OutgoingDraftRegistry()
     internal val editorSessionStore: EditorSessionStore = EditorSessionStore.create(appContext)
     internal val messageDraftRepository: MessageDraftRepository =
         messageDraftRepositoryOverride
@@ -3024,17 +3034,19 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String,
         value: TextFieldValue,
+        textChanged: Boolean? = null,
     ) {
         accountRef ?: return
-        setDraftForAccount(accountRef, groupIdHex, value)
+        setDraftForAccount(accountRef, groupIdHex, value, textChanged)
     }
 
     private fun setDraftForAccount(
         accountRef: String,
         groupIdHex: String,
         value: TextFieldValue,
+        textChanged: Boolean? = null,
     ) {
-        composerDraftExpansionBridge.setDraft(accountRef, groupIdHex, value)
+        composerDraftExpansionBridge.setDraft(accountRef, groupIdHex, value, textChanged)
     }
 
     /** Current draft generation used to bind an explicit composer resize. */
@@ -3619,6 +3631,9 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
     ): String = "${accountRef.orEmpty()}\u0000$groupIdHex"
 
+    /** The attached chat list's current rows, read to name the worker domain of a durable avatar. */
+    internal fun chatListItemsForAvatarDomains(): List<ChatListItem> = chatsController?.items.orEmpty()
+
     /** Attaches or permanently detaches the chat-list projection without transferring private row state. */
     fun attachChatsController(controller: ChatsController?) {
         chatsController = controller
@@ -4020,17 +4035,8 @@ class WhiteNoiseAppState private constructor(
                     accountRef,
                 )
                 if (payload.importReady && payload.streamUris.isNotEmpty()) shareStaging.notifyTextStaged()
-                if (droppedCount > 0) {
-                    presentText(
-                        AppText.Plain(
-                            appContext.resources.getQuantityString(
-                                R.plurals.toast_share_attachments_dropped,
-                                droppedCount,
-                                droppedCount,
-                            ),
-                        ),
-                    )
-                }
+                val offered = payload.streamUris.size
+                presentAttachmentAdmission(appContext, (offered - droppedCount).coerceAtLeast(0), offered)
                 true
             }
         }
@@ -6546,6 +6552,7 @@ class WhiteNoiseAppState private constructor(
         val trace = pendingAccountSwitchTrace ?: return
         if (trace.accountRef != accountRef) return
         val elapsedMs = (SystemClock.elapsedRealtime() - trace.startedAtMs).coerceAtLeast(0L)
+        recordAccountSwitchPerformance(trace.performance, stage, elapsedMs, rowCount)
         appStateDebug { "account-switch $stage +${elapsedMs}ms rows=$rowCount" }
     }
 
@@ -6811,6 +6818,7 @@ class WhiteNoiseAppState private constructor(
                 null
             }
         var accountSwitchOutcome = HostPerformanceOutcomeFfi.UNAVAILABLE
+        updatePendingAccountSwitchTrace(request.label, switchingAccounts = request.label != activeAccountRef)
         try {
             val receipt =
                 accountSession.activate(
@@ -6846,7 +6854,6 @@ class WhiteNoiseAppState private constructor(
             generation: Long,
             switchingAccounts: Boolean,
         ): PreparedAccountSessionActivation? {
-            updatePendingAccountSwitchTrace(request.label, switchingAccounts)
             val target = accounts.firstOrNull { it.label == request.label }
             if (!restoreSignedOutAccountForActivation(target, request.label, request.deferUnreadRefresh)) return null
             return PreparedAccountSessionActivation(
@@ -6927,18 +6934,32 @@ class WhiteNoiseAppState private constructor(
         override fun isInForeground(): Boolean = appInForeground
     }
 
-    /** Starts or clears the debug-only latency trace without adding policy branches to activation. */
+    /**
+     * Starts or clears the latency trace when a switch is requested, before setup routing and restoration, so its
+     * elapsed time covers the whole path from the tap. Debug builds always trace, and any build traces while a
+     * WNPerf diagnostic session is active, so release switches can be measured.
+     */
     private fun updatePendingAccountSwitchTrace(
         label: String,
         switchingAccounts: Boolean,
     ) {
-        if (switchingAccounts && BuildConfig.DEBUG) {
+        // A first activation has no previous account, so it is not a switch and is not traced.
+        val tracked = switchingAccounts && activeAccountRef != null
+        val performance =
+            if (tracked) {
+                PerformanceDiagnostics.begin(PerformanceOperation.ACCOUNT_SWITCH)
+            } else {
+                null
+            }
+        if (tracked && (BuildConfig.DEBUG || performance != null)) {
             pendingAccountSwitchTrace =
                 PendingAccountSwitchTrace(
                     accountRef = label,
                     startedAtMs = SystemClock.elapsedRealtime(),
+                    performance = performance,
                 )
-        } else if (pendingAccountSwitchTrace?.accountRef != label) {
+        } else {
+            // Any newer request supersedes a pending trace, so its stages cannot land on an older operation.
             pendingAccountSwitchTrace = null
         }
     }
@@ -7008,6 +7029,7 @@ class WhiteNoiseAppState private constructor(
         val trace = pendingAccountSwitchTrace ?: return
         if (accountRef != null && trace.accountRef != accountRef) return
         val elapsedMs = (SystemClock.elapsedRealtime() - trace.startedAtMs).coerceAtLeast(0L)
+        recordAccountSwitchPerformance(trace.performance, stage, elapsedMs)
         appStateDebug { "account-switch $stage +${elapsedMs}ms" }
     }
 
@@ -7019,6 +7041,7 @@ class WhiteNoiseAppState private constructor(
         val trace = pendingAccountSwitchTrace ?: return
         if (trace.accountRef != accountRef) return
         val elapsedMs = (SystemClock.elapsedRealtime() - trace.startedAtMs).coerceAtLeast(0L)
+        recordAccountSwitchPerformance(trace.performance, stage, elapsedMs, rowCount)
         appStateDebug { "account-switch $stage +${elapsedMs}ms rows=$rowCount" }
     }
 
@@ -7040,6 +7063,7 @@ class WhiteNoiseAppState private constructor(
         if (trace.accountRef != accountRef) return
         pendingAccountSwitchTrace = null
         val elapsedMs = (SystemClock.elapsedRealtime() - trace.startedAtMs).coerceAtLeast(0L)
+        recordAccountSwitchPerformance(trace.performance, "first-local-frame", elapsedMs, rowCount)
         appStateDebug { "account-switch first-local-frame +${elapsedMs}ms rows=$rowCount" }
     }
 
@@ -7578,6 +7602,7 @@ class WhiteNoiseAppState private constructor(
 
     /** Retires only the signed-out account's transient drafts and controllers, preserving a replacement account. */
     private fun clearSignedOutAccountMemory(account: String) {
+        attachmentCollections.forgetAccount(account)
         composerExpansionStateRetention.removeAccount(account)
         composerDraftExpansionBridge.removeAccount(account)
         pendingMessageEditHandoff.removeAccount(account)
@@ -7680,6 +7705,7 @@ class WhiteNoiseAppState private constructor(
             }
             chatMutePreferences.removeAccount(wipedRef)
             defaultDisappearingMessagesPreferences.removeAccount(wipedRef)
+            attachmentCollections.forgetAccount(wipedRef)
             composerExpansionStateRetention.removeAccount(wipedRef)
             composerDraftExpansionBridge.removeAccount(wipedRef)
             pendingMessageEditHandoff.removeAccount(wipedRef)
@@ -11804,7 +11830,10 @@ class WhiteNoiseAppState private constructor(
         val ref = contactPictureStore.reference(account, contact) ?: return
         val lifetime = AvatarImageLoader.currentCacheLifetime()
         runCatchingCancellable {
-            AvatarImageLoader.loadStored(ref.cacheKey, lifetime) {
+            val domain =
+                dev.ipf.whitenoise.android.media.MediaTrustDomain
+                    .local(account)
+            AvatarImageLoader.loadStored(ref.cacheKey, lifetime, domain) {
                 withContext(Dispatchers.IO) { contactPictureStore.read(ref) }
             }
         }
@@ -11942,26 +11971,32 @@ class WhiteNoiseAppState private constructor(
 
     /**
      * Start local profile materialization and image decoding without waiting for
-     * either. Chat/message projections call this before notification delivery;
-     * [applyProfilePresentation] queues the image as soon as local storage (or a
-     * relay refresh) yields a sanitized URL.
+     * either. Chat/message projections call this before notification delivery,
+     * and [applyProfilePresentation] queues the image as soon as local storage (or
+     * a relay refresh) yields a sanitized URL. The decode runs in [domain], the
+     * caller's account's public profiles. Only the active account's caller queues
+     * that later warm, which runs in the active account's worker.
      */
-    internal fun preWarmProfileAvatar(accountIdHex: String) {
+    internal fun preWarmProfileAvatar(
+        accountIdHex: String,
+        domain: dev.ipf.whitenoise.android.media.MediaTrustDomain = AvatarImageLoader.publicProfiles(),
+    ) {
         val id = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return
+        val deferrable = domain == AvatarImageLoader.publicProfiles()
         val cachedAvatar =
             synchronized(profilePresentationLock) {
                 val avatar = profilePresentations[id]?.avatarUrl
                 if (avatar != null) {
                     pendingAvatarPreWarmAccountIds.remove(id)
-                } else {
-                    // Reinsert to keep the set in recent-conversation order; a
-                    // live sender must not sit behind old avatarless profiles.
+                } else if (deferrable) {
+                    // Reinsert to keep the set in recent-conversation order, so a
+                    // live sender never sits behind old avatarless profiles.
                     pendingAvatarPreWarmAccountIds.remove(id)
                     pendingAvatarPreWarmAccountIds.add(id)
                 }
                 avatar
             }
-        AvatarImageLoader.preWarm(cachedAvatar)
+        AvatarImageLoader.preWarm(cachedAvatar, domain)
         // Starts an ungated local materialization on a miss and observes its
         // revision; applyProfilePresentation consumes the pending warm above once
         // the URL lands. The relay refresh remains independently cooldown-gated.
@@ -13278,7 +13313,15 @@ class WhiteNoiseAppState private constructor(
         content: LocalNotificationContent?,
     ): LateNotificationIdentity? {
         val warmed = notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)
-        val urlSources = firstPost.avatars.lateIdentitySources(warmed, update.isDm)
+        val urlSources =
+            firstPost.avatars.lateIdentitySources(
+                warmed,
+                update.isDm,
+                dev.ipf.whitenoise.android.notifications
+                    .notificationConversationDomain(update),
+                dev.ipf.whitenoise.android.notifications
+                    .notificationSenderDomain(update),
+            )
         val sources =
             if (!update.isDm && urlSources.conversationBitmap == null && urlSources.conversationUrl.isNullOrBlank()) {
                 urlSources.copy(conversationLoader = encryptedGroupIdentityLoader(update))
@@ -14302,7 +14345,7 @@ class WhiteNoiseAppState private constructor(
                 changed to shouldPreWarm
             }
         if (shouldPreWarm) {
-            AvatarImageLoader.preWarm(presentation.avatarUrl)
+            AvatarImageLoader.preWarm(presentation.avatarUrl, AvatarImageLoader.publicProfiles())
         }
         if (changed) {
             profileRevision += 1

@@ -84,6 +84,7 @@ class AccountSelectorScreenshotTest {
             .captureRoboImage("src/test/snapshots/account_selector_refreshing_with_snapshot_dark.png")
     }
 
+    /** Builds a running, locally signing account summary with the given label. */
     private fun account(label: String): AccountSummaryFfi =
         AccountSummaryFfi(
             label = label,
@@ -92,5 +93,6 @@ class AccountSelectorScreenshotTest {
             signedOut = false,
             running = true,
             externalSigning = false,
+            unlinked = false,
         )
 }

@@ -25,12 +25,14 @@ import kotlinx.coroutines.flow.first
  * A returning list may supply the same valid fallback through its owner-bound prepared window. Exact
  * completed loads join that window even when they finish after its preparation budget; fallback pixels
  * keep their original revision. Null when no valid picture is known; authoritative misses stay placeholders.
+ * The decode runs in [domain]'s worker, or the domain the chat list names for this asset when null.
  */
 @Composable
 internal fun rememberDurableAvatar(
     appState: WhiteNoiseAppState,
     asset: AvatarAssetFfi?,
     accountRef: String? = appState.activeAccountRef,
+    domain: dev.ipf.whitenoise.android.media.MediaTrustDomain? = null,
 ): ImageBitmap? {
     val ownedAsset = asset?.copy()
     val lifetime = AvatarImageLoader.currentCacheLifetime()
@@ -56,7 +58,7 @@ internal fun rememberDurableAvatar(
                 var completedRevision: Long? = null
                 AvatarLoadRecovery.revision.first { revision ->
                     if (completedRevision != revision) {
-                        appState.durableAvatar(ownedAsset, accountRef)?.let { value = it }
+                        appState.durableAvatar(ownedAsset, accountRef, domain = domain)?.let { value = it }
                         // A recovery during the read remains available for the next attempt.
                         completedRevision = revision
                     }

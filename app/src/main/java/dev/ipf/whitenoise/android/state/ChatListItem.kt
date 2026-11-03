@@ -108,6 +108,7 @@ internal fun chatListItemFromProjection(
     )
 }
 
+/** The chat-list row's latest message as a renderable record, or null when the row has none. */
 private fun chatListLatestMessage(row: ChatListRowFfi): AppMessageRecordFfi? =
     row.lastMessage?.let { preview ->
         AppMessageRecordFfi(
@@ -124,6 +125,7 @@ private fun chatListLatestMessage(row: ChatListRowFfi): AppMessageRecordFfi? =
             retentionExpiresAt = preview.retentionExpiresAt,
             recordedAt = preview.timelineAt,
             receivedAt = preview.timelineAt,
+            sticker = preview.sticker,
         )
     }
 

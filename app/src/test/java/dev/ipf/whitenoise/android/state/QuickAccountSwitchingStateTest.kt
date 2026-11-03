@@ -106,8 +106,8 @@ class QuickAccountSwitchingStateTest {
     }
 
     private companion object {
-        val A = AccountSummaryFfi("a", "aa".repeat(32), true, false, false, true)
-        val B = AccountSummaryFfi("b", "bb".repeat(32), true, false, false, true)
-        val C = AccountSummaryFfi("c", "cc".repeat(32), true, false, false, true)
+        val A = AccountSummaryFfi("a", "aa".repeat(32), true, false, false, true, false)
+        val B = AccountSummaryFfi("b", "bb".repeat(32), true, false, false, true, false)
+        val C = AccountSummaryFfi("c", "cc".repeat(32), true, false, false, true, false)
     }
 }

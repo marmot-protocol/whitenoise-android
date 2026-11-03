@@ -670,6 +670,7 @@ class ComposerBarScreenshotTest {
         return controller
     }
 
+    /** Builds the received parent message record that the composer replies to. */
     private fun replyRecord() =
         AppMessageRecordFfi(
             messageIdHex = "parent",
@@ -690,6 +691,7 @@ class ComposerBarScreenshotTest {
             retentionExpiresAt = null,
             recordedAt = 1uL,
             receivedAt = 1uL,
+            sticker = null,
         )
 
     private companion object {

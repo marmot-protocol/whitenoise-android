@@ -139,6 +139,7 @@ class AccountKeysScreenScreenshotTest {
                             externalSigning = !localSigning,
                             signedOut = false,
                             running = true,
+                            unlinked = false,
                         ),
                     ),
                 activeAccountRef = "personal",

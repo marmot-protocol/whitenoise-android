@@ -248,6 +248,7 @@ class WarmResumeFirstUsefulFrameScreenshotTest {
         }
     }
 
+    /** Builds an app state with one running account for the warm-resume screenshot. */
     private fun appState() =
         WhiteNoiseAppState(
             context = context,
@@ -262,6 +263,7 @@ class WarmResumeFirstUsefulFrameScreenshotTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,
@@ -280,6 +282,7 @@ class WarmResumeFirstUsefulFrameScreenshotTest {
         projection = cachedProjection(preview, unread),
     )
 
+    /** Builds the cached chat-list preview shown in the first frame after a warm resume. */
     private fun cachedPreview() =
         ChatListMessagePreviewFfi(
             retentionSeconds = null,
@@ -302,6 +305,7 @@ class WarmResumeFirstUsefulFrameScreenshotTest {
             attachmentCount = 0u,
             groupSystem = null,
             deliveryState = ChatListMessageDeliveryStateFfi.NOT_APPLICABLE,
+            sticker = null,
         )
 
     private fun cachedProjection(

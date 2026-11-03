@@ -140,6 +140,7 @@ class MessageDebugStyleTest {
         at = at,
     )
 
+    /** Builds a message record with the given id, direction, sender, body, kind, tags and timestamp. */
     private fun message(
         id: String,
         direction: String = "received",
@@ -162,5 +163,6 @@ class MessageDebugStyleTest {
         retentionExpiresAt = null,
         recordedAt = at.toULong(),
         receivedAt = at.toULong(),
+        sticker = null,
     )
 }

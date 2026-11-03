@@ -45,7 +45,9 @@ private val AvatarPalette =
 /**
  * Shows identity-scoped cached pixels or initials, recovering missing URL images while visible. A URL
  * picture whose cached bytes are a GIF animates over its first frame under the shared profile policy; a
- * supplied [picture] animates only when the caller names its stored person-picture [animationKey].
+ * supplied [picture] animates only when the caller names its stored person-picture [animationKey]. A URL
+ * this starts decoding runs in [pictureDomain]'s worker, single-use unless the caller names one, such as
+ * [AvatarImageLoader.publicProfiles] for a person's published picture.
  */
 @Composable
 internal fun Avatar(
@@ -56,6 +58,8 @@ internal fun Avatar(
     picture: ImageBitmap? = null,
     animationKey: String? = null,
     groupAnimation: GroupAvatarAnimation? = null,
+    pictureDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
+        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
 ) {
     val color = AvatarPalette[avatarPaletteIndex(seed.hashCode(), AvatarPalette.size)]
     // Seed from the in-memory cache so re-entering a screen shows an
@@ -72,7 +76,8 @@ internal fun Avatar(
             initialImage = AvatarImageLoader.peek(pictureUrl),
             enabled = pictureUrl != null && (picture == null || privateSource),
         ) {
-            AvatarImageLoader.load(checkNotNull(pictureUrl))
+            val url = checkNotNull(pictureUrl)
+            AvatarImageLoader.load(url, pictureDomain)
         }
     }
     val privateOwnerCurrent =
@@ -136,6 +141,22 @@ internal fun Avatar(
             )
         }
     }
+}
+
+/**
+ * [Avatar] for a person's published picture, which decodes in the active account's public profiles; a private
+ * contact handle still decodes in its own local domain. It names that domain so a person row cannot fall back to
+ * a single-use worker by omission.
+ */
+@Composable
+@Suppress("FunctionNaming")
+internal fun PersonAvatar(
+    title: String,
+    seed: String,
+    size: Dp,
+    pictureUrl: String?,
+) {
+    Avatar(title, seed, size, pictureUrl, pictureDomain = AvatarImageLoader.publicProfiles())
 }
 
 /** Keeps group admission and person-picture intent separate while sharing the avatar's pixels. */

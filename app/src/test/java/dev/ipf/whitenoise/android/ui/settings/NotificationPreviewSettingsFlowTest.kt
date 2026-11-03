@@ -143,5 +143,6 @@ class NotificationPreviewSettingsFlowTest {
             reactedToPreview = null,
             timestampMs = 1000L,
             isFromSelf = false,
+            sticker = null,
         )
 }

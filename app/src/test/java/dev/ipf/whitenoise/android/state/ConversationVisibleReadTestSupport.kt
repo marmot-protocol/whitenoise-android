@@ -71,6 +71,7 @@ internal abstract class ConversationVisibleReadTestSupport {
                     externalSigning = false,
                     signedOut = false,
                     running = true,
+                    unlinked = false,
                 ),
             ),
         chatListRows = listOf(row),

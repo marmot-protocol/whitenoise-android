@@ -247,6 +247,7 @@ class GroupRenameChatListProjectionTest {
         externalSigning = false,
         signedOut = false,
         running = true,
+        unlinked = false,
     )
 
     /** An authoritative chat-list row whose prepared title matches its group name. */

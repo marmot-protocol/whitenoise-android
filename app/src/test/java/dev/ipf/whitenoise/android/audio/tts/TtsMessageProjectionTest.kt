@@ -340,6 +340,7 @@ class TtsMessageProjectionTest {
         { name },
     )!!
 
+    /** Builds a received message record with the given text, kind and markdown tokens. */
     private fun message(
         plaintext: String,
         kind: ULong = 9uL,
@@ -358,5 +359,6 @@ class TtsMessageProjectionTest {
         retentionExpiresAt = null,
         recordedAt = 1uL,
         receivedAt = 1uL,
+        sticker = null,
     )
 }

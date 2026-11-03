@@ -450,6 +450,7 @@ class ProfileStartGroupNavigationTest {
         val replacementLabel: String? = null,
     )
 
+    /** Builds the running, locally signing active account summary. */
     private fun activeAccount() =
         AccountSummaryFfi(
             label = ACTIVE_ACCOUNT_REF,
@@ -458,6 +459,7 @@ class ProfileStartGroupNavigationTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private fun member(

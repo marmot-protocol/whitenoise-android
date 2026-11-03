@@ -251,6 +251,7 @@ class GroupSystemProfileLinkScreenshotTest {
             retentionExpiresAt = null,
             recordedAt = 100uL,
             receivedAt = 100uL,
+            sticker = null,
         )
 
     /** App state with one active local account and no stored drafts. */
@@ -268,6 +269,7 @@ class GroupSystemProfileLinkScreenshotTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,

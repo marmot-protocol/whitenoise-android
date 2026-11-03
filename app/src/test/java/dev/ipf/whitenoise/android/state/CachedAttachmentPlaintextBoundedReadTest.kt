@@ -64,9 +64,15 @@ class CachedAttachmentPlaintextBoundedReadTest {
     /** Releases the fixture, the main dispatcher and the private cache directory. */
     @After
     fun tearDown() {
-        fixture.close()
-        cacheRoot.deleteRecursively()
-        Dispatchers.resetMain()
+        try {
+            if (::fixture.isInitialized) fixture.closeAndDrain(dispatcher)
+        } finally {
+            try {
+                if (::cacheRoot.isInitialized) cacheRoot.deleteRecursively()
+            } finally {
+                Dispatchers.resetMain()
+            }
+        }
     }
 
     /** An entry above the budget is rejected by its size, leaving no plaintext lease behind. */

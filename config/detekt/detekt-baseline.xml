@@ -30,7 +30,7 @@
     <ID>CyclomaticComplexMethod:Controllers.kt:ConversationController$private suspend fun CoroutineScope.runTimelineSubscriptionPipeline</ID>
     <ID>CyclomaticComplexMethod:Controllers.kt:ConversationController$private suspend fun performMediaUpload</ID>
     <ID>CyclomaticComplexMethod:Controllers.kt:ConversationController$suspend fun send</ID>
-    <ID>CyclomaticComplexMethod:Controllers.kt:internal fun optimisticMessageIdForProjection: String?</ID>
+    <ID>CyclomaticComplexMethod:OptimisticMessageReconciliation.kt:internal fun optimisticMessageIdForProjection: String?</ID>
     <ID>CyclomaticComplexMethod:Controllers.kt:internal fun reduceSubscriptionChatListRow: ChatListRowFfi</ID>
     <ID>CyclomaticComplexMethod:ConversationScreen.kt:@OptIn(ExperimentalMaterial3Api::class) @Composable internal fun ConversationScreen</ID>
     <ID>CyclomaticComplexMethod:ConversationStreamPresentation.kt:internal fun durableStreamDisplayPositions: Map&lt;String, StreamFinalDisplayPosition&gt;</ID>
@@ -364,11 +364,12 @@
     <ID>MagicNumber:BubbleColors.kt:8</ID>
     <ID>MagicNumber:ChatFlowComponents.kt:0.45f</ID>
     <ID>MagicNumber:ComposerBar.kt:900L</ID>
-    <ID>MagicNumber:Controllers.kt:1009uL</ID>
+    <ID>MagicNumber:ConversationUnreadProjection.kt:1009uL</ID>
     <ID>MagicNumber:Controllers.kt:1200uL</ID>
-    <ID>MagicNumber:Controllers.kt:1210uL</ID>
+    <ID>MagicNumber:ConversationUnreadProjection.kt:1210uL</ID>
     <ID>MagicNumber:Controllers.kt:8</ID>
     <ID>MagicNumber:Controllers.kt:9uL</ID>
+    <ID>MagicNumber:ConversationUnreadProjection.kt:9uL</ID>
     <ID>MagicNumber:ChatListItem.kt:ChatListItem$1009uL</ID>
     <ID>MagicNumber:ChatListItem.kt:ChatListItem$1200uL</ID>
     <ID>MagicNumber:Controllers.kt:ChatsController$8</ID>
@@ -636,7 +637,7 @@
     <ID>MaxLineLength:Controllers.kt:ConversationController$private val membershipSeed = conversationMembershipSeed(initialGroup, initialMemberSnapshot, conversationAccountIdHex)</ID>
     <ID>MaxLineLength:Controllers.kt:GroupMemberSnapshot$fun otherMemberAccount: String?</ID>
     <ID>MaxLineLength:Controllers.kt:internal</ID>
-    <ID>MaxLineLength:Controllers.kt:internal fun AppMessageRecordFfi.withRecordedAtOverride: AppMessageRecordFfi</ID>
+    <ID>MaxLineLength:ConversationTimelineOrdering.kt:internal fun AppMessageRecordFfi.withRecordedAtOverride: AppMessageRecordFfi</ID>
     <ID>MaxLineLength:ConversationMentionPickerStateCoverageTest.kt:ConversationMentionPickerStateCoverageTest$"mention picker candidates must use contactDisplayNameCached so private nicknames flow into Candidate.displayName and MentionComposer.filter"</ID>
     <ID>MaxLineLength:ConversationMentionPickerStateCoverageTest.kt:ConversationMentionPickerStateCoverageTest$"mention picker must not use chatMemberTitleCached for candidate displayName; that skips the local nickname"</ID>
     <ID>MaxLineLength:ConversationMentionPickerStateCoverageTest.kt:ConversationMentionPickerStateCoverageTest$File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ConversationMentionPickerState.kt")</ID>
@@ -967,14 +968,14 @@
     <ID>ReturnCount:Controllers.kt:ConversationController$suspend fun send</ID>
     <ID>ReturnCount:Controllers.kt:ConversationController$suspend fun toggleReaction</ID>
     <ID>ReturnCount:Controllers.kt:internal fun chatRowNeedsMediaKindResolve: String?</ID>
-    <ID>ReturnCount:Controllers.kt:internal fun firstUnreadReceivedIndex: Int</ID>
-    <ID>ReturnCount:Controllers.kt:internal fun isDisappearingSendTimeExpiryDeferred: Boolean</ID>
-    <ID>ReturnCount:Controllers.kt:internal fun optimisticMessageIdForProjection: String?</ID>
+    <ID>ReturnCount:ConversationUnreadProjection.kt:internal fun firstUnreadReceivedIndex: Int</ID>
+    <ID>ReturnCount:TimelineRetentionProjection.kt:internal fun isDisappearingSendTimeExpiryDeferred: Boolean</ID>
+    <ID>ReturnCount:OptimisticMessageReconciliation.kt:internal fun optimisticMessageIdForProjection: String?</ID>
     <ID>ReturnCount:Controllers.kt:internal fun sharedChatListItemsWith: List&lt;ChatListItem&gt;</ID>
-    <ID>ReturnCount:Controllers.kt:internal fun timelineMessageIdsExceedingLiveCap: List&lt;String&gt;</ID>
-    <ID>ReturnCount:Controllers.kt:internal fun unreadCountDivergenceReport: UnreadCountDivergenceReport?</ID>
-    <ID>ReturnCount:Controllers.kt:internal fun unreadReceivedMentionIds: List&lt;String&gt;</ID>
-    <ID>ReturnCount:Controllers.kt:private fun messagesHaveSameRenderableSendShape: Boolean</ID>
+    <ID>ReturnCount:ConversationTimelineOrdering.kt:internal fun timelineMessageIdsExceedingLiveCap: List&lt;String&gt;</ID>
+    <ID>ReturnCount:ConversationUnreadProjection.kt:internal fun unreadCountDivergenceReport: UnreadCountDivergenceReport?</ID>
+    <ID>ReturnCount:ConversationUnreadProjection.kt:internal fun unreadReceivedMentionIds: List&lt;String&gt;</ID>
+    <ID>ReturnCount:OptimisticMessageReconciliation.kt:private fun messagesHaveSameRenderableSendShape: Boolean</ID>
     <ID>ReturnCount:ConversationLogic.kt:internal fun isNearBottom: Boolean</ID>
     <ID>ReturnCount:ConversationNotificationChannels.kt:ConversationNotificationChannels$private fun ensureConversationChannel: String?</ID>
     <ID>ReturnCount:ConversationStreamPresentation.kt:internal fun streamFinalDisplayPosition: StreamFinalDisplayPosition?</ID>

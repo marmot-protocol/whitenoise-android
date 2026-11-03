@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -126,7 +127,7 @@ internal fun ConfigureReactionsSheet(
     }
 }
 
-/** One editable quick-reaction slot. */
+/** One editable quick-reaction slot, announced once by its slot description rather than again by its glyph. */
 @Composable
 private fun ReactionSlot(
     index: Int,
@@ -142,7 +143,7 @@ private fun ReactionSlot(
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Box(contentAlignment = Alignment.Center) {
-            EmojiGlyph(emoji)
+            EmojiGlyph(emoji, modifier = Modifier.clearAndSetSemantics {})
         }
     }
 }

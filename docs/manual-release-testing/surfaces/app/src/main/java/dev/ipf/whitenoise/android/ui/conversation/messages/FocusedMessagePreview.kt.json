@@ -12,6 +12,14 @@
         ]
       },
       {
+        "surface": "ExcerptAboveWarning",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessagePreview.kt",
+        "anchor": "private fun ExcerptAboveWarning(",
+        "test_ids": [
+          "MSG-044"
+        ]
+      },
+      {
         "surface": "FocusedRenderedMessagePreview",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessagePreview.kt",
         "anchor": "fun FocusedRenderedMessagePreview(",
@@ -21,13 +29,22 @@
         ]
       },
       {
+        "surface": "FocusedTextBudgetLayout",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessagePreview.kt",
+        "anchor": "private fun FocusedTextBudgetLayout(",
+        "test_ids": [
+          "MSG-044"
+        ]
+      },
+      {
         "surface": "FocusedTextMessagePreview",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessagePreview.kt",
         "anchor": "fun FocusedTextMessagePreview(",
         "test_ids": [
           "MSG-004",
           "MSG-009",
-          "MSG-015"
+          "MSG-015",
+          "MSG-044"
         ]
       }
     ],

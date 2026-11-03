@@ -367,6 +367,7 @@ class ChatLongPressActionFlowTest {
 
     private fun string(res: Int): String = context.getString(res)
 
+    /** Builds an app state with one running local-signing account. */
     private fun appState() =
         WhiteNoiseAppState(
             context = context,
@@ -381,6 +382,7 @@ class ChatLongPressActionFlowTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = "personal",

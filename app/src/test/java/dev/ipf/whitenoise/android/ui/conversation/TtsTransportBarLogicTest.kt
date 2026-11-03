@@ -9,6 +9,26 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class TtsTransportBarLogicTest {
+    /** Estimates split into whole minutes and leftover seconds across the minute boundary (#3563). */
+    @Test
+    fun remainingTimeSplitsIntoMinutesAndSeconds() {
+        val cases =
+            mapOf(
+                -5 to TtsRemainingTime(0, 0),
+                0 to TtsRemainingTime(0, 0),
+                1 to TtsRemainingTime(0, 1),
+                59 to TtsRemainingTime(0, 59),
+                60 to TtsRemainingTime(1, 0),
+                61 to TtsRemainingTime(1, 1),
+                119 to TtsRemainingTime(1, 59),
+                120 to TtsRemainingTime(2, 0),
+                312 to TtsRemainingTime(5, 12),
+                Int.MAX_VALUE to TtsRemainingTime(Int.MAX_VALUE / 60, Int.MAX_VALUE % 60),
+            )
+
+        cases.forEach { (total, expected) -> assertEquals("$total s", expected, ttsRemainingTime(total)) }
+    }
+
     @Test
     fun rateLabelsFormatWithTheActiveLocale() {
         val previous = java.util.Locale.getDefault()

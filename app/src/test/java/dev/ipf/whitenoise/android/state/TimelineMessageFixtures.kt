@@ -21,6 +21,7 @@ internal fun localTimelineMessage(record: AppMessageRecordFfi): TimelineMessage 
         timelineOrder = record.recordedAt,
     )
 
+/** Builds a received plain-text message record with the given id and recorded time. */
 internal fun timelineAppMessage(
     id: String,
     recordedAt: ULong = 1uL,
@@ -39,8 +40,10 @@ internal fun timelineAppMessage(
         retentionExpiresAt = null,
         recordedAt = recordedAt,
         receivedAt = recordedAt,
+        sticker = null,
     )
 
+/** Projects an app message record into the equivalent timeline message record. */
 private fun projectedRecordFor(record: AppMessageRecordFfi): TimelineMessageRecordFfi =
     TimelineMessageRecordFfi(
         clientToken = null,
@@ -72,6 +75,8 @@ private fun projectedRecordFor(record: AppMessageRecordFfi): TimelineMessageReco
         sourceEpoch = null,
         retentionSeconds = null,
         retentionExpiresAt = null,
+        sticker = null,
+        importedFrom = null,
     )
 
 private fun emptyMarkdown(): MarkdownDocumentFfi =

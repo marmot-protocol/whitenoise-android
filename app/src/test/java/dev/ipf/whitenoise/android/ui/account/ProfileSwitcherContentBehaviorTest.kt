@@ -62,7 +62,10 @@ class ProfileSwitcherContentBehaviorTest {
         onAdd: () -> Unit = {},
         onSettings: () -> Unit = {},
     ) {
-        val accounts = listOf("a", "b", "c", "d").map { AccountSummaryFfi(it, it.repeat(64), true, false, false, true) }
+        val accounts =
+            listOf("a", "b", "c", "d").map {
+                AccountSummaryFfi(it, it.repeat(64), true, false, false, true, false)
+            }
         composeRule.setContent {
             WhiteNoiseTheme {
                 Surface {

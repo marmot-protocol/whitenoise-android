@@ -219,6 +219,7 @@ class GroupEditNameEmojiPickerTest {
                 it.config[SemanticsActions.OnClick].label == label
         }
 
+    /** Builds an app state with one running local-signing account for the group edit screen. */
     private fun appState() =
         WhiteNoiseAppState(
             context = context,
@@ -233,6 +234,7 @@ class GroupEditNameEmojiPickerTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ACCOUNT_REF,

@@ -1463,7 +1463,8 @@ class NotificationDeliveryModeRecoveryTest {
             (field.get(appState) as StalenessGuard).capture()
         }
 
-    private fun account(ref: String) = AccountSummaryFfi(ref, "$ref-id", true, false, false, true)
+    /** Builds a running local-signing account summary for the given ref. */
+    private fun account(ref: String) = AccountSummaryFfi(ref, "$ref-id", true, false, false, true, false)
 
     private fun settings(
         ref: String,

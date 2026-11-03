@@ -318,6 +318,7 @@ class ChatListSortKeyTest {
         disbandRequest = null,
     )
 
+    /** A received "hello" message in [groupId] recorded at [recordedAt]. */
     private fun message(
         groupId: String,
         recordedAt: ULong,
@@ -340,6 +341,7 @@ class ChatListSortKeyTest {
         retentionExpiresAt = null,
         recordedAt = recordedAt,
         receivedAt = recordedAt,
+        sticker = null,
     )
 
     private fun encryptedMedia() =

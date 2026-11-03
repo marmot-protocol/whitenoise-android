@@ -35,6 +35,15 @@
           "NTF-030",
           "NTF-035"
         ]
+      },
+      {
+        "surface": "Hidden-preview Mark as read keeps the shared open-envelope icon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationPreviewPrivacy.kt",
+        "anchor": "chatReadIcon(markRead = true)",
+        "test_ids": [
+          "CHL-008",
+          "NTF-030"
+        ]
       }
     ]
   },

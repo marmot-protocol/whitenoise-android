@@ -229,7 +229,7 @@ class PinnedConversationTrimTest {
             context = context,
             draftStore = DraftStore.forContext(context),
             accountIdHexResolver = { null },
-            accounts = listOf(AccountSummaryFfi(ACCOUNT, "self", true, false, false, true)),
+            accounts = listOf(AccountSummaryFfi(ACCOUNT, "self", true, false, false, true, false)),
             activeAccountRef = ACCOUNT,
         )
 

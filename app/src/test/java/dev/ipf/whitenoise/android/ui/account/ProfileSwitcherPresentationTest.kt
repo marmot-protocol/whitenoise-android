@@ -10,10 +10,10 @@ class ProfileSwitcherPresentationTest {
     @Test fun activeFirstRetainsNativeOrderAndRecoveryStates() {
         val accounts =
             listOf(
-                AccountSummaryFfi("a", "aa", true, false, false, true),
-                AccountSummaryFfi("b", "bb", true, false, false, true),
-                AccountSummaryFfi("retained", "cc", true, false, true, false),
-                AccountSummaryFfi("read-only", "dd", false, false, false, false),
+                AccountSummaryFfi("a", "aa", true, false, false, true, false),
+                AccountSummaryFfi("b", "bb", true, false, false, true, false),
+                AccountSummaryFfi("retained", "cc", true, false, true, false, false),
+                AccountSummaryFfi("read-only", "dd", false, false, false, false, false),
             )
         val state = accountSelectorState(accounts, "b", true)
         val presented = profileSwitcherPresentation(state)

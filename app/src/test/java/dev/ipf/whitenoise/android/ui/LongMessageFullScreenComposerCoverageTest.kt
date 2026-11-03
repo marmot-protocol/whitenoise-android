@@ -54,7 +54,8 @@ class LongMessageFullScreenComposerCoverageTest {
                 "ComposerGate.NOTICE" in fullScreenCall &&
                 "ComposerGate.INVITE" in fullScreenCall &&
                 "ComposerGate.COMPOSER" in fullScreenCall &&
-                "RemovedMemberComposerNotice()" in fullScreenCall &&
+                "RemovedMemberComposerNotice(" in fullScreenCall &&
+                "deviceRemoved = controller.group.isDeviceRemovedCopy()" in fullScreenCall &&
                 "InvitationActions(" in fullScreenCall,
         )
         val expandedComposerGate =

@@ -118,6 +118,12 @@
     <string name="library_loading">Loading files and media…</string>
     <string name="library_empty">No files or media found</string>
     <string name="library_source">From: %1$s · %2$s</string>
+    <string name="library_section_this_week">This week</string>
+    <string name="library_section_this_month">This month</string>
+    <string name="library_sender_in_chat">%1$s in %2$s</string>
+    <string name="library_item_description">%1$s, %2$s, from %3$s in %4$s, %5$s</string>
+    <string name="library_load_more_failed">Couldn\'t load more files and media</string>
+    <string name="library_filters_unsupported">These filters can\'t be used to browse files and media</string>
     <string name="chat_list_search_filter_remove">Remove filter: %1$s</string>
     <string name="chat_list_filter_all">All</string>
     <string name="chat_list_filter_unread">Unread</string>
@@ -189,6 +195,7 @@
     <string name="chat_pinned_badge">Pinned</string>
     <string name="chat_row_removed_badge">Removed</string>
     <string name="chat_row_removed_description">You were removed from this chat</string>
+    <string name="chat_row_device_removed_description">This device was removed from this chat</string>
     <string name="chat_row_action_move_up">Move up</string>
     <string name="chat_row_action_move_down">Move down</string>
     <string name="chat_row_action_delete_group">Delete group</string>
@@ -324,6 +331,7 @@
     <string name="group_empty_only_you_title">This group is only you</string>
     <string name="group_empty_invite_members">Invite people when you are ready.</string>
     <string name="you_are_no_longer_a_member">You can\'t send messages to this group because you\'re no longer a member.</string>
+    <string name="device_removed_from_group_composer">You can\'t send from this device because it was removed from this group. Your other devices are still in it.</string>
     <string name="group_unrecoverable_notice">This group is temporarily frozen while White Noise verifies and repairs its state.</string>
     <string name="chat_row_draft_prefix">Draft: </string>
     <string name="jump_to_newest">Jump to newest</string>
@@ -639,10 +647,6 @@
         <item quantity="other">%1$d attachments</item>
     </plurals>
     <string name="toast_share_staged_other_chats">Also staged in %1$d other chats</string>
-    <plurals name="toast_share_attachments_dropped">
-        <item quantity="one">%1$d attachment couldn\'t be added. You can send up to 10 at a time.</item>
-        <item quantity="other">%1$d attachments couldn\'t be added. You can send up to 10 at a time.</item>
-    </plurals>
     <string name="delete">Delete</string>
     <string name="delete_for_me">Delete for me</string>
     <string name="delete_for_everyone">Delete for everyone</string>
@@ -1182,6 +1186,7 @@
     <string name="toast_couldnt_publish_profile">Couldn\'t publish profile</string>
     <string name="toast_send_failed">Send failed</string>
     <string name="toast_send_storage_full">Not enough storage to send. Free up space and try again.</string>
+    <string name="error_storage_full">Not enough storage on this device. Free up space and try again.</string>
     <string name="toast_send_connection_failed">Couldn’t reach the relay. Check your connection and try again.</string>
     <string name="toast_send_queue_full">This chat has too many messages waiting to send, so yours wasn\'t sent. Try again once it catches up.</string>
     <string name="toast_send_chat_changed">The chat changed while your message was sending, so it wasn\'t sent. Try again.</string>
@@ -1962,6 +1967,21 @@
         <item quantity="one">~%1$ds left</item>
         <item quantity="other">~%1$ds left</item>
     </plurals>
+    <plurals name="tts_bar_minutes_remaining">
+        <item quantity="one">~%1$dm left</item>
+        <item quantity="other">~%1$dm left</item>
+    </plurals>
+    <string name="tts_bar_minutes_seconds_remaining">~%1$dm %2$ds left</string>
+    <string name="tts_bar_remaining_spoken">About %1$s remaining</string>
+    <plurals name="tts_bar_spoken_minutes">
+        <item quantity="one">%1$d minute</item>
+        <item quantity="other">%1$d minutes</item>
+    </plurals>
+    <plurals name="tts_bar_spoken_seconds">
+        <item quantity="one">%1$d second</item>
+        <item quantity="other">%1$d seconds</item>
+    </plurals>
+    <string name="tts_bar_spoken_minutes_seconds">%1$s %2$s</string>
     <string name="tts_bar_stop">Stop reading</string>
     <string name="tts_bar_return_to_source">Return to spoken message</string>
     <string name="tts_source_unavailable">The spoken message is no longer available</string>
@@ -2688,6 +2708,8 @@
     <string name="notification_tone_added">Added. Open a category below, then Sound to choose a tone. Some devices list these under My Sounds.</string>
     <string name="notification_tone_add_failed">Could not add the sounds. Try again or keep your current Android sound.</string>
     <string name="notification_tone_scope">Previewing or adding sounds does not change your alerts. Choose a sound in Android for each category, conversation or person. Conversations and people explicitly assigned their own sound keep that sound. New message categories use Ding; silent and customized categories stay unchanged. Previews use notification volume and respect Silent mode and Do Not Disturb.</string>
+    <string name="notification_quiet_during_spoken_audio">Quiet during podcasts</string>
+    <string name="notification_quiet_during_spoken_audio_detail">Messages arrive without sound or vibration while another app plays a podcast or audiobook, so it keeps playing. Mentions still alert.</string>
     <string name="notification_tone_android">Android sound</string>
     <string name="notification_tone_silent">Silent</string>
     <string name="notification_tone_off">Off</string>

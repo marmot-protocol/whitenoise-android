@@ -280,8 +280,8 @@ class PersonProfileRouteTest {
                 ),
                 { target },
                 listOf(
-                    AccountSummaryFfi("alice", "11".repeat(32), true, false, false, true),
-                    AccountSummaryFfi("carol", "33".repeat(32), true, false, false, true),
+                    AccountSummaryFfi("alice", "11".repeat(32), true, false, false, true, false),
+                    AccountSummaryFfi("carol", "33".repeat(32), true, false, false, true, false),
                 ),
                 "alice",
             )

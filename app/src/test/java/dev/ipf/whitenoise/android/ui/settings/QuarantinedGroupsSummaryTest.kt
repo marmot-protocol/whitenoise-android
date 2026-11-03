@@ -116,6 +116,7 @@ class QuarantinedGroupsSummaryTest {
             AppQuarantinedGroupFfi("a".repeat(64), AppGroupHydrationQuarantineReasonFfi.OPEN_MLS_LOAD_FAILED),
         )
 
+    /** Builds an app state with the test account active, backed by the given native interface. */
     private fun state(native: MarmotInterface?) =
         WhiteNoiseAppState(
             context = context,
@@ -130,6 +131,7 @@ class QuarantinedGroupsSummaryTest {
                         false,
                         false,
                         true,
+                        false,
                     ),
                 ),
             activeAccountRef = ConversationTimelineTestIds.ACCOUNT_REF,

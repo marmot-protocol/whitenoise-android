@@ -1428,6 +1428,7 @@ private fun removeAndRestoreChatRow(
         .invoke(controller, snapshot)
 }
 
+/** Builds an app state with a single active running account for preview ordering tests. */
 private fun appState(): WhiteNoiseAppState =
     WhiteNoiseAppState(
         context = ApplicationProvider.getApplicationContext(),
@@ -1442,6 +1443,7 @@ private fun appState(): WhiteNoiseAppState =
                     externalSigning = false,
                     signedOut = false,
                     running = true,
+                    unlinked = false,
                 ),
             ),
         activeAccountRef = ACCOUNT_REF,
@@ -1491,6 +1493,7 @@ private fun row(
         disbandRequest = null,
     )
 
+/** Builds a chat-list preview of a self-sent message with the given text, timestamp and delivery state. */
 private fun preview(
     messageId: String,
     plaintext: String,
@@ -1518,6 +1521,7 @@ private fun preview(
         attachmentCount = 0u,
         groupSystem = null,
         deliveryState = deliveryState,
+        sticker = null,
     )
 
 private const val ACCOUNT_REF = "alice"

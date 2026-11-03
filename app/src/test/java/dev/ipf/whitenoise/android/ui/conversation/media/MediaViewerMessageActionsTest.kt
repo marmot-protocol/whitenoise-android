@@ -110,6 +110,7 @@ class MediaViewerMessageActionsTest {
                 retentionExpiresAt = null,
                 recordedAt = 1uL,
                 receivedAt = 1uL,
+                sticker = null,
             )
         return TimelineMessage("album", record, MessageStatus.Received)
     }

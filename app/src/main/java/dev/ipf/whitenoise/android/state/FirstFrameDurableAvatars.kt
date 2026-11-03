@@ -28,15 +28,25 @@ internal const val FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS = 250L
 internal fun firstFrameDurableAvatarAssets(
     rows: List<PresentedChatRowFfi>,
     draftedAtSeconds: (groupIdHex: String) -> ULong? = { null },
-): List<AvatarAssetFfi> =
+): List<AvatarAssetFfi> = firstFrameDurableAvatarSelections(rows, null, draftedAtSeconds).map { it.first }
+
+/** [firstFrameDurableAvatarAssets] with each asset's worker domain, from the row that selects it. */
+internal fun firstFrameDurableAvatarSelections(
+    rows: List<PresentedChatRowFfi>,
+    accountRef: String?,
+    draftedAtSeconds: (groupIdHex: String) -> ULong? = { null },
+): List<Pair<AvatarAssetFfi, dev.ipf.whitenoise.android.media.MediaTrustDomain>> =
     sortChatListItems(
         rows.map { chatListItemFromProjection(it.row, it.presentation, it.avatarAsset) },
     ) { item -> draftedAtSeconds(item.group.groupIdHex) }
         .asSequence()
         .filterNot { it.group.archived }
         .take(FIRST_FRAME_DURABLE_AVATAR_ROWS)
-        .mapNotNull { item -> item.selectedAvatarAsset?.takeIf(AvatarAssetFfi::isRenderable) }
-        .distinctBy { asset -> asset.reference to asset.contentRevision }
+        .mapNotNull { item ->
+            item.selectedAvatarAsset
+                ?.takeIf(AvatarAssetFfi::isRenderable)
+                ?.let { it to chatListAvatarDomain(item, accountRef) }
+        }.distinctBy { (asset, _) -> asset.reference to asset.contentRevision }
         .toList()
 
 /**
@@ -62,15 +72,18 @@ internal suspend fun WhiteNoiseAppState.prewarmFirstFrameDurableAvatars(
     accountRef: String,
     rows: List<PresentedChatRowFfi>,
 ): List<FirstFrameDurableAvatar> {
-    val assets =
-        firstFrameDurableAvatarAssets(rows) { groupIdHex -> draftStore.draftedAtSecondsFor(accountRef, groupIdHex) }
-            .takeIf { it.isNotEmpty() } ?: return emptyList()
+    val selections =
+        firstFrameDurableAvatarSelections(rows, accountRef) { groupIdHex ->
+            draftStore.draftedAtSecondsFor(accountRef, groupIdHex)
+        }.takeIf { it.isNotEmpty() } ?: return emptyList()
     withTimeoutOrNull(FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS) {
         coroutineScope {
-            assets.map { asset -> async { durableAvatar(asset, accountRef, acquireMissing = false) } }.awaitAll()
+            selections
+                .map { (asset, domain) -> async { durableAvatar(asset, accountRef, acquireMissing = false, domain) } }
+                .awaitAll()
         }
     }
-    return assets.mapNotNull { asset ->
+    return selections.map { it.first }.mapNotNull { asset ->
         val key = asset.cacheKey(accountRef) ?: return@mapNotNull null
         AvatarImageLoader.cachedImage(key)?.let { image ->
             FirstFrameDurableAvatar(

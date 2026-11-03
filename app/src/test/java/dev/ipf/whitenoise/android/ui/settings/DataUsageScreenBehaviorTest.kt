@@ -50,6 +50,7 @@ class DataUsageScreenBehaviorTest {
         composeRule.waitUntil { !appState.publicJpegPreviewPreferences.enabled("ab".repeat(32)) }
     }
 
+    /** Clears stored preferences and builds a fresh single-account app state. */
     @Before
     fun setUp() {
         preferences.edit().clear().commit()
@@ -72,6 +73,7 @@ class DataUsageScreenBehaviorTest {
                             externalSigning = false,
                             signedOut = false,
                             running = true,
+                            unlinked = false,
                         ),
                     ),
                 activeAccountRef = ACCOUNT_REF,

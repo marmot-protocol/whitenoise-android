@@ -156,7 +156,7 @@ internal fun ChatListSelectionControls(
         if (showMarkRead) {
             DirectSelectionAction(
                 stringResource(R.string.chat_row_action_mark_read),
-                R.drawable.ic_check,
+                chatReadIcon(markRead = true),
                 actionsEnabled,
             ) {
                 perform(onMarkRead)
@@ -165,7 +165,7 @@ internal fun ChatListSelectionControls(
         if (showMarkUnread) {
             DirectSelectionAction(
                 stringResource(R.string.chat_row_action_mark_unread),
-                R.drawable.ic_mark_unread,
+                chatReadIcon(markRead = false),
                 actionsEnabled,
             ) {
                 perform(onMarkUnread)

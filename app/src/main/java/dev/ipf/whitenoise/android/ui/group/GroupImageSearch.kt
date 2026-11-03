@@ -169,7 +169,10 @@ internal fun ImageSearchPreview(
     previewUrl: String?,
     subtitle: String,
     presentation: ImagePreviewPresentation,
-    imageLoader: suspend (String) -> ImageBitmap? = { AvatarImageLoader.load(it) },
+    // Web search results and typed URLs are no account's published profile: each decodes single-use.
+    imageLoader: suspend (String) -> ImageBitmap? = {
+        AvatarImageLoader.load(it, dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique)
+    },
 ) {
     when (presentation) {
         ImagePreviewPresentation.Avatar ->
@@ -182,6 +185,7 @@ internal fun ImageSearchPreview(
                     seed = seed,
                     size = 64.dp,
                     pictureUrl = previewUrl,
+                    pictureDomain = dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -279,7 +283,9 @@ internal fun ImageSearchSheet(
     removeImageLabel: String? = null,
     applyImageLabel: String? = null,
     searchClient: ImageSearchClient = remember { DuckDuckGoImageSearchClient() },
-    resultImageLoader: suspend (String) -> ImageBitmap? = { AvatarImageLoader.load(it) },
+    resultImageLoader: suspend (String) -> ImageBitmap? = {
+        AvatarImageLoader.load(it, dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique)
+    },
     resultImageCacheLookup: (String) -> ImageBitmap? = { AvatarImageLoader.peek(it) },
 ) {
     // Tracks which button initiated the current in-flight mutation, so the

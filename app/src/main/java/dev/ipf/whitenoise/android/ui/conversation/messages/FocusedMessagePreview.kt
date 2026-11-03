@@ -20,6 +20,14 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.layout.IntrinsicMeasurable
+import androidx.compose.ui.layout.IntrinsicMeasureScope
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Measurable
+import androidx.compose.ui.layout.MeasureResult
+import androidx.compose.ui.layout.MeasureScope
+import androidx.compose.ui.layout.MultiContentMeasurePolicy
+import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -32,8 +40,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.state.MessageStatus
@@ -172,45 +183,46 @@ internal fun FocusedTextMessagePreview(
                 statusContainerColor = colorFromArgb(presentation.backgroundArgb),
             )
         }
-    val content: @Composable (Boolean) -> Unit = { compact ->
-        senderName?.let { EmojiLabel(it, style = MaterialTheme.typography.labelMedium) }
+    val excerptStyle = MaterialTheme.typography.bodyLarge
+    val sender: (@Composable () -> Unit)? =
+        senderName?.let { name -> { EmojiLabel(name, style = MaterialTheme.typography.labelMedium) } }
+    val main: @Composable (Boolean) -> Unit = { compact ->
         BubbleFooterLayout(
             footer = footer,
             lastLineWidth = { lastLineWidth.takeIf { warning == null } },
             lastLineBaseline = { lastLineBaseline.takeIf { warning == null } },
         ) {
-            Column {
-                MarkdownTimestampText(
-                    text = excerpt,
-                    style = MaterialTheme.typography.bodyLarge,
-                    maxLines = if (compact) 1 else FOCUSED_PREVIEW_TEXT_LINES,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.testTag("message-actions-excerpt"),
-                    onTextLayout = { layout ->
-                        lastLineLayout = layout
-                    },
-                )
-                warning?.let {
-                    MessageBubbleInvalidationWarning(it, color = colorFromArgb(presentation.contentArgb))
-                }
-            }
+            ExcerptAboveWarning(
+                excerptLineHeight = excerptStyle.lineHeight.takeIf { it.isSpecified } ?: (excerptStyle.fontSize * 1.5f),
+                excerpt = {
+                    MarkdownTimestampText(
+                        text = excerpt,
+                        style = excerptStyle,
+                        maxLines = if (compact) 1 else FOCUSED_PREVIEW_TEXT_LINES,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.testTag("message-actions-excerpt"),
+                        onTextLayout = { layout ->
+                            lastLineLayout = layout
+                        },
+                    )
+                },
+                warning = {
+                    warning?.let {
+                        MessageBubbleInvalidationWarning(it, color = colorFromArgb(presentation.contentArgb))
+                    }
+                },
+            )
         }
     }
     if (media == null) {
-        BoxWithConstraints {
-            // A short IME viewport cannot fit the quoted reply, five lines and footer.
-            // Keep the target excerpt and footer instead of clipping both out of view.
-            val compact = maxHeight <= 200.dp
-            MessageBubbleFrame(
-                presentation = presentation,
-                highlighted = false,
-                mine = mine,
-                mentionedSelf = mentionedSelf,
-                mentionedYouLabel = mentionedYouLabel,
-            ) {
-                if (!compact) reply?.invoke()
-                content(compact)
-            }
+        MessageBubbleFrame(
+            presentation = presentation,
+            highlighted = false,
+            mine = mine,
+            mentionedSelf = mentionedSelf,
+            mentionedYouLabel = mentionedYouLabel,
+        ) {
+            FocusedTextBudgetLayout(quote = reply, sender = sender) { main(false) }
         }
     } else {
         BoxWithConstraints {
@@ -243,9 +255,149 @@ internal fun FocusedTextMessagePreview(
                             media()
                         }
                     },
-                ) { content(compact) }
+                ) {
+                    sender?.invoke()
+                    main(compact)
+                }
             }
         }
+    }
+}
+
+/**
+ * Stacks the excerpt above its warning, measuring the warning first: a bounded frame shortens the excerpt
+ * rather than squeezing the warning out of view, and without a bound both keep their natural height. Its
+ * minimum intrinsic height is the warning plus one excerpt line of [excerptLineHeight].
+ */
+@Composable
+private fun ExcerptAboveWarning(
+    excerptLineHeight: TextUnit,
+    excerpt: @Composable () -> Unit,
+    warning: @Composable () -> Unit,
+) {
+    val policy = remember(excerptLineHeight) { ExcerptAboveWarningPolicy(excerptLineHeight) }
+    Layout(contents = listOf(excerpt, warning), measurePolicy = policy)
+}
+
+/** Measure policy for [ExcerptAboveWarning]. */
+private class ExcerptAboveWarningPolicy(
+    private val excerptLineHeight: TextUnit,
+) : MultiContentMeasurePolicy {
+    /** Measures the warning first and gives the excerpt the height left, or no bound when there is none. */
+    override fun MeasureScope.measure(
+        measurables: List<List<Measurable>>,
+        constraints: Constraints,
+    ): MeasureResult {
+        val (excerptMeasurables, warningMeasurables) = measurables
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val warnings = warningMeasurables.map { it.measure(loose) }
+        val warningHeight = warnings.sumOf { it.height }
+        val excerptMaxHeight =
+            if (constraints.hasBoundedHeight) {
+                (constraints.maxHeight - warningHeight).coerceAtLeast(0)
+            } else {
+                Constraints.Infinity
+            }
+        val excerpts = excerptMeasurables.map { it.measure(loose.copy(maxHeight = excerptMaxHeight)) }
+        val excerptHeight = excerpts.maxOfOrNull { it.height } ?: 0
+        val width = (excerpts + warnings).maxOfOrNull { it.width } ?: 0
+        return layout(
+            width.coerceIn(constraints.minWidth, constraints.maxWidth),
+            (excerptHeight + warningHeight).coerceIn(constraints.minHeight, constraints.maxHeight),
+        ) {
+            excerpts.forEach { it.placeRelative(0, 0) }
+            var y = excerptHeight
+            warnings.forEach {
+                it.placeRelative(0, y)
+                y += it.height
+            }
+        }
+    }
+
+    /** The least height that still shows one whole excerpt line above the full warning. */
+    override fun IntrinsicMeasureScope.minIntrinsicHeight(
+        measurables: List<List<IntrinsicMeasurable>>,
+        width: Int,
+    ): Int {
+        val (excerptMeasurables, warningMeasurables) = measurables
+        val line = if (excerptMeasurables.isEmpty()) 0 else excerptLineHeight.roundToPx()
+        return line + warningMeasurables.sumOf { it.minIntrinsicHeight(width) }
+    }
+}
+
+/**
+ * Fits a focused text preview to the height it is given from measured content, not a fixed threshold
+ * (issue #3532). The minimum is the [main] body's minimum intrinsic height: one excerpt line, any warning
+ * and the timestamp/status footer. The [sender] label is kept only while the minimum still fits with it,
+ * and the [quote] only while it fits whole above that. The main body then takes the remaining height,
+ * where the excerpt shortens to whole lines. Without a height bound everything is shown. Each part is
+ * composed once, so nothing is measured twice or duplicated in semantics.
+ */
+@Composable
+private fun FocusedTextBudgetLayout(
+    quote: (@Composable () -> Unit)?,
+    sender: (@Composable () -> Unit)?,
+    main: @Composable () -> Unit,
+) {
+    Layout(contents = listOf(quote ?: {}, sender ?: {}, main), measurePolicy = FocusedTextBudgetPolicy)
+}
+
+/** Measure policy for [FocusedTextBudgetLayout]. */
+private object FocusedTextBudgetPolicy : MultiContentMeasurePolicy {
+    /** Keeps the sender, then the quote, only while they fit above the main body's minimum. */
+    override fun MeasureScope.measure(
+        measurables: List<List<Measurable>>,
+        constraints: Constraints,
+    ): MeasureResult {
+        val (quoteMeasurables, senderMeasurables, mainMeasurables) = measurables
+        val gap = BubbleContentGap.roundToPx()
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val bounded = constraints.hasBoundedHeight
+        val limit = if (bounded) constraints.maxHeight else Constraints.Infinity
+        val mainMinimum = if (bounded) mainMeasurables.sumOf { it.minIntrinsicHeight(loose.maxWidth) } else 0
+        val sender = measureBlock(senderMeasurables, loose, gap).ifFits(above = mainMinimum, limit = limit)
+        val belowQuote = mainMinimum + sender.height
+        val quote = measureBlock(quoteMeasurables, loose, gap).ifFits(above = belowQuote, limit = limit)
+        val top = quote.height + sender.height
+        val mainConstraints = if (bounded) loose.copy(maxHeight = (limit - top).coerceAtLeast(0)) else loose
+        val mains = mainMeasurables.map { it.measure(mainConstraints) }
+        val width = (mains + quote.placeables + sender.placeables).maxOfOrNull { it.width } ?: 0
+        val height = top + (mains.maxOfOrNull { it.height } ?: 0)
+        return layout(
+            width.coerceIn(constraints.minWidth, constraints.maxWidth),
+            height.coerceIn(constraints.minHeight, constraints.maxHeight),
+        ) {
+            quote.placeables.forEach { it.placeRelative(0, 0) }
+            sender.placeables.forEach { it.placeRelative(0, quote.height) }
+            mains.forEach { it.placeRelative(0, top) }
+        }
+    }
+
+    /** Measures an optional block at its natural height; its height includes the gap below it. */
+    private fun measureBlock(
+        measurables: List<Measurable>,
+        loose: Constraints,
+        gap: Int,
+    ): Block {
+        if (measurables.isEmpty()) return Block.Empty
+        val placeables = measurables.map { it.measure(loose.copy(maxHeight = Constraints.Infinity)) }
+        return Block(placeables, placeables.maxOf { it.height } + gap)
+    }
+}
+
+/** An optional block of a focused preview, shown whole or not at all. */
+private class Block(
+    val placeables: List<Placeable>,
+    val height: Int,
+) {
+    /** This block when it fits whole above [above] within [limit], else an empty block. */
+    fun ifFits(
+        above: Int,
+        limit: Int,
+    ): Block = if (placeables.isEmpty() || height + above <= limit) this else Empty
+
+    companion object {
+        val Empty = Block(emptyList(), 0)
     }
 }
 

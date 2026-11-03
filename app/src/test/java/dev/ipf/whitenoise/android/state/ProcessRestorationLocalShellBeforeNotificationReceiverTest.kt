@@ -41,6 +41,7 @@ class ProcessRestorationLocalShellBeforeNotificationReceiverTest {
                     externalSigning = false,
                     signedOut = true,
                     running = false,
+                    unlinked = false,
                 )
             val fixture =
                 NotificationBootstrapTestFixture(
@@ -61,6 +62,7 @@ class ProcessRestorationLocalShellBeforeNotificationReceiverTest {
             }
         }
 
+    /** Restored shell becomes usable from the local projection while receiver convergence is still pending. */
     @Test
     fun localProjectionIsUsefulBeforeReceiverConvergenceCompletes() =
         runBlocking {
@@ -72,6 +74,7 @@ class ProcessRestorationLocalShellBeforeNotificationReceiverTest {
                     externalSigning = true,
                     signedOut = false,
                     running = true,
+                    unlinked = false,
                 )
             val fixture =
                 NotificationBootstrapTestFixture(

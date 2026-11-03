@@ -60,6 +60,7 @@ fun notificationUpdate(
     reactedToPreview = reactedToPreview,
     timestampMs = timestampMs,
     isFromSelf = isFromSelf,
+    sticker = null,
 )
 
 /**

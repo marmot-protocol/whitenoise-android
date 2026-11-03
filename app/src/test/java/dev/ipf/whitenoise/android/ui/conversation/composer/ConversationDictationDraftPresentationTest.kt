@@ -77,7 +77,7 @@ class ConversationDictationDraftPresentationTest {
             oldAcceptance = oldEditor.acceptanceToken()
             fixture.failSend()
             // The old input writer and actual ComposerBar acceptance land before the editor redraw.
-            fixture.writers.getValue(0)(TextFieldValue("stale edit"))
+            fixture.writers.getValue(0)(TextFieldValue("stale edit"), true)
             fixture.lateSendAcceptance.invoke()
             assertEquals("", oldEditor.valueState.value.text)
             assertEquals("Draft recognized", fixture.draft.text)
@@ -345,6 +345,47 @@ class ConversationDictationDraftPresentationTest {
         }
     }
 
+    @Test
+    fun presentationOnlyCallbacksPreserveTheCapturedDictationSend() {
+        val fixture = Fixture(dispatchRecognized = true)
+        composeRule.setContent { fixture.RenderComposer() }
+        composeRule.runOnIdle {
+            assertTrue(fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft))
+            val revision = fixture.revision
+            val presentation = fixture.draft.copy(selection = TextRange(0), composition = TextRange(0, 2))
+            val textChanged = fixture.editor.updateValueFromUser(presentation)
+            assertFalse(textChanged)
+            fixture.writers.getValue(0)(presentation, textChanged)
+            assertEquals(presentation, fixture.draft)
+            assertEquals(revision, fixture.revision)
+
+            fixture.controller.send()
+            fixture.result("recognized")
+            assertEquals(listOf("Draft recognized"), fixture.dictationSends)
+            assertEquals("", fixture.draft.text)
+        }
+    }
+
+    @Test
+    fun realEditsRevertedToTheCapturedTextStillFenceDictationSend() {
+        val fixture = Fixture(dispatchRecognized = true)
+        composeRule.setContent { fixture.RenderComposer() }
+        composeRule.runOnIdle {
+            assertTrue(fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft))
+            val revision = fixture.revision
+            val writer = fixture.writers.getValue(0)
+            val changed = TextFieldValue("changed")
+            writer(changed, fixture.editor.updateValueFromUser(changed))
+            val reverted = TextFieldValue("Draft", TextRange(5))
+            writer(reverted, fixture.editor.updateValueFromUser(reverted))
+            assertEquals(revision + 2, fixture.revision)
+
+            fixture.controller.send()
+            fixture.result("recognized")
+            assertTrue(fixture.dictationSends.isEmpty())
+        }
+    }
+
     private class Fixture(
         private val dispatchRecognized: Boolean = false,
         private val allowParking: Boolean = true,
@@ -359,7 +400,7 @@ class ConversationDictationDraftPresentationTest {
         private var elapsedMillis = 0L
         lateinit var editor: ComposerTextState
         lateinit var lateSendAcceptance: () -> Unit
-        val writers = mutableMapOf<Int, (TextFieldValue) -> Unit>()
+        val writers = mutableMapOf<Int, (TextFieldValue, Boolean) -> Unit>()
         val sent = mutableListOf<String>()
         private lateinit var listener: RecognitionListener
         private var recognitionCreated = false
@@ -475,7 +516,10 @@ class ConversationDictationDraftPresentationTest {
             val presentationRevision = controller.completionRevision(ACCOUNT, GROUP)
             val ownerKey = composerDraftOwnerKey(ACCOUNT, GROUP)
             editor = rememberComposerTextState(ownerKey, draft, 0 to presentationRevision)
-            val writer = conversationDictationDraftWriter(controller, ACCOUNT, GROUP, presentationRevision, ::edit)
+            val writer =
+                conversationDictationDraftWriter(controller, ACCOUNT, GROUP, presentationRevision) { value, changed ->
+                    edit(value, changed)
+                }
             writers[presentationRevision] = writer
             WhiteNoiseTheme {
                 Surface(Modifier.width(360.dp).testTag("dictation-composer")) {
@@ -530,10 +574,13 @@ class ConversationDictationDraftPresentationTest {
             restarts.toList().also { restarts.clear() }.forEach { it() }
         }
 
-        fun edit(value: TextFieldValue) {
+        fun edit(
+            value: TextFieldValue,
+            textChanged: Boolean = true,
+        ) {
             editorWrites += 1
             draft = value
-            revision += 1
+            if (textChanged) revision += 1
         }
     }
 

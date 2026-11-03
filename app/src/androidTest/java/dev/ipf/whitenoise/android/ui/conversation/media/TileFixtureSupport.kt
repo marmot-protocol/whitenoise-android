@@ -85,6 +85,7 @@ internal object TileFixtureSupport {
                 retentionExpiresAt = null,
                 recordedAt = 1uL,
                 receivedAt = 1uL,
+                sticker = null,
             ),
         status = if (sent) MessageStatus.Sent else MessageStatus.Received,
     )

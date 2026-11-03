@@ -1,0 +1,65 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsRemainingTime.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "R.plurals.tts_bar_seconds_remaining",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsRemainingTime.kt",
+        "anchor": "R.plurals.tts_bar_seconds_remaining",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "R.plurals.tts_bar_minutes_remaining",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsRemainingTime.kt",
+        "anchor": "R.plurals.tts_bar_minutes_remaining",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "R.string.tts_bar_minutes_seconds_remaining",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsRemainingTime.kt",
+        "anchor": "R.string.tts_bar_minutes_seconds_remaining",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "R.string.tts_bar_remaining_spoken",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsRemainingTime.kt",
+        "anchor": "R.string.tts_bar_remaining_spoken",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "R.plurals.tts_bar_spoken_minutes",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsRemainingTime.kt",
+        "anchor": "R.plurals.tts_bar_spoken_minutes",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "R.plurals.tts_bar_spoken_seconds",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsRemainingTime.kt",
+        "anchor": "R.plurals.tts_bar_spoken_seconds",
+        "test_ids": [
+          "TTS-001"
+        ]
+      },
+      {
+        "surface": "R.string.tts_bar_spoken_minutes_seconds",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TtsRemainingTime.kt",
+        "anchor": "R.string.tts_bar_spoken_minutes_seconds",
+        "test_ids": [
+          "TTS-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

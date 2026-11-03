@@ -171,6 +171,7 @@ class KeptMessageCardTest {
         composeRule.waitForIdle()
     }
 
+    /** Builds a received kind-9 timeline message from alice with a kept body. */
     private fun timelineMessage(id: String): TimelineMessage =
         TimelineMessage(
             id = "msg:$id",
@@ -194,6 +195,7 @@ class KeptMessageCardTest {
                     retentionExpiresAt = null,
                     recordedAt = 1_700_000_000uL,
                     receivedAt = 1_700_000_000uL,
+                    sticker = null,
                 ),
             status = MessageStatus.Received,
         )

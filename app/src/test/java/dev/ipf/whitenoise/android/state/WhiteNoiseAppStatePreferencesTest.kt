@@ -354,6 +354,7 @@ class WhiteNoiseAppStatePreferencesTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 }
 

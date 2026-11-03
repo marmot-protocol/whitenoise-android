@@ -110,6 +110,7 @@ class ProfileGroupInviteWaitTest {
                         externalSigning = false,
                         signedOut = false,
                         running = true,
+                        unlinked = false,
                     ),
                 ),
             activeAccountRef = ConversationTimelineTestIds.ACCOUNT_REF,

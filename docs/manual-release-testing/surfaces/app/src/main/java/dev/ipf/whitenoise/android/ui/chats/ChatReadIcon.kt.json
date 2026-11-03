@@ -1,0 +1,19 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatReadIcon.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "chatReadIcon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatReadIcon.kt",
+        "anchor": "fun chatReadIcon(",
+        "test_ids": [
+          "CHL-008",
+          "NTF-042",
+          "SET-032"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

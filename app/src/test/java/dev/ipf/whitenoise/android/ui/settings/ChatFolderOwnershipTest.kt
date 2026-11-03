@@ -460,6 +460,7 @@ class ChatFolderOwnershipTest {
         externalSigning = false,
         signedOut = false,
         running = true,
+        unlinked = false,
     )
 
     /** Chat item. */

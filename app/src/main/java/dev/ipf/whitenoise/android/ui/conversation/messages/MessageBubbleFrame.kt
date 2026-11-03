@@ -209,7 +209,10 @@ private enum class MediaEnvelopeSlot {
     Supplement,
 }
 
-private val bubbleContentArrangement = Arrangement.spacedBy(6.dp)
+/** Spacing between a bubble's stacked content blocks, shared with the focused preview's own stacks. */
+internal val BubbleContentGap = 6.dp
+
+private val bubbleContentArrangement = Arrangement.spacedBy(BubbleContentGap)
 
 /** Resolves the one visible border owned by a plain or media message frame. */
 @Composable

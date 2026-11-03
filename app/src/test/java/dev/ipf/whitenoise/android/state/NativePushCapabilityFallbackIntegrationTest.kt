@@ -605,6 +605,7 @@ class NativePushCapabilityFallbackIntegrationTest {
         externalSigning = false,
         signedOut = false,
         running = true,
+        unlinked = false,
     )
 
     /** Builds one authoritative native-push preference for the requested account. */

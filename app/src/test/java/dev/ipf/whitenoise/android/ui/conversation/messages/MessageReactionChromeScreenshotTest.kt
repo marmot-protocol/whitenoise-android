@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +19,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -25,8 +28,10 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.core.ReactionTally
+import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ConfigureReactionsSheet
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionPillRow
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -185,7 +190,35 @@ class MessageReactionChromeScreenshotTest {
         }
         composeRule.onNodeWithContentDescription("Reaction 1, Marmot. Double tap to replace.").assertExists()
         composeRule.onNodeWithContentDescription("Reaction 2, White Noise. Double tap to replace.").assertExists()
+        // The slot's own description is the whole announcement, the artwork does not repeat its name (#3292).
+        composeRule
+            .onNode(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.ContentDescription,
+                    listOf("Reaction 1, Marmot. Double tap to replace."),
+                ),
+            ).assertExists()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/configure_reactions_builtins.png")
+    }
+
+    /** Built-in slots saved through the real preferences come back as the same artwork after a reload (#3292). */
+    @Test
+    fun builtInConfiguredQuickReactionsAfterReload() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        RecentEmojiPreferences.saveQuickReactions(context, listOf(":marmot:", ":wn:", "👍", "❤️", "😂", "🎉"))
+        val reloaded = RecentEmojiPreferences.loadQuickReactions(context)
+        try {
+            composeRule.setContent {
+                WhiteNoiseTheme {
+                    ConfigureReactionsSheet(current = reloaded, onDismiss = {}, onApply = {}, onPickSlot = { _, _ -> })
+                }
+            }
+            composeRule.onNodeWithContentDescription("Reaction 1, Marmot. Double tap to replace.").assertExists()
+            composeRule.onNodeWithContentDescription("Reaction 2, White Noise. Double tap to replace.").assertExists()
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/configure_reactions_builtins_reloaded.png")
+        } finally {
+            RecentEmojiPreferences.resetQuickReactions(context)
+        }
     }
 
     /** Root-space bounds of a tagged row, for the spacing assertions. */

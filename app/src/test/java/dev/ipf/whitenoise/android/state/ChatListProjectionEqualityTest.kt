@@ -138,6 +138,7 @@ class ChatListProjectionEqualityTest {
             attachmentCount = 0u,
             groupSystem = null,
             deliveryState = ChatListMessageDeliveryStateFfi.DELIVERED,
+            sticker = null,
         )
 
     private fun row(lastMessage: ChatListMessagePreviewFfi?) =

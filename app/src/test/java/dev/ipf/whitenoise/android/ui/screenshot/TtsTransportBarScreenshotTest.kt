@@ -69,6 +69,42 @@ class TtsTransportBarScreenshotTest {
         capture("tts_transport_bar_speaking_amoled")
     }
 
+    /** A five-minute estimate reads as minutes and seconds (#3563). */
+    @Test
+    fun ttsTransportBarMultiMinuteLight() {
+        render(speaking(), darkTheme = false, amoled = false, remainingSeconds = MULTI_MINUTE_SECONDS)
+        capture("tts_transport_bar_multi_minute_light")
+    }
+
+    /** The multi-minute label in the dark theme. */
+    @Test
+    fun ttsTransportBarMultiMinuteDark() {
+        render(speaking(), darkTheme = true, amoled = false, remainingSeconds = MULTI_MINUTE_SECONDS)
+        capture("tts_transport_bar_multi_minute_dark")
+    }
+
+    /** The multi-minute label in the AMOLED theme. */
+    @Test
+    fun ttsTransportBarMultiMinuteAmoled() {
+        render(speaking(), darkTheme = true, amoled = true, remainingSeconds = MULTI_MINUTE_SECONDS)
+        capture("tts_transport_bar_multi_minute_amoled")
+    }
+
+    /** The longer label still fits a narrow bar at double font scale in RTL. */
+    @Test
+    fun ttsTransportBarMultiMinuteNarrowLargeFontRtl() {
+        render(
+            speaking(),
+            darkTheme = false,
+            amoled = false,
+            fontScale = 2f,
+            layoutDirection = LayoutDirection.Rtl,
+            remainingSeconds = MULTI_MINUTE_SECONDS,
+            barWidth = NARROW_BAR_WIDTH,
+        )
+        capture("tts_transport_bar_multi_minute_narrow_large_font_rtl")
+    }
+
     @Test
     fun ttsTransportBarPausedLight() {
         render(paused(), darkTheme = false, amoled = false)
@@ -279,6 +315,8 @@ class TtsTransportBarScreenshotTest {
         historyEdge: TtsHistoryEdgeState? = null,
         fontScale: Float = 1f,
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
+        remainingSeconds: Int = 12,
+        barWidth: Int = 360,
     ) {
         composeRule.setContent {
             CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
@@ -295,8 +333,8 @@ class TtsTransportBarScreenshotTest {
                         onNextMessage = {},
                         onRateSelected = {},
                         onStop = {},
-                        remainingSeconds = 12,
-                        modifier = Modifier.width(360.dp).testTag(TAG),
+                        remainingSeconds = remainingSeconds,
+                        modifier = Modifier.width(barWidth.dp).testTag(TAG),
                         historyEdge = historyEdge,
                     )
                 }
@@ -324,5 +362,7 @@ class TtsTransportBarScreenshotTest {
 
     private companion object {
         const val TAG = "tts-transport-bar"
+        const val MULTI_MINUTE_SECONDS = 312
+        const val NARROW_BAR_WIDTH = 280
     }
 }

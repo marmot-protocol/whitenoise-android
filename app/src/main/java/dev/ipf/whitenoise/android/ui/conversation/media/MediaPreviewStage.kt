@@ -110,14 +110,18 @@ internal fun MediaPreviewPager(
     }
 }
 
-/** Stable per-frame identity; duplicate URIs staged twice stay independently includable. */
+/**
+ * Stable per-frame identity that survives reordering; duplicate URIs staged twice stay independently
+ * includable. [index] is kept for callers that iterate by position.
+ */
+@Suppress("UnusedParameter", "UNUSED_PARAMETER")
 internal fun mediaPreviewItemKey(
     item: StagedPreviewItem,
     index: Int,
 ): String =
     when (item) {
         is StagedPreviewItem.Media -> "media:${item.slot.id}"
-        is StagedPreviewItem.Document -> "document:$index:${item.uri}"
+        is StagedPreviewItem.Document -> "document:${item.occurrence}:${item.uri}"
     }
 
 /** Drags the page down past a fixed distance to leave the preview, matching the full viewer's gesture. */
@@ -202,7 +206,7 @@ private fun MediaPreviewImagePage(
 ) {
     val image =
         metadata?.let {
-            rememberMediaPreviewImage(item.uri, it.isVideo, MediaPipeline.THUMBNAIL_MAX_EDGE_PX, prepared)
+            rememberMediaPreviewImage(item.uri, it.isVideo, MediaPipeline.THUMBNAIL_MAX_EDGE_PX, item.pick, prepared)
         } ?: MediaPreviewImage.Loading
     BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         val bitmap =
@@ -395,7 +399,9 @@ private fun MediaPreviewThumb(
                 ).clip(MaterialTheme.shapes.small)
         val bitmap =
             (item as? StagedPreviewItem.Media)?.let { media ->
-                metadata?.let { rememberMediaPreviewBitmap(media.uri, it.isVideo, THUMBNAIL_MAX_EDGE_PX, prepared) }
+                metadata?.let {
+                    rememberMediaPreviewBitmap(media.uri, it.isVideo, THUMBNAIL_MAX_EDGE_PX, media.pick, prepared)
+                }
             }
         if (bitmap != null) {
             Image(

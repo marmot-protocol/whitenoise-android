@@ -656,6 +656,7 @@ class GroupSystemEventsTest {
         assertEquals("Group updated", GroupSystemEvents.previewText("not json"))
     }
 
+    /** Builds a kind-1210 group system event record from the actor with the given direction. */
     private fun appRecord(
         plaintext: String,
         direction: String,
@@ -673,6 +674,7 @@ class GroupSystemEventsTest {
         retentionExpiresAt = null,
         recordedAt = 1uL,
         receivedAt = 1uL,
+        sticker = null,
     )
 
     /** Wraps a group-system event in the complete timeline projection consumed by rendering. */
@@ -711,5 +713,7 @@ class GroupSystemEventsTest {
         sourceEpoch = null,
         retentionSeconds = null,
         retentionExpiresAt = null,
+        sticker = null,
+        importedFrom = null,
     )
 }

@@ -32,6 +32,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.PollProjectionFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.PollVoteRow
 import dev.ipf.whitenoise.android.state.PollVotesPager
@@ -270,6 +271,7 @@ private fun PollVoterItem(
                 size = VoterAvatarSize,
                 // A blocked voter keeps a monogram, so their picture is never fetched for this list.
                 pictureUrl = if (blocked) null else avatarUrl(id),
+                pictureDomain = AvatarImageLoader.publicProfiles(),
             )
         },
         trailingContent =

@@ -435,6 +435,7 @@ class NotificationStartupOrderingTest {
             }
         }
 
+    /** A first post uses the contact nickname as sender name without reading the profile display name. */
     @Test
     fun contactNicknameFirstPostBypassesProfileBindingRead() =
         runBlocking {
@@ -447,6 +448,7 @@ class NotificationStartupOrderingTest {
                     externalSigning = false,
                     signedOut = false,
                     running = true,
+                    unlinked = false,
                 )
             val fixture =
                 NotificationBootstrapTestFixture(
@@ -777,6 +779,7 @@ class NotificationStartupOrderingTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     /** Counts only successful synchronized notification write boundaries. */

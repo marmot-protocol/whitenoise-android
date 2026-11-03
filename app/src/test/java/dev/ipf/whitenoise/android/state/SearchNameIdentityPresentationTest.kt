@@ -348,7 +348,7 @@ class SearchNameIdentityPresentationTest {
             context = context,
             draftStore = DraftStore.forContext(context),
             accountIdHexResolver = { OWNER },
-            accounts = listOf(AccountSummaryFfi("search-owner", OWNER, true, false, false, true)),
+            accounts = listOf(AccountSummaryFfi("search-owner", OWNER, true, false, false, true, false)),
             activeAccountRef = "search-owner",
             profileReader = { null },
             profileDisplayNameReader = readDisplayName,

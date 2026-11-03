@@ -276,7 +276,7 @@ class GroupAvatarRecoveryTest {
     }
 
     /** Two signed-in local labels exercise the real account-switch boundary without onboarding. */
-    private fun account(label: String) = AccountSummaryFfi(label, label, true, false, false, true)
+    private fun account(label: String) = AccountSummaryFfi(label, label, true, false, false, true, false)
 
     /** Uses the same encrypted metadata for both owners, so only account isolation separates their bytes. */
     private fun group() =

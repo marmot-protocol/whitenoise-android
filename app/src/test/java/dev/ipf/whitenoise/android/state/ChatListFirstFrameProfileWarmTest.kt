@@ -160,6 +160,7 @@ class ChatListFirstFrameProfileWarmTest {
         )
     }
 
+    /** Builds the running local-signing active account summary. */
     private fun activeAccount() =
         AccountSummaryFfi(
             label = ACCOUNT_REF,
@@ -168,6 +169,7 @@ class ChatListFirstFrameProfileWarmTest {
             externalSigning = false,
             signedOut = false,
             running = true,
+            unlinked = false,
         )
 
     private fun peerProfile() =

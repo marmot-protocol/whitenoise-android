@@ -5,7 +5,7 @@ import shutil
 import sys
 
 
-BASELINE = '3fb4b4759ac676b0c21c4c3527074866c9fa4c89'
+BASELINE = 'f7178f0e997e3d6d450fb0af45a32e4780ed862c'
 
 
 def stage(destination):
