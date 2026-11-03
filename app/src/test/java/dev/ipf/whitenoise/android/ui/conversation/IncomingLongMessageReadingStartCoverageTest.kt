@@ -59,6 +59,24 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
         verifyAppend(AppendCase(bodyLines = TALL_BODY_LINES / 2, expectReadingStart = true, appearance = appearance))
     }
 
+    /**
+     * A burst whose first tall message is pushed off screen by a second tall one still starts at the first message,
+     * the first newly arrived line the reader has not seen.
+     */
+    @Test
+    fun burstOfTallIncomingMessagesStartsAtTheFirstOne() {
+        verifyAppend(AppendCase(bodyLines = TALL_BODY_LINES, expectReadingStart = true, burstLines = TALL_BODY_LINES))
+    }
+
+    /**
+     * A burst of short incoming messages that together overflow the viewport keeps following the tail, and its append
+     * is made of exactly one write, the offset-zero tail, with no measuring scroll of its off-screen rows.
+     */
+    @Test
+    fun burstOfShortIncomingMessagesKeepsFollowingTheTail() {
+        verifyAppend(AppendCase(bodyLines = 1, expectReadingStart = false, shortBurstCount = SHORT_BURST_COUNT))
+    }
+
     /** An incoming message that fits keeps the newest edge and the tail-following intent. */
     @Test
     fun shortIncomingAppendKeepsFollowingTheTail() {
@@ -112,21 +130,21 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
     /** The screen's append path classifies rows, lands through the coordinator and hands the landing to its owner. */
     @Test
     fun productionAppendPathRoutesThroughTheIncomingLanding() {
-        val source = productionSource("ConversationScreen.kt")
+        val source = productionSource("ConversationScreen.kt").withoutWhitespace()
         val append =
             source
-                .substringAfter("LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored)")
+                .substringAfter("LaunchedEffect(controller,latestTimelineItemId,initialTimelineAnchored)")
                 .substringBefore("ConversationViewportStructureEffect(")
-        assertTrue(append.contains("conversationAppendedRows(renderedTimeline, previousId)"))
+        assertTrue(append.contains("conversationAppendedRows(renderedTimeline,previousId)"))
         assertTrue(append.contains("controller.isMessageMine(row.record)"))
         assertTrue(append.contains("incomingAppendLanding.admit("))
         assertTrue(append.contains("scrollCoordinator.followAppendOrRevealIncomingStart("))
         assertTrue(append.contains("viewportRestorationOwner.adoptIncomingReadingStart(outcome)"))
         assertFalse("an append must not bypass the landing decision", append.contains("followTailIfAllowed("))
-        assertTrue(source.contains("remember(controller) { ConversationIncomingAppendLandingQueue() }"))
-        // The physical-tail write keeps its #2627 offset-zero contract; the landing is a separate policy.
-        val writer = productionSource("ConversationScrollCoordinator.kt")
-        assertTrue(writer.contains("override suspend fun scrollToTail(index: Int) {\n        scrollToItem(index, 0)"))
+        assertTrue(source.contains("remember(controller){ConversationIncomingAppendLandingQueue()}"))
+        // The physical-tail write keeps its #2627 offset-zero contract, and the landing is a separate policy.
+        val writer = productionSource("ConversationScrollCoordinator.kt").withoutWhitespace()
+        assertTrue(writer.contains("overridesuspendfunscrollToTail(index:Int){scrollToItem(index,0)}"))
     }
 
     /** One mounted append: the body size it arrives with, what it must land on, and the appearance it renders in. */
@@ -134,6 +152,10 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
         val bodyLines: Int,
         val expectReadingStart: Boolean,
         val appearance: DirectNotificationAppearance = DirectNotificationAppearance(),
+        /** When set, a second incoming message of this many lines arrives in the same publication. */
+        val burstLines: Int? = null,
+        /** How many one-line incoming messages follow the first in the same publication. */
+        val shortBurstCount: Int = 0,
     )
 
     /** Mounts the real screen at the newest edge, appends a peer message live, then a later short one. */
@@ -159,13 +181,16 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
             awaitCondition(failureMessage = { "the reader never followed the tail" }) {
                 evidence.latest()?.mode == ConversationScrollMode.FollowingTail
             }
-            val body = (1..case.bodyLines).joinToString("\n") { "incoming line $it" }
-            val appended = history() + timelineRecord(INCOMING_ID, HISTORY_COUNT + 1uL, plaintext = body)
+            val appended = history() + appendedRows(case)
+            val writesBeforeAppend = evidence.writeCount()
             timeline.emitWindow(timelinePage(*appended.toTypedArray()))
-            awaitLanding(fixture, case, evidence)
+            awaitLanding(fixture, case, evidence, newestId = appended.last().messageIdHex)
+            if (case.shortBurstCount > 0) {
+                assertOnlyTheTailWrite(evidence.writesSince(writesBeforeAppend))
+            }
             if (case.expectReadingStart) {
                 assertIncomingAtReadingTop()
-                val withLater = appended + timelineRecord(LATER_ID, HISTORY_COUNT + 2uL, plaintext = "later")
+                val withLater = appended + timelineRecord(LATER_ID, HISTORY_COUNT + 3uL, plaintext = "later")
                 timeline.emitWindow(timelinePage(*withLater.toTypedArray()))
                 awaitCondition(
                     failureMessage = { "the later append never published" },
@@ -184,11 +209,29 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
         }
     }
 
+    /** The incoming rows [case] appends in one publication, oldest first. */
+    private fun appendedRows(case: AppendCase): List<TimelineMessageRecordFfi> {
+        val body = (1..case.bodyLines).joinToString("\n") { "incoming line $it" }
+        val burst =
+            case.burstLines?.let { lines ->
+                val burstBody = (1..lines).joinToString("\n") { "burst line $it" }
+                timelineRecord(BURST_ID, HISTORY_COUNT + 2uL, plaintext = burstBody)
+            }
+        val shortBurst =
+            (0 until case.shortBurstCount).map { index ->
+                val order = HISTORY_COUNT + 4uL + index.toULong()
+                timelineRecord(shortBurstId(index), order, plaintext = "short $index")
+            }
+        return listOf(timelineRecord(INCOMING_ID, HISTORY_COUNT + 1uL, plaintext = body)) +
+            listOfNotNull(burst) + shortBurst
+    }
+
     /** Waits for the append's settled intent, then checks the tail or reading geometry it left behind. */
     private fun awaitLanding(
         fixture: DirectNotificationConversationFixture,
         case: AppendCase,
         evidence: ViewportEvidence,
+        newestId: String,
     ) {
         awaitCondition(failureMessage = { "the append never published" }) {
             fixture.controller.timeline.any { it.record.messageIdHex == INCOMING_ID }
@@ -207,8 +250,8 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
             val viewport = requireNotNull(evidence.latest())
             assertEquals(ConversationScrollMode.FollowingTail, viewport.mode)
             assertFalse("a fitting row keeps the newest edge", viewport.canScrollBackward)
-            val bubble = bubbleBounds(INCOMING_ID)
-            assertTrue("the whole short row is below the reading top", bubble.first >= transcriptTop())
+            val bubble = bubbleBounds(newestId)
+            assertTrue("the whole newest row is below the reading top", bubble.first >= transcriptTop())
         }
     }
 
@@ -236,6 +279,13 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
                 }
             }
         }
+    }
+
+    /** A short-only burst writes the tail once and nothing else: no measuring scroll, no return. */
+    private fun assertOnlyTheTailWrite(writes: List<ConversationScrollWriteEvidence>) {
+        assertEquals("a short burst must make exactly one write: $writes", 1, writes.size)
+        val tail = writes.first()
+        assertEquals(ConversationScrollWriteEvidence(animated = false, index = tail.index, offsetPx = 0), tail)
     }
 
     /** The settled mode is a history reading anchored on the incoming message. */
@@ -289,6 +339,9 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
             .first(File::isFile)
             .readText()
 
+    /** Strips every whitespace character so a source check survives reformatting. */
+    private fun String.withoutWhitespace(): String = filterNot(Char::isWhitespace)
+
     /** Builds one appended row with its presentation identity. */
     private fun row(
         messageId: String,
@@ -301,14 +354,23 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
     /** Records every measured production viewport in test memory only. */
     private class ViewportEvidence : ConversationScrollEvidenceSink {
         private val samples = CopyOnWriteArrayList<ConversationViewportEvidence>()
+        private val writes = CopyOnWriteArrayList<ConversationScrollWriteEvidence>()
 
         /** Captures one measured viewport. */
         override fun onViewport(snapshot: ConversationViewportEvidence) {
             samples += snapshot
         }
 
-        /** Writes are asserted through geometry, not through the writer boundary. */
-        override fun onWrite(write: ConversationScrollWriteEvidence) = Unit
+        /** Records each list write in order. */
+        override fun onWrite(write: ConversationScrollWriteEvidence) {
+            writes += write
+        }
+
+        /** How many writes have happened so far. */
+        fun writeCount(): Int = writes.size
+
+        /** The writes after the first [count]. */
+        fun writesSince(count: Int): List<ConversationScrollWriteEvidence> = writes.drop(count)
 
         /** The newest measured viewport, or null before the first one. */
         fun latest(): ConversationViewportEvidence? = samples.lastOrNull()
@@ -320,5 +382,10 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
         const val LARGE_FONT_SCALE = 1.6f
         val INCOMING_ID = "e1".repeat(32)
         val LATER_ID = "e2".repeat(32)
+        val BURST_ID = "e3".repeat(32)
+        const val SHORT_BURST_COUNT = 24
+
+        /** A distinct message id for the short burst's row at [index]. */
+        fun shortBurstId(index: Int): String = (0xa0 + index).toString(16).repeat(32)
     }
 }

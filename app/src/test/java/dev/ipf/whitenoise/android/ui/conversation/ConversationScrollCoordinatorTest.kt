@@ -2173,6 +2173,126 @@ class ConversationScrollCoordinatorTest {
             assertEquals(listOf(0 to 0, 1 to 100), list.writes)
         }
 
+    /**
+     * When a later tall arrival pushes the burst's first tall row entirely above the viewport, the landing still
+     * reaches and measures that first row and starts at its beginning, not the later row's.
+     */
+    @Test
+    fun burstLandsOnItsFirstRowWhenALaterTallRowPushesItOffScreen() =
+        runTest {
+            assertBurstLandsOnFirstRow(
+                heightsPx = listOf(700, 900, 80),
+                expectedWrites = listOf(0 to 0, 1 to 0, 1 to 300),
+            )
+        }
+
+    /**
+     * Known limit: a tall first row hidden entirely behind a newer row that exactly fills the viewport is never laid
+     * out at the tail, so it cannot be seen to be oversized, and the burst keeps the single tail write.
+     */
+    @Test
+    fun oversizedRowHiddenBehindAFittingNewestRowKeepsTheTail() =
+        runTest {
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(600, 900, 80))
+            list.settle(index = 2)
+            val coordinator = ConversationScrollCoordinator(list)
+            val outcome = appendBurst(coordinator, list, listOf("first", "second"))
+            assertEquals(ConversationIncomingAppendOutcome.FollowedTail, outcome)
+            assertEquals(listOf(0 to 0), list.writes)
+            assertTrue(coordinator.isFollowingTail)
+        }
+
+    /** A burst of rows that each fit keeps the tail even when the first row's top is clipped. */
+    @Test
+    fun burstOfShortRowsKeepsFollowingTheTail() =
+        runTest {
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(400, 300, 80))
+            list.settle(index = 2)
+            val outcome = appendBurst(ConversationScrollCoordinator(list), list, listOf("first", "second"))
+            assertEquals(ConversationIncomingAppendOutcome.FollowedTail, outcome)
+            assertEquals(listOf(0 to 0), list.writes)
+        }
+
+    /**
+     * When a later oversized row pushes a short first row above the viewport, the burst lands on the short row's
+     * beginning, the first line the reader has not seen.
+     */
+    @Test
+    fun burstLandsOnAShortFirstRowPushedAboveByALaterOversizedRow() =
+        runTest {
+            assertBurstLandsOnFirstRow(
+                heightsPx = listOf(900, 300, 80),
+                expectedWrites = listOf(0 to 0, 1 to 0, 1 to -300),
+            )
+        }
+
+    /**
+     * A burst of short rows that overflows the viewport, leaving its first row not laid out, keeps the single tail
+     * write: no measuring scroll is made for rows the tail layout did not reach.
+     */
+    @Test
+    fun overflowingShortBurstMakesOnlyTheTailWrite() =
+        runTest {
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(300, 300, 300, 80))
+            list.settle(index = 3)
+            val coordinator = ConversationScrollCoordinator(list)
+            val outcome = appendBurst(coordinator, list, listOf("first", "second", "third"))
+            assertEquals(ConversationIncomingAppendOutcome.FollowedTail, outcome)
+            assertEquals(listOf(0 to 0), list.writes)
+            assertTrue(coordinator.isFollowingTail)
+        }
+
+    /** Appends [ids], oldest first, as a burst whose rows sit at list indices newest-first from zero. */
+    private suspend fun appendBurst(
+        coordinator: ConversationScrollCoordinator,
+        list: IncomingAppendTestList,
+        ids: List<String>,
+    ) = coordinator.followAppendOrRevealIncomingStart(
+        candidates = ids.map(::incoming),
+        probeFor = { candidate -> list.probe { ids.lastIndex - ids.indexOf(candidate.messageId) } },
+        resolveTailIndex = { 0 },
+        awaitFrame = list::frame,
+    )
+
+    /** A burst of short rows that fits together keeps the single physical-tail write. */
+    @Test
+    fun fittingBurstKeepsFollowingTheTail() =
+        runTest {
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(200, 200, 80))
+            list.settle(index = 2)
+            val coordinator = ConversationScrollCoordinator(list)
+            val outcome =
+                coordinator.followAppendOrRevealIncomingStart(
+                    candidates = listOf(incoming("first"), incoming("second")),
+                    probeFor = { candidate -> list.probe { if (candidate.messageId == "first") 1 else 0 } },
+                    resolveTailIndex = { 0 },
+                    awaitFrame = list::frame,
+                )
+            assertEquals(ConversationIncomingAppendOutcome.FollowedTail, outcome)
+            assertEquals(listOf(0 to 0), list.writes)
+        }
+
+    /** Appends a two-row burst (first at index 1, second at index 0) and asserts it lands on the first row. */
+    private suspend fun assertBurstLandsOnFirstRow(
+        heightsPx: List<Int>,
+        expectedWrites: List<Pair<Int, Int>>,
+    ) {
+        val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = heightsPx)
+        list.settle(index = 2)
+        val coordinator = ConversationScrollCoordinator(list)
+        val outcome =
+            coordinator.followAppendOrRevealIncomingStart(
+                candidates = listOf(incoming("first"), incoming("second")),
+                probeFor = { candidate -> list.probe { if (candidate.messageId == "first") 1 else 0 } },
+                resolveTailIndex = { 0 },
+                awaitFrame = list::frame,
+            )
+        val revealed = outcome as ConversationIncomingAppendOutcome.RevealedReadingStart
+        assertEquals("first", revealed.anchor.messageId)
+        assertEquals(expectedWrites, list.writes)
+        assertEquals(ConversationScrollMode.ReadingHistory("first", expectedWrites.last().second), coordinator.mode)
+    }
+
     /** An append with no incoming rows, such as an accepted own send, keeps the single physical-tail write. */
     @Test
     fun appendWithoutIncomingRowsKeepsTheTailFollow() =

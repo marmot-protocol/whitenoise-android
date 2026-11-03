@@ -13,7 +13,7 @@
       },
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationIncomingAppendLanding.kt",
-        "surface": "A burst of incoming messages keeps its first oversized landing; an own send retires it",
+        "surface": "A burst of incoming messages with a tall message lands on its first hidden beginning, a short-only burst keeps the tail, and an own send retires it",
         "anchor": "internal class ConversationIncomingAppendLandingQueue",
         "test_ids": [
           "CON-025"

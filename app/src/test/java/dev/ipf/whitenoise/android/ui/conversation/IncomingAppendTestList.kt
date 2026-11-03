@@ -2,14 +2,15 @@ package dev.ipf.whitenoise.android.ui.conversation
 
 /**
  * A reversed transcript reduced to its measured geometry: index 0 is the newest row, a write places the first visible
- * row's newest edge at minus its scroll offset, and older rows stack above it. Like the real list, a write is only
- * measured on the next frame, so a probe reads the geometry of the last completed layout pass.
+ * row's newest edge at minus its scroll offset, and older rows stack above it. Like the real list's `scrollToItem`,
+ * which forces a synchronous remeasure, a write is measured at once. Before the first write or [settle] nothing is
+ * measured.
  */
 internal class IncomingAppendTestList(
     private val viewportEndPx: Int,
     heightsPx: List<Int>,
 ) : ConversationScrollWriter {
-    /** Row heights by list index, newest first; a test may grow one to model a late remeasure. */
+    /** Row heights by list index, newest first — a test may grow one to model a late remeasure. */
     val heightsPx = heightsPx.toMutableList()
 
     /** Every write in order, as (index, scroll offset) pairs. */
@@ -20,13 +21,14 @@ internal class IncomingAppendTestList(
     override val firstVisibleItemIndex: Int
         get() = requested.first
 
-    /** Records a snap and leaves it unmeasured until the next frame. */
+    /** Records a snap and measures it at once, as the real list's forced remeasure does. */
     override suspend fun scrollToItem(
         index: Int,
         scrollOffset: Int,
     ) {
         writes += index to scrollOffset
         requested = index to scrollOffset
+        measured = requested
     }
 
     /** Records an animated write the same way, since only its destination matters here. */
@@ -35,10 +37,8 @@ internal class IncomingAppendTestList(
         scrollOffset: Int,
     ) = scrollToItem(index, scrollOffset)
 
-    /** Completes one layout pass, measuring the most recent write. */
-    fun frame() {
-        measured = requested
-    }
+    /** Advances one frame, which changes nothing here because every write is already measured. */
+    fun frame() = Unit
 
     /** Marks the current position as measured without a write, as an already-settled list is. */
     fun settle(

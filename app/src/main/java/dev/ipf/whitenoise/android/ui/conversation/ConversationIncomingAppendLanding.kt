@@ -30,7 +30,7 @@ internal sealed interface ConversationIncomingAppendOutcome {
     /** A gesture, navigation or newer command took the list before the append finished. */
     data object Superseded : ConversationIncomingAppendOutcome
 
-    /** An oversized incoming row's beginning meets the top of the clear viewport and is the durable reading anchor. */
+    /** A hidden incoming beginning meets the top of the clear viewport and is the durable reading anchor. */
     data class RevealedReadingStart(
         val anchor: ConversationScrollAnchor,
         val probe: ConversationReadingStartProbe,
@@ -57,10 +57,10 @@ internal fun conversationAppendedRows(
  * The incoming rows still waiting for a landing decision in one burst of appends.
  *
  * Each append restarts the screen's follow effect, which cancels a landing that was still waiting for its row to be
- * measured. Keeping the earlier rows here means the next append decides over the whole burst, so its first oversized
- * row, not the latest arrival, gets the reading start. The rows belong to the scroll intent they were admitted under:
- * a drag, a navigation or any other settled intent change since then discards them. An own row in the burst is the
- * reader's accepted send, which keeps the established tail reveal, so it retires the incoming landing as well.
+ * measured. Keeping the earlier rows here means the next append decides over the whole burst, so its first hidden
+ * beginning, not the latest arrival, gets the reading start. The rows belong to the scroll intent they were admitted
+ * under, so a drag, a navigation or any other settled intent change since then discards them. An own row in the burst
+ * is the reader's accepted send, which keeps the established tail reveal, so it retires the incoming landing as well.
  */
 internal class ConversationIncomingAppendLandingQueue {
     private var pending: List<ConversationIncomingAppendCandidate> = emptyList()
@@ -91,9 +91,12 @@ internal class ConversationIncomingAppendLandingQueue {
 }
 
 /**
- * Follows a live append exactly as tail following always has, unless an incoming row in it is taller than the clear
- * reading viewport. Physical-tail alignment would then show only that row's end, so its beginning is placed at the
- * top of the viewport instead and the reader's intent becomes reading that message.
+ * Follows a live append exactly as tail following always has, unless an incoming row laid out at the tail is taller
+ * than the clear reading viewport. Physical-tail alignment would then hide a beginning the reader has not seen, so the
+ * oldest incoming row of the append whose beginning the tail hides — the oversized row itself, or an earlier row of
+ * the burst that later arrivals pushed above the viewport — is placed at the top instead, and the reader's intent
+ * becomes reading that message. Appends whose laid-out incoming rows each fit keep tail following, even when together
+ * they overflow the viewport.
  *
  * The decision runs inside the same latest-wins command as the tail write. The rows are measured after the tail write
  * in the occlusion-aware reading layout, waiting a bounded number of frames for the newest of them to be laid out,
@@ -121,7 +124,7 @@ internal suspend fun ConversationScrollCoordinator.followAppendOrRevealIncomingS
         ) {
             awaitFrame()
             scrollToTail(resolveTailIndex())
-            val target = awaitOversizedIncomingRow(candidates, probeFor, maxMeasureFrames, awaitFrame)
+            val target = awaitHiddenIncomingStart(candidates, probeFor, maxMeasureFrames, awaitFrame)
             if (target != null) {
                 val placement =
                     placeReadingStart(
@@ -158,44 +161,67 @@ private fun ConversationScrollCoordinator.settleRevealedReadingStart(
 }
 
 /**
- * Waits at most [maxFrames] frames for the newest appended row still in the timeline to be measured, then returns the
- * oldest appended row whose measured height exceeds the clear reading viewport, or null when every one fits.
+ * Waits at most [maxFrames] frames for the newest appended row still in the timeline to be measured after the tail
+ * write, then returns the oldest appended row whose beginning that write left above the clear reading viewport — but
+ * only when a row laid out in that same tail layout is oversized. A burst of rows that each fit keeps tail following,
+ * however far it overflows the viewport in total, so a catch-up of short messages behaves exactly as it always has and
+ * no extra write is made for it.
  *
  * The newest row sits at the tail that was just written, so once it is measured the layout pass is complete. An older
- * row of the burst that newer rows already pushed past the top is not laid out and is passed over. Heights come from
- * the rendered rows, never from text length, and the reading layout already excludes the composer's overlap, so the
- * keyboard is not subtracted a second time.
+ * row of the burst that is not laid out by then was pushed past the far edge by newer rows, so its beginning is hidden
+ * even though its height is unknown, and the reading-start settle reaches and measures it if it becomes the target. A
+ * laid-out row is hidden when its measured top passes the far edge, which covers a single row taller than the
+ * viewport. Heights come from the rendered rows, never from text length, and the reading layout already excludes the
+ * composer's overlap, so the keyboard is not subtracted a second time.
+ *
+ * Only the tail layout is consulted, never a measuring scroll, so a row that is not laid out never counts as oversized.
+ * Known limit: an oversized row hidden entirely behind newer rows that themselves fit (a tall message followed by one
+ * that exactly fills the viewport) is not detected, and that burst keeps the tail.
  */
-private suspend fun awaitOversizedIncomingRow(
+private suspend fun awaitHiddenIncomingStart(
     candidates: List<ConversationIncomingAppendCandidate>,
     probeFor: (ConversationIncomingAppendCandidate) -> ConversationReadingStartProbe,
     maxFrames: Int,
     awaitFrame: suspend () -> Unit,
 ): ConversationIncomingAppendCandidate? {
-    var decided = candidates.isEmpty()
-    var target: ConversationIncomingAppendCandidate? = null
-    var frame = 0
-    while (!decided && frame < maxFrames.coerceAtLeast(1)) {
-        awaitFrame()
-        frame++
-        // A row that has left the timeline reads as null, an unlaid-out row as an unmeasured layout.
-        val layouts = candidates.map { probeFor(it).let { probe -> probe.resolveTargetIndex()?.let(probe.readLayout) } }
-        val newest = layouts.lastOrNull { it != null }
-        if (newest == null || newest.isMeasured) {
-            decided = true
-            target =
-                candidates
-                    .zip(layouts)
-                    .firstOrNull { (_, layout) -> layout?.exceedsReadingViewport == true }
-                    ?.first
-        }
-    }
-    return target
+    val layouts = awaitTailLayouts(candidates, probeFor, maxFrames, awaitFrame).orEmpty()
+    val hidden = candidates.indices.firstOrNull { layouts.getOrNull(it)?.startHiddenAtTail == true }
+    return hidden?.takeIf { layouts.any { it?.isOversized == true } }?.let(candidates::get)
 }
 
 /**
- * Whether physical-tail alignment would clip this row's beginning: its rendered height is larger than the reading
- * viewport between the tail and the viewport's far edge. A row exactly as tall as that space fits.
+ * Reads every candidate's layout once the newest present one is measured, or null when that never happens within
+ * [maxFrames] frames. A row that has left the timeline reads as null, a row that is not laid out as unmeasured.
  */
-private val ConversationMentionJumpLayout.exceedsReadingViewport: Boolean
+private suspend fun awaitTailLayouts(
+    candidates: List<ConversationIncomingAppendCandidate>,
+    probeFor: (ConversationIncomingAppendCandidate) -> ConversationReadingStartProbe,
+    maxFrames: Int,
+    awaitFrame: suspend () -> Unit,
+): List<ConversationMentionJumpLayout?>? {
+    var layouts: List<ConversationMentionJumpLayout?>? = null
+    var frame = 0
+    while (candidates.isNotEmpty() && layouts == null && frame < maxFrames.coerceAtLeast(1)) {
+        awaitFrame()
+        frame++
+        val current = candidates.map { probeFor(it).currentLayout() }
+        val newest = current.lastOrNull { it != null }
+        if (newest == null || newest.isMeasured) layouts = current
+    }
+    return layouts
+}
+
+/** The row's current layout, or null once the row has left the timeline. */
+private fun ConversationReadingStartProbe.currentLayout() = resolveTargetIndex()?.let(readLayout)
+
+/**
+ * Whether physical-tail alignment left this present row's beginning outside the reading viewport: it is not laid out
+ * at all, or its measured top lies beyond the viewport's far edge. A newest row exactly as tall as the space between
+ * the tail and that edge fits.
+ */
+private val ConversationMentionJumpLayout.startHiddenAtTail: Boolean
+    get() = !isMeasured || requireNotNull(itemOffsetPx) + requireNotNull(itemHeightPx) > viewportEndOffsetPx
+
+/** A measured row taller than the space between the tail and the viewport's far edge. A row exactly that tall fits. */
+private val ConversationMentionJumpLayout.isOversized: Boolean
     get() = isMeasured && readingStartOffset > 0
