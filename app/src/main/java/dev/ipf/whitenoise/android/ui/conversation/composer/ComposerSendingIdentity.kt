@@ -69,9 +69,11 @@ internal fun ComposerSendingIdentity(
     key(accountRef, conversationKey, account.accountIdHex, title, picture) {
         var showing by remember { mutableStateOf(false) }
         val currentOnShowingChange by rememberUpdatedState(onShowingChange)
-        DisposableEffect(showing) {
-            currentOnShowingChange(showing)
-            onDispose { if (showing) currentOnShowingChange(false) }
+        val open = showing
+        DisposableEffect(open) {
+            // Report only the open span, so each open and each close reaches the composer exactly once.
+            if (open) currentOnShowingChange(true)
+            onDispose { if (open) currentOnShowingChange(false) }
         }
         val sendingAs = stringResource(R.string.share_sending_as)
         val popupOffset = with(LocalDensity.current) { composerSendingIdentityTargetSize.roundToPx() }

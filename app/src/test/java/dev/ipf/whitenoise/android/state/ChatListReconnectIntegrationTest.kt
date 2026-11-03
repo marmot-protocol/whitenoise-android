@@ -15,6 +15,7 @@ import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.PresentationResolutionFfi
 import dev.ipf.marmotkit.PresentationSourceFfi
 import dev.ipf.marmotkit.PresentationTextFfi
@@ -684,6 +685,16 @@ class ChatListReconnectIntegrationTest {
     }
 }
 
+/** Runs only already-due main-thread work while waiting, so a debounced projection stays pending. */
+private fun awaitWithoutAdvancingTime(condition: () -> Boolean) {
+    repeat(250) {
+        shadowOf(Looper.getMainLooper()).idle()
+        if (condition()) return
+        Thread.sleep(10)
+    }
+    throw AssertionError("Condition not met without advancing the main-thread clock")
+}
+
 /** Advances Robolectric frames and coroutine delays while waiting for a chat-list projection. */
 internal fun awaitChatListCondition(condition: () -> Boolean) {
     repeat(250) {
@@ -692,6 +703,96 @@ internal fun awaitChatListCondition(condition: () -> Boolean) {
         Thread.sleep(10)
     }
     throw AssertionError("Chat-list condition not met within 5 simulated seconds")
+}
+
+/** The frame mark a pin follow waits on after returning the chat list to its top (#3555). */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36], qualifiers = "en")
+class ChatListReturnToTopFrameMarkTest {
+    /**
+     * A return to top that installs nothing itself — here MDK answers stale while a newer frame from the stream
+     * still waits in the projection debounce — marks that live frame, so a pin follow waits for it instead of
+     * snapping onto the older rows (#3555).
+     */
+    @Test
+    fun returnToTopThatInstallsNothingMarksTheLiveFrameAwaitingPresentation() {
+        val pinned = notificationChatListRow().copy(groupIdHex = "aa".repeat(32), pinned = true)
+        val group = notificationChatListRow().copy(groupIdHex = "bb".repeat(32))
+        val subscriptions = DroppedChatSubscriptions(pinned, group)
+        val controller =
+            testChatsController(chatListTestAppState(testRecoveryDiagnostics(), subscriptions.liveSubscriptions))
+        val bindScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        bindScope.launch { controller.bind(ConversationTimelineTestIds.ACCOUNT_REF) }
+        try {
+            awaitChatListCondition { subscriptions.first.nextUpdateStarted.isCompleted && controller.items.size == 2 }
+            val windows = checkNotNull(controller.chatListWindows)
+            val before = windows.frame().revision
+            subscriptions.first.beforeCommand = { throw MarmotKitException.ChatWindowStale() }
+            subscriptions.first.emitRows(listOf(group, pinned))
+            awaitWithoutAdvancingTime { windows.frame().revision > before }
+
+            var mark: ChatListFrameMark? = null
+            val command = bindScope.launch { mark = controller.returnChatListToTopFrame(ChatListViewFfi.CHATS) }
+            awaitWithoutAdvancingTime { command.isCompleted }
+            val live = checkNotNull(mark) { "a live window must still give the follow a frame to wait for" }
+            assertTrue(live.windows === windows)
+            assertEquals(windows.frame().revision, live.revision)
+            assertFalse("the debounced frame is not presented yet", controller.chatListFramePresented(live))
+
+            awaitChatListCondition { controller.chatListFramePresented(live) }
+        } finally {
+            controller.onCleared()
+            subscriptions.closeAll()
+            bindScope.cancel()
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+    }
+
+    /**
+     * A frame counts as presented once the projection shows it or a newer frame of the same window set, never
+     * while nothing has been published; a replaced window set releases every waiter on the old one.
+     */
+    @Test
+    fun framePresentedComparesRevisionsWithinOneWindowSet() {
+        val pinned = notificationChatListRow().copy(groupIdHex = "aa".repeat(32), pinned = true)
+        val group = notificationChatListRow().copy(groupIdHex = "bb".repeat(32))
+        val subscriptions = DroppedChatSubscriptions(pinned, group)
+        val controller =
+            testChatsController(chatListTestAppState(testRecoveryDiagnostics(), subscriptions.liveSubscriptions))
+        controller.setChatListVisible(false)
+        val bindScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        bindScope.launch { controller.bind(ConversationTimelineTestIds.ACCOUNT_REF) }
+        try {
+            awaitChatListCondition { subscriptions.first.nextUpdateStarted.isCompleted }
+            val windows = checkNotNull(controller.chatListWindows)
+            val current = windows.frame().revision
+            assertFalse(
+                "nothing is presented while the list is hidden",
+                controller.chatListFramePresented(ChatListFrameMark(windows, current)),
+            )
+
+            controller.setChatListVisible(true)
+            awaitChatListCondition {
+                controller.items.size == 2 &&
+                    controller.chatListFramePresented(ChatListFrameMark(windows, windows.frame().revision))
+            }
+            val shown = windows.frame().revision
+            assertTrue(controller.chatListFramePresented(ChatListFrameMark(windows, shown - 1)))
+            assertFalse(controller.chatListFramePresented(ChatListFrameMark(windows, shown + 1)))
+
+            subscriptions.first.close()
+            awaitChatListCondition { controller.chatListWindows.let { it != null && it !== windows } }
+            assertTrue(
+                "a replaced window set never shows the old frame, so its waiter is released",
+                controller.chatListFramePresented(ChatListFrameMark(windows, shown + 1)),
+            )
+        } finally {
+            controller.onCleared()
+            subscriptions.closeAll()
+            bindScope.cancel()
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+    }
 }
 
 /** Exercises the native window adapter used on advanced-folder entry. */

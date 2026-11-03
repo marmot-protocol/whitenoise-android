@@ -136,11 +136,12 @@ internal fun chatPinFollowStep(
  * Motion uses the list's animated scroll, so the system animation scale applies as it does for the
  * button. [onScrollStarted] marks each programmatic move for the head-motion owner.
  *
- * When the bounded window had earlier rows, [returnWindowToTop] reports the head frame it installed and
- * the final snap waits until that frame is presented, bounded by a timeout. A null report means no head was
- * installed (closed window, stale command): a newer frame already owns the list, so the follow settles on
- * what is shown instead of waiting. A user cancellation still consumes the request, so a stale follow never
- * outlives its gesture.
+ * When the bounded window had earlier rows, [returnWindowToTop] reports the frame to wait for — the head
+ * frame it installed, or the live window's current frame when a newer one already won — and the final snap
+ * waits until that frame is presented, bounded by a timeout. A null report means no live window remains, so
+ * the follow settles on what is shown. A stale MDK answer can leave the window shifted; the follow then
+ * settles on the current frame rather than retrying. A user cancellation still consumes the request, so a
+ * stale follow never outlives its gesture.
  */
 @Composable
 @Suppress("FunctionNaming", "LongParameterList") // Effect composable; one request plus the live gates it reads.

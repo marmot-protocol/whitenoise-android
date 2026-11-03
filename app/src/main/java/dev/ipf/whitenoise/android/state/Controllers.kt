@@ -1975,7 +1975,10 @@ class ChatsController private constructor(
                             chatListWindows === chatListStream,
                     )
                     if (!isActiveBindEpoch(epoch)) break
-                    chatListStream.publishIfCurrent(initialFrame, ::replacePresentedChatRows)
+                    chatListStream.publishIfCurrent(initialFrame) { rows ->
+                        replacePresentedChatRows(rows)
+                        stagedChatListFrame = ChatListFrameMark(chatListStream, initialFrame.revision)
+                    }
                     appState.schedulePendingLocalGroupDeleteCleanup()
                     appState.recordAccountSwitchLocalRowsReady(accountRef, chatRows.size)
                     val initialGroups =
@@ -4849,17 +4852,26 @@ class ChatsController private constructor(
     private var presentedChatListFrame by mutableStateOf<ChatListFrameMark?>(null)
 
     /**
-     * Returns [view] to its top and marks the frame that holds the restored head, so a caller can wait for
-     * [chatListFramePresented]; null means no head window was installed, because the window was closed or
-     * the command was stale or answered nothing new.
+     * Returns [view] to its top and marks the frame a caller should wait for with [chatListFramePresented]: the
+     * one holding the restored head, or, when the command installed nothing itself (a newer frame from the
+     * receive loop already won, or MDK answered stale), the live set's current frame, which may still sit in
+     * the projection debounce. Null only when no live window set remains to wait on.
      */
     internal suspend fun returnChatListToTopFrame(view: ChatListViewFfi): ChatListFrameMark? {
         val windows = chatListWindows
         val account = accountRef
-        if (windows == null || account == null || windows.returnToTop(view) == null) return null
-        val installed = ChatListFrameMark(windows, windows.frame().revision)
-        return installed.takeIf { applyChatListWindowRows(account, windows) }
+        return when {
+            windows == null || account == null -> null
+            windows.returnToTop(view) == null -> windows.currentFrameMarkIfLive()
+            else ->
+                ChatListFrameMark(windows, windows.frame().revision)
+                    .takeIf { applyChatListWindowRows(account, windows) }
+        }
     }
+
+    /** This set's current frame while it is still open and still the controller's window set, else null. */
+    private fun ChatListWindowSet.currentFrameMarkIfLive(): ChatListFrameMark? =
+        takeIf { !closed && chatListWindows === it }?.let { ChatListFrameMark(it, it.frame().revision) }
 
     /**
      * Whether [items] now shows [mark]'s frame or a newer one from the same window set. A replaced or

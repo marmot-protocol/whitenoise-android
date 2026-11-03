@@ -70,6 +70,7 @@ class ChatPinFollowToTopTest {
     @Test fun stepRetiresWaitsAndFollows() {
         val request = ChatPinFollowRequest(1L, setOf("ab"), dataset, userGestureGeneration = 3L)
 
+        /** [request]'s step with each live input defaulting to the request's own scope and a settled list. */
         fun step(
             key: ChatListDatasetKey = dataset,
             gesture: Long = 3L,

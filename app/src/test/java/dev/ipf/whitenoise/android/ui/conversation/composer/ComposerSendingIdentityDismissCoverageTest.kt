@@ -195,20 +195,21 @@ class ComposerSendingIdentityDismissCoverageTest {
                 Surface { ComposerSendingIdentity(state, "alice", conversation) { reports += it } }
             }
         }
-        assertEquals(listOf(false), reports.collapsed())
+        composeRule.waitForIdle()
+        assertEquals(emptyList<Boolean>(), reports)
 
         tapAt(centerOf("composer-sending-identity"))
-        assertEquals(true, reports.last())
+        assertEquals(listOf(true), reports)
         tapAt(centerOf("composer-sending-identity"))
-        assertEquals(false, reports.last())
+        assertEquals(listOf(true, false), reports)
 
         tapAt(centerOf("composer-sending-identity"))
-        assertEquals(true, reports.last())
+        assertEquals(listOf(true, false, true), reports)
         composeRule.runOnIdle { conversation = "second" }
         composeRule.waitForIdle()
-        assertEquals(false, reports.last())
         popup().assertDoesNotExist()
-        assertEquals(listOf(false, true, false, true, false), reports.collapsed())
+        // The retired identity reports its close exactly once; the replacement starts closed and says nothing.
+        assertEquals(listOf(true, false, true, false), reports)
     }
 
     /** Before Android 13 the popup's BackHandler owns Back, and the activity dispatcher closes it first. */
@@ -287,9 +288,6 @@ class ComposerSendingIdentityDismissCoverageTest {
         composeRule.waitForIdle()
         return consumed
     }
-
-    /** The values with consecutive repeats collapsed, since an effect may restate an unchanged state. */
-    private fun List<Boolean>.collapsed(): List<Boolean> = filterIndexed { i, v -> i == 0 || this[i - 1] != v }
 
     /** The confirmation popup's content node. */
     private fun popup() = composeRule.onNodeWithTag("composer-sending-identity-popup")
