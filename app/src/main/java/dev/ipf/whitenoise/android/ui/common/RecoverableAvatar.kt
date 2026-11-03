@@ -41,7 +41,9 @@ internal fun rememberRecoverableAvatar(
                 launch {
                     AvatarLoadRecovery.revision.first { revision ->
                         if (value == null && completedRevision != revision) {
-                            value = currentLoad()
+                            // Adoption may have filled the slot while this load was in flight; never undo it.
+                            val loaded = currentLoad()
+                            if (value == null) value = loaded
                             // Consume the captured event, not a newer event received during the load.
                             completedRevision = revision
                         }

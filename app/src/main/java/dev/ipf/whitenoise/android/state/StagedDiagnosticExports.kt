@@ -24,11 +24,12 @@ import java.nio.file.Path
  *   so a replaced or rotated archive is rejected.
  *
  * Admission rests on knowing the exact URI string, not on holding a read grant, since the importer
- * reads the file itself. Any app that learns the string — normally one the user shared the archive
- * with — can send it back, but only while this process still retains that archive among the most
- * recent exports, it reaches only that archive, and the draft still needs the user to pick a chat and
- * press Send. After process death the registry is empty, so a late or
- * recovered intent gets the ordinary recoverable rejection rather than a crash.
+ * reads the file itself and the app always holds access to its own provider. A binding is therefore
+ * single-use: the first successful admission retires it, so an app the user shared the archive with
+ * cannot replay the URI to stage it again. A failed or cancelled import leaves it bound. Even the one
+ * admission reaches only that archive, and the draft still needs the user to pick a chat and press
+ * Send. After process death the registry is empty, so a late or recovered intent gets the ordinary
+ * recoverable rejection rather than a crash.
  */
 internal object StagedDiagnosticExports {
     private class Staged(
@@ -86,7 +87,9 @@ internal object StagedDiagnosticExports {
             mime = AUDIT_LOG_ARCHIVE_MIME_TYPE,
             size = entry.size,
             sha256 = entry.sha256.copyOf(),
-        ) { Files.newInputStream(entry.realPath, LinkOption.NOFOLLOW_LINKS) }
+            open = { Files.newInputStream(entry.realPath, LinkOption.NOFOLLOW_LINKS) },
+            onAdmitted = { synchronized(lock) { if (entry.uri == text) entry.uri = null } },
+        )
     }
 
     /** Forgets every staged archive, as **Clear Diagnostic Logs** removes their files. */

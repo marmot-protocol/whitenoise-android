@@ -54,6 +54,8 @@ internal class TrustedShareSource(
     val size: Long,
     val sha256: ByteArray,
     val open: () -> InputStream,
+    /** Called once the verified copy is owned by the share request, so the producer can retire its handle. */
+    val onAdmitted: () -> Unit = {},
 ) {
     /** Fails the import unless the private copy holds exactly the bytes the producer recorded. */
     fun verify(copy: java.io.File) {
@@ -238,6 +240,7 @@ internal class ShareFileImporter(
             trusted?.verify(file)
             files.finish(uri, copied.name, resolveShareMime(copied.mime, intentMime), copied.size)
             staged = null
+            trusted?.onAdmitted()
             ImportedFile(uri, copied.size)
         } catch (cancel: kotlinx.coroutines.CancellationException) {
             throw cancel

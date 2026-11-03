@@ -672,7 +672,8 @@ class ShareFileImporterTest {
             java.security.MessageDigest
                 .getInstance("SHA-256")
                 .digest(recorded),
-    ) { ByteArrayInputStream(served) }
+        open = { ByteArrayInputStream(served) },
+    )
 
     /** Uses one stable request owner so lease-release assertions match the imported batch identity. */
     private fun request(uris: List<Uri>) =

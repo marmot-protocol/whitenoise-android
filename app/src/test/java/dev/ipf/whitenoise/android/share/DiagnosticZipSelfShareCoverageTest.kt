@@ -80,6 +80,30 @@ class DiagnosticZipSelfShareCoverageTest {
             assertTrue("The staged export stays for other recipients", archive.isFile)
         }
 
+    /**
+     * A bound URI admits its archive once: an app the archive was shared with cannot replay the same URI to stage
+     * it again, while an admission that failed verification leaves the binding for a real retry.
+     */
+    @Test
+    fun aBoundUriIsSingleUseAfterASuccessfulAdmission() =
+        runBlocking<Unit> {
+            val archive = stage("single-use")
+            val request = chooserRequest(archive)
+            val original = archive.readBytes()
+            archive.setWritable(true)
+            archive.writeBytes(original.copyOf().also { it[it.lastIndex] = (it.last() + 1).toByte() })
+            assertEquals(listOf(ShareImportError.Unreadable), importer().import(request).payload.importErrors)
+
+            archive.writeBytes(original)
+            val admitted = importer().import(request)
+            assertEquals(emptyList<ShareImportError>(), admitted.payload.importErrors)
+            assertEquals(1, admitted.payload.streamUris.size)
+
+            val replayed = importer().import(request)
+            assertEquals(listOf(ShareImportError.Scheme), replayed.payload.importErrors)
+            assertTrue(replayed.payload.streamUris.isEmpty())
+        }
+
     /** Any self-provider URI that is not the exact bound one is rejected before metadata or open. */
     @Test
     fun forgedAndNeighbouringSelfProviderUrisStayRejected() =
