@@ -1,4 +1,5 @@
 // The file names its primary composable; its row/action model stays colocated.
+
 @file:Suppress("MatchingDeclarationName")
 
 package dev.ipf.whitenoise.android.ui.chats.newchat
@@ -14,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -129,12 +131,14 @@ internal fun NewGroupRecipientContent(
             if (people.isEmpty() && searchComplete) {
                 item {
                     if (identifierEmptyLabelRes != null) {
-                        Text(
-                            stringResource(identifierEmptyLabelRes, identifierEmptyArg),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
-                        )
+                        SelectionContainer {
+                            Text(
+                                stringResource(identifierEmptyLabelRes, identifierEmptyArg),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                            )
+                        }
                     } else {
                         WhiteNoiseEmptyState(
                             stringResource(R.string.no_matches),

@@ -1,36 +1,34 @@
 package dev.ipf.whitenoise.android.core.namecoin
 
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
-import okhttp3.OkHttpClient
-import okhttp3.WebSocketListener
-import okhttp3.mockwebserver.MockResponse
-import okhttp3.mockwebserver.MockWebServer
-import okio.ByteString
-import org.junit.After
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.net.InetSocketAddress
+import java.net.ServerSocket
+import java.net.Socket
 import java.security.MessageDigest
 import java.security.cert.CertificateException
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.util.Base64
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 
 /**
  * Transport tests for [NamecoinTransport]: the reply-id envelope check
  * (fixtures mirrored from `scripts/nc_shim_selftest.c`), the pinned-leaf-pubkey
- * trust manager, and a live WebSocket round trip against MockWebServer.
+ * trust manager, and real blocking socket round trips/stall cancellation.
  */
 class NamecoinTransportTest {
-    private val server =
-        NamecoinTransport.NamecoinServer(
-            host = "nmc2.bitcoins.sk",
-            port = 57002,
-            pinBase64 = "dGVzdA==",
-        )
-
     // ── replyMatchesId (carries the C shim's depth-1 contract) ─────────
 
     @Test
@@ -151,130 +149,167 @@ bBvtKRl/cxazwQyikkaKTzByXNw=
         assertTrue(failure is CertificateException)
     }
 
-    // ── live WebSocket round trip (plaintext mock) ─────────────────────
+    @Test
+    fun pinsAreIsolatedPerOperatorAndSharedWithIpAlias() {
+        val certA = loadCertificate(certA)
+        val certB = loadCertificate(certB)
+        val nmc =
+            NamecoinTransport.NamecoinServer(
+                host = "nmc2.bitcoins.sk",
+                port = 57002,
+                pinBase64 = spkiPinBase64(certA),
+            )
+        val nmcIp = nmc.copy(host = "46.229.238.187", tlsHostname = nmc.host)
+        val relay = nmc.copy(host = "relay.testls.bit", pinBase64 = spkiPinBase64(certB))
 
-    private val mockWebServer = MockWebServer()
+        for (endpoint in listOf(nmc, nmcIp)) {
+            NamecoinTransport.trustManagerFor(endpoint)!!.checkServerTrusted(arrayOf(certA), "RSA")
+            assertTrue(
+                runCatching {
+                    NamecoinTransport.trustManagerFor(endpoint)!!.checkServerTrusted(arrayOf(certB), "RSA")
+                }.exceptionOrNull() is CertificateException,
+            )
+        }
+        NamecoinTransport.trustManagerFor(relay)!!.checkServerTrusted(arrayOf(certB), "RSA")
+        assertTrue(
+            runCatching {
+                NamecoinTransport.trustManagerFor(relay)!!.checkServerTrusted(arrayOf(certA), "RSA")
+            }.exceptionOrNull() is CertificateException,
+        )
+        assertEquals("nmc2.bitcoins.sk", nmcIp.tlsHostname)
+        assertNull(NamecoinTransport.trustManagerFor(nmc.copy(pinBase64 = null)))
+    }
 
-    // WebSockets need a zero read timeout; the client is shared across the
-    // round-trip tests and torn down with the server.
-    private val httpClient =
-        OkHttpClient
-            .Builder()
-            .readTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)
-            .build()
+    // ── real blocking socket round trips ───────────────────────────────
 
-    @After
-    fun tearDown() {
-        httpClient.connectionPool.evictAll()
-        httpClient.dispatcher.executorService.shutdownNow()
-        mockWebServer.shutdown()
+    private fun plaintextTransport() =
+        NamecoinTransport { server, socket ->
+            socket.soTimeout = NamecoinTransport.READ_TIMEOUT_MILLIS
+            socket.connect(
+                InetSocketAddress(server.host, server.port),
+                NamecoinTransport.CONNECT_TIMEOUT_MILLIS,
+            )
+            socket
+        }
+
+    private fun withSocketServer(
+        handler: (Socket) -> Unit,
+        test: suspend (NamecoinTransport.NamecoinServer) -> Unit,
+    ) = runBlocking {
+        ServerSocket().apply { bind(InetSocketAddress("127.0.0.1", 0)) }.use { listener ->
+            val worker =
+                thread(isDaemon = true) {
+                    runCatching { listener.accept().use(handler) }
+                }
+            try {
+                test(NamecoinTransport.NamecoinServer("127.0.0.1", listener.localPort))
+            } finally {
+                runCatching { listener.close() }
+                worker.join(1_000)
+            }
+        }
     }
 
     @Test
     fun callReturnsReplyWithMatchingId() =
-        runBlocking {
-            mockWebServer.useWebSocketUpgradeReply(
-                """{"jsonrpc":"2.0","id":2,"result":{"height":1}}""",
-            )
-            mockWebServer.start()
-            val transport = NamecoinTransport { httpClient }
-            val body =
-                transport.call(
-                    server = server,
-                    url = mockWebServer.url("/").toString().replace("http://", "ws://"),
-                    requestJson = """{"jsonrpc":"2.0","id":2,"method":"blockchain.headers.subscribe","params":[]}""",
-                    wantId = 2,
-                    timeoutMillis = 5_000,
-                )
-            assertEquals("""{"jsonrpc":"2.0","id":2,"result":{"height":1}}""", body)
-        }
+        withSocketServer(
+            handler = { socket ->
+                val request = socket.getInputStream().bufferedReader().readLine()
+                assertEquals("""{"jsonrpc":"2.0","id":2,"method":"m","params":[]}""", request)
+                socket.getOutputStream().bufferedWriter().use {
+                    it.write("""{"jsonrpc":"2.0","id":2,"result":{"height":1}}""")
+                    it.newLine()
+                    it.flush()
+                }
+            },
+            test = { server ->
+                val body =
+                    plaintextTransport().call(
+                        server = server,
+                        requestJson = """{"jsonrpc":"2.0","id":2,"method":"m","params":[]}""",
+                        wantId = 2,
+                        timeoutMillis = 5_000,
+                    )
+                assertEquals("""{"jsonrpc":"2.0","id":2,"result":{"height":1}}""", body)
+            },
+        )
 
     @Test
     fun callSkipsNotificationsUntilReply() =
-        runBlocking {
-            mockWebServer.useWebSocketUpgradeReply(
-                """{"method":"blockchain.headers.subscribe","params":[{"height":9}]}""",
-                """{"id":99,"result":null}""",
-                """{"jsonrpc":"2.0","id":2,"result":{"height":1}}""",
-            )
-            mockWebServer.start()
-            val transport = NamecoinTransport { httpClient }
-            val body =
-                transport.call(
-                    server = server,
-                    url = mockWebServer.url("/").toString().replace("http://", "ws://"),
-                    requestJson = """{"jsonrpc":"2.0","id":2,"method":"m","params":[]}""",
-                    wantId = 2,
-                    timeoutMillis = 5_000,
-                )
-            assertEquals("""{"jsonrpc":"2.0","id":2,"result":{"height":1}}""", body)
-        }
+        withSocketServer(
+            handler = { socket ->
+                socket.getInputStream().bufferedReader().readLine()
+                socket.getOutputStream().bufferedWriter().use {
+                    it.write("""{"method":"blockchain.headers.subscribe","params":[{"height":9}]}""" + "\n")
+                    it.write("""{"id":99,"result":null}""" + "\n")
+                    it.write("""{"jsonrpc":"2.0","id":2,"result":{"height":1}}""" + "\n")
+                    it.flush()
+                }
+            },
+            test = { server ->
+                val body = plaintextTransport().call(server, """{"id":2}""", 2, 5_000)
+                assertEquals("""{"jsonrpc":"2.0","id":2,"result":{"height":1}}""", body)
+            },
+        )
 
     @Test
-    fun callTimesOutWithoutMatchingReply() =
-        runBlocking {
-            mockWebServer.useWebSocketUpgradeReply("""{"id":99,"result":null}""")
-            mockWebServer.start()
-            val transport = NamecoinTransport { httpClient }
-            val started = System.nanoTime()
-            val body =
-                transport.call(
-                    server = server,
-                    url = mockWebServer.url("/").toString().replace("http://", "ws://"),
-                    requestJson = """{"jsonrpc":"2.0","id":2,"method":"m","params":[]}""",
-                    wantId = 2,
-                    timeoutMillis = 1_000,
-                )
-            assertNull(body)
-            val elapsedMillis = (System.nanoTime() - started) / 1_000_000
-            assertTrue("timeout should bound the call (took ${elapsedMillis}ms)", elapsedMillis < 4_000)
-        }
+    fun callTimesOutAndClosesStalledRead() =
+        withSocketServer(
+            handler = { socket ->
+                socket.getInputStream().bufferedReader().readLine()
+                Thread.sleep(2_000)
+            },
+            test = { server ->
+                val started = System.nanoTime()
+                val body = plaintextTransport().call(server, """{"id":2}""", 2, 250)
+                assertNull(body)
+                val elapsed = (System.nanoTime() - started) / 1_000_000
+                assertTrue("stalled read returned after ${elapsed}ms", elapsed < 1_500)
+            },
+        )
 
     @Test
-    fun callDropsOversizeMessage() =
-        runBlocking {
-            val oversized = """{"id":2,"result":"""" + "x".repeat(NamecoinTransport.MAX_REPLY_CHARS) + """"}"""
-            mockWebServer.useWebSocketUpgradeReply(oversized)
-            mockWebServer.start()
-            val transport = NamecoinTransport { httpClient }
-            val body =
-                transport.call(
-                    server = server,
-                    url = mockWebServer.url("/").toString().replace("http://", "ws://"),
-                    requestJson = """{"jsonrpc":"2.0","id":2,"method":"m","params":[]}""",
-                    wantId = 2,
-                    timeoutMillis = 1_000,
-                )
-            // The oversize message is not parsed; the call dies by timeout.
-            assertNull(body)
-        }
-
-    /** Enqueue a WebSocket upgrade that replies to any text frame with the given messages. */
-    private fun MockWebServer.useWebSocketUpgradeReply(vararg replies: String) {
-        val listener =
-            object : WebSocketListener() {
-                override fun onMessage(
-                    webSocket: okhttp3.WebSocket,
-                    text: String,
-                ) {
-                    for (reply in replies) webSocket.send(reply)
+    fun callerCancellationClosesUnderlyingSocket() =
+        withSocketServer(
+            handler = { socket ->
+                socket.getInputStream().bufferedReader().readLine()
+                Thread.sleep(5_000)
+            },
+            test = { server ->
+                coroutineScope {
+                    val enteredRead = CountDownLatch(1)
+                    val transport =
+                        NamecoinTransport { endpoint, socket ->
+                            socket.connect(InetSocketAddress(endpoint.host, endpoint.port), 5_000)
+                            enteredRead.countDown()
+                            socket
+                        }
+                    val call =
+                        async(start = CoroutineStart.UNDISPATCHED) {
+                            transport.call(server, """{"id":2}""", 2, 60_000)
+                        }
+                    assertTrue(enteredRead.await(2, TimeUnit.SECONDS))
+                    val started = System.nanoTime()
+                    withTimeout(1_500) { call.cancelAndJoin() }
+                    val elapsed = (System.nanoTime() - started) / 1_000_000
+                    assertTrue("cancellation took ${elapsed}ms", elapsed < 1_000)
                 }
+            },
+        )
 
-                override fun onMessage(
-                    webSocket: okhttp3.WebSocket,
-                    bytes: ByteString,
-                ) = Unit
-
-                override fun onClosing(
-                    webSocket: okhttp3.WebSocket,
-                    code: Int,
-                    reason: String,
-                ) {
-                    // Answer the close handshake so MockWebServer.shutdown
-                    // does not hang on an open socket.
-                    webSocket.close(code, reason)
+    @Test
+    fun callDropsOversizeLine() =
+        withSocketServer(
+            handler = { socket ->
+                socket.getInputStream().bufferedReader().readLine()
+                socket.getOutputStream().bufferedWriter().use {
+                    it.write("""{"id":2,"result":"""" + "x".repeat(NamecoinTransport.MAX_REPLY_CHARS) + """"}""" + "\n")
+                    it.flush()
                 }
-            }
-        enqueue(MockResponse().withWebSocketUpgrade(listener))
-    }
+                Thread.sleep(500)
+            },
+            test = { server ->
+                assertNull(plaintextTransport().call(server, """{"id":2}""", 2, 250))
+            },
+        )
 }

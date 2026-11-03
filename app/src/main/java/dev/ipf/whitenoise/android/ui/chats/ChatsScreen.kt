@@ -34,6 +34,7 @@ import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -2849,12 +2850,14 @@ private fun ChatListIdentifierResult(
                     tint = MaterialTheme.colorScheme.error,
                     modifier = Modifier.size(20.dp),
                 )
-                Text(
-                    resolution.arg
-                        ?.let { stringResource(resolution.messageRes, it) }
-                        ?: stringResource(resolution.messageRes),
-                    color = MaterialTheme.colorScheme.error,
-                )
+                SelectionContainer {
+                    Text(
+                        resolution.arg
+                            ?.let { stringResource(resolution.messageRes, it) }
+                            ?: stringResource(resolution.messageRes),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
     }
 }

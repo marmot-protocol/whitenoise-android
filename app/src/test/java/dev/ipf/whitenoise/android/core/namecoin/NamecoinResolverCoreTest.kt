@@ -27,18 +27,21 @@ class NamecoinResolverCoreTest {
     /** Canned ElectrumX answers keyed per server; null means transport failure. */
     private class FakeTransport(
         val latencyMillis: Long = 0,
+        val latencyByServer: Map<String, Long> = emptyMap(),
         val handler: (server: String, id: Int, method: String, params: List<String>) -> String?,
     ) : NamecoinTransport() {
         val requests = ConcurrentLinkedQueue<String>()
+        val startedAt = ConcurrentLinkedQueue<Pair<String, Long>>()
 
         override suspend fun call(
             server: NamecoinServer,
-            url: String,
             requestJson: String,
             wantId: Int,
             timeoutMillis: Long,
         ): String? {
-            if (latencyMillis > 0) delay(latencyMillis)
+            startedAt += server.host to System.nanoTime()
+            val latency = latencyByServer[server.host] ?: latencyMillis
+            if (latency > 0) delay(latency)
             requests += requestJson
             val req = JSONObject(requestJson)
             val params =
@@ -104,12 +107,20 @@ class NamecoinResolverCoreTest {
             }
         }
 
-    private fun coreFor(transport: FakeTransport) =
-        NamecoinResolverCore(
-            servers = servers,
-            transport = transport,
-            requestTimeoutMillis = 5_000,
-        )
+    private fun coreFor(
+        transport: FakeTransport,
+        serverList: List<NamecoinTransport.NamecoinServer> = servers,
+        hedgeDelayMillis: Long = 1_500,
+        negativeGraceMillis: Long = 1_500,
+        resolverTimeoutMillis: Long = 20_000,
+    ) = NamecoinResolverCore(
+        servers = serverList,
+        transport = transport,
+        requestTimeoutMillis = 5_000,
+        resolverTimeoutMillis = resolverTimeoutMillis,
+        hedgeDelayMillis = hedgeDelayMillis,
+        negativeGraceMillis = negativeGraceMillis,
+    )
 
     // ── happy path ─────────────────────────────────────────────────────
 
@@ -289,6 +300,71 @@ class NamecoinResolverCoreTest {
             assertEquals(NamecoinResolver.NamecoinResult.NotFound, result)
         }
 
+    @Test
+    fun slowPositiveBeatsFastNegativeAndStopsNewHedges() =
+        runBlocking {
+            val pubkey = "6".repeat(64)
+            val happy = happyPath("d/example", """{"nostr":{"pubkey":"$pubkey"}}""")
+            val third = NamecoinTransport.NamecoinServer("three.example", 50004, pinBase64 = "cGluMw==")
+            val transport =
+                FakeTransport(latencyByServer = mapOf("one.example" to 100)) { server, id, method, params ->
+                    when {
+                        server == "one.example" -> happy(server, id, method, params)
+                        method == "server.version" -> """{"jsonrpc":"2.0","id":$id,"result":["fake","1.4"]}"""
+                        method == "blockchain.scripthash.get_history" -> """{"jsonrpc":"2.0","id":$id,"result":[]}"""
+                        else -> null
+                    }
+                }
+            val result =
+                coreFor(
+                    transport = transport,
+                    serverList = servers + third,
+                    hedgeDelayMillis = 50,
+                    negativeGraceMillis = 600,
+                ).resolve("example.bit")
+            assertEquals(pubkey, (result as NamecoinResolver.NamecoinResult.Resolved).pubkeyHex)
+            assertTrue(transport.startedAt.none { it.first == "three.example" })
+        }
+
+    @Test
+    fun startsNextServerAfterHedgeDelay() =
+        runBlocking {
+            val pubkey = "7".repeat(64)
+            val happy = happyPath("d/example", """{"nostr":{"pubkey":"$pubkey"}}""")
+            val transport =
+                FakeTransport(latencyByServer = mapOf("one.example" to 500)) { server, id, method, params ->
+                    if (server == "one.example") null else happy(server, id, method, params)
+                }
+            val result = coreFor(transport, hedgeDelayMillis = 80).resolve("example.bit")
+            assertTrue(result is NamecoinResolver.NamecoinResult.Resolved)
+            val first = transport.startedAt.first { it.first == "one.example" }.second
+            val second = transport.startedAt.first { it.first == "two.example" }.second
+            val delayMillis = (second - first) / 1_000_000
+            assertTrue("second hedge started after ${delayMillis}ms", delayMillis >= 60)
+            assertTrue("failure did not wait for the stalled first server", delayMillis < 400)
+        }
+
+    @Test
+    fun emptyServerListIsUnavailable() =
+        runBlocking {
+            val transport = FakeTransport { _, _, _, _ -> error("must not be called") }
+            assertEquals(
+                NamecoinResolver.NamecoinResult.Unavailable,
+                coreFor(transport, serverList = emptyList()).resolve("example.bit"),
+            )
+        }
+
+    @Test
+    fun overallResolverBudgetBoundsHedging() =
+        runBlocking {
+            val transport = FakeTransport(latencyMillis = 5_000) { _, _, _, _ -> null }
+            val started = System.nanoTime()
+            val result = coreFor(transport, resolverTimeoutMillis = 150).resolve("example.bit")
+            assertEquals(NamecoinResolver.NamecoinResult.Unavailable, result)
+            val elapsed = (System.nanoTime() - started) / 1_000_000
+            assertTrue("resolver budget took ${elapsed}ms", elapsed < 2_000)
+        }
+
     // ── caching + dedup ────────────────────────────────────────────────
 
     @Test
@@ -331,12 +407,10 @@ class NamecoinResolverCoreTest {
                     }
                 }
             val core = coreFor(transport)
-            // Definitive miss: EVERY server is consulted once per upstream
-            // semantics (a later server may have fresher indexing), then the
-            // miss is cached and the second resolve makes no network calls.
+            // A fast definitive miss stops new hedges, then the miss is cached.
             assertEquals(NamecoinResolver.NamecoinResult.NotFound, core.resolve("example.bit"))
             assertEquals(NamecoinResolver.NamecoinResult.NotFound, core.resolve("example.bit"))
-            assertEquals(2, historyCalls.get())
+            assertEquals(1, historyCalls.get())
 
             // Unavailable: NOT cached — each resolve retries the network
             // (both servers, at the version handshake).

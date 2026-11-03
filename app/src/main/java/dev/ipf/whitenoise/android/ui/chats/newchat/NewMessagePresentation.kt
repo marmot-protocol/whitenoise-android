@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -315,11 +316,13 @@ internal fun NewMessageSearchFeedback(
             incomplete -> Text(stringResource(R.string.user_search_incomplete))
             empty ->
                 if (identifierEmptyLabelRes != null) {
-                    Text(
-                        stringResource(identifierEmptyLabelRes, identifierEmptyArg),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    SelectionContainer {
+                        Text(
+                            stringResource(identifierEmptyLabelRes, identifierEmptyArg),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 } else {
                     WhiteNoiseEmptyState(
                         stringResource(R.string.no_matches),

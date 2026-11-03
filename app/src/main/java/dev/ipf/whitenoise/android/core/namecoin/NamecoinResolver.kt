@@ -3,8 +3,14 @@ package dev.ipf.whitenoise.android.core.namecoin
 import dev.ipf.whitenoise.android.core.namecoin.NamecoinTransport.NamecoinServer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 import java.util.Locale
 
@@ -13,8 +19,7 @@ import java.util.Locale
  * `d/example`, `id/alice` -> Nostr pubkey hex (+ optional relay hints).
  *
  * Same closed loop the NIP-05 HTTP verifier serves for DNS names, but over
- * Namecoin's censorship-resistant name index (no DNS, no TLS CA) via ElectrumX
- * WSS. Port of the resolver core of `app/namecoin.odin` from whitenoise-linux
+ * Namecoin's censorship-resistant name index via ElectrumX TLS. Port of the resolver core of `app/namecoin.odin` from whitenoise-linux
  * commit 79447095f2.
  *
  * ── TRUST MODEL ───────────────────────────────────────────────────────
@@ -33,9 +38,9 @@ import java.util.Locale
  *
  * A dishonest, compromised, or MITM'd ElectrumX server can therefore return a
  * fabricated name -> pubkey binding, and the invite/new-chat action will use
- * whichever pubkey that server claims. TLS pinning (see [NamecoinTransport])
- * rules out network-path MITM against the pinned servers, but does not rule
- * out the operator themselves lying to us.
+ * whichever pubkey that server claims. System-CA or per-operator TLS pinning
+ * (see [NamecoinTransport]) rules out network-path MITM, but does not rule out
+ * the operator themselves lying to us.
  *
  * This matches what the parallel Kotlin, Swift, and TypeScript resolvers in
  * the Nostr ecosystem do today: they treat the ElectrumX server as a trusted
@@ -76,13 +81,11 @@ object NamecoinResolver {
 
     // ── ElectrumX endpoints ─────────────────────────────────────────────
     //
-    // The public Namecoin ElectrumX operators ship self-signed certs by
-    // convention (no browser-trusted CA has issued for these hosts, and none
-    // is expected to). To trust them safely we pin the leaf public key by
-    // SHA-256 (base64 of the SPKI digest — the OkHttp analogue of libcurl's
-    // `sha256//...` CURLOPT_PINNEDPUBLICKEY value); the TLS handshake succeeds
-    // only when the server presents a matching pubkey, and any MITM / rotated
-    // cert fails the handshake before any data flows.
+    // Public Namecoin ElectrumX endpoints use either ordinary system-CA TLS
+    // or a per-operator leaf public key pin. Pins are SHA-256 digests of
+    // the SPKI, encoded as base64 like libcurl's `sha256//...` value. A pinned
+    // handshake succeeds only for the matching pubkey; unpinned endpoints use
+    // the normal system CA and hostname checks.
     //
     // Rotation runbook: when a pinned server rotates its cert, regenerate the
     // pin with
@@ -94,37 +97,36 @@ object NamecoinResolver {
     //
     // and update the entry. Removing a pin without replacing it opens the
     // server to trivial MITM.
-    private val DEFAULT_SERVERS =
+    internal val DEFAULT_SERVERS =
         listOf(
-            // bitcoins.sk community ElectrumX peer (Slovakia). Self-signed;
-            // pubkey pin matches the leaf served on 2026-09-22.
+            NamecoinServer(host = "electrumx.testls.space", port = 50002),
             NamecoinServer(
                 host = "nmc2.bitcoins.sk",
                 port = 57002,
                 pinBase64 = "tkCCQ6AZPqU4Te1poKHeS5l/CRWYHz5n7J4LH22/LxQ=",
             ),
-            // testls.space community ElectrumX peer. Self-signed; the leaf CN
-            // (electrum.testls.space) does not match the deploy hostname
-            // (electrumx.testls.space), so a chain check would fail anyway.
-            // Pinning the pubkey side-steps that mismatch. Pin matches the
-            // leaf served on 2026-09-22.
             NamecoinServer(
-                host = "electrumx.testls.space",
-                port = 50004,
-                pinBase64 = "YQAbKuAPFnlb9hr6x7O20dgjW5HfVRc2juKlhVWH8Ww=",
+                host = "46.229.238.187",
+                port = 57002,
+                pinBase64 = "tkCCQ6AZPqU4Te1poKHeS5l/CRWYHz5n7J4LH22/LxQ=",
+                tlsHostname = "nmc2.bitcoins.sk",
             ),
-            // relay.testls.bit peer (Namecoin `.bit` resolved via a separate
-            // resolver on the host). Reached only when the host's `.bit` DNS
-            // is available; pinned to the leaf served on 2026-09-22.
             NamecoinServer(
                 host = "relay.testls.bit",
-                port = 50004,
+                port = 50012,
                 pinBase64 = "Y9Zu+VV8eoqOBanmpk5QzJtnHwqzxb0ynJGiMRKVJBw=",
             ),
+            NamecoinServer(
+                host = "23.158.233.10",
+                port = 50012,
+                pinBase64 = "Y9Zu+VV8eoqOBanmpk5QzJtnHwqzxb0ynJGiMRKVJBw=",
+                tlsHostname = "relay.testls.bit",
+            ),
+            NamecoinServer(host = "electrumx2.testls.space", port = 50002),
         )
 
-    /** Per-call request budget: connect + handshake + one JSON-RPC round trip. */
-    internal const val REQUEST_TIMEOUT_MILLIS = 8_000L
+    internal const val REQUEST_TIMEOUT_MILLIS = 15_000L
+    internal const val RESOLVER_TIMEOUT_MILLIS = 20_000L
 
     private val core by lazy {
         NamecoinResolverCore(
@@ -212,6 +214,9 @@ internal class NamecoinResolverCore(
     private val servers: List<NamecoinServer>,
     private val transport: NamecoinTransport,
     private val requestTimeoutMillis: Long,
+    private val resolverTimeoutMillis: Long = NamecoinResolver.RESOLVER_TIMEOUT_MILLIS,
+    private val hedgeDelayMillis: Long = 1_500L,
+    private val negativeGraceMillis: Long = 1_500L,
 ) {
     private val cacheMutex = Mutex()
 
@@ -251,7 +256,8 @@ internal class NamecoinResolverCore(
 
         val result =
             try {
-                resolveUncached(identifier)
+                withTimeoutOrNull(resolverTimeoutMillis) { resolveUncached(identifier) }
+                    ?: NamecoinResolver.NamecoinResult.Unavailable
             } catch (cancelled: CancellationException) {
                 // Release any waiters before propagating; their own scopes
                 // decide whether to re-issue the lookup.
@@ -320,22 +326,100 @@ internal class NamecoinResolverCore(
     }
 
     /**
-     * Server fallback: walk [servers] in order. Any server returning a
-     * definitive miss latches NotFound but we continue in case a later server
-     * has fresher indexing; transport failures try the next server. Returns
-     * Unavailable only when every server failed transport with no definitive
-     * miss.
+     * Quartz-style bounded hedging: start in list order 1.5 seconds apart, or
+     * immediately after a failure. A positive always wins. A definitive miss
+     * prevents new attempts but leaves existing attempts a 1.5-second grace
+     * period, so a slower positive can beat a faster negative.
      */
-    private suspend fun fetchNameValueWithFallback(name: String): Pair<LookupStatus, String?> {
-        var definitiveMiss = false
-        for (server in servers) {
-            when (val outcome = fetchNameValue(name, server)) {
-                is NameValueOutcome.Value -> return LookupStatus.Resolved to outcome.valueJson
-                NameValueOutcome.NotFound -> definitiveMiss = true
-                NameValueOutcome.Unavailable -> Unit // try the next server
+    private suspend fun fetchNameValueWithFallback(name: String): Pair<LookupStatus, String?> =
+        coroutineScope {
+            if (servers.isEmpty()) return@coroutineScope LookupStatus.Unavailable to null
+
+            val events = Channel<LookupEvent>(Channel.UNLIMITED)
+            var nextServer = 0
+            var active = 0
+            var scheduled: Job? = null
+            var definitiveMiss = false
+            var negativeGraceDeadline = 0L
+
+            fun scheduleNext() {
+                if (nextServer >= servers.size || definitiveMiss) return
+                scheduled =
+                    launch {
+                        delay(hedgeDelayMillis)
+                        events.send(LookupEvent.StartNext)
+                    }
             }
+
+            fun startNext() {
+                val server = servers[nextServer++]
+                active++
+                launch {
+                    events.send(LookupEvent.Completed(fetchNameValue(name, server)))
+                }
+            }
+
+            startNext()
+            scheduleNext()
+
+            while (true) {
+                val event =
+                    if (definitiveMiss) {
+                        val remaining = (negativeGraceDeadline - System.currentTimeMillis()).coerceAtLeast(0L)
+                        withTimeoutOrNull(remaining) { events.receive() }
+                            ?: return@coroutineScope LookupStatus.NotFound to null
+                    } else {
+                        events.receive()
+                    }
+
+                when (event) {
+                    LookupEvent.StartNext -> {
+                        if (!definitiveMiss && nextServer < servers.size) {
+                            startNext()
+                            scheduleNext()
+                        }
+                    }
+                    is LookupEvent.Completed -> {
+                        active--
+                        when (event.outcome) {
+                            is NameValueOutcome.Value ->
+                                return@coroutineScope LookupStatus.Resolved to event.outcome.valueJson
+                            NameValueOutcome.NotFound -> {
+                                if (!definitiveMiss) {
+                                    negativeGraceDeadline = System.currentTimeMillis() + negativeGraceMillis
+                                }
+                                definitiveMiss = true
+                                scheduled?.cancel()
+                                if (active == 0) return@coroutineScope LookupStatus.NotFound to null
+                            }
+                            NameValueOutcome.Unavailable -> {
+                                if (active == 0 && (definitiveMiss || nextServer == servers.size)) {
+                                    return@coroutineScope if (definitiveMiss) {
+                                        LookupStatus.NotFound to null
+                                    } else {
+                                        LookupStatus.Unavailable to null
+                                    }
+                                }
+                                if (!definitiveMiss && nextServer < servers.size) {
+                                    scheduled?.cancel()
+                                    startNext()
+                                    scheduleNext()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            @Suppress("UNREACHABLE_CODE")
+            LookupStatus.Unavailable to null
         }
-        return if (definitiveMiss) LookupStatus.NotFound to null else LookupStatus.Unavailable to null
+
+    private sealed interface LookupEvent {
+        data object StartNext : LookupEvent
+
+        data class Completed(
+            val outcome: NameValueOutcome,
+        ) : LookupEvent
     }
 
     private sealed interface NameValueOutcome {
@@ -357,14 +441,12 @@ internal class NamecoinResolverCore(
         name: String,
         server: NamecoinServer,
     ): NameValueOutcome {
-        val url = server.tlsUrl
-
         // server.version handshake — some ElectrumX operators reject calls
         // before it. On failure the server is treated as unusable (same as the
         // upstream shim: the next server in the fallback list gets a turn).
         val versionReq =
             """{"jsonrpc":"2.0","id":1,"method":"server.version","params":["whitenoise-android/namecoin","1.4"]}"""
-        transport.call(server, url, versionReq, 1, requestTimeoutMillis) ?: return NameValueOutcome.Unavailable
+        transport.call(server, versionReq, 1, requestTimeoutMillis) ?: return NameValueOutcome.Unavailable
 
         // Derive the ElectrumX scripthash key for this name LOCALLY.
         val script = NamecoinScript.buildNameIndexScript(name.toByteArray(Charsets.UTF_8))
@@ -373,7 +455,7 @@ internal class NamecoinResolverCore(
         val historyReq =
             """{"jsonrpc":"2.0","id":2,"method":"blockchain.scripthash.get_history","params":["$scripthash"]}"""
         val historyBody =
-            transport.call(server, url, historyReq, 2, requestTimeoutMillis) ?: return NameValueOutcome.Unavailable
+            transport.call(server, historyReq, 2, requestTimeoutMillis) ?: return NameValueOutcome.Unavailable
         val lastEntry =
             lastHistoryEntry(historyBody)
                 // Empty history is a definitive Namecoin miss (name never
@@ -383,12 +465,12 @@ internal class NamecoinResolverCore(
         val txReq =
             """{"jsonrpc":"2.0","id":3,"method":"blockchain.transaction.get","params":["${lastEntry.txHash}",true]}"""
         val txBody =
-            transport.call(server, url, txReq, 3, requestTimeoutMillis) ?: return NameValueOutcome.Unavailable
+            transport.call(server, txReq, 3, requestTimeoutMillis) ?: return NameValueOutcome.Unavailable
 
         // Best-effort expiry check via headers.subscribe.
         val headReq = """{"jsonrpc":"2.0","id":4,"method":"blockchain.headers.subscribe","params":[]}"""
         val currentHeight =
-            transport.call(server, url, headReq, 4, requestTimeoutMillis)?.let(::headerHeight) ?: 0L
+            transport.call(server, headReq, 4, requestTimeoutMillis)?.let(::headerHeight) ?: 0L
         if (currentHeight > 0 &&
             lastEntry.height > 0 &&
             currentHeight - lastEntry.height >= NAME_EXPIRE_DEPTH
