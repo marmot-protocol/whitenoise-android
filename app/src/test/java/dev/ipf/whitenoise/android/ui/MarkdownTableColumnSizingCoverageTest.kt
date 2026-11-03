@@ -157,9 +157,9 @@ class MarkdownTableColumnSizingCoverageTest {
         assertEquals(original, TRACKED.map(::bounds))
     }
 
-    /** Changing the width measures only the bounded window and never composes hidden table content. */
+    /** Changing the width keeps the composed table to the bounded window and never composes hidden content. */
     @Test
-    fun widthChangesOnlyMeasureTheBoundedVisibleWindow() {
+    fun widthChangesOnlyComposeTheBoundedVisibleWindow() {
         var width by mutableStateOf(320.dp)
         val columns = MARKDOWN_MAX_TABLE_COLUMNS + 3
         val table =
