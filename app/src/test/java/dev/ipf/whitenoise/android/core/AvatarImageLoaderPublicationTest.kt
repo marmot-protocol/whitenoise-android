@@ -55,6 +55,33 @@ class AvatarImageLoaderPublicationTest {
             assertEquals(0, AvatarImageLoader.waitingPublicationKeyCount())
         }
 
+    /**
+     * Two placeholders waiting on one key share that key's single registration slot, and one publication from a
+     * single fetch wakes both with the same pixels and leaves no waiter behind (#3557).
+     */
+    @Test
+    fun waitersOnOneKeyCoalesceIntoOnePublication() =
+        runBlocking {
+            val fetches = AtomicInteger()
+            AvatarImageLoader.attachProfileImageFetcher { _, _ ->
+                fetches.incrementAndGet()
+                Base64.getDecoder().decode(ONE_PIXEL_PNG_BASE64)
+            }
+            val url = "https://profiles.example/shared.png"
+            val lifetime = AvatarImageLoader.currentCacheLifetime()
+            val first = async(Dispatchers.Default) { AvatarImageLoader.awaitCached(url, lifetime) }
+            val second = async(Dispatchers.Default) { AvatarImageLoader.awaitCached(url, lifetime) }
+            withTimeout(5_000) { while (AvatarImageLoader.waitingPublicationKeyCount() == 0) yield() }
+            assertEquals("both waiters share one key", 1, AvatarImageLoader.waitingPublicationKeyCount())
+
+            val published = checkNotNull(AvatarImageLoader.load(url))
+
+            assertSame(published, withTimeout(5_000) { first.await() })
+            assertSame(published, withTimeout(5_000) { second.await() })
+            assertEquals(1, fetches.get())
+            assertEquals(0, AvatarImageLoader.waitingPublicationKeyCount())
+        }
+
     /** A banner decode of the same URL is a different variant and cannot satisfy an avatar waiter. */
     @Test
     fun bannerPublicationDoesNotSatisfyAnAvatarWaiter() =
