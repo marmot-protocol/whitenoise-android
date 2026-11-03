@@ -20,7 +20,8 @@ fi
 bash "$script_dir/verify-generated-profiles.sh" "$script_dir/../app/src/main/generated/baselineProfiles"
 
 if command -v apkanalyzer >/dev/null 2>&1; then
-  profile_entries="$(apkanalyzer files list "$apk_path")"
+  # apkanalyzer lists entries from the archive root ("/assets/..."), unlike the ZIP table.
+  profile_entries="$(apkanalyzer files list "$apk_path" | sed 's#^/##')"
 else
   require_command unzip
   profile_entries="$(unzip -Z1 "$apk_path")"

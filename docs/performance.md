@@ -991,9 +991,20 @@ Device limits found while regenerating (2026-11-01):
   "$GROUP_NAME" -e androidx.benchmark.enabledRules BaselineProfile
   dev.ipf.whitenoise.android.benchmark/androidx.test.runner.AndroidJUnitRunner`,
   `adb pull` each `/sdcard/Android/media/dev.ipf.whitenoise.android.benchmark/*-prof.txt`
-  file, and merge them: the Startup Profile is the union of the startup journeys' files, the
-  Baseline Profile the union of all four, with each rule's `H`, `S` and `P` flags
-  combined.
+  file, and merge them with `scripts/merge-baseline-profiles.py`, which keeps each rule
+  identity once with its `H`, `S` and `P` flags combined. The Startup Profile is the
+  union of the two startup journeys' files, the Baseline Profile the union of all four:
+
+  ```bash
+  python3 scripts/merge-baseline-profiles.py \
+    app/src/main/generated/baselineProfiles/startup-prof.txt \
+    generateStartup-startup-prof.txt generateInboundShareStartup-startup-prof.txt
+  python3 scripts/merge-baseline-profiles.py \
+    app/src/main/generated/baselineProfiles/baseline-prof.txt generate*-prof.txt
+  ```
+
+  Record the SHA-256 of each pulled file with the provenance so the merge can be
+  checked.
 
 The generated profile is merged into and committed from
 `app/src/main/generated/baselineProfiles/`. It is consumed by every supported
@@ -1020,7 +1031,9 @@ bash scripts/verify-baseline-profile.sh \
 
 Pass the merged text profile as a second argument to also require the app's own
 rules, which the compiled assets alone cannot show (CI does this for
-`devZapstoreBenchmarkRelease`):
+`devZapstoreBenchmarkRelease`). Both arguments must come from the same assemble:
+running only the merge task leaves an older APK beside a newer text profile, and
+the check would vouch for an APK it did not inspect.
 
 ```bash
 bash scripts/verify-baseline-profile.sh \
@@ -1036,14 +1049,18 @@ Startup Profile stays a strict subset of the Baseline Profile.
 
 Each regenerated profile commit or PR records its provenance:
 
-- source revision: full commit SHA the profileable target was built from;
+- source revision: full commit SHA the profileable target was built from, and a
+  ref that still reaches it if its branch is squash-merged (`refs/pull/<n>/head`);
+- MarmotKit version from `app/src/main/marmotkit/MARMOT_VERSION`, since native
+  binding classes are part of the profiled code;
 - fixture: `GROUP_NAME`'s member count and approximate message count, plus the
   account's chat count, never identities or message content;
 - device: model, build fingerprint and API level;
 - toolchain: AGP, Kotlin, AndroidX Benchmark and UiAutomator versions from
   `gradle/libs.versions.toml`, plus the JDK;
-- the exact generation command, and the startup and baseline rule counts that
-  `verify-generated-profiles.sh` prints.
+- the exact generation and merge commands, the SHA-256 of each per-journey file,
+  and the startup and baseline rule counts that `verify-generated-profiles.sh`
+  prints.
 
 Review and regenerate the profiles when a change substantially reworks a covered
 hot path: startup through the chat list, inbound share routing or the recipient

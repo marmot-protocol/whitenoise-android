@@ -609,7 +609,8 @@ android {
         // performance-only variants installable without weakening the signing
         // contract of a production or staging release APK. They intentionally
         // reuse the dev package so an authenticated dev fixture survives swaps
-        // between the debug and release-like benchmark APKs.
+        // between the debug and release-like benchmark APKs. Android CI reads
+        // this variant's merged ART profile by path, so a rename must update it.
         create("benchmarkRelease") {
             signingConfig = signingConfigs.getByName("debug")
             buildConfigField("boolean", "ENABLE_PERFORMANCE_TEST_SELECTORS", "true")

@@ -103,10 +103,14 @@ internal class WhiteNoiseJourneys {
      */
     fun MacrobenchmarkScope.deliverShareToRunningApp() {
         val component = "${BenchmarkConfig.TARGET_PACKAGE}/dev.ipf.whitenoise.android.MainActivity"
-        device.executeShellCommand(
-            "am start -W -a android.intent.action.SEND -t text/plain " +
-                "--es android.intent.extra.TEXT WarmShareProfile -n $component",
-        )
+        val output =
+            device.executeShellCommand(
+                "am start -W -a android.intent.action.SEND -t text/plain " +
+                    "--es android.intent.extra.TEXT WarmShareProfile -n $component",
+            )
+        check(output.lineSequence().any { it.trim() == "Status: ok" }) {
+            "Warm share delivery to the running app failed: $output"
+        }
         waitForVisibleTag(PerformanceTags.SHARE_PICKER, STARTUP_TIMEOUT_MS)
     }
 

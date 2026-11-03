@@ -223,6 +223,8 @@ jobs:
       - name: Verify generated performance profiles
         run: |
           bash .github/scripts/test-verify-generated-profiles.sh
+          bash .github/scripts/test-verify-baseline-profile.sh
+          python3 -m unittest scripts/test_merge_baseline_profiles.py
           bash scripts/verify-generated-profiles.sh
 
       - name: Test Android CI aggregate gate

@@ -5,7 +5,7 @@
     "source_coverage": [
       {
         "source": "app/src/main/generated/baselineProfiles/baseline-prof.txt",
-        "surface": "Generated Baseline Profile covering cold start, chat open, conversation scrolling and warm shares",
+        "surface": "Generated Baseline Profile covering cold start, cold and warm inbound shares, chat open, conversation scrolling and the member roster",
         "anchor": "Ldev/ipf/whitenoise/android/MainActivity;",
         "test_ids": [
           "INT-010"
