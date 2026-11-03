@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.SystemClock
 import kotlinx.coroutines.delay
 import java.io.IOException
+import kotlin.math.ceil
 
 internal data class RawAvPlaybackIntent(
     val alive: Boolean,
@@ -316,10 +317,13 @@ internal class RawAvRenderSession(
                 val nextVideo = progress.video
                 if (nextVideo != null) {
                     ensureAudioForVideo(progress, nextVideo.timestampUs, activation, read)
+                    val reserveTargetUs = audioReserveTargetUs(nextVideo.timestampUs)
+                    refillAudioReserve(progress, reserveTargetUs, activation, read)
+                    if (!valid(activation, appliedSeek)) continue
                     // Before owner.frame is called, this coroutine alone owns and must recycle the bitmap on failure.
                     var ready = false
                     try {
-                        ready = waitForVideo(nextVideo.timestampUs, activation, progress)
+                        ready = waitForVideo(nextVideo.timestampUs, activation, progress, reserveTargetUs, read)
                     } finally {
                         if (!ready) {
                             progress.video = null
@@ -417,17 +421,50 @@ internal class RawAvRenderSession(
         }
     }
 
+    /** Freezes one source-time reserve target; subsequent playback progress cannot move this target. */
+    private fun audioReserveTargetUs(timestampUs: Long): Long =
+        synchronized(clockLock) {
+            val reserveUs = ceil(AUDIO_RESERVE_US * clockSpeed.toDouble()).toLong()
+            (maxOf(timestampUs, positionUs()) + reserveUs).coerceAtMost(AvStreamProtocol.MAX_DURATION_US)
+        }
+
+    /**
+     * Uses existing device capacity for a soft reserve, without waiting on backpressure or known audio EOF.
+     * Written credits cap source admission while DSP output still waits to enter the actual device buffer.
+     */
+    private suspend fun refillAudioReserve(
+        progress: Progress,
+        targetUs: Long,
+        activation: Long,
+        read: (Int) -> AvStreamFrame,
+    ) {
+        while (sourceHasAudio && !eofWallClock && valid(activation, appliedSeek)) {
+            pumpAudio(progress)
+            if (progress.audioEnded && progress.audio == null) return
+            val covered =
+                synchronized(clockLock) {
+                    val sink = pcm
+                    audioAnchorUs + (sink?.bufferedPositionUs() ?: 0) >= targetUs ||
+                        audioAnchorUs + (sink?.writtenPositionUs() ?: 0) >= targetUs
+                }
+            if (covered) return
+            if (!feedAudioStep(progress, activation, read, waitOnBackpressure = false)) return
+        }
+    }
+
     /**
      * Writes at most one bounded audio quantum, preserving offsets across partial sink acceptance.
      * Gap silence and media bytes keep separate credits; an invalid accepted byte count is an output failure.
+     * Returns whether input credit advanced; optional reserve work never sleeps on refused credit.
      */
     @Suppress("CyclomaticComplexMethod", "ThrowsCount") // Partial source credits and both EOF guards commit together.
     private suspend fun feedAudioStep(
         progress: Progress,
         activation: Long,
         read: (Int) -> AvStreamFrame,
-    ) {
-        if (!valid(activation, appliedSeek)) return
+        waitOnBackpressure: Boolean = true,
+    ): Boolean {
+        if (!valid(activation, appliedSeek)) return false
         if (progress.audio == null && !progress.audioEnded) {
             when (val frame = read(AvStreamProtocol.AUDIO_TRACK)) {
                 is AvStreamFrame.Audio -> adoptPcm(frame, progress, activation)
@@ -440,6 +477,7 @@ internal class RawAvRenderSession(
             }
         }
         val pending = progress.audio
+        var acceptedInput = false
         if (pending != null && valid(activation, appliedSeek)) {
             val sink = checkNotNull(pcm)
             val frames = pending.frame.sampleRate / 100
@@ -469,11 +507,13 @@ internal class RawAvRenderSession(
                     progress.audio = null
                 }
             }
-            if (accepted == 0) delay(5)
-        } else if (progress.audioEnded) {
+            acceptedInput = accepted > 0
+            if (accepted == 0 && waitOnBackpressure) delay(5)
+        } else if (progress.audioEnded && waitOnBackpressure) {
             delay(5)
         }
         pumpAudio(progress)
+        return acceptedInput
     }
 
     /**
@@ -619,13 +659,24 @@ internal class RawAvRenderSession(
         timestampUs: Long,
         activation: Long,
         progress: Progress,
+        reserveTargetUs: Long,
+        read: (Int) -> AvStreamFrame,
     ): Boolean {
         while (valid(activation, appliedSeek)) {
             val tolerance = pumpAudio(progress)
             val clock = positionUs()
             if (timestampUs <= clock + tolerance) return true
-            delay(((timestampUs - clock) / 1000).coerceIn(1, 10))
+            refillAudioReserve(progress, reserveTargetUs, activation, read)
+            if (!valid(activation, appliedSeek)) return false
+            val refreshedTolerance = pumpAudio(progress)
+            val refreshedClock = positionUs()
+            if (timestampUs <= refreshedClock + refreshedTolerance) return true
+            delay(((timestampUs - refreshedClock) / 1000).coerceIn(1, 10))
         }
         return false
+    }
+
+    private companion object {
+        const val AUDIO_RESERVE_US = 100_000L
     }
 }

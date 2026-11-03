@@ -269,7 +269,9 @@ class RawAvPreferredRenderTest {
             val session = session(owner, Sink())
             val bitmap = video(0)
             try {
-                session.consumeFrames(info(), 7, { bitmap }, {})
+                session.consumeFrames(info(), 7, { track ->
+                    if (track == AvStreamProtocol.VIDEO_TRACK) bitmap else AvStreamFrame.AudioEnd
+                }, {})
                 fail("Expected owner failure")
             } catch (_: IOException) {
                 assertFalse(bitmap.bitmap.isRecycled)

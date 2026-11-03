@@ -390,9 +390,16 @@ class NativeBuildTests(unittest.TestCase):
     def test_existing_partial_build_refuses_to_regenerate(self):
         """Existing partial build refuses to regenerate."""
         output = self.root / "output"
-        (output / "tools").mkdir(parents=True)
-        with self.assertRaisesRegex(ValueError, "unfinished decoder build"):
+        tools = output / "tools"
+        tools.mkdir(parents=True)
+        marker = tools / "preserve-failed-build"
+        marker.write_bytes(b"review before removal")
+        with self.assertRaisesRegex(ValueError, "unfinished decoder build") as error:
             self.prepare(output)
+        self.assertIn(str(tools.resolve()), str(error.exception))
+        self.assertIn(str(output.resolve()), str(error.exception))
+        self.assertIn("inspect and reconcile", str(error.exception))
+        self.assertEqual(b"review before removal", marker.read_bytes())
         self.assertEqual([], self.commands)
 
     def test_fetch_checks_exact_digest_size_https_and_preserves_partial_intent(self):
@@ -409,9 +416,17 @@ class NativeBuildTests(unittest.TestCase):
                                                          "http://fixture.invalid/file" if mode == "http" else item["url"])
                 with self.assertRaises(ValueError):
                     build.fetch(item, directory, opener)
-                self.assertTrue((directory / "source.xz.partial").exists())
-                with self.assertRaisesRegex(ValueError, "unfinished dependency"):
-                    build.fetch(item, directory, opener)
+                partial = directory / "source.xz.partial"
+                self.assertTrue(partial.exists())
+                retained = partial.read_bytes()
+                def forbidden_opener(*args, **kwargs):
+                    """A retained partial must refuse before any further download attempt."""
+                    self.fail("retained partial triggered another transport")
+                with self.assertRaisesRegex(ValueError, "unfinished dependency") as error:
+                    build.fetch(item, directory, forbidden_opener)
+                self.assertIn(str(partial.resolve()), str(error.exception))
+                self.assertIn("inspect and reconcile", str(error.exception))
+                self.assertEqual(retained, partial.read_bytes())
 
     def test_cached_download_is_hashed_before_reuse(self):
         """Cached download is hashed before reuse."""

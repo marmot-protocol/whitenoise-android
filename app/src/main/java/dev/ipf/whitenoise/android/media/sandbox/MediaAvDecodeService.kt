@@ -153,7 +153,11 @@ class MediaAvDecodeService : Service() {
         repeat(MAX_READS) {
             check(android.os.SystemClock.elapsedRealtime() < deadline)
             samples.clear()
-            val frame = NativeMediaOutputPolicy.frame(NativeMediaEngine.nativeRead(handle, null, samples), 1)
+            val frame =
+                NativeMediaOutputPolicy.frame(
+                    checkedNativeRead(NativeMediaEngine.nativeRead(handle, null, samples)),
+                    1,
+                )
             when (frame.kind) {
                 0 -> return signal.finish()
                 2 -> {
@@ -212,7 +216,11 @@ class MediaAvDecodeService : Service() {
         var previous: NativeMediaFrame? = null
         repeat(MAX_READS) {
             source.clear()
-            val frame = NativeMediaOutputPolicy.frame(NativeMediaEngine.nativeRead(handle, source, null), edge)
+            val frame =
+                NativeMediaOutputPolicy.frame(
+                    checkedNativeRead(NativeMediaEngine.nativeRead(handle, source, null)),
+                    edge,
+                )
             if (frame.kind == 0) return previous
             check(frame.kind == 1) { "Unrequested PCM output" }
             if (frame.ptsUs >= targetUs) return frame

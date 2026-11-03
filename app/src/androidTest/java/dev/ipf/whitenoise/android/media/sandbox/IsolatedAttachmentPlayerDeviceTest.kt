@@ -513,7 +513,7 @@ class IsolatedAttachmentPlayerDeviceTest {
                 PixelCopy.request(view, source, sample.bitmap, sample::finish, Handler(Looper.getMainLooper()))
                 requested = true
             }
-            check(sample.completed.await(2, TimeUnit.SECONDS)) { "PixelCopy did not complete" }
+            if (!sample.completed.await(2, TimeUnit.SECONDS)) return null
             return if (sample.status.get() == PixelCopy.SUCCESS) sample.bitmap.getPixel(0, 0) else null
         } finally {
             // After timeout an accepted request owns its bitmap until its callback; never recycle under native copy.

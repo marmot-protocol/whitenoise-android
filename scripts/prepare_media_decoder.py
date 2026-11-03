@@ -95,7 +95,9 @@ def fetch(item, directory, opener=urllib.request.urlopen):
                 sha(path) == item["sha256"], "cached dependency bytes differ")
         return path
     temporary = path.with_suffix(path.suffix + ".partial")
-    require(not temporary.exists(), "unfinished dependency transfer requires inspection")
+    require(not temporary.exists(),
+            f"unfinished dependency transfer requires inspection: {temporary.resolve()}; "
+            "inspect and reconcile these bytes before manually removing the abandoned partial file")
     try:
         with opener(item["url"], timeout=120) as response, temporary.open("xb") as output:
             require(response.geturl().startswith("https://"), "dependency redirect left HTTPS")
@@ -371,7 +373,9 @@ def prepare(ndk, output, abis, *, jobs=2, opener=urllib.request.urlopen, command
         downloads.mkdir(exist_ok=True)
         inputs = {name: fetch(lock[name], downloads, opener) for name in ("ffmpeg", "dav1d", "meson", "ninja")}
         tools = output / "tools"
-        require(not tools.exists(), "unfinished decoder build requires inspection")
+        require(not tools.exists(),
+                f"unfinished decoder build requires inspection: {tools.resolve()} (cache {output.resolve()}); "
+                "inspect and reconcile this build before manually removing the abandoned cache directory")
         extract_tools([inputs["meson"], inputs["ninja"]], tools)
         write_meson_launcher(tools)
         built = [build_abi(ndk, abi, lock, inputs, tools, output, jobs, command) for abi in abis]

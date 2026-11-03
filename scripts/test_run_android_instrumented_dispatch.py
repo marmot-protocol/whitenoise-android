@@ -167,6 +167,27 @@ class InstrumentedDispatchTest(unittest.TestCase):
             self.assertFalse(any(value.startswith('-Pandroid.testInstrumentationRunnerArguments.class=')
                                  for value in command))
 
+    def test_streaming_trace_modes_keep_ring_buffer_flush_and_bounded_capture(self):
+        """Actual mode selectors retain bounded streaming and explicit producer flush."""
+        spec = importlib.util.spec_from_file_location("hosted_streaming_trace", ROOT / "scripts/hosted-startup-trace.py")
+        trace = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(trace)
+        for mode, api in (("healthy", "30"), ("av", "30"), ("av", "36")):
+            with self.subTest(mode=mode, api=api):
+                config, command, required = trace.selection(mode, api)
+                self.assertIn("buffers { size_kb: 65536 fill_policy: RING_BUFFER }", config)
+                self.assertIn("write_into_file: true", config)
+                self.assertIn("file_write_period_ms: 1000", config)
+                self.assertEqual(1, config.count("flush_period_ms: 1000"))
+                self.assertIn("max_file_size_bytes: 134217728", config)
+                self.assertIn("duration_ms: " + ("600000" if mode == "av" else "120000"), config)
+                if mode == "av":
+                    self.assertIn("proc_stats_poll_ms: 100", config)
+                    self.assertIn("-Pandroid.testInstrumentationRunnerArguments.annotation=" + trace.AV_ANNOTATION, command)
+                    self.assertEqual(trace.AV_CASE, required)
+                else:
+                    self.assertEqual(trace.LEGACY_CASE, required)
+
     def test_actual_checker_rejects_missing_or_skipped_selected_native_case(self):
         """Actual checker rejects missing or skipped selected native case."""
         for api in ("30", "36"):

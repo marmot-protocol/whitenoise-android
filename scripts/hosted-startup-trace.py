@@ -13,10 +13,11 @@ import uuid
 OUT = Path('app/build/reports/media-startup-trace')
 STATE = OUT / 'state.json'
 MAX_BYTES = 128 * 1024 * 1024
-CONFIG = '''buffers { size_kb: 65536 fill_policy: DISCARD }
+CONFIG = '''buffers { size_kb: 65536 fill_policy: RING_BUFFER }
 duration_ms: 120000
 write_into_file: true
 file_write_period_ms: 1000
+flush_period_ms: 1000
 max_file_size_bytes: 134217728
 data_sources { config { name: "linux.ftrace" ftrace_config {
  atrace_categories: "am"
