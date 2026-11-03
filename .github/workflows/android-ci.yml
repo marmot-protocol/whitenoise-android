@@ -104,7 +104,7 @@ jobs:
     needs: changes
     name: Validate tooling and documentation contracts
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

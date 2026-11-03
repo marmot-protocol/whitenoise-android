@@ -156,23 +156,16 @@ class InstrumentedDispatchTest(unittest.TestCase):
             annotation = "dev.ipf.whitenoise.android.media.sandbox.MediaContainmentAcceptance"
             self.assertIn("RunnerArguments.annotation=" + annotation, focused)
             self.assertIn(case, focused)
-        # The real AV producer selects this exact method, independently of either annotation.
+        # The AV producer keeps this exact raw method required while selecting its three methods by annotation.
         spec = importlib.util.spec_from_file_location("hosted_av_selection", ROOT / "scripts/hosted-startup-trace.py")
         trace = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(trace)
         for api in ("30", "36"):
             _, command, required = trace.selection("av", api)
             self.assertEqual(case, required)
-            expected_cases = [
-                case,
-                "dev.ipf.whitenoise.android.media.sandbox.MediaAvPlaybackPerformanceDeviceTest#"
-                "characterizePacedProductionPlaybackOnUnchangedCorpus",
-                "dev.ipf.whitenoise.android.media.sandbox.IsolatedAttachmentPlayerDeviceTest#"
-                "pausedSeekingSpeedPauseAndRepeatUseRealRawPlayback",
-            ]
-            prefix = "-Pandroid.testInstrumentationRunnerArguments.class="
-            selectors = [value.removeprefix(prefix).split(",") for value in command if value.startswith(prefix)]
-            self.assertEqual([expected_cases], selectors)
+            self.assertIn('-Pandroid.testInstrumentationRunnerArguments.annotation=' + trace.AV_ANNOTATION, command)
+            self.assertFalse(any(value.startswith('-Pandroid.testInstrumentationRunnerArguments.class=')
+                                 for value in command))
 
     def test_actual_checker_rejects_missing_or_skipped_selected_native_case(self):
         """Actual checker rejects missing or skipped selected native case."""

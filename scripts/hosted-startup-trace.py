@@ -87,6 +87,7 @@ def full_bounded_stdout(row, label):
         raise RuntimeError('required capture is not UTF8:' + label) from error
 
 
+AV_ANNOTATION = 'dev.ipf.whitenoise.android.media.sandbox.MediaAvTraceCase'
 AV_CASE = 'dev.ipf.whitenoise.android.media.sandbox.MediaAvPerformanceDeviceTest#measureProductionCostsOnUnchangedCorpus'
 AV_SURFACE_CASE = 'dev.ipf.whitenoise.android.media.sandbox.IsolatedAttachmentPlayerDeviceTest#pausedSeekingSpeedPauseAndRepeatUseRealRawPlayback'
 AV_PLAYBACK_CASE = 'dev.ipf.whitenoise.android.media.sandbox.MediaAvPlaybackPerformanceDeviceTest#characterizePacedProductionPlaybackOnUnchangedCorpus'
@@ -101,7 +102,11 @@ def selection(mode='healthy', api='30'):
         raise ValueError('fixed trace mode/API required')
     config = CONFIG.replace('duration_ms: 120000', 'duration_ms: 600000').replace(
         'scan_all_processes_on_start: true', 'scan_all_processes_on_start: true\n proc_stats_poll_ms: 100')
-    command = [value.replace('BenchmarkRelease', 'Debug').replace(LEGACY_CASE, AV_CASE + "," + AV_PLAYBACK_CASE + "," + AV_SURFACE_CASE).replace(
+    # AGP truncates comma-separated class selectors; the runtime method annotation
+    # selects all three exact cases without changing the required-result checks.
+    legacy_selector = '-Pandroid.testInstrumentationRunnerArguments.class=' + LEGACY_CASE
+    av_selector = '-Pandroid.testInstrumentationRunnerArguments.annotation=' + AV_ANNOTATION
+    command = [av_selector if value == legacy_selector else value.replace('BenchmarkRelease', 'Debug').replace(
         'timeout_msec=120000', 'timeout_msec=600000') for value in COMMAND]
     command.insert(1, '-PmediaAvStartupTrace=true')
     return config, command, AV_CASE

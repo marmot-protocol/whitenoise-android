@@ -24,6 +24,7 @@ import java.util.UUID
 class MediaAvPerformanceDeviceTest {
     /** Measure Production Costs On Unchanged Corpus. */
     @Test(timeout = 600_000) // One finite 85-observation campaign; other device cases keep the runner default.
+    @MediaAvTraceCase
     fun measureProductionCostsOnUnchangedCorpus() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val staged = mutableListOf<PerformanceInput>()

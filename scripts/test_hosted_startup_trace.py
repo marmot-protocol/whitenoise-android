@@ -417,6 +417,86 @@ class HostedStartupTraceTests(unittest.TestCase):
 
 
 
+    def test_top_level_av_route_survives_agp_comma_truncation_and_requires_all_methods(self):
+        """Exercise dispatcher, actual capture and real checker beneath a source-evidenced AGP transport fixture."""
+        directory = ROOT/'app/src/androidTest/java/dev/ipf/whitenoise/android/media/sandbox'
+        discovered = []
+        for source in directory.glob('*.kt'):
+            for method in re.findall(r'@MediaAvTraceCase\s+fun\s+(\w+)\s*\(', source.read_text()):
+                discovered.append('dev.ipf.whitenoise.android.media.sandbox.' + source.stem + '#' + method)
+        import ast
+        producer = ast.parse((ROOT/'scripts/hosted-startup-trace.py').read_text())
+        constants = {node.targets[0].id: ast.literal_eval(node.value) for node in producer.body
+                     if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
+                     and node.targets[0].id in ('AV_CASE', 'AV_PLAYBACK_CASE', 'AV_SURFACE_CASE', 'AV_ANNOTATION')}
+        required = [constants[key] for key in ('AV_CASE', 'AV_PLAYBACK_CASE', 'AV_SURFACE_CASE')]
+        self.assertCountEqual(discovered, required)
+        marker = (directory/'MediaAvTraceCase.kt').read_text()
+        self.assertIn('@Target(AnnotationTarget.FUNCTION)', marker)
+        self.assertIn('@Retention(AnnotationRetention.RUNTIME)', marker)
+        # Existing production dispatcher documents this actual AGP boundary. The
+        # fake Gradle below models it; this is not an AGP/device execution claim.
+        dispatcher = (ROOT/'scripts/run-android-instrumented-tests.sh').read_text()
+        self.assertIn('first comma', dispatcher)
+        for api in ('30', '36'):
+            for legacy in (True, False):
+                with self.subTest(api=api, legacy_comma_selector=legacy):
+                    root, env = self.fixture()
+                    env['FAKE_API'] = api
+                    shutil.copyfile(ROOT/'scripts/run-android-instrumented-tests.sh', root/'scripts/run-android-instrumented-tests.sh')
+                    shutil.copyfile(ROOT/'scripts/check_instrumented_required_cases.py', root/'scripts/check_instrumented_required_cases.py')
+                    (root/'annotated-methods.json').write_text(json.dumps(discovered))
+                    if legacy:
+                        script = root/'scripts/hosted-startup-trace.py'
+                        source = script.read_text()
+                        original = "av_selector = '-Pandroid.testInstrumentationRunnerArguments.annotation=' + AV_ANNOTATION"
+                        replacement = "av_selector = " + repr('-Pandroid.testInstrumentationRunnerArguments.class=' + ','.join(required))
+                        self.assertIn(original, source)
+                        script.write_text(source.replace(original, replacement))
+                    (root/'gradlew').write_text(r'''#!/usr/bin/env python3
+import json,pathlib,subprocess,sys,xml.etree.ElementTree as ET
+root=pathlib.Path('.')
+args=sys.argv[1:]
+(root/'gradle-arguments.txt').write_text('\n'.join(args)+'\n')
+(root/'gradle-invocations.txt').open('a').write('one\n')
+subprocess.run([sys.executable,'scripts/hosted-startup-trace.py','start'],check=True)
+selected=[]
+for arg in args:
+ if arg.startswith('-Pandroid.testInstrumentationRunnerArguments.class='):
+  selected=arg.split('=',1)[1].split(',')[:1]  # Known AGP comma-loss behavior.
+ if arg=='-Pandroid.testInstrumentationRunnerArguments.annotation=dev.ipf.whitenoise.android.media.sandbox.MediaAvTraceCase':
+  selected=json.loads((root/'annotated-methods.json').read_text())
+suite=ET.Element('testsuite')
+for case in selected:
+ classname,method=case.split('#');ET.SubElement(suite,'testcase',classname=classname,name=method)
+out=root/'app/build/outputs/androidTest-results/connected';out.mkdir(parents=True)
+ET.ElementTree(suite).write(out/'results.xml')
+''')
+                    result = subprocess.run(
+                        ['bash', 'scripts/run-android-instrumented-tests.sh', 'workflow_dispatch',
+                         'false', 'false', 'false', 'true', 'false', 'false', 'true', api, 'false', 'av'],
+                        cwd=root, env=env, capture_output=True, timeout=35,
+                    )
+                    report = root/'app/build/reports/media-startup-trace'
+                    receipt = json.loads((report/'capture-receipt.json').read_text())
+                    self.assertEqual((root/'gradle-invocations.txt').read_text(), 'one\n')
+                    self.assertEqual((report/'required-cases.txt').read_text().splitlines(), required)
+                    self.assertIn('duration_ms: 600000', (report/'config.pbtxt').read_text())
+                    self.assertIn('timeout_msec=600000', (root/'gradle-arguments.txt').read_text())
+                    self.assertEqual(receipt['cleanup'], 'CONFIRMED')
+                    if legacy:
+                        self.assertNotEqual(result.returncode, 0)
+                        errors = (report/'required-case.stderr').read_text()
+                        self.assertIn(required[1], errors)
+                        self.assertIn(required[2], errors)
+                        self.assertNotEqual(receipt['test_exit_code'], 0)
+                        self.assertFalse((report/'paced-report-validation.json').exists())
+                    else:
+                        self.assertEqual(result.returncode, 0, result.stderr)
+                        self.assertEqual(receipt['test_exit_code'], 0)
+                        self.assertTrue((report/'paced-report-validation.json').exists())
+                    self.assertFalse(receipt['capture_qualified'])
+
     def test_fixed_av_actual_cli_both_supported_apis(self):
         """Fixed av actual cli both supported apis."""
         for api in ('30', '36'):
@@ -438,7 +518,9 @@ class HostedStartupTraceTests(unittest.TestCase):
                 case='dev.ipf.whitenoise.android.media.sandbox.MediaAvPerformanceDeviceTest#measureProductionCostsOnUnchangedCorpus'
                 paced='dev.ipf.whitenoise.android.media.sandbox.MediaAvPlaybackPerformanceDeviceTest#characterizePacedProductionPlaybackOnUnchangedCorpus'
                 surface='dev.ipf.whitenoise.android.media.sandbox.IsolatedAttachmentPlayerDeviceTest#pausedSeekingSpeedPauseAndRepeatUseRealRawPlayback'
-                self.assertIn('-Pandroid.testInstrumentationRunnerArguments.class='+case+','+paced+','+surface,args)
+                self.assertIn('-Pandroid.testInstrumentationRunnerArguments.annotation='
+                              'dev.ipf.whitenoise.android.media.sandbox.MediaAvTraceCase', args)
+                self.assertFalse(any(arg.startswith('-Pandroid.testInstrumentationRunnerArguments.class=') for arg in args))
                 self.assertEqual(receipt['required_case'],case)
                 self.assertEqual(receipt['additional_required_cases'],[paced,surface])
                 self.assertIn('paced_report_sha256',receipt)

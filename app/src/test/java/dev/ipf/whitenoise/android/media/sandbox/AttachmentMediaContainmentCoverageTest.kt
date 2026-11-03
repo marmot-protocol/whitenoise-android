@@ -43,10 +43,21 @@ class AttachmentMediaContainmentCoverageTest {
     @Test
     fun automaticMediaUsesItsDedicatedIsolatedServiceWithoutFallback() {
         val facade = source("media/sandbox/IsolatedMediaDecoder.kt").readText()
-        val installation = facade.functionBody("installSelected")
+        val installation = facade.functionBody("install")
         assertTrue(
             "Automatic media must use the native isolated service",
             "MediaAvDecodeService::class.java" in installation,
+        )
+        assertTrue(
+            "Automatic media must reuse its process lifetime owner across account sessions",
+            "mediaOwner ?: IsolatedAutomaticAvTransport(" in installation &&
+                ").also { mediaOwner = it }" in installation,
+        )
+        val activation = installation.indexOf("automaticOwner.activateSession()")
+        val selection = installation.indexOf("mediaTransport = automaticOwner")
+        assertTrue(
+            "Automatic requests must activate the retained owner before selecting it",
+            activation in 0 until selection,
         )
         assertTrue(
             "Automatic requests must retain the transport lifetime owner",

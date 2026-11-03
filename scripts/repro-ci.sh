@@ -35,7 +35,7 @@ repro_ci_compare() {
     (cd "$directory" && sha256sum -c SHA256SUMS)
     repro_verify_assert_unsigned_apk "$directory/$name"
   done
-  # Match recorded JVM, SDK and wrapper inputs before claiming cross-runner equality.
+  # Match recorded JVM, resolved SDK and wrapper inputs before claiming cross-runner equality.
   diff -u "$first/repro-build-environment.txt" "$second/repro-build-environment.txt"
   if ! cmp -s "$first/$name" "$second/$name"; then
     repro_verify_diagnose_mismatch "$first/$name" "$second/$name"
@@ -43,6 +43,8 @@ repro_ci_compare() {
   fi
   repro_verify_write_evidence "$first/$name" "$commit_sha" "$evidence_dir"
   cp "$first/repro-build-environment.txt" "$evidence_dir/"
+  cp "$first/repro-installed-sdk-inventory.txt" "$evidence_dir/repro-installed-sdk-inventory-first.txt"
+  cp "$second/repro-installed-sdk-inventory.txt" "$evidence_dir/repro-installed-sdk-inventory-second.txt"
   printf 'repro-verify: OK (byte-identical independent unsigned production arm64-v8a APKs)\n'
 }
 

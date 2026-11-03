@@ -320,6 +320,7 @@ second="$FIXTURE_DIR/second"
 verified="$FIXTURE_DIR/verified"
 repro_verify_write_evidence "$unsigned_apk" "$source_sha" "$first" >/dev/null
 printf 'source_sha=%s\njava.version=21.0.7\n' "$source_sha" >"$first/repro-build-environment.txt"
+printf 'fixture installed SDK inventory\n' >"$first/repro-installed-sdk-inventory.txt"
 cp -a "$first" "$second"
 bash "$REPO_DIR/scripts/repro-ci.sh" compare "$source_sha" "$first" "$second" "$verified" >/dev/null
 cmp "$first/SHA256SUMS" "$verified/SHA256SUMS"
@@ -344,4 +345,5 @@ for corruption in source toolchain checksum bytes missing; do
 done
 unset REPRO_VERIFY_APKSIGNER_PATH
 
+python3 -B "$REPO_DIR/scripts/test_repro_sdk_inputs.py"
 printf 'test-repro-verify.sh passed\n'

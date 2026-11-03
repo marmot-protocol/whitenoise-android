@@ -36,6 +36,7 @@ class MediaAvPlaybackPerformanceDeviceTest {
     /** Preserves all ten raw inputs and measures 30 fresh playbacks plus 40 bounded control operations. */
     @Suppress("LongMethod") // One finite campaign owns staging, reporting and fixture cleanup.
     @Test(timeout = 600_000)
+    @MediaAvTraceCase
     fun characterizePacedProductionPlaybackOnUnchangedCorpus() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val staged = mutableListOf<PerformanceInput>()

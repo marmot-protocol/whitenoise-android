@@ -187,6 +187,18 @@ java.vendor=${System.getProperty('java.vendor')}
 java.version=${System.getProperty('java.version')}
 java.runtime.version=${System.getProperty('java.runtime.version')}
 """
+    gradle.projectsEvaluated {
+        def app = gradle.rootProject.project(':app')
+        def android = app.extensions.getByName('android')
+        def sdk = app.extensions.getByName('androidComponents').sdkComponents
+        def cmakeVersion = android.externalNativeBuild.cmake.version
+        def inputs = [schema: 1, sdk: sdk.sdkDirectory.get().asFile.absolutePath,
+                      bootClasspath: sdk.bootClasspath.get().collect { it.asFile.absolutePath },
+                      buildToolsVersion: android.buildToolsVersion,
+                      ndk: sdk.ndkDirectory.get().asFile.absolutePath,
+                      cmakeVersion: cmakeVersion ?: null]
+        new File(reportPath + '.sdk.json').text = groovy.json.JsonOutput.toJson(inputs) + '\n'
+    }
 }
 EOF
 }
@@ -241,6 +253,23 @@ repro_verify_record_build_environment() {
   local apksigner
 
   mkdir -p "$evidence_dir"
+  # Keep the complete hosted-image inventory as diagnostics, separate from the
+  # resolved inputs whose equality is required for the actual APK build.
+  if [[ -n "$android_sdk" && -d "$android_sdk" ]]; then
+    {
+      find "$android_sdk" -maxdepth 3 -type f \
+        \( -name source.properties -o -name android.jar \) -print -exec sha256sum '{}' ';' | LC_ALL=C sort
+    } >"$evidence_dir/repro-installed-sdk-inventory.txt"
+  fi
+  apksigner="$(repro_verify_locate_apksigner)"
+  cp -- "$jvm_report1.sdk.json" "$evidence_dir/repro-gradle-sdk-inputs.json"
+  python3 "$REPO_ROOT/scripts/repro_sdk_inputs.py" "$jvm_report1.sdk.json" "$apksigner" \
+    >"$evidence_dir/repro-resolved-sdk-inputs.txt"
+  if [[ -n "$jvm_report2" ]]; then
+    python3 "$REPO_ROOT/scripts/repro_sdk_inputs.py" "$jvm_report2.sdk.json" "$apksigner" \
+      >"$evidence_dir/repro-resolved-sdk-inputs-second.txt"
+    diff -u "$evidence_dir/repro-resolved-sdk-inputs.txt" "$evidence_dir/repro-resolved-sdk-inputs-second.txt"
+  fi
   {
     printf 'source_sha=%s\n' "$commit_sha"
     if [[ -n "${RUNNER_OS:-}" ]]; then printf 'runner_os=%s\n' "$RUNNER_OS"; fi
@@ -261,12 +290,8 @@ repro_verify_record_build_environment() {
       cat -- "$jvm_report2"
     fi
     (cd "$source_tree" && sha256sum gradle/wrapper/gradle-wrapper.{jar,properties})
-    if [[ -n "$android_sdk" && -d "$android_sdk" ]]; then
-      find "$android_sdk/platforms" "$android_sdk/build-tools" \
-        -maxdepth 2 -type f -name source.properties -print -exec sha256sum '{}' ';' | LC_ALL=C sort
-      find "$android_sdk/platforms" \
-        -maxdepth 2 -type f -name android.jar -print -exec sha256sum '{}' ';' | LC_ALL=C sort
-    fi
+    printf '\n[resolved SDK inputs]\n'
+    cat -- "$evidence_dir/repro-resolved-sdk-inputs.txt"
     if apksigner="$(repro_verify_locate_apksigner)"; then
       printf 'apksigner=%s\n' "$apksigner"
     fi

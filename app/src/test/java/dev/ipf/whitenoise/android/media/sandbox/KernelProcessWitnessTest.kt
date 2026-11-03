@@ -81,16 +81,19 @@ class KernelProcessWitnessTest {
         lifetime.bindCompleted(true)
         lifetime.beginCall()
         lifetime.close()
+        assertFalse(lifetime.beginUnbind()) // Close alone does not resolve an unexposed binding.
+        lifetime.deathObserved()
         assertTrue(lifetime.beginUnbind())
         lifetime.unbindFinished(true)
-        lifetime.deathObserved()
         admissions.invalidateAll()
         assertFalse(witness.confirmedGone())
         assertFalse(lifetime.releasable())
         assertTrue(admissions.current(AvStreamLane.Playback, admissions.epoch()) === old)
+        assertEquals(null, admissions.reserve(AvStreamLane.Playback, admissions.epoch()) { Any() })
         alive = false
         if (witness.confirmedGone()) lifetime.processGoneObserved()
         assertFalse(lifetime.releasable()) // Caller still owns its bounded raw-output copy.
+        assertEquals(null, admissions.reserve(AvStreamLane.Playback, admissions.epoch()) { Any() })
         lifetime.endCall()
         assertTrue(lifetime.releasable())
         admissions.release(AvStreamLane.Playback, old)

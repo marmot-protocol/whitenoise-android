@@ -125,6 +125,7 @@ class IsolatedAttachmentPlayerDeviceTest {
     /** Paused Seeking Speed Pause And Repeat Use Real Raw Playback. */
     @Test
     @Suppress("LongMethod") // One fixture owns the player, display and selected file through controls and cleanup.
+    @MediaAvTraceCase
     fun pausedSeekingSpeedPauseAndRepeatUseRealRawPlayback() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext

@@ -109,14 +109,17 @@ val prepareMarmotKitArtifact =
     }
 // Native codec code is linked only into the isolated media worker. Compilation is
 // attached to native packaging; Kotlin tooling and unit-only work do not build codecs.
+val supportedMediaDecoderAbis = listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
 val mediaDecoderAbis =
     providers
         .gradleProperty("android.injected.build.abi")
         .orNull
         ?.split(",")
         ?.map(String::trim)
-        ?.filter(String::isNotEmpty)
-        ?: listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+        ?.filter { it in supportedMediaDecoderAbis }
+        ?.distinct()
+        ?.takeIf { it.isNotEmpty() }
+        ?: supportedMediaDecoderAbis
 val mediaDecoderAbiArguments = mediaDecoderAbis.flatMap { listOf("--abi", it) }
 val mediaDecoderCacheKey =
     providers

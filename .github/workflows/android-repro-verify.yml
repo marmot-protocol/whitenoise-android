@@ -37,6 +37,8 @@ on:
       - 'config/compose-stability.conf'
       - 'scripts/release*'
       - 'scripts/repro-ci.sh'
+      - 'scripts/repro_sdk_inputs.py'
+      - 'scripts/test_repro_sdk_inputs.py'
       - 'scripts/repro-verify.sh'
       - 'scripts/test-repro-verify.sh'
       - 'scripts/check_ci_changes.py'
