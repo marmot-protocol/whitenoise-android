@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="composer_customize">Mesaj alanını özelleştir</string>
+    <string name="composer_settings">Mesaj alanı</string>
+    <string name="composer_settings_detail">Kısayollar, sıra ve düzen</string>
+    <string name="composer_layout">Düzen</string>
+    <string name="composer_side_left">Sol</string>
+    <string name="composer_side_right">Sağ</string>
+    <string name="composer_layout_automatic">Otomatik</string>
+    <string name="composer_layout_expanded">Her zaman genişletilmiş</string>
+    <string name="composer_selected">Seçili kısayollar</string>
+    <string name="composer_available">Kullanılabilir eylemler</string>
+    <string name="composer_move_earlier">Öne taşı</string>
+    <string name="composer_move_later">Arkaya taşı</string>
+    <string name="composer_add">Kısayol ekle</string>
+    <string name="composer_remove">Kısayolu kaldır</string>
+    <string name="composer_reset">Varsayılana sıfırla</string>
+    <string name="composer_save_failed">Yazma ayarları kaydedilemedi. Tekrar deneyin.</string>
+</resources>

@@ -22,6 +22,7 @@ class SettingsDetailNavigationTest {
         assertEquals(SettingsDetail.Appearance, settingsDetailParent(SettingsDetail.ActionColor))
         assertEquals(SettingsDetail.Appearance, settingsDetailParent(SettingsDetail.ChatBubbleColors))
         assertEquals(SettingsDetail.Appearance, settingsDetailParent(SettingsDetail.CustomEmoji))
+        assertEquals(SettingsDetail.Appearance, settingsDetailParent(SettingsDetail.Composer))
     }
 
     /** Diagnostics & Improvements returns to Privacy & Security, which returns home. */

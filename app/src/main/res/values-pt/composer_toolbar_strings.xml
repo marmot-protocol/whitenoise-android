@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="composer_customize">Personalizar campo de mensagem</string>
+    <string name="composer_settings">Campo de mensagem</string>
+    <string name="composer_settings_detail">Atalhos, ordem e disposição</string>
+    <string name="composer_layout">Disposição</string>
+    <string name="composer_side_left">Esquerda</string>
+    <string name="composer_side_right">Direita</string>
+    <string name="composer_layout_automatic">Automática</string>
+    <string name="composer_layout_expanded">Sempre expandido</string>
+    <string name="composer_selected">Atalhos selecionados</string>
+    <string name="composer_available">Ações disponíveis</string>
+    <string name="composer_move_earlier">Mover para antes</string>
+    <string name="composer_move_later">Mover para depois</string>
+    <string name="composer_add">Adicionar atalho</string>
+    <string name="composer_remove">Remover atalho</string>
+    <string name="composer_reset">Repor predefinições</string>
+    <string name="composer_save_failed">Não foi possível guardar as definições de composição. Tente novamente.</string>
+</resources>

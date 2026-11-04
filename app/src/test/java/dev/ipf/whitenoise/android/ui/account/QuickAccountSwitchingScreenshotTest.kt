@@ -29,6 +29,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.TimeZone
 
 /** The other-account avatars, the retained update emblem and the Appearance toggle, on local test identities. */
 @RunWith(RobolectricTestRunner::class)
@@ -60,7 +61,15 @@ class QuickAccountSwitchingScreenshotTest {
     /** Full Appearance content preserves the editor rows without text straddling the bottom edge fade. */
     @Test
     @Config(sdk = [36], qualifiers = "en-w360dp-h1600dp-mdpi")
-    fun appearance() = capture("quick_account_switching_appearance_light", settings = true, enabled = false)
+    fun appearance() {
+        val previousTimeZone = TimeZone.getDefault()
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+            capture("quick_account_switching_appearance_light", settings = true, enabled = false)
+        } finally {
+            TimeZone.setDefault(previousTimeZone)
+        }
+    }
 
     /** The default-on Appearance preference in AMOLED right-to-left. */
     @Test

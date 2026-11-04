@@ -164,6 +164,51 @@
           "ACC-017",
           "SET-001"
         ]
+      },
+      {
+        "surface": "setting:appearance_colors_heading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.appearance_colors_heading",
+        "test_ids": [
+          "SET-001",
+          "SET-002"
+        ]
+      },
+      {
+        "surface": "setting:appearance_text_heading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.appearance_text_heading",
+        "test_ids": [
+          "SET-001",
+          "SET-002"
+        ]
+      },
+      {
+        "surface": "setting:appearance_conversation_heading",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.appearance_conversation_heading",
+        "test_ids": [
+          "SET-001",
+          "SET-002"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.composer_settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.composer_settings",
+        "test_ids": [
+          "CON-041"
+        ]
+      },
+      {
+        "surface": "R.string.composer_settings_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt",
+        "anchor": "R.string.composer_settings_detail",
+        "test_ids": [
+          "CON-041"
+        ]
       }
     ]
   },

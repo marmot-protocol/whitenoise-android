@@ -2551,4 +2551,8 @@
     <string name="notification_tone_silent">Silencieux</string>
     <string name="notification_tone_off">Désactivé</string>
     <string name="notification_tone_default">Par défaut</string>
+    <string name="appearance_colors_heading">Thème et couleurs</string>
+    <string name="appearance_text_heading">Texte et langue</string>
+    <string name="appearance_conversation_heading">Conversation</string>
+    <string name="appearance_preview_intro">Essayez un texte plus grand et une disposition de droite à gauche.</string>
 </resources>

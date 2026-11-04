@@ -2511,4 +2511,8 @@
     <string name="notification_tone_silent">静音</string>
     <string name="notification_tone_off">关闭</string>
     <string name="notification_tone_default">默认</string>
+    <string name="appearance_colors_heading">主题和颜色</string>
+    <string name="appearance_text_heading">文字和语言</string>
+    <string name="appearance_conversation_heading">聊天</string>
+    <string name="appearance_preview_intro">试用大号文字和从右到左的布局。</string>
 </resources>

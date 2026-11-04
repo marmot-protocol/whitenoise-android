@@ -25,13 +25,16 @@
           "DIC-002",
           "DIC-003",
           "CON-030",
-          "DIC-008"
+          "DIC-008",
+          "CON-041",
+          "CON-042",
+          "CON-040"
         ]
       },
       {
         "surface": "Composer IME Send after a text commit",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerBar.kt",
-        "anchor": "val submitMessage: () -> Unit = {",
+        "anchor": "val submitMessage: () -> Unit = submit@{",
         "test_ids": [
           "CON-007",
           "CON-009",

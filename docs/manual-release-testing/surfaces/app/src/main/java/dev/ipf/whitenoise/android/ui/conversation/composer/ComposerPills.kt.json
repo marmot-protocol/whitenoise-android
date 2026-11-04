@@ -68,7 +68,7 @@
       {
         "surface": "Composer sending identity slot",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
-        "anchor": "sendingIdentity?.invoke()",
+        "anchor": "sendingIdentity?.invoke(Modifier)",
         "test_ids": [
           "CON-035"
         ]

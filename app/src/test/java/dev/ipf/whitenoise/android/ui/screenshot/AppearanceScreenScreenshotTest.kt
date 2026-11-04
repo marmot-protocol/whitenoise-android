@@ -7,7 +7,10 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -116,6 +119,8 @@ class AppearanceScreenScreenshotTest {
     /** Lazily compose the whole preview before capturing its production content and simulation controls. */
     private fun capturePreview(variant: String) {
         composeRule.onNodeWithTag("settings.list").performScrollToNode(hasTestTag("appearance.accessibility.preview"))
+        composeRule.onNodeWithText("Readability preview").performScrollTo().performClick()
+        composeRule.onNodeWithTag("appearance.accessibility.preview").performScrollTo()
         composeRule
             .onNodeWithTag("appearance.accessibility.preview")
             .captureRoboImage("src/test/snapshots/appearance_accessibility_preview_$variant.png")

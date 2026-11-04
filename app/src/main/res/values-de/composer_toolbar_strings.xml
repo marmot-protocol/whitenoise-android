@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="composer_customize">Nachrichtenfeld anpassen</string>
+    <string name="composer_settings">Nachrichtenfeld</string>
+    <string name="composer_settings_detail">Schnellaktionen, Reihenfolge und Layout</string>
+    <string name="composer_layout">Anordnung</string>
+    <string name="composer_side_left">Links</string>
+    <string name="composer_side_right">Rechts</string>
+    <string name="composer_layout_automatic">Automatisch</string>
+    <string name="composer_layout_expanded">Immer erweitert</string>
+    <string name="composer_selected">Ausgewählte Schnellaktionen</string>
+    <string name="composer_available">Verfügbare Aktionen</string>
+    <string name="composer_move_earlier">Nach vorn verschieben</string>
+    <string name="composer_move_later">Nach hinten verschieben</string>
+    <string name="composer_add">Schnellaktion hinzufügen</string>
+    <string name="composer_remove">Schnellaktion entfernen</string>
+    <string name="composer_reset">Auf Standard zurücksetzen</string>
+    <string name="composer_save_failed">Eingabeeinstellungen konnten nicht gespeichert werden. Versuche es erneut.</string>
+</resources>

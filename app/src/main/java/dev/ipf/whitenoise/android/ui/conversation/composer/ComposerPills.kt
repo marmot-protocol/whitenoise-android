@@ -99,6 +99,7 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.InterceptPlatformTextInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.LocalView
@@ -128,9 +129,12 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MentionComposer
+import dev.ipf.whitenoise.android.state.ComposerShortcut
+import dev.ipf.whitenoise.android.state.ComposerShortcutSide
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
@@ -362,6 +366,7 @@ internal fun ComposerPill(
     enterKeyBehavior: EnterKeyBehavior = EnterKeyBehavior.SendMessage,
     onImeSend: () -> Unit = {},
     onPasteImageUris: ((List<Uri>) -> Unit)? = null,
+    canReceiveContent: () -> Boolean = { true },
     // #589: report the BasicTextField's focus edge up so the conversation
     // screen can record whether the keyboard was up when the app was paused.
     onComposerFocusChanged: (Boolean) -> Unit = {},
@@ -388,7 +393,10 @@ internal fun ComposerPill(
     compactOuterEndInset: Dp = 0.dp,
     forceEditingLayout: Boolean = false,
     accessoryContent: (@Composable () -> Unit)? = null,
-    sendingIdentity: (@Composable () -> Unit)? = null,
+    sendingIdentity: (@Composable (Modifier) -> Unit)? = null,
+    toolbar: ComposerToolbarBindings? = null,
+    toolbarHeightLimit: Dp = ComposerToolbarMaximumHeight,
+    toolbarPreview: Boolean = false,
     // Sits in the bottom action row directly before the trailing Send slot.
     sendAccessoryContent: (@Composable () -> Unit)? = null,
     voiceReviewContent: (@Composable () -> Unit)? = null,
@@ -436,6 +444,7 @@ internal fun ComposerPill(
     DisposableEffect(textToolbar) { onDispose { textToolbar.hide() } }
     val resizeComposerDescription = stringResource(R.string.composer_resize)
     val latestOnPasteImageUris by rememberUpdatedState(onPasteImageUris)
+    val latestCanReceiveContent by rememberUpdatedState(canReceiveContent)
     val latestOnValueChange by rememberUpdatedState(onValueChange)
     val latestOnPreImeBack by rememberUpdatedState(onPreImeBack)
     val latestOnHeightDragStarted by rememberUpdatedState(onHeightDragStarted)
@@ -476,6 +485,7 @@ internal fun ComposerPill(
         remember(context) {
             object : ReceiveContentListener {
                 override fun onReceive(transferableContent: TransferableContent): TransferableContent? {
+                    if (!latestCanReceiveContent()) return transferableContent
                     val onPaste = latestOnPasteImageUris ?: return transferableContent
                     if (!transferableContent.hasMediaType(MediaType.Image)) return transferableContent
 
@@ -612,7 +622,8 @@ internal fun ComposerPill(
                 else -> ComposerResizeStripHeight
             },
         )
-    val tryPasteFromClipboard: () -> Boolean = {
+    val tryPasteFromClipboard: () -> Boolean = paste@{
+        if (!latestCanReceiveContent()) return@paste true
         try {
             clipboardManager.withPrimaryClipForPaste { clip ->
                 // Text only; image receive-content and attachment import keep their own routes.
@@ -686,36 +697,137 @@ internal fun ComposerPill(
         derivedStateOf { composerScrollState.value > 0 }
     }
     val sendingIdentityWidth = if (sendingIdentity != null) ComposerToolbarSlotWidth else 0.dp
-    val leadingControlsWidth =
-        ComposerToolbarSlotWidth * (if (hasAttachmentAction) 3 else 2) + sendingIdentityWidth + 8.dp
-    val compactEditorStartInset =
-        leadingControlsWidth
+    // A short active dictation row gives its disabled optional launchers' space to text and
+    // scrollable mandatory outcomes. The saved selection is restored when capture finishes.
+    val configuredActionsSuppressed = toolbar != null && multilineControlsSuppressed && dictationControls != null
     val primaryTrailingWidth =
         (if (expandedTrailingActionInset > 0.dp) expandedTrailingActionInset + 4.dp else 0.dp) +
             (if (trailingAction != null) ComposerToolbarSlotWidth else 0.dp)
     val minimumDictationWidth =
         when {
             dictationControls != null -> DICTATION_ACTIVE_ACTIONS_WIDTH
-            onDictation != null -> ComposerToolbarSlotWidth
+            onDictation != null && toolbar == null -> ComposerToolbarSlotWidth
             else -> 0.dp
         }
     // Automatic geometry may still be animating its outer reservation; budget the smaller surface.
     val navigationSurfaceWidth =
         (compactMeasurementWidth ?: Dp.Infinity) -
             (if (expansionMode == ComposerExpansionMode.Automatic) compactOuterEndInset else 0.dp)
+    // The app scales typography directly; platform density.fontScale alone misses that text size.
+    val compactMinimumTextWidth =
+        maxOf(
+            ComposerMinimumTextWidth,
+            with(density) {
+                MaterialTheme.typography.bodyLarge.fontSize
+                    .toDp()
+            } * 6,
+        )
+    val toolbarSeparateRow =
+        toolbar?.let {
+            composerToolbarRequiresSeparateRow(
+                navigationSurfaceWidth.value,
+                it.shortcuts.size,
+                (primaryTrailingWidth + minimumDictationWidth).value,
+                compactMinimumTextWidth.value,
+                it.settings.layout,
+            )
+        } ?: false
+    val toolbarExpanded = toolbarSeparateRow && !multilineControlsSuppressed
+    val physicalStart =
+        if (LocalLayoutDirection.current == LayoutDirection.Rtl) {
+            ComposerShortcutSide.Right
+        } else {
+            ComposerShortcutSide.Left
+        }
+    val leadingToolbar =
+        toolbar?.let { bindings ->
+            bindings.copy(shortcuts = bindings.shortcuts.filter { bindings.settings.side(it) == physicalStart })
+        }
+    val trailingToolbar =
+        toolbar?.let { bindings ->
+            bindings.copy(shortcuts = bindings.shortcuts.filter { bindings.settings.side(it) != physicalStart })
+        }
+    val groupRoom =
+        (navigationSurfaceWidth - primaryTrailingWidth - minimumDictationWidth - ComposerToolbarGutter)
+            .coerceAtLeast(ComposerShortcutPitch)
+    val leadingCount = leadingToolbar?.shortcuts?.size ?: 0
+    val trailingCount = trailingToolbar?.shortcuts?.size ?: 0
+    val expandedLeadingWidth =
+        if (leadingCount == 0) {
+            0.dp
+        } else if (trailingCount == 0) {
+            groupRoom
+        } else {
+            (groupRoom * (leadingCount.toFloat() / (leadingCount + trailingCount)))
+                .coerceIn(
+                    ComposerShortcutPitch,
+                    (groupRoom - ComposerShortcutPitch).coerceAtLeast(ComposerShortcutPitch),
+                )
+        }
+    val rightConfiguredWidth =
+        when {
+            configuredActionsSuppressed || trailingCount == 0 -> 0.dp
+            toolbarExpanded -> groupRoom - expandedLeadingWidth
+            multilineControlsSuppressed ->
+                composerToolbarCompactWidth(
+                    navigationSurfaceWidth.value,
+                    trailingCount,
+                    (primaryTrailingWidth + minimumDictationWidth + ComposerShortcutPitch * leadingCount).value,
+                    compactMinimumTextWidth.value,
+                ).dp
+            else -> ComposerShortcutPitch * trailingCount
+        }
+    val leadingControlsWidth =
+        if (toolbar != null) {
+            when {
+                configuredActionsSuppressed -> EditingEditorStartInset
+                toolbarExpanded -> expandedLeadingWidth + ComposerToolbarGutter
+                multilineControlsSuppressed ->
+                    composerToolbarCompactWidth(
+                        navigationSurfaceWidth.value,
+                        leadingCount,
+                        (
+                            primaryTrailingWidth + minimumDictationWidth + rightConfiguredWidth +
+                                if (sendAccessoryContent != null) 66.dp else 0.dp
+                        ).value + 4f,
+                        compactMinimumTextWidth.value,
+                    ).dp + ComposerToolbarGutter
+                else -> ComposerShortcutPitch * leadingCount + ComposerToolbarGutter
+            }
+        } else {
+            ComposerToolbarSlotWidth * (if (hasAttachmentAction) 3 else 2) + sendingIdentityWidth + 8.dp
+        }
+    val compactEditorStartInset =
+        leadingControlsWidth
     val navigationRoom =
-        navigationSurfaceWidth - leadingControlsWidth - primaryTrailingWidth -
+        navigationSurfaceWidth - leadingControlsWidth - rightConfiguredWidth - primaryTrailingWidth -
             minimumDictationWidth - (if (sendAccessoryContent != null) 66.dp else 0.dp)
     // Navigation uses only leftover room after the dictation minimum; reserving it cannot reduce
     // the capped dictation width. Keep this measurement independent of navigation admission.
     val availableDictationWidth =
         compactMeasurementWidth?.let {
-            (navigationSurfaceWidth - leadingControlsWidth - primaryTrailingWidth).coerceAtLeast(0.dp)
+            // Configured actions wrap independently; their unwrapped count cannot starve mandatory
+            // dictation completion controls. Keep one reachable optional-action viewport beside them.
+            if (configuredActionsSuppressed) {
+                val textRoom =
+                    (
+                        navigationSurfaceWidth - leadingControlsWidth - rightConfiguredWidth - primaryTrailingWidth -
+                            ComposerShortcutTarget - 4.dp
+                    ).coerceAtLeast(0.dp)
+                val editorReserve = minOf(ComposerMinimumTextWidth * density.fontScale.coerceAtLeast(1f), textRoom)
+                (
+                    navigationSurfaceWidth - leadingControlsWidth - rightConfiguredWidth -
+                        primaryTrailingWidth - editorReserve - 4.dp
+                ).coerceAtLeast(0.dp)
+            } else {
+                val optionalMinimum = if (toolbar != null) ComposerShortcutTarget else leadingControlsWidth
+                (navigationSurfaceWidth - optionalMinimum - primaryTrailingWidth).coerceAtLeast(0.dp)
+            }
         } ?: DICTATION_ACTIVE_ACTIONS_WIDTH
     val targetDictationControlWidth =
         when {
             dictationControls != null -> minOf(DICTATION_ACTIVE_ACTIONS_WIDTH, availableDictationWidth)
-            onDictation != null -> ComposerToolbarSlotWidth
+            onDictation != null && toolbar == null -> ComposerToolbarSlotWidth
             else -> 0.dp
         }
     val dictationControlWidthState =
@@ -732,6 +844,7 @@ internal fun ComposerPill(
     val compactMeasurementTrailingReserve =
         4.dp +
             dictationControlWidth +
+            rightConfiguredWidth +
             expandedTrailingActionInset +
             (if (compactMeasurementReservesTrailingAction) ComposerToolbarSlotWidth else 0.dp)
     val composerTextStyle =
@@ -743,7 +856,7 @@ internal fun ComposerPill(
         composerEditingRequested(
             focused = composerFocused,
             hasText = textFieldValue.text.isNotEmpty(),
-            forceEditingLayout = forceEditingLayout,
+            forceEditingLayout = forceEditingLayout || toolbarExpanded,
             mode = expansionMode,
             dismissInProgress = dismissInProgress,
         )
@@ -793,7 +906,7 @@ internal fun ComposerPill(
                     composerEditingRequested(
                         focused = composerFocused,
                         hasText = textFieldValue.text.isNotEmpty(),
-                        forceEditingLayout = forceEditingLayout,
+                        forceEditingLayout = forceEditingLayout || toolbarExpanded,
                         mode = ComposerExpansionMode.Automatic,
                         dismissInProgress = dismissInProgress,
                     ),
@@ -850,7 +963,7 @@ internal fun ComposerPill(
                     }
                 } ?: multilineControls
         }
-    val expandedLayout = visualMultilineControls || expansionMode != ComposerExpansionMode.Automatic
+    val expandedLayout = visualMultilineControls || toolbarExpanded || expansionMode != ComposerExpansionMode.Automatic
 
     // A draft can always grow, including when empty; keep the grip discoverable at every height.
     // Keep the editor instance and selection owner stable while empty reading
@@ -952,15 +1065,36 @@ internal fun ComposerPill(
             textHeightGeometrySettled &&
             draftTopGeometrySettled &&
             draftStartOffscreen &&
-            (!multilineControlsSuppressed || navigationRoom >= 40.dp)
+            (
+                !multilineControlsSuppressed ||
+                    navigationRoom >= if (toolbar != null) compactMinimumTextWidth + 44.dp else 40.dp
+            )
     val topOnSeparateRow = showDraftTop && inputContentVisible && navigationRoom < 40.dp
     val draftTopWidth = if (showDraftTop && inputContentVisible) 40.dp else 0.dp
-    val extraControlsHeight = if (topOnSeparateRow) 48.dp else 0.dp
+    val toolbarWidth =
+        if (toolbar != null) {
+            (leadingControlsWidth - ComposerToolbarGutter).coerceAtLeast(ComposerShortcutPitch)
+        } else {
+            0.dp
+        }
+    val toolbarRows =
+        if (multilineControlsSuppressed) {
+            1
+        } else {
+            maxOf(
+                composerToolbarRowCount(leadingCount, toolbarWidth.value),
+                composerToolbarRowCount(trailingCount, rightConfiguredWidth.value),
+            )
+        }
+    val toolbarHeight = minOf(ComposerShortcutTarget * toolbarRows, toolbarHeightLimit.coerceAtLeast(48.dp))
+    val toolbarExtraHeight = if (toolbar != null) (toolbarHeight - 48.dp).coerceAtLeast(0.dp) else 0.dp
+    val extraControlsHeight = (if (topOnSeparateRow) 48.dp else 0.dp) + toolbarExtraHeight
     val reservedTrailingWidth = primaryTrailingWidth + if (topOnSeparateRow) 0.dp else draftTopWidth
     SideEffect { onExtraControlsHeightChanged(extraControlsHeight) }
     SideEffect { if (accessoryContent == null) onAccessoryHeightChanged(0.dp) }
     val compactTrailingReserve =
-        4.dp + (if (topOnSeparateRow) 0.dp else draftTopWidth) + dictationControlWidth + expandedTrailingActionInset +
+        4.dp + (if (topOnSeparateRow) 0.dp else draftTopWidth) + dictationControlWidth +
+            rightConfiguredWidth + expandedTrailingActionInset +
             (if (trailingAction != null) ComposerToolbarSlotWidth else 0.dp)
     val automaticTextHeight =
         if (usesAnimatedTextHeight) {
@@ -1177,7 +1311,13 @@ internal fun ComposerPill(
                             inputContentVisible &&
                             voiceReviewContent == null
                         ) {
-                            defaultActionFocus.requestFocus()
+                            if (configuredActionsSuppressed ||
+                                (toolbar != null && toolbar.shortcuts.none { it != ComposerShortcut.VoiceNote })
+                            ) {
+                                composerFocus.requestFocus()
+                            } else {
+                                defaultActionFocus.requestFocus()
+                            }
                         }
                     }
                 }.focusGroup()
@@ -1590,107 +1730,150 @@ internal fun ComposerPill(
                                     ).alpha(if (inputContentVisible) 1f else 0f)
                                     .then(if (inputContentVisible) Modifier else Modifier.clearAndSetSemantics {}),
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (inputContentVisible) sendingIdentity?.invoke()
-                                if (hasAttachmentAction) {
-                                    Box(
-                                        modifier =
-
-                                            Modifier
-                                                .width(ComposerToolbarSlotWidth)
-                                                .height(48.dp)
-                                                .onGloballyPositioned { coordinates ->
-                                                    val position = coordinates.positionInWindow()
-                                                    attachmentAnchorBounds =
-                                                        androidx.compose.ui.unit.IntRect(
-                                                            position.x.roundToInt(),
-                                                            position.y.roundToInt(),
-                                                            position.x.roundToInt() + coordinates.size.width,
-                                                            position.y.roundToInt() + coordinates.size.height,
-                                                        )
-                                                },
-                                        contentAlignment = Alignment.CenterStart,
-                                    ) {
-                                        ComposerToolbarTargets {
-                                            IconButton(
-                                                onClick = onAttachmentsToggle,
-                                                enabled = inputContentVisible,
-                                                modifier =
-                                                    Modifier
-                                                        .width(ComposerToolbarSlotWidth)
-                                                        .height(48.dp)
-                                                        .alpha(if (inputContentVisible) 1f else 0f)
-                                                        .then(
-                                                            if (inputContentVisible) {
-                                                                Modifier
-                                                            } else {
-                                                                Modifier.clearAndSetSemantics {}
-                                                            },
-                                                        ),
-                                            ) {
-                                                // Swap the glyph on open (X) the way the emoji toggle swaps
-                                                // to a keyboard, so sighted users get a visual cue, not just
-                                                // a changed content description.
-                                                Icon(
-                                                    painter =
-                                                        painterResource(
-                                                            if (attachmentSheetOpen) {
-                                                                R.drawable.ic_close
-                                                            } else {
-                                                                R.drawable.ic_add
-                                                            },
-                                                        ),
-                                                    contentDescription =
-                                                        stringResource(
-                                                            if (attachmentSheetOpen) {
-                                                                R.string.close
-                                                            } else {
-                                                                R.string.attach_options
-                                                            },
-                                                        ),
-                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    modifier = Modifier.size(24.dp),
-                                                )
-                                            }
-                                        }
-                                        attachmentMenu?.invoke(attachmentAnchorBounds)
+                            if (toolbar != null) {
+                                if (!configuredActionsSuppressed) {
+                                    ComposerConfiguredToolbar(
+                                        checkNotNull(leadingToolbar),
+                                        toolbarWidth,
+                                        toolbarHeight,
+                                        singleRowOverflow = multilineControlsSuppressed,
+                                        defaultFocus = defaultActionFocus,
+                                    ) { shortcut, slotModifier ->
+                                        ComposerConfiguredAction(
+                                            shortcut = shortcut,
+                                            modifier = slotModifier,
+                                            bindings = toolbar,
+                                            enabled =
+                                                inputContentVisible &&
+                                                    inputFocusEnabled &&
+                                                    toolbar.enabled &&
+                                                    (!toolbar.transactionActive || shortcut == ComposerShortcut.Paste),
+                                            preview = toolbarPreview,
+                                            pasteKey =
+                                                listOf(
+                                                    scrollOwnerKey,
+                                                    pasteTargetKey,
+                                                    inputContentVisible,
+                                                    inputFocusEnabled,
+                                                ),
+                                            onPaste = tryPasteFromClipboard,
+                                            onMore = onAttachmentsToggle,
+                                            onAnchor = { attachmentAnchorBounds = it },
+                                            attachmentMenu = attachmentMenu,
+                                            anchor = attachmentAnchorBounds,
+                                            emojiPickerOpen = emojiPickerOpen,
+                                            onEmoji = {
+                                                selectingWithoutKeyboard = false
+                                                onEmojiPickerToggle()
+                                            },
+                                            onDictation = onDictation,
+                                            sendingIdentity = sendingIdentity,
+                                        )
                                     }
                                 }
-                                ComposerToolbarTargets {
-                                    TextEntryEmojiAction(
-                                        pickerOpen = emojiPickerOpen,
-                                        enabled = inputContentVisible,
-                                        onClick = {
-                                            selectingWithoutKeyboard = false
-                                            onEmojiPickerToggle()
-                                        },
-                                        togglesKeyboard = true,
-                                        modifier =
-                                            Modifier
-                                                .width(ComposerToolbarSlotWidth)
-                                                .height(48.dp)
-                                                .focusRequester(defaultActionFocus),
-                                        iconSize = 24.dp,
-                                        emojiIcon = painterResource(R.drawable.ic_emoji_smileys),
-                                    )
-                                }
-                                key(scrollOwnerKey, pasteTargetKey, inputContentVisible, inputFocusEnabled) {
+                            } else {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (inputContentVisible) sendingIdentity?.invoke(Modifier)
+                                    if (hasAttachmentAction) {
+                                        Box(
+                                            modifier =
+
+                                                Modifier
+                                                    .width(ComposerToolbarSlotWidth)
+                                                    .height(48.dp)
+                                                    .onGloballyPositioned { coordinates ->
+                                                        val position = coordinates.positionInWindow()
+                                                        attachmentAnchorBounds =
+                                                            androidx.compose.ui.unit.IntRect(
+                                                                position.x.roundToInt(),
+                                                                position.y.roundToInt(),
+                                                                position.x.roundToInt() + coordinates.size.width,
+                                                                position.y.roundToInt() + coordinates.size.height,
+                                                            )
+                                                    },
+                                            contentAlignment = Alignment.CenterStart,
+                                        ) {
+                                            ComposerToolbarTargets {
+                                                IconButton(
+                                                    onClick = onAttachmentsToggle,
+                                                    enabled = inputContentVisible,
+                                                    modifier =
+                                                        Modifier
+                                                            .width(ComposerToolbarSlotWidth)
+                                                            .height(48.dp)
+                                                            .alpha(if (inputContentVisible) 1f else 0f)
+                                                            .then(
+                                                                if (inputContentVisible) {
+                                                                    Modifier
+                                                                } else {
+                                                                    Modifier.clearAndSetSemantics {}
+                                                                },
+                                                            ),
+                                                ) {
+                                                    // Swap the glyph on open (X) the way the emoji toggle swaps
+                                                    // to a keyboard, so sighted users get a visual cue, not just
+                                                    // a changed content description.
+                                                    Icon(
+                                                        painter =
+                                                            painterResource(
+                                                                if (attachmentSheetOpen) {
+                                                                    R.drawable.ic_close
+                                                                } else {
+                                                                    R.drawable.ic_add
+                                                                },
+                                                            ),
+                                                        contentDescription =
+                                                            stringResource(
+                                                                if (attachmentSheetOpen) {
+                                                                    R.string.close
+                                                                } else {
+                                                                    R.string.attach_options
+                                                                },
+                                                            ),
+                                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        modifier = Modifier.size(24.dp),
+                                                    )
+                                                }
+                                            }
+                                            attachmentMenu?.invoke(attachmentAnchorBounds)
+                                        }
+                                    }
                                     ComposerToolbarTargets {
-                                        SystemPasteIconButton(
-                                            onPaste = tryPasteFromClipboard,
-                                            enabled = inputContentVisible && inputFocusEnabled,
+                                        TextEntryEmojiAction(
+                                            pickerOpen = emojiPickerOpen,
+                                            enabled = inputContentVisible,
+                                            onClick = {
+                                                selectingWithoutKeyboard = false
+                                                onEmojiPickerToggle()
+                                            },
+                                            togglesKeyboard = true,
                                             modifier =
                                                 Modifier
                                                     .width(ComposerToolbarSlotWidth)
                                                     .height(48.dp)
-                                                    .testTag("composer.paste"),
-                                        ) {
-                                            Icon(
-                                                painter = painterResource(R.drawable.ic_content_paste),
-                                                contentDescription = stringResource(R.string.paste_from_clipboard),
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                modifier = Modifier.size(24.dp),
-                                            )
+                                                    .focusRequester(defaultActionFocus),
+                                            iconSize = 24.dp,
+                                            emojiIcon = painterResource(R.drawable.ic_emoji_smileys),
+                                        )
+                                    }
+                                    key(scrollOwnerKey, pasteTargetKey, inputContentVisible, inputFocusEnabled) {
+                                        ComposerToolbarTargets {
+                                            SystemPasteIconButton(
+                                                onPaste = tryPasteFromClipboard,
+                                                enabled = inputContentVisible && inputFocusEnabled,
+                                                modifier =
+                                                    Modifier
+                                                        .width(ComposerToolbarSlotWidth)
+                                                        .height(48.dp)
+                                                        .testTag("composer.paste"),
+                                            ) {
+                                                Icon(
+                                                    painter = painterResource(R.drawable.ic_content_paste),
+                                                    contentDescription = stringResource(R.string.paste_from_clipboard),
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.size(24.dp),
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -1706,8 +1889,50 @@ internal fun ComposerPill(
                                         } else {
                                             Alignment.BottomEnd
                                         },
-                                    ).height(48.dp),
+                                    ).height(if (trailingCount > 0) toolbarHeight else 48.dp),
                         ) {
+                            if (!configuredActionsSuppressed && trailingToolbar?.shortcuts?.isNotEmpty() == true) {
+                                ComposerConfiguredToolbar(
+                                    checkNotNull(trailingToolbar),
+                                    rightConfiguredWidth,
+                                    toolbarHeight,
+                                    singleRowOverflow = multilineControlsSuppressed,
+                                ) { shortcut, slotModifier ->
+                                    ComposerConfiguredAction(
+                                        shortcut = shortcut,
+                                        modifier = slotModifier,
+                                        bindings = checkNotNull(toolbar),
+                                        enabled =
+                                            inputContentVisible &&
+                                                inputFocusEnabled &&
+                                                checkNotNull(toolbar).enabled &&
+                                                (
+                                                    !checkNotNull(toolbar).transactionActive ||
+                                                        shortcut == ComposerShortcut.Paste
+                                                ),
+                                        preview = toolbarPreview,
+                                        pasteKey =
+                                            listOf(
+                                                scrollOwnerKey,
+                                                pasteTargetKey,
+                                                inputContentVisible,
+                                                inputFocusEnabled,
+                                            ),
+                                        onPaste = tryPasteFromClipboard,
+                                        onMore = onAttachmentsToggle,
+                                        onAnchor = { attachmentAnchorBounds = it },
+                                        attachmentMenu = attachmentMenu,
+                                        anchor = attachmentAnchorBounds,
+                                        emojiPickerOpen = emojiPickerOpen,
+                                        onEmoji = {
+                                            selectingWithoutKeyboard = false
+                                            onEmojiPickerToggle()
+                                        },
+                                        onDictation = onDictation,
+                                        sendingIdentity = sendingIdentity,
+                                    )
+                                }
+                            }
                             if (draftTopWidth > 0.dp && !topOnSeparateRow) draftTopAction()
                             if (dictationControls != null) {
                                 Row(
@@ -1724,7 +1949,7 @@ internal fun ComposerPill(
                                         layout(child.width, child.height) { child.placeRelative(0, 0) }
                                     },
                                 ) { dictationControls() }
-                            } else if (onDictation != null) {
+                            } else if (onDictation != null && toolbar == null) {
                                 ComposerToolbarTargets {
                                     IconButton(
                                         onClick = onDictation,

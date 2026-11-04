@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="composer_customize">Настроить поле сообщения</string>
+    <string name="composer_settings">Поле сообщения</string>
+    <string name="composer_settings_detail">Быстрые действия, порядок и компоновка</string>
+    <string name="composer_layout">Компоновка</string>
+    <string name="composer_side_left">Слева</string>
+    <string name="composer_side_right">Справа</string>
+    <string name="composer_layout_automatic">Автоматически</string>
+    <string name="composer_layout_expanded">Всегда развёрнуто</string>
+    <string name="composer_selected">Выбранные быстрые действия</string>
+    <string name="composer_available">Доступные действия</string>
+    <string name="composer_move_earlier">Переместить раньше</string>
+    <string name="composer_move_later">Переместить позже</string>
+    <string name="composer_add">Добавить быстрое действие</string>
+    <string name="composer_remove">Удалить быстрое действие</string>
+    <string name="composer_reset">Восстановить по умолчанию</string>
+    <string name="composer_save_failed">Не удалось сохранить настройки ввода. Попробуйте ещё раз.</string>
+</resources>

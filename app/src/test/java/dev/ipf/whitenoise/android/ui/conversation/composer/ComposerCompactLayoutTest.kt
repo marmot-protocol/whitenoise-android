@@ -100,20 +100,47 @@ class ComposerCompactLayoutTest {
         val controls =
             buildList {
                 if (identity) {
-                    add(composeRule.onNodeWithTag("composer-sending-identity").fetchSemanticsNode().boundsInRoot)
+                    add(composeRule.onNodeWithTag("composer-sending-identity").fetchSemanticsNode())
                 }
-                add(bounds(R.string.attach_options))
-                add(bounds(R.string.open_emoji_picker))
-                add(bounds(R.string.paste_from_clipboard))
+                val attach = composeRule.onNodeWithContentDescription(context.getString(R.string.attach_options))
+                add(attach.fetchSemanticsNode())
+                val emoji = composeRule.onNodeWithContentDescription(context.getString(R.string.open_emoji_picker))
+                add(emoji.fetchSemanticsNode())
+                val paste = composeRule.onNodeWithContentDescription(context.getString(R.string.paste_from_clipboard))
+                add(paste.fetchSemanticsNode())
             }
         if (identity) {
             val suffix = if (direction == LayoutDirection.Rtl) "rtl" else "ltr"
             composeRule.onNodeWithTag(ROOT_TAG).captureRoboImage("src/test/snapshots/composer_icon_spacing_$suffix.png")
         }
-        val sign = if (direction == LayoutDirection.Ltr) 1f else -1f
-        controls.zipWithNext().forEach { (first, second) ->
-            assertEquals("icon centers use the same 40 dp rhythm", 40f, (second.center.x - first.center.x) * sign, 1f)
-            assertTrue("controls retain their 48 dp height", first.height >= 48f && second.height >= 48f)
+        // Configured actions flank Message; the legacy null-state fixture keeps one leading group.
+        val groups = if (identity) listOf(controls.take(2), controls.drop(2)) else listOf(controls)
+        groups.forEach { group ->
+            group.sortedBy { it.boundsInRoot.center.x }.zipWithNext().forEach { (first, second) ->
+                assertEquals(
+                    "icons within each physical group keep an even visual pitch",
+                    if (identity) 36f else 40f,
+                    second.boundsInRoot.center.x - first.boundsInRoot.center.x,
+                    1f,
+                )
+                assertTrue(
+                    "controls retain their 48 dp height",
+                    first.boundsInRoot.height >= 48f && second.boundsInRoot.height >= 48f,
+                )
+            }
+        }
+        if (identity) {
+            val input = placeholder()
+            val leftEdge = groups[0].maxOf { it.boundsInRoot.right }
+            val rightEdge = groups[1].minOf { it.boundsInRoot.left }
+            assertTrue("Message clears the physical left group", leftEdge <= input.left + 1f)
+            assertTrue("Message clears the physical right group", input.right <= rightEdge + 1f)
+        }
+        controls.forEach { control ->
+            assertTrue(
+                "compact glyph slots retain nominal 48 dp touch targets",
+                control.touchBoundsInRoot.width >= 47f && control.touchBoundsInRoot.height >= 47f,
+            )
         }
     }
 

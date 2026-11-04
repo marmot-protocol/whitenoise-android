@@ -351,6 +351,7 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
         SettingsDetail.ChatBubbleColors,
         SettingsDetail.Language,
         SettingsDetail.CustomEmoji,
+        SettingsDetail.Composer,
         -> SettingsDetail.Appearance
         SettingsDetail.About,
         SettingsDetail.BugReport,
@@ -467,7 +468,9 @@ private fun SettingsDetailRoute(
                 onOpenChatBubbleColors = { onDetailChange(SettingsDetail.ChatBubbleColors) },
                 onOpenLanguage = { onDetailChange(SettingsDetail.Language) },
                 onOpenCustomEmoji = { onDetailChange(SettingsDetail.CustomEmoji) },
+                onOpenComposer = { onDetailChange(SettingsDetail.Composer) },
             )
+        SettingsDetail.Composer -> ComposerSettingsScreen(appState) { onDetailChange(SettingsDetail.Appearance) }
         SettingsDetail.ActionColor ->
             ActionColorScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
         SettingsDetail.ChatBubbleColors ->

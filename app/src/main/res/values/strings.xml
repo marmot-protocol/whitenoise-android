@@ -2715,4 +2715,24 @@
     <string name="notification_tone_silent">Silent</string>
     <string name="notification_tone_off">Off</string>
     <string name="notification_tone_default">Default</string>
+    <string name="composer_customize">Customize composer</string>
+    <string name="composer_settings">Composer</string>
+    <string name="composer_settings_detail">Shortcuts, order and layout</string>
+    <string name="composer_layout">Layout</string>
+    <string name="composer_layout_automatic">Automatic</string>
+    <string name="composer_layout_expanded">Always expanded</string>
+    <string name="composer_selected">Selected shortcuts</string>
+    <string name="composer_available">Available actions</string>
+    <string name="composer_move_earlier">Move earlier</string>
+    <string name="composer_move_later">Move later</string>
+    <string name="composer_add">Add shortcut</string>
+    <string name="composer_remove">Remove shortcut</string>
+    <string name="composer_reset">Reset to default</string>
+    <string name="composer_save_failed">Couldn’t save composer settings. Try again.</string>
+    <string name="composer_side_left">Left</string>
+    <string name="composer_side_right">Right</string>
+    <string name="appearance_colors_heading">Theme &amp; colors</string>
+    <string name="appearance_text_heading">Text &amp; language</string>
+    <string name="appearance_conversation_heading">Conversation</string>
+    <string name="appearance_preview_intro">Try larger text and right-to-left layout.</string>
 </resources>

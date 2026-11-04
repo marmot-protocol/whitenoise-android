@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="composer_customize">自定义消息输入框</string>
+    <string name="composer_settings">消息输入框</string>
+    <string name="composer_settings_detail">快捷操作、顺序和布局</string>
+    <string name="composer_layout">布局</string>
+    <string name="composer_side_left">左侧</string>
+    <string name="composer_side_right">右侧</string>
+    <string name="composer_layout_automatic">自动</string>
+    <string name="composer_layout_expanded">始终展开</string>
+    <string name="composer_selected">已选快捷操作</string>
+    <string name="composer_available">可用操作</string>
+    <string name="composer_move_earlier">向前移动</string>
+    <string name="composer_move_later">向后移动</string>
+    <string name="composer_add">添加快捷操作</string>
+    <string name="composer_remove">移除快捷操作</string>
+    <string name="composer_reset">恢复默认设置</string>
+    <string name="composer_save_failed">无法保存输入设置，请重试。</string>
+</resources>

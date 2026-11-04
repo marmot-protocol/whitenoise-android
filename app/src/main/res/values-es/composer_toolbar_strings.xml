@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="composer_customize">Personalizar el campo de mensaje</string>
+    <string name="composer_settings">Campo de mensaje</string>
+    <string name="composer_settings_detail">Accesos directos, orden y disposición</string>
+    <string name="composer_layout">Disposición</string>
+    <string name="composer_side_left">Izquierda</string>
+    <string name="composer_side_right">Derecha</string>
+    <string name="composer_layout_automatic">Automática</string>
+    <string name="composer_layout_expanded">Siempre expandido</string>
+    <string name="composer_selected">Accesos directos seleccionados</string>
+    <string name="composer_available">Acciones disponibles</string>
+    <string name="composer_move_earlier">Mover antes</string>
+    <string name="composer_move_later">Mover después</string>
+    <string name="composer_add">Añadir acceso directo</string>
+    <string name="composer_remove">Quitar acceso directo</string>
+    <string name="composer_reset">Restablecer valores predeterminados</string>
+    <string name="composer_save_failed">No se pudo guardar la configuración del editor. Vuelve a intentarlo.</string>
+</resources>

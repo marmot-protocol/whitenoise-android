@@ -81,9 +81,13 @@ class ConversationDictationPersistentControlTest {
             listOf("Cancel", transcriptPasteLabel, "Send").map { label ->
                 composeRule.onNodeWithContentDescription(label).assertIsDisplayed()
             }
+        val centers = actions.map { it.getUnclippedBoundsInRoot().let { bounds -> (bounds.left + bounds.right) / 2 } }
+        centers.zipWithNext().forEach { (first, second) -> assertEquals(36.dp, second - first) }
         actions.forEach { action ->
+            val touch = action.fetchSemanticsNode().touchBoundsInRoot
+            assertTrue("nominal touch width", touch.width >= with(composeRule.density) { 48.dp.toPx() })
             val bounds = action.getUnclippedBoundsInRoot()
-            assertTrue(bounds.right - bounds.left >= 48.dp)
+            assertTrue(bounds.right - bounds.left >= 36.dp)
             assertTrue(bounds.bottom - bounds.top >= 48.dp)
         }
         composeRule.onNodeWithContentDescription("Record voice message").assertDoesNotExist()
@@ -372,7 +376,7 @@ class ConversationDictationPersistentControlTest {
                 .assertIsDisplayed()
                 .getUnclippedBoundsInRoot()
         assertTrue(cancel.left >= root.left && cancel.right <= root.right)
-        assertTrue(cancel.right - cancel.left >= 48.dp)
+        assertTrue(cancel.right - cancel.left >= 36.dp)
     }
 
     /** Verifies the recovery and dismiss actions stay visible and touch-accessible in compact RTL. */
@@ -388,7 +392,7 @@ class ConversationDictationPersistentControlTest {
             val action = composeRule.onNodeWithContentDescription(label).assertIsDisplayed().getUnclippedBoundsInRoot()
             assertTrue(action.left >= root.left && action.right <= root.right)
             assertTrue(action.top >= root.top && action.bottom <= root.bottom)
-            assertTrue(action.right - action.left >= 48.dp)
+            assertTrue(action.right - action.left >= 36.dp)
             assertTrue(action.bottom - action.top >= 48.dp)
         }
     }
@@ -501,7 +505,7 @@ class ConversationDictationPersistentControlTest {
         )
         listOf("Retry", "Dismiss").forEach { label ->
             val bounds = composeRule.onNodeWithContentDescription(label).assertIsDisplayed().getUnclippedBoundsInRoot()
-            assertTrue(bounds.right - bounds.left >= 48.dp)
+            assertTrue(bounds.right - bounds.left >= 36.dp)
             assertTrue(bounds.bottom - bounds.top >= 48.dp)
         }
     }
@@ -664,7 +668,7 @@ class ConversationDictationPersistentControlTest {
     }
 }
 
-/** Each completion choice is one labelled 48dp action; progress belongs to that action. */
+/** Each completion choice is one compact labelled action; progress belongs to that action. */
 private fun ConversationDictationPersistentControlTest.assertProcessingActionsAccessible(selectedLabel: String) {
     listOf("Send", transcriptPasteLabel).forEach { label ->
         composeRule.onAllNodesWithContentDescription(label).assertCountEquals(1)
@@ -672,7 +676,7 @@ private fun ConversationDictationPersistentControlTest.assertProcessingActionsAc
         action.assertIsEnabled().assertHasClickAction()
         action.assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, label == selectedLabel))
         val bounds = action.getUnclippedBoundsInRoot()
-        assertTrue(bounds.right - bounds.left >= 48.dp)
+        assertTrue(bounds.right - bounds.left >= 36.dp)
         assertTrue(bounds.bottom - bounds.top >= 48.dp)
     }
     composeRule.onNodeWithContentDescription(selectedLabel).assert(

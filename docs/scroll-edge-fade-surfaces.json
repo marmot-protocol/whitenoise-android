@@ -489,6 +489,40 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerConfiguredToolbar.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "conversation/composer",
+      "policy": "Use the shared state-bound fade for the bounded shortcut viewport, retaining its existing scroll state and enabled policy.",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "CON-038",
+        "CON-039",
+        "CON-040"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerToolbarEditor.kt",
+      "calls": {
+        "fadingVerticalScroll": 1
+      },
+      "family": "conversation/composer",
+      "policy": "Use the shared state-bound fade for the bounded shortcut viewport; retain existing scroll state, enabled policy and editor drag/autoscroll ownership.",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "CON-038",
+        "CON-039",
+        "CON-040"
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPills.kt",
       "calls": {
         "fadingVerticalScroll": 1,

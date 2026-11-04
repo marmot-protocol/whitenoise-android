@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="composer_customize">自訂訊息編輯器</string>
+    <string name="composer_settings">訊息編輯器</string>
+    <string name="composer_settings_detail">快速操作、順序與版面配置</string>
+    <string name="composer_layout">版面配置</string>
+    <string name="composer_side_left">左側</string>
+    <string name="composer_side_right">右側</string>
+    <string name="composer_layout_automatic">自動</string>
+    <string name="composer_layout_expanded">一律展開</string>
+    <string name="composer_selected">已選快速操作</string>
+    <string name="composer_available">可用操作</string>
+    <string name="composer_move_earlier">向前移動</string>
+    <string name="composer_move_later">向後移動</string>
+    <string name="composer_add">新增快速操作</string>
+    <string name="composer_remove">移除快速操作</string>
+    <string name="composer_reset">重設為預設值</string>
+    <string name="composer_save_failed">無法儲存輸入設定，請再試一次。</string>
+</resources>

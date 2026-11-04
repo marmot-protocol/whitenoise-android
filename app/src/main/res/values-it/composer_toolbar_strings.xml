@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="composer_customize">Personalizza il campo del messaggio</string>
+    <string name="composer_settings">Campo del messaggio</string>
+    <string name="composer_settings_detail">Scorciatoie, ordine e disposizione</string>
+    <string name="composer_layout">Disposizione</string>
+    <string name="composer_side_left">Sinistra</string>
+    <string name="composer_side_right">Destra</string>
+    <string name="composer_layout_automatic">Automatica</string>
+    <string name="composer_layout_expanded">Sempre espanso</string>
+    <string name="composer_selected">Scorciatoie selezionate</string>
+    <string name="composer_available">Azioni disponibili</string>
+    <string name="composer_move_earlier">Sposta prima</string>
+    <string name="composer_move_later">Sposta dopo</string>
+    <string name="composer_add">Aggiungi scorciatoia</string>
+    <string name="composer_remove">Rimuovi scorciatoia</string>
+    <string name="composer_reset">Ripristina valori predefiniti</string>
+    <string name="composer_save_failed">Impossibile salvare le impostazioni di composizione. Riprova.</string>
+</resources>

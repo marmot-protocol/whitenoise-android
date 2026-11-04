@@ -55,11 +55,11 @@ internal class ComposerActionRowAlignment(
     }
 }
 
-/** Keeps the trailing native action owner inside the shared 48dp composer toolbar. */
-internal fun Modifier.expandedComposerActionRow(): Modifier =
+/** A configured slot already owns its horizontal clearance; ordinary trailing controls retain their end gutter. */
+internal fun Modifier.expandedComposerActionRow(reserveEndInset: Boolean = true): Modifier =
     layout { measurable, constraints ->
         val rowHeight = ComposerActionRowHeight.roundToPx().coerceAtMost(constraints.maxHeight)
-        val endInset = 4.dp.roundToPx()
+        val endInset = if (reserveEndInset) 4.dp.roundToPx() else 0
         val placeable =
             measurable.measure(
                 constraints.copy(minHeight = rowHeight, maxHeight = rowHeight),
