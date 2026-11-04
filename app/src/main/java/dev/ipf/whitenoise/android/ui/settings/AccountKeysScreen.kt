@@ -669,7 +669,7 @@ private fun ProfileKeyValueRow(
     Surface(
         color = context.containerColor,
         shape = context.shapes.shape,
-        modifier = Modifier.fillMaxWidth().settingsRowBorder(context, editable = true),
+        modifier = Modifier.fillMaxWidth().settingsRowBorder(context),
     ) {
         Row(
             modifier =

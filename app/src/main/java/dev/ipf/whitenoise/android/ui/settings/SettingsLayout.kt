@@ -250,7 +250,7 @@ internal fun SettingsGroupPanel(
     Surface(
         color = context.containerColor,
         shape = context.shapes.shape,
-        modifier = modifier.fillMaxWidth().settingsRowBorder(context, editable = true),
+        modifier = modifier.fillMaxWidth().settingsRowBorder(context),
     ) {
         Column(Modifier.fillMaxWidth(), content = content)
     }
