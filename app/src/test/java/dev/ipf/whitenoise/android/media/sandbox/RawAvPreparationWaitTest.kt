@@ -11,6 +11,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -18,7 +19,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import java.io.IOException
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -174,6 +177,86 @@ class RawAvPreparationWaitTest {
         } finally {
             engine.close()
             scope.cancel()
+        }
+    }
+
+    /** Successful preparation is reused even when its caller arrives with the interrupt flag set. */
+    @Test
+    fun interruptedPreparePreservesSuccessfulPromiseAndInterruptFlag() {
+        val thread = Thread.currentThread()
+        val previouslyInterrupted = Thread.interrupted()
+        val probes = AtomicInteger()
+        val engine = engine(RuntimeEnvironment.getApplication(), probes)
+        try {
+            val successful = engine.prepare()
+            successful.get(2, TimeUnit.SECONDS)
+            val generation = field(engine, "prepareGeneration")
+            thread.interrupt()
+            assertSame(successful, engine.prepare())
+            assertTrue(thread.isInterrupted)
+            assertEquals(generation, field(engine, "prepareGeneration"))
+            assertEquals(1, probes.get())
+        } finally {
+            Thread.interrupted()
+            engine.close()
+            if (previouslyInterrupted) thread.interrupt()
+        }
+    }
+
+    /** A play-only retry replaces a failed promise while the stopped probe still owns its resources. */
+    @Test
+    fun playAfterPreparationFailureAdmitsNewPromiseAndRejectsStaleProbe() {
+        val context = RuntimeEnvironment.getApplication()
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val probes = AtomicInteger()
+        val engine =
+            RawAvPlaybackEngine(
+                context,
+                Uri.parse("file:///fixture.mp4"),
+                wantVideo = false,
+                externalAudioFocus = true,
+                listener =
+                    object : RawAvPlaybackEngine.Listener {
+                        override fun onChanged() = Unit
+                    },
+                prepareProbe = {
+                    if (probes.incrementAndGet() == 1) {
+                        entered.countDown()
+                        check(release.await(3, TimeUnit.SECONDS))
+                    }
+                    MediaProbe(0, 0, 4000, null)
+                },
+            )
+        try {
+            assertTrue(engine.setPlaying(true))
+            assertTrue(entered.await(2, TimeUnit.SECONDS))
+            val failed = field(engine, "prepared") as SettableFuture<*>
+            val oldActivation = engine.intent().activation
+            val failure = IOException("Preparation wait failed")
+            engine.failed(oldActivation, null, failure)
+            assertSame(failure, runCatching { failed.get() }.exceptionOrNull()?.cause)
+
+            // Draft controls call play(), which clears the visible error and Idle status before prepare().
+            assertTrue(engine.setPlaying(true))
+            val recovered = field(engine, "prepared") as SettableFuture<*>
+            assertNotSame(failed, recovered)
+            assertFalse(recovered.isDone)
+            // A returning failure from the old activation cannot poison the new preparation.
+            engine.failed(oldActivation, null, IOException("Stale renderer"))
+            assertFalse(recovered.isDone)
+            // Pause prevents opening a real source after the preparation-only assertion below.
+            engine.setPlaying(false)
+            release.countDown()
+            recovered.get(2, TimeUnit.SECONDS)
+            assertEquals(2, probes.get())
+            assertTrue(runCatching { failed.get() }.exceptionOrNull() is ExecutionException)
+            assertSame(recovered, engine.prepare())
+            engine.awaitPrepared()
+            assertEquals(RawAvPlaybackEngine.Status.Ready, engine.snapshot().status)
+        } finally {
+            release.countDown()
+            engine.close()
         }
     }
 

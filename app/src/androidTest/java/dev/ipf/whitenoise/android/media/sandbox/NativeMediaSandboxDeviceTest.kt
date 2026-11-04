@@ -271,7 +271,8 @@ class NativeMediaSandboxDeviceTest {
     ): Boolean {
         require(pid > 0 && pid != Process.myPid())
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
-        val command = "logcat -d -b main --uid=0 -v epoch -s Zygote:I '*:S'"
+        // executeShellCommand does not use a shell; -s already silences every other tag.
+        val command = "logcat -d -b main --uid=0 -v epoch -s Zygote:I"
         val descriptor = automation.executeShellCommand(command)
         return android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { input ->
             val bytes = ByteArray(NativeSandboxExitEvidence.MAX_BYTES + 1)

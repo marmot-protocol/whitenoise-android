@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import androidx.media3.common.Player
+import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.SettableFuture
 import kotlinx.coroutines.CancellationException
@@ -219,7 +220,8 @@ internal class RawAvPlaybackEngine(
             if (!current()) {
                 prepared.setException(IOException("Media source owner retired"))
             } else {
-                val restart = status == Status.Idle || error != null || prepared.isCancelled
+                val abnormalDone = prepared.isDone && runCatching { Futures.getDone(prepared) }.isFailure
+                val restart = status == Status.Idle || error != null || abnormalDone
                 if (restart) {
                     // An early paused seek may already wait for the initial unadmitted promise.
                     if (prepareGeneration != 0L || prepared.isDone) prepared = SettableFuture.create()
