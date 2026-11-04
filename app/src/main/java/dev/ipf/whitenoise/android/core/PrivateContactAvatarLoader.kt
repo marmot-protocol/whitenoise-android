@@ -96,6 +96,22 @@ internal object PrivateContactAvatarLoader {
         return image ?: selection.second?.let { AvatarImageLoader.load(it, published) }
     }
 
+    /**
+     * Adopts pixels another consumer publishes for this handle's stored picture or its public fallback,
+     * without reading the private file itself (#3557). Every wake goes back through [peek], so ownership is
+     * revalidated and another account's handle never adopts anything.
+     */
+    suspend fun awaitCached(
+        source: String,
+        accountRef: String? = null,
+        lifetime: Long,
+    ): ImageBitmap? {
+        val selection = parse(source) ?: return null
+        val keys = setOfNotNull(currentReference(selection.first, accountRef)?.cacheKey, selection.second)
+        if (keys.isEmpty()) return null
+        return AvatarImageLoader.awaitPublication(keys, lifetime) { peek(source, accountRef) }
+    }
+
     /** Revalidates display ownership before resolving a newer immutable selection for a captured handle. */
     private fun currentReference(
         reference: ContactPictureReference,

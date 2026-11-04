@@ -1975,7 +1975,10 @@ class ChatsController private constructor(
                             chatListWindows === chatListStream,
                     )
                     if (!isActiveBindEpoch(epoch)) break
-                    chatListStream.publishIfCurrent(initialFrame, ::replacePresentedChatRows)
+                    chatListStream.publishIfCurrent(initialFrame) { rows ->
+                        replacePresentedChatRows(rows)
+                        stagedChatListFrame = ChatListFrameMark(chatListStream, initialFrame.revision)
+                    }
                     appState.schedulePendingLocalGroupDeleteCleanup()
                     appState.recordAccountSwitchLocalRowsReady(accountRef, chatRows.size)
                     val initialGroups =
@@ -3172,6 +3175,7 @@ class ChatsController private constructor(
             else -> {
                 windows.publishIfCurrent(frame) { rows ->
                     replacePresentedChatRows(rows)
+                    stagedChatListFrame = ChatListFrameMark(windows, frame.revision)
                     scheduleRecompute()
                 }
                 !windows.closed
@@ -4841,6 +4845,51 @@ class ChatsController private constructor(
     /** Keeps folded native updates synchronous while coalescing only their visible publication. */
     private fun scheduleRecompute() = presentationLifetime.schedule()
 
+    /** The window frame whose rows wait for the next visible projection. */
+    @Volatile private var stagedChatListFrame: ChatListFrameMark? = null
+
+    /** The window frame whose rows [items] last published; snapshot state, so a pin follow can wait on it. */
+    private var presentedChatListFrame by mutableStateOf<ChatListFrameMark?>(null)
+
+    /**
+     * Returns [view] to its top and marks the frame a caller should wait for with [chatListFramePresented]: the
+     * one holding the restored head, or, when the command installed nothing itself (a newer frame from the
+     * receive loop already won, or MDK answered stale), the live set's current frame, which may still sit in
+     * the projection debounce. Null only when no live window set remains to wait on.
+     */
+    internal suspend fun returnChatListToTopFrame(view: ChatListViewFfi): ChatListFrameMark? {
+        val windows = chatListWindows
+        val account = accountRef
+        return when {
+            windows == null || account == null -> null
+            windows.returnToTop(view) == null -> windows.currentFrameMarkIfLive()
+            else ->
+                ChatListFrameMark(windows, windows.frame().revision)
+                    .takeIf { applyChatListWindowRows(account, windows) }
+        }
+    }
+
+    /** This set's current frame while it is still open and still the controller's window set, else null. */
+    private fun ChatListWindowSet.currentFrameMarkIfLive(): ChatListFrameMark? =
+        takeIf { !closed && chatListWindows === it }?.let { ChatListFrameMark(it, it.frame().revision) }
+
+    /**
+     * Whether [items] now shows [mark]'s frame or a newer one from the same window set. A replaced or
+     * closed window set also counts, since that frame will never be shown and the caller must not wait on it.
+     */
+    internal fun chatListFramePresented(mark: ChatListFrameMark): Boolean {
+        val presented = presentedChatListFrame
+        if (chatListWindows !== mark.windows) return true
+        return presented != null && presented.windows === mark.windows && presented.revision >= mark.revision
+    }
+
+    /** Whether [items] shows a frame newer than [mark] from its window set, or that set was replaced or closed. */
+    internal fun chatListFrameSuperseded(mark: ChatListFrameMark): Boolean {
+        val presented = presentedChatListFrame
+        if (chatListWindows !== mark.windows) return true
+        return presented != null && presented.windows === mark.windows && presented.revision > mark.revision
+    }
+
     /**
      * Dispose every reference this controller owns. The chat-list screen calls
      * this once when it disposes the controller, which happens on every account
@@ -4955,6 +5004,7 @@ class ChatsController private constructor(
         val avatarWarmTargets = visible.take(CHAT_LIST_AVATAR_WARM_ROWS)
         items = visible
         archivedItems = archived
+        presentedChatListFrame = stagedChatListFrame
         val recoveryGeneration = pendingRecoveryProjectionGeneration.consume()
         if (recoveryGeneration > 0L) {
             if (

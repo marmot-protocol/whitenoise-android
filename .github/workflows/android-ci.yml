@@ -223,6 +223,8 @@ jobs:
       - name: Verify generated performance profiles
         run: |
           bash .github/scripts/test-verify-generated-profiles.sh
+          bash .github/scripts/test-verify-baseline-profile.sh
+          python3 -m unittest scripts/test_merge_baseline_profiles.py
           bash scripts/verify-generated-profiles.sh
 
       - name: Test Android CI aggregate gate
@@ -389,7 +391,10 @@ jobs:
             | if length == 1 then .[0].outputFile else empty end
           ' "$metadata")
           app_apk="$(dirname "$metadata")/$output_file"
-          bash scripts/verify-baseline-profile.sh "$app_apk"
+          # Macrobenchmarks measure this variant, so it must carry the app's
+          # generated profile and not just the library rules.
+          merged=app/build/intermediates/merged_art_profile/devZapstoreBenchmarkRelease/mergeDevZapstoreBenchmarkReleaseArtProfile/baseline-prof.txt
+          bash scripts/verify-baseline-profile.sh "$app_apk" "$merged"
           printf 'apk=%s\n' "$app_apk" >> "$GITHUB_OUTPUT"
 
       # benchmarkRelease is unminified D8 output. Its budget warns when a benchmarked

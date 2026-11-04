@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -518,6 +519,7 @@ internal fun ComposerBar(
     val density = LocalDensity.current
     val editorLineHeight = rememberComposerEditorLineHeight()
     var composerEmojiPickerOpen by remember { mutableStateOf(false) }
+    var closeSendingIdentity by remember { mutableStateOf<(() -> Unit)?>(null) }
     var composerEmojiPickerRequested by remember { mutableStateOf(false) }
     var composerEmojiSearchActive by remember { mutableStateOf(false) }
     var composerKeyboardRestorePending by remember { mutableStateOf(false) }
@@ -1420,7 +1422,11 @@ internal fun ComposerBar(
                     ComposerPill(
                         sendingIdentity =
                             if (appState != null && composerSendingAccount(appState, draftAccountRef) != null) {
-                                { ComposerSendingIdentity(appState, draftAccountRef, draftKey, overlayBackRegistrar) }
+                                {
+                                    ComposerSendingIdentity(appState, draftAccountRef, draftKey, overlayBackRegistrar) {
+                                        closeSendingIdentity = it
+                                    }
+                                }
                             } else {
                                 null
                             },
@@ -1505,9 +1511,18 @@ internal fun ComposerBar(
                                 onPoll = onCreatePoll,
                             )
                         },
-                        preImeBackEnabled = !composerEmojiPickerOpen && !attachmentSheetState.isOpen,
+                        // Android 13+ lets the open confirmation's overlay callback take Back ahead of the keyboard,
+                        // so the composer stands down. Earlier, only this pre-IME catch runs before the keyboard, so
+                        // it closes the confirmation itself and the keyboard stays up (#3553).
+                        preImeBackEnabled =
+                            !composerEmojiPickerOpen &&
+                                !attachmentSheetState.isOpen &&
+                                (closeSendingIdentity == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU),
                         onPreImeBack = {
-                            if (onComposerPreImeBack != null) {
+                            val closeConfirmation = closeSendingIdentity
+                            if (closeConfirmation != null) {
+                                closeConfirmation()
+                            } else if (onComposerPreImeBack != null) {
                                 onComposerPreImeBack()
                             } else {
                                 focusManager.clearFocus(force = true)
