@@ -76,6 +76,8 @@ internal class MediaDownloadIntegrationFixture(
 
     @Volatile private var nativeImagesAllowed = false
     val permissionApplications = AtomicInteger()
+    val permissionHistory = CopyOnWriteArrayList<AttachmentAutomaticPermissionFfi>()
+    var onPermissionApplied: () -> Unit = {}
 
     /** Native permission generations begun, one per refresh that reached the runtime. */
     val permissionBegins = AtomicInteger()
@@ -240,7 +242,10 @@ internal class MediaDownloadIntegrationFixture(
                 }
                 "setAttachmentAutomaticPermission" -> {
                     permissionApplications.incrementAndGet()
-                    nativeImagesAllowed = (args!![2] as AttachmentAutomaticPermissionFfi).images
+                    val permission = args!![2] as AttachmentAutomaticPermissionFfi
+                    nativeImagesAllowed = permission.images
+                    permissionHistory.add(permission)
+                    onPermissionApplied()
                     true
                 }
                 "downloadMedia" -> error("Legacy network fallback is forbidden")

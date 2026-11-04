@@ -26,6 +26,7 @@ import dev.ipf.whitenoise.android.state.attachmentDownloadWorkName
 import dev.ipf.whitenoise.android.state.attachmentIntentStore
 import dev.ipf.whitenoise.android.state.nativeProgress
 import dev.ipf.whitenoise.android.state.openNativeAttachment
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -88,6 +89,9 @@ internal object PlatformInterruptedAttachmentProbe {
 
         val workStates = CopyOnWriteArrayList<WorkInfo>()
         val nativeStates = CopyOnWriteArrayList<NativeResumeSnapshot>()
+
+        // Keep the earliest facts even after the rolling resume buffer has evicted them.
+        val initialNativeStates = CopyOnWriteArrayList<NativeResumeSnapshot>()
     }
 
     /** Automatic demand receives no interactive read, deliberate Retry, force-run or seeded checkpoint. */
@@ -122,16 +126,8 @@ internal object PlatformInterruptedAttachmentProbe {
             HeldAttachmentCancellationProbe.control(port, "/__hold-resumable-acquisition")
             ActivityScenario.launch(ComponentActivity::class.java).use { scenario ->
                 enableAutomaticDocumentPolicy(state)
-                withContext(Dispatchers.Main.immediate) {
-                    AttachmentDownloadWorker.enqueue(context, request, AttachmentDownloadPriority.Automatic)
-                }
-                step = "first-run"
-                withTimeout(20_000L) { while (states.none { it.state == WorkInfo.State.RUNNING }) delay(25L) }
-                val firstRun = states.first { it.state == WorkInfo.State.RUNNING }
-                step = "held-prefix"
-                val progress = awaitAutomaticProgress(state, request)
                 nativeObserver =
-                    launch {
+                    launch(start = CoroutineStart.UNDISPATCHED) {
                         state
                             .nativeProgress(request)
                             .filterNotNull()
@@ -144,10 +140,21 @@ internal object PlatformInterruptedAttachmentProbe {
                                     retryAt = it.retryAt,
                                 )
                             }.collect {
+                                if (observations.initialNativeStates.size < FAILURE_STATE_LIMIT) {
+                                    observations.initialNativeStates.add(it)
+                                }
                                 if (nativeStates.size == FAILURE_STATE_LIMIT) nativeStates.removeAt(0)
                                 nativeStates.add(it)
                             }
                     }
+                withContext(Dispatchers.Main.immediate) {
+                    AttachmentDownloadWorker.enqueue(context, request, AttachmentDownloadPriority.Automatic)
+                }
+                step = "first-run"
+                withTimeout(20_000L) { while (states.none { it.state == WorkInfo.State.RUNNING }) delay(25L) }
+                val firstRun = states.first { it.state == WorkInfo.State.RUNNING }
+                step = "held-prefix"
+                val progress = awaitAutomaticProgress(state, request)
                 awaitFirstNativeSnapshot(nativeStates)
                 assertEquals((bytes.size + 16).toULong(), progress.total)
                 HeldAttachmentCancellationProbe.awaitLedger(port) { events ->
@@ -246,6 +253,7 @@ internal object PlatformInterruptedAttachmentProbe {
                         .put("native_observation_before_stop", nativeObservationBeforeStop)
                         .put("resume_phase_timings", observations.phaseDiagnostics())
                         .put("native_resume_states", nativeResumeDiagnostics(nativeStates))
+                        .put("native_initial_states", nativeResumeDiagnostics(observations.initialNativeStates))
                         .put("android_process_restart_qualified", false),
                 )
             }
@@ -463,6 +471,7 @@ internal object PlatformInterruptedAttachmentProbe {
                     JSONArray(observations.workStates.takeLast(FAILURE_STATE_LIMIT).map { it.state.name }),
                 ).put("resume_phase_timings", observations.phaseDiagnostics())
                 .put("native_resume_states", nativeResumeDiagnostics(observations.nativeStates))
+                .put("native_initial_states", nativeResumeDiagnostics(observations.initialNativeStates))
                 .put("ledger_kinds", JSONObject(counts.filterKeys { it.isNotEmpty() }))
                 .put("ms_since_stop", sinceStop),
         )

@@ -189,7 +189,12 @@ jars or arbitrary external downloads.
 Artifact verification still covers Maven artifacts resolved by detached/plugin
 configurations. The wrapper distribution hash, pinned Android command-line tools
 and existing MarmotKit source/archive/native hashes retain their separate checks.
-Do not describe those external inputs as covered by a Maven lock. Synthetic Maven
+Do not describe those external inputs as covered by a Maven lock.
+CI fetches Robolectric's SDK jars before the unit tests with
+`scripts/prefetch-robolectric-android-all.sh`, which retries the download and
+checks each jar against the SHA-512 pinned in `scripts/robolectric-android-all.sha512`.
+That list names the Robolectric version it was written for, and the script fails
+when `gradle/libs.versions.toml` moves on, so a Robolectric update must refresh it. Synthetic Maven
 fixtures deliberately create their own temporary trust roots and never share or
 update the production evidence; source archives consume the checked-in inputs
 without needing Git metadata.

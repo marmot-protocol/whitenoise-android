@@ -28,11 +28,79 @@ internal class NativeAttachmentPermissions {
         val accounts: Map<String, AttachmentAutomaticPermissionFfi>,
     )
 
+    /** Network callback equivalence is scoped to one runtime, revision and signed-in account set. */
+    private data class NetworkRefresh(
+        val snapshot: AttachmentPermissionNetworkSnapshot,
+        val accounts: Set<String>,
+        val revision: Long,
+        val owner: Any,
+    )
+
+    private var networkRefresh: NetworkRefresh? = null
+
+    /**
+     * Only network callbacks may reuse an equivalent successful or still-applying refresh. Generic invalidation
+     * clears this record, so settings, account and runtime changes always evaluate again. Call under the host's
+     * permission refresh lock, like generic invalidate/beginRefresh.
+     */
+    @Synchronized
+    fun beginNetworkRefresh(
+        snapshot: AttachmentPermissionNetworkSnapshot,
+        accounts: Set<String>,
+        owner: Any,
+    ): Long? {
+        val detachedSnapshot =
+            snapshot.copy(
+                validatedNetworkHandles = snapshot.validatedNetworkHandles.toSet(),
+                networkTypes = snapshot.networkTypes.toSet(),
+            )
+        val previous = networkRefresh
+        if (previous != null &&
+            previous.snapshot == detachedSnapshot &&
+            previous.accounts == accounts &&
+            previous.owner === owner &&
+            isCurrent(previous.revision, owner)
+        ) {
+            val current = applied.value
+            if (refreshInFlight(owner) ||
+                (current.revision == previous.revision && accounts.all { it in current.accounts })
+            ) {
+                return null
+            }
+        }
+        val next = invalidate(owner)
+        networkRefresh = NetworkRefresh(detachedSnapshot, accounts.toSet(), next, owner)
+        beginRefresh(next)
+        return next
+    }
+
+    /**
+     * A network refresh evaluates live inputs after pending preference commits. If any account evaluated a
+     * different tuple than its initial key, that revision must never be reused as equivalent to the key again.
+     * Clearing, rather than rebinding, also handles A -> B -> A while the coalescer is awaiting this apply.
+     */
+    @Synchronized
+    fun noteNetworkEvaluation(
+        expectedRevision: Long,
+        expectedOwner: Any,
+        snapshot: AttachmentPermissionNetworkSnapshot,
+    ) {
+        val recorded = networkRefresh ?: return
+        if (recorded.revision == expectedRevision &&
+            recorded.owner === expectedOwner &&
+            recorded.snapshot != snapshot
+        ) {
+            networkRefresh = null
+        }
+    }
+
     /**
      * Invalidates pending evaluations and binds the next revision to one runtime identity. No account counts as
      * applied again until an update under the new revision applies it.
      */
+    @Synchronized
     fun invalidate(owner: Any?): Long {
+        networkRefresh = null
         runtimeOwner.set(owner)
         val next = revision.incrementAndGet()
         applied.update { current -> if (next > current.revision) AppliedPermissions(next, emptyMap()) else current }
@@ -156,3 +224,12 @@ internal fun MediaAutoDownloadMatrix.nativePermission(
         files = allowed(MediaAutoDownloadType.Document),
     )
 }
+
+/** Immutable platform inputs, including identity changes that leave the category mask unchanged. */
+internal data class AttachmentPermissionNetworkSnapshot(
+    val defaultNetworkHandle: Long?,
+    val validatedNetworkHandles: Set<Long>,
+    val hasActiveNetwork: Boolean,
+    val hasValidatedInternet: Boolean,
+    val networkTypes: Set<MediaAutoDownloadNetwork>,
+)
