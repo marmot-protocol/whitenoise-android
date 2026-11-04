@@ -76,8 +76,11 @@ artifact retention); it is not a durable release distribution asset.
   `gradle/gradle-daemon-jvm.properties` criteria remain unchanged). This report
   covers the JVM executing Gradle, not separate compiler or worker processes.
   The Gradle wrapper checksum and repository dependency versions are pinned, and CI
-  records installed Android SDK packages in `repro-build-environment.txt` before
-  the verifier cleans up its temporary Gradle state. Android SDK packages and
+  records the Android SDK platform and build-tools that AGP resolved for `:app`
+  (named by the same init script) in `repro-build-environment.txt` before the
+  verifier cleans up its temporary Gradle state. Other installed SDK packages are
+  not fingerprinted: runner images ship many platforms the build never reads, and
+  a partial image rollout can change those between the two runners. Android SDK packages and
   Maven dependencies are not yet pinned by repository-owned content hashes.
   MarmotKit is pinned separately by the repository-owned lock and archive SHA-256.
   The local script checks path/build-order determinism on one host. CI additionally
@@ -95,7 +98,8 @@ Check out the tag and reproduce the environment recorded in the workflow's
 `repro-build-environment.txt` artifact. CI uses Ubuntu 24.04, exact Temurin
 21.0.7+6.0.LTS as `JAVA_HOME`, records each build’s actual JVM properties in the
 toolchain report, and lists the apksigner path used for unsigned checks; the report
-also lists installed Android SDK package revisions and wrapper checksums. The script
+also lists the SDK platform and build-tools the build used, with their hashes, and
+wrapper checksums. The script
 currently requires Linux with Bash and GNU coreutils/findutils. Then run:
 
 ```bash
