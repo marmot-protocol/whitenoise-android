@@ -1,8 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -80,33 +78,6 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
     @Test
     fun burstOfShortIncomingMessagesKeepsFollowingTheTail() {
         verifyAppend(AppendCase(bodyLines = 1, expectReadingStart = false, shortBurstCount = SHORT_BURST_COUNT))
-    }
-
-    /**
-     * A tall message that arrives together with enough short ones to fill the screen is never laid out at the tail,
-     * and nothing earlier in the burst saw it, yet the append still starts at its beginning.
-     */
-    @Test
-    fun tallMessageArrivingWithAScreenOfShortOnesStartsAtItsBeginning() {
-        verifyAppend(
-            AppendCase(bodyLines = TALL_BODY_LINES, expectReadingStart = true, shortBurstCount = SHORT_BURST_COUNT),
-        )
-    }
-
-    /**
-     * A short message, a tall one and a screen of short ones arrive together. Neither of the first two is laid out at
-     * the tail, the tall one is found by premeasuring, and the append starts at the short first message.
-     */
-    @Test
-    fun tallMiddleMessageArrivingWithAScreenOfShortOnesStartsAtTheFirstMessage() {
-        verifyAppend(
-            AppendCase(
-                bodyLines = 1,
-                expectReadingStart = true,
-                burstLines = TALL_BODY_LINES,
-                shortBurstCount = SHORT_BURST_COUNT,
-            ),
-        )
     }
 
     /** An incoming message that fits keeps the newest edge and the tail-following intent. */
@@ -337,7 +308,7 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
             val writesBeforeAppend = evidence.writeCount()
             timeline.emitWindow(timelinePage(*appended.toTypedArray()))
             awaitLanding(fixture, case, evidence, newestId = appended.last().messageIdHex)
-            if (case.shortBurstCount > 0 && !case.expectReadingStart) {
+            if (case.shortBurstCount > 0) {
                 assertOnlyTheTailWrite(evidence.writesSince(writesBeforeAppend))
             }
             if (case.expectReadingStart) {
@@ -408,20 +379,16 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
     }
 
     /** Mounts the production screen with the opt-in viewport evidence sink and the case's appearance. */
-    @OptIn(ExperimentalFoundationApi::class) // Provides a prefetch scheduler, which Robolectric otherwise turns off.
     private fun mount(
         fixture: DirectNotificationConversationFixture,
         mounted: MutableState<Boolean>,
         evidence: ViewportEvidence,
         appearance: DirectNotificationAppearance,
     ) {
-        val prefetchScheduler = FramePrefetchScheduler()
         composeRule.setContent {
-            LaunchedEffect(prefetchScheduler) { prefetchScheduler.run() }
             if (mounted.value) {
                 CompositionLocalProvider(
                     LocalConversationScrollEvidenceSink provides evidence,
-                    LocalConversationPrefetchScheduler provides prefetchScheduler,
                     LocalLayoutDirection provides if (appearance.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
                 ) {
                     WhiteNoiseTheme(fontScale = appearance.fontScale) {

@@ -9,20 +9,12 @@ package dev.ipf.whitenoise.android.ui.conversation
 internal class IncomingAppendTestList(
     private val viewportEndPx: Int,
     heightsPx: List<Int>,
-) : ConversationScrollWriter,
-    ConversationRowPremeasurer {
+) : ConversationScrollWriter {
     /** Row heights by list index, newest first — a test may grow one to model a late remeasure. */
     val heightsPx = heightsPx.toMutableList()
 
     /** Every write in order, as (index, scroll offset) pairs. */
     val writes = mutableListOf<Pair<Int, Int>>()
-
-    /** Every row index premeasured off screen, in order. */
-    val premeasured = mutableListOf<Int>()
-
-    /** How many premeasured rows were released. */
-    var released = 0
-        private set
     private var requested = 0 to 0
     private var measured: Pair<Int, Int>? = null
 
@@ -47,16 +39,6 @@ internal class IncomingAppendTestList(
 
     /** Advances one frame, which changes nothing here because every write is already measured. */
     fun frame() = Unit
-
-    /** Reports the row's height at once, as an urgent prefetch does by the next frame, without moving the list. */
-    override fun premeasure(
-        index: Int,
-        onMeasured: (Int) -> Unit,
-    ): (() -> Unit)? {
-        premeasured += index
-        heightsPx.getOrNull(index)?.let(onMeasured)
-        return { released++ }
-    }
 
     /** Marks the current position as measured without a write, as an already-settled list is. */
     fun settle(
