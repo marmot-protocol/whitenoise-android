@@ -213,11 +213,7 @@ class AvStreamSourceOwnershipTest {
                 assertFalse(retirementWaiter.isAlive)
                 assertNull(retirementFailure.get()?.stackTraceToString(), retirementFailure.get())
                 assertEquals(true, retired.get())
-                val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(AvStreamProtocol.CALL_DEADLINE_MS)
-                assertTrue(nextSourceOpened.await(AvStreamProtocol.CALL_DEADLINE_MS, TimeUnit.MILLISECONDS))
-                val remaining = (deadline - System.nanoTime()).coerceAtLeast(0)
-                if (remaining > 0) TimeUnit.NANOSECONDS.timedJoin(calls[1], remaining)
-                assertFalse(calls[1].isAlive)
+                awaitSourceCall(nextSourceOpened, calls[1])
                 assertTrue(secondFailure.get()?.stackTraceToString(), secondFailure.get() is IOException)
                 assertEquals(if (staged) 2 else 1, opens)
             }
@@ -244,6 +240,17 @@ class AvStreamSourceOwnershipTest {
             }
             file.delete()
         }
+    }
+
+    private fun awaitSourceCall(
+        opened: CountDownLatch,
+        call: Thread,
+    ) {
+        val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(AvStreamProtocol.CALL_DEADLINE_MS)
+        assertTrue(opened.await(AvStreamProtocol.CALL_DEADLINE_MS, TimeUnit.MILLISECONDS))
+        val remaining = (deadline - System.nanoTime()).coerceAtLeast(0)
+        if (remaining > 0) TimeUnit.NANOSECONDS.timedJoin(call, remaining)
+        assertFalse(call.isAlive)
     }
 
     private fun holdClose(
