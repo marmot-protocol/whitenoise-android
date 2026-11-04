@@ -924,7 +924,9 @@ jobs:
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
       # Robolectric downloads these inside the test JVMs without retrying; fetch them first.
+      # It took 8 s on a hosted runner; the cap keeps a slow mirror from eating the test budget.
       - name: Prefetch Robolectric Android jars
+        timeout-minutes: 5
         shell: bash
         run: ./scripts/prefetch-robolectric-android-all.sh
 
@@ -1111,7 +1113,9 @@ jobs:
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
       # Robolectric downloads these inside the test JVMs without retrying; fetch them first.
+      # It took 8 s on a hosted runner; the cap keeps a slow mirror from eating the test budget.
       - name: Prefetch Robolectric Android jars
+        timeout-minutes: 5
         shell: bash
         run: ./scripts/prefetch-robolectric-android-all.sh
 

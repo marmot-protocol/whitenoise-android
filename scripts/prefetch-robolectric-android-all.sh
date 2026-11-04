@@ -41,7 +41,9 @@ fetch_jar() {
     return 0
   fi
   mkdir -p "$dir"
+  # A stalled transfer (under 1 MiB/s for 30 s) or a slow attempt fails so the next retry starts.
   curl --fail --silent --show-error --location --retry 5 --retry-all-errors --retry-delay 5 \
+    --connect-timeout 20 --speed-limit 1048576 --speed-time 30 --max-time 300 \
     --output "$partial" "$REMOTE/$ARTIFACT_PATH/$version/$name"
   if [[ "$(sha512_of "$partial")" != "$expected" ]]; then
     rm -f -- "$partial"
