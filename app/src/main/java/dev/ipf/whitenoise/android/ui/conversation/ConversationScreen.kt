@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.scrollBy
@@ -674,12 +675,20 @@ internal fun ConversationScreen(
                 notificationOpenRequestId = notificationOpenRequestId,
             )
         }
+
+    // Prefetches as the default strategy does, and lets an incoming append measure a row the tail did not lay out.
+    // Prefetch strategies are still experimental foundation API.
+    @OptIn(ExperimentalFoundationApi::class)
+    val transcriptPrefetch = rememberConversationTranscriptPrefetch(controller)
+
+    @OptIn(ExperimentalFoundationApi::class)
     val listState =
         key(controller) {
             rememberLazyListState(
                 initialFirstVisibleItemIndex =
                     positionalScrollRestore?.firstVisibleItemIndex ?: firstFrameSeed.initialListIndex,
                 initialFirstVisibleItemScrollOffset = positionalScrollRestore?.firstVisibleItemScrollOffset ?: 0,
+                prefetchStrategy = transcriptPrefetch,
             )
         }
     val timelineViewport = remember(listState) { ConversationTimelineViewport(listState) }
@@ -3306,6 +3315,7 @@ internal fun ConversationScreen(
                         resolveTailIndex = { currentTailIndex },
                         oversizedSeen = incomingAppendLanding.oversizedSeen,
                         onOversized = incomingAppendLanding::markOversized,
+                        premeasurer = transcriptPrefetch,
                     )
                 incomingAppendLanding.retire()
                 if (outcome is ConversationIncomingAppendOutcome.RevealedReadingStart) {

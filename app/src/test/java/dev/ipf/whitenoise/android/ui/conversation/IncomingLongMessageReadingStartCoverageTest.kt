@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -72,8 +74,8 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
     }
 
     /**
-     * A burst of short incoming messages that together overflow the viewport keeps following the tail. Besides the
-     * offset-zero tail write, its append only snaps to the burst's first row to measure it and straight back.
+     * A burst of short incoming messages that together overflow the viewport keeps following the tail, and its append
+     * is made of exactly one write, the offset-zero tail, with no measuring scroll of its off-screen rows.
      */
     @Test
     fun burstOfShortIncomingMessagesKeepsFollowingTheTail() {
@@ -88,6 +90,22 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
     fun tallMessageArrivingWithAScreenOfShortOnesStartsAtItsBeginning() {
         verifyAppend(
             AppendCase(bodyLines = TALL_BODY_LINES, expectReadingStart = true, shortBurstCount = SHORT_BURST_COUNT),
+        )
+    }
+
+    /**
+     * A short message, a tall one and a screen of short ones arrive together. Neither of the first two is laid out at
+     * the tail, the tall one is found by premeasuring, and the append starts at the short first message.
+     */
+    @Test
+    fun tallMiddleMessageArrivingWithAScreenOfShortOnesStartsAtTheFirstMessage() {
+        verifyAppend(
+            AppendCase(
+                bodyLines = 1,
+                expectReadingStart = true,
+                burstLines = TALL_BODY_LINES,
+                shortBurstCount = SHORT_BURST_COUNT,
+            ),
         )
     }
 
@@ -320,7 +338,7 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
             timeline.emitWindow(timelinePage(*appended.toTypedArray()))
             awaitLanding(fixture, case, evidence, newestId = appended.last().messageIdHex)
             if (case.shortBurstCount > 0 && !case.expectReadingStart) {
-                assertTheTailWithOneMeasuringSnap(evidence.writesSince(writesBeforeAppend))
+                assertOnlyTheTailWrite(evidence.writesSince(writesBeforeAppend))
             }
             if (case.expectReadingStart) {
                 assertIncomingAtReadingTop()
@@ -390,16 +408,20 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
     }
 
     /** Mounts the production screen with the opt-in viewport evidence sink and the case's appearance. */
+    @OptIn(ExperimentalFoundationApi::class) // Provides a prefetch scheduler, which Robolectric otherwise turns off.
     private fun mount(
         fixture: DirectNotificationConversationFixture,
         mounted: MutableState<Boolean>,
         evidence: ViewportEvidence,
         appearance: DirectNotificationAppearance,
     ) {
+        val prefetchScheduler = FramePrefetchScheduler()
         composeRule.setContent {
+            LaunchedEffect(prefetchScheduler) { prefetchScheduler.run() }
             if (mounted.value) {
                 CompositionLocalProvider(
                     LocalConversationScrollEvidenceSink provides evidence,
+                    LocalConversationPrefetchScheduler provides prefetchScheduler,
                     LocalLayoutDirection provides if (appearance.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
                 ) {
                     WhiteNoiseTheme(fontScale = appearance.fontScale) {
@@ -415,14 +437,11 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
         }
     }
 
-    /** A short-only burst writes the tail, snaps once to measure its first row and returns to the same tail. */
-    private fun assertTheTailWithOneMeasuringSnap(writes: List<ConversationScrollWriteEvidence>) {
-        assertEquals("a short burst must make the tail, probe and return writes: $writes", 3, writes.size)
+    /** A short-only burst writes the tail once and nothing else: no measuring scroll, no return. */
+    private fun assertOnlyTheTailWrite(writes: List<ConversationScrollWriteEvidence>) {
+        assertEquals("a short burst must make exactly one write: $writes", 1, writes.size)
         val tail = writes.first()
         assertEquals(ConversationScrollWriteEvidence(animated = false, index = tail.index, offsetPx = 0), tail)
-        val probe = writes[1]
-        assertEquals(ConversationScrollWriteEvidence(animated = false, index = probe.index, offsetPx = 0), probe)
-        assertEquals(tail, writes.last())
     }
 
     /** The settled mode is a history reading anchored on the incoming message. */

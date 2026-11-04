@@ -2188,15 +2188,72 @@ class ConversationScrollCoordinatorTest {
 
     /**
      * A tall first row hidden entirely behind a newer row that exactly fills the viewport is never laid out at the
-     * tail, so a measuring snap reads it, restores the tail in the same frame and the burst lands on its beginning.
+     * tail, so it is premeasured off screen and the burst lands on its beginning without any measuring scroll.
      */
     @Test
     fun oversizedRowHiddenBehindAFittingNewestRowStartsAtItsBeginning() =
         runTest {
             assertBurstLandsOnFirstRow(
                 heightsPx = listOf(600, 900, 80),
-                expectedWrites = listOf(0 to 0, 1 to 0, 0 to 0, 1 to 0, 1 to 300),
+                expectedWrites = listOf(0 to 0, 1 to 0, 1 to 300),
             )
+        }
+
+    /**
+     * A short first row, a tall middle row and a newest row that fills the viewport arrive together. Neither older row
+     * is laid out at the tail, premeasuring finds the tall one, and the burst lands on the short first row, whose
+     * beginning is the first unread line.
+     */
+    @Test
+    fun tallMiddleRowHiddenBehindAFittingNewestRowLandsOnTheFirstRow() =
+        runTest {
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(600, 900, 100, 80))
+            list.settle(index = 3)
+            val coordinator = ConversationScrollCoordinator(list)
+            val outcome = appendBurst(coordinator, list, listOf("first", "second", "third"))
+            assertEquals("first", (outcome as ConversationIncomingAppendOutcome.RevealedReadingStart).anchor.messageId)
+            assertEquals(listOf(0 to 0, 2 to 0, 2 to -500), list.writes)
+            assertEquals(listOf(2, 1), list.premeasured)
+            assertEquals(2, list.released)
+        }
+
+    /**
+     * A row under the newest message takes space only from rows at the tail. An off-tail row that fits the viewport
+     * alone is not oversized, so the burst keeps the tail.
+     */
+    @Test
+    fun offTailRowIsMeasuredAgainstTheViewportAlone() =
+        runTest {
+            // Newest first: a 40 px trailing row, two 300 px rows at the tail, and a 580 px first row above them.
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(40, 300, 300, 580, 80))
+            list.settle(index = 4)
+            val ids = listOf("first", "second", "third")
+            val outcome =
+                ConversationScrollCoordinator(list).followAppendOrRevealIncomingStart(
+                    candidates = ids.map(::incoming),
+                    probeFor = { candidate -> list.probe { ids.size - ids.indexOf(candidate.messageId) } },
+                    resolveTailIndex = { 0 },
+                    premeasurer = list,
+                    awaitFrame = list::frame,
+                )
+            assertEquals(ConversationIncomingAppendOutcome.FollowedTail, outcome)
+            assertEquals(listOf(3), list.premeasured)
+            assertEquals(listOf(0 to 0), list.writes)
+        }
+
+    /** A catch-up far longer than the viewport premeasures only its oldest off-tail rows, up to the row budget. */
+    @Test
+    fun longShortCatchUpPremeasuresOnlyItsOldestRows() =
+        runTest {
+            val ids = (0 until 30).map { "row$it" }
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = List(ids.size) { 300 } + 80)
+            list.settle(index = ids.size)
+            val outcome = appendBurst(ConversationScrollCoordinator(list), list, ids)
+            assertEquals(ConversationIncomingAppendOutcome.FollowedTail, outcome)
+            assertEquals(listOf(0 to 0), list.writes)
+            val oldest = (ids.lastIndex downTo 0).take(INCOMING_APPEND_MAX_PREMEASURED_ROWS)
+            assertEquals(oldest, list.premeasured)
+            assertEquals(oldest.size, list.released)
         }
 
     /** A burst of rows that each fit keeps the tail even when the first row's top is clipped. */
@@ -2224,19 +2281,19 @@ class ConversationScrollCoordinatorTest {
         }
 
     /**
-     * A burst of short rows that overflows the viewport, leaving its first row not laid out, keeps the tail: the
-     * measuring snap to that first row and the return to the tail are written in one frame, so none is drawn.
+     * A burst of short rows that overflows the viewport, leaving its first row not laid out, keeps the single tail
+     * write: that row is premeasured off screen, not reached by a measuring scroll.
      */
     @Test
-    fun overflowingShortBurstMeasuresItsFirstRowWithinOneFrame() =
+    fun overflowingShortBurstMakesOnlyTheTailWrite() =
         runTest {
             val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(300, 300, 300, 80))
             list.settle(index = 3)
             val coordinator = ConversationScrollCoordinator(list)
             val outcome = appendBurst(coordinator, list, listOf("first", "second", "third"))
             assertEquals(ConversationIncomingAppendOutcome.FollowedTail, outcome)
-            assertEquals(listOf(0 to 0, 2 to 0, 0 to 0), list.writes)
-            assertEquals("the probe and its return share a frame", list.writeFrames[1], list.writeFrames[2])
+            assertEquals(listOf(0 to 0), list.writes)
+            assertEquals(listOf(2), list.premeasured)
             assertTrue(coordinator.isFollowingTail)
         }
 
@@ -2249,6 +2306,7 @@ class ConversationScrollCoordinatorTest {
         candidates = ids.map(::incoming),
         probeFor = { candidate -> list.probe { ids.lastIndex - ids.indexOf(candidate.messageId) } },
         resolveTailIndex = { 0 },
+        premeasurer = list,
         awaitFrame = list::frame,
     )
 
@@ -2283,6 +2341,7 @@ class ConversationScrollCoordinatorTest {
                 candidates = listOf(incoming("first"), incoming("second")),
                 probeFor = { candidate -> list.probe { if (candidate.messageId == "first") 1 else 0 } },
                 resolveTailIndex = { 0 },
+                premeasurer = list,
                 awaitFrame = list::frame,
             )
         val revealed = outcome as ConversationIncomingAppendOutcome.RevealedReadingStart

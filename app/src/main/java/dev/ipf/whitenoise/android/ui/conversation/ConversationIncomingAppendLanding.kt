@@ -6,6 +6,9 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 /** Frames an appended incoming row has to be measured before the append keeps ordinary tail following. */
 private const val INCOMING_APPEND_MEASURE_FRAMES = 6
 
+/** Rows the tail layout did not reach that one append premeasures, oldest first, to bound a long catch-up's cost. */
+internal const val INCOMING_APPEND_MAX_PREMEASURED_ROWS = 8
+
 /** One row a live append added after the newest row the reader was following. */
 internal data class ConversationAppendedRow(
     val messageId: String,
@@ -113,8 +116,9 @@ internal class ConversationIncomingAppendLandingQueue {
  * than the clear reading viewport. Physical-tail alignment would then hide a beginning the reader has not seen, so the
  * oldest incoming row of the append whose beginning the tail hides — the oversized row itself, or an earlier row of
  * the burst that later arrivals pushed above the viewport — is placed at the top instead, and the reader's intent
- * becomes reading that message. The same happens when that pushed-up row is itself oversized, which a measuring snap
- * finds out. Appends whose incoming rows each fit keep tail following, even when together they overflow the viewport.
+ * becomes reading that message. The same happens when a pushed-up row is itself oversized, which [premeasurer] finds
+ * out without moving the list. Appends whose incoming rows each fit keep tail following, even when together they
+ * overflow the viewport.
  *
  * The decision runs inside the same latest-wins command as the tail write. The rows are measured after the tail write
  * in the occlusion-aware reading layout, waiting a bounded number of frames for the newest of them to be laid out,
@@ -133,6 +137,7 @@ internal suspend fun ConversationScrollCoordinator.followAppendOrRevealIncomingS
     resolveTailIndex: () -> Int,
     oversizedSeen: Boolean = false,
     onOversized: () -> Unit = {},
+    premeasurer: ConversationRowPremeasurer = ConversationRowPremeasurer.None,
     maxMeasureFrames: Int = INCOMING_APPEND_MEASURE_FRAMES,
     awaitFrame: suspend () -> Unit = { withFrameNanos { } },
 ): ConversationIncomingAppendOutcome {
@@ -156,13 +161,8 @@ internal suspend fun ConversationScrollCoordinator.followAppendOrRevealIncomingS
                     awaitFrame,
                     oversizedSeen,
                     onOversized,
-                ) { probe ->
-                    // Both writes force a synchronous remeasure, so no frame draws the row before the tail is restored.
-                    probe.resolveTargetIndex()?.let { index ->
-                        scrollToItem(index)
-                        probe.readLayout(index).also { scrollToTail(resolveTailIndex()) }
-                    }
-                }
+                    premeasurer,
+                )
             if (target != null) {
                 val placement =
                     placeReadingStart(
@@ -202,8 +202,8 @@ private fun ConversationScrollCoordinator.settleRevealedReadingStart(
  * Waits at most [maxFrames] frames for the newest appended row still in the timeline to be measured after the tail
  * write, then returns the oldest appended row whose beginning that write left above the clear reading viewport — but
  * only when a row laid out in that same tail layout is oversized, [oversizedSeen] says an earlier, cancelled decision
- * over the burst measured one, or that oldest hidden row turns out to be oversized itself, and [onOversized] records
- * what this decision measured. A burst of rows that each fit keeps tail following, however far it overflows the
+ * over the burst measured one, or a row the tail layout did not reach turns out to be oversized, and [onOversized]
+ * records what this decision measured. A burst of rows that each fit keeps tail following, however far it overflows the
  * viewport in total, so a catch-up of short messages ends exactly where it always has.
  *
  * The newest row sits at the tail that was just written, so once it is measured the layout pass is complete. An older
@@ -213,12 +213,11 @@ private fun ConversationScrollCoordinator.settleRevealedReadingStart(
  * viewport. Heights come from the rendered rows, never from text length, and the reading layout already excludes the
  * composer's overlap, so the keyboard is not subtracted a second time.
  *
- * Newer rows that each fit can together fill the viewport and push an older row of the burst out of the tail layout,
- * where it cannot be seen to be oversized. When nothing else decided the landing, [measureOffTail] snaps to the oldest
- * such row, reads it and restores the tail in the same frame. Only that one row is probed, so a long catch-up costs a
- * single extra measure pass, and a later row of it that is oversized but never laid out still keeps the tail.
+ * Newer rows that each fit can together fill the viewport and push older rows of the burst out of the tail layout,
+ * where they cannot be seen to be oversized. When nothing else decided the landing, [premeasurer] measures those rows
+ * off screen within the same frame budget, so the list never moves for them.
  */
-@Suppress("LongParameterList") // The burst, its probes, the frame source, the burst's observation and the probe.
+@Suppress("LongParameterList") // The burst, its probes, the frame source, the burst's observation and the premeasurer.
 private suspend fun awaitHiddenIncomingStart(
     candidates: List<ConversationIncomingAppendCandidate>,
     probeFor: (ConversationIncomingAppendCandidate) -> ConversationReadingStartProbe,
@@ -226,22 +225,60 @@ private suspend fun awaitHiddenIncomingStart(
     awaitFrame: suspend () -> Unit,
     oversizedSeen: Boolean,
     onOversized: () -> Unit,
-    measureOffTail: suspend (ConversationReadingStartProbe) -> ConversationMentionJumpLayout?,
+    premeasurer: ConversationRowPremeasurer,
 ): ConversationIncomingAppendCandidate? {
     val layouts = awaitTailLayouts(candidates, probeFor, maxFrames, awaitFrame).orEmpty()
     // Rows below the newest message (a pending membership row, a load error) are not part of the burst, but they
     // take space from it, so an arrival that fits the viewport alone can still have its beginning clipped.
     val trailingPx = layouts.lastOrNull { it?.isMeasured == true }?.itemOffsetPx?.coerceAtLeast(0) ?: 0
     val hidden = candidates.indices.firstOrNull { layouts.getOrNull(it)?.startHiddenAtTail == true } ?: return null
+    val offTail = candidates.filterIndexed { index, _ -> layouts.getOrNull(index)?.isMeasured == false }
     val oversized =
         layouts.any { it?.isOversized(trailingPx) == true } ||
             (
                 !oversizedSeen &&
-                    layouts[hidden]?.isMeasured == false &&
-                    measureOffTail(probeFor(candidates[hidden]))?.isOversized(trailingPx) == true
+                    anyOversizedOffTail(
+                        offTail.map(probeFor),
+                        viewportEndPx = layouts.firstNotNullOfOrNull { it?.viewportEndOffsetPx } ?: 0,
+                        premeasurer,
+                        maxFrames,
+                        awaitFrame,
+                    )
             )
     if (oversized) onOversized()
     return candidates[hidden].takeIf { oversized || oversizedSeen }
+}
+
+/**
+ * Whether any of [probes], rows the tail layout did not reach with the oldest first, is taller than the clear reading
+ * viewport ending at [viewportEndPx]. At most [INCOMING_APPEND_MAX_PREMEASURED_ROWS] of them are premeasured, and the
+ * wait ends at the first oversized size, once every size is in or after [maxFrames] frames. An off-tail row is not
+ * placed above the trailing rows under the newest message, so only the viewport counts against it. The premeasured
+ * rows are released afterwards. Known limit: an oversized row beyond that many of the oldest keeps the tail.
+ */
+private suspend fun anyOversizedOffTail(
+    probes: List<ConversationReadingStartProbe>,
+    viewportEndPx: Int,
+    premeasurer: ConversationRowPremeasurer,
+    maxFrames: Int,
+    awaitFrame: suspend () -> Unit,
+): Boolean {
+    if (viewportEndPx <= 0) return false
+    val sizes = mutableListOf<Int>()
+    val releases =
+        probes.take(INCOMING_APPEND_MAX_PREMEASURED_ROWS).mapNotNull { probe ->
+            probe.resolveTargetIndex()?.let { index -> premeasurer.premeasure(index) { sizes += it } }
+        }
+    try {
+        var frame = 0
+        while (sizes.none { it > viewportEndPx } && sizes.size < releases.size && frame < maxFrames.coerceAtLeast(1)) {
+            awaitFrame()
+            frame++
+        }
+    } finally {
+        releases.forEach { it() }
+    }
+    return sizes.any { it > viewportEndPx }
 }
 
 /**
