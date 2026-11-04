@@ -45,9 +45,15 @@ if [[ -n "$merged_profile" ]]; then
     echo "Merged ART profile not found: $merged_profile" >&2
     exit 1
   fi
+  if [[ ! -s "$merged_profile" ]]; then
+    echo "Merged ART profile is empty: $merged_profile" >&2
+    exit 1
+  fi
+  # Tell the inputs apart by name: NR == FNR would treat the committed profile
+  # as merged input whenever the first file has no records.
   missing="$(awk '
     { sub(/^[HSP]+/, "") }
-    NR == FNR { if (length($0)) merged[$0] = 1; next }
+    FILENAME == ARGV[1] { if (length($0)) merged[$0] = 1; next }
     length($0) && !($0 in merged) { count++; if (!first) first = $0 }
     END { if (count) print count " rules missing, first: " first }
   ' "$merged_profile" "$generated_dir/baseline-prof.txt")"

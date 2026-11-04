@@ -27,6 +27,10 @@ printf '%s\n' 'Lexample/Library;' 'Lexample/App;' 'HSPLexample/App;->launch()V' 
 printf '%s\n' 'Lexample/Library;' 'HSPLexample/Library;->load()V' >"$tmp_dir/library-only.txt"
 # A stub naming only the app class must not pass for the whole profile.
 printf '%s\n' 'Lexample/Library;' 'Lexample/App;' >"$tmp_dir/stub.txt"
+# An empty merged profile has no rules at all, so it cannot hold the app's.
+: >"$tmp_dir/empty.txt"
+# Blank lines alone are as empty as a zero-byte file.
+printf '\n\n' >"$tmp_dir/blank.txt"
 
 expect_success() {
   if ! bash "$verify_script" "$@" >/dev/null; then
@@ -48,6 +52,8 @@ expect_success "$tmp_dir/app.apk" "$tmp_dir/complete.txt"
 # text profile shows that the app's own profile was left out.
 expect_failure "$tmp_dir/app.apk" "$tmp_dir/library-only.txt"
 expect_failure "$tmp_dir/app.apk" "$tmp_dir/stub.txt"
+expect_failure "$tmp_dir/app.apk" "$tmp_dir/empty.txt"
+expect_failure "$tmp_dir/app.apk" "$tmp_dir/blank.txt"
 expect_failure "$tmp_dir/app.apk" "$tmp_dir/missing.txt"
 
 echo "Baseline Profile packaging verifier tests passed"
