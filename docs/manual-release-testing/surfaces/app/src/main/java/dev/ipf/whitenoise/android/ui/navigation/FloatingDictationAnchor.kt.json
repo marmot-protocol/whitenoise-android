@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/FloatingDictationAnchor.kt",
         "anchor": "fun FloatingDictationLayout(",
         "test_ids": [
-          "DIC-002"
+          "DIC-002",
+          "DIC-011"
         ]
       },
       {
@@ -16,7 +17,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/FloatingDictationAnchor.kt",
         "anchor": "fun Modifier.floatingDictationAnchor(",
         "test_ids": [
-          "DIC-002"
+          "DIC-002",
+          "DIC-011"
         ]
       },
       {
@@ -24,7 +26,18 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/FloatingDictationAnchor.kt",
         "anchor": "fun Modifier.floatingDictationFooter(",
         "test_ids": [
-          "DIC-002"
+          "DIC-002",
+          "DIC-011"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Measured control morph ownership and presentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/FloatingDictationAnchor.kt",
+        "anchor": "package dev.ipf.whitenoise.android",
+        "test_ids": [
+          "DIC-011"
         ]
       }
     ]
