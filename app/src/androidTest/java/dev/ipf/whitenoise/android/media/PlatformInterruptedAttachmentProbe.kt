@@ -187,8 +187,8 @@ internal object PlatformInterruptedAttachmentProbe {
                 val stopDiagnostic = assertStopDiagnostics(beforeLogs, request)
                 assertFalse(store.isInteractive(request))
                 HeldAttachmentCancellationProbe.control(port, "/__interrupt-acquisition-held-resume")
-                // Observe the held native retry before querying the current WorkSpec;
-                // asynchronous Flow delivery must not delay body release.
+                // Native retry and WorkManager backoff are independent. Release the
+                // verified live body before waiting for Android to run this WorkSpec again.
                 step = "resume-request"
                 observations.mark("resumed-acquisition-wait-start")
                 awaitResumedAcquisition(port, nativeStates, nativeObservationBeforeStop)
@@ -198,12 +198,6 @@ internal object PlatformInterruptedAttachmentProbe {
                 observations.mark("resumed-local-read-start")
                 assertNull("resumed partial ciphertext cannot be published", state.openNativeAttachment(request))
                 observations.mark("resumed-local-read-end")
-                step = "resumed-work-query"
-                val resumedWork = currentResumedWork(manager, firstRun)
-                // This is an actual bounded database snapshot, distinct from the asynchronous Flow observation.
-                states.add(resumedWork)
-                awaitResumedRun(states, firstRun)
-                val runningAt = SystemClock.elapsedRealtime()
                 val latest = nativeStates.toList().lastOrNull()
                 val observedDownloading = nativeDownloadingAfterStop(latest, nativeObservationBeforeStop)
                 check(observedDownloading) { "native resumed body is no longer downloading" }
@@ -214,9 +208,13 @@ internal object PlatformInterruptedAttachmentProbe {
                 HeldAttachmentCancellationProbe.control(port, "/__release-acquisition")
                 observations.mark("resumed-release-end")
                 step = "resumed-completion"
-                withTimeout(20_000L) {
+                withTimeout(60_000L) {
                     while (states.none { it.id == firstRun.id && it.state == WorkInfo.State.SUCCEEDED }) delay(25L)
                 }
+                step = "resumed-work-query"
+                val completedWork = currentSuccessfulRetry(manager, firstRun)
+                states.add(completedWork)
+                val workSucceededAt = SystemClock.elapsedRealtime()
                 assertFalse(store.isInteractive(request))
                 assertEquals(Lifecycle.State.CREATED, scenario.state)
                 state.openNativeAttachment(request).use { source ->
@@ -243,8 +241,7 @@ internal object PlatformInterruptedAttachmentProbe {
                         .put("android_api", Build.VERSION.SDK_INT)
                         .put("worker_stop_reason", stopDiagnostic.first)
                         .put("worker_run_attempt", stopDiagnostic.second)
-                        .put("resume_running_ms", runningAt - stoppedAt)
-                        .put("resume_request_ms", requestedAt - runningAt)
+                        .put("resume_work_succeeded_ms", workSucceededAt - stoppedAt)
                         .put("resume_request_after_stop_ms", requestedAt - stoppedAt)
                         .put("native_observation_before_stop", nativeObservationBeforeStop)
                         .put("resume_phase_timings", observations.phaseDiagnostics())
@@ -309,8 +306,8 @@ internal object PlatformInterruptedAttachmentProbe {
             latest.observationIndex > beforeStop &&
             latest.phase == AttachmentTransferStateFfi.DOWNLOADING
 
-    /** Confirm current execution of this exact one-time WorkSpec before releasing its held resumed body. */
-    private suspend fun currentResumedWork(
+    /** Prove a new ordinary run from this exact one-time WorkSpec's persisted successful result. */
+    private suspend fun currentSuccessfulRetry(
         manager: WorkManager,
         firstRun: WorkInfo,
     ): WorkInfo {
@@ -328,16 +325,17 @@ internal object PlatformInterruptedAttachmentProbe {
                 JSONObject()
                     .put("phase", "automatic-resume-work-query")
                     .put("state", queried?.state?.name ?: "unavailable")
+                    .put("same_work_id", queried?.id == firstRun.id)
                     .put("run_attempt", queried?.runAttemptCount ?: JSONObject.NULL)
                     .put("initial_run_attempt", firstRun.runAttemptCount)
                     .put("elapsed_ms", SystemClock.elapsedRealtime() - started),
             )
         }
         val current = checkNotNull(queried) { "resumed WorkSpec missing" }
-        check(current.id == firstRun.id && current.state == WorkInfo.State.RUNNING) {
-            "same WorkSpec is not currently running"
+        check(current.id == firstRun.id && current.state == WorkInfo.State.SUCCEEDED) {
+            "same WorkSpec has not succeeded"
         }
-        // WorkManager2.12 increments this persisted count atomically with ENQUEUED -> RUNNING for one-time work.
+        // One-time success preserves the count incremented atomically when WorkManager starts the new run.
         check(current.runAttemptCount > firstRun.runAttemptCount) { "WorkSpec did not enter a new run" }
         return current
     }
@@ -468,34 +466,6 @@ internal object PlatformInterruptedAttachmentProbe {
                 .put("ledger_kinds", JSONObject(counts.filterKeys { it.isNotEmpty() }))
                 .put("ms_since_stop", sinceStop),
         )
-    }
-
-    /** Observe the same identity leaving its first run and returning to RUNNING without force-running it. */
-    private suspend fun awaitResumedRun(
-        states: List<WorkInfo>,
-        firstRun: WorkInfo,
-    ) {
-        val firstIndex = states.indexOfFirst { it.id == firstRun.id && it.state == WorkInfo.State.RUNNING }
-        withTimeout(100_000L) {
-            while (true) {
-                val enqueued =
-                    states
-                        .withIndex()
-                        .firstOrNull {
-                            it.index > firstIndex &&
-                                it.value.id == firstRun.id &&
-                                it.value.state == WorkInfo.State.ENQUEUED
-                        }?.index ?: -1
-                if (enqueued >= 0 &&
-                    states.drop(enqueued + 1).any {
-                        it.id == firstRun.id && it.state == WorkInfo.State.RUNNING
-                    }
-                ) {
-                    return@withTimeout
-                }
-                delay(25L)
-            }
-        }
     }
 
     /** A real worker stop must emit coarse diagnostics without the generated attachment's identity. */

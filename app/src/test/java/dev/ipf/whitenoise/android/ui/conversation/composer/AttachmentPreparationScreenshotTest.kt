@@ -75,7 +75,9 @@ class AttachmentPreparationScreenshotTest {
         large: Boolean,
         legacy: Boolean,
     ) {
-        CompositionLocalProvider(LocalLayoutDirection provides if (large) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+        CompositionLocalProvider(
+            LocalLayoutDirection provides if (large) LayoutDirection.Rtl else LayoutDirection.Ltr,
+        ) {
             WhiteNoiseTheme(darkTheme = dark, amoled = dark, fontScale = if (large) 2f else 1f) {
                 Surface(Modifier.width(if (large) 320.dp else 360.dp).testTag("preparation.surface")) {
                     if (legacy) {

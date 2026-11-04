@@ -32,6 +32,16 @@ def check_automatic_resume(metrics, events):
                 or result[0].get("worker_run_attempt") != 0
                 or isinstance(result[0].get("worker_run_attempt"), bool)):
             violations.append("missing actual first-run scheduler stop diagnostics")
+    queries = [m for m in metrics if m.get("phase") == "automatic-resume-work-query"]
+    if len(queries) != 1:
+        violations.append("missing unique successful same-WorkSpec query proof")
+    else:
+        query = queries[0]
+        initial, current = query.get("initial_run_attempt"), query.get("run_attempt")
+        if (query.get("state") != "SUCCEEDED" or query.get("same_work_id") is not True
+                or type(initial) is not int or type(current) is not int
+                or initial < 0 or current <= initial):
+            violations.append("same WorkSpec did not succeed in an advanced ordinary run")
     samples = [m for m in metrics if m.get("phase") == "automatic-platform-resume-overall"]
     if len(samples) != 1:
         violations.append("missing measured sample")
