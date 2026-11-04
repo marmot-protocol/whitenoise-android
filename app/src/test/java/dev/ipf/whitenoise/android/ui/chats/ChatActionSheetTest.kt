@@ -3,13 +3,20 @@ package dev.ipf.whitenoise.android.ui.chats
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -77,6 +84,45 @@ class ChatActionSheetTest {
 
         assertEquals(1, dismisses)
         assertEquals(1, selects)
+    }
+
+    /** The envelope icons leave the read-state callbacks as they were: each command fires its own once. */
+    @Test
+    fun readStateCommandsKeepTheirCallbacks() {
+        var hasUnread by mutableStateOf(true)
+        var reads = 0
+        var unreads = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ChatContextMenu(
+                    hasUnread = hasUnread,
+                    canMarkUnread = true,
+                    archived = false,
+                    muted = false,
+                    pinned = false,
+                    showPinToggle = false,
+                    showMovePinnedUp = false,
+                    showMovePinnedDown = false,
+                    onMarkRead = { reads++ },
+                    onMarkUnread = { unreads++ },
+                    onAddToFolder = {},
+                    onArchiveToggle = {},
+                    onMuteToggle = {},
+                    onPinToggle = {},
+                    onMovePinned = {},
+                    onSelect = {},
+                    onDelete = {},
+                    onDismiss = {},
+                )
+            }
+        }
+
+        composeRule.onNodeWithText(string(R.string.chat_row_action_mark_read)).performClick()
+        hasUnread = false
+        composeRule.onNodeWithText(string(R.string.chat_row_action_mark_unread)).performClick()
+
+        assertEquals(1, reads)
+        assertEquals(1, unreads)
     }
 
     /** Omits unread action when membership cannot persist it. */
@@ -245,32 +291,81 @@ class ChatActionSheetTest {
             .captureRoboImage("src/test/snapshots/chat_action_sheet_dark.png")
     }
 
-    /** Composes the sheet for a screenshot capture. */
-    private fun renderScreenshotSheet(darkTheme: Boolean) {
+    /** Mark read shows the open envelope beside Select's checkmark in the light theme (#3566). */
+    @Test
+    fun actionSheetMarkReadLightScreenshot() {
+        renderScreenshotSheet(darkTheme = false, hasUnread = true)
+        captureSheet("chat_action_sheet_mark_read_light")
+    }
+
+    /** Mark read and Select stay distinct in the dark theme. */
+    @Test
+    fun actionSheetMarkReadDarkScreenshot() {
+        renderScreenshotSheet(darkTheme = true, hasUnread = true)
+        captureSheet("chat_action_sheet_mark_read_dark")
+    }
+
+    /** Mark read and Select stay distinct in the AMOLED theme. */
+    @Test
+    fun actionSheetMarkReadAmoledScreenshot() {
+        renderScreenshotSheet(darkTheme = true, hasUnread = true, amoled = true)
+        captureSheet("chat_action_sheet_mark_read_amoled")
+    }
+
+    /** The envelope outline stays legible at double font scale in RTL. */
+    @Test
+    fun actionSheetMarkReadRtlLargeScreenshot() {
+        renderScreenshotSheet(darkTheme = false, hasUnread = true, rtl = true, fontScale = 2f)
+        captureSheet("chat_action_sheet_mark_read_rtl_large")
+    }
+
+    /** Captures the sheet's popup as [name]. */
+    private fun captureSheet(name: String) {
+        composeRule.onNode(isPopup(), useUnmergedTree = true).captureRoboImage("src/test/snapshots/$name.png")
+    }
+
+    /** Composes the sheet for a screenshot capture, offering Mark read when [hasUnread]. */
+    private fun renderScreenshotSheet(
+        darkTheme: Boolean,
+        hasUnread: Boolean = false,
+        amoled: Boolean = false,
+        rtl: Boolean = false,
+        fontScale: Float = 1f,
+    ) {
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = darkTheme) {
-                ChatContextMenu(
-                    hasUnread = false,
-                    canMarkUnread = true,
-                    archived = false,
-                    muted = false,
-                    pinned = false,
-                    showPinToggle = true,
-                    showMovePinnedUp = false,
-                    showMovePinnedDown = false,
-                    onMarkRead = {},
-                    onMarkUnread = {},
-                    onAddToFolder = {},
-                    onArchiveToggle = {},
-                    onMuteToggle = {},
-                    onPinToggle = {},
-                    onMovePinned = {},
-                    onSelect = {},
-                    onDelete = {},
-                    onDismiss = {},
-                )
+            val direction = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
+            CompositionLocalProvider(LocalLayoutDirection provides direction) {
+                WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled, fontScale = fontScale) {
+                    SheetFixture(hasUnread)
+                }
             }
         }
         composeRule.waitForIdle()
+    }
+
+    /** The production sheet with read-state and Select commands, no callbacks attached. */
+    @Suppress("FunctionNaming")
+    @Composable
+    private fun SheetFixture(hasUnread: Boolean) {
+        ChatContextMenu(
+            hasUnread = hasUnread,
+            canMarkUnread = true,
+            archived = false,
+            muted = false,
+            pinned = false,
+            showPinToggle = true,
+            showMovePinnedUp = false,
+            showMovePinnedDown = false,
+            onMarkRead = {},
+            onMarkUnread = {},
+            onAddToFolder = {},
+            onArchiveToggle = {},
+            onMuteToggle = {},
+            onPinToggle = {},
+            onMovePinned = {},
+            onSelect = {},
+            onDelete = {},
+            onDismiss = {},
+        )
     }
 }

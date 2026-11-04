@@ -82,13 +82,18 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="${appRoundIcon}"
         android:supportsRtl="true"
-        android:theme="@style/Theme.WhiteNoise">
+        android:theme="@style/Theme.WhiteNoise"
+        android:zygotePreloadName="dev.ipf.whitenoise.android.media.sandbox.MediaZygotePreload">
 
+        <!-- Still-image workers start from this app's own zygote where the OS uses one (#3373).
+             zygotePreloadName stays fully qualified: Android resolves it against the package
+             name, which differs from the namespace in suffixed builds. -->
         <service
             android:name=".media.sandbox.MediaDecodeService"
             android:exported="false"
             android:isolatedProcess="true"
-            android:process=":media_decoder" />
+            android:process=":media_decoder"
+            android:useAppZygote="true" />
 
         <service
             android:name=".media.sandbox.MediaAnimationService"

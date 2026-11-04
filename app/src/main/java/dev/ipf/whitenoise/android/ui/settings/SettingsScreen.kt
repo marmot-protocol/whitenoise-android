@@ -21,7 +21,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -50,11 +49,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.BuildConfig
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
 import dev.ipf.whitenoise.android.ui.icons.filled.Help
 import dev.ipf.whitenoise.android.ui.icons.filled.Notifications
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
@@ -557,6 +558,7 @@ internal data class SettingsHomeAccount(
     val subtitle: String,
     val seed: String,
     val pictureUrl: String?,
+    val npub: String = "",
 )
 
 /** The Settings hub. */
@@ -610,6 +612,7 @@ private fun SettingsHomeScreen(
                     subtitle = appState.shortNpub(account.accountIdHex),
                     seed = account.accountIdHex,
                     pictureUrl = appState.avatarUrl(account.accountIdHex),
+                    npub = appState.npubForDisplay(account.accountIdHex),
                 )
             },
         profileReadiness = readiness,
@@ -808,7 +811,7 @@ private fun SettingsProfileHeader(
     }
 }
 
-/** The active profile as one tappable row: avatar, name, short key, QR glyph and chevron. */
+/** The active profile as one tappable row: avatar, name, short key that copies the full key, QR glyph and chevron. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 @Suppress("FunctionNaming")
@@ -835,10 +838,11 @@ private fun SettingsProfileRow(
                 )
             },
             supportingContent = {
-                Text(
-                    text = account.subtitle,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                // The short key copies the whole key; the rest of the row still opens Share & Connect (#3565).
+                PublicKeyCopyText(
+                    account.subtitle,
+                    account.npub,
+                    Modifier.testTag("settings.active_profile_public_key"),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             },
@@ -859,6 +863,7 @@ private fun SettingsProfileRow(
                         seed = account.seed,
                         size = SettingsHomeDefaults.ProfileAvatarSize,
                         pictureUrl = account.pictureUrl,
+                        pictureDomain = AvatarImageLoader.publicProfiles(),
                     )
                 }
             },

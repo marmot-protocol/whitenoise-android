@@ -223,6 +223,8 @@ jobs:
       - name: Verify generated performance profiles
         run: |
           bash .github/scripts/test-verify-generated-profiles.sh
+          bash .github/scripts/test-verify-baseline-profile.sh
+          python3 -m unittest scripts/test_merge_baseline_profiles.py
           bash scripts/verify-generated-profiles.sh
 
       - name: Test Android CI aggregate gate
@@ -307,7 +309,7 @@ jobs:
 
       # Retain this job's task outputs instead of relying on the Play test cache.
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
 
@@ -389,7 +391,10 @@ jobs:
             | if length == 1 then .[0].outputFile else empty end
           ' "$metadata")
           app_apk="$(dirname "$metadata")/$output_file"
-          bash scripts/verify-baseline-profile.sh "$app_apk"
+          # Macrobenchmarks measure this variant, so it must carry the app's
+          # generated profile and not just the library rules.
+          merged=app/build/intermediates/merged_art_profile/devZapstoreBenchmarkRelease/mergeDevZapstoreBenchmarkReleaseArtProfile/baseline-prof.txt
+          bash scripts/verify-baseline-profile.sh "$app_apk" "$merged"
           printf 'apk=%s\n' "$app_apk" >> "$GITHUB_OUTPUT"
 
       # benchmarkRelease is unminified D8 output. Its budget warns when a benchmarked
@@ -520,7 +525,7 @@ jobs:
       # publication. Generate/upload only: PR jobs never receive contents:write.
       - name: Qualify dependency submission graph generation
         if: matrix.phase == 'tooling'
-        uses: gradle/actions/dependency-submission@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        uses: gradle/actions/dependency-submission@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         env:
           DEPENDENCY_GRAPH_PLUGIN_VERSION: '1.5.0'
         with:
@@ -582,7 +587,7 @@ jobs:
           java-version: '17'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
 
@@ -685,7 +690,7 @@ jobs:
 
       # Retain this flavor's compilation outputs in its own job cache.
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
 
@@ -792,7 +797,7 @@ jobs:
 
       # Retain this job's task outputs instead of relying on the Play test cache.
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
 
@@ -896,7 +901,7 @@ jobs:
 
       # Retain both flavors' compilation outputs; fork PRs remain read-only.
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
 
@@ -1079,7 +1084,7 @@ jobs:
           java-version: '17'
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           cache-read-only: ${{ github.event_name == 'merge_group' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository) }}
 

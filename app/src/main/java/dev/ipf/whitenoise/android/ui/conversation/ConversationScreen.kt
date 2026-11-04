@@ -245,6 +245,7 @@ import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTilesState
 import dev.ipf.whitenoise.android.ui.medialibrary.toConversationViewerPages
+import dev.ipf.whitenoise.android.ui.navigation.conversationRouteBodyMotion
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
 import dev.ipf.whitenoise.android.ui.settings.blockOutcomeMessage
 import dev.ipf.whitenoise.android.ui.settings.rememberRouteMotionModifier
@@ -4095,30 +4096,35 @@ internal fun ConversationScreen(
                             {
                                 collectionPanels?.invoke()
                                 if (pendingMediaSlots.size + pendingDocumentUris.size > 0) {
-                                    dev.ipf.whitenoise.android.ui.conversation.media.ComposerAttachmentShelf(
-                                        mediaSlots = pendingMediaSlots,
-                                        documentUris = pendingDocumentUris,
-                                        enabled = !attachmentSendClaim.isHeld,
-                                        prepared = mediaDraftState.preparedPreviews(),
-                                        onPreview = { if (!attachmentSendClaim.isHeld) mediaPreviewIndex = it },
-                                        onRemoveMedia = { slot ->
-                                            if (!attachmentSendClaim.isHeld) {
-                                                mediaDraftState.releasePreparedPhoto(slot.id)
-                                                pendingMediaSlots = pendingMediaSlots.filterNot { it.id == slot.id }
-                                            }
-                                        },
-                                        onRemoveDocument = { index ->
-                                            if (!attachmentSendClaim.isHeld) {
-                                                val remaining = pendingDocumentUris.filterIndexed { i, _ -> i != index }
-                                                // A second occurrence of the same file keeps its prepared bytes.
-                                                pendingDocumentUris
-                                                    .getOrNull(index)
-                                                    ?.takeIf { it !in remaining }
-                                                    ?.let(mediaDraftState::releasePreparedDocument)
-                                                pendingDocumentUris = remaining
-                                            }
-                                        },
-                                    )
+                                    CompositionLocalProvider(
+                                        dev.ipf.whitenoise.android.ui.conversation.media.LocalPickMediaDomains provides
+                                            controller::outgoingMediaTrustDomain,
+                                    ) {
+                                        dev.ipf.whitenoise.android.ui.conversation.media.ComposerAttachmentShelf(
+                                            mediaSlots = pendingMediaSlots,
+                                            documentUris = pendingDocumentUris,
+                                            enabled = !attachmentSendClaim.isHeld,
+                                            prepared = mediaDraftState.preparedPreviews(),
+                                            onPreview = { if (!attachmentSendClaim.isHeld) mediaPreviewIndex = it },
+                                            onRemoveMedia = { slot ->
+                                                if (!attachmentSendClaim.isHeld) {
+                                                    mediaDraftState.releasePreparedPhoto(slot.id)
+                                                    pendingMediaSlots = pendingMediaSlots.filterNot { it.id == slot.id }
+                                                }
+                                            },
+                                            onRemoveDocument = { index ->
+                                                if (!attachmentSendClaim.isHeld) {
+                                                    val kept = pendingDocumentUris.filterIndexed { i, _ -> i != index }
+                                                    // A second occurrence of the same file keeps its prepared bytes.
+                                                    pendingDocumentUris
+                                                        .getOrNull(index)
+                                                        ?.takeIf { it !in kept }
+                                                        ?.let(mediaDraftState::releasePreparedDocument)
+                                                    pendingDocumentUris = kept
+                                                }
+                                            },
+                                        )
+                                    }
                                 }
                             }
                         } else {
@@ -4272,6 +4278,7 @@ internal fun ConversationScreen(
                         Modifier
                             .fillMaxSize()
                             .padding(conversationUnderlayScaffoldPadding(padding, overlayPadding))
+                            .conversationRouteBodyMotion()
                             // The composer bottomBar owns IME padding; consume here so the
                             // transcript does not count the keyboard a second time (#895).
                             .consumeWindowInsets(WindowInsets.ime)

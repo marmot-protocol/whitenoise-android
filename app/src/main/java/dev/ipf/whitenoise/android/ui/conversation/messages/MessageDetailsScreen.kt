@@ -46,6 +46,7 @@ import androidx.core.os.ConfigurationCompat
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.ContentReportFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.ReactionTally
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -481,6 +482,7 @@ private fun MessageDeliverySection(
                             seed = senderSeed,
                             size = DeliveryAvatarSize,
                             pictureUrl = senderAvatarUrl,
+                            pictureDomain = AvatarImageLoader.publicProfiles(),
                         )
                     },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -496,6 +498,7 @@ private fun MessageDeliverySection(
                                 seed = recipient.seed,
                                 size = DeliveryAvatarSize,
                                 pictureUrl = recipient.avatarUrl,
+                                pictureDomain = AvatarImageLoader.publicProfiles(),
                             )
                         },
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),

@@ -8,6 +8,7 @@ import dev.ipf.whitenoise.android.FileProviderStrategyCacheRule
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import org.json.JSONObject
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -20,6 +21,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import java.io.File
 import java.nio.file.Files
+import java.security.MessageDigest
 import java.util.zip.ZipFile
 
 @RunWith(RobolectricTestRunner::class)
@@ -350,6 +352,69 @@ class AuditLogShareTest {
         val chooser = auditLogShareChooserIntent(context, archive, "Export")
         assertTrue(chooser.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
         assertEquals(1, chooser.clipData!!.itemCount)
+    }
+
+    /** Only the URI issued for an archive this process wrote resolves, carrying that archive's digest. */
+    @Test
+    fun selfShareResolvesOnlyTheBoundUriOfARecordedArchive() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        clearPreparedAuditLogShares(context.cacheDir)
+        try {
+            val archive = stagePerformanceOnlyArchive(context)
+            assertNull("A recorded but unshared archive has no handle", resolveSent(context, archive, bind = false))
+
+            val source = requireNotNull(resolveSent(context, archive))
+            assertEquals(archive.length(), source.size)
+            assertArrayEquals(MessageDigest.getInstance("SHA-256").digest(archive.readBytes()), source.sha256)
+            assertEquals(AUDIT_LOG_ARCHIVE_NAME, source.name)
+            assertEquals(AUDIT_LOG_ARCHIVE_MIME_TYPE, source.mime)
+            assertArrayEquals(archive.readBytes(), source.open().use { it.readBytes() })
+
+            val handWritten =
+                File(context.cacheDir, "audit_logs/session/$AUDIT_LOG_ARCHIVE_NAME").apply {
+                    parentFile!!.mkdirs()
+                    writeText("zip")
+                }
+            assertNull("An archive the export never wrote is not trusted", resolveSent(context, handWritten))
+        } finally {
+            clearPreparedAuditLogShares(context.cacheDir)
+        }
+    }
+
+    /** Clearing diagnostic logs also retires every self-share handle, even if the file came back. */
+    @Test
+    fun clearPreparedAuditLogSharesRetiresSelfShareHandles() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val archive = stagePerformanceOnlyArchive(context)
+        val uri = auditLogShareIntent(context, archive).getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)!!
+        val bytes = archive.readBytes()
+
+        assertTrue(clearPreparedAuditLogShares(context.cacheDir))
+        archive.parentFile!!.mkdirs()
+        archive.writeBytes(bytes)
+
+        assertNull(stagedDiagnosticExportSource(context, uri))
+        clearPreparedAuditLogShares(context.cacheDir)
+    }
+
+    /** Stages a real export holding only a one-byte performance log. */
+    private fun stagePerformanceOnlyArchive(context: Context): File =
+        prepareAuditLogArchive(context.cacheDir, context.filesDir, emptyList(), performanceLogBytes = "p".toByteArray())
+
+    /** Resolves the URI a share of [archive] would carry; [bind] false skips issuing the share. */
+    private fun resolveSent(
+        context: Context,
+        archive: File,
+        bind: Boolean = true,
+    ): dev.ipf.whitenoise.android.share.TrustedShareSource? {
+        val uri =
+            if (bind) {
+                auditLogShareIntent(context, archive).getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)!!
+            } else {
+                androidx.core.content.FileProvider
+                    .getUriForFile(context, "${context.packageName}.fileprovider", archive)
+            }
+        return stagedDiagnosticExportSource(context, uri)
     }
 
     /** Entry name to content, so a test can assert an archive's whole contents in one comparison. */

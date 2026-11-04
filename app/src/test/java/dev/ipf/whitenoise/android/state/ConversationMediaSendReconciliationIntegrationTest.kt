@@ -50,8 +50,14 @@ import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.media.DiskByteCache
 import dev.ipf.whitenoise.android.media.DiskByteCacheKeyProvider
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.media.PresentationMemoryTrim
 import dev.ipf.whitenoise.android.media.minimalMp4Header
+import dev.ipf.whitenoise.android.media.sandbox.ImageInspection
+import dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+import dev.ipf.whitenoise.android.media.sandbox.MediaDecodeTransport
+import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
+import dev.ipf.whitenoise.android.media.sandbox.TestMediaDecodeTransport
 import dev.ipf.whitenoise.android.ui.conversation.ConversationMediaSender
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollCoordinator
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScrollMode
@@ -85,6 +91,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -96,6 +103,7 @@ import org.robolectric.annotation.Config
 import java.lang.reflect.Proxy
 import java.nio.file.Files
 import java.time.Duration
+import java.util.concurrent.CopyOnWriteArrayList
 import javax.crypto.spec.SecretKeySpec
 
 @RunWith(RobolectricTestRunner::class)
@@ -685,20 +693,94 @@ class ConversationMediaSendReconciliationIntegrationTest {
             )
         }
 
-    /** One queued video whose retained bytes stand in for a real clip's poster source. */
-    private fun pendingVideo() =
-        PendingAttachment(
-            plaintextBytes = VIDEO_BYTES,
-            mediaType = VIDEO_MEDIA_TYPE,
-            fileName = "clip.mp4",
-            dim = "1280x720",
-        )
-
     /** A voice reply carries one exact target in its pending row and token-bound native draft admission. */
     @Test
     fun voiceReplyKeepsOriginalTargetWhenSelectionChangesDuringUpload() =
         assertDraftlessMediaUsesTokenBoundNativeAdmission("audio/mp4", "voice.m4a", replyTarget = "poll-original")
 }
+
+/** Covers which publish failures make a composer media Retry upload again (mdk#2891). */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36], qualifiers = "en")
+class ConversationMediaPublishRefusalRetryTest {
+    /** A stale-epoch refusal uploads the retained bytes again on Retry instead of resending the refused references. */
+    @Test
+    fun staleEpochRefusalUploadsAgainOnRetry() {
+        assertPublishRefusalRetry(
+            MarmotKitException.MediaReferenceStaleEpoch(sourceEpoch = 2uL, currentEpoch = 2uL),
+            expectedUploads = 2,
+        )
+    }
+
+    /** Any other publish failure keeps the uploaded references, so Retry publishes them without uploading again. */
+    @Test
+    fun otherPublishFailureReusesUploadedReferencesOnRetry() {
+        assertPublishRefusalRetry(IllegalStateException("relay unavailable"), expectedUploads = 1)
+    }
+
+    /** Fails the first publish with [refusal], retries once, and checks how many uploads the whole send took. */
+    private fun assertPublishRefusalRetry(
+        refusal: Throwable,
+        expectedUploads: Int,
+    ) = runTest {
+        val appState = mediaSendReconciliationAppState()
+        attachedChatsController(appState)
+        val reference = mediaReference()
+        var uploadAttempts = 0
+        var publishAttempts = 0
+        lateinit var controller: ConversationController
+        controller =
+            ConversationController(
+                appState = appState,
+                initialGroup = group(),
+                initialMemberSnapshot = memberSnapshot(),
+                groupRosterReader = { _, _ -> authoritativeRoster() },
+                mediaUploader = { _, _, _ ->
+                    uploadAttempts += 1
+                    uploadResult(reference)
+                },
+                mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
+                mediaPublisher = { _, _, _, _ ->
+                    publishAttempts += 1
+                    if (publishAttempts == 1) throw refusal
+                    val optimistic = controller.timeline.single()
+                    applyProjection(
+                        controller,
+                        projectedMediaMessage(
+                            recordedAt = optimistic.record.recordedAt,
+                            reference = reference,
+                        ),
+                    )
+                    acceptedPendingSummary()
+                },
+            )
+
+        controller.retryMembers()
+        controller.sendAttachments(attachments = listOf(pendingVideo()), caption = null)
+
+        val failedMessage = controller.timeline.single()
+        assertEquals(MessageStatus.Failed, failedMessage.status)
+        controller.retryFailedSend(failedMessage)
+
+        assertEquals(2, publishAttempts)
+        assertEquals(expectedUploads, uploadAttempts)
+        assertEquals(
+            CONFIRMED_MESSAGE_ID,
+            controller.timeline
+                .single()
+                .record.messageIdHex,
+        )
+    }
+}
+
+/** One queued video whose retained bytes stand in for a real clip's poster source. */
+private fun pendingVideo() =
+    PendingAttachment(
+        plaintextBytes = VIDEO_BYTES,
+        mediaType = VIDEO_MEDIA_TYPE,
+        fileName = "clip.mp4",
+        dim = "1280x720",
+    )
 
 /** Covers native echo ordering while host-only thumbnail decoding suspends. */
 @RunWith(RobolectricTestRunner::class)
@@ -723,7 +805,7 @@ class ConversationMediaSendReconciliationThumbnailTest {
                     mediaUploader = { _, _, _ -> uploadResult(reference) },
                     mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
                     mediaPublisher = { _, _, _, _ -> requireNotNull(uploadResult(reference).sent) },
-                    mediaThumbnailDecoder = {
+                    mediaThumbnailDecoder = { _, _ ->
                         val original = controller.timeline.single()
                         pendingId = original.presentationId
                         val projection =
@@ -752,6 +834,47 @@ class ConversationMediaSendReconciliationThumbnailTest {
                 )
                 assertEquals(pendingId, controller.timeline.single().presentationId)
             } finally {
+                finishMediaFixture(controller, state)
+                Dispatchers.resetMain()
+            }
+        }
+
+    /**
+     * A just-sent photo's poster decodes in the outgoing domain its attachment names, that of the draft it was sent
+     * from, whatever draft is current by then. The poster retires nothing: its draft's worker retires once the send
+     * that owns it has ended.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun justSentPosterDecodesInItsSentDraftsDomain() =
+        runTest {
+            Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+            val state = mediaSendReconciliationAppState()
+            val reference = mediaReference()
+            val recorder = PosterDomainRecorder()
+            IsolatedMediaDecoder.installTestTransport(recorder)
+            val controller =
+                ConversationController(
+                    appState = state,
+                    initialGroup = group(),
+                    initialMemberSnapshot = memberSnapshot(),
+                    groupRosterReader = { _, _ -> authoritativeRoster() },
+                    mediaUploader = { _, _, _ -> uploadResult(reference) },
+                    mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
+                    mediaPublisher = { _, _, _, _ -> requireNotNull(uploadResult(reference).sent) },
+                )
+            try {
+                controller.retryMembers()
+                val sentDraft = MediaTrustDomain.outgoing(ACCOUNT_REF, GROUP_ID, "sent-draft")
+                controller.sendAttachments(
+                    listOf(PendingAttachment(PHOTO_BYTES, "image/png", "photo.png", "1x1", outgoingDomain = sentDraft)),
+                    null,
+                )
+                assertNotEquals(sentDraft, controller.outgoingMediaTrustDomain(PHOTO_PICK))
+                assertEquals(listOf(sentDraft), recorder.decoded.toList())
+                assertEquals(emptyList<MediaTrustDomain>(), recorder.retired.toList())
+            } finally {
+                IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)
                 finishMediaFixture(controller, state)
                 Dispatchers.resetMain()
             }
@@ -967,6 +1090,7 @@ private fun projectedMediaMessage(
     retentionExpiresAt = null,
     sticker = null,
     importedFrom = null,
+    historyImportProvenance = null,
 )
 
 /** Builds a single account owner with process-local drafts and no real relay connection. */
@@ -1150,6 +1274,33 @@ private val GROUP_ID = "b2".repeat(32)
 private val CONFIRMED_MESSAGE_ID = "c3".repeat(32)
 private const val VIDEO_MEDIA_TYPE = "video/mp4"
 private val VIDEO_BYTES = byteArrayOf(0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109)
+private const val PHOTO_PICK = "slot-photo"
+private val PHOTO_BYTES = byteArrayOf(1, 2, 3, 4)
+
+/** Decodes nothing and records the domain of every still decode and every retirement, in order. */
+private class PosterDomainRecorder : MediaDecodeTransport {
+    val decoded = CopyOnWriteArrayList<MediaTrustDomain>()
+    val retired = CopyOnWriteArrayList<MediaTrustDomain>()
+
+    /** Records the domain the decode declares and returns no pixels. */
+    override fun decode(
+        bytes: ByteArray,
+        edge: Int,
+        oriented: Boolean,
+        operation: Int,
+    ): android.graphics.Bitmap? {
+        decoded += MediaTrustScope.current()
+        return null
+    }
+
+    /** No inspection: the poster path only decodes. */
+    override fun inspect(bytes: ByteArray): ImageInspection? = null
+
+    /** Records [domain] in call order. */
+    override fun retireDomain(domain: MediaTrustDomain) {
+        retired += domain
+    }
+}
 
 /** Allocates a test-only opaque native draft token without loading the device ABI. */
 private fun mediaReplyRevisionStub(): MessageDraftRevisionFfi {

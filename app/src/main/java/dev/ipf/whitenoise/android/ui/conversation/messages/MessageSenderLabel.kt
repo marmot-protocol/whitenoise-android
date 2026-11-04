@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.em
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.ReceivedEmoji
@@ -73,6 +74,7 @@ internal fun MessageSenderLabel(
                                         picture == null || PrivateContactAvatarLoader.isPrivate(it)
                                     },
                                 picture = picture,
+                                pictureDomain = AvatarImageLoader.publicProfiles(),
                             )
                         }
                     }

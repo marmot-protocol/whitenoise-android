@@ -162,6 +162,7 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
             .captureRoboImage("src/test/snapshots/poll_message_info_light.png")
     }
 
+    /** Renders the poll fixture in its requested layout and interaction state. */
     private fun render(
         name: String,
         configuration: PollScreenshotConfiguration = PollScreenshotConfiguration(),
@@ -215,6 +216,7 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
         }
     }
 
+    /** Checks poll geometry, semantics and expected interaction bounds. */
     private fun assertPollLayout(configuration: PollScreenshotConfiguration) {
         if (configuration.menu) {
             val card =

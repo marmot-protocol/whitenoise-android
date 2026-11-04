@@ -11,6 +11,7 @@ import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.After
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
@@ -33,6 +34,11 @@ import javax.crypto.spec.SecretKeySpec
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class PendingShareRequestStoreTest {
+    @get:org.junit.Rule
+    val fileProviderStrategyCacheRule =
+        dev.ipf.whitenoise.android
+            .FileProviderStrategyCacheRule()
+
     private lateinit var dir: File
     private val keyProvider =
         DiskByteCacheKeyProvider {
@@ -293,6 +299,79 @@ class PendingShareRequestStoreTest {
             assertSame(expected, actual)
             assertNotSame(callerThread, factoryThread)
         }
+
+    /** A staged diagnostic ZIP shared to White Noise survives the import bridge and a fresh store. */
+    @Test
+    fun stagedDiagnosticArchiveSurvivesTheImportBridgeAndStoreRecreation() =
+        kotlinx.coroutines.runBlocking<Unit> {
+            val (archive, request) = stagedDiagnosticShare()
+            val intake = PrivateShareFiles(dir.resolve("intake"), "test.private-share")
+            val serialized =
+                SerializedPendingShareRequestStore(store(), importRequest = { selfShareImporter(intake).import(it) })
+
+            assertTrue(serialized.save(request))
+
+            val restored = store().load(request.requestId)!!
+            assertTrue(restored.payload.importReady)
+            assertEquals(emptyList<ShareImportError>(), restored.payload.importErrors)
+            assertArrayEquals(archive.readBytes(), intake.resolve(restored.payload.streamUris.single())!!.readBytes())
+            dev.ipf.whitenoise.android.state
+                .clearPreparedAuditLogShares(context.cacheDir)
+        }
+
+    /** After process death the in-memory handle is gone, so recovery records a rejection, not a crash. */
+    @Test
+    fun recreatedProcessRejectsAnUnknownDiagnosticHandleRecoverably() =
+        kotlinx.coroutines.runBlocking<Unit> {
+            val (_, request) = stagedDiagnosticShare()
+            dev.ipf.whitenoise.android.state.StagedDiagnosticExports
+                .clear()
+            val intake = PrivateShareFiles(dir.resolve("intake"), "test.private-share")
+            val serialized =
+                SerializedPendingShareRequestStore(store(), importRequest = { selfShareImporter(intake).import(it) })
+
+            assertTrue(serialized.save(request))
+
+            val restored = store().load(request.requestId)!!
+            assertTrue(restored.payload.importReady)
+            assertTrue(restored.payload.streamUris.isEmpty())
+            assertEquals(listOf(ShareImportError.Scheme), restored.payload.importErrors)
+            dev.ipf.whitenoise.android.state
+                .clearPreparedAuditLogShares(context.cacheDir)
+        }
+
+    private val context get() = ApplicationProvider.getApplicationContext<Context>()
+
+    /** Stages a real diagnostic export and parses the request the chooser would deliver to White Noise. */
+    private fun stagedDiagnosticShare(): Pair<File, ShareRequest> {
+        dev.ipf.whitenoise.android.state
+            .clearPreparedAuditLogShares(context.cacheDir)
+        val archive =
+            dev.ipf.whitenoise.android.state.prepareAuditLogArchive(
+                context.cacheDir,
+                context.filesDir,
+                emptyList(),
+                performanceLogBytes = "schema=2\n".toByteArray(),
+            )
+        val chooser =
+            dev.ipf.whitenoise.android.state
+                .auditLogShareChooserIntent(context, archive, "Share")
+        val send = chooser.getParcelableExtra(android.content.Intent.EXTRA_INTENT, android.content.Intent::class.java)!!
+        return archive to parseShareRequest(send)!!
+    }
+
+    /** The production self-share admission with provider callbacks that fail if ever used. */
+    private fun selfShareImporter(intake: PrivateShareFiles) =
+        ShareFileImporter(
+            intake,
+            { _, _ -> error("Must not query the app's own provider") },
+            { _, _ -> error("Must not open the app's own provider") },
+            isAppOwnedProvider = { it.authority == "${context.packageName}.fileprovider" },
+            trustedSource = {
+                dev.ipf.whitenoise.android.state
+                    .stagedDiagnosticExportSource(context, it)
+            },
+        )
 
     private fun store(): EncryptedPendingShareRequestStore =
         EncryptedPendingShareRequestStore(

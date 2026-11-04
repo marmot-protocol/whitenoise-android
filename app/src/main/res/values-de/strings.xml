@@ -933,6 +933,7 @@
     <string name="scan_to_connect">Zum Verbinden scannen.</string>
     <string name="not_copied">Nicht kopiert</string>
     <string name="copy_public_key">Öffentlichen Schlüssel kopieren</string>
+    <string name="public_key_copy_action_with_value">Öffentlichen Schlüssel %1$s kopieren</string>
     <string name="button_in_progress">In Bearbeitung</string>
     <string name="private_key">Privater Schlüssel</string>
     <string name="profile_public_key_help">Teile diesen Schlüssel, damit andere dich finden und sich mit dir verbinden können.</string>
@@ -1690,6 +1691,21 @@
         <item quantity="one">Noch ~%1$d s</item>
         <item quantity="other">Noch ~%1$d s</item>
     </plurals>
+    <plurals name="tts_bar_minutes_remaining">
+        <item quantity="one">Noch ~%1$d min</item>
+        <item quantity="other">Noch ~%1$d min</item>
+    </plurals>
+    <string name="tts_bar_minutes_seconds_remaining">Noch ~%1$d min %2$d s</string>
+    <string name="tts_bar_remaining_spoken">Noch etwa %1$s</string>
+    <plurals name="tts_bar_spoken_minutes">
+        <item quantity="one">%1$d Minute</item>
+        <item quantity="other">%1$d Minuten</item>
+    </plurals>
+    <plurals name="tts_bar_spoken_seconds">
+        <item quantity="one">%1$d Sekunde</item>
+        <item quantity="other">%1$d Sekunden</item>
+    </plurals>
+    <string name="tts_bar_spoken_minutes_seconds">%1$s %2$s</string>
     <string name="tts_bar_stop">Vorlesen beenden</string>
     <string name="tts_bar_return_to_source">Zur vorgelesenen Nachricht zurückkehren</string>
     <string name="tts_source_unavailable">Die vorgelesene Nachricht ist nicht mehr verfügbar</string>

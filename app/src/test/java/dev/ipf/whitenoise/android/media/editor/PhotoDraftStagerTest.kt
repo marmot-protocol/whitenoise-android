@@ -7,6 +7,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.marmotkit.MessageDraftFfi
 import dev.ipf.marmotkit.MessageDraftSummaryFfi
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.state.MediaQuality
 import dev.ipf.whitenoise.android.ui.conversation.media.PendingMediaSlot
 import dev.ipf.whitenoise.android.ui.conversation.restoredPhotosMissingFrom
@@ -283,7 +284,76 @@ class PhotoDraftStagerTest {
             )
         }
 
-    private fun fixture(onEncode: () -> Unit = {}): Fixture {
+    /**
+     * Picks staged through their content URIs, at standard and Original quality, run every inspection, render and
+     * Original preparation in the domain the draft policy names for them: one draft's picks share its worker, and a
+     * pick of a later draft runs in that draft's own. Staging an attachment the draft already holds, as restoring a
+     * draft does, inspects it in the same shared worker (#3373).
+     */
+    @Test
+    fun everyStagedPickDecodesInItsDraftsSharedWorker() =
+        runTest {
+            EditorDomainRecorder().use { recorder ->
+                val draftOf = mapOf("slot-a" to "first-draft", "slot-b" to "first-draft", "slot-c" to "later-draft")
+                val domainOf = { pick: String -> MediaTrustDomain.outgoing(ACCOUNT, GROUP, draftOf.getValue(pick)) }
+                val fixture = fixture(outgoingDomain = domainOf)
+                val bytes = pngBytes()
+                ShadowContentResolver.reset()
+                val uris =
+                    listOf("slot-a", "slot-b", "slot-c").associateWith { Uri.parse("content://photo-editor/$it") }
+                uris.values.forEach { uri ->
+                    shadowOf(app.contentResolver).registerInputStreamSupplier(uri) { ByteArrayInputStream(bytes) }
+                }
+                val cases =
+                    listOf(
+                        "slot-a" to MediaQuality.Standard,
+                        "slot-b" to MediaQuality.Original,
+                        "slot-c" to MediaQuality.Standard,
+                        // Already in the draft: restored through its committed session, not staged again.
+                        "slot-a" to MediaQuality.Standard,
+                    )
+                cases.forEach { (slot, quality) ->
+                    recorder.clear()
+                    val staged = fixture.stager.stage(uris.getValue(slot), slot, ACCOUNT, GROUP, quality)
+                    assertTrue(staged is PhotoDraftStageResult.Success)
+                    assertEquals(setOf(domainOf(slot)), recorder.domains())
+                }
+                // The later draft's pick never shared the first draft's worker.
+                val distinct = draftOf.keys.map(domainOf).toSet()
+                assertEquals(2, distinct.size)
+            }
+        }
+
+    /**
+     * A pick's staging decodes in the draft its pick belonged to when staging began, even when the composer is emptied
+     * and another pick starts a new draft while the source is still being read (#3373).
+     */
+    @Test
+    fun stagingKeepsItsDraftWhenTheComposerChangesMidRead() =
+        runTest {
+            EditorDomainRecorder().use { recorder ->
+                var draft = "first-draft"
+                val fixture = fixture(outgoingDomain = { MediaTrustDomain.outgoing(ACCOUNT, GROUP, draft) })
+                val bytes = pngBytes()
+                val uri = Uri.parse("content://photo-editor/slot-a")
+                ShadowContentResolver.reset()
+                shadowOf(app.contentResolver).registerInputStreamSupplier(uri) {
+                    // The source read is in flight: the user empties the composer and picks into a new draft.
+                    draft = "later-draft"
+                    ByteArrayInputStream(bytes)
+                }
+                val staged = fixture.stager.stage(uri, "slot-a", ACCOUNT, GROUP, MediaQuality.Standard)
+                assertTrue(staged is PhotoDraftStageResult.Success)
+                assertEquals("later-draft", draft)
+                assertEquals(setOf(MediaTrustDomain.outgoing(ACCOUNT, GROUP, "first-draft")), recorder.domains())
+            }
+        }
+
+    /** A stager over in-memory stores whose picks decode in [outgoingDomain], single-use unless a test names one. */
+    private fun fixture(
+        onEncode: () -> Unit = {},
+        outgoingDomain: (String) -> MediaTrustDomain = { MediaTrustDomain.Unique },
+    ): Fixture {
         val payloads = StagerPayloadStore()
         val sources =
             EditorSourceStore(
@@ -312,6 +382,7 @@ class PhotoDraftStagerTest {
                     sessions = sessions,
                     renderer = renderer,
                     drafts = drafts,
+                    outgoingDomain = outgoingDomain,
                     ioDispatcher = dispatcher,
                 ),
         )

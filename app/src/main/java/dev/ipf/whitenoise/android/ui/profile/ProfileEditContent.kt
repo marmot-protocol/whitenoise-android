@@ -369,9 +369,14 @@ internal fun ProfileAvatar(
     owner: String,
     url: String?,
 ) {
-    val bitmap by key(owner, url) {
-        rememberRecoverableAvatar(initialImage = AvatarImageLoader.peek(url), enabled = url != null) {
-            AvatarImageLoader.load(checkNotNull(url))
+    val lifetime = AvatarImageLoader.currentCacheLifetime()
+    val bitmap by key(owner, url, lifetime) {
+        rememberRecoverableAvatar(
+            initialImage = AvatarImageLoader.peek(url),
+            enabled = url != null,
+            awaitCached = { AvatarImageLoader.awaitCached(checkNotNull(url), lifetime) },
+        ) {
+            AvatarImageLoader.load(checkNotNull(url), AvatarImageLoader.publicProfiles())
         }
     }
     Box(
@@ -407,7 +412,10 @@ internal fun ProfileBanner(
     var bitmap by remember(url, targetWidthPx) { mutableStateOf(AvatarImageLoader.peekBanner(url, targetWidthPx)) }
     var loaded by remember(url, targetWidthPx) { mutableStateOf(bitmap != null) }
     LaunchedEffect(url, targetWidthPx) {
-        if (bitmap == null) bitmap = AvatarImageLoader.loadBanner(url, targetWidthPx)
+        // A kind-0 banner is published, so it decodes in the public profiles.
+        if (bitmap == null) {
+            bitmap = AvatarImageLoader.loadBanner(url, targetWidthPx, AvatarImageLoader.publicProfiles())
+        }
         loaded = true
     }
     Surface(

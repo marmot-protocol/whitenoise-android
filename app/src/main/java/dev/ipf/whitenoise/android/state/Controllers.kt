@@ -108,6 +108,7 @@ import dev.ipf.whitenoise.android.media.GroupImageMutationFailure
 import dev.ipf.whitenoise.android.media.ImageUploadDraft
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
+import dev.ipf.whitenoise.android.media.OutgoingSend
 import dev.ipf.whitenoise.android.media.REMOVE_GROUP_IMAGE_MUTATION_KEY
 import dev.ipf.whitenoise.android.media.classifyGroupImageMutationFailure
 import dev.ipf.whitenoise.android.media.mutationKey
@@ -785,9 +786,13 @@ internal suspend fun removeMediaMemoryCacheKeys(
  *
  * A photo decodes its own bytes. A video has a frame pulled from the same bytes instead, so the
  * confirmed bubble opens on the poster the optimistic one already showed rather than waiting for
- * the file to be materialized and read again (#2732).
+ * the file to be materialized and read again (#2732). A photo decodes in [domain]'s worker.
  */
-private suspend fun decodeMediaThumbnailOffMain(attachment: PendingAttachment): android.graphics.Bitmap? {
+private suspend fun decodeMediaThumbnailOffMain(
+    attachment: PendingAttachment,
+    domain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
+        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
+): android.graphics.Bitmap? {
     // A file-backed item has no bytes here; its confirmed bubble paints the thumbhash, then MDK's copy.
     val bytes = attachment.inMemoryBytes ?: return null
     return withContext(Dispatchers.Default) {
@@ -797,6 +802,7 @@ private suspend fun decodeMediaThumbnailOffMain(attachment: PendingAttachment): 
             MediaPipeline.decodeSampledBitmap(
                 bytes,
                 MediaPipeline.THUMBNAIL_MAX_EDGE_PX,
+                domain = domain,
             )
         }
     }
@@ -1969,7 +1975,10 @@ class ChatsController private constructor(
                             chatListWindows === chatListStream,
                     )
                     if (!isActiveBindEpoch(epoch)) break
-                    chatListStream.publishIfCurrent(initialFrame, ::replacePresentedChatRows)
+                    chatListStream.publishIfCurrent(initialFrame) { rows ->
+                        replacePresentedChatRows(rows)
+                        stagedChatListFrame = ChatListFrameMark(chatListStream, initialFrame.revision)
+                    }
                     appState.schedulePendingLocalGroupDeleteCleanup()
                     appState.recordAccountSwitchLocalRowsReady(accountRef, chatRows.size)
                     val initialGroups =
@@ -3166,6 +3175,7 @@ class ChatsController private constructor(
             else -> {
                 windows.publishIfCurrent(frame) { rows ->
                     replacePresentedChatRows(rows)
+                    stagedChatListFrame = ChatListFrameMark(windows, frame.revision)
                     scheduleRecompute()
                 }
                 !windows.closed
@@ -4778,17 +4788,32 @@ class ChatsController private constructor(
         row.lastMessage?.sender?.let(appState::requestProfile)
     }
 
+    /**
+     * Warms the pictures a row's next notification may show, in this controller's own account's workers: a
+     * replaced controller recomputing after an account switch never decodes its rows in the new account's worker.
+     */
     private fun preWarmNotificationAvatars(item: ChatListItem) {
         val conversationAvatar =
             ProfileSanitizer.protocolImageUrl(item.group.avatarUrl)
                 ?: ProfileSanitizer.protocolImageUrl(item.projection?.avatarUrl)
+        val profiles =
+            dev.ipf.whitenoise.android.media.MediaTrustDomain
+                .publicProfiles(accountRef)
         if (item.selectedAvatarAsset == null) {
-            AvatarImageLoader.preWarm(conversationAvatar)
+            // A group's own picture here is its URL, whose host chooses the bytes, so it decodes single-use, and a
+            // direct chat's peer picture is a published one.
+            val domain =
+                if (GroupProjector.ownsGroupPicture(item)) {
+                    dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique
+                } else {
+                    profiles
+                }
+            AvatarImageLoader.preWarm(conversationAvatar, domain)
             GroupProjector
                 .avatarAccount(item.group, item.presentationOtherMemberAccount, item.presentationMemberCount)
-                ?.let(appState::preWarmProfileAvatar)
+                ?.let { appState.preWarmProfileAvatar(it, profiles) }
         }
-        item.latest?.sender?.let(appState::preWarmProfileAvatar)
+        item.latest?.sender?.let { appState.preWarmProfileAvatar(it, profiles) }
     }
 
     private fun firstFrameAvatarSeed(item: ChatListItem): ChatListAvatarSeed? {
@@ -4819,6 +4844,51 @@ class ChatsController private constructor(
 
     /** Keeps folded native updates synchronous while coalescing only their visible publication. */
     private fun scheduleRecompute() = presentationLifetime.schedule()
+
+    /** The window frame whose rows wait for the next visible projection. */
+    @Volatile private var stagedChatListFrame: ChatListFrameMark? = null
+
+    /** The window frame whose rows [items] last published; snapshot state, so a pin follow can wait on it. */
+    private var presentedChatListFrame by mutableStateOf<ChatListFrameMark?>(null)
+
+    /**
+     * Returns [view] to its top and marks the frame a caller should wait for with [chatListFramePresented]: the
+     * one holding the restored head, or, when the command installed nothing itself (a newer frame from the
+     * receive loop already won, or MDK answered stale), the live set's current frame, which may still sit in
+     * the projection debounce. Null only when no live window set remains to wait on.
+     */
+    internal suspend fun returnChatListToTopFrame(view: ChatListViewFfi): ChatListFrameMark? {
+        val windows = chatListWindows
+        val account = accountRef
+        return when {
+            windows == null || account == null -> null
+            windows.returnToTop(view) == null -> windows.currentFrameMarkIfLive()
+            else ->
+                ChatListFrameMark(windows, windows.frame().revision)
+                    .takeIf { applyChatListWindowRows(account, windows) }
+        }
+    }
+
+    /** This set's current frame while it is still open and still the controller's window set, else null. */
+    private fun ChatListWindowSet.currentFrameMarkIfLive(): ChatListFrameMark? =
+        takeIf { !closed && chatListWindows === it }?.let { ChatListFrameMark(it, it.frame().revision) }
+
+    /**
+     * Whether [items] now shows [mark]'s frame or a newer one from the same window set. A replaced or
+     * closed window set also counts, since that frame will never be shown and the caller must not wait on it.
+     */
+    internal fun chatListFramePresented(mark: ChatListFrameMark): Boolean {
+        val presented = presentedChatListFrame
+        if (chatListWindows !== mark.windows) return true
+        return presented != null && presented.windows === mark.windows && presented.revision >= mark.revision
+    }
+
+    /** Whether [items] shows a frame newer than [mark] from its window set, or that set was replaced or closed. */
+    internal fun chatListFrameSuperseded(mark: ChatListFrameMark): Boolean {
+        val presented = presentedChatListFrame
+        if (chatListWindows !== mark.windows) return true
+        return presented != null && presented.windows === mark.windows && presented.revision > mark.revision
+    }
 
     /**
      * Dispose every reference this controller owns. The chat-list screen calls
@@ -4934,6 +5004,7 @@ class ChatsController private constructor(
         val avatarWarmTargets = visible.take(CHAT_LIST_AVATAR_WARM_ROWS)
         items = visible
         archivedItems = archived
+        presentedChatListFrame = stagedChatListFrame
         val recoveryGeneration = pendingRecoveryProjectionGeneration.consume()
         if (recoveryGeneration > 0L) {
             if (
@@ -5640,6 +5711,10 @@ internal typealias MediaPublisher =
 
 internal typealias InviteAcceptor = suspend (String, String) -> AppGroupRecordFfi
 
+/** Decodes a just-sent attachment's poster in the given worker domain, that of the draft it was sent from. */
+internal typealias MediaThumbnailDecoder =
+    suspend (PendingAttachment, dev.ipf.whitenoise.android.media.MediaTrustDomain) -> android.graphics.Bitmap?
+
 private const val MESSAGE_EDIT_EVENT_KIND = 1009uL
 
 class ConversationController(
@@ -5691,8 +5766,10 @@ class ConversationController(
         }
     },
     private val mediaPublisher: MediaPublisher? = null,
-    private val mediaThumbnailDecoder: suspend (PendingAttachment) -> android.graphics.Bitmap? =
-        ::decodeMediaThumbnailOffMain,
+    // A just-sent pick decodes in its sent draft's domain, whose worker retires once the send has ended.
+    private val mediaThumbnailDecoder: MediaThumbnailDecoder = { attachment, domain ->
+        decodeMediaThumbnailOffMain(attachment, domain)
+    },
     private val markdownParser: suspend (String) -> MarkdownDocumentFfi = { appState.parseMarkdownOrEmpty(it) },
     private val groupArchivedUpdater: suspend (String, String, Boolean) -> AppGroupRecordFfi =
         { account, groupIdHex, archived ->
@@ -6094,6 +6171,42 @@ class ConversationController(
     private val conversationRuntimeGeneration = appState.runtimeGeneration
     internal val boundAccountRef: String?
         get() = conversationAccountRef
+
+    /** This conversation's media trust domain: a worker that decodes its images serves no other conversation. */
+    internal val mediaTrustDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain
+        get() =
+            dev.ipf.whitenoise.android.media.MediaTrustDomain
+                .conversation(conversationAccountRef, group.groupIdHex)
+
+    /**
+     * The domain of one file this conversation's user picked to send here: [pick] is its composer slot id, which a
+     * restored draft attachment keeps as its own, or a document's URI. It decodes in its draft's one shared worker,
+     * which no later draft reaches, while a read that names no pick decodes single-use. The drafts belong to the
+     * app, not this controller, so a replaced controller or screen keeps every pick's draft.
+     */
+    internal fun outgoingMediaTrustDomain(pick: String?): dev.ipf.whitenoise.android.media.MediaTrustDomain =
+        appState.outgoingDrafts.domain(conversationAccountRef, group.groupIdHex, pick)
+
+    /**
+     * Starts a send of [picks]: they keep their draft's worker and the next pick starts a new draft. With [ownDraft],
+     * picks that joined no draft yet, as after a restart, join one of their own. The returned send stays open until
+     * [endOutgoingSend], once its just-sent thumbnails are done.
+     */
+    internal fun beginOutgoingSend(
+        picks: Collection<String>,
+        ownDraft: Boolean = false,
+    ): OutgoingSend = appState.outgoingDrafts.beginSend(conversationAccountRef, group.groupIdHex, picks, ownDraft)
+
+    /** Ends a send [beginOutgoingSend] started, retiring each of its drafts that nothing decodes in any more. */
+    internal fun endOutgoingSend(send: OutgoingSend) = appState.outgoingDrafts.endSend(send)
+
+    /**
+     * Records the [picks] now in the composer, so a sent pick that left it releases its draft and an empty composer
+     * ends the current draft.
+     */
+    internal fun retainOutgoingPicks(picks: Set<String>) {
+        appState.outgoingDrafts.retain(conversationAccountRef, group.groupIdHex, picks)
+    }
 
     /** Current retained owner eligibility; the shell's privacy and route admission remain independent. */
     internal val ownsRetainedForegroundPresentation: Boolean
@@ -8600,9 +8713,6 @@ class ConversationController(
                                         )
                                     }
                                 }.also { retained.uploadedReferences = it }
-                                // A publish-only retry reuses these references, so large snapshots can go now
-                                // instead of waiting, possibly offline for hours, for the send to settle.
-                                .also { retained.releaseStagedSources(appState::closeStagedUploadSourceOffMain) }
                         }
                 // Stop before publication after a discard; an unreferenced Blossom blob is inert.
                 if (discardedDuringRetry.remove(key)) {
@@ -8641,6 +8751,9 @@ class ConversationController(
                                     accepted
                                 }.also { diagnostics.finishMediaPublish(tempId, startedAtMs) }
                         }
+                // Once MDK has accepted the send, no retry uploads again, so large snapshots can go now instead of
+                // waiting, possibly offline for hours, for it to settle. Until then a stale-epoch refusal needs them.
+                retained.releaseStagedSources(appState::closeStagedUploadSourceOffMain)
                 completeDurableAcceptance(key)
                 if (retained.replyTarget != null && replySelectionVersion == retained.replyVersion) replyingTo = null
                 sendHostAttempt.success()
@@ -8779,7 +8892,8 @@ class ConversationController(
                         // Offload the multi-MB ARGB decode to Default; the
                         // main-confined thumbnail-cache put resumes on Main.
                         // Mirrors the receive/render path in WhiteNoiseApp.
-                        val decoded = mediaThumbnailDecoder(attachment)
+                        // The attachment names its sent draft's domain, the one its previews used.
+                        val decoded = mediaThumbnailDecoder(attachment, attachment.outgoingDomain)
                         if (!mediaUploadSessionStillCurrent(account)) return@forEachIndexed
                         if (decoded != null) {
                             appState.cacheMediaThumbnail(confirmedKey, decoded)
@@ -8917,6 +9031,9 @@ class ConversationController(
                     if (BuildConfig.DEBUG) Log.w("DMConversation", "post-acceptance media settlement failed", throwable)
                     return
                 }
+                // MDK refuses references whose upload epoch or branch is no longer current (mdk#2891), and
+                // reusing them would fail every Retry the same way, so the next attempt uploads again.
+                if (isStaleMediaReferenceEpoch(throwable)) retained.uploadedReferences = null
                 // A failed bubble offers Retry, not the bytes of the attempt that failed.
                 retained.clearTransferProgress()
                 optimisticMessages[key] =

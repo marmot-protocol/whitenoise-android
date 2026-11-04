@@ -957,6 +957,7 @@ internal fun networkDisplayNameFallback(
     return shortNpub(accountIdHex)
 }
 
+/** The cached or freshly encoded npub for [accountIdHex], or empty rather than a non-npub or the raw hex. */
 internal fun npubPresentation(
     accountIdHex: String,
     cachedNpub: String?,
@@ -970,8 +971,8 @@ internal fun npubPresentation(
 
 /**
  * Fail-closed npub for visible/copy profile and message surfaces. Keeps an
- * already-canonical [reference] when it is not the raw account hex; otherwise
- * derives through [npubForDisplay] from [resolvedAccountIdHex].
+ * already-canonical [reference] when it is not the raw account hex, lowercasing an
+ * all-uppercase key; otherwise derives through [npubForDisplay] from [resolvedAccountIdHex].
  */
 internal fun presentationNpubFromReference(
     reference: String,
@@ -982,7 +983,8 @@ internal fun presentationNpubFromReference(
         reference.startsWith("npub1", ignoreCase = true) &&
         resolvedAccountIdHex?.equals(reference, ignoreCase = true) != true
     ) {
-        return reference
+        // Bech32 allows one case; an all-uppercase key is the same key, so show and copy its canonical lowercase.
+        return if (reference == reference.uppercase(Locale.ROOT)) reference.lowercase(Locale.ROOT) else reference
     }
     return resolvedAccountIdHex?.let(npubForDisplay).orEmpty()
 }
@@ -1246,6 +1248,8 @@ class WhiteNoiseAppState private constructor(
             .also {
                 dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
                     .attach(it) { activeAccountRef }
+                dev.ipf.whitenoise.android.core.AvatarImageLoader
+                    .attachActiveAccount { activeAccountRef }
             }
     internal val localGroupDeleteCleanupJournal =
         LocalGroupDeleteCleanupJournal(appContext.noBackupFilesDir.resolve("local-group-delete-cleanup"))
@@ -1321,6 +1325,11 @@ class WhiteNoiseAppState private constructor(
 
     private val legacyDraftMigrationSource by lazy { LegacyDraftMigrationSource(appContext) }
     internal val editorSourceStore: EditorSourceStore = EditorSourceStore.create(appContext)
+
+    /** Which draft each picked file belongs to, per account and conversation, so its outgoing worker never changes. */
+    internal val outgoingDrafts =
+        dev.ipf.whitenoise.android.media
+            .OutgoingDraftRegistry()
     internal val editorSessionStore: EditorSessionStore = EditorSessionStore.create(appContext)
     internal val messageDraftRepository: MessageDraftRepository =
         messageDraftRepositoryOverride
@@ -3623,6 +3632,9 @@ class WhiteNoiseAppState private constructor(
         accountRef: String?,
         groupIdHex: String,
     ): String = "${accountRef.orEmpty()}\u0000$groupIdHex"
+
+    /** The attached chat list's current rows, read to name the worker domain of a durable avatar. */
+    internal fun chatListItemsForAvatarDomains(): List<ChatListItem> = chatsController?.items.orEmpty()
 
     /** Attaches or permanently detaches the chat-list projection without transferring private row state. */
     fun attachChatsController(controller: ChatsController?) {
@@ -11562,13 +11574,21 @@ class WhiteNoiseAppState private constructor(
         )
     }
 
+    /** The active account's name for [accountIdHex]: its private nickname, else its network display name. */
     fun displayName(accountIdHex: String): String = displayNameForAccount(activeAccountRef, accountIdHex)
 
+    /** The account's published or local name, or its short npub when only the key can name it. */
     fun networkDisplayName(accountIdHex: String): String {
+        val name = networkDisplayNameOrNull(accountIdHex)
+        return name ?: shortNpub(accountIdHex)
+    }
+
+    /** The published or local account name for [accountIdHex], or null when only its public key could name it. */
+    fun networkDisplayNameOrNull(accountIdHex: String): String? {
         profileDisplayName(accountIdHex)?.let { return it }
         requestProfile(accountIdHex)
         val accountLabel = accounts.firstOrNull { it.accountIdHex == accountIdHex }?.label
-        return networkDisplayNameFallback(accountLabel, accountIdHex, ::shortNpub)
+        return networkDisplayNameFallback(accountLabel, accountIdHex) { "" }.takeIf(String::isNotEmpty)
     }
 
     fun chatMemberTitle(accountIdHex: String): String {
@@ -11820,7 +11840,10 @@ class WhiteNoiseAppState private constructor(
         val ref = contactPictureStore.reference(account, contact) ?: return
         val lifetime = AvatarImageLoader.currentCacheLifetime()
         runCatchingCancellable {
-            AvatarImageLoader.loadStored(ref.cacheKey, lifetime) {
+            val domain =
+                dev.ipf.whitenoise.android.media.MediaTrustDomain
+                    .local(account)
+            AvatarImageLoader.loadStored(ref.cacheKey, lifetime, domain) {
                 withContext(Dispatchers.IO) { contactPictureStore.read(ref) }
             }
         }
@@ -11958,26 +11981,32 @@ class WhiteNoiseAppState private constructor(
 
     /**
      * Start local profile materialization and image decoding without waiting for
-     * either. Chat/message projections call this before notification delivery;
-     * [applyProfilePresentation] queues the image as soon as local storage (or a
-     * relay refresh) yields a sanitized URL.
+     * either. Chat/message projections call this before notification delivery,
+     * and [applyProfilePresentation] queues the image as soon as local storage (or
+     * a relay refresh) yields a sanitized URL. The decode runs in [domain], the
+     * caller's account's public profiles. Only the active account's caller queues
+     * that later warm, which runs in the active account's worker.
      */
-    internal fun preWarmProfileAvatar(accountIdHex: String) {
+    internal fun preWarmProfileAvatar(
+        accountIdHex: String,
+        domain: dev.ipf.whitenoise.android.media.MediaTrustDomain = AvatarImageLoader.publicProfiles(),
+    ) {
         val id = accountIdHex.trim().takeIf { it.isNotEmpty() } ?: return
+        val deferrable = domain == AvatarImageLoader.publicProfiles()
         val cachedAvatar =
             synchronized(profilePresentationLock) {
                 val avatar = profilePresentations[id]?.avatarUrl
                 if (avatar != null) {
                     pendingAvatarPreWarmAccountIds.remove(id)
-                } else {
-                    // Reinsert to keep the set in recent-conversation order; a
-                    // live sender must not sit behind old avatarless profiles.
+                } else if (deferrable) {
+                    // Reinsert to keep the set in recent-conversation order, so a
+                    // live sender never sits behind old avatarless profiles.
                     pendingAvatarPreWarmAccountIds.remove(id)
                     pendingAvatarPreWarmAccountIds.add(id)
                 }
                 avatar
             }
-        AvatarImageLoader.preWarm(cachedAvatar)
+        AvatarImageLoader.preWarm(cachedAvatar, domain)
         // Starts an ungated local materialization on a miss and observes its
         // revision; applyProfilePresentation consumes the pending warm above once
         // the URL lands. The relay refresh remains independently cooldown-gated.
@@ -13294,7 +13323,15 @@ class WhiteNoiseAppState private constructor(
         content: LocalNotificationContent?,
     ): LateNotificationIdentity? {
         val warmed = notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)
-        val urlSources = firstPost.avatars.lateIdentitySources(warmed, update.isDm)
+        val urlSources =
+            firstPost.avatars.lateIdentitySources(
+                warmed,
+                update.isDm,
+                dev.ipf.whitenoise.android.notifications
+                    .notificationConversationDomain(update),
+                dev.ipf.whitenoise.android.notifications
+                    .notificationSenderDomain(update),
+            )
         val sources =
             if (!update.isDm && urlSources.conversationBitmap == null && urlSources.conversationUrl.isNullOrBlank()) {
                 urlSources.copy(conversationLoader = encryptedGroupIdentityLoader(update))
@@ -14318,7 +14355,7 @@ class WhiteNoiseAppState private constructor(
                 changed to shouldPreWarm
             }
         if (shouldPreWarm) {
-            AvatarImageLoader.preWarm(presentation.avatarUrl)
+            AvatarImageLoader.preWarm(presentation.avatarUrl, AvatarImageLoader.publicProfiles())
         }
         if (changed) {
             profileRevision += 1

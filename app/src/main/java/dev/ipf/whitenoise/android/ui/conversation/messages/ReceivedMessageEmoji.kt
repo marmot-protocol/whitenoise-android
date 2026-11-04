@@ -90,7 +90,7 @@ private fun rememberReceivedEmojiInScope(
     val messageArt by produceState(emptyMap<String, EmojiArt>(), record.messageIdHex, defined, allowNetwork) {
         value =
             loadReceivedEmojiArtwork(defined, attachments.accepted) { (index, reference) ->
-                emojiArt {
+                emojiArt(controller.mediaTrustDomain) {
                     imageAttachmentBytes(
                         controller = controller,
                         messageIdHex = record.messageIdHex,
@@ -168,8 +168,11 @@ internal fun reactionArtworkAutoDownloadAllowed(
         automaticDownloadsPaused = automaticDownloadsPaused,
     )
 
-/** Decoded artwork, or null when the bytes are unavailable under policy or do not decode. */
-private suspend fun emojiArt(bytes: suspend () -> ByteArray?): EmojiArt? {
+/** Decoded artwork, in a worker serving only [domain], or null when unavailable under policy or undecodable. */
+private suspend fun emojiArt(
+    domain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
+    bytes: suspend () -> ByteArray?,
+): EmojiArt? {
     val data =
         try {
             bytes()
@@ -180,7 +183,7 @@ private suspend fun emojiArt(bytes: suspend () -> ByteArray?): EmojiArt? {
         ) {
             null
         }
-    return data?.let { withContext(Dispatchers.Default) { decodeEmojiImage(it) } }?.let(EmojiArt::Decoded)
+    return data?.let { withContext(Dispatchers.Default) { decodeEmojiImage(it, domain) } }?.let(EmojiArt::Decoded)
 }
 
 /** The message's attachments minus the ones that are inline emoji artwork. */

@@ -13,6 +13,12 @@ data class PendingAttachment(
     val dim: String? = null,
     val thumbhash: String? = null,
     val sourceFile: StagedUploadSource? = null,
+    /**
+     * The outgoing domain of the draft this attachment was sent from, where its pending preview and just-sent
+     * thumbnail decode, or single-use when it came from no pick.
+     */
+    val outgoingDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
+        dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
 ) {
     init {
         require(sourceFile == null || plaintextBytes.isEmpty()) { "attachment must have one input representation" }

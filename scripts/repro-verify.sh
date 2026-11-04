@@ -173,6 +173,7 @@ repro_verify_write_configured_jvm_report() {
   done
 }
 
+# Writes the init script that reports the Gradle JVM and the Android SDK packages AGP resolved.
 repro_verify_write_jvm_report_init_script() {
   local init_script="$1"
 
@@ -187,6 +188,15 @@ java.vendor=${System.getProperty('java.vendor')}
 java.version=${System.getProperty('java.version')}
 java.runtime.version=${System.getProperty('java.runtime.version')}
 """
+    // The SDK packages AGP resolved for :app; the environment report fingerprints only these.
+    gradle.projectsEvaluated {
+        def android = gradle.rootProject.findProject(':app')?.extensions?.findByName('android')
+        if (android != null) {
+            report << """android.compileSdk=${android.compileSdkVersion}
+android.buildTools=${android.buildToolsVersion}
+"""
+        }
+    }
 }
 EOF
 }
@@ -229,6 +239,7 @@ repro_verify_assert_build_jvm() {
   done
 }
 
+# Records the toolchain inputs both builds must share, failing when the used SDK packages are unknown.
 repro_verify_record_build_environment() {
   local evidence_dir="$1"
   local commit_sha="$2"
@@ -238,7 +249,29 @@ repro_verify_record_build_environment() {
   local source_tree="$6"
   local android_sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
   local report="$evidence_dir/repro-build-environment.txt"
-  local apksigner
+  local apksigner compile_sdk build_tools sdk_file
+  local -a sdk_files=()
+
+  if [[ -n "$android_sdk" && -d "$android_sdk" ]]; then
+    # Runner images also ship platforms the build never reads, and a partial image
+    # rollout changes those between runners, so fingerprint only what the build used.
+    if ! compile_sdk="$(repro_verify_report_value "$jvm_report1" android.compileSdk)" ||
+      ! build_tools="$(repro_verify_report_value "$jvm_report1" android.buildTools)"; then
+      printf 'error: build report names no Android platform and build-tools: %s\n' "$jvm_report1" >&2
+      return 1
+    fi
+    sdk_files=(
+      "$android_sdk/platforms/$compile_sdk/source.properties"
+      "$android_sdk/platforms/$compile_sdk/android.jar"
+      "$android_sdk/build-tools/$build_tools/source.properties"
+    )
+    for sdk_file in "${sdk_files[@]}"; do
+      if [[ ! -f "$sdk_file" ]]; then
+        printf 'error: Android SDK file used by the build is missing: %s\n' "$sdk_file" >&2
+        return 1
+      fi
+    done
+  fi
 
   mkdir -p "$evidence_dir"
   {
@@ -261,11 +294,8 @@ repro_verify_record_build_environment() {
       cat -- "$jvm_report2"
     fi
     (cd "$source_tree" && sha256sum gradle/wrapper/gradle-wrapper.{jar,properties})
-    if [[ -n "$android_sdk" && -d "$android_sdk" ]]; then
-      find "$android_sdk/platforms" "$android_sdk/build-tools" \
-        -maxdepth 2 -type f -name source.properties -print -exec sha256sum '{}' ';' | LC_ALL=C sort
-      find "$android_sdk/platforms" \
-        -maxdepth 2 -type f -name android.jar -print -exec sha256sum '{}' ';' | LC_ALL=C sort
+    if ((${#sdk_files[@]} > 0)); then
+      sha256sum -- "${sdk_files[@]}"
     fi
     if apksigner="$(repro_verify_locate_apksigner)"; then
       printf 'apksigner=%s\n' "$apksigner"

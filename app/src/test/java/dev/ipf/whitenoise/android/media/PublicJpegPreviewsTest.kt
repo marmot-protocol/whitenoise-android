@@ -192,13 +192,13 @@ class PublicJpegPreviewsTest {
                 calls++
                 bytes
             }
-            val displayed = requireNotNull(loader.load("alice", url, { true }, fetch))
+            val displayed = requireNotNull(loader.load("alice", url, { true }, fetch = fetch))
             loader.trimMemory(PresentationMemoryTrim.EMPTY)
             assertFalse(displayed.isRecycled)
-            assertNull(loader.load("alice", url, { false }, fetch))
+            assertNull(loader.load("alice", url, { false }, fetch = fetch))
             assertEquals(1, calls)
-            val restored = requireNotNull(loader.load("alice", url, { true }, fetch))
-            org.junit.Assert.assertSame(restored, loader.load("alice", url, { true }, fetch))
+            val restored = requireNotNull(loader.load("alice", url, { true }, fetch = fetch))
+            org.junit.Assert.assertSame(restored, loader.load("alice", url, { true }, fetch = fetch))
             assertEquals(2, calls)
         }
 

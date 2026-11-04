@@ -130,6 +130,7 @@ internal fun ProfileQrSheet(
                 seed = accountIdHex,
                 size = 120.dp,
                 pictureUrl = appState.avatarUrl(accountIdHex),
+                pictureDomain = AvatarImageLoader.publicProfiles(),
             )
             EmojiLabel(
                 appState.displayName(accountIdHex),

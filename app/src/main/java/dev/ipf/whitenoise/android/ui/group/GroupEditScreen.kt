@@ -176,7 +176,10 @@ internal fun GroupEditScreen(
         val groupAvatarUrl = groupAvatar.pictureUrl
         val encryptedGroupAvatar = groupAvatar.image
         val legacyGroupAvatarAvailable =
-            rememberAvatarImageAvailable(groupAvatarUrl.takeIf { encryptedGroupAvatar == null })
+            rememberAvatarImageAvailable(
+                groupAvatarUrl.takeIf { encryptedGroupAvatar == null },
+                groupAvatar.pictureDomain,
+            )
         val groupAvatarImageAvailable = encryptedGroupAvatar != null || legacyGroupAvatarAvailable
         val hasGroupImage =
             ProfileSanitizer.protocolImageUrl(controller.group.avatarUrl) != null ||
@@ -512,6 +515,7 @@ internal fun GroupEditScreen(
                             pictureUrl = groupAvatarUrl.takeIf { encryptedGroupAvatar == null },
                             picture = encryptedGroupAvatar,
                             groupAnimation = groupAvatar.groupAnimation,
+                            pictureDomain = groupAvatar.pictureDomain,
                         )
                     }
                     if (imageSaving) LinearProgressIndicator(Modifier.fillMaxWidth())

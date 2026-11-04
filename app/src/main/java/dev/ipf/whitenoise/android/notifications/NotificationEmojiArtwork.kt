@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.FileProvider
 import dev.ipf.whitenoise.android.ui.CustomEmojiStore
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
+import dev.ipf.whitenoise.android.ui.customEmojiDomain
 import dev.ipf.whitenoise.android.ui.sanitizeEmojiCode
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -201,7 +202,7 @@ private suspend fun localNotificationEmojiBitmap(
         val bitmap =
             bytes
                 ?.takeIf { it.size <= CustomEmojiStore.MAX_BYTES }
-                ?.let { decodeNotificationEmojiInterruptibly(it) }
+                ?.let { decodeNotificationEmojiInterruptibly(it, customEmojiDomain(context)) }
         if (bitmap != null) return bitmap
     }
     return null

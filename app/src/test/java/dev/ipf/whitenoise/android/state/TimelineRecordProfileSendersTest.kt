@@ -87,6 +87,7 @@ class TimelineRecordProfileSendersTest {
         retentionExpiresAt = null,
         sticker = null,
         importedFrom = null,
+        historyImportProvenance = null,
     )
 
     @Test

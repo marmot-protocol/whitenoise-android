@@ -135,6 +135,7 @@ class GroupSenderHeaderTimelineScreenshotTest : MessageBubbleFileAttachmentFixtu
             scale = 1.6f,
         )
 
+    /** Captures a mixed sender run with the requested avatar, theme, direction and font scale. */
     private fun captureRun(
         name: String,
         loaded: Boolean = false,
@@ -255,6 +256,7 @@ class GroupSenderHeaderTimelineScreenshotTest : MessageBubbleFileAttachmentFixtu
             customColor = true,
         )
 
+    /** Checks sender identity placement after opening the production media focus surface. */
     private fun checkProductionMediaFocus(
         caption: String,
         customColor: Boolean,
@@ -553,6 +555,7 @@ class GroupSenderHeaderTimelineScreenshotTest : MessageBubbleFileAttachmentFixtu
         return listOf(first, follow, media, fromOther(other), own, fromOther(afterOwn))
     }
 
+    /** Builds synthetic account and avatar state for the mounted conversation fixture. */
     private fun appState(): WhiteNoiseAppState {
         val app =
             WhiteNoiseAppState(
@@ -618,6 +621,7 @@ class GroupSenderHeaderTimelineScreenshotTest : MessageBubbleFileAttachmentFixtu
         return controller
     }
 
+    /** Renders the sender run in the requested theme, layout direction and font scale. */
     private fun render(
         rows: List<TimelineMessage>,
         app: WhiteNoiseAppState,
@@ -665,6 +669,7 @@ class GroupSenderHeaderTimelineScreenshotTest : MessageBubbleFileAttachmentFixtu
         }
     }
 
+    /** Mounts one production timeline row with the fixture sender and selection state. */
     @Composable
     @Suppress("LongParameterList", "LongMethod")
     private fun Row(

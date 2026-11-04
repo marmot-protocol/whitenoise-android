@@ -215,5 +215,6 @@ class ConvergenceRetryMediaMatchTest {
             retentionExpiresAt = null,
             sticker = null,
             importedFrom = null,
+            historyImportProvenance = null,
         )
 }

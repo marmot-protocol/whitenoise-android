@@ -79,13 +79,37 @@ internal object PrivateContactAvatarLoader {
         val current = currentReference(selection.first, accountRef)
         val image =
             current?.let { ref ->
-                AvatarImageLoader.loadStored(ref.cacheKey, lifetime) {
+                // A stored private contact picture is only drawn on this device, so it decodes in the local domain.
+                val domain =
+                    dev.ipf.whitenoise.android.media.MediaTrustDomain
+                        .local(accountRef ?: activeAccount?.invoke())
+                AvatarImageLoader.loadStored(ref.cacheKey, lifetime, domain) {
                     withContext(Dispatchers.IO) { store?.read(ref) }
                 }
             }
         val expired = AvatarImageLoader.currentCacheLifetime() != lifetime
         if (expired || current != currentReference(selection.first, accountRef)) return null
-        return image ?: selection.second?.let { AvatarImageLoader.load(it) }
+        // The fallback is the contact's published picture.
+        val published =
+            dev.ipf.whitenoise.android.media.MediaTrustDomain
+                .publicProfiles(accountRef ?: activeAccount?.invoke())
+        return image ?: selection.second?.let { AvatarImageLoader.load(it, published) }
+    }
+
+    /**
+     * Adopts pixels another consumer publishes for this handle's stored picture or its public fallback,
+     * without reading the private file itself (#3557). Every wake goes back through [peek], so ownership is
+     * revalidated and another account's handle never adopts anything.
+     */
+    suspend fun awaitCached(
+        source: String,
+        accountRef: String? = null,
+        lifetime: Long,
+    ): ImageBitmap? {
+        val selection = parse(source) ?: return null
+        val keys = setOfNotNull(currentReference(selection.first, accountRef)?.cacheKey, selection.second)
+        if (keys.isEmpty()) return null
+        return AvatarImageLoader.awaitPublication(keys, lifetime) { peek(source, accountRef) }
     }
 
     /** Revalidates display ownership before resolving a newer immutable selection for a captured handle. */

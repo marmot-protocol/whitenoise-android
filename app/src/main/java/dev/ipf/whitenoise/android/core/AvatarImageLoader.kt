@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import dev.ipf.whitenoise.android.media.ByteSizeLruCache
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.state.StalenessGuard
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -45,7 +46,9 @@ object AvatarImageLoader {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val fetchGate = AvatarFetchGate(REGULAR_FETCH_CONCURRENCY, NOTIFICATION_FETCH_CONCURRENCY)
     private val lock = Any()
-    private val cache = PartitionedProfileImageCache(AVATAR_CACHE_SIZE_BYTES, BANNER_CACHE_SIZE_BYTES)
+    private val publications = AvatarCachePublications()
+    private val cache =
+        PartitionedProfileImageCache(AVATAR_CACHE_SIZE_BYTES, BANNER_CACHE_SIZE_BYTES, publications::published)
     private val inFlight = mutableMapOf<String, AvatarInFlightRequest>()
 
     // staleness-exempt: captured request-lifetime tokens for bounded queued work, not a counter owner.
@@ -61,6 +64,9 @@ object AvatarImageLoader {
             maxEntryBytes = MAX_AVATAR_BYTES.toLong(),
         )
     private var profileImageFetcher: (suspend (String, ULong) -> ByteArray)? = null
+
+    /** The account whose public-profile domain decodes kind-0 pictures, attached by the app state. */
+    @Volatile private var activeAccount: () -> String? = { null }
 
     // Bumped by clear(); fetches launched under an older generation discard
     // their results so a logout/account-switch can't be re-polluted by an
@@ -87,6 +93,31 @@ object AvatarImageLoader {
         if (becameAvailable) AvatarLoadRecovery.onFetcherAvailable()
     }
 
+    /** Attaches the active-account reader that names the public-profile decode domain. */
+    internal fun attachActiveAccount(account: () -> String?) {
+        activeAccount = account
+    }
+
+    /**
+     * The active account's public-profile domain, which a caller names explicitly for a kind-0 picture or banner.
+     * Kind-0 pictures are published, so one account's share a worker domain; nothing else may use it.
+     */
+    fun publicProfiles(): MediaTrustDomain = MediaTrustDomain.publicProfiles(activeAccount())
+
+    /**
+     * The domain an enclosing [dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope] declared for this request,
+     * otherwise a single-use worker: the fail-safe. An undeclared avatar-loader call inside a declared scope
+     * therefore inherits that scope's domain. `PictureDomainCoverageTest` does not see scopes, so it requires every
+     * production avatar-loader call to name its domain instead, so for this loader the inherited default is reachable
+     * only from test and harness code. Other production paths do rely on scope inheritance by design:
+     * `MediaPipeline`'s decode functions default to the enclosing scope, the photo editor declares its draft's domain
+     * through its render context, and the notification presenter declares each picture slot's domain around its
+     * resolver.
+     */
+    private fun declaredOrUnique(): MediaTrustDomain =
+        dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
+            .declared() ?: MediaTrustDomain.Unique
+
     /** Test-only lifecycle boundary for the process-global MDK fetch adapter. */
     internal fun resetProfileImageFetcherForTests() {
         synchronized(lock) {
@@ -94,13 +125,25 @@ object AvatarImageLoader {
         }
     }
 
-    /** Intercepts private display handles before the MDK public-profile image acquisition boundary. */
-    suspend fun load(url: String): ImageBitmap? =
+    /** Test-only stand-in for the 60-second failure cooldown elapsing, without a recovery event. */
+    internal fun expireFailureCooldownForTests() {
+        synchronized(lock) { failureExpiresAt.clear() }
+    }
+
+    /**
+     * Intercepts private display handles before the MDK public-profile image acquisition boundary. A decode
+     * this call starts runs in a worker serving only [domain]: [publicProfiles] for a kind-0 picture, named by
+     * the caller. Without a name or a declared scope it is single-use.
+     */
+    suspend fun load(
+        url: String,
+        domain: MediaTrustDomain = declaredOrUnique(),
+    ): ImageBitmap? =
         if (PrivateContactAvatarLoader.isPrivate(url)) {
             PrivateContactAvatarLoader.load(url)
         } else {
             load(
-                request = avatarRequest(url),
+                request = avatarRequest(url, domain),
                 expectedGeneration = null,
                 fetchLane = AvatarFetchLane.REGULAR,
             )
@@ -112,14 +155,15 @@ object AvatarImageLoader {
      * The target is bucketed and bounded, and the bucket is part of the cache and in-flight keys, so
      * a banner request can never be answered by the avatar-sized bitmap of the same URL while two
      * banner surfaces at comparable widths still share one decode. The bytes come through the same
-     * MarmotKit fetcher as every other profile image.
+     * MarmotKit fetcher as every other profile image. A decode it starts serves only [domain].
      */
     suspend fun loadBanner(
         url: String,
         targetWidthPx: Int,
+        domain: MediaTrustDomain = declaredOrUnique(),
     ): ImageBitmap? =
         load(
-            request = bannerRequest(url, targetWidthPx),
+            request = bannerRequest(url, targetWidthPx, domain),
             expectedGeneration = null,
             fetchLane = AvatarFetchLane.REGULAR,
         )
@@ -128,9 +172,10 @@ object AvatarImageLoader {
     suspend fun retryBanner(
         url: String,
         targetWidthPx: Int,
+        domain: MediaTrustDomain = declaredOrUnique(),
     ): ImageBitmap? {
-        synchronized(lock) { failureExpiresAt.remove(bannerRequest(url, targetWidthPx).cacheKey) }
-        return loadBanner(url, targetWidthPx)
+        synchronized(lock) { failureExpiresAt.remove(bannerRequest(url, targetWidthPx, domain).cacheKey) }
+        return loadBanner(url, targetWidthPx, domain)
     }
 
     /** Synchronous banner counterpart to [peek]; an avatar-sized entry never satisfies it. */
@@ -139,27 +184,32 @@ object AvatarImageLoader {
         targetWidthPx: Int,
     ): ImageBitmap? {
         val key = url?.trim()?.takeIf { it.isNotEmpty() } ?: return null
-        return synchronized(lock) { cache.get(bannerRequest(key, targetWidthPx).cacheKey) }
+        return synchronized(lock) { cache.get(bannerRequest(key, targetWidthPx, MediaTrustDomain.Unique).cacheKey) }
     }
 
     /** The avatar-variant request for [url], whose cache key stays the bare URL. */
-    private fun avatarRequest(url: String) =
-        ProfileImageRequest(
-            url = url,
-            variant = ProfileImageVariant.AVATAR,
-            maxDimension = MAX_AVATAR_DIMENSION,
-            maxBytes = MAX_AVATAR_BYTES,
-        )
+    private fun avatarRequest(
+        url: String,
+        domain: MediaTrustDomain,
+    ) = ProfileImageRequest(
+        url = url,
+        variant = ProfileImageVariant.AVATAR,
+        maxDimension = MAX_AVATAR_DIMENSION,
+        maxBytes = MAX_AVATAR_BYTES,
+        domain = domain,
+    )
 
     /** The banner-variant request for [url] at the bucket [targetWidthPx] rounds up into. */
     private fun bannerRequest(
         url: String,
         targetWidthPx: Int,
+        domain: MediaTrustDomain,
     ) = ProfileImageRequest(
         url = url,
         variant = ProfileImageVariant.BANNER,
         maxDimension = profileBannerDecodeDimension(targetWidthPx),
         maxBytes = MAX_BANNER_BYTES,
+        domain = domain,
     )
 
     /**
@@ -167,9 +217,12 @@ object AvatarImageLoader {
      * uses this ahead of notification delivery so the first shortcut/person icon
      * can take the synchronous cache path. Work is URL-deduplicated, bounded to a
      * small network fan-out, and generation-guarded so account teardown cannot be
-     * followed by an old queued warm repopulating the cache.
+     * followed by an old queued warm repopulating the cache. The decode serves only [domain].
      */
-    fun preWarm(url: String?) {
+    fun preWarm(
+        url: String?,
+        domain: MediaTrustDomain = declaredOrUnique(),
+    ) {
         val key = url?.trim()?.takeIf { it.isNotEmpty() } ?: return
         val scheduledGeneration =
             synchronized(lock) {
@@ -192,7 +245,7 @@ object AvatarImageLoader {
                 // deferred that has not acquired network capacity yet.
                 fetchGate.withPreWarmAdmission {
                     load(
-                        request = avatarRequest(key),
+                        request = avatarRequest(key, domain),
                         expectedGeneration = scheduledGeneration,
                         fetchLane = AvatarFetchLane.PREWARM_ADMITTED,
                         waitForDetachedFetch = true,
@@ -322,6 +375,50 @@ object AvatarImageLoader {
     }
 
     /**
+     * Waits, without fetching, reading or decoding anything, for another consumer to publish [url]'s avatar
+     * pixels in cache lifetime [lifetime], so a mounted placeholder whose own attempt failed can adopt them
+     * (#3557). A banner entry never satisfies it, because banner keys are distinct. Null once the lifetime
+     * ends, so a cleared cache or switched account cannot hand a retired consumer new pixels.
+     */
+    internal suspend fun awaitCached(
+        url: String,
+        lifetime: Long,
+    ): ImageBitmap? =
+        if (PrivateContactAvatarLoader.isPrivate(url)) {
+            PrivateContactAvatarLoader.awaitCached(url, lifetime = lifetime)
+        } else {
+            awaitPublication(setOf(url), lifetime) { peek(url) }
+        }
+
+    /**
+     * Registers for [keys] before reading through [read], so a publication between the read and the wait
+     * cannot be missed, then re-reads after each publication of one of those keys. [read] decides what the
+     * consumer would show, so a caller with ownership rules re-validates them on every wake.
+     */
+    internal suspend fun awaitPublication(
+        keys: Set<String>,
+        lifetime: Long,
+        read: () -> ImageBitmap?,
+    ): ImageBitmap? {
+        while (true) {
+            val registration = synchronized(lock) { publications.register(keys) }
+            try {
+                val image = read()
+                when {
+                    !synchronized(lock) { cacheLifetime.isCurrent(lifetime) } -> return null
+                    image != null -> return image
+                }
+                registration.published.await()
+            } finally {
+                synchronized(lock) { publications.release(registration) }
+            }
+        }
+    }
+
+    /** Keys that currently have a mounted waiter, for cleanup assertions. */
+    internal fun waitingPublicationKeyCount(): Int = synchronized(lock) { publications.waitingKeyCount }
+
+    /**
      * The encoded GIF behind [url]'s cached first frame, or null for a static, uncached or evicted
      * image. Surfaces animate only from these bytes, so they never fetch or decode a URL themselves.
      */
@@ -395,7 +492,7 @@ object AvatarImageLoader {
         image: ImageBitmap,
     ) {
         val key = url.trim().takeIf { it.isNotEmpty() } ?: return
-        val cacheKey = bannerRequest(key, targetWidthPx).cacheKey
+        val cacheKey = bannerRequest(key, targetWidthPx, MediaTrustDomain.Unique).cacheKey
         synchronized(lock) {
             cache.put(cacheKey, image)
             failureExpiresAt.remove(cacheKey)
@@ -405,10 +502,13 @@ object AvatarImageLoader {
     /** Android-bitmap view of [peek], for non-Compose consumers (notification icons). */
     fun peekBitmap(url: String?): android.graphics.Bitmap? = peek(url)?.asAndroidBitmap()
 
-    /** Android-bitmap view of [load], using capacity reserved for notification icons. */
-    suspend fun loadBitmap(url: String): android.graphics.Bitmap? =
+    /** Android-bitmap view of [load], using capacity reserved for notification icons, decoded in [domain]. */
+    suspend fun loadBitmap(
+        url: String,
+        domain: MediaTrustDomain = declaredOrUnique(),
+    ): android.graphics.Bitmap? =
         load(
-            request = avatarRequest(url),
+            request = avatarRequest(url, domain),
             expectedGeneration = null,
             fetchLane = AvatarFetchLane.NOTIFICATION,
         )?.asAndroidBitmap()
@@ -430,6 +530,7 @@ object AvatarImageLoader {
             cache.evictAll()
             animatedSources.clear()
             retireRequestsLocked()
+            publications.retireAll()
         }
     }
 
@@ -443,6 +544,7 @@ object AvatarImageLoader {
             cache.evictStoredAvatars()
             animatedSources.keysSnapshot().filter(::isStoredAvatarKey).forEach(animatedSources::remove)
             retireRequestsLocked()
+            publications.retireAll()
         }
     }
 
@@ -498,7 +600,7 @@ object AvatarImageLoader {
     private suspend fun fetch(request: ProfileImageRequest): AvatarImageFetchResult =
         when (val result = fetchBytes(request.url, request.maxBytes, request.variant == ProfileImageVariant.AVATAR)) {
             is AvatarByteFetchResult.Success ->
-                decode(result.bytes, request.variant, request.maxDimension)
+                decode(result.bytes, request.variant, request.maxDimension, request.domain)
                     ?.asImageBitmap()
                     ?.let { firstFrame ->
                         val animatedSource =
@@ -524,15 +626,24 @@ object AvatarImageLoader {
     /**
      * Shares local reads and off-main decodes through the existing bounded, generation-fenced loader. A
      * stored GIF keeps its bytes as an animated source under the same account-private key, so whether it
-     * may animate is decided by the surface that knows it is a person's picture.
+     * may animate is decided by the surface that knows it is a person's picture. A caller that cannot name the
+     * asset's owner decodes it single-use.
      */
     internal suspend fun loadStored(
         key: String,
         lifetime: Long,
         readBytes: suspend () -> ByteArray?,
+    ): ImageBitmap? = loadStored(key, lifetime, MediaTrustDomain.Unique, readBytes)
+
+    /** [loadStored] whose decode runs in a worker serving only [domain], the asset owner's domain. */
+    internal suspend fun loadStored(
+        key: String,
+        lifetime: Long,
+        domain: MediaTrustDomain,
+        readBytes: suspend () -> ByteArray?,
     ): ImageBitmap? =
         load(
-            request = avatarRequest(key),
+            request = avatarRequest(key, domain),
             expectedGeneration = null,
             expectedCacheLifetime = lifetime,
             fetchLane = AvatarFetchLane.STORED,
@@ -540,7 +651,7 @@ object AvatarImageLoader {
                 AvatarCacheDiagnostics.fetch(AvatarCacheKind.PROFILE)
                 val bytes = readBytes()
                 bytes
-                    ?.let { decode(it, request.variant, request.maxDimension)?.asImageBitmap() }
+                    ?.let { decode(it, request.variant, request.maxDimension, request.domain)?.asImageBitmap() }
                     ?.let { AvatarImageFetchResult.Success(it, profileAvatarAnimationSource(bytes)) }
                     ?: AvatarImageFetchResult.Unavailable
             },
@@ -557,8 +668,10 @@ object AvatarImageLoader {
         key: String,
         bytes: ByteArray,
         lifetime: Long,
+        domain: MediaTrustDomain = MediaTrustDomain.Unique,
     ): ImageBitmap? {
-        val image = decode(bytes, ProfileImageVariant.AVATAR, MAX_AVATAR_DIMENSION)?.asImageBitmap() ?: return null
+        val image =
+            decode(bytes, ProfileImageVariant.AVATAR, MAX_AVATAR_DIMENSION, domain)?.asImageBitmap() ?: return null
         val published =
             synchronized(lock) {
                 cacheLifetime.isCurrent(lifetime).also { current ->
@@ -571,19 +684,22 @@ object AvatarImageLoader {
         return image.takeIf { published }
     }
 
-    /** Samples and bounds decoded pixels; a failed decode still counts as attempted work. */
+    /** Samples and bounds decoded pixels in a worker serving only [domain]; a failed decode still counts. */
     private fun decode(
         bytes: ByteArray,
         variant: ProfileImageVariant,
         maxDimension: Int,
+        domain: MediaTrustDomain,
     ): android.graphics.Bitmap? {
         if (variant == ProfileImageVariant.AVATAR) AvatarCacheDiagnostics.decode(AvatarCacheKind.PROFILE)
-        val info =
-            dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
-                .inspect(bytes) ?: return null
-        val target = boundedDecodeDimension(info.width, info.height, maxDimension)
-        return dev.ipf.whitenoise.android.media.MediaPipeline
-            .decodeSampledBitmap(bytes, target)
+        return dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope.within(domain) {
+            val info =
+                dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+                    .inspect(bytes) ?: return@within null
+            val target = boundedDecodeDimension(info.width, info.height, maxDimension)
+            dev.ipf.whitenoise.android.media.MediaPipeline
+                .decodeSampledBitmap(bytes, target)
+        }
     }
 }
 
@@ -604,6 +720,8 @@ internal data class ProfileImageRequest(
     val variant: ProfileImageVariant,
     val maxDimension: Int,
     val maxBytes: Int,
+    /** The worker domain a decode for this request uses; never part of the cache key. */
+    val domain: MediaTrustDomain = MediaTrustDomain.Unique,
 ) {
     val cacheKey: String get() = profileImageCacheKey(url, variant, maxDimension)
 }
@@ -643,6 +761,7 @@ internal fun profileImageVariantOf(cacheKey: String): ProfileImageVariant =
 internal class PartitionedProfileImageCache(
     avatarBytes: Int,
     bannerBytes: Int,
+    private val onPublished: (String) -> Unit = {},
 ) {
     private var trimmingMemory = false
     private val avatars =
@@ -666,6 +785,7 @@ internal class PartitionedProfileImageCache(
     ) {
         partitionFor(cacheKey).put(cacheKey, CachedProfileFrame(image))
         if (profileImageVariantOf(cacheKey) == ProfileImageVariant.AVATAR) AvatarCacheChanges.published()
+        onPublished(cacheKey)
     }
 
     /** Null means absent or unclassified pixels; a known static frame needs no second original-byte read. */

@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/UserShare.kt",
+  "legacy_sha256": "5f5a9c6c4f5bc12306ca383a6be6d463a76994501020a346b64e85f9c9594baa",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "UserMessageBubble",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/UserShare.kt",
+        "anchor": "fun UserMessageBubble(",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "UserShareIdentity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/share/UserShare.kt",
+        "anchor": "private fun UserShareIdentity(",
+        "test_ids": [
+          "ACC-002"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -1,0 +1,29 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/design/KeyboardSafePopup.kt",
+  "legacy_sha256": "02f91aa270ee21335f549d512ed1388e5cc6dbeb42a5e430b56c09c90aae12fa",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "KeyboardSafePopup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/design/KeyboardSafePopup.kt",
+        "anchor": "fun KeyboardSafePopup(",
+        "test_ids": [
+          "CON-035",
+          "INT-001",
+          "MSG-004"
+        ]
+      },
+      {
+        "surface": "KeyboardSafePopupPlatformBackHandler",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/design/KeyboardSafePopup.kt",
+        "anchor": "fun KeyboardSafePopupPlatformBackHandler(",
+        "test_ids": [
+          "AXY-004",
+          "CON-035",
+          "SET-024"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

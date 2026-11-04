@@ -272,6 +272,7 @@ class TimelineOrderingInversionTest {
                 retentionExpiresAt = null,
                 sticker = null,
                 importedFrom = null,
+                historyImportProvenance = null,
             )
         return TimelineMessage(
             id = "msg:$id",

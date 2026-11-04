@@ -856,6 +856,7 @@ open class MessageBubbleFileAttachmentFixtures {
                 retentionExpiresAt = retentionExpiresAt,
                 sticker = null,
                 importedFrom = null,
+                historyImportProvenance = null,
             )
         return TimelineMessage(
             id = "msg:$messageId",

@@ -24,6 +24,10 @@
 *.BubbleCollapsibleFooterLayoutTest.overflowingBodyIsClippedBeforeFooterRow
 *.ChatActionSheetTest.actionSheetDarkScreenshot
 *.ChatActionSheetTest.actionSheetLightScreenshot
+*.ChatActionSheetTest.actionSheetMarkReadAmoledScreenshot
+*.ChatActionSheetTest.actionSheetMarkReadDarkScreenshot
+*.ChatActionSheetTest.actionSheetMarkReadLightScreenshot
+*.ChatActionSheetTest.actionSheetMarkReadRtlLargeScreenshot
 *.ChatListPinnedBoundaryTest.pinnedBoundaryAmoled
 *.ChatListPinnedBoundaryTest.pinnedBoundaryDark
 *.ChatListPinnedBoundaryTest.pinnedBoundaryLight
@@ -47,6 +51,7 @@
 *.ComposerCompactLayoutTest.doubleTextMirrorsTheCenteredRowInRtl
 *.ComposerCompactLayoutTest.leadingIconsHaveEvenSpacingWithIdentity
 *.ComposerCompactLayoutTest.leadingIconsHaveEvenSpacingWithIdentityRtl
+*.ComposerFabBaselineTest
 *.ComposerPrototypeGeometryTest.acceptedSendWithoutAnAdmittedFlightClearsAndSnapsThePill
 *.ComposerPrototypeGeometryTest.editingRowUsesFullWidthAboveActionsAndOnlyClearsAfterAcceptance
 *.ComposerPrototypeGeometryTest.narrowLargeTextRtlPreservesDraftAndMirrorsControlOrder
@@ -153,6 +158,9 @@
 
 # Current chat swipe cues.
 *.ChatRowPortGestureTest.readCueDark
+*.ChatRowPortGestureTest.readCueAmoled
+*.ChatRowPortGestureTest.readCueLargeRtl
+*.ChatRowPortGestureTest.readCueLight
 *.ChatRowPortGestureTest.muteCueAmoled
 *.ChatRowPortGestureTest.pinCueLargeRtl
 *.ChatRowPortGestureTest.unreadCueLight

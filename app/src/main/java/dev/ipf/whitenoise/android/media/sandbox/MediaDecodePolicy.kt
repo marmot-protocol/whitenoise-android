@@ -22,6 +22,9 @@ internal object MediaDecodePolicy {
     const val REGION = 10
     const val DEBUG_BAD_REPLY = 11
     const val DEBUG_REPLY_KINDS = 4
+    const val DEBUG_CANARY = 12
+    const val DEBUG_IGNORE_RETIRE = 13
+    const val DEBUG_STUBBORN_HANG = 14
     const val MAX_REGION_DECODE_PIXELS = 16_777_216L
     const val WAVEFORM_DEADLINE_MS = 40000L
     const val REFUSAL_TTL_MS = 60000L

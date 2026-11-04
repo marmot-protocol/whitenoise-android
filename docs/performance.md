@@ -405,6 +405,21 @@ concurrency, or a signed release candidate. Those require their own fixtures and
 passing this diagnostic must not be treated as proof that all field latency
 tails are eliminated.
 
+### Still-image worker lane throughput
+
+`MediaWorkerThroughputDeviceTest` compares still-image transport variants on one
+APK, device and synthetic corpus: cold first thumbnails, first images in new
+conversations, idle thumbnails and viewer decodes, the six-operation mix,
+24/48/96-request bursts within one conversation, a mixed burst across
+conversations, a cold chat list and overlapping scroll rounds. It records latency, admission wait, eight-second admission
+timeouts, worker starts, live worker processes and caller FD/RSS. It is an
+opt-in `ManualDeviceFixture`; run it with `am instrument` on a disposable
+emulator or dedicated device, in ABBA order. The procedure and record format are
+in [the still-worker baseline](media-worker-baseline.md#matched-throughput-comparison);
+the #3373 results and accepted budget are recorded with the
+[domain-bound worker generations](media-containment.md#domain-bound-worker-generations). Measure worker
+PSS separately with `dumpsys meminfo`; RSS counts shared zygote pages per process.
+
 ### Deterministic Android media regressions
 
 Run `MediaDownloadHostRegressionTest` for the actual app-state download and
@@ -950,10 +965,16 @@ APK in place.
 
 ## Generate and package the Baseline Profile
 
-Generate startup, chat-list, group-open, and member-roster rules on the prepared
-device. Only launch-to-chat-list rules enter the Startup Profile; the broader
-group and roster journey remains in the Baseline Profile so it cannot crowd
-startup code out of the primary DEX:
+`BaselineProfileGenerator` collects on the
+[prepared device](#prepare-a-physical-device-fixture), whose `GROUP_NAME`
+conversation must hold enough history to scroll several screens. Only cold launch-to-surface rules (populated startup to the
+chat list and a cold share to the recipient picker) enter the Startup Profile.
+Chat open, conversation scroll, member roster and warm share delivery remain in
+the Baseline Profile so they cannot crowd startup code out of the primary DEX,
+which R8 lays out from the Startup Profile alone. Their Baseline Profile rules
+may still carry the `S` flag, because each journey begins with a cold launch;
+that flag guides ART compilation only. The Startup Profile also keeps the
+`P`-only rules the startup journeys' own dumps contain:
 
 ```bash
 ./gradlew :app:generateBaselineProfile \
@@ -961,10 +982,54 @@ startup code out of the primary DEX:
   -Pandroid.testInstrumentationRunnerArguments.groupName="$GROUP_NAME"
 ```
 
+Device limits found while regenerating (2026-11-01):
+
+- GrapheneOS leaves `dalvik.vm.usejitprofiles` unset and blocks kernel tracing,
+  so profile dumps come back empty ("Generated Profile is empty") and
+  Macrobenchmark cannot record its Perfetto metrics there. Generate on a stock
+  device or an emulator, and measure on a stock physical device.
+- On a device with a second user, the AGP runner fails with `Invalid userId -2`
+  and copies empty profiles into the source set. Run the generator class
+  directly instead. `adb shell` hands the device one command line, so quote it
+  on the host and quote the group name again inside it (a name containing a
+  single quote needs escaping):
+
+  ```bash
+  adb shell "am instrument -w -r --user 0 \
+    -e class dev.ipf.whitenoise.android.benchmark.BaselineProfileGenerator \
+    -e groupName '$GROUP_NAME' -e androidx.benchmark.enabledRules BaselineProfile \
+    dev.ipf.whitenoise.android.benchmark/androidx.test.runner.AndroidJUnitRunner"
+  ```
+
+  `BaselineProfileRule` names each dump after the test class and method, for
+  example `BaselineProfileGenerator_generateStartup-startup-prof.txt`, and writes
+  a timestamped copy beside it. Pull the four untimestamped files and merge them
+  with `scripts/merge-baseline-profiles.py`, which keeps each rule identity once
+  with its `H`, `S` and `P` flags combined. The Startup Profile is the union of
+  the two startup journeys' files, the Baseline Profile the union of all four:
+
+  ```bash
+  dir=/sdcard/Android/media/dev.ipf.whitenoise.android.benchmark
+  for f in $(adb shell "ls $dir/BaselineProfileGenerator_*-prof.txt"); do adb pull "$f" .; done
+  python3 scripts/merge-baseline-profiles.py \
+    app/src/main/generated/baselineProfiles/startup-prof.txt \
+    BaselineProfileGenerator_generateStartup-startup-prof.txt \
+    BaselineProfileGenerator_generateInboundShareStartup-startup-prof.txt
+  python3 scripts/merge-baseline-profiles.py \
+    app/src/main/generated/baselineProfiles/baseline-prof.txt BaselineProfileGenerator_*-prof.txt
+  ```
+
+  Record the SHA-256 of each pulled file with the provenance so the merge can be
+  checked.
+
 The generated profile is merged into and committed from
 `app/src/main/generated/baselineProfiles/`. It is consumed by every supported
-release variant; generation does not run implicitly during ordinary release
-assembly. The leave-APKs-installed property prevents AGP teardown from removing
+release variant and by `benchmarkRelease`; generation does not run implicitly
+during ordinary release assembly. The plugin wires the merged-into-main profile
+only into shipping variants, so `app/build.gradle.kts` adds it to the
+`benchmarkRelease` source set explicitly. Before that wiring (2026-11-03),
+`benchmarkRelease` packaged only the library rules, and "Baseline Profile"
+Macrobenchmark results measured none of the app's own profile. The leave-APKs-installed property prevents AGP teardown from removing
 the authenticated target. After collection, replace the profileable variant
 with the normal dev build in place—never uninstall first:
 
@@ -980,8 +1045,48 @@ bash scripts/verify-baseline-profile.sh \
   app/build/outputs/apk/devZapstore/benchmarkRelease/app-dev-zapstore-universal-benchmarkRelease.apk
 ```
 
+Pass the merged text profile as a second argument to also require every rule
+identity of the committed Baseline Profile in it, which the compiled assets alone
+cannot show (CI does this for
+`devZapstoreBenchmarkRelease`). Both arguments must come from the same assemble:
+running only the merge task leaves an older APK beside a newer text profile, and
+the check would vouch for an APK it did not inspect.
+
+```bash
+bash scripts/verify-baseline-profile.sh \
+  app/build/outputs/apk/devZapstore/benchmarkRelease/app-dev-zapstore-universal-benchmarkRelease.apk \
+  app/build/intermediates/merged_art_profile/devZapstoreBenchmarkRelease/mergeDevZapstoreBenchmarkReleaseArtProfile/baseline-prof.txt
+```
+
 The verifier uses `apkanalyzer` when available and falls back to the ZIP table.
 For a signed staging/production APK, pass that APK path to the same script.
+
+Run `bash scripts/verify-generated-profiles.sh` before committing to confirm the
+Startup Profile stays a strict subset of the Baseline Profile.
+
+Each regenerated profile commit or PR records its provenance:
+
+- source revision: full commit SHA the profileable target was built from, and a
+  ref that still reaches it if its branch is squash-merged (`refs/pull/<n>/head`);
+- MarmotKit version from `app/src/main/marmotkit/MARMOT_VERSION`, since native
+  binding classes are part of the profiled code;
+- fixture: `GROUP_NAME`'s member count and approximate message count, plus the
+  account's chat count, never identities or message content;
+- device: model, build fingerprint and API level;
+- toolchain: AGP, Kotlin, AndroidX Benchmark and UiAutomator versions from
+  `gradle/libs.versions.toml`, plus the JDK;
+- the exact generation and merge commands, the SHA-256 of each per-journey file,
+  and the startup and baseline rule counts that `verify-generated-profiles.sh`
+  prints.
+
+Review and regenerate the profiles when a change substantially reworks a covered
+hot path: startup through the chat list, inbound share routing or the recipient
+picker, conversation open, transcript rendering or scrolling, or the member
+roster. Also regenerate after a MarmotKit, Compose or AGP upgrade that changes
+those paths, and add a generator journey when a new hot path deserves coverage.
+Profile age alone does not justify regeneration. Compare matching release-like
+runs of `StartupBenchmark` and `ConversationScrollBenchmark` with and without the
+update, and report neutral or adverse results as well.
 
 ## Compose compiler reports
 

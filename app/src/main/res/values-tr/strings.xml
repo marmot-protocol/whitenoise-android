@@ -933,6 +933,7 @@
     <string name="scan_to_connect">Bağlanmak için tarayın.</string>
     <string name="not_copied">Kopyalanmadı</string>
     <string name="copy_public_key">Genel anahtarı kopyala</string>
+    <string name="public_key_copy_action_with_value">Genel anahtarı kopyala: %1$s</string>
     <string name="button_in_progress">Devam ediyor</string>
     <string name="private_key">Özel anahtar</string>
     <string name="profile_public_key_help">İnsanların sizi bulup sizinle bağlantı kurabilmesi için bu anahtarı paylaşın.</string>
@@ -1677,6 +1678,21 @@
         <item quantity="one">~%1$d sn kaldı</item>
         <item quantity="other">~%1$d sn kaldı</item>
     </plurals>
+    <plurals name="tts_bar_minutes_remaining">
+        <item quantity="one">~%1$d dk kaldı</item>
+        <item quantity="other">~%1$d dk kaldı</item>
+    </plurals>
+    <string name="tts_bar_minutes_seconds_remaining">~%1$d dk %2$d sn kaldı</string>
+    <string name="tts_bar_remaining_spoken">Yaklaşık %1$s kaldı</string>
+    <plurals name="tts_bar_spoken_minutes">
+        <item quantity="one">%1$d dakika</item>
+        <item quantity="other">%1$d dakika</item>
+    </plurals>
+    <plurals name="tts_bar_spoken_seconds">
+        <item quantity="one">%1$d saniye</item>
+        <item quantity="other">%1$d saniye</item>
+    </plurals>
+    <string name="tts_bar_spoken_minutes_seconds">%1$s %2$s</string>
     <string name="tts_bar_stop">Okumayı durdur</string>
     <string name="tts_bar_return_to_source">Okunan mesaja dön</string>
     <string name="tts_source_unavailable">Okunan mesaj artık kullanılamıyor</string>

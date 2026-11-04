@@ -3,7 +3,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -27,11 +27,9 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
@@ -94,6 +92,7 @@ class MessageSenderLabelCoverageTest {
             title = "Maya :marmot: Reed",
         )
 
+    /** Checks the inline avatar and sender line bounds across theme, direction and font scale. */
     private fun checkGeometry(
         name: String,
         loaded: Boolean = false,
@@ -200,9 +199,8 @@ class MessageSenderLabelCoverageTest {
         assertEquals("a stable sender name cannot retain an old captured bitmap", AndroidColor.BLUE, avatarPixel())
     }
 
-    @Test fun compactProfileTargetKeepsClickAndLongPressWithoutSizingTheLine() {
+    @Test fun compactProfileTargetKeepsProductionClickWithoutSizingTheLine() {
         var clicks = 0
-        var holds = 0
         composeRule.setContent {
             WhiteNoiseTheme {
                 Surface(Modifier.width(320.dp).padding(24.dp)) {
@@ -211,16 +209,17 @@ class MessageSenderLabelCoverageTest {
                         "sender",
                         null,
                         null,
-                        Modifier.testTag("identity").combinedClickable(
-                            onClick = { clicks++ },
-                            onLongClick = { holds++ },
-                        ),
+                        Modifier.testTag("identity").clickable(onClick = { clicks++ }),
                     )
                 }
             }
         }
         val node = composeRule.onNodeWithTag("identity")
         node.assertHasClickAction()
+        assertFalse(
+            "the production header leaves holds to its message row",
+            node.fetchSemanticsNode().config.contains(SemanticsActions.OnLongClick),
+        )
         val visible = node.getUnclippedBoundsInRoot()
         assertTrue("the visible line stays compact", visible.bottom - visible.top < 48.dp)
         assertTrue(
@@ -233,10 +232,8 @@ class MessageSenderLabelCoverageTest {
             } >= 48.dp,
         )
         node.performClick()
-        node.performTouchInput { longClick() }
         composeRule.runOnIdle {
             assertEquals(1, clicks)
-            assertEquals(1, holds)
         }
     }
 
@@ -244,6 +241,7 @@ class MessageSenderLabelCoverageTest {
 
     @Test fun focusedTextIdentityRemainsAboveReplyAndBody() = checkFocusedOrder(media = false)
 
+    /** Checks sender identity order above the focused reply and message content. */
     private fun checkFocusedOrder(media: Boolean) {
         composeRule.setContent {
             WhiteNoiseTheme {

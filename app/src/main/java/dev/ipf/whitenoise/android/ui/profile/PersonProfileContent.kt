@@ -34,12 +34,16 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.StartingAccount
 import dev.ipf.whitenoise.android.ui.account.StartingAccountIndicator
@@ -49,8 +53,7 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseButton
 import dev.ipf.whitenoise.android.ui.common.whiteNoiseVerticalScroll
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.outlined.Block
-import dev.ipf.whitenoise.android.ui.settings.FullPublicKey
-import dev.ipf.whitenoise.android.ui.settings.IdentifierCopyCapsule
+import dev.ipf.whitenoise.android.ui.settings.CopyableFullPublicKey
 import dev.ipf.whitenoise.android.ui.settings.SettingsAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsBottomAction
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
@@ -331,25 +334,16 @@ private fun PersonProfileIdentity(
                     onClick = onAvatar,
                 ),
             ) {
-                Avatar(person.title, person.seed, avatarSize, pictureUrl = person.pictureUrl)
-            }
-            EmojiLabel(
-                person.title,
-                Modifier
-                    .padding(start = 16.dp, end = 16.dp, top = WhiteNoiseSpacing.FormField)
-                    .testTag("person_profile.name"),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.SemiBold,
-                textAlign = TextAlign.Center,
-            )
-            if (person.title != person.publishedName) {
-                EmojiLabel(
-                    person.publishedName,
-                    Modifier.padding(horizontal = 16.dp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
+                Avatar(
+                    person.title,
+                    person.seed,
+                    avatarSize,
+                    pictureUrl = person.pictureUrl,
+                    pictureDomain = AvatarImageLoader.publicProfiles(),
                 )
             }
+            val keyShown = person.publicKey.isNotBlank()
+            PersonProfileNames(person, keyShown)
             person.about?.let { about ->
                 Surface(
                     Modifier
@@ -406,28 +400,62 @@ private fun PersonProfileIdentity(
                     textAlign = TextAlign.Center,
                 )
             }
-            if (person.publicKey.isNotBlank()) {
-                IdentifierCopyCapsule(
-                    person.publicKey,
-                    copied,
-                    onCopy,
-                    stringResource(R.string.copy_public_key),
-                    stringResource(R.string.copied),
-                    stringResource(R.string.not_copied),
-                    stringResource(R.string.copied),
-                    "person_profile.copy_public_key",
-                    "person_profile.copy_public_key.visual",
-                    Modifier.padding(top = 4.dp),
-                )
-                // The capsule abbreviates; the whole key stays readable for comparison (#3321).
-                FullPublicKey(
+            if (keyShown) {
+                // One complete, copyable key replaces the old short capsule plus inert full block (#3321, #3565).
+                CopyableFullPublicKey(
                     npub = person.publicKey,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = WhiteNoiseSpacing.Related),
-                    testTag = "person_profile.full_public_key",
-                    label = stringResource(R.string.public_key),
+                    copied = copied,
+                    onCopy = onCopy,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = WhiteNoiseSpacing.Related),
+                    targetTestTag = "person_profile.copy_public_key",
+                    textTestTag = "person_profile.full_public_key",
                 )
             }
         }
+    }
+}
+
+/**
+ * The person's title and, when it differs, their published name. A nameless person is named by the complete key
+ * block instead of a second shortened copy, and keeps an accessible heading (#3565).
+ */
+@Suppress("FunctionNaming")
+@Composable
+private fun PersonProfileNames(
+    person: PersonProfilePresentation,
+    keyShown: Boolean,
+) {
+    if (person.titleIsPublicKey && keyShown) {
+        val heading = stringResource(R.string.profile)
+        // Nonzero width keeps the heading's bounds visible to TalkBack's heading navigation.
+        Spacer(
+            Modifier
+                .fillMaxWidth()
+                .height(WhiteNoiseSpacing.FormField)
+                .testTag("person_profile.key_heading")
+                .semantics {
+                    heading()
+                    contentDescription = heading
+                },
+        )
+    } else {
+        EmojiLabel(
+            person.title,
+            Modifier
+                .padding(start = 16.dp, end = 16.dp, top = WhiteNoiseSpacing.FormField)
+                .testTag("person_profile.name"),
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+        )
+    }
+    if (person.title != person.publishedName && !(person.publishedNameIsPublicKey && keyShown)) {
+        EmojiLabel(
+            person.publishedName,
+            Modifier.padding(horizontal = 16.dp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 

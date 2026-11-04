@@ -10,7 +10,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -20,24 +19,27 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -60,6 +62,7 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.requiresCompletionControls
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
+import dev.ipf.whitenoise.android.ui.common.settleControlMorph
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.icons.filled.ContentPaste
@@ -85,6 +88,10 @@ internal fun ConversationDictationPersistentControl(
     state: ConversationDictationState,
     controller: ConversationDictationController,
     modifier: Modifier = Modifier,
+    embedded: Boolean = false,
+    chromeVisibility: () -> Float = { if (embedded) 0f else 1f },
+    movingChromeSize: () -> Size? = { null },
+    actionColors: AccountActionColors = accountActionColors(appState = null),
 ) {
     if (!state.requiresCompletionControls(controller.recoveryHandedToComposer)) return
     val status =
@@ -93,33 +100,43 @@ internal fun ConversationDictationPersistentControl(
         } else {
             dictationStatusLabel(state, controller.captureInProgress)
         }
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(24.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    val fill = MaterialTheme.colorScheme.surfaceContainerHigh
+    val border = MaterialTheme.colorScheme.outlineVariant
+    val contentColor = contentColorFor(if (embedded) Color.Transparent else fill)
+    Box(
         modifier =
             modifier
-                .testTag(APP_DICTATION_CONTROL_TAG)
-                .semantics {
-                    liveRegion = LiveRegionMode.Polite
-                    stateDescription = status
-                },
+                .testTag(if (embedded) "composer-dictation-shell-control" else APP_DICTATION_CONTROL_TAG)
+                .persistentDictationChrome(fill, border, status, chromeVisibility, movingChromeSize),
     ) {
-        Row(
-            modifier = Modifier.widthIn(max = 288.dp).padding(horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Preserve the old bar's single-line recovery explanation; active capture is icon-only.
-            if (state is ConversationDictationState.Failed) {
-                Text(
-                    text = status,
-                    style = MaterialTheme.typography.labelLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f).padding(start = 12.dp),
-                )
-            }
-            ConversationDictationCompactActions(state = state, controller = controller)
+        Layout(
+            content = {
+                // Match Material Surface foreground inheritance without adding another painted container.
+                CompositionLocalProvider(LocalContentColor provides contentColor) {
+                    // This fixed recovery explanation is not a transcript. Retain its composition while
+                    // changing owners so the shared clock can reveal it without replacing the commands.
+                    if (state is ConversationDictationState.Failed) {
+                        Text(
+                            text = status,
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier =
+                                Modifier
+                                    .padding(start = 12.dp)
+                                    .graphicsLayer { alpha = chromeVisibility().coerceIn(0f, 1f) }
+                                    .then(if (embedded) Modifier.clearAndSetSemantics {} else Modifier),
+                        )
+                    }
+                    ConversationDictationCompactActions(
+                        state = state,
+                        controller = controller,
+                        actionColors = actionColors,
+                    )
+                }
+            },
+        ) { measurables, constraints ->
+            measurePersistentDictation(measurables, constraints, embedded)
         }
     }
 }
@@ -210,7 +227,7 @@ private val ConversationDictationState.hasActiveRecognitionActions: Boolean
             this is ConversationDictationState.Processing
 
 /** Reserves either the listening pulse or processing-only action width without shifting controls. */
-private fun ConversationDictationState.compactActionsWidth(captureInProgress: Boolean) =
+internal fun ConversationDictationState.compactActionsWidth(captureInProgress: Boolean) =
     when (this) {
         is ConversationDictationState.Starting,
         is ConversationDictationState.Listening,
@@ -233,7 +250,7 @@ private fun ConversationDictationActiveActions(
         ConversationDictationListeningIndicator()
     }
     IconButton(
-        onClick = controller::cancel,
+        onClick = settleControlMorph(controller::cancel),
         enabled = !controller.deliveryInProgress,
         modifier = Modifier.size(48.dp),
     ) {
@@ -242,7 +259,7 @@ private fun ConversationDictationActiveActions(
     ConversationDictationPasteAction(controller)
     if (controller.processingDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish) {
         IconButton(
-            onClick = controller::send,
+            onClick = settleControlMorph(controller::send),
             enabled = controller.completionActionsEnabled,
             modifier =
                 Modifier.size(48.dp).semantics {
@@ -264,7 +281,7 @@ private fun ConversationDictationActiveActions(
         // The same disc the composer sends with: sending a dictation is sending a message, and the
         // two should not look like different actions.
         ComposerActionDisc(
-            onClick = controller::send,
+            onClick = settleControlMorph(controller::send),
             containerColor = actionColors.container,
             contentColor = actionColors.content,
             description = sendLabel,
@@ -278,11 +295,12 @@ private fun ConversationDictationActiveActions(
     }
 }
 
+/** Retains the paste action while its selected outcome is still processing. */
 @Composable
 private fun ConversationDictationPasteAction(controller: ConversationDictationController) {
     val pasteLabel = stringResource(R.string.paste_dictation_transcript)
     IconButton(
-        onClick = controller::paste,
+        onClick = settleControlMorph(controller::paste),
         enabled = controller.completionActionsEnabled,
         modifier =
             Modifier.size(48.dp).semantics {
@@ -398,7 +416,7 @@ private fun ConversationDictationDismissAction(
             is ConversationDictationState.Failed -> R.string.dismiss
             else -> R.string.dictation_cancel
         }
-    IconButton(onClick = onClick, modifier = Modifier.size(48.dp)) {
+    IconButton(onClick = settleControlMorph(onClick), modifier = Modifier.size(48.dp)) {
         Icon(
             Icons.Default.Close,
             contentDescription = stringResource(label),

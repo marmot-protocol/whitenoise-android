@@ -113,6 +113,7 @@ import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseTextFieldContainerCol
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.VISIBLE_GROUP_AVATAR_LIMIT
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.common.rememberChatListGroupAvatar
 import dev.ipf.whitenoise.android.ui.common.rememberConversationGroupAvatar
@@ -541,10 +542,13 @@ internal fun ProfileSheet(
         presentationNpub.takeIf { it.isNotBlank() }?.let {
             IdentityFormatter.short(it, prefix = 12, suffix = 8)
         }
-    val title =
-        profile.displayName
-            ?: hex?.let { appState.networkDisplayName(it) }
-            ?: presentationNpubShort.orEmpty()
+    // The shortened key names a nameless person only as a fallback, so record where the title came from (#3565).
+    // A name source that itself answers with this key's abbreviation is the same fallback, not a person's name.
+    val personName =
+        (profile.displayName ?: hex?.let { appState.networkDisplayNameOrNull(it) })
+            ?.takeUnless { abbreviatesPublicKey(it, presentationNpub) }
+    val title = personName ?: presentationNpubShort.orEmpty()
+    val titleIsPublicKey = personName == null && presentationNpubShort != null
     val contactNickname = hex?.let { appState.contactNickname(it) }
     val contactNotes = hex?.let { appState.contactNotes(it) }
     // #1226: the header + identity surfaces show the nickname when one is set;
@@ -553,7 +557,7 @@ internal fun ProfileSheet(
     val displayTitle = contactNickname ?: title
     val pictureUrl = hex?.let { appState.contactAvatarSource(it) } ?: profile.pictureUrl
     val bannerUrl = profile.bannerUrl
-    val avatarImageAvailable = rememberAvatarImageAvailable(pictureUrl)
+    val avatarImageAvailable = rememberAvatarImageAvailable(pictureUrl, AvatarImageLoader.publicProfiles())
     val about = profile.about
     val nip05 = profile.nip05
     var nip05ResolvedHex by remember(nip05) { mutableStateOf<String?>(null) }
@@ -821,6 +825,8 @@ internal fun ProfileSheet(
                     lightningAddress,
                     hasTarget = hex != null,
                     self = targetIsSelf,
+                    titleIsPublicKey = contactNickname == null && titleIsPublicKey,
+                    publishedNameIsPublicKey = titleIsPublicKey,
                 ),
             scroll = contentScrollState,
             follow = followRow,
@@ -1192,7 +1198,10 @@ internal fun rememberProfileBannerLoadState(
     bannerUrl: String,
     targetWidthPx: Int,
     peek: (String, Int) -> ImageBitmap? = AvatarImageLoader::peekBanner,
-    load: suspend (String, Int) -> ImageBitmap? = AvatarImageLoader::loadBanner,
+    load: suspend (String, Int) -> ImageBitmap? = { url, width ->
+        // A kind-0 banner is published, so it decodes in the public profiles.
+        AvatarImageLoader.loadBanner(url, width, AvatarImageLoader.publicProfiles())
+    },
 ): ProfileBannerLoadState {
     var image by remember(bannerUrl, targetWidthPx) { mutableStateOf(peek(bannerUrl, targetWidthPx)) }
     var settled by remember(bannerUrl, targetWidthPx) { mutableStateOf(image != null) }
@@ -1210,7 +1219,10 @@ internal fun rememberProfileBannerLoadState(
 internal fun ProfileBannerImage(
     bannerUrl: String,
     peek: (String, Int) -> ImageBitmap? = AvatarImageLoader::peekBanner,
-    load: suspend (String, Int) -> ImageBitmap? = AvatarImageLoader::loadBanner,
+    load: suspend (String, Int) -> ImageBitmap? = { url, width ->
+        // A kind-0 banner is published, so it decodes in the public profiles.
+        AvatarImageLoader.loadBanner(url, width, AvatarImageLoader.publicProfiles())
+    },
 ) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val targetWidthPx = profileBannerTargetWidthPx(maxWidth)
@@ -1489,6 +1501,7 @@ internal fun ProfileAddToGroupsContent(
                         avatarUrl = avatar.pictureUrl,
                         avatarImage = avatar.image,
                         groupAnimation = avatar.groupAnimation,
+                        avatarDomain = avatar.pictureDomain,
                         enabled = !busy,
                         onClick = {
                             if (isSelected) selected.remove(groupId) else selected.add(groupId)
@@ -1664,6 +1677,7 @@ internal fun ProfileMakeAdminContent(
                             avatarUrl = avatar.pictureUrl,
                             avatarImage = avatar.image,
                             groupAnimation = avatar.groupAnimation,
+                            avatarDomain = avatar.pictureDomain,
                             enabled = !busy,
                             onClick = { selectedGroupId = item.group.groupIdHex },
                             trailing = { SelectionIndicator(selected = selected) },

@@ -1307,6 +1307,7 @@
     <string name="scan_to_connect">Scan to connect.</string>
     <string name="not_copied">Not copied</string>
     <string name="copy_public_key">Copy public key</string>
+    <string name="public_key_copy_action_with_value">Copy public key %1$s</string>
     <string name="button_in_progress">In progress</string>
     <string name="private_key">Private key</string>
     <string name="profile_public_key_help">Share this key so people can find and connect with you.</string>
@@ -1967,6 +1968,21 @@
         <item quantity="one">~%1$ds left</item>
         <item quantity="other">~%1$ds left</item>
     </plurals>
+    <plurals name="tts_bar_minutes_remaining">
+        <item quantity="one">~%1$dm left</item>
+        <item quantity="other">~%1$dm left</item>
+    </plurals>
+    <string name="tts_bar_minutes_seconds_remaining">~%1$dm %2$ds left</string>
+    <string name="tts_bar_remaining_spoken">About %1$s remaining</string>
+    <plurals name="tts_bar_spoken_minutes">
+        <item quantity="one">%1$d minute</item>
+        <item quantity="other">%1$d minutes</item>
+    </plurals>
+    <plurals name="tts_bar_spoken_seconds">
+        <item quantity="one">%1$d second</item>
+        <item quantity="other">%1$d seconds</item>
+    </plurals>
+    <string name="tts_bar_spoken_minutes_seconds">%1$s %2$s</string>
     <string name="tts_bar_stop">Stop reading</string>
     <string name="tts_bar_return_to_source">Return to spoken message</string>
     <string name="tts_source_unavailable">The spoken message is no longer available</string>

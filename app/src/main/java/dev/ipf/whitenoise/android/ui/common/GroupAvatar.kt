@@ -15,6 +15,7 @@ import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.state.ChatListAvatarSeed
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -54,10 +55,12 @@ internal fun rememberGroupAvatarPresentation(
         ownedFallback
             ?.takeUnless { groupOwnsPicture }
             ?.takeIf(dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader::isPrivate)
-    val privateImage by key(appState, accountRef, privateSource, AvatarImageLoader.currentCacheLifetime()) {
+    val lifetime = AvatarImageLoader.currentCacheLifetime()
+    val privateImage by key(appState, accountRef, privateSource, lifetime) {
         rememberRecoverableAvatar(
             initialImage = privateSource?.let { PrivateContactAvatarLoader.peek(it, accountRef) },
             enabled = privateSource != null,
+            awaitCached = { PrivateContactAvatarLoader.awaitCached(checkNotNull(privateSource), accountRef, lifetime) },
         ) {
             PrivateContactAvatarLoader.load(checkNotNull(privateSource), accountRef)
         }
@@ -73,6 +76,7 @@ internal fun rememberGroupAvatarPresentation(
             accountRef,
             ownedSeed,
             durableAvatarIsPersonPicture,
+            durableGroupPictureDomain(group, groupOwnsPicture, accountRef),
         )
     }
     val legacyUrl = ProfileSanitizer.protocolImageUrl(group.avatarUrl)
@@ -84,6 +88,7 @@ internal fun rememberGroupAvatarPresentation(
     return GroupAvatarPresentation(
         image = seededImage ?: remoteImage ?: encryptedImage,
         pictureUrl = legacyUrl ?: ownedFallback?.takeIf { encryptedImage == null },
+        pictureDomain = legacyGroupPictureDomain(legacyUrl, accountRef),
         readOriginalBytes = originalReader,
         groupAnimation =
             originalReader?.takeIf { groupOwnsPicture }?.let {
@@ -98,19 +103,27 @@ internal fun rememberGroupAvatarPresentation(
     )
 }
 
-/** Keeps legacy public acquisition scoped to the same runtime and account as its presentation. */
+/**
+ * Keeps legacy public acquisition scoped to the same runtime and account as its presentation. The URL's host
+ * chooses the bytes, not a member, so the image decodes single-use rather than in the conversation's worker.
+ */
 @Composable
 private fun rememberLegacyRemoteGroupAvatar(
     appState: WhiteNoiseAppState,
     accountRef: String?,
     legacyUrl: String?,
 ): ImageBitmap? =
-    key(appState, appState.runtimeGeneration, accountRef, legacyUrl) {
-        val image by rememberRecoverableAvatar(
-            initialImage = AvatarImageLoader.peek(legacyUrl),
-            enabled = legacyUrl != null,
-        ) { AvatarImageLoader.load(checkNotNull(legacyUrl)) }
-        image
+    AvatarImageLoader.currentCacheLifetime().let { lifetime ->
+        key(appState, appState.runtimeGeneration, accountRef, legacyUrl, lifetime) {
+            val image by rememberRecoverableAvatar(
+                initialImage = AvatarImageLoader.peek(legacyUrl),
+                enabled = legacyUrl != null,
+                awaitCached = { AvatarImageLoader.awaitCached(checkNotNull(legacyUrl), lifetime) },
+            ) {
+                AvatarImageLoader.load(checkNotNull(legacyUrl), MediaTrustDomain.Unique)
+            }
+            image
+        }
     }
 
 /** A legacy viewer/thumbnail reads only the still-selected image of a current authoritative row. */
@@ -338,5 +351,6 @@ internal fun GroupAvatar(
         picture = presentation.image,
         animationKey = presentation.animationKey,
         groupAnimation = presentation.groupAnimation,
+        pictureDomain = presentation.pictureDomain,
     )
 }

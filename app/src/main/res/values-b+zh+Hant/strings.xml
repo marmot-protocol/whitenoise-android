@@ -920,6 +920,7 @@
     <string name="scan_to_connect">掃描即可連線。</string>
     <string name="not_copied">未複製</string>
     <string name="copy_public_key">複製公鑰</string>
+    <string name="public_key_copy_action_with_value">複製公鑰 %1$s</string>
     <string name="button_in_progress">進行中</string>
     <string name="private_key">私鑰</string>
     <string name="profile_public_key_help">分享此金鑰，讓他人能夠找到並連線你。</string>
@@ -1664,6 +1665,18 @@
     <plurals name="tts_bar_seconds_remaining">
         <item quantity="other">約剩 %1$d 秒</item>
     </plurals>
+    <plurals name="tts_bar_minutes_remaining">
+        <item quantity="other">約剩 %1$d 分鐘</item>
+    </plurals>
+    <string name="tts_bar_minutes_seconds_remaining">約剩 %1$d 分 %2$d 秒</string>
+    <string name="tts_bar_remaining_spoken">大約還剩 %1$s</string>
+    <plurals name="tts_bar_spoken_minutes">
+        <item quantity="other">%1$d 分鐘</item>
+    </plurals>
+    <plurals name="tts_bar_spoken_seconds">
+        <item quantity="other">%1$d 秒</item>
+    </plurals>
+    <string name="tts_bar_spoken_minutes_seconds">%1$s %2$s</string>
     <string name="tts_bar_stop">停止朗讀</string>
     <string name="tts_bar_return_to_source">返回正在朗讀的訊息</string>
     <string name="tts_source_unavailable">正在朗讀的訊息已無法使用</string>

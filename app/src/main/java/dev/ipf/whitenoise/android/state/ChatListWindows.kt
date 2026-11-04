@@ -35,6 +35,12 @@ internal fun requireCompleteChatListWindowRows(complete: Boolean) {
     if (!complete) throw IncompleteChatListReplacement()
 }
 
+/** One window set's frame revision, naming which bounded window a published projection came from (#3555). */
+internal data class ChatListFrameMark(
+    val windows: ChatListWindowSet,
+    val revision: Long,
+)
+
 /** A merged row snapshot bound to the replacement that produced it. */
 internal data class ChatListFrame(
     val rows: List<PresentedChatRowFfi>,
@@ -386,9 +392,7 @@ suspend fun ChatsController.reportVisibleChat(
 
 /** Returns the active list to its top after a scroll-to-top gesture. */
 suspend fun ChatsController.returnChatListToTop(view: ChatListViewFfi = ChatListViewFfi.CHATS) {
-    val windows = chatListWindows ?: return
-    val account = accountRef ?: return
-    if (windows.returnToTop(view) != null) applyChatListWindowRows(account, windows)
+    returnChatListToTopFrame(view)
 }
 
 /** Whether MDK retains more active chats than the window currently shows. */

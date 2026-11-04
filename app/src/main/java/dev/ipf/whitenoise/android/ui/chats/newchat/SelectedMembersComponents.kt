@@ -39,6 +39,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
@@ -46,9 +47,10 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.StartingAccount
 import dev.ipf.whitenoise.android.ui.account.StartingAccountIndicator
-import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.PersonAvatar
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
+import dev.ipf.whitenoise.android.ui.common.abbreviatesPublicKey
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowBack
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.KeyboardArrowRight
@@ -133,7 +135,7 @@ internal fun SelectedMemberSummary(
             Box(modifier = Modifier.width(avatarStackWidth)) {
                 members.take(SUMMARY_AVATAR_COUNT).forEachIndexed { index, member ->
                     Box(modifier = Modifier.padding(start = (index * SUMMARY_AVATAR_OVERLAP_DP).dp)) {
-                        Avatar(
+                        PersonAvatar(
                             title = selectedMemberDisplayName(member, appState),
                             seed = member.accountIdHex,
                             size = 32.dp,
@@ -246,13 +248,19 @@ internal fun SelectedMembersReviewScreen(
         ) {
             items(members, key = { it.accountIdHex }) { member ->
                 val memberName = selectedMemberDisplayName(member, appState)
+                val memberNpub = appState.npubForDisplay(member.accountIdHex)
+                // Only an abbreviation of this member's own key is a key title; a name starting npub1 stays a name.
+                val nameIsKey = abbreviatesPublicKey(memberName, memberNpub)
                 Column(Modifier.fillMaxWidth()) {
                     ContactRow(
                         title = memberName,
                         subtitle =
                             appState.shortNpub(member.accountIdHex).takeIf {
-                                it.isNotBlank() && !IdentityFormatter.isNostrIdentityFallback(memberName)
+                                it.isNotBlank() && !nameIsKey
                             },
+                        // The copy reads the member's own canonical key, never the displayed short label (#3565).
+                        publicKey = memberNpub,
+                        publicKeyInTitle = nameIsKey,
                         avatarSeed = member.accountIdHex,
                         avatarUrl = selectedMemberAvatarUrl(member, appState.contactAvatarSource(member.accountIdHex)),
                         titleMaxLines = Int.MAX_VALUE,
@@ -268,6 +276,7 @@ internal fun SelectedMembersReviewScreen(
                                 )
                             }
                         },
+                        avatarDomain = AvatarImageLoader.publicProfiles(),
                     )
                     onInitialAdminChange?.let { change ->
                         Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
