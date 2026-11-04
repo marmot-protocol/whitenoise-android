@@ -107,9 +107,20 @@ Android's send paths already do:
 download. It now persists `sourceEpochIdentity` as an optional key, so its
 encoding stays field for field. Requests stored before this change still decode.
 
-An upload that was pending before the upgrade carries no identity. The hosted
-qualification's pending-upload promotion phase shows whether MDK still admits
-it after the upgrade.
+A reference saved by the host before the upgrade carries no identity, and MDK
+refuses it. The first hosted qualification run at `b48c5ea37` showed this: its
+`pending-promotion` phase sent the baseline's saved reference and got
+`MarmotKitException.MediaReferenceStaleEpoch` ("sourceEpoch=2, currentEpoch=2"),
+while every other phase passed.
+
+That phase now asserts the new contract. The saved reference must be refused as
+stale, and then the same bytes are uploaded again and sent once. This matches
+Android's existing stale-upload recovery. The phase still checks the exact
+retained plaintext afterwards.
+
+The app itself never keeps upload references across a restart. On a Pixel 9a, an
+image left attached in the composer under the November 2 build sent normally
+after the upgrade, because the composer uploads when it sends.
 
 ## Behavior that changes without Android code
 

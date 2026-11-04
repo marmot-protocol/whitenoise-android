@@ -6,6 +6,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.AttachmentLocalTargetFfi
 import dev.ipf.marmotkit.AttachmentPageReadFfi
 import dev.ipf.marmotkit.Marmot
+import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
@@ -284,7 +285,11 @@ class MarmotUpgradeFixtureTest {
         if (fileStoreBaseline()) verifyUpgradeAvatar(runtime, value)
     }
 
-    /** Promotes the baseline upload without uploading it again, then verifies its distinct retained plaintext. */
+    /**
+     * Sends the baseline's pending bytes after the upgrade, then verifies their distinct retained plaintext.
+     * The receipt's reference predates MDK's upload branch identity (mdk#2891), so MDK must refuse it as
+     * stale; the same bytes are uploaded again and sent once, as the app's stale-upload recovery does.
+     */
     private suspend fun verifyPendingUpload(
         runtime: Marmot,
         receipt: File,
@@ -294,7 +299,33 @@ class MarmotUpgradeFixtureTest {
         val account = value.getString("sender")
         val group = value.getString("group")
         if (phase == "promote") {
-            val reference = value.getJSONObject("pendingReference").upgradeMediaReference()
+            val stale = value.getJSONObject("pendingReference").upgradeMediaReference()
+            val refused =
+                try {
+                    runtime.sendMediaReference(account, group, stale, "Promoted baseline pending upload")
+                    false
+                } catch (_: MarmotKitException.MediaReferenceStaleEpoch) {
+                    true
+                }
+            assertTrue("A pre-upgrade reference without upload branch identity must be refused as stale", refused)
+            reportUpgradePending(runtime, value, "stale-refused")
+            val blobPort = requireNotNull(InstrumentationRegistry.getArguments().getString("blobPort"))
+            val reference =
+                runtime
+                    .uploadMedia(
+                        account,
+                        group,
+                        MediaUploadRequestFfi(
+                            listOf(
+                                MediaUploadAttachmentRequestFfi("pending.txt", "text/plain", payload(1), null, null),
+                            ),
+                            null,
+                            false,
+                            "http://127.0.0.1:$blobPort",
+                        ),
+                    ).attachments
+                    .single()
+                    .reference
             val sent = runtime.sendMediaReference(account, group, reference, "Promoted baseline pending upload")
             value.put("pendingMessage", sent.messageIds.single())
             receipt.writeText(value.toString())
