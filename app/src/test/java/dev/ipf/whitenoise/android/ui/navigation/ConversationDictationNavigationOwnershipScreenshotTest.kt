@@ -1,74 +1,34 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
 import android.content.Context
-import android.view.View
-import androidx.compose.animation.core.updateTransition
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
-import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
-import androidx.core.graphics.Insets
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.audio.ConversationDictationController
-import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationFailure
-import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
-import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
-import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
-import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
-import dev.ipf.whitenoise.android.core.MessageTextCopy
-import dev.ipf.whitenoise.android.ui.chats.ChatsNewMessageFabContent
-import dev.ipf.whitenoise.android.ui.conversation.compactTopClearanceFor
 import dev.ipf.whitenoise.android.ui.conversation.composer.APP_DICTATION_CONTROL_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_DICTATION_COMPACT_ACTIONS_TAG
-import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_ACCESSIBILITY_TAG
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
-import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_HANDLE_TAG
+import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.ACCOUNT
+import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.COMPOSER_TAG
+import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.GROUP
+import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.origin
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestCoroutineScheduler
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -79,18 +39,14 @@ import org.robolectric.annotation.GraphicsMode
 @OptIn(ExperimentalCoroutinesApi::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
-class ConversationDictationNavigationOwnershipScreenshotTest {
-    private val transcriptPasteLabel: String
-        get() = ApplicationProvider.getApplicationContext<Context>().getString(R.string.paste_dictation_transcript)
+internal class ConversationDictationNavigationOwnershipScreenshotTest : DictationNavigationScenarioFixture() {
+    /** Captures shared scenarios through this selected owner using its existing Compose rule. */
+    protected override fun captureGolden(path: String) {
+        composeRule.onRoot().captureRoboImage(path)
+    }
 
-    private val scheduler = TestCoroutineScheduler()
-
-    @get:Rule
-    val composeRule = createComposeRule(effectContext = StandardTestDispatcher(scheduler))
-
-    private lateinit var renderedFixture: Fixture
-    private lateinit var renderedView: View
-    private var observedImeBottom = 0
+    @After
+    fun releaseMotionVoiceFixture() = releasePreviewVoiceController()
 
     @Test
     fun persistentActionsAboveKeyboardLight() = captureKeyboardActions(dark = false, largeRtl = false)
@@ -116,27 +72,11 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
     @Test
     fun settledChatListAmoled() = captureChatList(dark = true, amoled = true)
 
-    private fun captureChatList(
-        dark: Boolean,
-        amoled: Boolean,
-    ) {
-        val fixture = render(dark = dark, amoled = amoled)
-        composeRule.runOnIdle { fixture.route = origin.copy(selectedChatId = null, selectedGroupIdHex = null) }
-        composeRule.waitForIdle()
-        val capsule = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).fetchSemanticsNode().boundsInRoot
-        val pen = composeRule.onNodeWithContentDescription("New Message").fetchSemanticsNode().boundsInRoot
-        assertTrue("Capsule must clear actual pen: capsule=$capsule pen=$pen", capsule.bottom <= pen.top - 10f)
-        assertSingleActionSet()
-        val theme =
-            if (amoled) {
-                "amoled"
-            } else if (dark) {
-                "dark"
-            } else {
-                "light"
-            }
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_navigation_chat_list_$theme.png")
-    }
+    @Test
+    fun otherChatPaintedComposerGapLight() = captureOtherChatGap(largeRtl = false)
+
+    @Test
+    fun otherChatPaintedComposerGapLargeRtlDark() = captureOtherChatGap(largeRtl = true)
 
     @Test
     @Config(qualifiers = "w360dp-h480dp-mdpi")
@@ -145,108 +85,6 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
     @Test
     @Config(qualifiers = "w360dp-h480dp-mdpi")
     fun compactExpandedOtherChatLargeRtlDark() = captureCompactExpanded(largeRtl = true)
-
-    private fun captureCompactExpanded(largeRtl: Boolean) {
-        val fixture = render(dark = largeRtl, largeRtl = largeRtl, compact = true)
-        composeRule.runOnIdle {
-            fixture.route = origin.copy(selectedChatId = "other-chat", selectedGroupIdHex = "other-group")
-        }
-        composeRule.waitForIdle()
-        composeRule.runOnUiThread {
-            ViewCompat.dispatchApplyWindowInsets(
-                renderedView.rootView,
-                WindowInsetsCompat
-                    .Builder()
-                    .setInsets(WindowInsetsCompat.Type.statusBars(), Insets.of(0, 24, 0, 0))
-                    .setInsets(WindowInsetsCompat.Type.ime(), Insets.of(0, 0, 0, 280))
-                    .setVisible(WindowInsetsCompat.Type.statusBars(), true)
-                    .setVisible(WindowInsetsCompat.Type.ime(), true)
-                    .build(),
-            )
-        }
-        composeRule.waitForIdle()
-        val expand =
-            composeRule
-                .onNodeWithTag(COMPOSER_RESIZE_ACCESSIBILITY_TAG, useUnmergedTree = true)
-                .fetchSemanticsNode()
-                .config[SemanticsActions.CustomActions]
-                .single()
-        composeRule.runOnIdle { assertTrue(expand.action()) }
-        composeRule.waitForIdle()
-
-        fun capture(phase: String) {
-            val capsule = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).fetchSemanticsNode().boundsInRoot
-            val composer = composeRule.onNodeWithTag(COMPOSER_TAG).fetchSemanticsNode().boundsInRoot
-            assertTrue("Capsule clears status bar: $capsule", capsule.top >= 24f)
-            assertTrue("Clearance: capsule=$capsule composer=$composer", capsule.bottom <= composer.top)
-            assertTrue("Compact capsule keeps its native action height", capsule.height <= 48f)
-            val variant = if (largeRtl) "large_font_rtl_dark" else "light"
-            val snapshotName = "dictation_navigation_compact_${phase}_$variant.png"
-            composeRule.onRoot().captureRoboImage("src/test/snapshots/$snapshotName")
-        }
-        capture("expanded")
-        composeRule.runOnIdle { fixture.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable) }
-        composeRule.waitForIdle()
-        capture("failure")
-    }
-
-    /** MainActivity is edge-to-edge with adjustResize; dispatch its IME model and settle navigation. */
-    private fun captureKeyboardActions(
-        dark: Boolean,
-        largeRtl: Boolean,
-        amoled: Boolean = false,
-    ) {
-        val fixture = render(dark, largeRtl, amoled)
-        val capture = fixture.controller.state
-        composeRule.runOnIdle {
-            fixture.route = origin.copy(selectedChatId = "other-chat", selectedGroupIdHex = "other-group")
-        }
-        composeRule.waitForIdle()
-        composeRule.runOnUiThread {
-            val insets =
-                WindowInsetsCompat
-                    .Builder()
-                    .setInsets(WindowInsetsCompat.Type.ime(), Insets.of(0, 0, 0, 300))
-                    .setVisible(WindowInsetsCompat.Type.ime(), true)
-                    .build()
-            ViewCompat.dispatchApplyWindowInsets(renderedView.rootView, insets)
-        }
-        composeRule.waitForIdle()
-        assertEquals(300, observedImeBottom)
-        composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed()
-        val rootBounds = composeRule.onRoot().fetchSemanticsNode().boundsInRoot
-        val keyboardTop = rootBounds.bottom - observedImeBottom
-        listOf("Cancel", transcriptPasteLabel, "Send").forEach { label ->
-            val matcher = hasContentDescription(label) and hasAnyAncestor(hasTestTag(APP_DICTATION_CONTROL_TAG))
-            composeRule.onAllNodes(matcher).assertCountEquals(1)
-            val action = composeRule.onNode(matcher).assertIsDisplayed()
-            val bounds = action.fetchSemanticsNode().boundsInRoot
-            assertTrue("$label must be above the IME", bounds.bottom <= keyboardTop)
-            assertTrue("$label must not clip above the root", bounds.top >= rootBounds.top)
-            assertTrue("$label must retain visible area", bounds.width > 0f && bounds.height > 0f)
-        }
-        val stripBounds = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).fetchSemanticsNode().boundsInRoot
-        val inputBounds = composeRule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInRoot
-        val inputVisible = inputBounds.height > 0f && inputBounds.top >= rootBounds.top
-        assertTrue("Destination input must remain visible", inputVisible)
-        val composerBounds = composeRule.onNodeWithTag(COMPOSER_TAG).fetchSemanticsNode().boundsInRoot
-        assertTrue(
-            "Capsule must clear the composer: capsule=$stripBounds composer=$composerBounds",
-            composerBounds.top - stripBounds.bottom in 11f..13f,
-        )
-        assertTrue("Capsule must remain physically right aligned", stripBounds.right > rootBounds.right - 40f)
-        assertTrue("Capsule must not become a full-width strip", stripBounds.width < rootBounds.width - 64f)
-        assertSame(capture, fixture.controller.state)
-        val variant =
-            if (amoled) {
-                "amoled"
-            } else if (largeRtl) {
-                "large_font_rtl_dark"
-            } else {
-                "light"
-            }
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_navigation_keyboard_$variant.png")
-    }
 
     @Test
     fun departureFirstFrameLight() = captureNavigation(dark = false, largeRtl = false, returning = false)
@@ -351,218 +189,284 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
         assertEquals(ConversationDictationState.Idle, fixture.controller.state)
     }
 
-    /** No await-idle loop or recognition callback may advance the clock past this single commit. */
-    private fun firstNavigationFrame(change: () -> Unit) {
-        composeRule.mainClock.autoAdvance = false
-        val before = composeRule.mainClock.currentTime
-        composeRule.runOnUiThread {
-            change()
+    /** Actual transformed hit testing keeps Cancel owned until its pointer-up dispatch. */
+    @Test
+    fun midpointCancelUsesOneRealActionAndCancelsOnce() {
+        val fixture = render()
+        firstNavigationFrame { fixture.route = origin.copy(selectedChatId = null, selectedGroupIdHex = null) }
+        composeRule.mainClock.advanceTimeBy(80)
+        assertSingleActionSet()
+        composeRule
+            .onNode(
+                hasContentDescription("Cancel") and hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG)),
+            ).performTouchInput {
+                down(center)
+                up()
+            }
+        composeRule.runOnIdle {
+            assertEquals(ConversationDictationState.Idle, fixture.controller.state)
+            assertEquals(1, fixture.platform.cancels)
+        }
+    }
+
+    /** First/intermediate/settled pixels come from the production shell and its single control set. */
+    @Test
+    fun dictationMorphFramesAmoled() {
+        val fixture = render(dark = true, amoled = true)
+        firstNavigationFrame { fixture.route = origin.copy(selectedChatId = null, selectedGroupIdHex = null) }
+        composeRule.mainClock.advanceTimeBy(256)
+        val chatsTop = requireNotNull(fixture.anchor?.topInWindow)
+        firstNavigationFrame { fixture.route = origin }
+        composeRule.mainClock.advanceTimeBy(256)
+        listOf(false, true).forEach { returning ->
+            firstNavigationFrame {
+                fixture.route = if (returning) origin else origin.copy(selectedChatId = null, selectedGroupIdHex = null)
+            }
+            val direction = if (returning) "into_composer" else "into_capsule"
+            if (!returning) {
+                composeRule.onNodeWithTag(COMPOSER_TAG).assertExists()
+                assertEquals(chatsTop, requireNotNull(fixture.anchor?.topInWindow), 0.5f)
+            }
+            assertSingleActionSet()
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_morph_${direction}_first_amoled.png")
+            composeRule.mainClock.advanceTimeBy(32)
+            assertSingleActionSet()
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_morph_${direction}_early_amoled.png")
+            composeRule.mainClock.advanceTimeBy(32)
+            if (!returning) assertEquals(chatsTop, requireNotNull(fixture.anchor?.topInWindow), 0.5f)
+            assertSingleActionSet()
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_morph_${direction}_middle_amoled.png")
+            composeRule.mainClock.advanceTimeBy(48)
+            assertSingleActionSet()
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_morph_${direction}_late_amoled.png")
+            composeRule.mainClock.advanceTimeBy(144)
+            if (!returning) assertEquals(chatsTop, requireNotNull(fixture.anchor?.topInWindow), 0.5f)
+            assertSingleActionSet()
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_morph_${direction}_settled_amoled.png")
+        }
+    }
+
+    /** Real shell actions keep their measured size while embedded chrome becomes a capsule. */
+    @Test
+    fun dictationActionsKeepWidthWhenLeavingComposer() {
+        val fixture = render(dark = true, amoled = true)
+        val embedded =
+            composeRule.onNodeWithTag("composer-dictation-shell-control").fetchSemanticsNode().boundsInRoot
+        firstNavigationFrame { fixture.route = origin.copy(selectedChatId = null, selectedGroupIdHex = null) }
+        val floating = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).fetchSemanticsNode().boundsInRoot
+        assertEquals(
+            "Route ownership must not add padding to the live action set",
+            embedded.width,
+            floating.width,
+            0.5f,
+        )
+        assertSingleActionSet()
+    }
+
+    /** Captures the production listening indicator and chrome before and after an interrupted return. */
+    @Test
+    fun dictationMorphReversalFramesAmoled() {
+        val fixture = render(dark = true, amoled = true)
+        firstNavigationFrame { fixture.route = origin.copy(selectedChatId = null, selectedGroupIdHex = null) }
+        composeRule.mainClock.advanceTimeBy(64)
+        assertSingleActionSet()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_morph_reverse_before_amoled.png")
+        firstNavigationFrame { fixture.route = origin }
+        assertSingleActionSet()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_morph_reverse_first_amoled.png")
+        composeRule.mainClock.advanceTimeBy(64)
+        assertSingleActionSet()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_morph_reverse_middle_amoled.png")
+        composeRule.mainClock.advanceTimeBy(192)
+        assertSingleActionSet()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_morph_reverse_settled_amoled.png")
+    }
+
+    /** Keeps failed-recovery label changes visible for review rather than claiming active-capture coverage. */
+    @Test
+    fun dictationFailedReturnFramesAmoled() {
+        val fixture = render(dark = true, amoled = true)
+        composeRule.runOnIdle {
+            fixture.route = origin.copy(selectedChatId = "other-chat", selectedGroupIdHex = "other-group")
+            fixture.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+            assertTrue(fixture.controller.state is ConversationDictationState.Failed)
             Snapshot.sendApplyNotifications()
         }
         scheduler.runCurrent()
         composeRule.waitForIdle()
-        composeRule.mainClock.advanceTimeByFrame()
+        assertCommittedFailedFixture(fixture, persistent = true)
+        firstNavigationFrame { fixture.route = origin }
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_failed_return_first_amoled.png")
+        composeRule.mainClock.advanceTimeBy(64)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_failed_return_middle_amoled.png")
+        composeRule.mainClock.advanceTimeBy(192)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_failed_return_settled_amoled.png")
+    }
+
+    /** Failed-label width changes must not teleport the one command set on the first frame. */
+    @Test
+    fun failedCommandsKeepTrailingEdgeDuringEveryFrame() = verifyFailedCommandTrajectory(largeRtl = false)
+
+    @Test
+    fun failedCommandsKeepTrailingEdgeDuringEveryFrameLargeRtl() = verifyFailedCommandTrajectory(largeRtl = true)
+
+    @Test
+    fun activeCapsuleDimensionsMatchBetweenChatsAndOtherChatLight() = compareActiveCapsuleDimensions(largeRtl = false)
+
+    @Test
+    fun activeCapsuleDimensionsMatchBetweenChatsAndOtherChatLargeRtlDark() {
+        compareActiveCapsuleDimensions(largeRtl = true)
+    }
+
+    /** Same-owner navigation has no dictation animation: the existing container clock owns placement. */
+    @Test
+    fun persistentCapsuleFollowsPaintedBorderThroughNavigationAndReverse() {
+        verifyPersistentTrajectory(largeRtl = false)
+    }
+
+    /** A taller real editor makes a stale final-anchor jump visible instead of hiding it at equal endpoints. */
+    @Test
+    fun persistentCapsuleFollowsTallRtlBorderThroughNavigationAndReverse() = verifyPersistentTrajectory(largeRtl = true)
+
+    /** Changing actual insets during the same-owner morph keeps the controls on the painted border. */
+    @Test
+    fun persistentCapsuleFollowsBorderWhileKeyboardMoves() {
+        verifyPersistentTrajectory(largeRtl = false, moveIme = true)
+    }
+
+    /** An older inline departure must not retire into a newer midflight composer and jump. */
+    @Test
+    fun rapidInlineToChatsToOtherChatKeepsBothClocksContinuous() = verifyMixedOwnershipTrajectory(moveIme = false)
+
+    /** The same interrupted route path keeps its real action geometry while the IME changes the destination. */
+    @Test
+    fun rapidInlineToChatsToOtherChatWithKeyboardKeepsBothClocksContinuous() {
+        verifyMixedOwnershipTrajectory(moveIme = true)
+    }
+
+    /** The existing frame clock captures the currently drawn command edge on a Failed-route reversal. */
+    @Test
+    fun failedCommandsStayContinuousOnMidpointReverse() {
+        val fixture = render(dark = true, amoled = true, withComposerMorph = true)
+        composeRule.runOnIdle {
+            fixture.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+            assertTrue(fixture.controller.state is ConversationDictationState.Failed)
+            Snapshot.sendApplyNotifications()
+        }
+        scheduler.runCurrent()
         composeRule.waitForIdle()
-        assertEquals(before + 16L, composeRule.mainClock.currentTime)
-        assertEquals(renderedFixture.route, renderedFixture.committedRoute)
-        assertEquals(renderedFixture.locked, renderedFixture.committedLocked)
-    }
+        assertCommittedFailedFixture(fixture, persistent = false)
 
-    private fun assertSingleActionSet() {
-        listOf("Cancel", transcriptPasteLabel, "Send").forEach { label ->
-            val action =
-                hasContentDescription(label) and
-                    hasAnyAncestor(hasTestTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG))
-            composeRule.onAllNodes(action).assertCountEquals(1)
-            composeRule.onNode(action).assertIsDisplayed()
+        fun commands(): androidx.compose.ui.geometry.Rect {
+            val semanticsNode = composeRule.onNodeWithTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG).fetchSemanticsNode()
+            return semanticsNode.boundsInRoot
+        }
+        // Reference the uninterrupted trajectory at the same presentation time as the
+        // reversing commit. That commit itself advances 16 ms of the existing clock.
+        val referenceStart = composeRule.mainClock.currentTime
+        firstNavigationFrame {
+            fixture.route = origin.copy(selectedChatId = "other-chat", selectedGroupIdHex = "other-group")
+        }
+        composeRule.mainClock.advanceTimeBy(80)
+        val reference = commands()
+        assertEquals(referenceStart + 96L, composeRule.mainClock.currentTime)
+        firstNavigationFrame { fixture.route = origin }
+        composeRule.mainClock.advanceTimeBy(272)
+        assertCommittedFailedFixture(fixture, persistent = false)
+
+        val reversalStart = composeRule.mainClock.currentTime
+        firstNavigationFrame {
+            fixture.route = origin.copy(selectedChatId = "other-chat", selectedGroupIdHex = "other-group")
+        }
+        composeRule.mainClock.advanceTimeBy(64)
+        val beforeReverse = commands()
+        firstNavigationFrame { fixture.route = origin }
+        val afterReverse = commands()
+        assertEquals(reversalStart + 96L, composeRule.mainClock.currentTime)
+        assertEquals(reference.right, afterReverse.right, 0.5f)
+        assertEquals(reference.center.y, afterReverse.center.y, 0.5f)
+        repeat(12) {
+            composeRule.mainClock.advanceTimeByFrame()
+            assertEquals(beforeReverse.width, commands().width, 0.5f)
         }
     }
 
-    /** Exercises the production ownership/layout, route animation, and actual composer controls. */
-    private fun render(
-        dark: Boolean = false,
-        largeRtl: Boolean = false,
-        amoled: Boolean = false,
-        compact: Boolean = false,
-    ): Fixture {
-        val fixture = Fixture()
-        renderedFixture = fixture
-        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
-        fixture.platform.listener.onReady()
-        composeRule.setContent {
-            observeImeInsets()
-            val route = fixture.route
-            val locked = fixture.locked
-            SideEffect {
-                fixture.committedRoute = route
-                fixture.committedLocked = locked
+    /** Runs both production handoff clocks together; the existing isolation fixtures stay unchanged. */
+    @Test
+    fun combinedComposerAndDictationFramesAmoled() {
+        val fixture = render(dark = true, amoled = true, withComposerMorph = true)
+        listOf(false, true).forEach { returning ->
+            firstNavigationFrame {
+                fixture.route = if (returning) origin else origin.copy(selectedChatId = null, selectedGroupIdHex = null)
             }
-            CompositionLocalProvider(
-                LocalDensity provides Density(1f, if (largeRtl) 2f else 1f),
-                LocalLayoutDirection provides if (largeRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
-            ) {
-                WhiteNoiseTheme(darkTheme = dark, amoled = amoled) {
-                    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                        MainShellNoticeLayout(
-                            notice = null,
-                            dictationController = fixture.controller,
-                            dictationComposerRoute = fixture.route,
-                            appLockScreenVisible = fixture.locked,
-                        ) { owner ->
-                            if (!fixture.locked) {
-                                val transition =
-                                    updateTransition(fixture.route.selectedChatId, label = "dictation route")
-                                ConversationRouteAnimatedContent(
-                                    transition = transition,
-                                    routeForwardDirection = 1,
-                                    suppressMotion = false,
-                                    contentKey = { it ?: "chat-list" },
-                                ) { chatId ->
-                                    RenderRouteContents(fixture, owner, chatId, largeRtl, compact)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        composeRule.waitForIdle()
-        return fixture
-    }
-
-    /** Paints the actual route-specific FAB/composer inside its existing animation. */
-    @Composable
-    private fun RenderRouteContents(
-        fixture: Fixture,
-        owner: ConversationDictationControlOwner,
-        chatId: String?,
-        largeRtl: Boolean,
-        compact: Boolean,
-    ) {
-        Box(Modifier.fillMaxSize()) {
-            if (chatId == null) {
-                Box(Modifier.align(Alignment.BottomEnd).padding(16.dp)) {
-                    ChatsNewMessageFabContent(missingRelays = false) {}
-                }
-            }
-            if (chatId != null) {
-                val group = if (chatId == origin.selectedChatId) GROUP else "other-group"
-                ComposerBar(
-                    replyingTo = null,
-                    messageTextCopy = MessageTextCopy.Default,
-                    onCancelReply = {},
-                    onSend = { _, _ -> },
-                    topInteractionClearance =
-                        if (compact) {
-                            compactTopClearanceFor(if (largeRtl) 2f else 1f)
-                        } else {
-                            64.dp
-                        },
-                    dictationController = fixture.controller,
-                    dictationAccountRef = ACCOUNT,
-                    dictationGroupIdHex = group,
-                    dictationControlsVisible =
-                        owner == ConversationDictationControlOwner.Composer &&
-                            fixture.route.selectedChatId == chatId,
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .testTag(COMPOSER_TAG)
-                            .floatingDictationAnchor(),
-                )
-            }
-        }
-    }
-
-    @Composable
-    private fun observeImeInsets() {
-        val view = LocalView.current
-        val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
-        SideEffect {
-            renderedView = view
-            observedImeBottom = imeBottom
-        }
-    }
-
-    /** Pixel evidence for the same first departure frame and the fully returned composer. */
-    private fun captureNavigation(
-        dark: Boolean,
-        largeRtl: Boolean,
-        returning: Boolean,
-        amoled: Boolean = false,
-    ) {
-        val fixture = render(dark, largeRtl, amoled)
-        firstNavigationFrame { fixture.route = origin.copy(selectedChatId = null, selectedGroupIdHex = null) }
-        composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed()
-        if (returning) {
-            composeRule.mainClock.autoAdvance = true
-            composeRule.waitForIdle()
-            composeRule.runOnIdle { fixture.route = origin }
-            composeRule.waitForIdle()
-            composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertDoesNotExist()
-        }
-        assertSingleActionSet()
-        val phase = if (returning) "returned_composer" else "departure_first_frame"
-        val variant =
-            if (amoled) {
-                "amoled"
-            } else if (largeRtl) {
-                "large_font_rtl_dark"
-            } else {
-                "light"
-            }
-        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_navigation_${phase}_$variant.png")
-    }
-
-    private class Fixture {
-        var route by mutableStateOf(origin)
-        var locked by mutableStateOf(false)
-        var committedRoute = origin
-        var committedLocked = false
-        val platform = FakePlatform()
-        var draft = TextFieldValue()
-        val writes = mutableListOf<Pair<String, String>>()
-        val controller =
-            ConversationDictationController(
-                platform = platform,
-                readDraft = { _, _ -> ConversationDictationDraftSnapshot(draft, 0L) },
-                writeDraft = { account, group, _, value ->
-                    writes += account to group
-                    draft = value
-                    0L
-                },
-                disclosureAccepted = { true },
-                markDisclosureAccepted = {},
-                scheduleTimeout = { _, _ -> ConversationDictationTimeoutHandle {} },
+            val direction = if (returning) "into_composer" else "into_capsule"
+            assertSingleActionSet()
+            composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_combined_${direction}_first_amoled.png")
+            composeRule.mainClock.advanceTimeBy(64)
+            assertSingleActionSet()
+            composeRule.onRoot().captureRoboImage(
+                "src/test/snapshots/dictation_combined_${direction}_middle_amoled.png",
             )
-    }
-
-    private class FakePlatform : ConversationDictationPlatform {
-        lateinit var listener: ConversationDictationRecognitionListener
-
-        override fun hasRecordAudioPermission() = true
-
-        override fun recognitionAvailable() = true
-
-        @Suppress("MaxLineLength")
-        override fun createSession(listener: ConversationDictationRecognitionListener): ConversationDictationRecognitionSession {
-            this.listener = listener
-            return object : ConversationDictationRecognitionSession {
-                override fun start() = Unit
-
-                override fun stop() = Unit
-
-                override fun cancel() = Unit
-
-                override fun destroy() = Unit
-            }
+            composeRule.mainClock.advanceTimeBy(192)
+            assertSingleActionSet()
+            composeRule.onRoot().captureRoboImage(
+                "src/test/snapshots/dictation_combined_${direction}_settled_amoled.png",
+            )
         }
+        firstNavigationFrame { fixture.route = origin.copy(selectedChatId = null, selectedGroupIdHex = null) }
+        composeRule.mainClock.advanceTimeBy(64)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_combined_reverse_before_amoled.png")
+        firstNavigationFrame { fixture.route = origin }
+        assertSingleActionSet()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_combined_reverse_first_amoled.png")
+        composeRule.mainClock.advanceTimeBy(64)
+        assertSingleActionSet()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_combined_reverse_middle_amoled.png")
+        composeRule.mainClock.advanceTimeBy(192)
+        assertSingleActionSet()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_combined_reverse_settled_amoled.png")
     }
 
-    private companion object {
-        const val ACCOUNT = "account"
-        const val GROUP = "group"
-        const val COMPOSER_TAG = "navigation-origin-composer"
-        val origin = ConversationDictationComposerRoute("chat", GROUP, "chat", ACCOUNT, true, true)
+    /** Every rendered frame retains chrome; optional exports are not physical-device measurements. */
+    @Test
+    fun activeDictationControlsKeepArtworkOnEveryFrame() {
+        val fixture = render(dark = true, amoled = true, withComposerMorph = true)
+        val initialTarget = composeRule.runOnIdle { requireNotNull(fixture.handoff?.targetBounds) }
+        val initialGrip =
+            composeRule
+                .onNodeWithTag(COMPOSER_RESIZE_HANDLE_TAG, useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        fixture.gripTopOffset = initialGrip.top - initialTarget.top
+        firstNavigationFrame { fixture.route = origin.copy(selectedChatId = null, selectedGroupIdHex = null) }
+        exportCurrentFrame("active_departure", 0)
+        repeat(16) { index ->
+            composeRule.mainClock.advanceTimeByFrame()
+            exportCurrentFrame("active_departure", index + 1)
+        }
+        fixture.incomingCapsuleLeft =
+            composeRule
+                .onNodeWithTag(APP_DICTATION_CONTROL_TAG)
+                .fetchSemanticsNode()
+                .boundsInRoot.left
+        firstNavigationFrame { fixture.route = origin }
+        exportCurrentFrame("active_return", 0)
+        repeat(16) { index ->
+            composeRule.mainClock.advanceTimeByFrame()
+            exportCurrentFrame("active_return", index + 1)
+        }
+        firstNavigationFrame { fixture.route = origin.copy(selectedChatId = null, selectedGroupIdHex = null) }
+        exportCurrentFrame("active_reverse", 0)
+        repeat(4) { index ->
+            composeRule.mainClock.advanceTimeByFrame()
+            exportCurrentFrame("active_reverse", index + 1)
+        }
+        firstNavigationFrame { fixture.route = origin }
+        exportCurrentFrame("active_reverse", 5)
+        repeat(16) { index ->
+            composeRule.mainClock.advanceTimeByFrame()
+            exportCurrentFrame("active_reverse", index + 6)
+        }
+        assertTrue("Every route must exercise its settled pixel checks", fixture.checkedArtworkFrames >= 3)
     }
 }

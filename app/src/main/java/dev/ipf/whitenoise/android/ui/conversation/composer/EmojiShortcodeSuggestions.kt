@@ -28,6 +28,7 @@ import dev.ipf.whitenoise.android.core.ShortcodeComposer
 import dev.ipf.whitenoise.android.ui.EmojiData
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
+import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -78,6 +79,7 @@ internal fun EmojiShortcodeSuggestions(
         modifier =
             modifier
                 .fillMaxWidth()
+                .floatingDictationAnchor()
                 .padding(horizontal = 8.dp, vertical = 4.dp)
                 .testTag(EMOJI_SUGGESTIONS_TEST_TAG),
         shape = MaterialTheme.shapes.medium,

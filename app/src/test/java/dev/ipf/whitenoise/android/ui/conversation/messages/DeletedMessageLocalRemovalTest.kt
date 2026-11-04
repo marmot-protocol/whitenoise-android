@@ -646,6 +646,7 @@ class DeletedMessageLocalRemovalTest {
         retentionExpiresAt = null,
         sticker = null,
         importedFrom = null,
+        historyImportProvenance = null,
     )
 
     private fun emptyReactionSummary() = TimelineReactionSummaryFfi(byEmoji = emptyList(), userReactions = emptyList())

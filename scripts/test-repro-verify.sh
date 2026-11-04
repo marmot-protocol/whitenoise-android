@@ -87,6 +87,99 @@ repro_verify_write_jvm_report_init_script "$fake_init"
 repro_verify_build "$fake_tree" deadbeefdeadbeefdeadbeefdeadbeefdeadbeef \
   "$fake_gradle_home" "$fake_jvm_report" "$fake_init" "$fake_expected_jvm_report"
 repro_verify_assert_build_jvm "$fake_jvm_report" "$fake_expected_jvm_report" tree1
+# Required toolchain equality uses the actual Gradle-resolved SDK report, not
+# the runner's complete installed SDK inventory.
+mkdir -p "$fake_tree/gradle/wrapper" "$fake_sdk/platforms/android-37.1" \
+  "$fake_sdk/platforms/android-37.2" "$fake_sdk/build-tools/36.0.0" \
+  "$fake_sdk/ndk/29.0.14206865"
+touch "$fake_tree/gradle/wrapper/gradle-wrapper.jar" "$fake_tree/gradle/wrapper/gradle-wrapper.properties"
+for sdk_file in platforms/android-37.1/source.properties platforms/android-37.1/android.jar \
+  platforms/android-37.2/source.properties platforms/android-37.2/android.jar \
+  build-tools/36.0.0/source.properties ndk/29.0.14206865/source.properties \
+  ndk/29.0.14206865/clang; do
+  printf '%s\n' "$sdk_file" >"$fake_sdk/$sdk_file"
+done
+printf '#!/bin/sh\nexit 0\n' >"$fake_sdk/build-tools/36.0.0/apksigner"
+chmod +x "$fake_sdk/build-tools/36.0.0/apksigner"
+python3 - "$fake_sdk" "$fake_jvm_report.sdk.json" <<'PYSDK'
+import json
+import sys
+from pathlib import Path
+sdk = Path(sys.argv[1])
+Path(sys.argv[2]).write_text(json.dumps({
+    'schema': 1, 'sdk': str(sdk),
+    'bootClasspath': [str(sdk / 'platforms/android-37.1/android.jar')],
+    'buildToolsVersion': '36.0.0', 'ndk': str(sdk / 'ndk/29.0.14206865'),
+    'cmakeVersion': None,
+}) + '\n')
+PYSDK
+fake_evidence="$FIXTURE_DIR/fake-evidence"
+repro_verify_record_build_environment "$fake_evidence" deadbeef "$fake_expected_jvm_report" \
+  "$fake_jvm_report" "" "$fake_tree"
+python3 - "$fake_sdk" "$fake_evidence" <<'PYSDK'
+import hashlib
+import json
+import sys
+from pathlib import Path
+sdk, evidence = map(Path, sys.argv[1:])
+resolved = json.loads((evidence / 'repro-resolved-sdk-inputs.txt').read_text())
+assert set(resolved['packages']) == {
+    'platforms/android-37.1', 'build-tools/36.0.0', 'ndk/29.0.14206865',
+}
+files = {item['path']: item for item in resolved['files']}
+for name in ('platforms/android-37.1/source.properties', 'platforms/android-37.1/android.jar',
+             'build-tools/36.0.0/source.properties', 'build-tools/36.0.0/apksigner',
+             'ndk/29.0.14206865/source.properties', 'ndk/29.0.14206865/clang'):
+    assert files[name]['sha256'] == hashlib.sha256((sdk / name).read_bytes()).hexdigest(), name
+required = (evidence / 'repro-build-environment.txt').read_text()
+assert '[resolved SDK inputs]' in required
+assert 'android-37.2' not in required
+assert 'android-37.2' in (evidence / 'repro-installed-sdk-inventory.txt').read_text()
+PYSDK
+printf 'unused hosted-image rollout\n' >>"$fake_sdk/platforms/android-37.2/android.jar"
+fake_drift_evidence="$FIXTURE_DIR/fake-drift-evidence"
+repro_verify_record_build_environment "$fake_drift_evidence" deadbeef "$fake_expected_jvm_report" \
+  "$fake_jvm_report" "" "$fake_tree"
+cmp "$fake_evidence/repro-build-environment.txt" "$fake_drift_evidence/repro-build-environment.txt"
+if cmp -s "$fake_evidence/repro-installed-sdk-inventory.txt" \
+  "$fake_drift_evidence/repro-installed-sdk-inventory.txt"; then
+  echo 'error: diagnostic SDK inventory did not record unused-platform drift' >&2
+  exit 1
+fi
+
+# Separate strict shells preserve top-level errexit behavior: putting the function
+# directly in an if condition would suppress Bash's errexit inside the function.
+cp "$fake_jvm_report" "$fake_work/unnamed-sdk.properties"
+if bash -euo pipefail -c 'source "$1"; repro_verify_record_build_environment "$2" deadbeef "$3" "$4" "" "$5"' \
+  fixture "$REPO_DIR/scripts/repro-verify.sh" "$FIXTURE_DIR/unnamed-evidence" \
+  "$fake_expected_jvm_report" "$fake_work/unnamed-sdk.properties" "$fake_tree" 2>/dev/null; then
+  echo 'error: environment report accepted a missing resolved SDK report' >&2
+  exit 1
+fi
+python3 - "$fake_jvm_report.sdk.json" "$fake_work/unnamed-sdk.properties.sdk.json" <<'PYSDK'
+import json
+import sys
+from pathlib import Path
+value = json.loads(Path(sys.argv[1]).read_text())
+del value['bootClasspath']
+Path(sys.argv[2]).write_text(json.dumps(value) + '\n')
+PYSDK
+if bash -euo pipefail -c 'source "$1"; repro_verify_record_build_environment "$2" deadbeef "$3" "$4" "" "$5"' \
+  fixture "$REPO_DIR/scripts/repro-verify.sh" "$FIXTURE_DIR/incomplete-evidence" \
+  "$fake_expected_jvm_report" "$fake_work/unnamed-sdk.properties" "$fake_tree" 2>/dev/null; then
+  echo 'error: environment report accepted incomplete resolved SDK metadata' >&2
+  exit 1
+fi
+rm "$fake_sdk/build-tools/36.0.0/source.properties"
+if bash -euo pipefail -c 'source "$1"; repro_verify_record_build_environment "$2" deadbeef "$3" "$4" "" "$5"' \
+  fixture "$REPO_DIR/scripts/repro-verify.sh" "$FIXTURE_DIR/missing-sdk-evidence" \
+  "$fake_expected_jvm_report" "$fake_jvm_report" "$fake_tree" 2>/dev/null; then
+  echo 'error: environment report accepted a missing build-tools package' >&2
+  exit 1
+fi
+# Later unsigned-verifier fixtures intentionally begin without an SDK apksigner.
+rm "$fake_sdk/build-tools/36.0.0/apksigner"
+
 unset WHITENOISE_PRODUCTION_KEYSTORE_PATH WHITENOISE_OTLP_AUTH_TOKEN
 unset WHITENOISE_AUDIT_OTLP_AUTH_TOKEN JAVA_TOOL_OPTIONS
 

@@ -259,6 +259,7 @@ internal fun timelineRecord(
         retentionExpiresAt = null,
         sticker = null,
         importedFrom = null,
+        historyImportProvenance = null,
     )
 
 /**

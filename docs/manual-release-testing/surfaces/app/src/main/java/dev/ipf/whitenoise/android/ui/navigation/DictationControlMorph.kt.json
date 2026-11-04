@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/DictationControlMorph.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "DictationComposerControlSlot",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/DictationControlMorph.kt",
+        "anchor": "fun DictationComposerControlSlot(",
+        "test_ids": [
+          "DIC-011"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Measured control morph ownership and presentation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/DictationControlMorph.kt",
+        "anchor": "package dev.ipf.whitenoise.android",
+        "test_ids": [
+          "DIC-011"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

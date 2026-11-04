@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# sort and comm must share one collation, or contained rules are reported missing in non-C locales.
+export LC_ALL=C
 
 profile_dir="${1:-app/src/main/generated/baselineProfiles}"
 baseline_profile="$profile_dir/baseline-prof.txt"

@@ -138,6 +138,7 @@ class GroupSystemPreparedIdentityTest {
             retentionExpiresAt = null,
             sticker = null,
             importedFrom = null,
+            historyImportProvenance = null,
         )
 
     private companion object {

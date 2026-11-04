@@ -1,7 +1,10 @@
 package dev.ipf.whitenoise.android.ui.chats
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.FloatingActionButton
@@ -18,6 +21,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -27,9 +33,14 @@ import dev.ipf.marmotkit.AccountRelayListsFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ToastMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
+import dev.ipf.whitenoise.android.ui.common.LocalFinishControlMorph
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseContentMaxWidth
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerActionRowHeight
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOuterVerticalPadding
 import dev.ipf.whitenoise.android.ui.navigation.ComposerFabEndpoint
-import dev.ipf.whitenoise.android.ui.navigation.composerFabEndpoint
+import dev.ipf.whitenoise.android.ui.navigation.LocalComposerFabHandoff
+import dev.ipf.whitenoise.android.ui.navigation.composerFabSurface
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.settings.RelaysScreen
 import dev.ipf.whitenoise.android.ui.settings.SupportRelayState
@@ -111,7 +122,7 @@ internal fun ChatsNewMessageFab(
 }
 
 /**
- * Composer-colored edit/warning button, with adaptive pane placement and the AMOLED outline.
+ * Composer-colored edit/warning button, with adaptive pane placement and matching composer chrome.
  */
 @Suppress("FunctionNaming")
 @Composable
@@ -119,29 +130,65 @@ internal fun ChatsNewMessageFabContent(
     missingRelays: Boolean,
     onClick: () -> Unit,
 ) {
-    val outline = amoledOutlineBorder()
+    if (!LocalControlHandoffEndpointCurrent.current) {
+        Box(Modifier.size(if (missingRelays) 56.dp else ComposerActionRowHeight))
+        return
+    }
+    // The pen occupies one real composer action row, with the same bottom clearance.
+    // Font scaling grows the editor above this baseline; it must not lift the pen.
+    val composerBaselineAdjustment = 16.dp - ComposerOuterVerticalPadding
+    val outline =
+        if (missingRelays) amoledOutlineBorder() else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    val finishControlMorph = LocalFinishControlMorph.current
+    val morphing = !missingRelays && LocalComposerFabHandoff.current?.active == true
     BoxWithConstraints {
         val paneInset = ((maxWidth - WhiteNoiseContentMaxWidth) / 2).coerceAtLeast(0.dp)
         val modifier =
             Modifier
                 .padding(end = paneInset)
-                .floatingDictationAnchor()
-                .composerFabEndpoint(ComposerFabEndpoint.NewMessage)
+                .then(if (missingRelays) Modifier else Modifier.offset(y = composerBaselineAdjustment))
+                .floatingDictationAnchor(followsComposerFab = !missingRelays)
                 .performanceTestTag(PerformanceTestTags.NEW_MESSAGE)
+        val chrome =
+            if (morphing || outline == null) modifier else modifier.border(outline, FloatingActionButtonDefaults.shape)
         FloatingActionButton(
-            onClick = onClick,
-            modifier = if (outline == null) modifier else modifier.border(outline, FloatingActionButtonDefaults.shape),
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            onClick = {
+                finishControlMorph()
+                onClick()
+            },
+            modifier =
+                if (missingRelays) {
+                    chrome
+                } else {
+                    chrome.size(ComposerActionRowHeight).composerFabSurface(
+                        ComposerFabEndpoint.NewMessage,
+                        MaterialTheme.colorScheme.surfaceContainerHigh,
+                        outline?.brush?.let { MaterialTheme.colorScheme.outlineVariant },
+                        radiusDp = 16f,
+                        morphing = morphing,
+                    )
+                },
+            shape = if (morphing) RectangleShape else FloatingActionButtonDefaults.shape,
+            containerColor = chatsFabContainerColor(morphing, MaterialTheme.colorScheme.surfaceContainerHigh),
             contentColor = MaterialTheme.colorScheme.onSurface,
             elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 0.dp),
         ) {
             Icon(
                 painterResource(if (missingRelays) R.drawable.ic_warning else R.drawable.ic_edit),
                 stringResource(if (missingRelays) R.string.chats_check_relays else R.string.new_message),
-                Modifier.size(ChatFabIconSize),
+                Modifier.size(ChatFabIconSize).drawWithContent {
+                    // The shell paints the one moving glyph outside this final FAB's local clip.
+                    if (!morphing) drawContent()
+                },
             )
         }
     }
 }
+
+/** Lets the shared morph paint its fill until the settled Material FAB takes ownership. */
+private fun chatsFabContainerColor(
+    morphing: Boolean,
+    settledColor: Color,
+): Color = if (morphing) Color.Transparent else settledColor
 
 private val ChatFabIconSize = 24.dp

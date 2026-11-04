@@ -97,6 +97,24 @@ internal class WhiteNoiseJourneys {
     }
 
     /**
+     * Delivers a text share to the already-running app and waits for the picker. It starts the activity
+     * through `am start` rather than [startActivityAndWait], which adds `FLAG_ACTIVITY_CLEAR_TASK` during
+     * profile collection and would recreate the `singleTask` activity instead of reaching `onNewIntent`.
+     */
+    fun MacrobenchmarkScope.deliverShareToRunningApp() {
+        val component = "${BenchmarkConfig.TARGET_PACKAGE}/dev.ipf.whitenoise.android.MainActivity"
+        val output =
+            device.executeShellCommand(
+                "am start -W -a android.intent.action.SEND -t text/plain " +
+                    "--es android.intent.extra.TEXT WarmShareProfile -n $component",
+            )
+        check(output.lineSequence().any { it.trim() == "Status: ok" }) {
+            "Warm share delivery to the running app failed: $output"
+        }
+        waitForVisibleTag(PerformanceTags.SHARE_PICKER, STARTUP_TIMEOUT_MS)
+    }
+
+    /**
      * Resumes the existing task and unwinds any journey left by the preceding
      * iteration. Unlike [launchToChatList], this is setup work and is excluded
      * from the measured trace.

@@ -547,6 +547,7 @@ class MaestroWorkflowTest(unittest.TestCase):
         self.assertNotIn('continue-on-error:', baseline)
         self.assertNotIn('maestro_apk.py', baseline)
         self.assertIn('verify-baseline-profile.sh', baseline)
+        self.assertIn('mergeDevZapstoreBenchmarkReleaseArtProfile/baseline-prof.txt', baseline)
         self.assertIn('continue-on-error: true', stage)
         self.assertIn('continue-on-error: true', upload)
         self.assertIn("if: steps.maestro_stage.outcome == 'success'", upload)
