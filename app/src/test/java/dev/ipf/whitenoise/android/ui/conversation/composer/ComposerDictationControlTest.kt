@@ -27,6 +27,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -462,7 +463,7 @@ class ComposerDictationControlTest {
 
     private class SendGuardFixture {
         val origin = ACCOUNT to GROUP
-        val drafts = mutableMapOf(origin to TextFieldValue("Typed message"))
+        val drafts = mutableMapOf(origin to TextFieldValue("Typed message", TextRange("Typed message".length)))
         val revisions = mutableMapOf(origin to 0L)
         val sent = mutableListOf<Pair<Pair<String, String>, String>>()
         val writes = mutableListOf<Pair<String, String>>()
@@ -510,7 +511,11 @@ class ComposerDictationControlTest {
         val origin = ACCOUNT to GROUP
         val other = "other-account" to "other-group"
         val visible = mutableStateOf(origin)
-        val drafts = mutableMapOf(origin to TextFieldValue("Original"), other to TextFieldValue("Other draft"))
+        val drafts =
+            mutableMapOf(
+                origin to TextFieldValue("Original", TextRange("Original".length)),
+                other to TextFieldValue("Other draft"),
+            )
         val revisions = mutableMapOf(origin to 0L, other to 0L)
         val writes = mutableListOf<Pair<String, String>>()
         val sent = mutableListOf<Pair<Pair<String, String>, String>>()
