@@ -21,8 +21,8 @@ internal const val FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS = 250L
 /**
  * The renderable stored avatars of the rows the restored chat list draws first. The rows are projected and
  * ordered exactly as the first frame orders them: [chatListItemFromProjection] and [sortChatListItems] with
- * the same [draftedAtSeconds] lookup `ChatsController` uses (pending confirmation, pinned block and manual pin
- * position, draft-aware recency, arrival order, title). Archived rows are not on the first frame and are
+ * the same [draftedAtSeconds] lookup `ChatsController` uses (pinned block in manual pin position, pending
+ * confirmation, draft-aware recency, arrival order, title). Archived rows are not on the first frame and are
  * skipped. Each asset is the one the row itself adopts, so a picture the row would not draw is not decoded.
  */
 internal fun firstFrameDurableAvatarAssets(
