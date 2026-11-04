@@ -8,8 +8,6 @@
     <string name="composer_side_right">Destra</string>
     <string name="composer_layout_automatic">Automatica</string>
     <string name="composer_layout_expanded">Sempre espanso</string>
-    <string name="composer_selected">Scorciatoie selezionate</string>
-    <string name="composer_available">Azioni disponibili</string>
     <string name="composer_move_earlier">Sposta prima</string>
     <string name="composer_move_later">Sposta dopo</string>
     <string name="composer_add">Aggiungi scorciatoia</string>

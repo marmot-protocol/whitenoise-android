@@ -146,5 +146,6 @@ class TimelineMarkdownHydrationTest {
             retentionExpiresAt = null,
             sticker = null,
             importedFrom = null,
+            historyImportProvenance = null,
         )
 }

@@ -55,7 +55,6 @@ internal fun ComposerConfiguredAction(
         return
     }
     val voiceLabel = stringResource(R.string.voice_message_record)
-    val shortcutEnabled = enabled && (shortcut != ComposerShortcut.Dictation || onDictation != null)
     when (shortcut) {
         ComposerShortcut.SendingIdentity -> sendingIdentity?.invoke(modifier)
         ComposerShortcut.More ->
@@ -123,31 +122,43 @@ internal fun ComposerConfiguredAction(
                 }
             }
         }
-        else ->
-            IconButton(
-                onClick = {
-                    if (bindings.canActivate()) {
-                        if (shortcut == ComposerShortcut.Dictation) {
-                            onDictation?.invoke()
-                        } else {
-                            bindings.attachmentActions[shortcut]?.invoke()
-                        }
-                    }
-                },
-                enabled = shortcutEnabled,
-                modifier = modifier,
-            ) {
-                Icon(
-                    painterResource(shortcut.iconRes),
-                    stringResource(shortcut.labelRes),
-                    Modifier.size(ComposerShortcutIconSize),
-                    tint =
-                        if (shortcut == ComposerShortcut.Dictation && !shortcutEnabled) {
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = DISABLED_VOICE_OPACITY)
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                )
+        else -> ComposerOptionalShortcutAction(shortcut, modifier, bindings, enabled, onDictation)
+    }
+}
+
+/** Renders dictation and attachment shortcuts while rechecking activation at click time. */
+@Composable
+private fun ComposerOptionalShortcutAction(
+    shortcut: ComposerShortcut,
+    modifier: Modifier,
+    bindings: ComposerToolbarBindings,
+    enabled: Boolean,
+    onDictation: (() -> Unit)?,
+) {
+    val shortcutEnabled = enabled && (shortcut != ComposerShortcut.Dictation || onDictation != null)
+    IconButton(
+        onClick = {
+            if (bindings.canActivate()) {
+                if (shortcut == ComposerShortcut.Dictation) {
+                    onDictation?.invoke()
+                } else {
+                    bindings.attachmentActions[shortcut]?.invoke()
+                }
             }
+        },
+        enabled = shortcutEnabled,
+        modifier = modifier,
+    ) {
+        Icon(
+            painterResource(shortcut.iconRes),
+            stringResource(shortcut.labelRes),
+            Modifier.size(ComposerShortcutIconSize),
+            tint =
+                if (shortcut == ComposerShortcut.Dictation && !shortcutEnabled) {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = DISABLED_VOICE_OPACITY)
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+        )
     }
 }

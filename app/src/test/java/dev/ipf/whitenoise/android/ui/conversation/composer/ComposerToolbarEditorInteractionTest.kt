@@ -451,7 +451,7 @@ class ComposerToolbarEditorInteractionTest {
                             Modifier
                                 .size(48.dp)
                                 .testTag("partial.${shortcut.id}")
-                                .then(composerPreviewDragModifier(shortcut, edit, false)),
+                                .then(composerPreviewDragModifier(shortcut, edit)),
                         )
                     }
                 }
@@ -476,6 +476,7 @@ class ComposerToolbarEditorInteractionTest {
                 hasAnyAncestor(hasTestTag("composer.toolbar.preview")),
         )
 
+    /** Renders the editor and its save callbacks for the requested settings. */
     private fun render(
         edit: ComposerToolbarEditState,
         save: (ComposerToolbarSettings, (Boolean) -> Unit) -> Unit,

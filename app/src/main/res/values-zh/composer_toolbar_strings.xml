@@ -8,8 +8,6 @@
     <string name="composer_side_right">右侧</string>
     <string name="composer_layout_automatic">自动</string>
     <string name="composer_layout_expanded">始终展开</string>
-    <string name="composer_selected">已选快捷操作</string>
-    <string name="composer_available">可用操作</string>
     <string name="composer_move_earlier">向前移动</string>
     <string name="composer_move_later">向后移动</string>
     <string name="composer_add">添加快捷操作</string>

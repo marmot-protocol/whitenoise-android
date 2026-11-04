@@ -508,6 +508,7 @@ class ComposerToolbarProductionTest {
         }
     }
 
+    /** Renders the actual app-state-backed composer with the requested shortcut capabilities. */
     @Suppress("LongMethod") // Keeps the app-state-backed renderer and its callback instrumentation together.
     private fun render(
         settings: ComposerToolbarSettings,
@@ -577,6 +578,7 @@ class ComposerToolbarProductionTest {
         composeRule.waitForIdle()
     }
 
+    /** Counts invocations of one optional attachment action. */
     private fun recordExtra(id: String) {
         extraCalls[id] = (extraCalls[id] ?: 0) + 1
     }

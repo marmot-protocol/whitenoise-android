@@ -21,7 +21,6 @@ import dev.ipf.whitenoise.android.state.ComposerShortcut
 internal fun composerPreviewDragModifier(
     shortcut: ComposerShortcut,
     state: ComposerToolbarEditState,
-    @Suppress("UNUSED_PARAMETER") saving: Boolean,
 ): Modifier {
     val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     DisposableEffect(state, shortcut) { onDispose { state.forget(shortcut) } }

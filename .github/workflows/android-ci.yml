@@ -223,7 +223,12 @@ jobs:
       - name: Verify generated performance profiles
         run: |
           bash .github/scripts/test-verify-generated-profiles.sh
+          bash .github/scripts/test-verify-baseline-profile.sh
+          python3 -m unittest scripts/test_merge_baseline_profiles.py
           bash scripts/verify-generated-profiles.sh
+
+      - name: Test Robolectric jar prefetch
+        run: bash .github/scripts/test-prefetch-robolectric-android-all.sh
 
       - name: Test Android CI aggregate gate
         run: python3 -m unittest scripts/test_android_ci_gate.py scripts/test_unit_test_diagnostics.py scripts/test_verify_compose_release_apk.py
@@ -389,7 +394,10 @@ jobs:
             | if length == 1 then .[0].outputFile else empty end
           ' "$metadata")
           app_apk="$(dirname "$metadata")/$output_file"
-          bash scripts/verify-baseline-profile.sh "$app_apk"
+          # Macrobenchmarks measure this variant, so it must carry the app's
+          # generated profile and not just the library rules.
+          merged=app/build/intermediates/merged_art_profile/devZapstoreBenchmarkRelease/mergeDevZapstoreBenchmarkReleaseArtProfile/baseline-prof.txt
+          bash scripts/verify-baseline-profile.sh "$app_apk" "$merged"
           printf 'apk=%s\n' "$app_apk" >> "$GITHUB_OUTPUT"
 
       # benchmarkRelease is unminified D8 output. Its budget warns when a benchmarked
@@ -915,6 +923,13 @@ jobs:
           path: ${{ runner.temp }}/marmotkit-cache
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
 
+      # Robolectric downloads these inside the test JVMs without retrying; fetch them first.
+      # It took 8 s on a hosted runner; the cap keeps a slow mirror from eating the test budget.
+      - name: Prefetch Robolectric Android jars
+        timeout-minutes: 5
+        shell: bash
+        run: ./scripts/prefetch-robolectric-android-all.sh
+
       - name: Unit tests
         timeout-minutes: 30
         id: unit_tests
@@ -1096,6 +1111,13 @@ jobs:
         with:
           path: ${{ runner.temp }}/marmotkit-cache
           key: marmotkit-${{ runner.os }}-${{ steps.marmotkit.outputs.sha }}
+
+      # Robolectric downloads these inside the test JVMs without retrying; fetch them first.
+      # It took 8 s on a hosted runner; the cap keeps a slow mirror from eating the test budget.
+      - name: Prefetch Robolectric Android jars
+        timeout-minutes: 5
+        shell: bash
+        run: ./scripts/prefetch-robolectric-android-all.sh
 
       - name: Compile Play and run its flavor-sensitive unit tests
         shell: bash

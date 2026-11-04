@@ -148,6 +148,7 @@ class ComposerToolbarScreenshotTest {
             height = 180,
         )
 
+    /** Renders the requested toolbar state and records its actual screenshot baseline. */
     @Suppress("LongMethod", "LongParameterList") // One production render fixture varies only visible case inputs.
     private fun capture(
         name: String,
@@ -245,33 +246,7 @@ class ComposerToolbarScreenshotTest {
             composeRule.onNodeWithTag("composer.shortcut.camera").performTouchInput { longClick() }
         }
         if (editor || inline) assertEditorPreview(settings, height, width, fontScale)
-        if (name.startsWith("dense")) {
-            val ancestor =
-                if (editor) {
-                    hasAnyAncestor(hasTestTag("composer.toolbar.preview"))
-                } else {
-                    hasAnyAncestor(hasTestTag("toolbar.snapshot"))
-                }
-            val surface =
-                composeRule
-                    .onNode(hasTestTag(COMPOSER_PILL_SURFACE_TAG) and ancestor)
-                    .fetchSemanticsNode()
-                    .boundsInRoot
-            val centers =
-                settings.normalized().shortcuts.map { shortcut ->
-                    val bounds =
-                        composeRule
-                            .onNode(hasTestTag("composer.shortcut.${shortcut.id}") and ancestor)
-                            .fetchSemanticsNode()
-                            .boundsInRoot
-                    assertTrue(
-                        "$name ${shortcut.id} center outside $surface: $bounds",
-                        bounds.center.x >= surface.left && bounds.center.x <= surface.right,
-                    )
-                    shortcut.id to bounds.center
-                }
-            println("Dense toolbar actual centers $name surface=$surface slots=$centers")
-        }
+        assertDenseToolbarGeometry(name, settings, editor)
         composeRule.onNodeWithTag("toolbar.snapshot").captureRoboImage("src/test/snapshots/composer_toolbar_$name.png")
         if (probeVoice) {
             composeRule.onNode(hasSetTextAction()).performTextReplacement("")
@@ -279,6 +254,40 @@ class ComposerToolbarScreenshotTest {
             assertShortcutPositions("cleared")
             composeRule.onNodeWithTag("composer.voice.launcher").assertIsDisplayed()
         }
+    }
+
+    /** Checks visible dense-toolbar slot bounds and logs their actual rendered centers. */
+    private fun assertDenseToolbarGeometry(
+        name: String,
+        settings: ComposerToolbarSettings,
+        editor: Boolean,
+    ) {
+        if (!name.startsWith("dense")) return
+        val ancestor =
+            if (editor) {
+                hasAnyAncestor(hasTestTag("composer.toolbar.preview"))
+            } else {
+                hasAnyAncestor(hasTestTag("toolbar.snapshot"))
+            }
+        val surface =
+            composeRule
+                .onNode(hasTestTag(COMPOSER_PILL_SURFACE_TAG) and ancestor)
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val centers =
+            settings.normalized().shortcuts.map { shortcut ->
+                val bounds =
+                    composeRule
+                        .onNode(hasTestTag("composer.shortcut.${shortcut.id}") and ancestor)
+                        .fetchSemanticsNode()
+                        .boundsInRoot
+                assertTrue(
+                    "$name ${shortcut.id} center outside $surface: $bounds",
+                    bounds.center.x >= surface.left && bounds.center.x <= surface.right,
+                )
+                shortcut.id to bounds.center
+            }
+        println("Dense toolbar actual centers $name surface=$surface slots=$centers")
     }
 
     @Test fun denseSixLeftVoiceLive() = capture("dense_six_left_voice_live", denseVoice(6))
@@ -330,6 +339,7 @@ class ComposerToolbarScreenshotTest {
             ComposerToolbarLayout.AlwaysExpanded,
         )
 
+    /** Checks preview targets, scrolling and scaled labels against the rendered editor bounds. */
     private fun assertEditorPreview(
         settings: ComposerToolbarSettings,
         height: Int,

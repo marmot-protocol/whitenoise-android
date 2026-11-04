@@ -30,10 +30,14 @@ internal data class AnimationFrameInfo(
     val privateCanaryErrno: Int,
 )
 
+/** Checks sequence and canvas admission before sending the fixed frame primitives in a one-way Binder transaction. */
 internal fun writeAnimationFrame(
     callback: IBinder,
     frame: AnimationFrameInfo,
 ) {
+    // One-way Binder does not propagate a receiver's rejection back to the sender.
+    // Validate before even obtaining the Parcel; the receiver independently checks untrusted primitives.
+    require(frame.sequence > 0 && ViewerAnimationOutput.fromDimensions(frame.width, frame.height) != null)
     val parcel = Parcel.obtain()
     try {
         parcel.writeInterfaceToken(AnimationFrameProtocol.DESCRIPTOR)
@@ -51,6 +55,7 @@ internal fun writeAnimationFrame(
     }
 }
 
+/** Accepts only the exact frame primitive layout, bounded canvas, positive sequence, and boolean isolation flags. */
 internal fun readAnimationFrame(parcel: Parcel): AnimationFrameInfo {
     require(parcel.dataAvail() <= AnimationFrameProtocol.MAX_REPLY_BYTES)
     parcel.enforceInterface(AnimationFrameProtocol.DESCRIPTOR)
@@ -66,7 +71,7 @@ internal fun readAnimationFrame(parcel: Parcel): AnimationFrameInfo {
             value
         }
     val canary = parcel.readInt()
-    require(sequence > 0 && width in 1..AnimationFrameProtocol.MAX_EDGE && height in 1..AnimationFrameProtocol.MAX_EDGE)
+    require(sequence > 0 && ViewerAnimationOutput.fromDimensions(width, height) != null)
     require(parcel.dataAvail() == 0)
     return AnimationFrameInfo(session, sequence, width, height, flags[0] == 1, flags[1] == 1, flags[2] == 1, canary)
 }
@@ -85,6 +90,8 @@ internal fun writeAnimationStatus(
     callback: IBinder,
     status: AnimationStatusInfo,
 ) {
+    // A one-way callback cannot return the host's rejection of an unsupported status reason.
+    require(status.reason == AnimationFrameProtocol.CODEC_REJECTED)
     val parcel = Parcel.obtain()
     try {
         parcel.writeInterfaceToken(AnimationFrameProtocol.DESCRIPTOR)

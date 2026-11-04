@@ -190,6 +190,7 @@ class GroupSystemRetentionControllerTest {
             retentionExpiresAt = null,
             sticker = null,
             importedFrom = null,
+            historyImportProvenance = null,
         )
 
     private class TestDraftPersistence : DraftPersistence {

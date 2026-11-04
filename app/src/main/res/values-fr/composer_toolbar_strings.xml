@@ -8,8 +8,6 @@
     <string name="composer_side_right">Droite</string>
     <string name="composer_layout_automatic">Automatique</string>
     <string name="composer_layout_expanded">Toujours agrandi</string>
-    <string name="composer_selected">Raccourcis sélectionnés</string>
-    <string name="composer_available">Actions disponibles</string>
     <string name="composer_move_earlier">Déplacer plus tôt</string>
     <string name="composer_move_later">Déplacer plus tard</string>
     <string name="composer_add">Ajouter un raccourci</string>

@@ -55,7 +55,7 @@ class ComposerToolbarDictationTest {
 
     @Test fun shortNarrowActiveRowKeepsInputAndScrollableMandatoryOutcomes() = assertActiveControls(200, 100)
 
-    // Controller ownership, production render and geometry assertions form one case.
+    /** Checks that mandatory dictation outcomes remain reachable beside the configured toolbar. */
     @Suppress("LongMethod")
     private fun assertActiveControls(
         width: Int,

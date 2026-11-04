@@ -8,8 +8,6 @@
     <string name="composer_side_right">Rechts</string>
     <string name="composer_layout_automatic">Automatisch</string>
     <string name="composer_layout_expanded">Immer erweitert</string>
-    <string name="composer_selected">Ausgewählte Schnellaktionen</string>
-    <string name="composer_available">Verfügbare Aktionen</string>
     <string name="composer_move_earlier">Nach vorn verschieben</string>
     <string name="composer_move_later">Nach hinten verschieben</string>
     <string name="composer_add">Schnellaktion hinzufügen</string>

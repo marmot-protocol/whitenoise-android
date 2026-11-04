@@ -8,8 +8,6 @@
     <string name="composer_side_right">Справа</string>
     <string name="composer_layout_automatic">Автоматически</string>
     <string name="composer_layout_expanded">Всегда развёрнуто</string>
-    <string name="composer_selected">Выбранные быстрые действия</string>
-    <string name="composer_available">Доступные действия</string>
     <string name="composer_move_earlier">Переместить раньше</string>
     <string name="composer_move_later">Переместить позже</string>
     <string name="composer_add">Добавить быстрое действие</string>

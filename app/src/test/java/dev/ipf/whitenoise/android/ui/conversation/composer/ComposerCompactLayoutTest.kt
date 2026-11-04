@@ -92,6 +92,7 @@ class ComposerCompactLayoutTest {
 
     @Test fun leadingIconsHaveEvenSpacingWithoutIdentityRtl() = assertIconSpacing(LayoutDirection.Rtl, false)
 
+    /** Checks that visible leading action centers retain their spacing in either layout direction. */
     private fun assertIconSpacing(
         direction: LayoutDirection,
         identity: Boolean,

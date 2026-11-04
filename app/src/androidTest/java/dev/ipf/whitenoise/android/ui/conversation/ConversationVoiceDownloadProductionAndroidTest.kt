@@ -1277,6 +1277,7 @@ private fun instrumentedTimelineRecord(
         retentionExpiresAt = null,
         sticker = null,
         importedFrom = null,
+        historyImportProvenance = null,
     )
 }
 

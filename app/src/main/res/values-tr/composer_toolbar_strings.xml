@@ -8,8 +8,6 @@
     <string name="composer_side_right">Sağ</string>
     <string name="composer_layout_automatic">Otomatik</string>
     <string name="composer_layout_expanded">Her zaman genişletilmiş</string>
-    <string name="composer_selected">Seçili kısayollar</string>
-    <string name="composer_available">Kullanılabilir eylemler</string>
     <string name="composer_move_earlier">Öne taşı</string>
     <string name="composer_move_later">Arkaya taşı</string>
     <string name="composer_add">Kısayol ekle</string>

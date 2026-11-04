@@ -16,6 +16,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
@@ -28,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.StickyFormActionBar
 import dev.ipf.whitenoise.android.ui.settings.SettingsBottomAction
 import org.junit.Assert.assertEquals
@@ -47,6 +50,101 @@ import org.robolectric.annotation.GraphicsMode
 class FloatingDictationBottomObstacleCoverageTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    /** Releases an outgoing route obstacle while retaining its visible transition layout. */
+    @Test
+    fun retainedOutgoingAnchorReleasesObstacleOnOwnershipChange() {
+        val anchor = FloatingDictationAnchor()
+        val current = mutableStateOf(true)
+        var incomingTop = 0f
+        composeRule.setContent {
+            CompositionLocalProvider(LocalFloatingDictationAnchor provides anchor) {
+                Box(Modifier.size(240.dp, 420.dp)) {
+                    CompositionLocalProvider(LocalControlHandoffEndpointCurrent provides current.value) {
+                        Box(
+                            Modifier
+                                .align(Alignment.BottomCenter)
+                                .size(240.dp, 160.dp)
+                                .testTag("retained.outgoing")
+                                .floatingDictationAnchor(),
+                        )
+                    }
+                    Box(
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .size(240.dp, 48.dp)
+                            .floatingDictationAnchor()
+                            .onPlaced { incomingTop = it.boundsInWindow().top },
+                    )
+                }
+            }
+        }
+        val outgoing = composeRule.onNodeWithTag("retained.outgoing")
+        val bounds = outgoing.fetchSemanticsNode().boundsInRoot
+        composeRule.runOnIdle { assertTrue(requireNotNull(anchor.topInWindow) < incomingTop) }
+        composeRule.runOnIdle { current.value = false }
+        outgoing.assertIsDisplayed()
+        assertEquals(bounds, outgoing.fetchSemanticsNode().boundsInRoot)
+        composeRule.runOnIdle { assertEquals(incomingTop, requireNotNull(anchor.topInWindow), 0.5f) }
+    }
+
+    /** Retires an outgoing footer clip and scroll owner without removing its rendered layout. */
+    @Test
+    fun retainedOutgoingFooterKeepsLayoutButReleasesScrollOwnership() {
+        val anchor = FloatingDictationAnchor()
+        val current = mutableStateOf(true)
+        var incomingTop = 0f
+        composeRule.setContent {
+            MaterialTheme {
+                CompositionLocalProvider(LocalFloatingDictationAnchor provides anchor) {
+                    Box(Modifier.size(240.dp, 100.dp)) {
+                        FloatingDictationLayout(
+                            anchor = anchor,
+                            content = {
+                                Box(Modifier.fillMaxSize()) {
+                                    CompositionLocalProvider(
+                                        LocalControlHandoffEndpointCurrent provides current.value,
+                                    ) {
+                                        SettingsBottomAction(
+                                            Modifier.align(Alignment.BottomCenter).testTag("retained.footer"),
+                                        ) {
+                                            repeat(3) { index ->
+                                                Button(onClick = {}, modifier = Modifier.height(48.dp)) {
+                                                    Text("Retained action $index")
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Box(
+                                        Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .size(240.dp, 8.dp)
+                                            .floatingDictationAnchor()
+                                            .onPlaced { incomingTop = it.boundsInWindow().top },
+                                    )
+                                }
+                            },
+                            control = { Box(Modifier.size(168.dp, 48.dp)) },
+                        )
+                    }
+                }
+            }
+        }
+        val footer = composeRule.onNodeWithTag("retained.footer")
+        val bounds = footer.fetchSemanticsNode().boundsInRoot
+        composeRule.runOnIdle {
+            assertTrue(anchor.scrollingCapsule != null)
+            assertTrue(anchor.scrollingState != null)
+            current.value = false
+        }
+        footer.assertIsDisplayed()
+        assertEquals(bounds, footer.fetchSemanticsNode().boundsInRoot)
+        composeRule.runOnIdle {
+            assertEquals(incomingTop, requireNotNull(anchor.topInWindow), 0.5f)
+            assertNull(anchor.scrollingCapsule)
+            assertNull(anchor.scrollingState)
+        }
+    }
 
     /** A tall/wrapped footer keeps its actual actions below the real measured capsule. */
     @Test

@@ -105,7 +105,7 @@ internal fun ComposerToolbarPreview(
                     enabled = false,
                     scrollEnabled = editState?.dragging == null,
                     slotModifier = { shortcut ->
-                        if (editState != null) composerPreviewDragModifier(shortcut, editState, saving) else Modifier
+                        if (editState != null) composerPreviewDragModifier(shortcut, editState) else Modifier
                     },
                 ),
             compactMeasurementWidth = maxWidth,

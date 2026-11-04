@@ -21,6 +21,8 @@ internal object MediaDecodePolicy {
     const val RETIRE = 9
     const val REGION = 10
     const val DEBUG_BAD_REPLY = 11
+    const val VIEWER_SVG_INSPECT = 15
+    const val VIEWER_SVG_REGION = 16
     const val DEBUG_REPLY_KINDS = 4
     const val DEBUG_CANARY = 12
     const val DEBUG_IGNORE_RETIRE = 13

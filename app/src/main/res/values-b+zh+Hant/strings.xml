@@ -2515,4 +2515,10 @@
     <string name="appearance_text_heading">文字與語言</string>
     <string name="appearance_conversation_heading">聊天</string>
     <string name="appearance_preview_intro">試用大字體和由右至左的版面。</string>
+    <string name="media_viewer_toggle_controls">顯示或隱藏控制項</string>
+    <string name="media_viewer_zoom_image">放大</string>
+    <string name="media_viewer_zoom_out">縮小</string>
+    <string name="media_viewer_actual_size">實際大小（1:1）</string>
+    <string name="media_viewer_fit_image">適應圖片</string>
+    <string name="media_viewer_image_scale">縮放 %1$d%%</string>
 </resources>

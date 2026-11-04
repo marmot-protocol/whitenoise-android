@@ -52,6 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Rect
@@ -78,6 +79,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -95,9 +97,12 @@ import dev.ipf.whitenoise.android.core.graphemeBoundaryAtOrBefore
 import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
 import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
 import dev.ipf.whitenoise.android.state.ComposerShortcut
+import dev.ipf.whitenoise.android.state.ComposerShortcutSide
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
+import dev.ipf.whitenoise.android.ui.common.LocalFinishControlMorph
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.conversation.CompactViableComposerHeight
 import dev.ipf.whitenoise.android.ui.conversation.composerMultilineControlsSuppressed
@@ -105,6 +110,8 @@ import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.resolveAutomaticComposerCeiling
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Delete
+import dev.ipf.whitenoise.android.ui.navigation.composerFabContent
+import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -116,6 +123,8 @@ private val ComposerManualChromeHeight = 72.dp
 private val ComposerManualCompactChromeHeight = 36.dp
 
 // The resting single-line row: 12 dp above and below the line, plus the 12 dp outer padding.
+internal val ComposerOuterVerticalPadding = 6.dp
+internal val ComposerRestingPillMinimumHeight = 48.dp
 private val ComposerAutomaticEmptyChromeHeight = 36.dp
 
 /** How close to an endpoint a release still counts as landing on it rather than resting free. */
@@ -123,7 +132,7 @@ private val ComposerSettleDeadband = 24.dp
 
 /** Measures the same body text line spacing used by the composer editor at the current font scale. */
 @Composable
-private fun rememberComposerEditorLineHeight(): Dp {
+internal fun rememberComposerEditorLineHeight(): Dp {
     val density = LocalDensity.current
     val style = MaterialTheme.typography.bodyLarge
     val measurer = rememberTextMeasurer()
@@ -525,6 +534,13 @@ internal fun ComposerBar(
     // reserved chrome because their parent already constrains the bottom bar.
     topInteractionClearance: Dp = 0.dp,
 ) {
+    var lastMeasuredHeight by remember { mutableStateOf(0) }
+    val routeDensity = LocalDensity.current
+    if (!LocalControlHandoffEndpointCurrent.current) {
+        // Retain only layout, never an outgoing input connection, focus target or action callback.
+        Box(modifier.fillMaxWidth().height(with(routeDensity) { lastMeasuredHeight.toDp() }))
+        return
+    }
     val actionColors = accountActionColors(appState)
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
@@ -970,8 +986,18 @@ internal fun ComposerBar(
         if (active != null && active.inputGeneration != textState.contentGeneration) sendMotion.clear()
     }
     var attachmentSendInFlight by remember(draftKey) { mutableStateOf(false) }
+
+    /** Rechecks dictation ownership and pending completion before ordinary Send. */
+    fun originDictationRequiresCompletion(): Boolean =
+        dictationAccountRef != null &&
+            dictationGroupIdHex != null &&
+            dictationController?.isOwnedBy(dictationAccountRef, dictationGroupIdHex) == true &&
+            dictationController.completionControlsRequired
+
+    val finishControlMorph = LocalFinishControlMorph.current
     val submitMessage: () -> Unit = submit@{
-        if (toolbarEdit != null) return@submit
+        if (toolbarEdit != null || originDictationRequiresCompletion()) return@submit
+        finishControlMorph()
         // An IME can commit text and request Send before the next composition.
         // Eligibility and submission must use the same live editor content.
         val acceptanceToken = textState.acceptanceToken()
@@ -1079,7 +1105,7 @@ internal fun ComposerBar(
     LaunchedEffect(showEmojiPane) {
         if (!showEmojiPane) customInputPaneHeightPx = 0f
     }
-    BoxWithConstraints(modifier.fillMaxWidth()) {
+    BoxWithConstraints(modifier.fillMaxWidth().onSizeChanged { lastMeasuredHeight = it.height }) {
         val statusBarTop = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
         val appliesImePadding =
             composerBottomClusterAppliesImePadding(
@@ -1258,7 +1284,7 @@ internal fun ComposerBar(
                                     size.height,
                                     automaticComposerHeightPx.toInt().coerceAtLeast(0),
                                 )
-                            }.padding(horizontal = 16.dp, vertical = 6.dp),
+                            }.padding(horizontal = 16.dp, vertical = ComposerOuterVerticalPadding),
                     fillEditorHeight = composerExpansion.mode != ComposerExpansionMode.Automatic,
                     minimumEditorHeight = with(density) { minimumManualComposerHeightPx.toDp() } - 12.dp,
                 ) {
@@ -1383,7 +1409,7 @@ internal fun ComposerBar(
                         }
                     if (openQuery != null) {
                         MentionPicker(
-                            modifier = Modifier.layoutId(COMPOSER_SUGGESTIONS_SLOT),
+                            modifier = Modifier.layoutId(COMPOSER_SUGGESTIONS_SLOT).floatingDictationAnchor(),
                             candidates = mentionMatches,
                             onPick = { candidate ->
                                 val insertion = MentionComposer.insertMention(textFieldValue.text, openQuery, candidate)
@@ -1415,12 +1441,14 @@ internal fun ComposerBar(
                     val showDictationRecovery =
                         dictationOwnedByComposer && dictationController?.recoveryHandedToComposer == true
                     if (showDictationRecovery) {
-                        ConversationDictationRecoveryStatus(
-                            checkNotNull(dictationController).composerAccess(
-                                checkNotNull(dictationAccountRef),
-                                checkNotNull(dictationGroupIdHex),
-                            ),
-                        )
+                        Box(Modifier.floatingDictationAnchor()) {
+                            ConversationDictationRecoveryStatus(
+                                checkNotNull(dictationController).composerAccess(
+                                    checkNotNull(dictationAccountRef),
+                                    checkNotNull(dictationGroupIdHex),
+                                ),
+                            )
+                        }
                     }
                     val activeRecordingController = voiceRecordingController?.takeIf { it.isRecording }
                     val isRecordingVoice = activeRecordingController != null
@@ -1507,6 +1535,24 @@ internal fun ComposerBar(
                             !customizationOpen
                     val configuredVoiceUsesSlot =
                         configuredToolbar && showMicButton && voiceSelected && voiceRecordingController?.locked != true
+                    val lockedVoiceAtStart =
+                        showMicButton &&
+                            voiceRecordingController.locked &&
+                            voiceSelected &&
+                            renderedToolbar.first.side(ComposerShortcut.VoiceNote) ==
+                            if (layoutDirection == LayoutDirection.Rtl) {
+                                ComposerShortcutSide.Right
+                            } else {
+                                ComposerShortcutSide.Left
+                            }
+                    val recordingActionAlignment =
+                        if (lockedVoiceAtStart) {
+                            remember {
+                                ComposerActionRowAlignment(Alignment.Start) { editingProgressSource?.value ?: 0f }
+                            }
+                        } else {
+                            trailingActionAlignment
+                        }
                     val toolbarRuntime = appState?.runtimeGeneration
                     // Receiving draft content does not acquire a recording or send transaction.
                     val canReceiveComposerContent: () -> Boolean = {
@@ -1524,6 +1570,7 @@ internal fun ComposerBar(
                             !attachmentSendInFlight
                     }
 
+                    /** Rechecks toolbar availability when a retained attachment callback is invoked. */
                     fun guardedAttachmentAction(action: () -> Unit): () -> Unit = { if (canActivateToolbar()) action() }
                     val beginCustomization: (() -> Unit)? =
                         toolbarPreference?.let { preference ->
@@ -1564,8 +1611,11 @@ internal fun ComposerBar(
                             // Typing must not move the neighboring shortcuts when Send becomes visible.
                             actionTargetWidth
                         }
+                    val ordinarySendAlpha = if (originDictationRequiresCompletion()) 0.38f else 1f
                     val primaryActionEnabled =
-                        !customizationOpen && (!showMicButton || text.isNotBlank() || hasPendingAttachments)
+                        !customizationOpen &&
+                            !originDictationRequiresCompletion() &&
+                            (!showMicButton || text.isNotBlank() || hasPendingAttachments)
                     val trailingControlsWidth = primaryTrailingActionWidth
                     BoxWithConstraints(
                         modifier =
@@ -1622,9 +1672,19 @@ internal fun ComposerBar(
                                                 Modifier
                                                     .matchParentSize()
                                                     .padding(
+                                                        start =
+                                                            if (lockedVoiceAtStart) {
+                                                                trailingControlsWidth + 4.dp
+                                                            } else {
+                                                                0.dp
+                                                            },
                                                         end =
-                                                            primaryTrailingActionWidth +
-                                                                if (expandedControlLayout) 4.dp else 12.dp,
+                                                            if (lockedVoiceAtStart) {
+                                                                0.dp
+                                                            } else {
+                                                                trailingControlsWidth +
+                                                                    if (expandedControlLayout) 4.dp else 12.dp
+                                                            },
                                                     ).pointerInput(recordingController) {
                                                         awaitPointerEventScope {
                                                             while (true) {
@@ -1649,12 +1709,14 @@ internal fun ComposerBar(
                                 onComposerFocusChanged(focused)
                             },
                             onValueChange = { value ->
+                                finishControlMorph()
                                 if (!isRecordingVoice && voiceReviewClip == null && toolbarEdit == null) {
                                     val applied = repairComposerMentionEdit(textFieldValue, value, mentionPickerEnabled)
                                     applyComposerFieldValue(applied)
                                 }
                             },
                             onEmojiPickerToggle = {
+                                finishControlMorph()
                                 if (composerEmojiPickerRequested) {
                                     showKeyboardFromEmojiPane()
                                 } else {
@@ -1662,6 +1724,7 @@ internal fun ComposerBar(
                                 }
                             },
                             onAttachmentsToggle = {
+                                finishControlMorph()
                                 if (attachmentSheetState.isOpen) {
                                     attachmentSheetState.dismiss()
                                 } else {
@@ -1903,7 +1966,7 @@ internal fun ComposerBar(
                             horizontalArrangement = Arrangement.spacedBy(0.dp),
                             modifier =
                                 Modifier
-                                    .align(trailingActionAlignment)
+                                    .align(recordingActionAlignment)
                                     .onSizeChanged { primaryActionSize = it }
                                     .absoluteOffset {
                                         val target =
@@ -1914,7 +1977,7 @@ internal fun ComposerBar(
                                             }
                                         if (configuredVoiceUsesSlot && showConfiguredMic && target != null) {
                                             val original =
-                                                trailingActionAlignment.align(
+                                                recordingActionAlignment.align(
                                                     primaryActionSize,
                                                     toolbarParentSize,
                                                     layoutDirection,
@@ -1930,7 +1993,7 @@ internal fun ComposerBar(
                                         // The configured Mic overlays an exact slot in either layout direction.
                                         // A second end gutter would shift its child away from that slot in RTL.
                                         reserveEndInset = !(configuredVoiceUsesSlot && showConfiguredMic),
-                                    ),
+                                    ).composerFabContent(),
                         ) {
                             // This call site stays shared by idle and recording states;
                             // moving it would break the active hold gesture's identity.
@@ -1980,6 +2043,7 @@ internal fun ComposerBar(
                                     contentColor = actionColors.content,
                                     description = stringResource(R.string.send),
                                     icon = R.drawable.ic_arrow_upward,
+                                    modifier = Modifier.alpha(alpha = ordinarySendAlpha),
                                 )
                             }
                         }

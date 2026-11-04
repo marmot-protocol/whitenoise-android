@@ -63,13 +63,16 @@ internal data class ComposerToolbarSettings(
         return copy(shortcuts = remaining.toMutableList().apply { add(index.coerceIn(0, size), shortcut) }).normalized()
     }
 
+    /** Returns the shortcut's persisted physical side without applying layout direction. */
     fun side(shortcut: ComposerShortcut): ComposerShortcutSide {
         val isRight = shortcut in rightShortcuts
         return if (isRight) ComposerShortcutSide.Right else ComposerShortcutSide.Left
     }
 
+    /** Keeps saved shortcut order while selecting one physical side. */
     fun onSide(side: ComposerShortcutSide): List<ComposerShortcut> = shortcuts.filter { this.side(it) == side }
 
+    /** Changes a shortcut's physical side without changing its saved order. */
     fun withSide(
         shortcut: ComposerShortcut,
         side: ComposerShortcutSide,
@@ -79,6 +82,7 @@ internal data class ComposerToolbarSettings(
                 if (side == ComposerShortcutSide.Right) rightShortcuts + shortcut else rightShortcuts - shortcut,
         )
 
+    /** Inserts a shortcut at a bounded position among its destination-side siblings. */
     fun insertOnSide(
         shortcut: ComposerShortcut,
         side: ComposerShortcutSide,

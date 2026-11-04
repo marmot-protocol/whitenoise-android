@@ -2721,8 +2721,6 @@
     <string name="composer_layout">Layout</string>
     <string name="composer_layout_automatic">Automatic</string>
     <string name="composer_layout_expanded">Always expanded</string>
-    <string name="composer_selected">Selected shortcuts</string>
-    <string name="composer_available">Available actions</string>
     <string name="composer_move_earlier">Move earlier</string>
     <string name="composer_move_later">Move later</string>
     <string name="composer_add">Add shortcut</string>
@@ -2735,4 +2733,10 @@
     <string name="appearance_text_heading">Text &amp; language</string>
     <string name="appearance_conversation_heading">Conversation</string>
     <string name="appearance_preview_intro">Try larger text and right-to-left layout.</string>
+    <string name="media_viewer_fit_image">Fit image</string>
+    <string name="media_viewer_zoom_image">Zoom in</string>
+    <string name="media_viewer_image_scale">%1$d%% zoom</string>
+    <string name="media_viewer_actual_size">Actual size (1:1)</string>
+    <string name="media_viewer_zoom_out">Zoom out</string>
+    <string name="media_viewer_toggle_controls">Show or hide controls</string>
 </resources>

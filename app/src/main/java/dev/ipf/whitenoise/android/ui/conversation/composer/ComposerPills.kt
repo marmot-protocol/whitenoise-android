@@ -18,7 +18,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.content.MediaType
 import androidx.compose.foundation.content.ReceiveContentListener
 import androidx.compose.foundation.content.TransferableContent
@@ -81,6 +80,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.input.key.Key
@@ -150,6 +150,12 @@ import dev.ipf.whitenoise.android.ui.conversation.media.receiveContentImageUriOr
 import dev.ipf.whitenoise.android.ui.conversation.media.safeGetType
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Send
 import dev.ipf.whitenoise.android.ui.icons.filled.Key
+import dev.ipf.whitenoise.android.ui.navigation.ComposerFabEndpoint
+import dev.ipf.whitenoise.android.ui.navigation.LocalComposerFabHandoff
+import dev.ipf.whitenoise.android.ui.navigation.composerFabContent
+import dev.ipf.whitenoise.android.ui.navigation.composerFabGrip
+import dev.ipf.whitenoise.android.ui.navigation.composerFabSurface
+import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
@@ -722,12 +728,21 @@ internal fun ComposerPill(
                     .toDp()
             } * 6,
         )
+    // Recording replaces the hidden toolbar, but retains its idle row floor. The strip separately
+    // reserves the full live Stop/Cancel width. Group allocation and hidden row counts use the same
+    // idle width so neither the fit threshold nor wrapping can add height for invisible shortcuts.
+    val toolbarGeometryPrimaryWidth =
+        if (recordingContent != null && toolbar != null) {
+            minOf(primaryTrailingWidth, ComposerShortcutPitch + 4.dp)
+        } else {
+            primaryTrailingWidth
+        }
     val toolbarSeparateRow =
         toolbar?.let {
             composerToolbarRequiresSeparateRow(
                 navigationSurfaceWidth.value,
                 it.shortcuts.size,
-                (primaryTrailingWidth + minimumDictationWidth).value,
+                (toolbarGeometryPrimaryWidth + minimumDictationWidth).value,
                 compactMinimumTextWidth.value,
                 it.settings.layout,
             )
@@ -748,8 +763,10 @@ internal fun ComposerPill(
             bindings.copy(shortcuts = bindings.shortcuts.filter { bindings.settings.side(it) != physicalStart })
         }
     val groupRoom =
-        (navigationSurfaceWidth - primaryTrailingWidth - minimumDictationWidth - ComposerToolbarGutter)
+        (navigationSurfaceWidth - toolbarGeometryPrimaryWidth - minimumDictationWidth - ComposerToolbarGutter)
             .coerceAtLeast(ComposerShortcutPitch)
+    val defaultFocusOnLeadingToolbar =
+        leadingToolbar?.shortcuts?.any { it != ComposerShortcut.VoiceNote } == true
     val leadingCount = leadingToolbar?.shortcuts?.size ?: 0
     val trailingCount = trailingToolbar?.shortcuts?.size ?: 0
     val expandedLeadingWidth =
@@ -772,7 +789,7 @@ internal fun ComposerPill(
                 composerToolbarCompactWidth(
                     navigationSurfaceWidth.value,
                     trailingCount,
-                    (primaryTrailingWidth + minimumDictationWidth + ComposerShortcutPitch * leadingCount).value,
+                    (toolbarGeometryPrimaryWidth + minimumDictationWidth + ComposerShortcutPitch * leadingCount).value,
                     compactMinimumTextWidth.value,
                 ).dp
             else -> ComposerShortcutPitch * trailingCount
@@ -787,7 +804,7 @@ internal fun ComposerPill(
                         navigationSurfaceWidth.value,
                         leadingCount,
                         (
-                            primaryTrailingWidth + minimumDictationWidth + rightConfiguredWidth +
+                            toolbarGeometryPrimaryWidth + minimumDictationWidth + rightConfiguredWidth +
                                 if (sendAccessoryContent != null) 66.dp else 0.dp
                         ).value + 4f,
                         compactMinimumTextWidth.value,
@@ -800,7 +817,7 @@ internal fun ComposerPill(
     val compactEditorStartInset =
         leadingControlsWidth
     val navigationRoom =
-        navigationSurfaceWidth - leadingControlsWidth - rightConfiguredWidth - primaryTrailingWidth -
+        navigationSurfaceWidth - leadingControlsWidth - rightConfiguredWidth - toolbarGeometryPrimaryWidth -
             minimumDictationWidth - (if (sendAccessoryContent != null) 66.dp else 0.dp)
     // Navigation uses only leftover room after the dictation minimum; reserving it cannot reduce
     // the capped dictation width. Keep this measurement independent of navigation admission.
@@ -811,17 +828,18 @@ internal fun ComposerPill(
             if (configuredActionsSuppressed) {
                 val textRoom =
                     (
-                        navigationSurfaceWidth - leadingControlsWidth - rightConfiguredWidth - primaryTrailingWidth -
+                        navigationSurfaceWidth - leadingControlsWidth - rightConfiguredWidth -
+                            toolbarGeometryPrimaryWidth -
                             ComposerShortcutTarget - 4.dp
                     ).coerceAtLeast(0.dp)
                 val editorReserve = minOf(ComposerMinimumTextWidth * density.fontScale.coerceAtLeast(1f), textRoom)
                 (
                     navigationSurfaceWidth - leadingControlsWidth - rightConfiguredWidth -
-                        primaryTrailingWidth - editorReserve - 4.dp
+                        toolbarGeometryPrimaryWidth - editorReserve - 4.dp
                 ).coerceAtLeast(0.dp)
             } else {
                 val optionalMinimum = if (toolbar != null) ComposerShortcutTarget else leadingControlsWidth
-                (navigationSurfaceWidth - optionalMinimum - primaryTrailingWidth).coerceAtLeast(0.dp)
+                (navigationSurfaceWidth - optionalMinimum - toolbarGeometryPrimaryWidth).coerceAtLeast(0.dp)
             }
         } ?: DICTATION_ACTIVE_ACTIONS_WIDTH
     val targetDictationControlWidth =
@@ -1340,18 +1358,27 @@ internal fun ComposerPill(
             sendMotion?.sourceBottomRadius = with(density) { 24.dp.toPx() }
             sendMotion?.sourceStrokeWidth = with(density) { ComposerOutlineThickness.toPx() }
         }
+        val morphing = LocalComposerFabHandoff.current?.active == true
         Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            shape = RoundedCornerShape(24.dp),
-            border = BorderStroke(ComposerOutlineThickness, MaterialTheme.colorScheme.outlineVariant),
+            color = if (morphing) Color.Transparent else sourceFill,
+            // Custom clipping owns motion; settled chrome remains the original Material surface.
+            shape = if (morphing) RectangleShape else RoundedCornerShape(24.dp),
+            border = if (morphing) null else BorderStroke(ComposerOutlineThickness, sourceBorder),
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .then(expandedHeightModifier)
                     .testTag(COMPOSER_PILL_SURFACE_TAG)
-                    .onGloballyPositioned { sendMotion?.sourceSurface = it },
+                    .floatingDictationAnchor(followsComposerFab = true)
+                    .composerFabSurface(
+                        ComposerFabEndpoint.Composer,
+                        MaterialTheme.colorScheme.surfaceContainerHigh,
+                        MaterialTheme.colorScheme.outlineVariant,
+                        radiusDp = 24f,
+                        morphing = morphing,
+                    ).onGloballyPositioned { sendMotion?.sourceSurface = it },
         ) {
-            Box {
+            Box(Modifier.composerFabContent()) {
                 // Keep resize semantics inside the surface; an underlying sibling is pruned by Android.
                 if (inputContentVisible) {
                     Box(
@@ -1387,11 +1414,12 @@ internal fun ComposerPill(
                             accessoryContent()
                         }
                     }
+                    val minimumPillHeight = if (voiceReviewContent == null) ComposerRestingPillMinimumHeight else 96.dp
                     Box(
                         modifier =
                             Modifier
                                 .weight(1f, fill = expansionMode != ComposerExpansionMode.Automatic)
-                                .heightIn(min = if (voiceReviewContent == null) 48.dp else 96.dp)
+                                .heightIn(min = minimumPillHeight)
                                 .then(expandedHeightModifier),
                     ) {
                         Box(
@@ -1737,7 +1765,7 @@ internal fun ComposerPill(
                                         toolbarWidth,
                                         toolbarHeight,
                                         singleRowOverflow = multilineControlsSuppressed,
-                                        defaultFocus = defaultActionFocus,
+                                        defaultFocus = defaultActionFocus.takeIf { defaultFocusOnLeadingToolbar },
                                     ) { shortcut, slotModifier ->
                                         ComposerConfiguredAction(
                                             shortcut = shortcut,
@@ -1897,6 +1925,7 @@ internal fun ComposerPill(
                                     rightConfiguredWidth,
                                     toolbarHeight,
                                     singleRowOverflow = multilineControlsSuppressed,
+                                    defaultFocus = defaultActionFocus.takeUnless { defaultFocusOnLeadingToolbar },
                                 ) { shortcut, slotModifier ->
                                     ComposerConfiguredAction(
                                         shortcut = shortcut,
@@ -2056,6 +2085,7 @@ private fun ComposerResizeGestureStrip(modifier: Modifier = Modifier) {
                 // Center the grip on the border stroke, rather than inside the editor's top inset.
                 .offset(y = (ComposerOutlineThickness - ComposerResizeHandleThickness) / 2)
                 .size(width = ComposerResizeHandleWidth, height = ComposerResizeHandleThickness)
+                .composerFabGrip()
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.outlineVariant)
                 .testTag(COMPOSER_RESIZE_HANDLE_TAG),

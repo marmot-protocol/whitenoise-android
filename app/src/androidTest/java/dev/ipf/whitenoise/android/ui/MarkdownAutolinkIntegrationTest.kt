@@ -121,5 +121,6 @@ class MarkdownAutolinkIntegrationTest {
         invalidationStatus = null,
         sticker = null,
         importedFrom = null,
+        historyImportProvenance = null,
     )
 }

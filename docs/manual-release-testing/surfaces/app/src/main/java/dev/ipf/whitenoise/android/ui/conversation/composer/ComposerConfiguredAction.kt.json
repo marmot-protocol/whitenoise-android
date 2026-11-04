@@ -12,6 +12,25 @@
           "CON-042",
           "CON-040"
         ]
+      },
+      {
+        "surface": "ComposerOptionalShortcutAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerConfiguredAction.kt",
+        "anchor": "fun ComposerOptionalShortcutAction(",
+        "test_ids": [
+          "CON-040",
+          "CON-041"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:voice_message_record",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerConfiguredAction.kt",
+        "anchor": "R.string.voice_message_record",
+        "test_ids": [
+          "CON-040"
+        ]
       }
     ]
   },

@@ -162,12 +162,14 @@ class ComposerToolbarPreferencesTest {
             }
         }
 
+    /** Fails one selected durable write while retaining the real preference editor. */
     private fun failOnCommit(
         actual: SharedPreferences,
         failAt: Int,
     ): SharedPreferences {
         var commits = 0
         return object : SharedPreferences by actual {
+            /** Wraps a real edit so its selected commit can report failure. */
             override fun edit(): SharedPreferences.Editor {
                 val editor = actual.edit()
                 return object : SharedPreferences.Editor by editor {
@@ -179,6 +181,7 @@ class ComposerToolbarPreferencesTest {
                         return this
                     }
 
+                    /** Commits the real values and reports failure only for the configured write. */
                     override fun commit(): Boolean {
                         val committed = editor.commit()
                         commits++
@@ -189,6 +192,7 @@ class ComposerToolbarPreferencesTest {
         }
     }
 
+    /** Returns an isolated preference file for one persistence scenario. */
     private fun preferences(name: String): SharedPreferences =
         ApplicationProvider
             .getApplicationContext<Context>()

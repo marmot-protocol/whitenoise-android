@@ -2555,4 +2555,10 @@
     <string name="appearance_text_heading">Texto e idioma</string>
     <string name="appearance_conversation_heading">Conversa</string>
     <string name="appearance_preview_intro">Experimente texto maior e uma disposição da direita para a esquerda.</string>
+    <string name="media_viewer_fit_image">Ajustar imagem à tela</string>
+    <string name="media_viewer_zoom_image">Aumentar zoom</string>
+    <string name="media_viewer_image_scale">Zoom de %1$d%%</string>
+    <string name="media_viewer_actual_size">Tamanho real (1:1)</string>
+    <string name="media_viewer_zoom_out">Diminuir zoom</string>
+    <string name="media_viewer_toggle_controls">Mostrar ou ocultar controles</string>
 </resources>

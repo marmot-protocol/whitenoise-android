@@ -8,8 +8,6 @@
     <string name="composer_side_right">Derecha</string>
     <string name="composer_layout_automatic">Automática</string>
     <string name="composer_layout_expanded">Siempre expandido</string>
-    <string name="composer_selected">Accesos directos seleccionados</string>
-    <string name="composer_available">Acciones disponibles</string>
     <string name="composer_move_earlier">Mover antes</string>
     <string name="composer_move_later">Mover después</string>
     <string name="composer_add">Añadir acceso directo</string>

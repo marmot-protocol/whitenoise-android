@@ -23,6 +23,7 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
@@ -40,6 +41,9 @@ import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.audio.VoiceRecordingResult
 import dev.ipf.whitenoise.android.audio.VoiceRecordingSession
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.state.ComposerShortcut
+import dev.ipf.whitenoise.android.state.ComposerShortcutSide
+import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.share.testAccount
@@ -68,7 +72,9 @@ private typealias ToolbarListener = ConversationDictationRecognitionListener
 class ComposerToolbarSpacingScreenshotTest {
     @get:Rule val composeRule = createComposeRule()
 
-    /** The default two-account composer at 360dp places Message between physical side groups. */
+    private lateinit var transitionVoice: VoiceRecordingController
+
+    /** The default two-account composer at 360dp places Message above the physical side groups. */
     @Test fun empty360() = render(ToolbarCase("empty360", 360))
 
     /** At320dp compact visual slots retain usable expanded touch targets. */
@@ -112,6 +118,38 @@ class ComposerToolbarSpacingScreenshotTest {
                 locked = true,
             ),
         )
+
+    /** Locking retains an inline composer and the configured physical voice edge in either direction. */
+    @Test fun lockedSingleLtrLeft() = recordingTransition("single_ltr_left", false, ComposerShortcutSide.Left)
+
+    /** A right-side voice launcher keeps locked controls on the right in LTR. */
+    @Test fun lockedSingleLtrRight() = recordingTransition("single_ltr_right", false, ComposerShortcutSide.Right)
+
+    /** A left-side voice launcher keeps locked controls on the left in RTL. */
+    @Test fun lockedSingleRtlLeft() = recordingTransition("single_rtl_left", true, ComposerShortcutSide.Left)
+
+    /** A right-side voice launcher keeps locked controls on the right in RTL. */
+    @Test fun lockedSingleRtlRight() = recordingTransition("single_rtl_right", true, ComposerShortcutSide.Right)
+
+    /** An already wrapped two-account composer retains its row floor when locking. */
+    @Test fun lockedTwoAccountsKeepRows() = render(ToolbarCase("two_accounts_transition", 360, transition = true))
+
+    /** Hidden toolbar rows cannot add lock height when the two-account surface is narrow. */
+    @Test fun lockedNarrowTwoAccountsKeepRows() {
+        render(ToolbarCase("narrow_two_accounts_transition", 320, transition = true))
+    }
+
+    /** The same row floor survives large RTL type; existing label truncation is separately reviewed. */
+    @Test fun lockedNarrowRtlLargeKeepRows() {
+        render(ToolbarCase("narrow_rtl_large_transition", 320, rtl = true, fontScale = 2f, transition = true))
+    }
+
+    /** Uses the real recording controller to verify the idle, active and locked geometry sequence. */
+    private fun recordingTransition(
+        name: String,
+        rtl: Boolean,
+        side: ComposerShortcutSide,
+    ) = render(ToolbarCase(name, 360, rtl = rtl, accounts = 1, voiceSide = side, transition = true))
 
     /** Compact discs keep 48dp touch targets, and clicks at or just past each visual edge reach only that disc. */
     @Test
@@ -164,10 +202,22 @@ class ComposerToolbarSpacingScreenshotTest {
         val draft: String = "",
         val accounts: Int = 2,
         val locked: Boolean = false,
+        val voiceSide: ComposerShortcutSide? = null,
+        val transition: Boolean = false,
     )
 
     /** Renders the toolbar for the case, asserts its slot geometry and records the Roborazzi baseline. */
     private fun render(case: ToolbarCase) {
+        case.voiceSide?.let { side ->
+            ApplicationProvider
+                .getApplicationContext<Context>()
+                .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+                .edit()
+                .putString(
+                    "composer_toolbar_v1",
+                    ComposerToolbarSettings().withSide(ComposerShortcut.VoiceNote, side).encode(),
+                ).commit()
+        }
         val alice = testAccount("alice", "aa".repeat(32))
         val bob = testAccount("bob", "bb".repeat(32))
         val state =
@@ -181,7 +231,7 @@ class ComposerToolbarSpacingScreenshotTest {
         composeRule
             .onNodeWithTag("toolbar-spacing")
             .captureRoboImage("src/test/snapshots/composer_toolbar_spacing_${case.name}.png")
-        assertToolbarGeometry(case)
+        if (case.transition) assertRecordingTransition(case) else assertToolbarGeometry(case)
     }
 
     /** Builds the voice and dictation controllers, locking the recording when asked, and hosts the toolbar. */
@@ -197,6 +247,7 @@ class ComposerToolbarSpacingScreenshotTest {
                 createVoice(context, scope)
             }
         LaunchedEffect(voice) {
+            transitionVoice = voice
             if (case.locked) {
                 check(voice.start())
                 voice.lock()
@@ -221,6 +272,36 @@ class ComposerToolbarSpacingScreenshotTest {
                 )
             }
         toolbarSurface(case, state, dictation, voice)
+    }
+
+    /** Locking reserves mandatory controls without counting the hidden idle toolbar a second time. */
+    private fun assertRecordingTransition(case: ToolbarCase) {
+        val root = composeRule.onNodeWithTag("toolbar-spacing")
+        val idle = root.fetchSemanticsNode().boundsInRoot
+        val voice = bounds("Hold to record voice message")
+        composeRule.runOnIdle { check(transitionVoice.start()) }
+        composeRule.waitForIdle()
+        root.captureRoboImage("src/test/snapshots/composer_toolbar_spacing_${case.name}_recording.png")
+        assertEquals("recording keeps idle height", idle.height, root.fetchSemanticsNode().boundsInRoot.height, 1f)
+        composeRule.runOnIdle { transitionVoice.lock() }
+        composeRule.waitForIdle()
+        root.captureRoboImage("src/test/snapshots/composer_toolbar_spacing_${case.name}_locked.png")
+        val locked = root.fetchSemanticsNode().boundsInRoot
+        val cancel = bounds("Cancel voice message")
+        val stop = bounds("Stop recording")
+        assertEquals("lock keeps idle height", idle.height, locked.height, 1f)
+        assertTrue("locked controls do not overlap", cancel.right <= stop.left || stop.right <= cancel.left)
+        listOf(cancel, stop).forEach { target ->
+            assertTrue("locked controls remain inside", target.left >= locked.left && target.right <= locked.right)
+        }
+        val physicalLeft = case.voiceSide == ComposerShortcutSide.Left
+        if (case.voiceSide != null) {
+            val controlsCenter = (minOf(cancel.left, stop.left) + maxOf(cancel.right, stop.right)) / 2f
+            assertEquals("launcher uses configured side", physicalLeft, voice.center.x < idle.center.x)
+            assertEquals("locked controls retain voice side", physicalLeft, controlsCenter < locked.center.x)
+        }
+        composeRule.onNodeWithContentDescription("Cancel voice message").performClick()
+        composeRule.runOnIdle { assertTrue("cancel stops recording", !transitionVoice.isRecording) }
     }
 
     /** Builds a voice controller backed by a no-op recorder session and unconfined dispatchers. */
@@ -324,16 +405,34 @@ class ComposerToolbarSpacingScreenshotTest {
                 }
             assertDistinctFootprints(all, labels)
             if (case.width == 360 && case.fontScale == 1f && case.draft.isEmpty()) {
-                assertTrue("physical left actions precede the field", left.all { it.right <= editor.left + 1f })
-                assertTrue(
-                    "physical right actions follow the field",
-                    (right + primary).all { it.left >= editor.right - 1f },
-                )
-                assertTrue(
-                    "single-line controls align with Message",
-                    all.all { kotlin.math.abs(it.center.y - editor.center.y) < 8f },
-                )
+                assertDefaultFieldPlacement(case, left, right + primary, editor)
             }
+        }
+    }
+
+    /** Defaults retain inline spacing when they fit, otherwise the editor sits above separated side groups. */
+    private fun assertDefaultFieldPlacement(
+        case: ToolbarCase,
+        left: List<androidx.compose.ui.geometry.Rect>,
+        right: List<androidx.compose.ui.geometry.Rect>,
+        editor: androidx.compose.ui.geometry.Rect,
+    ) {
+        if (case.accounts == 1) {
+            assertTrue("physical left actions precede the field", left.all { it.right <= editor.left + 1f })
+            assertTrue("physical right actions follow the field", right.all { it.left >= editor.right - 1f })
+            assertTrue(
+                "single-line controls align with Message",
+                (left + right).all { kotlin.math.abs(it.center.y - editor.center.y) < 8f },
+            )
+        } else {
+            assertTrue(
+                "wrapped controls stay below the editor",
+                (left + right).all { it.top >= editor.bottom - 1f },
+            )
+            assertTrue(
+                "physical side groups stay separated below the editor",
+                left.maxOf { it.right } <= right.minOf { it.left } + 1f,
+            )
         }
     }
 

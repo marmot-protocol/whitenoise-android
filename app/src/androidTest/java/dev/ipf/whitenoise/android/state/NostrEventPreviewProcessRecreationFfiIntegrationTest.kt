@@ -357,4 +357,5 @@ private fun message(
     retentionExpiresAt = null,
     sticker = null,
     importedFrom = null,
+    historyImportProvenance = null,
 )

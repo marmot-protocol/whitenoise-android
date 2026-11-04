@@ -565,6 +565,7 @@ class MessageBubbleLongPressDragTest {
                 retentionExpiresAt = null,
                 sticker = null,
                 importedFrom = null,
+                historyImportProvenance = null,
             )
         return TimelineMessage(
             id = "msg:${record.messageIdHex}",
