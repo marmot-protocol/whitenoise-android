@@ -102,11 +102,14 @@ class ChatsScreenUnreadReadLifetimeTest {
         assertEquals(2, model.snapshotReads)
     }
 
-    /** The production list activates its temporary filter only after a deliberate top pull is released. */
+    /** A released top pull opens the prepared filter, including off-window unread, without a new read. */
     @Test fun mountedChatsTopPullActivatesOnReleaseAndIncludesOffWindowUnread() {
         val model = OffWindowActionFixture(scope).also { fixture = it }
         model.state.swipePreferences.setPullUnread(true)
         mount(model)
+        awaitProgress { model.snapshotReads >= 1 }
+        settle()
+        val preparedReads = model.snapshotReads
         val row = rule.onNodeWithTag("chat.row.$ACTION_SURVIVOR")
         awaitProgress { row.fetchSemanticsNode().config.contains(SemanticsActions.OnLongClick) }
         val distance = with(rule.density) { 100.dp.toPx() }
@@ -115,11 +118,12 @@ class ChatsScreenUnreadReadLifetimeTest {
             moveTo(Offset(width * 0.6f, 10f + distance), 120)
         }
         rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
-        assertEquals(0, model.snapshotReads)
         row.performTouchInput { up() }
-        awaitProgress { model.snapshotReads == 1 }
+        rule.waitForIdle()
         rule.onNodeWithText(rule.activity.getString(R.string.pull_unread_filtered)).assertExists()
         rule.onNodeWithTag("chat.row.$ACTION_TARGET").assertExists()
+        rule.onNodeWithTag("chats.unread_refresh").assertDoesNotExist()
+        assertEquals(preparedReads, model.snapshotReads)
         assertTrue("pulling must not issue a read, pin, archive or mute command", model.calls.isEmpty())
         rule.onNodeWithTag("chats.unread_surface").performTouchInput {
             down(Offset(width * 0.6f, height * 0.3f))
@@ -149,11 +153,10 @@ class ChatsScreenUnreadReadLifetimeTest {
         pull()
         settle()
         rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
-        assertEquals(0, model.snapshotReads)
         rule.runOnIdle { model.state.swipePreferences.setPullUnread(true) }
         rule.waitForIdle()
         pull()
-        awaitProgress { model.snapshotReads == 1 }
+        settle()
         rule.onNodeWithTag("chats.unread_filter").assertExists()
         surface.performUnreadFilterAction(rule)
         rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
@@ -171,7 +174,7 @@ class ChatsScreenUnreadReadLifetimeTest {
         rule.runOnIdle { model.state.swipePreferences.setPullUnread(true) }
         rule.waitForIdle()
         pull()
-        awaitProgress { model.snapshotReads > readsBeforeCancelledPull }
+        settle()
         rule.onNodeWithTag("chats.unread_filter").assertExists()
         rule.onNodeWithTag("chat.row.$ACTION_TARGET").assertExists()
         assertTrue(model.calls.isEmpty())
@@ -295,8 +298,10 @@ class ChatsScreenUnreadReadLifetimeTest {
     /** Each production dismissal path restores read pinned predecessors above the surviving unread row. */
     @Test fun mountedUnreadPillDismissalRestoresPinnedHead() = assertPinnedHeadRestored(Exit.Pill)
 
+    /** A second pull dismisses the filter and restores the read pinned predecessor. */
     @Test fun mountedUnreadSecondPullRestoresPinnedHead() = assertPinnedHeadRestored(Exit.Pull)
 
+    /** The accessible toggle dismisses the filter and restores the read pinned predecessor. */
     @Test fun mountedUnreadAccessibilityDismissalRestoresPinnedHead() = assertPinnedHeadRestored(Exit.Accessibility)
 
     private fun assertPinnedHeadRestored(exit: Exit) {
@@ -308,7 +313,7 @@ class ChatsScreenUnreadReadLifetimeTest {
         mount(model)
         val listId = rule.onNodeWithTag("chats.list").fetchSemanticsNode().id
         rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(rule)
-        awaitProgress { model.snapshotReads == 1 }
+        awaitProgress { model.snapshotReads >= 1 }
         val row = rule.onNodeWithTag("chat.row.$ACTION_TARGET")
         awaitProgress { row.fetchSemanticsNode().config.contains(SemanticsActions.OnLongClick) }
         when (exit) {

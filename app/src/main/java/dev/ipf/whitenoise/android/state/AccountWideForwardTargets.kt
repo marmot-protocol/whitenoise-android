@@ -13,6 +13,8 @@ import java.util.Locale
 //
 // A profile's groups in common and its Add to Groups and Promote pickers read the same snapshot (#2983),
 // held for as long as that profile surface is open.
+//
+// The mounted chat list keeps one current too, so its unread filter opens complete on the first frame (#3586).
 
 /**
  * Every eligible forward target MDK presents for the bound account that the retained window does not
