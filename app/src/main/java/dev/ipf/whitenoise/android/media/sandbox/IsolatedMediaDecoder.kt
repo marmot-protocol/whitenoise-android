@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Looper
 import android.os.Process
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
 
 /** All production still-image codec calls enter the permissionless service, never a local fallback. */
 @Suppress("TooManyFunctions") // One process-owned facade for the complete platform codec boundary.
@@ -89,6 +90,15 @@ internal object IsolatedMediaDecoder {
     /** Retires [domain]'s still-image worker, such as a draft that was sent or emptied. */
     fun retireDomain(domain: dev.ipf.whitenoise.android.media.MediaTrustDomain) {
         transport?.retireDomain(domain)
+    }
+
+    /**
+     * The [domains] whose next still-image decode needs no worker to start first. A lane that does not start
+     * workers on demand, or no lane at all, has nothing to wait for, so every domain is reported.
+     */
+    fun servableNow(domains: List<MediaTrustDomain>): Set<MediaTrustDomain> {
+        val readiness = transport as? MediaWorkerReadiness ?: return domains.toSet()
+        return readiness.servableNow(domains)
     }
 
     fun decode(

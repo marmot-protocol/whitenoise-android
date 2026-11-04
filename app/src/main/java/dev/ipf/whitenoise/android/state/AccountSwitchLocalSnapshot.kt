@@ -208,8 +208,14 @@ internal data class AccountSwitchPreloadPlan(
      * deliberately skips the heavier member/direct-peer projections (#2155).
      */
     val includeTopBarProfileSeeds: Boolean,
+    /**
+     * Whether first-frame avatars wait for decoder workers that must start first. A quick switch does not: the
+     * switch resets every worker, and a new one can take longer than the whole avatar budget to start (#3496).
+     */
+    val awaitColdAvatarWorkers: Boolean = true,
 )
 
+/** What a switch to another account reads before publication, chosen by its [preloadPolicy]. */
 internal fun accountSwitchPreloadPlan(
     switchingAccounts: Boolean,
     activationStillWanted: Boolean,
@@ -237,6 +243,7 @@ internal fun accountSwitchPreloadPlan(
         includeTopBarProfileSeeds =
             includePresentationSeeds ||
                 (loadLocalRows && preloadPolicy == AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS),
+        awaitColdAvatarWorkers = preloadPolicy != AccountSwitchPreloadPolicy.INTERACTIVE_LOCAL_ROWS,
     )
 }
 

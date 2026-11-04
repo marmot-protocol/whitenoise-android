@@ -40,6 +40,25 @@ class MediaWorkerDomainTest {
         }
     }
 
+    /**
+     * Only a domain that owns a connected generation is servable now, and a single-use input never is (#3496): each
+     * one waits for a fresh generation, so a caller that will not wait for a worker to start skips it.
+     */
+    @Test
+    fun servableNowReportsOnlyDomainsWithAConnectedGeneration() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), validReplyAt = { true })
+        val transport = domainLane(context)
+        try {
+            assertEquals(emptySet<MediaTrustDomain>(), transport.servableNow(listOf(A, B, MediaTrustDomain.Unique)))
+            finish(decodeIn(transport, 1, A))
+            assertEquals(setOf(A), transport.servableNow(listOf(A, B, MediaTrustDomain.Unique)))
+        } finally {
+            context.dieAll()
+            transport.close()
+        }
+        assertEquals(emptySet<MediaTrustDomain>(), transport.servableNow(listOf(A)))
+    }
+
     /** A domain's later inputs reuse its generation, and no input of another domain ever reaches it. */
     @Test
     fun domainGenerationServesOnlyItsOwnDomain() {

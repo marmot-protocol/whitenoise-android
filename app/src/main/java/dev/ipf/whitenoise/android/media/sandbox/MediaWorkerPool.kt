@@ -230,6 +230,26 @@ internal class MediaWorkerPool(
         idle?.let(::retire)
     }
 
+    /**
+     * The [domains] a claim could take now without starting, evicting or waiting for a generation's death: each one
+     * that owns a connected generation, then others in order while clean spares last. It never changes the pool, so
+     * a caller can skip work rather than wait for a worker to start; a later claim may still find the pool changed.
+     */
+    fun servableNow(domains: List<Any>): Set<Any> =
+        synchronized(lock) {
+            if (closed) return@synchronized emptySet()
+            val ready = LinkedHashSet<Any>()
+            domains.filterTo(ready) { domain ->
+                generations.any { it.domain == domain && it.linked && !it.retiring && it.dead.count != 0L }
+            }
+            var spares = generations.count(MediaWorker::clean)
+            for (domain in domains) {
+                if (spares == 0) break
+                if (ready.add(domain)) spares--
+            }
+            ready
+        }
+
     private fun retireIfIdle(
         worker: MediaWorker,
         stamp: Int,
