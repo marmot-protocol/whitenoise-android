@@ -90,7 +90,7 @@ class ChatsScreenSelectionActionsCoverageTest {
                 .replace(Regex("\\s+"), " ")
         assertTrue(
             "fixed scope captured before launch",
-            "PendingChatListBatch(selectedChatIds.toList(), command, owner)" in source,
+            "PendingChatListBatch( selectedChatIds.toList(), command, owner," in source.replace(Regex("\\s+"), " "),
         )
         assertTrue(
             "screen lifetime guards admission",

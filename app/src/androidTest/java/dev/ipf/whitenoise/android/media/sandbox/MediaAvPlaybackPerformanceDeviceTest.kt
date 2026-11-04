@@ -123,13 +123,16 @@ class MediaAvPlaybackPerformanceDeviceTest {
         val operations = JSONArray()
         val row =
             JSONObject()
-                .put("schema", "media_av_paced_performance_v1")
+                .put("schema", "media_av_paced_performance_v2")
                 .put("input", input.name)
                 .put("input_sha256", input.sha)
                 .put("input_bytes", input.bytes)
                 .put("iteration", iteration)
                 .put("operation", if (controls) "controls" else "startup_eos")
                 .put("fresh_player", true)
+                .put("playback_owner", "IsolatedAttachmentPlayer")
+                .put("preparation_mode", "attachment_autoplay_optional_probe_not_requested")
+                .put("request_order", "play_then_prepare")
                 .put("cold_app_process", false)
                 .put("cold_filesystem_cache", false)
                 .put("paced", true)
@@ -174,20 +177,20 @@ class MediaAvPlaybackPerformanceDeviceTest {
             }
             row.put("prepare_play_request_ns", SystemClock.elapsedRealtimeNanos())
             sample(player, calls, "prepare_play") { live ->
-                live.prepare()
                 live.play()
+                live.prepare()
             }
             row.put("prepare_play_return_ns", SystemClock.elapsedRealtimeNanos())
             await(player, failure, calls, probe, "initial_progress") {
                 it.currentPosition > 20 || it.playbackState == Player.STATE_ENDED
             }
             row.put("first_media_progress_observed_ns", SystemClock.elapsedRealtimeNanos())
-            val preparation = requireNotNull(IsolatedMediaDecoder.lastAvIsolation)
-            check(preparation !== previousPreparation && preparation.isolated && preparation.uid != Process.myUid())
-            check(!preparation.internetGranted && !preparation.runtimeInitialized && preparation.privateCanaryDenied)
+            // This production attachment owner requested raw-header playback, not an automatic poster worker.
+            check(IsolatedMediaDecoder.lastAvIsolation === previousPreparation)
             row
-                .put("preparation_authenticated_uid", preparation.uid)
-                .put("preparation_identity_scope", "automatic_completed_receipt_UID_requires_external_lifetime_trace")
+                .put("preparation_authenticated_uid", JSONObject.NULL)
+                .put("preparation_identity_scope", "not_requested_attachment_autoplay_raw_header")
+                .put("optional_preparation_receipt_unchanged", true)
             if (controls) {
                 controlSeries(player, failure, calls, operations, probe, input.video)
             } else {

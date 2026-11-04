@@ -46,7 +46,8 @@ class AttachmentMediaContainmentCoverageTest {
         val installation = facade.functionBody("install")
         assertTrue(
             "Automatic media must use the native isolated service",
-            "MediaAvDecodeService::class.java" in installation,
+            "Intent(context, MediaAvDecodeService::class.java)" in
+                source("media/sandbox/IsolatedAutomaticAvTransport.kt").readText().functionBody("connect"),
         )
         assertTrue(
             "Automatic media must reuse its process lifetime owner across account sessions",

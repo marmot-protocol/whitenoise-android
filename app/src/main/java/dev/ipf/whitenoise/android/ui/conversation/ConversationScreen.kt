@@ -4104,6 +4104,7 @@ internal fun ConversationScreen(
                                             documentUris = pendingDocumentUris,
                                             enabled = !attachmentSendClaim.isHeld,
                                             prepared = mediaDraftState.preparedPreviews(),
+                                            preparing = mediaDraftState.isPreparing,
                                             onPreview = { if (!attachmentSendClaim.isHeld) mediaPreviewIndex = it },
                                             onRemoveMedia = { slot ->
                                                 if (!attachmentSendClaim.isHeld) {

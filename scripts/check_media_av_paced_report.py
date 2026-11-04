@@ -67,6 +67,32 @@ def validate_controls(row, video_required, ready_by_activation):
         last_completion = completion
 
 
+
+def validate_preparation(row):
+    """Bind absence of an optional probe to the actual attachment autoplay owner; raw authentication stays required."""
+    schema = row.get('schema')
+    fields = ('playback_owner', 'preparation_mode', 'request_order', 'optional_preparation_receipt_unchanged')
+    if schema == 'media_av_paced_performance_v2' or any(field in row for field in fields):
+        expected = {'schema': 'media_av_paced_performance_v2',
+                    'playback_owner': 'IsolatedAttachmentPlayer',
+                    'preparation_mode': 'attachment_autoplay_optional_probe_not_requested',
+                    'request_order': 'play_then_prepare',
+                    'preparation_identity_scope': 'not_requested_attachment_autoplay_raw_header',
+                    'optional_preparation_receipt_unchanged': True}
+        if (any(row.get(k) != value for k, value in expected.items()) or
+                row.get('optional_preparation_receipt_unchanged') is not True):
+            raise ValueError('invalid attachment autoplay preparation binding')
+        if 'preparation_authenticated_uid' not in row or row['preparation_authenticated_uid'] is not None:
+            raise ValueError('unrequested preparation cannot claim an authenticated UID')
+    else:
+        # Historical prepare-then-play rows retain their completed automatic-worker receipt requirement.
+        if schema not in (None, 'media_av_paced_performance_v1'):
+            raise ValueError('unknown paced observation schema')
+        uid = row.get('preparation_authenticated_uid')
+        if type(uid) is not int or uid <= 0 or uid == row['caller_uid']:
+            raise ValueError('authenticated preparation worker UID absent')
+
+
 def validate(records):
     """Reject missing phases, overflow, malformed clocks/generations and fabricated unsupported presentation."""
     if len(records) != 33 or records[-1].get('record_type') != 'completion':
@@ -76,6 +102,9 @@ def validate(records):
         complete.get('resume_observations'), complete.get('seek_observations'),
         complete.get('failed_rows')) != (32, 30, 20, 20, 0):
         raise ValueError('incomplete campaign counts')
+    schemas = {row.get('schema') for row in records[:-1]}
+    if 'media_av_paced_performance_v2' in schemas and schemas != {'media_av_paced_performance_v2'}:
+        raise ValueError('mixed legacy and attachment autoplay campaign')
     keys = set()
     for row in records[:-1]:
         key = row.get('input'), row.get('operation'), row.get('iteration')
@@ -92,13 +121,14 @@ def validate(records):
             raise ValueError('unreviewed performance verdict')
         if not (row['start_ns'] <= row['prepare_play_request_ns'] <= row['prepare_play_return_ns'] <= row['end_ns']):
             raise ValueError('invalid campaign clock order')
-        if row.get('preparation_authenticated_uid', 0) <= 0 or row.get('preparation_authenticated_uid') == row['caller_uid']:
-            raise ValueError('authenticated preparation worker UID absent')
+        validate_preparation(row)
         if not row.get('workers'):
             raise ValueError('authenticated playback worker identity absent')
         activations = set()
         ready_by_activation = {}
         for activation, uid, pid, ready in row['workers']:
+            if any(type(value) is not int for value in (activation, uid, pid, ready)):
+                raise ValueError('malformed authenticated worker receipt')
             if uid <= 0 or pid <= 0 or uid == row['caller_uid'] or pid == row['caller_pid'] or not row['start_ns'] <= ready <= row['end_ns']:
                 raise ValueError('invalid authenticated worker receipt')
             activations.add(activation)

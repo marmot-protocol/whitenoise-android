@@ -84,7 +84,22 @@ Inline eligibility requires a visible row, a resumed lifecycle, focused window, 
 
 A startup timeout retains animation admission even before OPEN: an unconnected Android instance may still be starting. This favours the one-worker resource bound over automatic recovery from an unconfirmed startup. If Android never reports a connection or worker death, the animation lane can remain unavailable until app-process restart; the still-image lane remains independent.
 
-Received and picked video playback accepts local file/content inputs through the isolated decoder. Media3 supplies the existing player controls over a raw-output adapter. Voice playback shares the established voice focus owner; video has its own focus owner. Paused seeking uses an account-bound automatic poster request. Playback and transcription have distinct process-wide lanes, each retaining its resource and process retirement witness. Referenced Nostr-event networking retains its existing ExoPlayer owner and explicit loading policy; it remains outside local attachment containment.
+Received and picked video playback accepts local file/content inputs through the isolated decoder. Media3 supplies the existing player controls over a raw-output adapter. Voice playback shares the established voice focus owner; video has its own focus owner. Paused seeking uses an account-bound automatic poster request. Playback and transcription have distinct process-wide lanes, each retaining its resource and process retirement witness.
+
+An accepted playback or transcription binding that never connects retains its lane,
+even though OPEN was never sent. A binding exception also leaves creation uncertain.
+A Binder death or terminal binding callback before IDENTITY allows connection
+cleanup but cannot calibrate the worker PID or prove kernel absence, so it does
+not release the lane. A late connection can run retirement identification before
+requesting RETIRE; it cannot restore OPEN admission. Release still requires
+confirmed absence of that calibrated process, acknowledged unbind, settled
+caller/RPC/retirement work and closed parent resources. If no identity can be
+calibrated, the affected playback or transcription lane can remain unavailable
+until app-process restart; resetting an account or waiting out a deadline does
+not clear that hold. A definitive false bind or a failure before binding has no
+possible worker and follows the existing no-worker cleanup path.
+
+Referenced Nostr-event networking retains its existing ExoPlayer owner and explicit loading policy; it remains outside local attachment containment.
 
 ## Native audio/video policy
 

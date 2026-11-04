@@ -5,6 +5,7 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -15,9 +16,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -33,8 +35,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.disabled
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.ProseTextField
@@ -52,41 +52,46 @@ internal fun MediaPreviewSendBar(
     initialCaption: String,
     sending: Boolean,
     sendEnabled: Boolean,
+    preparing: Boolean = false,
     onSend: (String) -> Unit,
 ) {
     // Seeded from the composer draft so text typed before attaching carries
     // into the caption instead of silently waiting behind the send.
     var caption by rememberSaveable { mutableStateOf(initialCaption) }
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .imePadding()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        ProseTextField(
-            value = caption,
-            onValueChange = { caption = it },
-            modifier = Modifier.weight(1f),
-            placeholder = { Text(stringResource(R.string.add_caption)) },
-            maxLines = 4,
-            enabled = !sending,
-            colors = previewCaptionFieldColors(),
-        )
-        FloatingActionButton(
-            onClick = { if (sendEnabled) onSend(caption) },
-            modifier = Modifier.semantics { if (!sendEnabled) disabled() },
-            shape = CircleShape,
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
+    Column(Modifier.fillMaxWidth().imePadding()) {
+        if (preparing) AttachmentPreparationStatus()
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Icon(
-                painterResource(R.drawable.ic_arrow_upward),
-                contentDescription = stringResource(R.string.send),
-                modifier = Modifier.size(20.dp),
+            ProseTextField(
+                value = caption,
+                onValueChange = { caption = it },
+                modifier = Modifier.weight(1f),
+                placeholder = { Text(stringResource(R.string.add_caption)) },
+                maxLines = 4,
+                enabled = !sending,
+                colors = previewCaptionFieldColors(),
             )
+            FilledIconButton(
+                onClick = { onSend(caption) },
+                enabled = sendEnabled,
+                modifier = Modifier.size(56.dp),
+                shape = CircleShape,
+                colors =
+                    IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        disabledContainerColor = MaterialTheme.colorScheme.surface,
+                    ),
+            ) {
+                Icon(
+                    painterResource(R.drawable.ic_arrow_upward),
+                    contentDescription = stringResource(R.string.send),
+                    modifier = Modifier.size(20.dp),
+                )
+            }
         }
     }
 }

@@ -229,7 +229,12 @@ internal class RawAvPlaybackEngine(
                 }
                 preparationRequested = true
                 error = null
-                if (headerReady) {
+                if (videoNeedsStreamPreparation()) {
+                    // Explicit video opens its own authoritative raw header. Revoke optional-poster adoption,
+                    // but the old synchronous job retains its resources until finishProbe observes its return.
+                    prepareGeneration++
+                    finishPreparation(prepared)
+                } else if (headerReady) {
                     if (restart) status = if (playIntent) Status.Buffering else Status.Ready
                     prepared.set(null)
                     if (restart && !playIntent) restorePosterLocked()
@@ -241,6 +246,9 @@ internal class RawAvPlaybackEngine(
             }
             prepared
         }
+
+    /** Only explicit video playback can replace the optional poster with authoritative raw-stream preparation. */
+    private fun videoNeedsStreamPreparation(): Boolean = wantVideo && playIntent && !headerReady
 
     /**
      * Starts at most one preparation job, capturing its generation and exact completion promise.
@@ -335,7 +343,8 @@ internal class RawAvPlaybackEngine(
     }
 
     /**
-     * Marks header preparation complete and chooses Ready versus Buffering from current play intent.
+     * Admits prepared work and chooses Ready versus Buffering from current play intent.
+     * Explicit video can admit its raw stream before optional metadata; opened() supplies authoritative layout.
      * Caller holds the engine lock and has checked the exact preparation promise.
      */
     private fun finishPreparation(completion: SettableFuture<Void>) {

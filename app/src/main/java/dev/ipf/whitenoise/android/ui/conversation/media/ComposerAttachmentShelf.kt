@@ -133,6 +133,7 @@ internal fun ComposerAttachmentShelf(
     onRemoveMedia: (PendingMediaSlot) -> Unit,
     onRemoveDocument: (Int) -> Unit,
     enabled: Boolean = true,
+    preparing: Boolean = false,
 ) {
     val items = remember(mediaSlots, documentUris) { stagedPreviewItems(mediaSlots, documentUris) }
     val metadata = rememberPreviewMetadata(items)
@@ -168,6 +169,7 @@ internal fun ComposerAttachmentShelf(
                 )
             }
         }
+        if (preparing) AttachmentPreparationStatus()
         // The prototype only rules off the shelf once it carries visual media.
         if (hasVisual) AppDivider(Modifier.padding(horizontal = SHELF_DIVIDER_INSET))
     }

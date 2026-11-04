@@ -46,6 +46,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
 /** Stops one real ordinary WorkManager job, preserving native automatic demand and its received checkpoint. */
@@ -186,9 +187,8 @@ internal object PlatformInterruptedAttachmentProbe {
                 val stopDiagnostic = assertStopDiagnostics(beforeLogs, request)
                 assertFalse(store.isInteractive(request))
                 HeldAttachmentCancellationProbe.control(port, "/__interrupt-acquisition-held-resume")
-                step = "resumed-run"
-                awaitResumedRun(states, firstRun)
-                val runningAt = SystemClock.elapsedRealtime()
+                // Observe the held native retry before querying the current WorkSpec;
+                // asynchronous Flow delivery must not delay body release.
                 step = "resume-request"
                 observations.mark("resumed-acquisition-wait-start")
                 awaitResumedAcquisition(port, nativeStates, nativeObservationBeforeStop)
@@ -198,9 +198,22 @@ internal object PlatformInterruptedAttachmentProbe {
                 observations.mark("resumed-local-read-start")
                 assertNull("resumed partial ciphertext cannot be published", state.openNativeAttachment(request))
                 observations.mark("resumed-local-read-end")
+                step = "resumed-work-query"
+                val resumedWork = currentResumedWork(manager, firstRun)
+                // This is an actual bounded database snapshot, distinct from the asynchronous Flow observation.
+                states.add(resumedWork)
+                awaitResumedRun(states, firstRun)
+                val runningAt = SystemClock.elapsedRealtime()
+                val latest = nativeStates.toList().lastOrNull()
+                val observedDownloading = nativeDownloadingAfterStop(latest, nativeObservationBeforeStop)
+                check(observedDownloading) { "native resumed body is no longer downloading" }
+                check(currentResumedBodyHeld(HeldAttachmentCancellationProbe.ledger(port))) {
+                    "resumed acquisition is no longer held"
+                }
                 observations.mark("resumed-release-start")
                 HeldAttachmentCancellationProbe.control(port, "/__release-acquisition")
                 observations.mark("resumed-release-end")
+                step = "resumed-completion"
                 withTimeout(20_000L) {
                     while (states.none { it.id == firstRun.id && it.state == WorkInfo.State.SUCCEEDED }) delay(25L)
                 }
@@ -232,6 +245,7 @@ internal object PlatformInterruptedAttachmentProbe {
                         .put("worker_run_attempt", stopDiagnostic.second)
                         .put("resume_running_ms", runningAt - stoppedAt)
                         .put("resume_request_ms", requestedAt - runningAt)
+                        .put("resume_request_after_stop_ms", requestedAt - stoppedAt)
                         .put("native_observation_before_stop", nativeObservationBeforeStop)
                         .put("resume_phase_timings", observations.phaseDiagnostics())
                         .put("native_resume_states", nativeResumeDiagnostics(nativeStates))
@@ -278,12 +292,71 @@ internal object PlatformInterruptedAttachmentProbe {
                 "automatic native recovery ended as ${latest?.phase}"
             }
             val events = HeldAttachmentCancellationProbe.ledger(port)
-            val resumedBodyHeld =
-                events.any { it.getString("kind") == "held" && it.getLong("value") == 3L * 1024 * 1024 }
-            if (latest != null && latest.observationIndex > nativeObservationBeforeStop && resumedBodyHeld) {
+            val observedDownloading = nativeDownloadingAfterStop(latest, nativeObservationBeforeStop)
+            if (observedDownloading && currentResumedBodyHeld(events)) {
                 return@withTimeout
             }
             delay(25L)
+        }
+    }
+
+    /** Both admission checks require the same post-stop active native body phase. */
+    private fun nativeDownloadingAfterStop(
+        latest: NativeResumeSnapshot?,
+        beforeStop: Long,
+    ): Boolean =
+        latest != null &&
+            latest.observationIndex > beforeStop &&
+            latest.phase == AttachmentTransferStateFfi.DOWNLOADING
+
+    /** Confirm current execution of this exact one-time WorkSpec before releasing its held resumed body. */
+    private suspend fun currentResumedWork(
+        manager: WorkManager,
+        firstRun: WorkInfo,
+    ): WorkInfo {
+        val started = SystemClock.elapsedRealtime()
+        var queried: WorkInfo? = null
+        try {
+            queried =
+                withTimeout(1_500L) {
+                    withContext(Dispatchers.IO) {
+                        manager.getWorkInfoById(firstRun.id).get(1, TimeUnit.SECONDS)
+                    }
+                }
+        } finally {
+            ControlledAttachmentProbe.report(
+                JSONObject()
+                    .put("phase", "automatic-resume-work-query")
+                    .put("state", queried?.state?.name ?: "unavailable")
+                    .put("run_attempt", queried?.runAttemptCount ?: JSONObject.NULL)
+                    .put("initial_run_attempt", firstRun.runAttemptCount)
+                    .put("elapsed_ms", SystemClock.elapsedRealtime() - started),
+            )
+        }
+        val current = checkNotNull(queried) { "resumed WorkSpec missing" }
+        check(current.id == firstRun.id && current.state == WorkInfo.State.RUNNING) {
+            "same WorkSpec is not currently running"
+        }
+        // WorkManager2.12 increments this persisted count atomically with ENQUEUED -> RUNNING for one-time work.
+        check(current.runAttemptCount > firstRun.runAttemptCount) { "WorkSpec did not enter a new run" }
+        return current
+    }
+
+    /** Require the second acquisition's held body to remain live; a historical hold cannot admit release. */
+    private fun currentResumedBodyHeld(events: List<JSONObject>): Boolean {
+        val acquisitions = events.filter { it.getString("kind") == "get" }
+        check(acquisitions.size <= 2) { "unexpected extra acquisition before release" }
+        val resumedRequest = acquisitions.getOrNull(1)?.getLong("seq") ?: return false
+        val ended =
+            events.any {
+                it.getString("kind") in setOf("disconnect", "complete") &&
+                    it.getLong("request") == resumedRequest
+            }
+        check(!ended) { "resumed acquisition ended before fixture release" }
+        return events.any {
+            it.getString("kind") == "held" &&
+                it.getLong("request") == resumedRequest &&
+                it.getLong("value") == 3L * 1024 * 1024
         }
     }
 

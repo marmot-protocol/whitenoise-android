@@ -26,20 +26,13 @@ import java.util.concurrent.atomic.AtomicInteger
 internal class IsolatedAutomaticAvTransport(
     private val context: Context,
     private val instanceName: String = "automatic_av",
-    private val serviceClass: Class<out android.app.Service> = MediaAvDecodeService::class.java,
     private val processWitnessFactory: () -> KernelProcessWitness = ::KernelProcessWitness,
     private val refusalClock: () -> Long = android.os.SystemClock::elapsedRealtime,
 ) : MediaDecodeTransport,
     java.io.Closeable {
-    init {
-        require(serviceClass == MediaAvDecodeService::class.java)
-    }
-
     private val gate = Semaphore(1)
     private val bindingLock = Any()
-    private val ids = AtomicInteger()
     private val automaticIds = AtomicInteger()
-    private val automaticAv = serviceClass == MediaAvDecodeService::class.java
     private val parentResources = MediaParentResources()
     private var epoch = 0L
 
@@ -82,14 +75,9 @@ internal class IsolatedAutomaticAvTransport(
                 revokePending()
                 previous to retiringWorker
             }
-        if (automaticAv) {
-            try {
-                previous?.sources?.close()
-            } finally {
-                retiringWorker?.let(::retire)
-            }
-        } else {
+        try {
             previous?.sources?.close()
+        } finally {
             retiringWorker?.let(::retire)
         }
     }
@@ -114,7 +102,7 @@ internal class IsolatedAutomaticAvTransport(
      * release.
      */
     private fun sourceAccess(): MediaSourceAccess {
-        val access = MediaSourceAccess(context, if (automaticAv) parentResources else null)
+        val access = MediaSourceAccess(context, parentResources)
         return access
     }
 
@@ -123,7 +111,7 @@ internal class IsolatedAutomaticAvTransport(
         value: T,
         block: (T) -> R,
     ): R {
-        val owner = if (automaticAv) parentResources.own(value) else MediaParentResource(value)
+        val owner = parentResources.own(value)
         return owner.use { block(it.value) }
     }
 
@@ -150,20 +138,19 @@ internal class IsolatedAutomaticAvTransport(
                     response: android.os.Parcel?,
                     flags: Int,
                 ): Boolean {
-                    if (automaticAv && code == AutomaticAvIdentity.CALLBACK) {
+                    if (code == AutomaticAvIdentity.CALLBACK) {
                         return acceptIdentity(selected, data, response, flags)
                     }
-                    if (automaticAv) {
-                        val invalidReply = response == null || flags and IBinder.FLAG_ONEWAY != 0
-                        if (invalidReply ||
-                            !selected.processWitness.acceptsCaller(
-                                android.os.Binder.getCallingUid(),
-                                android.os.Binder.getCallingPid(),
-                            )
-                        ) {
-                            return false
-                        }
+                    val invalidReply = response == null || flags and IBinder.FLAG_ONEWAY != 0
+                    if (invalidReply ||
+                        !selected.processWitness.acceptsCaller(
+                            android.os.Binder.getCallingUid(),
+                            android.os.Binder.getCallingPid(),
+                        )
+                    ) {
+                        return false
                     }
+
                     if (code != IBinder.FIRST_CALL_TRANSACTION) return super.onTransact(code, data, response, flags)
                     if (pending !== reply || data.dataAvail() > MediaDecodePolicy.MAX_REPLY_BYTES) return false
                     val result =
@@ -181,9 +168,7 @@ internal class IsolatedAutomaticAvTransport(
                             pending = null // Revoke the capability before retirement or another callback.
                             result?.let { receipt ->
                                 IsolatedMediaDecoder.recordIsolation(receipt)
-                                if (serviceClass == MediaAvDecodeService::class.java) {
-                                    IsolatedMediaDecoder.recordAvIsolation(receipt)
-                                }
+                                IsolatedMediaDecoder.recordAvIsolation(receipt)
                             }
                             reply.ready.countDown()
                         }
@@ -311,21 +296,7 @@ internal class IsolatedAutomaticAvTransport(
     }
 
     /** Advance exact-generation cleanup only after its calls and retirement operation no longer own resources. */
-    private fun dispose(selected: Worker) {
-        if (automaticAv) {
-            disposeAutomatic(selected)
-            return
-        }
-        synchronized(bindingLock) {
-            if (selected.dead.count != 0L || !selected.bindComplete || selected.disposed) return
-            selected.disposed = true
-            if (worker === selected) worker = null
-        }
-        // A definitive false bind still registers a connection that must be released.
-        runCatching { context.unbindService(selected.connection) }
-        selected.binder?.let { binder -> runCatching { binder.unlinkToDeath(selected.deathRecipient, 0) } }
-        if (closed && callbackThread.isInitialized()) callbacks.quitSafely()
-    }
+    private fun dispose(selected: Worker) = disposeAutomatic(selected)
 
     /** Close the selected automatic source and unbind once, retaining admission until process absence is proven. */
     @Suppress("ReturnCount", "CyclomaticComplexMethod") // One atomic process/unbind/caller retirement decision.
@@ -374,86 +345,15 @@ internal class IsolatedAutomaticAvTransport(
         if (closed && retirementThread.isInitialized()) retirementExecutor.shutdown()
     }
 
-    /** Return bounded still pixels only if this selected service supports the requested decode operation. */
+    /** This lane accepts only A/V probes and waveforms; still images use their domain-bound transport. */
     override fun decode(
         bytes: ByteArray,
         edge: Int,
         oriented: Boolean,
         operation: Int,
-    ): Bitmap? =
-        serialized { ticket ->
-            val capacity = MediaDecodePolicy.outputCapacity(edge) ?: return@serialized null
-            SharedMemory.create("media-pixels", capacity).use { output ->
-                val spec = MediaDecodeRequest(edge, oriented, operation)
-                val result = request(ticket, bytes, spec, output) ?: return@serialized null
-                copyPixels(ticket, result, output, edge)
-            }
-        }
+    ): Bitmap? = null
 
-    /** Read orientation only through the selected isolated service; refusal produces no metadata fallback. */
-    override fun exif(bytes: ByteArray): Int? =
-        serialized { ticket ->
-            SharedMemory.create("media-exif", Int.SIZE_BYTES).use { output ->
-                val spec = MediaDecodeRequest(1, false, MediaDecodePolicy.EXIF)
-                request(ticket, bytes, spec, output)?.getInt("orientation")?.takeIf {
-                    it in
-                        1..MediaDecodePolicy.MAX_EXIF_ORIENTATION
-                }
-            }
-        }
-
-    /** Request a bounded selected-image region without exposing a general provider or network capability. */
-    override fun region(
-        bytes: ByteArray,
-        region: MediaImageRegion,
-        edge: Int,
-    ): Bitmap? =
-        serialized { ticket ->
-            val capacity = MediaDecodePolicy.outputCapacity(edge) ?: return@serialized null
-            SharedMemory.create("media-region", capacity).use { output ->
-                ticket.session.sources.withInput(bytes) { input ->
-                    val request = MediaDecodeRequest(edge, false, MediaDecodePolicy.REGION, region = region)
-                    exchange(ticket, input, output, request)
-                        ?.let { copyPixels(ticket, it, output, edge) }
-                }
-            }
-        }
-
-    /** Request bounded image inspection from the selected service and refuse unsupported replies. */
-    override fun inspect(bytes: ByteArray): ImageInspection? =
-        serialized { ticket ->
-            SharedMemory.create("media-inspection", Int.SIZE_BYTES).use { output ->
-                val spec = MediaDecodeRequest(1, false, MediaDecodePolicy.INSPECT)
-                val result = request(ticket, bytes, spec, output) ?: return@serialized null
-                val width = result.getInt("width")
-                val height = result.getInt("height")
-                if (width <= 0 || height <= 0) return@serialized null
-                ImageInspection(
-                    width,
-                    height,
-                    result.getString("mime").orEmpty().take(MediaDecodePolicy.MAX_MIME_CHARS),
-                    result.getInt("orientation"),
-                )
-            }
-        }
-
-    /** Borrow and register only the selected URI descriptor for the bounded isolated operation. */
-    override fun decodeUri(
-        resolver: android.content.ContentResolver,
-        uri: android.net.Uri,
-        edge: Int,
-    ): Bitmap? {
-        val selected = session ?: return null
-        return selected.sources.withUriInput(resolver, uri) { input ->
-            serialized(selected) { ticket ->
-                val capacity = MediaDecodePolicy.outputCapacity(edge) ?: return@serialized null
-                SharedMemory.create("media-pixels", capacity).use { output ->
-                    exchange(ticket, input, output, MediaDecodeRequest(edge, true, MediaDecodePolicy.DECODE))
-                        ?.let { copyPixels(ticket, it, output, edge) }
-                }
-            }
-        }
-    }
+    override fun inspect(bytes: ByteArray): ImageInspection? = null
 
     /** Probe one selected local file for bounded automatic metadata and an optional poster. */
     override fun probe(
@@ -492,16 +392,10 @@ internal class IsolatedAutomaticAvTransport(
         edge: Int,
     ): MediaProbe? {
         val selected = session ?: return null
-        return if (!automaticAv) {
+        return serialized(selected) { ticket ->
             selected.sources.withMediaUriInput(resolver, uri) { input ->
-                serialized(selected) { ticket -> probeInput(ticket, input, edge, true) }
-            }
-        } else {
-            serialized(selected) { ticket ->
-                selected.sources.withMediaUriInput(resolver, uri) { input ->
-                    ticket.deadline = android.os.SystemClock.elapsedRealtime() + MediaDecodePolicy.DEADLINE_MS
-                    probeInput(ticket, input, edge, true)
-                }
+                ticket.deadline = android.os.SystemClock.elapsedRealtime() + MediaDecodePolicy.DEADLINE_MS
+                probeInput(ticket, input, edge, true)
             }
         }
     }
@@ -514,18 +408,10 @@ internal class IsolatedAutomaticAvTransport(
         edge: Int,
     ): MediaProbe? {
         val selected = session?.takeIf { positionMs in 0..MAX_MEDIA_DURATION_MS } ?: return null
-        return if (!automaticAv) {
+        return serialized(selected) { ticket ->
             selected.sources.withMediaUriInput(resolver, uri) { input ->
-                serialized(selected) { ticket ->
-                    probeInput(ticket, input, edge, true, TimeUnit.MILLISECONDS.toMicros(positionMs))
-                }
-            }
-        } else {
-            serialized(selected) { ticket ->
-                selected.sources.withMediaUriInput(resolver, uri) { input ->
-                    ticket.deadline = android.os.SystemClock.elapsedRealtime() + MediaDecodePolicy.DEADLINE_MS
-                    probeInput(ticket, input, edge, true, TimeUnit.MILLISECONDS.toMicros(positionMs))
-                }
+                ticket.deadline = android.os.SystemClock.elapsedRealtime() + MediaDecodePolicy.DEADLINE_MS
+                probeInput(ticket, input, edge, true, TimeUnit.MILLISECONDS.toMicros(positionMs))
             }
         }
     }
@@ -621,7 +507,7 @@ internal class IsolatedAutomaticAvTransport(
         } else {
             val ticket = Operation(selected, android.os.SystemClock.elapsedRealtime() + deadlineMs)
             try {
-                if (!current(ticket) || (automaticAv && !parentResources.available())) {
+                if (!current(ticket) || !parentResources.available()) {
                     null
                 } else {
                     val result = block(ticket)
@@ -653,33 +539,6 @@ internal class IsolatedAutomaticAvTransport(
         ticket: Operation,
     ): Boolean = latch.await(remaining(ticket), TimeUnit.MILLISECONDS)
 
-    /** Create one bounded request capability and retire its exact worker on every terminal path. */
-    @Suppress("ReturnCount") // Reject resource and cooldown failures before binding.
-    private fun request(
-        ticket: Operation,
-        bytes: ByteArray,
-        spec: MediaDecodeRequest,
-        output: SharedMemory,
-    ): Bundle? {
-        val limit = MediaDecodePolicy.MAX_INPUT_BYTES.toLong()
-        if (bytes.size.toLong() !in 1..limit || !current(ticket)) return null
-        val digest =
-            java.security.MessageDigest
-                .getInstance("SHA-256")
-                .digest(bytes)
-        val key = "${spec.operation}:${spec.edge}:${spec.option}:" + digest.joinToString("") { "%02x".format(it) }
-        val now = android.os.SystemClock.elapsedRealtime()
-        if ((ticket.session.refusals[key] ?: 0L) > now) return null
-        val result =
-            ticket.session.sources.withInput(bytes) { input ->
-                exchange(ticket, input, output, spec)
-            }
-        if (ticket.workerRefused && current(ticket)) {
-            recordRefusal(ticket.session, key, android.os.SystemClock.elapsedRealtime())
-        }
-        return result
-    }
-
     // One input capability owns READY, exact reply, deadline and retirement; every refusal stays fail-closed.
 
     /**
@@ -695,42 +554,38 @@ internal class IsolatedAutomaticAvTransport(
     ): Bundle? {
         requestDispatched = false
         val id =
-            if (automaticAv) {
-                automaticIds.updateAndGet {
-                    if (it ==
-                        Int.MAX_VALUE
-                    ) {
-                        1
-                    } else {
-                        it + 1
-                    }
+            automaticIds.updateAndGet {
+                if (it ==
+                    Int.MAX_VALUE
+                ) {
+                    1
+                } else {
+                    it + 1
                 }
-            } else {
-                ids.incrementAndGet()
             }
+
         val reply = Reply(id, ticket.session)
         val selected = reserveWorker(reply, ticket) ?: return null
         try {
             if (!connect(selected, ticket)) return null
-            val target = admittedTarget(selected, ticket, dispatch = !automaticAv) ?: return null
+            val target = admittedTarget(selected, ticket, dispatch = false) ?: return null
             val capability = responseCapability(selected, reply)
-            if (automaticAv) {
-                target.send(
-                    Message.obtain().apply {
-                        what = AutomaticAvIdentity.MESSAGE
-                        arg1 = reply.id
-                        replyTo = capability
-                    },
-                )
-                if (!await(selected.identityReady, ticket) ||
-                    !selected.identityAccepted ||
-                    !current(ticket)
-                ) {
-                    return null
-                }
+            target.send(
+                Message.obtain().apply {
+                    what = AutomaticAvIdentity.MESSAGE
+                    arg1 = reply.id
+                    replyTo = capability
+                },
+            )
+            if (!await(selected.identityReady, ticket) ||
+                !selected.identityAccepted ||
+                !current(ticket)
+            ) {
+                return null
             }
+
             // Only the calibrated READY permits selected-descriptor admission.
-            if (automaticAv && admittedTarget(selected, ticket) == null) return null
+            if (admittedTarget(selected, ticket) == null) return null
             target.send(
                 Message.obtain().apply {
                     what = MediaDecodePolicy.DECODE
@@ -741,7 +596,7 @@ internal class IsolatedAutomaticAvTransport(
             )
             if (!await(reply.ready, ticket)) return null
             retire(selected)
-            val lifetime = if (automaticAv) selected.safeToCopy else selected.dead
+            val lifetime = selected.safeToCopy
             if (!await(lifetime, ticket) || !current(ticket)) return null
             val result = reply.result ?: return null
             ticket.workerRefused = validIsolation(result) && !result.getBoolean("success")
@@ -763,7 +618,7 @@ internal class IsolatedAutomaticAvTransport(
                 null
             } else {
                 val occupied = worker != null || remaining(ticket) == 0L
-                if (occupied || (automaticAv && !parentResources.healthy())) {
+                if (occupied || !parentResources.healthy()) {
                     null
                 } else {
                     Worker(reply).also {
@@ -784,7 +639,7 @@ internal class IsolatedAutomaticAvTransport(
     ): Messenger? =
         synchronized(bindingLock) {
             val matching = current(ticket) && worker === selected
-            val usable = selected.linked && !selected.retiring && (!automaticAv || parentResources.healthy())
+            val usable = selected.linked && !selected.retiring && parentResources.healthy()
             if (!matching || !usable || remaining(ticket) == 0L) {
                 null
             } else {
@@ -814,30 +669,26 @@ internal class IsolatedAutomaticAvTransport(
                 } else {
                     selected.remote?.also {
                         selected.retireSent = true
-                        if (automaticAv) selected.retireRpcActive = true
+                        selected.retireRpcActive = true
                     }
                 }
             }
-        if (automaticAv) {
-            if (target != null) {
-                try {
-                    retirementExecutor.execute {
-                        try {
-                            runCatching { target.send(Message.obtain().apply { what = MediaDecodePolicy.RETIRE }) }
-                        } finally {
-                            synchronized(bindingLock) { selected.retireRpcActive = false }
-                            disposeAutomatic(selected)
-                        }
+        if (target != null) {
+            try {
+                retirementExecutor.execute {
+                    try {
+                        runCatching { target.send(Message.obtain().apply { what = MediaDecodePolicy.RETIRE }) }
+                    } finally {
+                        synchronized(bindingLock) { selected.retireRpcActive = false }
+                        disposeAutomatic(selected)
                     }
-                } catch (_: RuntimeException) {
-                    synchronized(bindingLock) { selected.retireRpcActive = false }
                 }
+            } catch (_: RuntimeException) {
+                synchronized(bindingLock) { selected.retireRpcActive = false }
             }
-            // AMS unbinding and process observation never queue behind a hostile endpoint transaction.
-            disposeAutomatic(selected)
-        } else {
-            runCatching { target?.send(Message.obtain().apply { what = MediaDecodePolicy.RETIRE }) }
         }
+        // AMS unbinding and process observation never queue behind a hostile endpoint transaction.
+        disposeAutomatic(selected)
     }
 
     /** One input-free diagnostic per held worker; this never supplies a death witness. */
@@ -886,18 +737,6 @@ internal class IsolatedAutomaticAvTransport(
             putParcelable("output", output)
         }
 
-    /** Cache a confirmed refusal only for the exact source revision, with bounded account-local retention. */
-    private fun recordRefusal(
-        selected: Session,
-        key: String,
-        now: Long,
-    ) {
-        selected.refusals[key] = now + MediaDecodePolicy.REFUSAL_TTL_MS
-        while (selected.refusals.size > MediaDecodePolicy.MAX_REFUSALS) {
-            selected.refusals.remove(selected.refusals.keys.first())
-        }
-    }
-
     /**
      * Distinguish definite framework refusal from uncertain binding outcomes before admitting or retaining the
      * worker.
@@ -907,7 +746,7 @@ internal class IsolatedAutomaticAvTransport(
         val accepted =
             try {
                 context.bindIsolatedService(
-                    Intent(context, serviceClass),
+                    Intent(context, MediaAvDecodeService::class.java),
                     Context.BIND_AUTO_CREATE,
                     workerInstanceName(instanceName, bindingSequence.incrementAndGet()),
                     callbackExecutor,
@@ -1002,7 +841,6 @@ internal class IsolatedAutomaticAvTransport(
         refusalClock: () -> Long,
     ) {
         val mediaRefusals = MediaRefusalCache(refusalClock)
-        val refusals = LinkedHashMap<String, Long>()
     }
 
     private inner class Operation(

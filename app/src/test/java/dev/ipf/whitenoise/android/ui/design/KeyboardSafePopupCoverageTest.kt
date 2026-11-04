@@ -11,11 +11,12 @@ import org.junit.Test
 import java.io.File
 
 class KeyboardSafePopupCoverageTest {
+    /** The overlay stays one zero-size Box child of its caller, sized only by the caller's anchor modifier. */
     @Test
     fun keyboardSafePopupUsesZeroSizeBoxWrapper() {
         val body = keyboardSafePopupSource().readText().functionBody("KeyboardSafePopup")
 
-        assertTrue("overlay must stay in a single zero-size Box wrapper", "Box {" in body)
+        assertTrue("overlay must stay in a single zero-size Box wrapper", "Box(modifier) {" in body)
         assertTrue(
             "expanded=false must not emit popup siblings into the caller layout",
             "if (!expanded) return@Box" in body,

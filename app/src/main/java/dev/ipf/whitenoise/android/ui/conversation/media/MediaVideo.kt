@@ -1710,9 +1710,10 @@ internal fun VideoViewerPage(
     LaunchedEffect(isCurrent, exo) {
         if (isCurrent) {
             VoicePlaybackController.pause()
-            exo.prepare()
             // Materialization may finish after STOP, before this player has observed any lifecycle event.
+            // Publish current autoplay intent before preparation so explicit video avoids an optional poster probe.
             exo.playWhenReady = autoplayAllowed.value && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+            exo.prepare()
         } else {
             exo.playWhenReady = false
             exo.stop()

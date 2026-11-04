@@ -67,7 +67,6 @@ internal object IsolatedMediaDecoder {
                 mediaOwner ?: IsolatedAutomaticAvTransport(
                     context.applicationContext,
                     "automatic_av",
-                    MediaAvDecodeService::class.java,
                 ).also { mediaOwner = it }
             automaticOwner.activateSession()
             mediaTransport = automaticOwner

@@ -113,7 +113,6 @@ class AutomaticMediaBindingRecoveryTest {
             IsolatedAutomaticAvTransport(
                 context,
                 "automatic_av",
-                MediaAvDecodeService::class.java,
                 processWitnessFactory = context::processWitness,
             ) {
                 clock
@@ -160,7 +159,6 @@ class AutomaticMediaBindingRecoveryTest {
             IsolatedAutomaticAvTransport(
                 context,
                 "automatic_av",
-                MediaAvDecodeService::class.java,
                 processWitnessFactory = context::processWitness,
             )
         val file = java.io.File.createTempFile("waveform-refusal-", ".bin")
@@ -194,7 +192,6 @@ class AutomaticMediaBindingRecoveryTest {
             IsolatedAutomaticAvTransport(
                 context,
                 "automatic_av",
-                MediaAvDecodeService::class.java,
                 processWitnessFactory = context::processWitness,
             )
         val file = java.io.File.createTempFile("av-reset-refusal-", ".bin")
@@ -244,7 +241,6 @@ class AutomaticMediaBindingRecoveryTest {
             IsolatedAutomaticAvTransport(
                 context,
                 "automatic_av",
-                MediaAvDecodeService::class.java,
                 processWitnessFactory = context::processWitness,
             )
         val file = java.io.File.createTempFile("av-final-identity-", ".bin")
@@ -299,7 +295,6 @@ class AutomaticMediaBindingRecoveryTest {
             IsolatedAutomaticAvTransport(
                 context,
                 "automatic_av",
-                MediaAvDecodeService::class.java,
                 processWitnessFactory = context::processWitness,
             )
         val file = java.io.File.createTempFile("av-held-uri-close-", ".bin")
@@ -352,7 +347,6 @@ class AutomaticMediaBindingRecoveryTest {
             IsolatedAutomaticAvTransport(
                 context,
                 "automatic_av",
-                MediaAvDecodeService::class.java,
                 processWitnessFactory = context::processWitness,
             )
         val file = java.io.File.createTempFile("av-failed-uri-close-", ".bin")
@@ -422,7 +416,6 @@ class AutomaticMediaBindingRecoveryTest {
             IsolatedAutomaticAvTransport(
                 context,
                 "automatic_av",
-                MediaAvDecodeService::class.java,
                 processWitnessFactory = context::processWitness,
             )
         val file = java.io.File.createTempFile("av-late-ready-", ".bin")
@@ -470,7 +463,6 @@ class AutomaticMediaBindingRecoveryTest {
             IsolatedAutomaticAvTransport(
                 context,
                 "automatic_av",
-                MediaAvDecodeService::class.java,
                 processWitnessFactory = context::processWitness,
             )
         val file = java.io.File.createTempFile("av-false-bind-", ".bin")
@@ -500,7 +492,6 @@ class AutomaticMediaBindingRecoveryTest {
             IsolatedAutomaticAvTransport(
                 context,
                 "automatic_av",
-                MediaAvDecodeService::class.java,
                 processWitnessFactory = context::processWitness,
             )
         val file = java.io.File.createTempFile("av-unbind-refusal-", ".bin")
@@ -536,7 +527,6 @@ class AutomaticMediaBindingRecoveryTest {
             IsolatedAutomaticAvTransport(
                 context,
                 "automatic_av",
-                MediaAvDecodeService::class.java,
                 processWitnessFactory = context::processWitness,
             )
         val file = java.io.File.createTempFile("av-no-ready-", ".bin")
@@ -599,7 +589,6 @@ class AutomaticMediaBindingRecoveryTest {
             IsolatedAutomaticAvTransport(
                 context,
                 "automatic_av",
-                MediaAvDecodeService::class.java,
                 processWitnessFactory = context::processWitness,
             )
         val file = java.io.File.createTempFile("av-identity-flags-", ".bin")
@@ -685,7 +674,6 @@ class AutomaticMediaBindingRecoveryTest {
             IsolatedAutomaticAvTransport(
                 context,
                 "automatic_av",
-                MediaAvDecodeService::class.java,
                 processWitnessFactory = context::processWitness,
             )
         val file = java.io.File.createTempFile("av-calibration-refusal-", ".bin")
@@ -721,7 +709,6 @@ class AutomaticMediaBindingRecoveryTest {
             IsolatedAutomaticAvTransport(
                 context,
                 "automatic_av",
-                MediaAvDecodeService::class.java,
                 processWitnessFactory = context::processWitness,
             )
         val file = java.io.File.createTempFile("av-process-witness-", ".bin")

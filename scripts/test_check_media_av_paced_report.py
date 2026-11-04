@@ -58,11 +58,67 @@ def campaign():
     return rows
 
 
+def autoplay_campaign():
+    """The actual attachment owner can omit an unrequested probe, while every raw identity/output remains required."""
+    rows = campaign()
+    for row in rows[:-1]:
+        row.update(schema='media_av_paced_performance_v2', playback_owner='IsolatedAttachmentPlayer',
+                   preparation_mode='attachment_autoplay_optional_probe_not_requested',
+                   request_order='play_then_prepare', preparation_authenticated_uid=None,
+                   preparation_identity_scope='not_requested_attachment_autoplay_raw_header',
+                   optional_preparation_receipt_unchanged=True)
+    return rows
+
+
 class PacedReportTests(unittest.TestCase):
     """Reject incomplete evidence rather than silently converting absence into success."""
     def test_complete_shape_remains_unqualified(self):
         """A complete fake shape grants neither measured timing nor security/performance qualification."""
         self.assertEqual(validate(campaign())['verdict'], 'complete_observations_only')
+
+    def test_actual_attachment_autoplay_shape_retains_raw_identity_and_output_requirements(self):
+        self.assertEqual(validate(autoplay_campaign())['verdict'], 'complete_observations_only')
+        changes = [lambda r: r.update(playback_owner='RawVoicePlaybackPlayer'),
+                   lambda r: r.pop('playback_owner'),
+                   lambda r: r.update(preparation_mode='optional'),
+                   lambda r: r.update(request_order='prepare_then_play'),
+                   lambda r: r.update(schema='media_av_paced_performance_v1'),
+                   lambda r: r.update(optional_preparation_receipt_unchanged=False),
+                   lambda r: r.update(optional_preparation_receipt_unchanged=1),
+                   lambda r: r.update(preparation_authenticated_uid=99001),
+                   lambda r: r.pop('preparation_authenticated_uid'),
+                   lambda r: r.update(workers=[]),
+                   lambda r: r['workers'][0].__setitem__(1, r['caller_uid']),
+                   lambda r: r['workers'][0].__setitem__(2, r['caller_pid']),
+                   lambda r: r['workers'][0].__setitem__(1, True),
+                   lambda r: r['workers'][0].__setitem__(2, 200.0),
+                   lambda r: r['workers'][0].__setitem__(3, 9),
+                   lambda r: r.update(submissions=[]),
+                   lambda r: r.update(audio=[])]
+        for change in changes:
+            rows = autoplay_campaign()
+            row = next(r for r in rows if r.get('input') == 'original-video.mp4')
+            change(row)
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                validate(rows)
+
+    def test_unknown_or_missing_preparation_mode_cannot_downgrade_authentication(self):
+        rows = autoplay_campaign()
+        rows[0].pop('preparation_mode')
+        with self.assertRaises(ValueError):
+            validate(rows)
+        rows = campaign()
+        rows[0]['preparation_authenticated_uid'] = None
+        with self.assertRaises(ValueError):
+            validate(rows)
+        rows = autoplay_campaign()
+        rows[0] = campaign()[0]
+        with self.assertRaises(ValueError):
+            validate(rows)
+        rows = campaign()
+        rows[0]['schema'] = 'future_schema'
+        with self.assertRaises(ValueError):
+            validate(rows)
 
     def test_missing_phase_overflow_generation_and_presentation_fail(self):
         """Each independently broken evidence boundary rejects the report."""
