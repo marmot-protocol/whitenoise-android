@@ -1016,6 +1016,7 @@ private fun projectedMediaMessage(
     retentionExpiresAt = null,
     sticker = null,
     importedFrom = null,
+    historyImportProvenance = null,
 )
 
 /** Builds a single account owner with process-local drafts and no real relay connection. */

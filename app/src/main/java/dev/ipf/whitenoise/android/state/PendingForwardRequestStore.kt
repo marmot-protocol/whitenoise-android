@@ -227,6 +227,7 @@ private const val KEY_FILE_NAME = "fileName"
 private const val KEY_MEDIA_TYPE = "mediaType"
 private const val KEY_MEDIA_VERSION = "mediaVersion"
 private const val KEY_SOURCE_EPOCH = "sourceEpoch"
+private const val KEY_SOURCE_EPOCH_IDENTITY = "sourceEpochIdentity"
 private const val KEY_DIM = "dim"
 private const val KEY_THUMBHASH = "thumbhash"
 private const val KIND_TEXT = "text"
@@ -356,6 +357,7 @@ private fun encodeReference(reference: MediaAttachmentReferenceFfi): JSONObject 
         .put(KEY_MEDIA_TYPE, reference.mediaType)
         .put(KEY_MEDIA_VERSION, reference.version.name)
         .put(KEY_SOURCE_EPOCH, reference.sourceEpoch.toString())
+        .put(KEY_SOURCE_EPOCH_IDENTITY, reference.sourceEpochIdentity ?: JSONObject.NULL)
         .put(KEY_DIM, reference.dim ?: JSONObject.NULL)
         .put(KEY_THUMBHASH, reference.thumbhash ?: JSONObject.NULL)
 
@@ -378,6 +380,9 @@ private fun decodeReference(json: JSONObject): MediaAttachmentReferenceFfi {
         mediaType = json.getString(KEY_MEDIA_TYPE),
         version = EncryptedMediaVersionFfi.valueOf(json.getString(KEY_MEDIA_VERSION)),
         sourceEpoch = json.getString(KEY_SOURCE_EPOCH).toULong(),
+        // Requests stored before MarmotKit carried upload branch identity omit the key.
+        sourceEpochIdentity =
+            if (json.isNull(KEY_SOURCE_EPOCH_IDENTITY)) null else json.getString(KEY_SOURCE_EPOCH_IDENTITY),
         dim = if (json.isNull(KEY_DIM)) null else json.getString(KEY_DIM),
         thumbhash = if (json.isNull(KEY_THUMBHASH)) null else json.getString(KEY_THUMBHASH),
     )
