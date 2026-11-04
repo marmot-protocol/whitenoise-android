@@ -16,12 +16,12 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -265,7 +266,7 @@ internal fun QuickAccountSwitchTransitionOverlay(
             exit = fadeOut(tween(QUICK_ACCOUNT_SWITCH_TRANSITION_MILLIS)),
         ) {
             val cue = transition ?: return@AnimatedVisibility
-            QuickAccountSwitchCue(cue)
+            QuickAccountSwitchCue(cue, blocksInput = visible)
         }
 
         LaunchedEffect(
@@ -292,19 +293,27 @@ internal fun QuickAccountSwitchTransitionOverlay(
     }
 }
 
-/** Draws the full-surface target identity used during the bounded reveal. */
+/**
+ * Draws the full-surface target identity used during the bounded reveal. While [blocksInput], the cue swallows
+ * touches, so none reach the frame beneath before the target is ready. Once the reveal starts the target below is
+ * already safe, and touches pass through the fading cue to it: the fade never gates input (#3496).
+ */
 @Composable
 @Suppress("FunctionNaming")
-private fun QuickAccountSwitchCue(cue: QuickAccountSwitchTransition) {
-    Surface(
+private fun QuickAccountSwitchCue(
+    cue: QuickAccountSwitchTransition,
+    blocksInput: Boolean,
+) {
+    Box(
         modifier =
             Modifier
                 .fillMaxSize()
                 // Preserve the cue's internal contrast while the whole frame
                 // crossfades over an AMOLED-black destination.
                 .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+                .background(MaterialTheme.colorScheme.background)
+                .then(if (blocksInput) Modifier.pointerInput(Unit) {} else Modifier)
                 .testTag(QUICK_ACCOUNT_SWITCH_CUE_TAG),
-        color = MaterialTheme.colorScheme.background,
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
