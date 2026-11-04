@@ -45,7 +45,7 @@ class MediaViewerChromeGestureTest {
         assertEquals(0, doubleTaps)
     }
 
-    /** A double tap resets the transform without also toggling chrome. */
+    /** A double tap selects zoom without also toggling chrome. */
     @Test
     fun doubleTapDoesNotToggleChrome() {
         var singleTaps = 0
@@ -102,7 +102,7 @@ class MediaViewerChromeGestureTest {
             Box(
                 Modifier
                     .size(240.dp)
-                    .viewerTapGestureModifier(Unit, onSingleTap, onDoubleTap)
+                    .viewerTapGestureModifier(Unit, onSingleTap) { onDoubleTap() }
                     .testTag(GESTURE_TAG),
             )
         }

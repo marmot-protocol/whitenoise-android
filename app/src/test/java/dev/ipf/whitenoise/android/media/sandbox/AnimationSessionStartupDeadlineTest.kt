@@ -321,8 +321,9 @@ class AnimationSessionStartupDeadlineTest {
                 AnimationAdmission.Lease::class.java,
                 kotlin.jvm.functions.Function0::class.java,
                 kotlin.jvm.functions.Function2::class.java,
+                ViewerAnimationOutput::class.java,
             ).apply { isAccessible = true }
-            .newInstance(context, 2, lease, staged, await) as IsolatedAnimationSession
+            .newInstance(context, 2, lease, staged, await, null) as IsolatedAnimationSession
 
     /** Runs the session's OPEN on a background thread and always closes the session when startup returns or throws. */
     private fun open(session: IsolatedAnimationSession) =
