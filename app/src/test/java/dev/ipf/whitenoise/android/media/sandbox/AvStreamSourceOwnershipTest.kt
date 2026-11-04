@@ -166,6 +166,7 @@ class AvStreamSourceOwnershipTest {
                     }
                 }
             assertTrue(entered.await(2, TimeUnit.SECONDS))
+            val firstOwner = checkNotNull(admissions.current(AvStreamLane.Analysis, admissions.epoch()))
             val secondFailure = AtomicReference<Throwable?>()
             calls +=
                 launch(secondFailure) { IsolatedAvStream.openUri(context, uri, false, true, 1, AvStreamLane.Analysis) }
@@ -197,10 +198,27 @@ class AvStreamSourceOwnershipTest {
                 assertFalse(resources(owner).available())
                 assertEquals(if (staged) 1 else 0, opens)
             } else {
-                calls[1].join(2000)
+                // Caller return is not the retained owner's asynchronous cleanup ACK.
+                val retired = AtomicReference<Boolean?>()
+                val retirementFailure = AtomicReference<Throwable?>()
+                val retirementWaiter =
+                    Thread {
+                        runCatching { firstOwner.awaitRetired() }
+                            .onSuccess { retired.set(it) }
+                            .onFailure { retirementFailure.set(it) }
+                    }
+                calls += retirementWaiter
+                retirementWaiter.start()
+                retirementWaiter.join(AvStreamProtocol.CALL_DEADLINE_MS + 2000)
+                assertFalse(retirementWaiter.isAlive)
+                assertNull(retirementFailure.get()?.stackTraceToString(), retirementFailure.get())
+                assertEquals(true, retired.get())
+                val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(AvStreamProtocol.CALL_DEADLINE_MS)
+                assertTrue(nextSourceOpened.await(AvStreamProtocol.CALL_DEADLINE_MS, TimeUnit.MILLISECONDS))
+                val remaining = (deadline - System.nanoTime()).coerceAtLeast(0)
+                if (remaining > 0) TimeUnit.NANOSECONDS.timedJoin(calls[1], remaining)
                 assertFalse(calls[1].isAlive)
                 assertTrue(secondFailure.get()?.stackTraceToString(), secondFailure.get() is IOException)
-                assertTrue(nextSourceOpened.await(2, TimeUnit.SECONDS))
                 assertEquals(if (staged) 2 else 1, opens)
             }
         } finally {
