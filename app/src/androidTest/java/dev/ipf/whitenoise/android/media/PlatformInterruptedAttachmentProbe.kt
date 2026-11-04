@@ -92,6 +92,15 @@ internal object PlatformInterruptedAttachmentProbe {
 
         // Keep the earliest facts even after the rolling resume buffer has evicted them.
         val initialNativeStates = CopyOnWriteArrayList<NativeResumeSnapshot>()
+
+        /** Retains bounded initial evidence independently from the rolling resume proof. */
+        fun recordNativeSnapshot(snapshot: NativeResumeSnapshot) {
+            if (initialNativeStates.size < FAILURE_STATE_LIMIT) {
+                initialNativeStates.add(snapshot)
+            }
+            if (nativeStates.size == FAILURE_STATE_LIMIT) nativeStates.removeAt(0)
+            nativeStates.add(snapshot)
+        }
     }
 
     /** Automatic demand receives no interactive read, deliberate Retry, force-run or seeded checkpoint. */
@@ -139,13 +148,7 @@ internal object PlatformInterruptedAttachmentProbe {
                                     attempt = it.attempt,
                                     retryAt = it.retryAt,
                                 )
-                            }.collect {
-                                if (observations.initialNativeStates.size < FAILURE_STATE_LIMIT) {
-                                    observations.initialNativeStates.add(it)
-                                }
-                                if (nativeStates.size == FAILURE_STATE_LIMIT) nativeStates.removeAt(0)
-                                nativeStates.add(it)
-                            }
+                            }.collect(observations::recordNativeSnapshot)
                     }
                 withContext(Dispatchers.Main.immediate) {
                     AttachmentDownloadWorker.enqueue(context, request, AttachmentDownloadPriority.Automatic)

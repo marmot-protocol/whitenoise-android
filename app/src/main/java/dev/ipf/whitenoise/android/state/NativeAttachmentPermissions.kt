@@ -55,17 +55,16 @@ internal class NativeAttachmentPermissions {
                 networkTypes = snapshot.networkTypes.toSet(),
             )
         val previous = networkRefresh
-        if (previous != null &&
-            previous.snapshot == detachedSnapshot &&
-            previous.accounts == accounts &&
-            previous.owner === owner &&
-            isCurrent(previous.revision, owner)
-        ) {
-            val current = applied.value
-            if (refreshInFlight(owner) ||
-                (current.revision == previous.revision && accounts.all { it in current.accounts })
-            ) {
-                return null
+        if (previous != null) {
+            val matchingInputs = previous.snapshot == detachedSnapshot && previous.accounts == accounts
+            val matchingOwner = previous.owner === owner && isCurrent(previous.revision, owner)
+            if (matchingInputs && matchingOwner) {
+                val current = applied.value
+                if (refreshInFlight(owner) ||
+                    (current.revision == previous.revision && accounts.all { it in current.accounts })
+                ) {
+                    return null
+                }
             }
         }
         val next = invalidate(owner)
@@ -123,7 +122,8 @@ internal class NativeAttachmentPermissions {
     fun appliedRevision(account: String): Long? = applied.value.takeIf { account in it.accounts }?.revision
 
     /** How many callers are waiting in [awaitApplied], so a test can act exactly while work is held. */
-    internal fun waitersForTest(): StateFlow<Int> = applied.subscriptionCount
+    internal val waitersForTest: StateFlow<Int>
+        get() = applied.subscriptionCount
 
     /** Marks [revision]'s refresh as applying, so a settle timeout does not supersede it with a new one. */
     fun beginRefresh(revision: Long) = inFlight.set(revision)

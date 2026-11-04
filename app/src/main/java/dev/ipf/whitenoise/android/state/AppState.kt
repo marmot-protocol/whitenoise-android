@@ -1594,13 +1594,15 @@ class WhiteNoiseAppState private constructor(
                     }
                 }
         }
-        val engine = runtime?.marmot ?: return null
-        // Marmot binding calls remain on the mutations scope's Main.immediate dispatcher.
-        return mutationsScope.launch {
-            try {
-                applyNativeAttachmentPermissions(revision, runtime, engine, accountRefs, networkCallback)
-            } finally {
-                nativeAttachmentPermissions.endRefresh(revision)
+        return runtime?.let { activeRuntime ->
+            val engine = activeRuntime.marmot
+            // Marmot binding calls remain on the mutations scope's Main.immediate dispatcher.
+            mutationsScope.launch {
+                try {
+                    applyNativeAttachmentPermissions(revision, activeRuntime, engine, accountRefs, networkCallback)
+                } finally {
+                    nativeAttachmentPermissions.endRefresh(revision)
+                }
             }
         }
     }

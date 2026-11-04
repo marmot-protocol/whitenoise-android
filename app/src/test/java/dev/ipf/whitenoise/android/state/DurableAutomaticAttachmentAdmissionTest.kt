@@ -198,7 +198,7 @@ class DurableAutomaticAttachmentAdmissionTest {
         runTest(dispatcher) {
             setNetwork(setOf(MediaAutoDownloadNetwork.WiFi))
             val download = async { durable(AttachmentDownloadPriority.Automatic) }
-            permissions().waitersForTest().first { it > 0 }
+            permissions().waitersForTest.first { it > 0 }
             assertFalse(download.isCompleted)
             assertEquals(0, fixture.automaticDemands.get())
 
@@ -315,11 +315,17 @@ class DurableAutomaticAttachmentAdmissionTest {
 
     /** A captured allowing key cannot cache a live denial after preferences suspend its evaluation. */
     @Test
-    fun allowingNetworkAbaDuringSuspendedPreferencesCorrectsTheAppliedInputs() = runTest(dispatcher) { assertSuspendedNetworkAba(allowA = true) }
+    fun allowingNetworkAbaDuringSuspendedPreferencesCorrectsTheAppliedInputs() =
+        runTest(dispatcher) {
+            assertSuspendedNetworkAba(allowA = true)
+        }
 
     /** A captured denying key cannot cache a live approval after preferences suspend its evaluation. */
     @Test
-    fun denyingNetworkAbaDuringSuspendedPreferencesCorrectsTheAppliedInputs() = runTest(dispatcher) { assertSuspendedNetworkAba(allowA = false) }
+    fun denyingNetworkAbaDuringSuspendedPreferencesCorrectsTheAppliedInputs() =
+        runTest(dispatcher) {
+            assertSuspendedNetworkAba(allowA = false)
+        }
 
     /** Replays A -> wait on preferences -> evaluate/apply B -> A before the coalescer follow-up. */
     private suspend fun TestScope.assertSuspendedNetworkAba(allowA: Boolean) {
