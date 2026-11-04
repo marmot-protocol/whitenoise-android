@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.common.AccountActionColors
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoff
+import kotlin.math.ceil
 import kotlin.math.roundToInt
 
 /** Visible layout obstacles owned by the current route or persistent shell chrome. */
@@ -135,6 +136,18 @@ internal class FloatingDictationAnchor {
         }
     }
 
+    /**
+     * Window bounds where the shell last placed the floating capsule, or null while no floating
+     * capsule is placed — an inline composer control is not floating and publishes nothing.
+     */
+    var floatingCapsuleBounds: Rect? by mutableStateOf(null)
+        private set
+
+    /** Written only by the shell's placement pass, so route overlays read but never steer the capsule. */
+    fun reportFloatingCapsule(placed: Rect?) {
+        floatingCapsuleBounds = placed
+    }
+
     fun remove(token: Any) {
         bounds.remove(token)
         composerFabObstacles.remove(token)
@@ -174,6 +187,44 @@ internal fun Modifier.floatingDictationAnchor(
     } else {
         this
     }
+}
+
+/**
+ * Lifts a bottom-aligned route overlay so it sits [gap] above the shell's placed floating capsule
+ * whenever the two share horizontal space. The read is one-way — the overlay never registers as an
+ * obstacle, so the capsule cannot chase the overlay it just moved. Without a capsule nothing moves.
+ */
+@Composable
+internal fun Modifier.floatingDictationCapsuleClearance(gap: Dp = 12.dp): Modifier {
+    val anchor = LocalFloatingDictationAnchor.current ?: return this
+    return layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints)
+        layout(placeable.width, placeable.height) {
+            val capsule = anchor.floatingCapsuleBounds
+            val origin = coordinates?.positionInWindow()
+            val lift =
+                if (capsule == null || origin == null) {
+                    0
+                } else {
+                    floatingCapsuleClearancePx(
+                        overlay = Rect(origin.x, origin.y, origin.x + placeable.width, origin.y + placeable.height),
+                        capsule = capsule,
+                        gapPx = gap.toPx(),
+                    )
+                }
+            placeable.place(0, -lift)
+        }
+    }
+}
+
+/** Upward shift that leaves [gapPx] between [overlay] and [capsule], or zero when they never meet. */
+internal fun floatingCapsuleClearancePx(
+    overlay: Rect,
+    capsule: Rect,
+    gapPx: Float,
+): Int {
+    val sharesColumn = overlay.width > 0f && overlay.left < capsule.right && overlay.right > capsule.left
+    return if (sharesColumn) ceil(overlay.bottom + gapPx - capsule.top).toInt().coerceAtLeast(0) else 0
 }
 
 /** Insets are consumed outside the action viewport; a short viewport scrolls the capsule slot too. */
@@ -334,6 +385,7 @@ internal fun FloatingDictationLayout(
         val body = subcompose("content", contentSlots.forSpace(footerSpace)).single().measure(constraints)
         layout(constraints.maxWidth, constraints.maxHeight) {
             body.place(0, 0)
+            if (bubble == null || inlineControl) anchor.reportFloatingCapsule(null)
             if (bubble != null) {
                 val inlineBounds = anchor.composerControlBounds.takeIf { inlineControl }
                 // The composer slot reports during body placement, before its shell controls are placed.
@@ -366,12 +418,11 @@ internal fun FloatingDictationLayout(
                     }
                 // Registration reads its previous geometry before writing it. Those bookkeeping
                 // reads must not subscribe this placement to the map it updates every motion frame.
+                val placed = Rect(rootLeft + x, rootTop + y, rootLeft + x + bubble.width, rootTop + y + bubble.height)
                 Snapshot.withoutReadObservation {
-                    controlMotion?.report(
-                        owner,
-                        controlToken,
-                        Rect(rootLeft + x, rootTop + y, rootLeft + x + bubble.width, rootTop + y + bubble.height),
-                    )
+                    controlMotion?.report(owner, controlToken, placed)
+                    // Route overlays such as the conversation jump stack clear this settled position.
+                    if (!inlineControl) anchor.reportFloatingCapsule(placed)
                 }
                 val localClip =
                     scrolling?.takeUnless { inlineControl }?.second?.translate(-rootLeft - x, -rootTop - y)
