@@ -989,22 +989,34 @@ Device limits found while regenerating (2026-11-01):
   Macrobenchmark cannot record its Perfetto metrics there. Generate on a stock
   device or an emulator, and measure on a stock physical device.
 - On a device with a second user, the AGP runner fails with `Invalid userId -2`
-  and copies empty profiles into the source set. Run the generator class with
-  `adb shell am instrument -w -r --user 0 -e class
-  dev.ipf.whitenoise.android.benchmark.BaselineProfileGenerator -e groupName
-  "$GROUP_NAME" -e androidx.benchmark.enabledRules BaselineProfile
-  dev.ipf.whitenoise.android.benchmark/androidx.test.runner.AndroidJUnitRunner`,
-  `adb pull` each `/sdcard/Android/media/dev.ipf.whitenoise.android.benchmark/*-prof.txt`
-  file, and merge them with `scripts/merge-baseline-profiles.py`, which keeps each rule
-  identity once with its `H`, `S` and `P` flags combined. The Startup Profile is the
-  union of the two startup journeys' files, the Baseline Profile the union of all four:
+  and copies empty profiles into the source set. Run the generator class
+  directly instead. `adb shell` hands the device one command line, so quote it
+  on the host and quote the group name again inside it (a name containing a
+  single quote needs escaping):
 
   ```bash
+  adb shell "am instrument -w -r --user 0 \
+    -e class dev.ipf.whitenoise.android.benchmark.BaselineProfileGenerator \
+    -e groupName '$GROUP_NAME' -e androidx.benchmark.enabledRules BaselineProfile \
+    dev.ipf.whitenoise.android.benchmark/androidx.test.runner.AndroidJUnitRunner"
+  ```
+
+  `BaselineProfileRule` names each dump after the test class and method, for
+  example `BaselineProfileGenerator_generateStartup-startup-prof.txt`, and writes
+  a timestamped copy beside it. Pull the four untimestamped files and merge them
+  with `scripts/merge-baseline-profiles.py`, which keeps each rule identity once
+  with its `H`, `S` and `P` flags combined. The Startup Profile is the union of
+  the two startup journeys' files, the Baseline Profile the union of all four:
+
+  ```bash
+  dir=/sdcard/Android/media/dev.ipf.whitenoise.android.benchmark
+  for f in $(adb shell "ls $dir/BaselineProfileGenerator_*-prof.txt"); do adb pull "$f" .; done
   python3 scripts/merge-baseline-profiles.py \
     app/src/main/generated/baselineProfiles/startup-prof.txt \
-    generateStartup-startup-prof.txt generateInboundShareStartup-startup-prof.txt
+    BaselineProfileGenerator_generateStartup-startup-prof.txt \
+    BaselineProfileGenerator_generateInboundShareStartup-startup-prof.txt
   python3 scripts/merge-baseline-profiles.py \
-    app/src/main/generated/baselineProfiles/baseline-prof.txt generate*-prof.txt
+    app/src/main/generated/baselineProfiles/baseline-prof.txt BaselineProfileGenerator_*-prof.txt
   ```
 
   Record the SHA-256 of each pulled file with the provenance so the merge can be

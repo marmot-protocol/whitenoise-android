@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """Merge per-journey ART profile dumps into one committed profile file.
 
-BaselineProfileGenerator writes one `<journey>-baseline-prof.txt` or
-`<journey>-startup-prof.txt` per journey. When the AGP runner cannot copy them
+BaselineProfileGenerator writes one `BaselineProfileGenerator_<journey>-baseline-prof.txt`
+or `BaselineProfileGenerator_<journey>-startup-prof.txt` per journey. When the AGP runner cannot copy them
 into the source set (for example on a device with a second user), pull them
 with `adb` and merge them here:
 
     python3 scripts/merge-baseline-profiles.py \
       app/src/main/generated/baselineProfiles/startup-prof.txt \
-      generateStartup-startup-prof.txt generateInboundShareStartup-startup-prof.txt
+      BaselineProfileGenerator_generateStartup-startup-prof.txt \
+      BaselineProfileGenerator_generateInboundShareStartup-startup-prof.txt
 
 Each rule identity appears once, with the union of its H, S and P flags, in
 class order with a class rule before its members.
