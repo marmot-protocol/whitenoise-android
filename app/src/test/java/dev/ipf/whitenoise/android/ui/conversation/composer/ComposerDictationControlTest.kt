@@ -3,10 +3,12 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 import android.content.Context
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
@@ -21,6 +23,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -63,6 +66,8 @@ class ComposerDictationControlTest {
 
     @get:Rule
     val composeRule = createComposeRule()
+
+    private var voicePermissionRequests = 0
 
     /** A real controller tail failure leaves a normal composer, with audio recovery only in its own chat. */
     @Test
@@ -323,6 +328,179 @@ class ComposerDictationControlTest {
         assertTrue(controller.state is ConversationDictationState.Idle)
     }
 
+    /** A failed session still owns completion even though it no longer blocks a fresh Dictate request. */
+    @Test
+    fun floatingFailedSessionCannotExposeANewVoiceMicrophone() {
+        val controller = idleDictationController(TextFieldValue())
+        val voice = previewVoiceRecordingController()
+        try {
+            render(suppliedController = controller, voiceRecordingController = voice, floatingOrigin = true)
+            val retainedClick =
+                composeRule
+                    .onNodeWithTag("composer.voice.launcher")
+                    .fetchSemanticsNode()
+                    .config[SemanticsActions.OnClick]
+            composeRule.runOnIdle {
+                assertTrue(controller.requestStart(ACCOUNT, GROUP, TextFieldValue()))
+                FakeDictationPlatform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+                assertTrue(controller.state is ConversationDictationState.Failed)
+                assertFalse(controller.blocksNewRequest)
+                assertTrue(controller.completionControlsRequired)
+            }
+            composeRule.onNodeWithTag("composer.voice.launcher").assertDoesNotExist()
+            composeRule.runOnIdle {
+                checkNotNull(retainedClick.action).invoke()
+                assertEquals(0, voicePermissionRequests)
+                assertFalse(voice.isRecording)
+            }
+        } finally {
+            voice.release()
+        }
+    }
+
+    /** The ordinary visual Send shares IME acceptance guards when the session controls float. */
+    @Test
+    fun floatingOriginSendAndLateRecognitionDoNotOverwriteANewerDraft() {
+        var authoritativeDraft = TextFieldValue("Original")
+        var revision = 0L
+        val writes = mutableListOf<Pair<String, String>>()
+        val controller =
+            ConversationDictationController(
+                platform = FakeDictationPlatform,
+                readDraft = { _, _ -> ConversationDictationDraftSnapshot(authoritativeDraft, revision) },
+                writeDraft = { account, group, expected, value ->
+                    writes += account to group
+                    if (expected != revision) {
+                        null
+                    } else {
+                        authoritativeDraft = value
+                        revision += 1L
+                        revision
+                    }
+                },
+                disclosureAccepted = { true },
+                markDisclosureAccepted = {},
+            )
+        assertTrue(controller.requestStart(ACCOUNT, GROUP, authoritativeDraft))
+        val late = FakeDictationPlatform.listener
+        val input = ComposerTextState(authoritativeDraft)
+        val sent = mutableListOf<String>()
+        var accept: (() -> Unit)? = null
+        render(
+            draft = authoritativeDraft,
+            suppliedController = controller,
+            floatingOrigin = true,
+            suppliedText = input,
+            onDraftChange = { value, changed ->
+                authoritativeDraft = value
+                if (changed) revision += 1L
+            },
+            onSend = { value, accepted ->
+                sent += value
+                accept = accepted
+            },
+        )
+        composeRule.onNode(hasSetTextAction()).performTextReplacement("Typed message")
+        composeRule.onNodeWithContentDescription("Send").performClick()
+        composeRule.onNode(hasSetTextAction()).performTextReplacement("Newer draft")
+        composeRule.runOnIdle {
+            checkNotNull(accept).invoke()
+            late.onResult("late recognition")
+            controller.paste()
+            assertEquals(listOf("Typed message"), sent)
+            assertEquals("Newer draft", authoritativeDraft.text)
+            assertEquals("Newer draft", input.valueState.value.text)
+            assertTrue(writes.all { it == (ACCOUNT to GROUP) })
+        }
+    }
+
+    @Test
+    fun acceptedVisualSendFencesLateRecognitionAndRecovery() = acceptedSendThenLateResult(false)
+
+    @Test
+    fun acceptedVisualSendFencesLateResultsAfterAccountAndChatSwitch() = acceptedSendThenLateResult(true)
+
+    /** Uses the real Bar acceptance token, per-owner editor and controller revision boundary together. */
+    private fun acceptedSendThenLateResult(switchTarget: Boolean) {
+        val origin = ACCOUNT to GROUP
+        val other = "other-account" to "other-group"
+        val visible = mutableStateOf(origin)
+        val drafts = mutableMapOf(origin to TextFieldValue("Original"), other to TextFieldValue("Other draft"))
+        val revisions = mutableMapOf(origin to 0L, other to 0L)
+        val writes = mutableListOf<Pair<String, String>>()
+        val sent = mutableListOf<Pair<Pair<String, String>, String>>()
+        val controller =
+            ConversationDictationController(
+                platform = FakeDictationPlatform,
+                readDraft = { account, group ->
+                    val key = account to group
+                    ConversationDictationDraftSnapshot(drafts.getValue(key), revisions.getValue(key))
+                },
+                writeDraft = { account, group, expected, value ->
+                    val key = account to group
+                    writes += key
+                    if (expected != revisions.getValue(key)) {
+                        null
+                    } else {
+                        drafts[key] = value
+                        revisions[key] = expected + 1L
+                        expected + 1L
+                    }
+                },
+                disclosureAccepted = { true },
+                markDisclosureAccepted = {},
+            )
+        assertTrue(controller.requestStart(ACCOUNT, GROUP, drafts.getValue(origin)))
+        val late = FakeDictationPlatform.listener
+        composeRule.setContent {
+            val key = visible.value
+            val editor = rememberComposerTextState(key, drafts.getValue(key))
+            WhiteNoiseTheme {
+                ComposerBar(
+                    replyingTo = null,
+                    messageTextCopy = MessageTextCopy.Default,
+                    onCancelReply = {},
+                    textState = editor,
+                    draftKey = key,
+                    draftAccountRef = key.first,
+                    draftGroupIdHex = key.second,
+                    onDraftChange = { value, changed ->
+                        drafts[key] = value
+                        if (changed) revisions[key] = revisions.getValue(key) + 1L
+                    },
+                    onSend = { text, accepted ->
+                        sent += key to text
+                        drafts[key] = TextFieldValue()
+                        revisions[key] = revisions.getValue(key) + 1L
+                        accepted()
+                    },
+                    dictationController = controller,
+                    dictationAccountRef = key.first,
+                    dictationGroupIdHex = key.second,
+                    dictationControlsVisible = false,
+                    dictationOriginVisible = key == origin,
+                    modifier = Modifier.width(320.dp),
+                )
+            }
+        }
+        composeRule.onNode(hasSetTextAction()).performTextReplacement("Accepted typed message")
+        composeRule.onNodeWithContentDescription("Send").performClick()
+        composeRule.runOnIdle {
+            assertEquals(listOf(origin to "Accepted typed message"), sent)
+            assertEquals("", drafts.getValue(origin).text)
+            if (switchTarget) visible.value = other
+        }
+        composeRule.onNode(hasSetTextAction()).performTextReplacement("Newer visible draft")
+        composeRule.runOnIdle {
+            late.onResult("late transcript")
+            controller.paste()
+            assertEquals(listOf(origin to "Accepted typed message"), sent)
+            assertEquals("Newer visible draft", drafts.getValue(visible.value).text)
+            if (switchTarget) assertEquals("", drafts.getValue(origin).text)
+            assertTrue(writes.all { it == origin })
+        }
+    }
+
     private fun render(
         fontScale: Float = 1f,
         rtl: Boolean = false,
@@ -331,6 +509,10 @@ class ComposerDictationControlTest {
         voiceRecordingController: VoiceRecordingController? = null,
         replyingTo: dev.ipf.marmotkit.AppMessageRecordFfi? = null,
         suppliedController: ConversationDictationController? = null,
+        floatingOrigin: Boolean = false,
+        suppliedText: ComposerTextState? = null,
+        onDraftChange: (TextFieldValue, Boolean) -> Unit = { _, _ -> },
+        onSend: (String, () -> Unit) -> Unit = { _, _ -> },
     ): ConversationDictationController {
         val dictationController = suppliedController ?: idleDictationController(draft)
         composeRule.setContent {
@@ -344,7 +526,11 @@ class ComposerDictationControlTest {
                         replyingTo = replyingTo,
                         messageTextCopy = MessageTextCopy.Default,
                         onCancelReply = {},
-                        onSend = { _, _ -> },
+                        onSend = onSend,
+                        onDraftChange = onDraftChange,
+                        textState = suppliedText ?: rememberComposerTextState(null, draft),
+                        dictationControlsVisible = !floatingOrigin,
+                        dictationOriginVisible = true,
                         onPickFromGallery = if (withAttachments) ({}) else null,
                         initialDraft = draft,
                         dictationController = dictationController,
@@ -366,7 +552,10 @@ class ComposerDictationControlTest {
             context = context,
             outputDirectory = context.cacheDir,
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
-            onPermissionRequest = { true },
+            onPermissionRequest = {
+                voicePermissionRequests++
+                false
+            },
             onRecordingComplete = { _, _ -> },
             onError = {},
         )

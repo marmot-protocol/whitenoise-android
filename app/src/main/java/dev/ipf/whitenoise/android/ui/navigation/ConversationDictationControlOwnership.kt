@@ -42,12 +42,12 @@ internal fun conversationDictationControlOwner(
             route.renderedAccountRef.equals(target.accountRef, ignoreCase = true) &&
             route.selectedGroupIdHex.equals(target.groupIdHex, ignoreCase = true)
     return when {
-        originComposerVisible -> ConversationDictationControlOwner.Composer
         shouldShowConversationDictationPersistentControl(
             state = state,
             originVisible = false,
             appLockScreenVisible = false,
         ) -> ConversationDictationControlOwner.Persistent
+        originComposerVisible -> ConversationDictationControlOwner.Composer
         else -> ConversationDictationControlOwner.Hidden
     }
 }

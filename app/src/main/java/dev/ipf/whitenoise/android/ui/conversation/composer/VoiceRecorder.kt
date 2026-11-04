@@ -65,9 +65,11 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Lock
 internal fun MicHoldButton(
     controller: dev.ipf.whitenoise.android.audio.VoiceRecordingController,
     slotWidth: Dp = ComposerToolbarSlotWidth,
+    canStart: () -> Boolean = { true },
     onHoldStart: () -> Unit = {},
 ) {
     val latestHoldStart by rememberUpdatedState(onHoldStart)
+    val latestCanStart by rememberUpdatedState(canStart)
     val haptics = LocalHapticFeedback.current
     val cancelThresholdDp = 120.dp
     val lockThresholdDp = 80.dp
@@ -84,7 +86,7 @@ internal fun MicHoldButton(
             onClick = {
                 if (controller.isRecording) {
                     controller.stop()
-                } else {
+                } else if (latestCanStart()) {
                     latestHoldStart()
                     if (controller.start()) controller.lock()
                 }
@@ -98,6 +100,7 @@ internal fun MicHoldButton(
                     .pointerInput(controller) {
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
+                            if (!latestCanStart()) return@awaitEachGesture
                             latestHoldStart()
                             val started = controller.start()
                             if (!started) return@awaitEachGesture

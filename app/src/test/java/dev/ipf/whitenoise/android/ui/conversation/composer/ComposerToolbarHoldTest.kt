@@ -20,6 +20,9 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.ConversationDictationController
+import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
+import dev.ipf.whitenoise.android.audio.DictationForegroundTestPlatform
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.audio.VoiceRecordingResult
 import dev.ipf.whitenoise.android.audio.VoiceRecordingSession
@@ -87,6 +90,14 @@ class ComposerToolbarHoldTest {
                 assertEquals(before.left, afterSave.left, 1f)
                 assertEquals(before.top, afterSave.top, 1f)
                 assertTrue(fixture.controller.isRecording)
+                // Changing acquisition authority must not retire an already-held pointer node.
+                composeRule.runOnIdle {
+                    assertTrue(fixture.dictation.requestStart("account", "group", TextFieldValue()))
+                }
+                composeRule.waitForIdle()
+                assertTrue(fixture.dictation.completionControlsRequired)
+                voice.assertIsDisplayed()
+                assertEquals(1, fixture.starts)
                 composeRule.runOnIdle { fixture.width.value = 400.dp }
                 composeRule.waitForIdle()
                 val held = voice.fetchSemanticsNode().boundsInRoot
@@ -104,6 +115,7 @@ class ComposerToolbarHoldTest {
                 assertEquals(1, fixture.completes)
             } finally {
                 fixture.controller.release()
+                fixture.dictation.cancel()
                 runCurrent()
             }
         }
@@ -127,6 +139,7 @@ class ComposerToolbarHoldTest {
                 assertEquals(0, fixture.completes)
             } finally {
                 fixture.controller.release()
+                fixture.dictation.cancel()
                 runCurrent()
             }
         }
@@ -170,6 +183,7 @@ class ComposerToolbarHoldTest {
                 assertEquals(0, fixture.completes)
             } finally {
                 fixture.controller.release()
+                fixture.dictation.cancel()
                 runCurrent()
             }
         }
@@ -236,6 +250,11 @@ class ComposerToolbarHoldTest {
                             onSend = { _, _ -> },
                             onCaptureFromCamera = {},
                             voiceRecordingController = fixture.controller,
+                            dictationController = fixture.dictation,
+                            dictationAccountRef = "account",
+                            dictationGroupIdHex = "group",
+                            dictationControlsVisible = false,
+                            dictationOriginVisible = true,
                             textState = textState,
                         )
                     }
@@ -249,6 +268,14 @@ class ComposerToolbarHoldTest {
         val appState: WhiteNoiseAppState,
     ) {
         lateinit var controller: VoiceRecordingController
+        val dictation =
+            ConversationDictationController(
+                platform = DictationForegroundTestPlatform(),
+                readDraft = { _, _ -> ConversationDictationDraftSnapshot(TextFieldValue(), 0L) },
+                writeDraft = { _, _, _, _ -> 0L },
+                disclosureAccepted = { true },
+                markDisclosureAccepted = {},
+            )
         val width = mutableStateOf(360.dp)
         var starts = 0
         var stops = 0

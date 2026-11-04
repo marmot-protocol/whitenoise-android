@@ -558,6 +558,7 @@ internal fun ConversationScreen(
     onSaveScrollSnapshot: (ConversationScrollSnapshot?) -> Unit = {},
     surfaceState: ConversationSurfaceState? = null,
     dictationControlsVisible: Boolean = true,
+    dictationOriginVisible: Boolean = dictationControlsVisible,
     playbackTransport: @Composable () -> Unit = {},
     onStartGroupWithPeer: (RecipientSearch.Candidate) -> Unit = {},
     searchChatsController: ChatsController? = null,
@@ -3963,6 +3964,7 @@ internal fun ConversationScreen(
                 ConversationBottomBar(
                     compactHeight = compactHeightConversation,
                     dictationControlsVisible = dictationControlsVisible,
+                    dictationOriginVisible = dictationOriginVisible,
                     selectionMode = selectionMode,
                     selectionActionAvailability =
                         batchSelectionUi.actionAvailability.let { availability ->

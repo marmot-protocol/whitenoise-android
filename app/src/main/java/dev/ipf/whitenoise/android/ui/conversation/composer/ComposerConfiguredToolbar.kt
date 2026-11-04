@@ -87,6 +87,7 @@ internal data class ComposerToolbarBindings(
     val enabled: Boolean = true,
     val scrollEnabled: Boolean = enabled,
     val transactionActive: Boolean = false,
+    val voiceLauncherVisible: Boolean = true,
     val onCustomize: (() -> Unit)? = null,
     val canActivate: () -> Boolean = { true },
     val onVoiceBounds: (Rect?) -> Unit = {},

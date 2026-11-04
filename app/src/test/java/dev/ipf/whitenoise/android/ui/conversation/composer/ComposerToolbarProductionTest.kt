@@ -19,6 +19,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
@@ -43,6 +44,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ComposerToolbarLayout
@@ -51,6 +53,9 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.share.testAccount
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -450,6 +455,59 @@ class ComposerToolbarProductionTest {
         assertEquals(ComposerShortcut.entries, appState.composerToolbarPreference.value.shortcuts)
     }
 
+    /** Typing disables the selected live voice slot without changing its place. */
+    @Test
+    fun typedVoiceShortcutKeepsItsBoundsAndCannotAcquireTheMicrophone() {
+        var permissionRequests = 0
+        val voice =
+            VoiceRecordingController(
+                context = context,
+                outputDirectory = context.cacheDir,
+                scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+                onPermissionRequest = {
+                    permissionRequests++
+                    false
+                },
+                onRecordingComplete = { _, _ -> },
+                onError = {},
+            )
+        try {
+            render(
+                ComposerToolbarSettings(
+                    listOf(
+                        ComposerShortcut.Camera,
+                        ComposerShortcut.VoiceNote,
+                        ComposerShortcut.Gallery,
+                    ),
+                    rightShortcuts = emptySet(),
+                ),
+                voiceController = voice,
+            )
+            val tag = "composer.shortcut.voice_note"
+            val before = composeRule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+            composeRule.runOnIdle { text.updateValue(TextFieldValue("Typed draft")) }
+            composeRule.waitForIdle()
+            val after = composeRule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+            assertEquals(before.center.x, after.center.x, 1f)
+            assertEquals(before.center.y, after.center.y, 1f)
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.voice_message_record))
+                .assertIsNotEnabled()
+                .performTouchInput { click() }
+            composeRule.runOnIdle {
+                assertEquals(0, permissionRequests)
+                assertTrue(!voice.isRecording)
+            }
+            composeRule.runOnIdle { text.updateValue(TextFieldValue()) }
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag("composer.voice.launcher").assertIsDisplayed()
+            val restored = composeRule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+            assertEquals(before.center.x, restored.center.x, 1f)
+        } finally {
+            voice.release()
+        }
+    }
+
     @Suppress("LongMethod") // Keeps the app-state-backed renderer and its callback instrumentation together.
     private fun render(
         settings: ComposerToolbarSettings,
@@ -458,6 +516,7 @@ class ComposerToolbarProductionTest {
         height: Int = 600,
         fontScale: Float = 1f,
         attachmentSend: ((String, (Boolean) -> Unit) -> Unit)? = null,
+        voiceController: VoiceRecordingController? = null,
     ) {
         context
             .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
@@ -507,6 +566,7 @@ class ComposerToolbarProductionTest {
                                 onShareContact = if (extraInventory) ({ recordExtra("contact") }) else null,
                                 onCreatePoll = if (extraInventory || pollOnly) ({ recordExtra("poll") }) else null,
                                 textState = text,
+                                voiceRecordingController = voiceController,
                                 modifier = Modifier.testTag("composer.toolbar.production"),
                             )
                         }

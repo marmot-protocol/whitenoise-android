@@ -12,12 +12,12 @@ class ConversationDictationControlOwnershipTest {
     /** A retained outgoing controller cannot hide root controls after the selected route changes. */
     @Test
     fun departureAndReturnUseTheCurrentRouteWithoutRecognitionCallbacks() {
-        assertEquals(ConversationDictationControlOwner.Composer, owner(origin))
+        assertEquals(ConversationDictationControlOwner.Persistent, owner(origin))
         assertEquals(
             ConversationDictationControlOwner.Persistent,
             owner(origin.copy(selectedChatId = null, selectedGroupIdHex = null)),
         )
-        assertEquals(ConversationDictationControlOwner.Composer, owner(origin))
+        assertEquals(ConversationDictationControlOwner.Persistent, owner(origin))
         assertSame(target, listening.target)
     }
 

@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
@@ -55,12 +56,16 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.state.ComposerShortcut
+import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.ChatsNewMessageFabContent
 import dev.ipf.whitenoise.android.ui.conversation.compactTopClearanceFor
 import dev.ipf.whitenoise.android.ui.conversation.composer.APP_DICTATION_CONTROL_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_DICTATION_COMPACT_ACTIONS_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_ACCESSIBILITY_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
+import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -91,6 +96,16 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
     private lateinit var renderedFixture: Fixture
     private lateinit var renderedView: View
     private var observedImeBottom = 0
+
+    /** The origin uses the same single floating owner as every other route. */
+    @Test
+    fun sameOriginBubbleLight() {
+        render(configured = true)
+        composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Dictate text").assertIsNotEnabled()
+        assertSingleActionSet()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_navigation_same_origin_light.png")
+    }
 
     @Test
     fun persistentActionsAboveKeyboardLight() = captureKeyboardActions(dark = false, largeRtl = false)
@@ -289,7 +304,7 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
 
         firstNavigationFrame { fixture.route = origin }
 
-        composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed()
         assertSingleActionSet()
         assertSame(capture, fixture.controller.state)
     }
@@ -307,7 +322,7 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
             composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed()
             assertSingleActionSet()
             firstNavigationFrame { fixture.route = origin }
-            composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertDoesNotExist()
+            composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed()
             assertSingleActionSet()
         }
     }
@@ -384,8 +399,25 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
         largeRtl: Boolean = false,
         amoled: Boolean = false,
         compact: Boolean = false,
+        configured: Boolean = false,
     ): Fixture {
         val fixture = Fixture()
+        if (configured) {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val settings =
+                ComposerToolbarSettings(
+                    listOf(
+                        ComposerShortcut.Emoji,
+                        ComposerShortcut.Dictation,
+                    ),
+                )
+            context
+                .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+                .edit()
+                .putString("composer_toolbar_v1", settings.encode())
+                .commit()
+            fixture.toolbarState = emptyAppState()
+        }
         renderedFixture = fixture
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
         fixture.platform.listener.onReady()
@@ -448,6 +480,7 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
             if (chatId != null) {
                 val group = if (chatId == origin.selectedChatId) GROUP else "other-group"
                 ComposerBar(
+                    appState = fixture.toolbarState,
                     replyingTo = null,
                     messageTextCopy = MessageTextCopy.Default,
                     onCancelReply = {},
@@ -461,6 +494,7 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
                     dictationController = fixture.controller,
                     dictationAccountRef = ACCOUNT,
                     dictationGroupIdHex = group,
+                    dictationOriginVisible = fixture.route.selectedChatId == chatId,
                     dictationControlsVisible =
                         owner == ConversationDictationControlOwner.Composer &&
                             fixture.route.selectedChatId == chatId,
@@ -499,7 +533,7 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
             composeRule.waitForIdle()
             composeRule.runOnIdle { fixture.route = origin }
             composeRule.waitForIdle()
-            composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertDoesNotExist()
+            composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed()
         }
         assertSingleActionSet()
         val phase = if (returning) "returned_composer" else "departure_first_frame"
@@ -515,6 +549,7 @@ class ConversationDictationNavigationOwnershipScreenshotTest {
     }
 
     private class Fixture {
+        var toolbarState: WhiteNoiseAppState? = null
         var route by mutableStateOf(origin)
         var locked by mutableStateOf(false)
         var committedRoute = origin

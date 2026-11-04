@@ -462,6 +462,7 @@ internal fun ComposerBar(
     dictationAccountRef: String? = null,
     dictationGroupIdHex: String? = null,
     dictationControlsVisible: Boolean = true,
+    dictationOriginVisible: Boolean = dictationControlsVisible,
     editingMessageId: String? = null,
     editingInitialText: String? = null,
     onCancelEdit: () -> Unit = {},
@@ -1428,15 +1429,27 @@ internal fun ComposerBar(
                             dictationOwnedByComposer &&
                             dictationController?.completionControlsRequired == true
                     val dictationOriginHidden =
-                        !dictationControlsVisible &&
+                        !dictationOriginVisible &&
                             dictationOwnedByComposer &&
                             dictationController?.completionControlsRequired == true
                     val activeDictationController = dictationController?.takeIf { dictationActiveInComposer }
+                    val canAcquireVoice: () -> Boolean = {
+                        val controller = dictationController
+                        controller == null ||
+                            (
+                                !controller.completionControlsRequired &&
+                                    !controller.ownsMicrophone &&
+                                    dictationAccountRef != null &&
+                                    dictationGroupIdHex != null &&
+                                    controller.composerAccess(dictationAccountRef, dictationGroupIdHex).phase ==
+                                    dev.ipf.whitenoise.android.audio.ConversationDictationComposerPhase.Ready
+                            )
+                    }
                     val showMicButton =
                         ((text.isBlank() && !hasPendingAttachments) || isRecordingVoice) &&
                             editingMessageId == null &&
                             voiceRecordingController != null &&
-                            !dictationActiveInComposer
+                            (isRecordingVoice || canAcquireVoice())
                     val showPrimaryTrailingAction =
                         voiceReviewClip == null &&
                             !dictationActiveInComposer &&
@@ -1455,8 +1468,7 @@ internal fun ComposerBar(
                     val transactionActive =
                         isRecordingVoice ||
                             voiceReviewClip != null ||
-                            dictationActiveInComposer ||
-                            dictationOriginHidden
+                            (dictationOwnedByComposer && dictationController?.completionControlsRequired == true)
                     val settings = toolbarPreference?.value ?: ComposerToolbarSettings()
                     val available =
                         attachmentActions.keys + setOf(ComposerShortcut.Emoji, ComposerShortcut.Paste) +
@@ -1471,7 +1483,13 @@ internal fun ComposerBar(
                                 }
                             ) +
                             (if (startAppOwnedDictation != null) setOf(ComposerShortcut.Dictation) else emptySet()) +
-                            (if (showMicButton) setOf(ComposerShortcut.VoiceNote) else emptySet())
+                            (
+                                if (voiceRecordingController != null && editingMessageId == null) {
+                                    setOf(ComposerShortcut.VoiceNote)
+                                } else {
+                                    emptySet()
+                                }
+                            )
                     val selectedShortcuts = settings.normalized().shortcuts.filter { it in available }
                     val hiddenAttachments = attachmentActions.keys - selectedShortcuts.toSet()
                     val liveShortcuts =
@@ -1534,15 +1552,16 @@ internal fun ComposerBar(
                             onCustomize = beginCustomization,
                             canActivate = canActivateToolbar,
                             onVoiceBounds = { if (!isRecordingVoice) voiceSlotBounds = it },
+                            voiceLauncherVisible = showConfiguredMic && configuredVoiceUsesSlot,
                         )
                     val primaryTrailingActionWidth =
                         if (dictationActiveInComposer) {
                             0.dp
                         } else if (showMicButton && voiceRecordingController.locked) {
                             actionTargetWidth * 2
-                        } else if (configuredVoiceUsesSlot) {
-                            0.dp
                         } else {
+                            // Keep Send's space reserved while the microphone occupies a configured slot.
+                            // Typing must not move the neighboring shortcuts when Send becomes visible.
                             actionTargetWidth
                         }
                     val primaryActionEnabled =
@@ -1717,7 +1736,8 @@ internal fun ComposerBar(
                                 },
                             onDictation =
                                 startAppOwnedDictation?.takeIf {
-                                    !dictationActiveInComposer &&
+                                    dictationController?.completionControlsRequired != true &&
+                                        dictationController?.blocksNewRequest != true &&
                                         !isRecordingVoice &&
                                         voiceReviewClip == null
                                 },
@@ -1946,6 +1966,7 @@ internal fun ComposerBar(
                                         controller = voiceRecordingController,
                                         slotWidth = actionTargetWidth,
                                         onHoldStart = { heldVoiceBounds = voiceSlotBounds },
+                                        canStart = canAcquireVoice,
                                     )
                                 }
                             } else if (showPrimaryTrailingAction &&

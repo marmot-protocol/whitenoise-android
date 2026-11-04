@@ -15,12 +15,16 @@ import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntRect
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
 import kotlin.math.roundToInt
+
+private const val DISABLED_VOICE_OPACITY = 0.38f
 
 /** Reuses the existing action owners, including the trusted system Paste fallback and native attachment menu. */
 @Composable
@@ -50,6 +54,8 @@ internal fun ComposerConfiguredAction(
         Icon(painterResource(shortcut.iconRes), null, Modifier.size(ComposerShortcutIconSize))
         return
     }
+    val voiceLabel = stringResource(R.string.voice_message_record)
+    val shortcutEnabled = enabled && (shortcut != ComposerShortcut.Dictation || onDictation != null)
     when (shortcut) {
         ComposerShortcut.SendingIdentity -> sendingIdentity?.invoke(modifier)
         ComposerShortcut.More ->
@@ -106,7 +112,17 @@ internal fun ComposerConfiguredAction(
                 }
             }
         // The real held-pointer node has one stable call site in ComposerBar, positioned over this slot.
-        ComposerShortcut.VoiceNote -> Unit
+        ComposerShortcut.VoiceNote -> {
+            if (!bindings.voiceLauncherVisible) {
+                IconButton(onClick = {}, enabled = false, modifier = modifier) {
+                    Box(Modifier.semantics { contentDescription = voiceLabel }) {
+                        MiniWaveformGlyph(
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = DISABLED_VOICE_OPACITY),
+                        )
+                    }
+                }
+            }
+        }
         else ->
             IconButton(
                 onClick = {
@@ -118,14 +134,19 @@ internal fun ComposerConfiguredAction(
                         }
                     }
                 },
-                enabled = enabled,
+                enabled = shortcutEnabled,
                 modifier = modifier,
             ) {
                 Icon(
                     painterResource(shortcut.iconRes),
                     stringResource(shortcut.labelRes),
                     Modifier.size(ComposerShortcutIconSize),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint =
+                        if (shortcut == ComposerShortcut.Dictation && !shortcutEnabled) {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = DISABLED_VOICE_OPACITY)
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
                 )
             }
     }

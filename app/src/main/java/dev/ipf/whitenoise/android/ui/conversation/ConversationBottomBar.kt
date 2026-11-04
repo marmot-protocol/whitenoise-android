@@ -54,6 +54,7 @@ internal fun ConversationBottomBar(
     // reserves correspondingly less clearance below it.
     compactHeight: Boolean = false,
     dictationControlsVisible: Boolean = true,
+    dictationOriginVisible: Boolean = dictationControlsVisible,
     selectionMode: Boolean,
     selectionActionAvailability: BatchSelectionActionAvailability,
     selectionForwardBlockedReason: ForwardBlockedReason?,
@@ -283,6 +284,7 @@ internal fun ConversationBottomBar(
                             dictationAccountRef = controller.boundAccountRef,
                             dictationGroupIdHex = controller.group.groupIdHex,
                             dictationControlsVisible = dictationControlsVisible,
+                            dictationOriginVisible = dictationOriginVisible,
                             appState = appState,
                             mentionCandidates = mentionCandidates,
                             mentionPickerEnabled = mentionPickerEnabled,
