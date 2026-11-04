@@ -8663,9 +8663,6 @@ class ConversationController(
                                         )
                                     }
                                 }.also { retained.uploadedReferences = it }
-                                // A publish-only retry reuses these references, so large snapshots can go now
-                                // instead of waiting, possibly offline for hours, for the send to settle.
-                                .also { retained.releaseStagedSources(appState::closeStagedUploadSourceOffMain) }
                         }
                 // Stop before publication after a discard; an unreferenced Blossom blob is inert.
                 if (discardedDuringRetry.remove(key)) {
@@ -8704,6 +8701,9 @@ class ConversationController(
                                     accepted
                                 }.also { diagnostics.finishMediaPublish(tempId, startedAtMs) }
                         }
+                // Once MDK has accepted the send, no retry uploads again, so large snapshots can go now instead of
+                // waiting, possibly offline for hours, for it to settle. Until then a stale-epoch refusal needs them.
+                retained.releaseStagedSources(appState::closeStagedUploadSourceOffMain)
                 completeDurableAcceptance(key)
                 if (retained.replyTarget != null && replySelectionVersion == retained.replyVersion) replyingTo = null
                 sendHostAttempt.success()
@@ -8981,6 +8981,9 @@ class ConversationController(
                     if (BuildConfig.DEBUG) Log.w("DMConversation", "post-acceptance media settlement failed", throwable)
                     return
                 }
+                // MDK refuses references whose upload epoch or branch is no longer current (mdk#2891), and
+                // reusing them would fail every Retry the same way, so the next attempt uploads again.
+                if (isStaleMediaReferenceEpoch(throwable)) retained.uploadedReferences = null
                 // A failed bubble offers Retry, not the bytes of the attempt that failed.
                 retained.clearTransferProgress()
                 optimisticMessages[key] =

@@ -25,7 +25,11 @@ private fun timelineRecordEnvelopeEqual(
         a.sender == b.sender &&
         a.kind == b.kind
 
-/** Compares the projected content and state that determine the bubble's visible presentation. */
+/**
+ * Compares the projected content and state that determine the bubble's visible presentation.
+ * `importedFrom` and `historyImportProvenance` are left out because no bubble shows them yet;
+ * add them here when one does.
+ */
 private fun timelineRecordContentEqual(
     a: TimelineMessageRecordFfi,
     b: TimelineMessageRecordFfi,

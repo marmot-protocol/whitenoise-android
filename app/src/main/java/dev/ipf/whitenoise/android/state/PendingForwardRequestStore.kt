@@ -357,6 +357,8 @@ private fun encodeReference(reference: MediaAttachmentReferenceFfi): JSONObject 
         .put(KEY_MEDIA_TYPE, reference.mediaType)
         .put(KEY_MEDIA_VERSION, reference.version.name)
         .put(KEY_SOURCE_EPOCH, reference.sourceEpoch.toString())
+        // Source references come from received history, which MDK projects with no upload identity, so this
+        // is null in practice; it is kept only so the encoding stays field for field.
         .put(KEY_SOURCE_EPOCH_IDENTITY, reference.sourceEpochIdentity ?: JSONObject.NULL)
         .put(KEY_DIM, reference.dim ?: JSONObject.NULL)
         .put(KEY_THUMBHASH, reference.thumbhash ?: JSONObject.NULL)

@@ -78,8 +78,10 @@ gh workflow run android-instrumented.yml --repo marmot-protocol/whitenoise-andro
 It seeds two accounts, history, retained attachments, a pending upload and cached
 avatars through MDK. Upgrade and cold restart must preserve their original bytes
 with acquisition disabled, and normal MainActivity must open usable retained
-chats. Separate phases promote the pending upload, restart again and recover
-corrupt/lost disposable media. Both recovery modes then require all seven named
+chats. Separate phases send the pending upload's bytes, restart again and recover
+corrupt/lost disposable media. Since the November 4 nightly (mdk#2891), the
+baseline's saved upload reference has no branch identity: it must be refused as
+stale, and the same bytes are uploaded again before sending. Both recovery modes then require all seven named
 cases, including the formerly ignored single-sender and long-offline replays.
 Avatar seeding uses an immutable public HTTPS image with a checked SHA-256,
 respecting MDK's URL validation. Before the first candidate launch, the runner

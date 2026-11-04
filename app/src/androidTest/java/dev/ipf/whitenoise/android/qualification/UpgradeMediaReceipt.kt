@@ -20,7 +20,7 @@ internal fun MediaAttachmentReferenceFfi.upgradeReceipt(): JSONObject =
         .put("dim", dim ?: JSONObject.NULL)
         .put("thumbhash", thumbhash ?: JSONObject.NULL)
 
-/** Reconstructs exactly the baseline's native result so MDK can promote its own pending upload after upgrade. */
+/** Reconstructs the baseline's saved upload reference, which a candidate must refuse as stale after the upgrade. */
 internal fun JSONObject.upgradeMediaReference(): MediaAttachmentReferenceFfi {
     val values = getJSONArray("locators")
     // Named arguments compile against both the baseline and candidate bindings; the baseline

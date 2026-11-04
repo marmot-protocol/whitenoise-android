@@ -98,14 +98,30 @@ upload was encrypted under. It rejects references with no recorded provenance
 at local admission, and stale uploads before sending. Existing references stay
 downloadable. Hosts must pass back references returned by an upload unchanged.
 
-Android's send paths already do:
-- The composer uploads and sends the returned references in one flow.
+Android's send paths pass upload results through unchanged:
+- The composer sends the references its own upload returned.
 - Forwards upload again from the decrypted source.
 - Custom emoji artwork sends the references its own upload returned.
 
+A send can still be refused as stale when the group's epoch or branch moves
+between upload and send. mdk#2891 adds that second trigger: a branch change at
+the same epoch number.
+- Forward and emoji artwork already upload again on Retry.
+- The composer cached the refused references and reused them on every Retry,
+  so the send could never succeed. It now drops them on a
+  `MediaReferenceStaleEpoch` or `MediaReferenceEpochUnsettled` refusal.
+- It also keeps the staged copies of large file attachments until MDK accepts
+  the send, not just until the upload returns, so the next attempt has bytes
+  to upload.
+- `ConversationMediaSendReconciliationIntegrationTest` covers both retry paths:
+  a stale refusal uploads again, and any other publish failure reuses the
+  uploaded references.
+
 `PendingForwardRequestStore` keeps *source* references, which are used only to
-download. It now persists `sourceEpochIdentity` as an optional key, so its
-encoding stays field for field. Requests stored before this change still decode.
+download. MDK projects those with no identity, so this changes nothing in
+practice. The store now persists `sourceEpochIdentity` as an optional key to
+keep its encoding field for field. Requests stored before this change still
+decode.
 
 A reference saved by the host before the upgrade carries no identity, and MDK
 refuses it. The first hosted qualification run at `b48c5ea37` showed this: its
@@ -114,9 +130,11 @@ refuses it. The first hosted qualification run at `b48c5ea37` showed this: its
 while every other phase passed.
 
 That phase now asserts the new contract. The saved reference must be refused as
-stale, and then the same bytes are uploaded again and sent once. This matches
-Android's existing stale-upload recovery. The phase still checks the exact
-retained plaintext afterwards.
+stale. The same bytes are then uploaded again, which must produce a new
+ciphertext, and sent once, and the phase reads back that send's exact
+plaintext. The phase no longer promotes the baseline's own upload. A blob
+uploaded but never sent has no recipient, so the qualification does not
+require it to be retained.
 
 The app itself never keeps upload references across a restart. On a Pixel 9a, an
 image left attached in the composer under the November 2 build sent normally
@@ -124,6 +142,19 @@ after the upgrade, because the composer uploads when it sends.
 
 ## Behavior that changes without Android code
 
+- **Reaction artwork in attachment history (mdk#2893, migration 0167).** Custom
+  reaction artwork now has an attachment source. It appears in
+  `attachmentHistoryPage` and `accountAttachmentHistoryPage` with role
+  `INLINE_EMOJI`.
+  - Both media libraries keep only `SHARED` entries
+    (`GroupAttachmentLibrary.kt`, `GlobalAttachmentLibrarySession.kt`), so the
+    artwork does not show up there.
+  - Receipt and transfer lookups match one message ID, and a reaction's
+    ID never matches a message.
+  - A chat full of artwork reactions can make an account library batch come
+    back empty, which the existing empty-batch handling covers.
+- **Custom event kind 458.** `sendCustomEvent` now refuses kind 458 (sibling
+  chat gap-fill claims). Android never calls `sendCustomEvent`.
 - **Offline sends (mdk#2860).** Every send queued while offline is published
   after reconnect, not only the first. Startup and reopen wake the queue.
 - **Late removal branches (mdk#2864).** A late losing removal branch no longer
