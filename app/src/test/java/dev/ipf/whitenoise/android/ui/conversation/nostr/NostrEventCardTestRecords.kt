@@ -49,6 +49,7 @@ internal fun eventCardTimelineRecord(
     retentionExpiresAt = null,
     sticker = null,
     importedFrom = null,
+    historyImportProvenance = null,
 )
 
 /** A one-paragraph Markdown document holding a `nostr:` URI for each of [bech32References]. */

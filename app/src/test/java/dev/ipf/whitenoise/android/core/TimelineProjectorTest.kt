@@ -619,5 +619,6 @@ class TimelineProjectorTest {
         retentionExpiresAt = null,
         sticker = null,
         importedFrom = null,
+        historyImportProvenance = null,
     )
 }

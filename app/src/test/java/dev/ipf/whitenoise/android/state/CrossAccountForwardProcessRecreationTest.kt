@@ -65,6 +65,7 @@ class CrossAccountForwardProcessRecreationTest {
             mediaType = "image/png",
             version = EncryptedMediaVersionFfi.V1,
             sourceEpoch = 4uL,
+            sourceEpochIdentity = "branch-$fileName",
             dim = "800x600",
             thumbhash = "hash",
         )
@@ -117,6 +118,22 @@ class CrossAccountForwardProcessRecreationTest {
         val media = restored.payloads[1] as ForwardMessagePayload.Media
         assertEquals(listOf(0, 1), media.attachments.map(ForwardAttachmentSource::attachmentIndex))
         assertEquals(listOf("first.png", "second.png"), media.attachments.map { it.reference.fileName })
+    }
+
+    /** A request stored before upload branch identity existed still decodes, with no identity. */
+    @Test
+    fun requestStoredWithoutBranchIdentityStillDecodes() {
+        val legacy =
+            encodePendingForwardRequest(request())
+                .decodeToString()
+                .replace(Regex(""","?"sourceEpochIdentity":"[^"]*""""), "")
+                .encodeToByteArray()
+
+        val restored = checkNotNull(decodePendingForwardRequest(legacy))
+
+        val media = restored.payloads[1] as ForwardMessagePayload.Media
+        assertEquals(listOf("first.png", "second.png"), media.attachments.map { it.reference.fileName })
+        assertEquals(listOf(null, null), media.attachments.map { it.reference.sourceEpochIdentity })
     }
 
     /** No message text, caption, or account ref appears unencrypted on disk. */

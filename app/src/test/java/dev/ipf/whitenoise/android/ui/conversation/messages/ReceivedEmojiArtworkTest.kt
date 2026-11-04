@@ -72,6 +72,7 @@ class ReceivedEmojiArtworkTest {
                 1u,
                 null,
                 null,
+                null,
             ),
         )
 }

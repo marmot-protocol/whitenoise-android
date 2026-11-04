@@ -688,6 +688,7 @@ class OptimisticMessageReconciliationTest {
             retentionExpiresAt = null,
             sticker = null,
             importedFrom = null,
+            historyImportProvenance = null,
         )
 
     private fun timelineMessage(

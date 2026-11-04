@@ -20,21 +20,24 @@ internal fun MediaAttachmentReferenceFfi.upgradeReceipt(): JSONObject =
         .put("dim", dim ?: JSONObject.NULL)
         .put("thumbhash", thumbhash ?: JSONObject.NULL)
 
-/** Reconstructs exactly the baseline's native result so MDK can promote its own pending upload after upgrade. */
+/** Reconstructs the baseline's saved upload reference, which a candidate must refuse as stale after the upgrade. */
 internal fun JSONObject.upgradeMediaReference(): MediaAttachmentReferenceFfi {
     val values = getJSONArray("locators")
+    // Named arguments compile against both the baseline and candidate bindings; the baseline
+    // result predates `sourceEpochIdentity`, so the candidate's default stands in for it.
     return MediaAttachmentReferenceFfi(
-        List(values.length()) { index ->
-            values.getJSONObject(index).let { MediaLocatorFfi(it.getString("kind"), it.getString("value")) }
-        },
-        getString("ciphertextSha256"),
-        getString("plaintextSha256"),
-        getString("nonceHex"),
-        getString("fileName"),
-        getString("mediaType"),
-        EncryptedMediaVersionFfi.valueOf(getString("version")),
-        getString("sourceEpoch").toULong(),
-        if (isNull("dim")) null else getString("dim"),
-        if (isNull("thumbhash")) null else getString("thumbhash"),
+        locators =
+            List(values.length()) { index ->
+                values.getJSONObject(index).let { MediaLocatorFfi(it.getString("kind"), it.getString("value")) }
+            },
+        ciphertextSha256 = getString("ciphertextSha256"),
+        plaintextSha256 = getString("plaintextSha256"),
+        nonceHex = getString("nonceHex"),
+        fileName = getString("fileName"),
+        mediaType = getString("mediaType"),
+        version = EncryptedMediaVersionFfi.valueOf(getString("version")),
+        sourceEpoch = getString("sourceEpoch").toULong(),
+        dim = if (isNull("dim")) null else getString("dim"),
+        thumbhash = if (isNull("thumbhash")) null else getString("thumbhash"),
     )
 }
