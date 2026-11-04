@@ -71,10 +71,12 @@ internal fun Avatar(
     // state holder itself must also be recreated to re-seed from the new cache
     // key instead of displaying the old bitmap transiently.
     val privateSource = PrivateContactAvatarLoader.isPrivate(pictureUrl)
-    val loadedUrlImage by key(seed, pictureUrl, picture, AvatarImageLoader.currentCacheLifetime()) {
+    val lifetime = AvatarImageLoader.currentCacheLifetime()
+    val loadedUrlImage by key(seed, pictureUrl, picture, lifetime) {
         rememberRecoverableAvatar(
             initialImage = AvatarImageLoader.peek(pictureUrl),
             enabled = pictureUrl != null && (picture == null || privateSource),
+            awaitCached = { AvatarImageLoader.awaitCached(checkNotNull(pictureUrl), lifetime) },
         ) {
             val url = checkNotNull(pictureUrl)
             AvatarImageLoader.load(url, pictureDomain)

@@ -46,7 +46,9 @@ object AvatarImageLoader {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val fetchGate = AvatarFetchGate(REGULAR_FETCH_CONCURRENCY, NOTIFICATION_FETCH_CONCURRENCY)
     private val lock = Any()
-    private val cache = PartitionedProfileImageCache(AVATAR_CACHE_SIZE_BYTES, BANNER_CACHE_SIZE_BYTES)
+    private val publications = AvatarCachePublications()
+    private val cache =
+        PartitionedProfileImageCache(AVATAR_CACHE_SIZE_BYTES, BANNER_CACHE_SIZE_BYTES, publications::published)
     private val inFlight = mutableMapOf<String, AvatarInFlightRequest>()
 
     // staleness-exempt: captured request-lifetime tokens for bounded queued work, not a counter owner.
@@ -121,6 +123,11 @@ object AvatarImageLoader {
         synchronized(lock) {
             profileImageFetcher = null
         }
+    }
+
+    /** Test-only stand-in for the 60-second failure cooldown elapsing, without a recovery event. */
+    internal fun expireFailureCooldownForTests() {
+        synchronized(lock) { failureExpiresAt.clear() }
     }
 
     /**
@@ -368,6 +375,50 @@ object AvatarImageLoader {
     }
 
     /**
+     * Waits, without fetching, reading or decoding anything, for another consumer to publish [url]'s avatar
+     * pixels in cache lifetime [lifetime], so a mounted placeholder whose own attempt failed can adopt them
+     * (#3557). A banner entry never satisfies it, because banner keys are distinct. Null once the lifetime
+     * ends, so a cleared cache or switched account cannot hand a retired consumer new pixels.
+     */
+    internal suspend fun awaitCached(
+        url: String,
+        lifetime: Long,
+    ): ImageBitmap? =
+        if (PrivateContactAvatarLoader.isPrivate(url)) {
+            PrivateContactAvatarLoader.awaitCached(url, lifetime = lifetime)
+        } else {
+            awaitPublication(setOf(url), lifetime) { peek(url) }
+        }
+
+    /**
+     * Registers for [keys] before reading through [read], so a publication between the read and the wait
+     * cannot be missed, then re-reads after each publication of one of those keys. [read] decides what the
+     * consumer would show, so a caller with ownership rules re-validates them on every wake.
+     */
+    internal suspend fun awaitPublication(
+        keys: Set<String>,
+        lifetime: Long,
+        read: () -> ImageBitmap?,
+    ): ImageBitmap? {
+        while (true) {
+            val registration = synchronized(lock) { publications.register(keys) }
+            try {
+                val image = read()
+                when {
+                    !synchronized(lock) { cacheLifetime.isCurrent(lifetime) } -> return null
+                    image != null -> return image
+                }
+                registration.published.await()
+            } finally {
+                synchronized(lock) { publications.release(registration) }
+            }
+        }
+    }
+
+    /** Keys that currently have a mounted waiter, for cleanup assertions. */
+    internal fun waitingPublicationKeyCount(): Int = synchronized(lock) { publications.waitingKeyCount }
+
+    /**
      * The encoded GIF behind [url]'s cached first frame, or null for a static, uncached or evicted
      * image. Surfaces animate only from these bytes, so they never fetch or decode a URL themselves.
      */
@@ -479,6 +530,7 @@ object AvatarImageLoader {
             cache.evictAll()
             animatedSources.clear()
             retireRequestsLocked()
+            publications.retireAll()
         }
     }
 
@@ -492,6 +544,7 @@ object AvatarImageLoader {
             cache.evictStoredAvatars()
             animatedSources.keysSnapshot().filter(::isStoredAvatarKey).forEach(animatedSources::remove)
             retireRequestsLocked()
+            publications.retireAll()
         }
     }
 
@@ -708,6 +761,7 @@ internal fun profileImageVariantOf(cacheKey: String): ProfileImageVariant =
 internal class PartitionedProfileImageCache(
     avatarBytes: Int,
     bannerBytes: Int,
+    private val onPublished: (String) -> Unit = {},
 ) {
     private var trimmingMemory = false
     private val avatars =
@@ -731,6 +785,7 @@ internal class PartitionedProfileImageCache(
     ) {
         partitionFor(cacheKey).put(cacheKey, CachedProfileFrame(image))
         if (profileImageVariantOf(cacheKey) == ProfileImageVariant.AVATAR) AvatarCacheChanges.published()
+        onPublished(cacheKey)
     }
 
     /** Null means absent or unclassified pixels; a known static frame needs no second original-byte read. */

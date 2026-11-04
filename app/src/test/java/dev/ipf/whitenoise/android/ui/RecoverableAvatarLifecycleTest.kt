@@ -14,6 +14,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.ipf.whitenoise.android.core.AvatarLoadRecovery
 import dev.ipf.whitenoise.android.ui.common.rememberRecoverableAvatar
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -140,6 +141,112 @@ class RecoverableAvatarLifecycleTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText("loaded").assertExists()
         assertEquals(2, attempts.get())
+    }
+
+    /** Cached pixels another consumer publishes are adopted while visible, with no new attempt or recovery (#3557). */
+    @Test
+    fun cachedPublicationIsAdoptedWithoutAnotherAttempt() {
+        val attempts = AtomicInteger()
+        val published = CompletableDeferred<ImageBitmap?>()
+        val recompose = mutableStateOf(0)
+        composeRule.setContent {
+            val image by rememberRecoverableAvatar(null, awaitCached = { published.await() }) {
+                attempts.incrementAndGet()
+                null
+            }
+            Text(if (image == null) "missing ${recompose.value}" else "loaded ${recompose.value}")
+        }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { recompose.value = 1 }
+        composeRule.onNodeWithText("missing 1").assertExists()
+        composeRule.runOnIdle { published.complete(ImageBitmap(2, 2)) }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { recompose.value = 2 }
+        composeRule.onNodeWithText("loaded 2").assertExists()
+        assertEquals(1, attempts.get())
+        composeRule.runOnIdle { AvatarLoadRecovery.onNetworkRestored() }
+        composeRule.waitForIdle()
+        assertEquals(1, attempts.get())
+    }
+
+    /** A wait that ends without pixels (a retired cache lifetime) leaves the recovery policy in charge. */
+    @Test
+    fun emptyAdoptionKeepsWaitingForRecovery() {
+        val attempts = AtomicInteger()
+        composeRule.setContent {
+            rememberRecoverableAvatar(null, awaitCached = { null }) {
+                attempts.incrementAndGet()
+                null
+            }
+        }
+        composeRule.waitForIdle()
+        assertEquals(1, attempts.get())
+        composeRule.runOnIdle { AvatarLoadRecovery.onNetworkRestored() }
+        composeRule.waitForIdle()
+        assertEquals(2, attempts.get())
+    }
+
+    /** The wait is cancelled at STOP and re-registered at START, so a publication made while stopped is adopted. */
+    @Test
+    fun publicationWhileStoppedIsAdoptedOnStart() {
+        lateinit var owner: AvatarLifecycleOwner
+        val registrations = AtomicInteger()
+        val cancellations = AtomicInteger()
+        var cached: ImageBitmap? = null
+        composeRule.runOnIdle { owner = AvatarLifecycleOwner() }
+        composeRule.setContent {
+            CompositionLocalProvider(LocalLifecycleOwner provides owner) {
+                val image by rememberRecoverableAvatar(
+                    null,
+                    awaitCached = {
+                        registrations.incrementAndGet()
+                        cached ?: try {
+                            awaitCancellation()
+                        } finally {
+                            cancellations.incrementAndGet()
+                        }
+                    },
+                ) { null }
+                Text(if (image == null) "missing" else "loaded")
+            }
+        }
+        composeRule.waitForIdle()
+        assertEquals(1, registrations.get())
+        composeRule.runOnIdle { owner.state = Lifecycle.State.CREATED }
+        composeRule.waitForIdle()
+        assertEquals(1, cancellations.get())
+        composeRule.runOnIdle { cached = ImageBitmap(2, 2) }
+        composeRule.mainClock.advanceTimeBy(120_000)
+        composeRule.onNodeWithText("missing").assertExists()
+        composeRule.runOnIdle { owner.state = Lifecycle.State.STARTED }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("loaded").assertExists()
+        assertEquals(2, registrations.get())
+    }
+
+    /** Disposing a placeholder cancels its cache wait, so no observer outlives the composition. */
+    @Test
+    fun disposalCancelsTheCacheWait() {
+        val visible = mutableStateOf(true)
+        val cancelled = CompletableDeferred<Unit>()
+        composeRule.setContent {
+            if (visible.value) {
+                rememberRecoverableAvatar(
+                    null,
+                    awaitCached = {
+                        try {
+                            awaitCancellation()
+                        } finally {
+                            cancelled.complete(Unit)
+                        }
+                    },
+                ) { null }
+            }
+        }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle { visible.value = false }
+        composeRule.waitForIdle()
+        assertEquals(true, cancelled.isCompleted)
     }
 
     /** Gives each test explicit foreground/background control without replacing its composition. */
