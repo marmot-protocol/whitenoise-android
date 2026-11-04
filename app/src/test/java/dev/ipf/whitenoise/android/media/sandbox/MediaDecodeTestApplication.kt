@@ -7,8 +7,13 @@ import java.io.File
 
 /** JVM rendering tests use an explicit codec fixture. Only device tests attest process isolation. */
 class MediaDecodeTestApplication : WhiteNoiseApplication() {
+    /**
+     * Enables the explicit JVM SVG fixture and installs deterministic decoding after normal application
+     * initialization.
+     */
     override fun onCreate() {
         super.onCreate()
+        ViewerSvgDecoder.allowInProcessDecodingForTests()
         IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)
     }
 }
@@ -27,6 +32,16 @@ internal object TestMediaDecodeTransport : MediaDecodeTransport {
         } else {
             PlatformMediaDecoder.decode(bytes, edge, oriented)
         }
+
+    /** Inspects original SVG bytes through the same policy and document parser used by the vector worker. */
+    override fun svgInspect(bytes: ByteArray): ImageInspection? = ViewerSvgDecoder.inspect(bytes)
+
+    /** Uses in-process JVM fixture rendering for the requested fractional SVG crop. */
+    override fun svgRegion(
+        bytes: ByteArray,
+        region: ViewerSvgRegion,
+        edge: Int,
+    ): Bitmap? = ViewerSvgDecoder.region(bytes, region, edge)
 
     override fun exif(bytes: ByteArray): Int? =
         dev.ipf.whitenoise.android.media.MediaPipeline

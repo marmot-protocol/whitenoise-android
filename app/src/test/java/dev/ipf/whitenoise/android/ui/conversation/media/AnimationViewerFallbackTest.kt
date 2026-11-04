@@ -68,4 +68,53 @@ class AnimationViewerFallbackTest {
                 IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)
             }
         }
+
+    /** Only the real viewer opt-in requests original detail; bubbles keep their normal animation budget. */
+    @Test
+    fun viewerOriginalAnimationIsAnExplicitSourcePolicy(): Unit =
+        runBlocking {
+            val edges = mutableListOf<Int>()
+            val transport =
+                object : MediaDecodeTransport by TestMediaDecodeTransport {
+                    /**
+                     * Records requested animation edges and refuses output to exercise the fallback presentation
+                     * path.
+                     */
+                    override fun animation(
+                        bytes: ByteArray,
+                        edge: Int,
+                    ): Drawable? {
+                        edges.add(edge)
+                        return null
+                    }
+
+                    /**
+                     * Provides a small static bitmap when the test explicitly admits fallback after animation
+                     * refusal.
+                     */
+                    override fun decode(
+                        bytes: ByteArray,
+                        edge: Int,
+                        oriented: Boolean,
+                        operation: Int,
+                    ): Bitmap = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+                }
+            IsolatedMediaDecoder.installTestTransport(transport)
+            try {
+                for (viewerOriginal in listOf(false, true)) {
+                    val presentation =
+                        decodeMessageAttachmentImage(
+                            twoFrameGif(),
+                            "image/gif",
+                            32,
+                            animationAllowed = true,
+                            viewerOriginalAnimation = viewerOriginal,
+                        )
+                    (presentation as DecodedAttachmentPresentation.Static).bitmap.recycle()
+                }
+                assertEquals(listOf(MediaPipeline.ANIMATED_IMAGE_MAX_EDGE_PX, 4096), edges)
+            } finally {
+                IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)
+            }
+        }
 }

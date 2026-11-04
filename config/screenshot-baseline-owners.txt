@@ -220,3 +220,5 @@
 *.ComposerMentionLayoutTest.compactLandscapeRosterDoesNotFlattenTheEditor
 *.ComposerMentionLayoutTest.longDraftLeavesShortcodeSuggestionsVisible
 *.MediaPressIndicationTest.heldReadyImagePressIsVisibleAndCancelRemovesItWithoutOpening
+
+*.EventImageViewerScreenshotTest

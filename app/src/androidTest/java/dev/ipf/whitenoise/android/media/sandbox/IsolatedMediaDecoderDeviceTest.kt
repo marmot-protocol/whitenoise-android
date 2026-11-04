@@ -139,7 +139,7 @@ class IsolatedMediaDecoderDeviceTest {
             try {
                 val started = android.os.SystemClock.elapsedRealtime()
                 val blocked = executor.submit { IsolatedMediaDecoder.exerciseWatchdogForTest() }
-                awaitDispatch(owner)
+                awaitDispatch(context, owner)
                 val hung = context.inputEndpoints().single().getInt("generation")
                 assertTrue(context.isEndpointAlive(hung))
                 val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -523,12 +523,20 @@ class IsolatedMediaDecoderDeviceTest {
         }
     }
 
-    private fun awaitDispatch(owner: IsolatedMediaTransport) {
+    /** Waits for a witnessed DECODE, not merely admission before the Messenger send. */
+    private fun awaitDispatch(
+        context: MediaWorkerBaselineBinding,
+        owner: IsolatedMediaTransport,
+    ) {
         val deadline = android.os.SystemClock.elapsedRealtime() + 5_000L
-        while (!owner.isRequestDispatchedForTest() && android.os.SystemClock.elapsedRealtime() < deadline) {
+        while (
+            (!owner.isRequestDispatchedForTest() || context.inputEndpoints().size != 1) &&
+            android.os.SystemClock.elapsedRealtime() < deadline
+        ) {
             android.os.SystemClock.sleep(20)
         }
         assertTrue(owner.isRequestDispatchedForTest())
+        assertEquals(1, context.inputEndpoints().size)
     }
 
     /** Waits for the kernel Binder death of the [generation]th binding attempt. */

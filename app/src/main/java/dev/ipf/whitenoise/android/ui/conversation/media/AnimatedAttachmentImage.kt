@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.viewinterop.AndroidView
+import dev.ipf.whitenoise.android.media.AnimationSourceAdmission
 import dev.ipf.whitenoise.android.media.MediaPipeline
 import dev.ipf.whitenoise.android.media.decodeAdmittedAttachmentImage
 
@@ -39,29 +40,44 @@ suspend fun decodeMessageAttachmentImage(
     staticMaxEdgePx: Int,
     animatedMaxEdgePx: Int = MediaPipeline.ANIMATED_IMAGE_MAX_EDGE_PX,
     animationAllowed: Boolean = false,
+    viewerOriginalAnimation: Boolean = false,
     domain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
 ): DecodedAttachmentPresentation? =
     dev.ipf.whitenoise.android.media.decodeOwnedMedia(decode = {
-        val admission =
-            dev.ipf.whitenoise.android.media
-                .admitAnimationSource(bytes)
-        val animationDeferred =
-            !animationAllowed && admission is dev.ipf.whitenoise.android.media.AnimationSourceAdmission.Admitted
-        decodeAdmittedAttachmentImage<DecodedAttachmentPresentation>(
-            bytes = bytes,
-            admission = admission,
-            decodeAnimated = {
-                (if (animationAllowed) MediaPipeline.decodeAnimatedDrawable(bytes, animatedMaxEdgePx) else null)?.let {
-                    DecodedAttachmentPresentation.Animated(it)
-                }
-            },
-            decodeStill = {
-                MediaPipeline.decodeSampledBitmap(bytes, staticMaxEdgePx, domain = domain)?.let {
-                    DecodedAttachmentPresentation.Static(it, animationDeferred)
-                }
-            },
-        )
+        dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope.within(domain) {
+            val admission =
+                dev.ipf.whitenoise.android.media
+                    .admitAnimationSource(bytes)
+            val animationDeferred =
+                !animationAllowed && admission is dev.ipf.whitenoise.android.media.AnimationSourceAdmission.Admitted
+            decodeAdmittedAttachmentImage<DecodedAttachmentPresentation>(
+                bytes = bytes,
+                admission = admission,
+                decodeAnimated = {
+                    val drawable =
+                        when {
+                            !animationAllowed -> null
+                            viewerOriginalAnimation -> MediaPipeline.decodeViewerAnimatedDrawable(bytes)
+                            else -> MediaPipeline.decodeAnimatedDrawable(bytes, animatedMaxEdgePx)
+                        }
+                    drawable?.let {
+                        DecodedAttachmentPresentation.Animated(it)
+                    }
+                },
+                decodeStill = {
+                    val fallbackEdge =
+                        if (viewerOriginalAnimation && admission is AnimationSourceAdmission.Admitted) {
+                            maxOf(admission.canvasWidth, admission.canvasHeight)
+                        } else {
+                            staticMaxEdgePx
+                        }
+                    decodeChatAttachmentStill(bytes, fallbackEdge)?.let {
+                        DecodedAttachmentPresentation.Static(it, animationDeferred)
+                    }
+                },
+            )
+        }
     }, discard = { presentation ->
         when (presentation) {
             is DecodedAttachmentPresentation.Static -> presentation.bitmap.recycle()

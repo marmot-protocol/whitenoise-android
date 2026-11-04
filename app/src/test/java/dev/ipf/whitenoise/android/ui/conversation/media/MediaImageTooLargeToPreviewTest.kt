@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -22,6 +23,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ATTACHMENT_PRESENTATION_MAX_BYTES
@@ -138,22 +140,25 @@ class MediaImageTooLargeToPreviewTest {
     /** The viewer page reads as too large to preview with the Save or share hint and without a Retry action. */
     @Test
     fun anOversizedViewerPageOffersNoRetry() {
+        val lifecycle = ViewerPageTestLifecycleOwner()
         composeRule.setContent {
             WhiteNoiseTheme {
-                Box(Modifier.fillMaxSize()) {
-                    ViewerPage(
-                        controller = controller,
-                        messageIdHex = request(0).messageIdHex,
-                        attachmentIndex = 0,
-                        reference = reference(0),
-                        scale = 1f,
-                        offset = Offset.Zero,
-                        onScaleChange = {},
-                        onOffsetChange = {},
-                        mine = false,
-                        isCurrent = true,
-                        onChromeToggle = {},
-                    )
+                CompositionLocalProvider(LocalLifecycleOwner provides lifecycle) {
+                    Box(Modifier.fillMaxSize()) {
+                        ViewerPage(
+                            controller = controller,
+                            messageIdHex = request(0).messageIdHex,
+                            attachmentIndex = 0,
+                            reference = reference(0),
+                            scale = 1f,
+                            offset = Offset.Zero,
+                            onScaleChange = {},
+                            onOffsetChange = {},
+                            mine = false,
+                            isCurrent = true,
+                            onChromeToggle = {},
+                        )
+                    }
                 }
             }
         }

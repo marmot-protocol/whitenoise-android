@@ -7,6 +7,31 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MediaDecodePolicyTest {
+    /** Worker protocol operations cannot alias debug hooks or another codec request. */
+    @Test
+    fun workerOperationsHaveDistinctProtocolValues() {
+        val operations =
+            listOf(
+                MediaDecodePolicy.DECODE,
+                MediaDecodePolicy.INSPECT,
+                MediaDecodePolicy.SVG,
+                MediaDecodePolicy.RESPONSE,
+                MediaDecodePolicy.PROBE,
+                MediaDecodePolicy.WAVEFORM,
+                MediaDecodePolicy.DEBUG_HANG,
+                MediaDecodePolicy.EXIF,
+                MediaDecodePolicy.RETIRE,
+                MediaDecodePolicy.REGION,
+                MediaDecodePolicy.DEBUG_BAD_REPLY,
+                MediaDecodePolicy.DEBUG_CANARY,
+                MediaDecodePolicy.DEBUG_IGNORE_RETIRE,
+                MediaDecodePolicy.DEBUG_STUBBORN_HANG,
+                MediaDecodePolicy.VIEWER_SVG_INSPECT,
+                MediaDecodePolicy.VIEWER_SVG_REGION,
+            )
+        assertEquals(operations.size, operations.toSet().size)
+    }
+
     @Test
     fun regionSamplingPreservesQualityAndBoundsItsRoundedIntermediate() {
         assertNull(MediaDecodePolicy.regionSampleSize(MediaImageRegion(0, 0, 7200, 5400), 4096))
