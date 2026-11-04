@@ -747,9 +747,9 @@ class ConversationMediaPublishRefusalRetryTest {
                     applyProjection(
                         controller,
                         projectedMediaMessage(
-                        recordedAt = optimistic.record.recordedAt,
-                        reference = reference,
-                    ),
+                            recordedAt = optimistic.record.recordedAt,
+                            reference = reference,
+                        ),
                     )
                     acceptedPendingSummary()
                 },
