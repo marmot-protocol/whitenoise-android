@@ -76,10 +76,25 @@ internal fun messageActionKinds(
         MessageActionKind.Report to canReport,
     ).filter { (_, enabled) -> enabled }.map { (kind, _) -> kind }
 
-internal fun messageActionColumnCount(
+/**
+ * Column widths for actions whose one-line cell widths are [cellWidths], in menu order.
+ *
+ * Two columns, each as wide as its widest cell, when both fit [availableWidth] beside the gap. Otherwise
+ * one column, as wide as the widest cell up to [availableWidth], where only a label too long for the full
+ * width wraps.
+ */
+internal fun messageActionColumnWidths(
+    cellWidths: List<Dp>,
     availableWidth: Dp,
-    minimumCellWidth: Dp,
-): Int = if (availableWidth >= minimumCellWidth * 2 + messageActionColumnGap) 2 else 1
+): List<Dp> {
+    val firstColumn = cellWidths.filterIndexed { index, _ -> index % 2 == 0 }.maxOrNull() ?: 0.dp
+    val secondColumn = cellWidths.filterIndexed { index, _ -> index % 2 == 1 }.maxOrNull()
+    return if (secondColumn != null && firstColumn + messageActionColumnGap + secondColumn <= availableWidth) {
+        listOf(firstColumn, secondColumn)
+    } else {
+        listOf(minOf(maxOf(firstColumn, secondColumn ?: 0.dp), availableWidth))
+    }
+}
 
 internal fun estimatedMessageActionMenuHeight(
     actionCount: Int,
