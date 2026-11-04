@@ -2187,19 +2187,16 @@ class ConversationScrollCoordinatorTest {
         }
 
     /**
-     * Known limit: a tall first row hidden entirely behind a newer row that exactly fills the viewport is never laid
-     * out at the tail, so it cannot be seen to be oversized, and the burst keeps the single tail write.
+     * A tall first row hidden entirely behind a newer row that exactly fills the viewport is never laid out at the
+     * tail, so a measuring snap reads it, restores the tail in the same frame and the burst lands on its beginning.
      */
     @Test
-    fun oversizedRowHiddenBehindAFittingNewestRowKeepsTheTail() =
+    fun oversizedRowHiddenBehindAFittingNewestRowStartsAtItsBeginning() =
         runTest {
-            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(600, 900, 80))
-            list.settle(index = 2)
-            val coordinator = ConversationScrollCoordinator(list)
-            val outcome = appendBurst(coordinator, list, listOf("first", "second"))
-            assertEquals(ConversationIncomingAppendOutcome.FollowedTail, outcome)
-            assertEquals(listOf(0 to 0), list.writes)
-            assertTrue(coordinator.isFollowingTail)
+            assertBurstLandsOnFirstRow(
+                heightsPx = listOf(600, 900, 80),
+                expectedWrites = listOf(0 to 0, 1 to 0, 0 to 0, 1 to 0, 1 to 300),
+            )
         }
 
     /** A burst of rows that each fit keeps the tail even when the first row's top is clipped. */
@@ -2227,18 +2224,19 @@ class ConversationScrollCoordinatorTest {
         }
 
     /**
-     * A burst of short rows that overflows the viewport, leaving its first row not laid out, keeps the single tail
-     * write: no measuring scroll is made for rows the tail layout did not reach.
+     * A burst of short rows that overflows the viewport, leaving its first row not laid out, keeps the tail: the
+     * measuring snap to that first row and the return to the tail are written in one frame, so none is drawn.
      */
     @Test
-    fun overflowingShortBurstMakesOnlyTheTailWrite() =
+    fun overflowingShortBurstMeasuresItsFirstRowWithinOneFrame() =
         runTest {
             val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(300, 300, 300, 80))
             list.settle(index = 3)
             val coordinator = ConversationScrollCoordinator(list)
             val outcome = appendBurst(coordinator, list, listOf("first", "second", "third"))
             assertEquals(ConversationIncomingAppendOutcome.FollowedTail, outcome)
-            assertEquals(listOf(0 to 0), list.writes)
+            assertEquals(listOf(0 to 0, 2 to 0, 0 to 0), list.writes)
+            assertEquals("the probe and its return share a frame", list.writeFrames[1], list.writeFrames[2])
             assertTrue(coordinator.isFollowingTail)
         }
 

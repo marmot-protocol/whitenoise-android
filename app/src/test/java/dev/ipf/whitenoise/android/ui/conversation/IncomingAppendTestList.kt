@@ -15,6 +15,10 @@ internal class IncomingAppendTestList(
 
     /** Every write in order, as (index, scroll offset) pairs. */
     val writes = mutableListOf<Pair<Int, Int>>()
+
+    /** How many frames had passed at each write in [writes], so a test can tell writes in one frame apart. */
+    val writeFrames = mutableListOf<Int>()
+    private var frames = 0
     private var requested = 0 to 0
     private var measured: Pair<Int, Int>? = null
 
@@ -27,6 +31,7 @@ internal class IncomingAppendTestList(
         scrollOffset: Int,
     ) {
         writes += index to scrollOffset
+        writeFrames += frames
         requested = index to scrollOffset
         measured = requested
     }
@@ -37,8 +42,10 @@ internal class IncomingAppendTestList(
         scrollOffset: Int,
     ) = scrollToItem(index, scrollOffset)
 
-    /** Advances one frame, which changes nothing here because every write is already measured. */
-    fun frame() = Unit
+    /** Advances one frame, which changes no geometry here because every write is already measured. */
+    fun frame() {
+        frames++
+    }
 
     /** Marks the current position as measured without a write, as an already-settled list is. */
     fun settle(

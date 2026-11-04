@@ -72,12 +72,23 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
     }
 
     /**
-     * A burst of short incoming messages that together overflow the viewport keeps following the tail, and its append
-     * is made of exactly one write, the offset-zero tail, with no measuring scroll of its off-screen rows.
+     * A burst of short incoming messages that together overflow the viewport keeps following the tail. Besides the
+     * offset-zero tail write, its append only snaps to the burst's first row to measure it and straight back.
      */
     @Test
     fun burstOfShortIncomingMessagesKeepsFollowingTheTail() {
         verifyAppend(AppendCase(bodyLines = 1, expectReadingStart = false, shortBurstCount = SHORT_BURST_COUNT))
+    }
+
+    /**
+     * A tall message that arrives together with enough short ones to fill the screen is never laid out at the tail,
+     * and nothing earlier in the burst saw it, yet the append still starts at its beginning.
+     */
+    @Test
+    fun tallMessageArrivingWithAScreenOfShortOnesStartsAtItsBeginning() {
+        verifyAppend(
+            AppendCase(bodyLines = TALL_BODY_LINES, expectReadingStart = true, shortBurstCount = SHORT_BURST_COUNT),
+        )
     }
 
     /** An incoming message that fits keeps the newest edge and the tail-following intent. */
@@ -308,8 +319,8 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
             val writesBeforeAppend = evidence.writeCount()
             timeline.emitWindow(timelinePage(*appended.toTypedArray()))
             awaitLanding(fixture, case, evidence, newestId = appended.last().messageIdHex)
-            if (case.shortBurstCount > 0) {
-                assertOnlyTheTailWrite(evidence.writesSince(writesBeforeAppend))
+            if (case.shortBurstCount > 0 && !case.expectReadingStart) {
+                assertTheTailWithOneMeasuringSnap(evidence.writesSince(writesBeforeAppend))
             }
             if (case.expectReadingStart) {
                 assertIncomingAtReadingTop()
@@ -404,11 +415,14 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
         }
     }
 
-    /** A short-only burst writes the tail once and nothing else: no measuring scroll, no return. */
-    private fun assertOnlyTheTailWrite(writes: List<ConversationScrollWriteEvidence>) {
-        assertEquals("a short burst must make exactly one write: $writes", 1, writes.size)
+    /** A short-only burst writes the tail, snaps once to measure its first row and returns to the same tail. */
+    private fun assertTheTailWithOneMeasuringSnap(writes: List<ConversationScrollWriteEvidence>) {
+        assertEquals("a short burst must make the tail, probe and return writes: $writes", 3, writes.size)
         val tail = writes.first()
         assertEquals(ConversationScrollWriteEvidence(animated = false, index = tail.index, offsetPx = 0), tail)
+        val probe = writes[1]
+        assertEquals(ConversationScrollWriteEvidence(animated = false, index = probe.index, offsetPx = 0), probe)
+        assertEquals(tail, writes.last())
     }
 
     /** The settled mode is a history reading anchored on the incoming message. */

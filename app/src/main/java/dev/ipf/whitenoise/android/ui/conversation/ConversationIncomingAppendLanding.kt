@@ -113,8 +113,8 @@ internal class ConversationIncomingAppendLandingQueue {
  * than the clear reading viewport. Physical-tail alignment would then hide a beginning the reader has not seen, so the
  * oldest incoming row of the append whose beginning the tail hides — the oversized row itself, or an earlier row of
  * the burst that later arrivals pushed above the viewport — is placed at the top instead, and the reader's intent
- * becomes reading that message. Appends whose laid-out incoming rows each fit keep tail following, even when together
- * they overflow the viewport.
+ * becomes reading that message. The same happens when that pushed-up row is itself oversized, which a measuring snap
+ * finds out. Appends whose incoming rows each fit keep tail following, even when together they overflow the viewport.
  *
  * The decision runs inside the same latest-wins command as the tail write. The rows are measured after the tail write
  * in the occlusion-aware reading layout, waiting a bounded number of frames for the newest of them to be laid out,
@@ -149,7 +149,20 @@ internal suspend fun ConversationScrollCoordinator.followAppendOrRevealIncomingS
             awaitFrame()
             scrollToTail(resolveTailIndex())
             val target =
-                awaitHiddenIncomingStart(candidates, probeFor, maxMeasureFrames, awaitFrame, oversizedSeen, onOversized)
+                awaitHiddenIncomingStart(
+                    candidates,
+                    probeFor,
+                    maxMeasureFrames,
+                    awaitFrame,
+                    oversizedSeen,
+                    onOversized,
+                ) { probe ->
+                    // Both writes force a synchronous remeasure, so no frame draws the row before the tail is restored.
+                    probe.resolveTargetIndex()?.let { index ->
+                        scrollToItem(index)
+                        probe.readLayout(index).also { scrollToTail(resolveTailIndex()) }
+                    }
+                }
             if (target != null) {
                 val placement =
                     placeReadingStart(
@@ -188,10 +201,10 @@ private fun ConversationScrollCoordinator.settleRevealedReadingStart(
 /**
  * Waits at most [maxFrames] frames for the newest appended row still in the timeline to be measured after the tail
  * write, then returns the oldest appended row whose beginning that write left above the clear reading viewport — but
- * only when a row laid out in that same tail layout is oversized, or [oversizedSeen] says an earlier, cancelled
- * decision over the burst measured one, which [onOversized] records. A burst of rows that each fit keeps tail
- * following, however far it overflows the viewport in total, so a catch-up of short messages behaves exactly as it
- * always has and no extra write is made for it.
+ * only when a row laid out in that same tail layout is oversized, [oversizedSeen] says an earlier, cancelled decision
+ * over the burst measured one, or that oldest hidden row turns out to be oversized itself, and [onOversized] records
+ * what this decision measured. A burst of rows that each fit keeps tail following, however far it overflows the
+ * viewport in total, so a catch-up of short messages ends exactly where it always has.
  *
  * The newest row sits at the tail that was just written, so once it is measured the layout pass is complete. An older
  * row of the burst that is not laid out by then was pushed past the far edge by newer rows, so its beginning is hidden
@@ -200,11 +213,12 @@ private fun ConversationScrollCoordinator.settleRevealedReadingStart(
  * viewport. Heights come from the rendered rows, never from text length, and the reading layout already excludes the
  * composer's overlap, so the keyboard is not subtracted a second time.
  *
- * Only the tail layout is consulted, never a measuring scroll, so a row that is not laid out never counts as oversized.
- * Known limit: an oversized row that no decision over the burst saw at the tail, because it arrived together with newer
- * rows that each fit and together fill the viewport (a tall message followed by several short ones, or by one that
- * fills the screen), is not detected, and that burst keeps the tail.
+ * Newer rows that each fit can together fill the viewport and push an older row of the burst out of the tail layout,
+ * where it cannot be seen to be oversized. When nothing else decided the landing, [measureOffTail] snaps to the oldest
+ * such row, reads it and restores the tail in the same frame. Only that one row is probed, so a long catch-up costs a
+ * single extra measure pass, and a later row of it that is oversized but never laid out still keeps the tail.
  */
+@Suppress("LongParameterList") // The burst, its probes, the frame source, the burst's observation and the probe.
 private suspend fun awaitHiddenIncomingStart(
     candidates: List<ConversationIncomingAppendCandidate>,
     probeFor: (ConversationIncomingAppendCandidate) -> ConversationReadingStartProbe,
@@ -212,15 +226,22 @@ private suspend fun awaitHiddenIncomingStart(
     awaitFrame: suspend () -> Unit,
     oversizedSeen: Boolean,
     onOversized: () -> Unit,
+    measureOffTail: suspend (ConversationReadingStartProbe) -> ConversationMentionJumpLayout?,
 ): ConversationIncomingAppendCandidate? {
     val layouts = awaitTailLayouts(candidates, probeFor, maxFrames, awaitFrame).orEmpty()
     // Rows below the newest message (a pending membership row, a load error) are not part of the burst, but they
     // take space from it, so an arrival that fits the viewport alone can still have its beginning clipped.
     val trailingPx = layouts.lastOrNull { it?.isMeasured == true }?.itemOffsetPx?.coerceAtLeast(0) ?: 0
-    val oversized = layouts.any { it?.isOversized(trailingPx) == true }
+    val hidden = candidates.indices.firstOrNull { layouts.getOrNull(it)?.startHiddenAtTail == true } ?: return null
+    val oversized =
+        layouts.any { it?.isOversized(trailingPx) == true } ||
+            (
+                !oversizedSeen &&
+                    layouts[hidden]?.isMeasured == false &&
+                    measureOffTail(probeFor(candidates[hidden]))?.isOversized(trailingPx) == true
+            )
     if (oversized) onOversized()
-    val hidden = candidates.indices.firstOrNull { layouts.getOrNull(it)?.startHiddenAtTail == true }
-    return hidden?.takeIf { oversized || oversizedSeen }?.let(candidates::get)
+    return candidates[hidden].takeIf { oversized || oversizedSeen }
 }
 
 /**
