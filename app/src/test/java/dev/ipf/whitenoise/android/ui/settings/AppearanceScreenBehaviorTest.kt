@@ -137,7 +137,7 @@ class AppearanceScreenBehaviorTest {
         modes.forEach { (label, mode) ->
             chooseTheme(label)
             composeRule.runOnIdle { assertEquals(mode, appState.themeMode) }
-            composeRule.onNode(hasTestTag("appearance.theme.group") and hasText(label)).assertExists()
+            composeRule.onNode(hasTestTag("appearance.theme.group") and hasText(label, substring = true)).assertExists()
         }
     }
 

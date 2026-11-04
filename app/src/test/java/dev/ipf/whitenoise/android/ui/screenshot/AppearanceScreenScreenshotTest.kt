@@ -21,12 +21,15 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.settings.AppearanceScreen
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.After
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.TimeZone
 
 /**
  * Screenshot baselines for the Appearance settings screen.
@@ -38,6 +41,20 @@ import org.robolectric.annotation.GraphicsMode
 class AppearanceScreenScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    private val originalTimeZone = TimeZone.getDefault()
+
+    /** Keeps the synthetic sample timestamps independent of the host timezone. */
+    @Before
+    fun setTimeZone() {
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+    }
+
+    /** Restores the host timezone for subsequent tests. */
+    @After
+    fun restoreTimeZone() {
+        TimeZone.setDefault(originalTimeZone)
+    }
 
     /** Default light rendering with the System theme card selected. */
     @Test

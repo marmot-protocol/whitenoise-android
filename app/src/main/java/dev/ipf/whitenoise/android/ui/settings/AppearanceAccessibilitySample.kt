@@ -27,6 +27,8 @@ import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
+private const val ExpandedDisclosureRotation = 180f
+
 /** Synthetic sample; the screen retains simulation state without writing app or system preferences. */
 @Composable
 @Suppress("FunctionNaming")
@@ -84,7 +86,7 @@ private fun AppearancePreviewDisclosure(
             Icon(
                 painterResource(R.drawable.ic_expand_more),
                 null,
-                Modifier.rotate(if (state.expanded) 180f else 0f),
+                Modifier.rotate(if (state.expanded) ExpandedDisclosureRotation else 0f),
             )
         },
     )

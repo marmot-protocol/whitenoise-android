@@ -24,7 +24,7 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isPopup
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -102,7 +102,7 @@ class ComposerToolbarProductionTest {
         val hidesBefore = keyboardHides
         val customize =
             composeRule
-                .onNodeWithTag("composer.shortcut.camera")
+                .onNodeWithContentDescription(context.getString(R.string.attachment_camera))
                 .fetchSemanticsNode()
                 .config[SemanticsActions.CustomActions]
                 .single { it.label == context.getString(R.string.composer_customize) }
@@ -189,7 +189,7 @@ class ComposerToolbarProductionTest {
     }
 
     @Test
-    fun pasteLongPressDoesNotReadOrChangeTheDraftAndCancelDiscardsThePreferenceDraft() {
+    fun pasteLongPressDoesNotReadOrChangeTheDraftAndBackKeepsSavedPreferences() {
         val initial = TextFieldValue("keep this draft", TextRange(5, 9))
         val settings = ComposerToolbarSettings(listOf(ComposerShortcut.More, ComposerShortcut.Paste))
         render(settings, initial)
@@ -200,7 +200,10 @@ class ComposerToolbarProductionTest {
         composeRule.onNodeWithTag("composer.shortcut.paste").performTouchInput { longClick() }
         composeRule.onNodeWithTag("composer.customize.label.camera").performScrollTo()
         composeRule.onNodeWithTag("composer.customize.label.camera").assertExists()
-        composeRule.onNodeWithText("Cancel").performClick()
+        composeRule.onNodeWithText("Cancel").assertDoesNotExist()
+        composeRule.onNodeWithTag("composer.customize.done").assertDoesNotExist()
+        composeRule.runOnIdle { checkNotNull(back).onBackInvoked() }
+        composeRule.onNodeWithTag("composer.customize").assertDoesNotExist()
         assertEquals(initial, text.valueState.value)
         assertEquals(settings, appState.composerToolbarPreference.value)
     }
