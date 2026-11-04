@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.media.sandbox
 
+import android.app.Application
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
@@ -19,16 +20,16 @@ import org.robolectric.annotation.Config
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicInteger
 
-/** Normal installation, real reusable guards; only the final Android binding is refused. */
+/** Normal installation and input guards; only the final Android service binding is refused. */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [36])
+@Config(sdk = [36], application = Application::class)
 class DefaultSvgTransportTest {
     /**
-     * Uses the normal installer with a refusing service context to verify both SVG operations enter reusable
-     * admission.
+     * Uses a plain application so the normal installer owns the refusing context, verifying both SVG operations
+     * enter scoped admission without inheriting an application-created worker owner.
      */
     @Test
-    fun defaultInstallerRoutesBothSvgOperationsThroughReusableAdmission() =
+    fun defaultInstallerRoutesBothSvgOperationsThroughScopedAdmission() =
         runBlocking {
             val bindings = AtomicInteger()
             val context =
@@ -56,8 +57,8 @@ class DefaultSvgTransportTest {
             try {
                 val field = IsolatedMediaDecoder::class.java.getDeclaredField("transport").apply { isAccessible = true }
                 assertTrue(
-                    "The production installer must retain its reusable policy",
-                    field.get(IsolatedMediaDecoder) is ReusableMediaTransport,
+                    "The production installer must retain its scoped isolation policy",
+                    field.get(IsolatedMediaDecoder) is IsolatedMediaTransport,
                 )
                 val source = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"/>""".toByteArray()
                 val region = ViewerSvgRegion(0.0, 0.0, 24.0, 24.0)

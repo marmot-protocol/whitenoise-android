@@ -719,7 +719,7 @@ class ConversationMediaViewerProductionPathTest {
             .assert(
                 SemanticsMatcher.expectValue(
                     SemanticsProperties.StateDescription,
-                    context.getString(R.string.media_viewer_image_scale, 100),
+                    context.getString(R.string.media_viewer_image_scale, 1600),
                 ),
             )
         val fitAction =
@@ -729,5 +729,13 @@ class ConversationMediaViewerProductionPathTest {
                 .config[SemanticsActions.CustomActions]
                 .first { it.label == fitLabel }
         composeRule.runOnIdle { check(fitAction.action()) }
+        composeRule
+            .onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG)
+            .assert(
+                SemanticsMatcher.expectValue(
+                    SemanticsProperties.StateDescription,
+                    context.getString(R.string.media_viewer_image_scale, 100),
+                ),
+            )
     }
 }
