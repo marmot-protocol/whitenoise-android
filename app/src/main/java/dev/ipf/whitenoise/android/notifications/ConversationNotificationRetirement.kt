@@ -186,7 +186,8 @@ internal class ConversationNotificationRetirement(
                 ConversationCardDismissalOutcome.CANCELLED
             } catch (expectedPlatformFailure: RuntimeException) {
                 notificationDebug {
-                    "dismiss cancel failed tag=${key.tag.take(DISMISSAL_LOG_TAG_LENGTH)} type=${expectedPlatformFailure.javaClass.simpleName}"
+                    "dismiss cancel failed tag=${key.tag.take(DISMISSAL_LOG_TAG_LENGTH)} " +
+                        "type=${expectedPlatformFailure.javaClass.simpleName}"
                 }
                 ConversationCardDismissalOutcome.FAILED
             }
@@ -386,7 +387,11 @@ internal class ConversationNotificationRetirement(
         val manager = context.getSystemService(NotificationManager::class.java)
         val active =
             manager?.let {
-                publisher.activeNotification(it, update.notificationKey, LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID)
+                publisher.activeNotification(
+                    it,
+                    update.notificationKey,
+                    LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID,
+                )
             }
         val extras = active?.notification?.extras
         return update.trigger == NotificationTriggerFfi.GROUP_INVITE &&
@@ -416,7 +421,7 @@ internal class ConversationNotificationRetirement(
         notificationId: Int,
     ) {
         cancelSynchronized(NotificationManagerCompat.from(context), notificationTag, notificationId)
-        notificationDebug { "cancelled tag=${notificationTag.take(16)} id=$notificationId" }
+        notificationDebug { "cancelled tag=${notificationTag.take(DISMISSAL_LOG_TAG_LENGTH)} id=$notificationId" }
     }
 
     internal fun cancelRepliedConversationCardIfSameGeneration(
@@ -447,7 +452,9 @@ internal class ConversationNotificationRetirement(
             if (shouldCancelRepliedConversationCard(actedMessageIdHex, liveCardMessageIdHex)) {
                 ConversationCardPostedRegistry.clearPosted(notificationTag, notificationId)
                 publisher.cancelNotification(NotificationManagerCompat.from(context), notificationTag, notificationId)
-                notificationDebug { "cancelled tag=${notificationTag.take(16)} id=$notificationId" }
+                notificationDebug {
+                    "cancelled tag=${notificationTag.take(DISMISSAL_LOG_TAG_LENGTH)} id=$notificationId"
+                }
             }
         }
     }

@@ -214,7 +214,14 @@ internal class ConversationNotificationContentReconciler(
                     },
                 ).build()
         val result =
-            publisher.postNotificationSafely(compat, key.tag, key.id, rewritten, recordedAtMs = recordedAtMs, mustBeLive = true)
+            publisher.postNotificationSafely(
+                compat,
+                key.tag,
+                key.id,
+                rewritten,
+                recordedAtMs = recordedAtMs,
+                mustBeLive = true,
+            )
         val written = result == NotificationCardWriteResult.WRITTEN
         return if (written) CardContentOutcome.REBUILT else CardContentOutcome.FAILED
     }

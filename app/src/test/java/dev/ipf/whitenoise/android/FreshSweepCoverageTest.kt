@@ -289,7 +289,10 @@ class FreshSweepCoverageTest {
         assertTrue(
             "mark-read cleanup reaches the generation-checked retirement owner",
             "retirement.dismissActionNotificationAndOlderSiblings(" in
-                presenter.section("fun dismissActionNotificationAndOlderSiblings", "fun dismissConversationSiblingCardsNotNewerThan"),
+                presenter.section(
+                    "fun dismissActionNotificationAndOlderSiblings",
+                    "fun dismissConversationSiblingCardsNotNewerThan",
+                ),
         )
         val postPath = presenter.section("if (messaging != null)", "notificationDebug {")
         val firstPostAttempt = postPath.indexOf("postNotificationSafely(")

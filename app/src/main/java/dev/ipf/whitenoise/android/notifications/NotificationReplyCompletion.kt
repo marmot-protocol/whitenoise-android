@@ -111,7 +111,9 @@ internal class NotificationReplyCompletion(
                 ) {
                     return@runCatching false
                 }
-                notificationDebug { "remote-input-handled re-post tag=${notificationTag.take(REPLY_LOG_TAG_LENGTH)} id=$notificationId" }
+                notificationDebug {
+                    "remote-input-handled re-post tag=${notificationTag.take(REPLY_LOG_TAG_LENGTH)} id=$notificationId"
+                }
                 true
             }.getOrDefault(false)
         }
@@ -172,7 +174,9 @@ internal class NotificationReplyCompletion(
                 ) {
                     return@runCatching false
                 }
-                notificationDebug { "reply-failed re-post tag=${notificationTag.take(REPLY_LOG_TAG_LENGTH)} id=$notificationId" }
+                notificationDebug {
+                    "reply-failed re-post tag=${notificationTag.take(REPLY_LOG_TAG_LENGTH)} id=$notificationId"
+                }
                 true
             }.getOrDefault(false)
         }

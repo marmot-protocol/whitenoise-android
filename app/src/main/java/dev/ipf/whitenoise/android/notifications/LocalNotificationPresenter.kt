@@ -278,7 +278,10 @@ class LocalNotificationPresenter(
     internal fun activeConversationCards(): List<ActiveConversationCard> = reconciler.activeConversationCards()
 
     /** Cancels [update]'s card only while it still shows that same newest message, keeping newer siblings. */
-    internal fun cancelNotificationUpdateCardIfCurrent(update: NotificationUpdateFfi) = retirement.cancelNotificationUpdateCardIfCurrent(update)
+    internal fun cancelNotificationUpdateCardIfCurrent(update: NotificationUpdateFfi) =
+        retirement.cancelNotificationUpdateCardIfCurrent(
+            update = update,
+        )
 
     // Replying / marking read owns the acted-on card, so cancel it before taking
     // the sibling snapshot. Both action paths share this operation so their
@@ -290,7 +293,15 @@ class LocalNotificationPresenter(
         accountRef: String,
         groupIdHex: String,
         sinceMs: Long,
-    ): Boolean = retirement.dismissActionNotificationAndOlderSiblings(notificationTag, notificationId, actedMessageIdHex, accountRef, groupIdHex, sinceMs)
+    ): Boolean =
+        retirement.dismissActionNotificationAndOlderSiblings(
+            notificationTag,
+            notificationId,
+            actedMessageIdHex,
+            accountRef,
+            groupIdHex,
+            sinceMs,
+        )
 
     // Clear reaction, mention, and invite sibling cards, but keep any that were
     // (re)posted after [sinceMs] — a reaction, mention, or invite that landed
@@ -1315,7 +1326,8 @@ class LocalNotificationPresenter(
             if (!isPostStillAllowed() || !ConversationCardPostSynchronizer.isShowCurrent(showToken)) {
                 return@withLock
             }
-            val active = publisher.activeConversationCard(content.notificationTag, content.notificationId) ?: return@withLock
+            val active =
+                publisher.activeConversationCard(content.notificationTag, content.notificationId) ?: return@withLock
             if (!ConversationCardPostedRegistry.isCurrentPayload(
                     content.notificationTag,
                     content.notificationId,
@@ -1526,7 +1538,9 @@ class LocalNotificationPresenter(
                 senderAvatarBitmap = senderPicture,
                 sender = sender,
                 directShareEligible = refresh.directShareEligible,
-                isPublishAllowed = { refresh.isCurrent() && publisher.canPublishPreviewShortcut(refresh.content, card) },
+                isPublishAllowed = {
+                    refresh.isCurrent() && publisher.canPublishPreviewShortcut(refresh.content, card)
+                },
             )
         }
         return cardContent.enrichedIdentityNotification(card, sender, identity)?.let { rewritten ->
@@ -1591,9 +1605,15 @@ class LocalNotificationPresenter(
         return contactAvatarOverride(scope, contact)
     }
 
-    internal fun isGroupInviteNotificationActive(update: NotificationUpdateFfi): Boolean = retirement.isGroupInviteNotificationActive(update)
+    internal fun isGroupInviteNotificationActive(update: NotificationUpdateFfi): Boolean =
+        retirement.isGroupInviteNotificationActive(
+            update = update,
+        )
 
-    internal fun isNotificationUpdateCurrentForEnrichment(update: NotificationUpdateFfi): Boolean = retirement.isNotificationUpdateCurrentForEnrichment(update)
+    internal fun isNotificationUpdateCurrentForEnrichment(update: NotificationUpdateFfi): Boolean =
+        retirement.isNotificationUpdateCurrentForEnrichment(
+            update = update,
+        )
 
     private fun stampConversationCardMessageId(
         builder: NotificationCompat.Builder,
@@ -1704,7 +1724,13 @@ class LocalNotificationPresenter(
         notificationId: Int,
         reactedMessageIdHex: String?,
         reaction: String,
-    ): Boolean = replyCompletion.markReactionHandledIfSameGeneration(notificationTag, notificationId, reactedMessageIdHex, reaction)
+    ): Boolean =
+        replyCompletion.markReactionHandledIfSameGeneration(
+            notificationTag,
+            notificationId,
+            reactedMessageIdHex,
+            reaction,
+        )
 
     /**
      * Re-post the (tag, id) conversation card after a direct reply failed
@@ -1722,7 +1748,13 @@ class LocalNotificationPresenter(
         notificationId: Int,
         repliedMessageIdHex: String?,
         failureNotice: String,
-    ): Boolean = replyCompletion.markDirectReplyFailed(notificationTag, notificationId, repliedMessageIdHex, failureNotice)
+    ): Boolean =
+        replyCompletion.markDirectReplyFailed(
+            notificationTag,
+            notificationId,
+            repliedMessageIdHex,
+            failureNotice,
+        )
 }
 
 private data class MessagingPostContext(

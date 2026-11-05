@@ -61,10 +61,14 @@ internal class NotificationCardPublisher
         /** The message id stamped on one logical entry, or null for an entry posted before entries carried ids. */
         fun entryMessageId(entry: List<NotificationCompat.MessagingStyle.Message>): String? =
             entry.firstNotNullOfOrNull { message ->
-                message.extras.getString(LocalNotificationFormatter.EXTRA_ENTRY_MESSAGE_ID_HEX)?.takeIf(String::isNotBlank)
+                message.extras
+                    .getString(LocalNotificationFormatter.EXTRA_ENTRY_MESSAGE_ID_HEX)
+                    ?.takeIf(String::isNotBlank)
             }
 
-        /** Reads the system tray while preserving coroutine cancellation and converting platform faults to retry state. */
+        /**
+         * Reads the system tray while preserving coroutine cancellation and converting platform faults to retry state.
+         */
         fun readActiveNotifications(manager: NotificationManager): Array<StatusBarNotification>? =
             try {
                 activeNotificationsProvider(manager)
@@ -107,8 +111,14 @@ internal class NotificationCardPublisher
                         isLive = { notificationWriteIsLive(notification, tag, id, mustBeLive, finalPostAllowed) },
                     ) {
                         val payload =
-                            previewPayload(cardContent.withCurrentContactPictures(notification), tag, id, hiddenShortcut)
-                        // Rewrites of a card posted by the earlier expanded-choice build return to the standard template.
+                            previewPayload(
+                                cardContent.withCurrentContactPictures(notification),
+                                tag,
+                                id,
+                                hiddenShortcut,
+                            )
+                        // Rewrites of a card posted by the earlier expanded-choice build
+                        // return to the standard template.
                         val standard = withoutGroupSenderPictures(context, withoutLegacyReactionRail(context, payload))
                         val revision = ConversationCardPostedRegistry.newPayloadRevision()
                         // A recovery builder can discard custom views and group alert behavior. Stamp a copy of
@@ -125,7 +135,8 @@ internal class NotificationCardPublisher
                 throw cancelled
             } catch (expectedPlatformFailure: RuntimeException) {
                 notificationDebug {
-                    "post failed tag=${tag.take(NOTIFICATION_LOG_TAG_LENGTH)} type=${expectedPlatformFailure.javaClass.simpleName}"
+                    "post failed tag=${tag.take(NOTIFICATION_LOG_TAG_LENGTH)} " +
+                        "type=${expectedPlatformFailure.javaClass.simpleName}"
                 }
                 NotificationCardWriteResult.FAILED
             }
@@ -187,7 +198,8 @@ internal class NotificationCardPublisher
             expected: Notification,
         ): Boolean {
             val latest = activeConversationCard(content.notificationTag, content.notificationId) ?: return false
-            val sameGeneration = latest.extras.getString(EXTRA_GENERATION) == expected.extras.getString(EXTRA_GENERATION)
+            val sameGeneration =
+                latest.extras.getString(EXTRA_GENERATION) == expected.extras.getString(EXTRA_GENERATION)
             return sameGeneration &&
                 ConversationCardPostedRegistry.isCurrentPayload(
                     content.notificationTag,

@@ -99,7 +99,10 @@ class NotificationDeletedContentTest {
         assertEquals(generation, handled.extras.getString(UserEventNotificationGroup.EXTRA_GENERATION))
         assertEquals(originalActions, actionTargets(handled))
         assertTrue(handled.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
-        assertEquals(listOf("reply accepted"), handled.extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY)?.toList())
+        assertEquals(
+            listOf("reply accepted"),
+            handled.extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY)?.toList(),
+        )
 
         presenter.cancelConversationCardIfSameGeneration(key.tag, key.id, "new-id")
         assertNull(card(ACCOUNT))
