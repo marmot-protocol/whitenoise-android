@@ -31,7 +31,13 @@ class ConversationRecipientConfirmationTest {
                     direction = "sent",
                     sender = ConversationTimelineTestIds.ACCOUNT_ID,
                 )
-            val subscription = ScriptedConversationTimelineSubscription(page(pending))
+            val initialPage =
+                TimelinePageFfi(
+                    messages = listOf(pending),
+                    hasMoreBefore = false,
+                    hasMoreAfter = false,
+                )
+            val subscription = ScriptedConversationTimelineSubscription(initialPage)
             val scripted =
                 ScriptedConversationLiveSubscriptions(
                     timelineScripts = listOf(subscription),
@@ -173,7 +179,15 @@ class ConversationRecipientConfirmationTest {
                 ),
             )
 
-            controller.applyTimelinePage(page(historical), replaceWindow = true, updatePagination = true)
+            controller.applyTimelinePage(
+                TimelinePageFfi(
+                    messages = listOf(historical),
+                    hasMoreBefore = false,
+                    hasMoreAfter = false,
+                ),
+                replaceWindow = true,
+                updatePagination = true,
+            )
 
             assertEquals(status, optimistic["msg:new-send"]?.status)
             assertEquals(2, controller.timeline.size)
@@ -250,9 +264,4 @@ class ConversationRecipientConfirmationTest {
                         ),
                 ),
         )
-
-    /** Builds a complete native window containing only the send under test. */
-    private fun page(record: TimelineMessageRecordFfi): TimelinePageFfi {
-        return TimelinePageFfi(messages = listOf(record), hasMoreBefore = false, hasMoreAfter = false)
-    }
 }
