@@ -44,6 +44,7 @@ class AvStreamRetirementTest {
         val entered = CountDownLatch(1)
         val unblock = CountDownLatch(1)
         val absentObserved = CountDownLatch(1)
+        val aliveObserved = AtomicBoolean()
         val alive = AtomicBoolean(true)
         val endpoint =
             object : Binder() {
@@ -72,10 +73,11 @@ class AvStreamRetirementTest {
         val stream = constructor.newInstance(context, false, true, 1, epoch, AvStreamLane.Analysis) as IsolatedAvStream
         val witness =
             KernelProcessWitness(100, 200) { _, _ ->
-                if (!alive.get()) absentObserved.countDown()
+                if (alive.get()) aliveObserved.set(true) else absentObserved.countDown()
                 throw ErrnoException("kill", if (alive.get()) OsConstants.EPERM else OsConstants.ESRCH)
             }
         assertTrue(witness.admit(101, 201))
+        aliveObserved.set(false) // Calibration is not the cleanup observer checkpoint.
         setField(stream, "processWitness", witness)
         setField(stream, "identity", 101 to 201) // Match the already calibrated witness used by this fixture.
         setField(stream, "endpoint", endpoint)
@@ -85,7 +87,12 @@ class AvStreamRetirementTest {
         val released = field(stream, "released") as CountDownLatch
         lifetime.bindCompleted(true)
         admissions.reserve(AvStreamLane.Analysis, epoch) { stream }
+        val callbacks = field(stream, "callbacks") as HandlerThread
+        val callbackQueue = shadowOf(callbacks.looper)
+        var callbackQueuePaused = false
         try {
+            callbackQueue.pause()
+            callbackQueuePaused = true
             val unavailable =
                 IsolatedAvStream::class.java
                     .getDeclaredMethod(
@@ -93,11 +100,14 @@ class AvStreamRetirementTest {
                     ).apply { isAccessible = true }
             unavailable.invoke(stream)
             assertTrue(entered.await(2, TimeUnit.SECONDS))
+            callbackQueue.idle()
             assertTrue("AMS cleanup cannot queue behind the hostile endpoint", unbound.await(2, TimeUnit.SECONDS))
             assertEquals(1, unbindCalls)
+            assertTrue("Cleanup must observe the still-alive worker", aliveObserved.get())
+            assertTrue((field(stream, "observationScheduled") as AtomicBoolean).get())
+            assertEquals(1, field(stream, "observationPolls"))
             alive.set(false)
-            val callbacks = field(stream, "callbacks") as HandlerThread
-            shadowOf(callbacks.looper).idleFor(Duration.ofSeconds(1))
+            callbackQueue.idleFor(Duration.ofMillis(AutomaticAvIdentity.POLL_MS))
             assertTrue(
                 "Process observer must progress before retirement RPC returns",
                 absentObserved.await(2, TimeUnit.SECONDS),
@@ -106,15 +116,21 @@ class AvStreamRetirementTest {
             assertEquals(1L, released.count)
             assertFalse(lifetime.releasable())
             assertTrue(admissions.current(AvStreamLane.Analysis, epoch) === stream)
+            callbackQueue.unPause()
+            callbackQueuePaused = false
             unblock.countDown()
             assertTrue(released.await(2, TimeUnit.SECONDS))
             assertNull(admissions.current(AvStreamLane.Analysis, epoch))
             assertEquals(1, unbindCalls)
         } finally {
             alive.set(false)
-            unblock.countDown()
-            stream.close()
-            assertTrue(released.await(2, TimeUnit.SECONDS))
+            try {
+                if (callbackQueuePaused) callbackQueue.unPause()
+            } finally {
+                unblock.countDown()
+                stream.close()
+                assertTrue(released.await(2, TimeUnit.SECONDS))
+            }
         }
     }
 

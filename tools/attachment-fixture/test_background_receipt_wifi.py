@@ -105,19 +105,19 @@ class WifiTest(unittest.TestCase):
         self.assertEqual(saved_networks(networks({1: ("saved space", "OPEN")})), {1: ("saved space", "OPEN")})
         duplicate = networks({1: ("saved", "OPEN")}) + networks({1: ("saved", "OPEN")}).split("\n", 1)[1]
         with self.assertRaises(WifiSetupError): saved_networks(duplicate)
-        owner = WifiAssociation(Commands({1: ("Fixture AP", "WPA2_PSK")}))
+        owner = WifiAssociation(Commands({1: ("Fixture AP", "wpa2-psk")}))
         with self.assertRaises(WifiSetupError): owner.prepare()
     def test_existing_open_ap_is_reusable_and_other_saved_networks_untouched(self):
-        commands = Commands({1: ("Fixture AP", "OPEN"), 9: ("Other", "WPA2_PSK")})
+        commands = Commands({1: ("Fixture AP", "OPEN"), 9: ("Other", "wpa2-psk")})
         owner = WifiAssociation(commands); owner.prepare(); owner.cleanup()
         self.assertEqual(commands.networks, owner.before)
         self.assertFalse(any(c[2] == "forget-network" for c in commands.calls))
     def test_only_new_matching_config_is_removed_and_original_radio_restored(self):
-        commands = Commands({9: ("Other", "WPA2_PSK")}, enabled=False)
+        commands = Commands({9: ("Other", "wpa2-psk")}, enabled=False)
         owner = WifiAssociation(commands); owner.prepare()
         commands.networks.update({10: ("Fixture AP", "OPEN"), 11: ("Unrelated", "OPEN")})
         owner.cleanup()
-        self.assertEqual(commands.networks, {9: ("Other", "WPA2_PSK"), 11: ("Unrelated", "OPEN")})
+        self.assertEqual(commands.networks, {9: ("Other", "wpa2-psk"), 11: ("Unrelated", "OPEN")})
         self.assertFalse(commands.enabled)
     def test_failed_owned_cleanup_still_restores_original_radio(self):
         commands = Commands(enabled=False); owner = WifiAssociation(commands); owner.prepare()
@@ -242,8 +242,41 @@ class WifiTest(unittest.TestCase):
         self.assertEqual([c[3] for c in commands.calls if c[2] == "set-wifi-enabled"], ["enabled", "disabled"])
 
     def test_prior_config_mutation_is_a_failure_not_success(self):
-        commands = Commands({9: ("Other", "WPA2_PSK")}); owner = WifiAssociation(commands); owner.prepare()
+        commands = Commands({9: ("Other", "wpa2-psk")}); owner = WifiAssociation(commands); owner.prepare()
         del commands.networks[9]
         with self.assertRaises(WifiSetupError): owner.cleanup()
+
+
+class SavedNetworkPrimaryFormatTests(unittest.TestCase):
+    def test_minimum_width_primary_rows_and_spaces(self):
+        for name in ("short", "0123456789abcdef" * 4, "a space inside " * 3, " leading space"):
+            with self.subTest(width=len(name)):
+                self.assertEqual(saved_networks(networks({7: (name.rstrip(), "OPEN")})),
+                                 {7: (name.rstrip(), "OPEN")})
+    def test_primary_security_names_with_spaces_hyphens_and_upgrades(self):
+        for security in ("null", "unknown", "wpa2-psk", "wpa3 enterprise 192-bit", "passpoint r1/r2",
+                         "open/owe^", "wpa2-psk/wpa3-sae^"):
+            with self.subTest(security=security):
+                value = saved_networks(networks({7: (("saved space " * 4).rstrip(), security)}))
+                expected = "OPEN/OWE^" if security == "open/owe^" else security
+                self.assertEqual(value, {7: (("saved space " * 4).rstrip(), expected)})
+    def test_malformed_padding_ids_and_controls_never_skip(self):
+        good = networks({7: ("private-network", "OPEN")})
+        for bad in (good.replace("7            ", "7 "), good.replace("OPEN", "OPEN!"), good.replace("OPEN", "opaque"), good.replace("OPEN", "future enterprise"),
+                    good.replace("private-network", "private\tnetwork"),
+                    good + good.split("\n", 1)[1], good.replace("7 ", "-1 ")):
+            with self.subTest():
+                with self.assertRaises(WifiSetupError) as caught:
+                    saved_networks(bad)
+                structure = caught.exception.structure
+                self.assertIsNotNone(structure)
+                self.assertTrue(all(type(value) in (int, bool) for value in structure.values()))
+                self.assertNotIn("private-network", str(structure))
+    def test_unreadable_error_only_contains_bounded_structure(self):
+        with self.assertRaises(WifiSetupError) as caught:
+            saved_networks("Network Id SSID Security type\nprivate-network malformed\n")
+        self.assertEqual(caught.exception.reason, "saved_network_row_unreadable")
+        self.assertEqual(caught.exception.structure["row_index"], 1)
+        self.assertNotIn("private-network", str(caught.exception.structure))
 
 if __name__ == "__main__": unittest.main()

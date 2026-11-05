@@ -20,7 +20,10 @@ import java.util.concurrent.atomic.AtomicReference
 
 /** Binding completion must preserve an existing retirement's reason and original deadline. */
 @RunWith(RobolectricTestRunner::class)
-@Config(application = android.app.Application::class)
+@Config(
+    application = android.app.Application::class,
+    instrumentedPackages = ["dev.ipf.whitenoise.android.media.sandbox.MediaWorkerPool"],
+)
 @LooperMode(LooperMode.Mode.PAUSED)
 class MediaWorkerRetirementBindingTest {
     /** A normal retirement begun after connection publication keeps its original cooperative grace. */
@@ -34,18 +37,22 @@ class MediaWorkerRetirementBindingTest {
                     .await(2, TimeUnit.SECONDS),
             )
             val retiredAt = pending.worker.retiredAtNanos
+            assertEquals(ShadowSystemClock.nanoTime(), retiredAt)
             pending.advanceClock(100)
             pending.advanceClock(MediaWorkerPool.RETIRE_ESCALATION_MS - 101)
             assertFalse(pending.worker.escalationRequested)
             pending.finish()
             pending.idleCallbacks()
             assertEquals(retiredAt, pending.worker.retiredAtNanos)
-            assertEquals(TimeUnit.MILLISECONDS.toNanos(249), System.nanoTime() - retiredAt)
-            assertFalse("The original grace still has one millisecond remaining", pending.context.isUnbound(pending.bound))
+            assertEquals(TimeUnit.MILLISECONDS.toNanos(249), ShadowSystemClock.nanoTime() - retiredAt)
+            assertFalse(
+                "The original grace still has one millisecond remaining",
+                pending.context.isUnbound(pending.bound),
+            )
             pending.advanceClock(1)
             pending.idleCallbacks()
             assertEquals(retiredAt, pending.worker.retiredAtNanos)
-            assertEquals(TimeUnit.MILLISECONDS.toNanos(250), System.nanoTime() - retiredAt)
+            assertEquals(TimeUnit.MILLISECONDS.toNanos(250), ShadowSystemClock.nanoTime() - retiredAt)
             assertTrue("Stop at the original deadline, without a new grace", pending.context.isUnbound(pending.bound))
         }
     }
@@ -79,13 +86,17 @@ class MediaWorkerRetirementBindingTest {
             pending.pauseCallbacks()
             pending.pool.retire(pending.worker)
             val retiredAt = pending.worker.retiredAtNanos
+            assertEquals(ShadowSystemClock.nanoTime(), retiredAt)
             pending.advanceClock(MediaWorkerPool.RETIRE_ESCALATION_MS)
             // Neither the delayed task nor awaitDeath has pre-selected forced escalation.
             assertFalse(pending.worker.escalationRequested)
             assertFalse(pending.context.isUnbound(pending.bound))
             pending.finish()
             assertEquals(retiredAt, pending.worker.retiredAtNanos)
-            assertTrue("Binding completion must use the already expired original grace", pending.context.isUnbound(pending.bound))
+            assertTrue(
+                "Binding completion must use the already expired original grace",
+                pending.context.isUnbound(pending.bound),
+            )
         }
     }
 
@@ -135,16 +146,18 @@ class MediaWorkerRetirementBindingTest {
         /** Runs due callbacks without advancing either production clock or the retirement origin. */
         fun idleCallbacks() = shadowOf(callbacks().looper).idle()
 
-        /** Requires Java nanoTime to follow the controlled Robolectric clock used by the actual pool. */
+        /** Advances the clock intercepted in the pool; the RunWith test itself is not instrumented. */
         fun advanceClock(milliseconds: Long) {
-            val before = System.nanoTime()
-            assertEquals(ShadowSystemClock.nanoTime(), before)
+            val before = ShadowSystemClock.nanoTime()
             ShadowSystemClock.advanceBy(Duration.ofMillis(milliseconds))
-            assertEquals(before + TimeUnit.MILLISECONDS.toNanos(milliseconds), System.nanoTime())
+            assertEquals(before + TimeUnit.MILLISECONDS.toNanos(milliseconds), ShadowSystemClock.nanoTime())
         }
 
         /** Reads the actual callback thread from the existing lazy pool owner. */
-        private fun callbacks(): HandlerThread = (privateField(pool, "callbackThread") as Lazy<*>).value as HandlerThread
+        private fun callbacks(): HandlerThread {
+            val callbackOwner = privateField(pool, "callbackThread") as Lazy<*>
+            return callbackOwner.value as HandlerThread
+        }
 
         /** Invokes the existing pool boundary without adding production test hooks. */
         private fun invoke(

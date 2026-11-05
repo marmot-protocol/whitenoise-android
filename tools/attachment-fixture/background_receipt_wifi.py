@@ -6,14 +6,34 @@ import time
 SCAN = re.compile(r"^  ([0-9a-fA-F:]{17})  (.{9})  (.{18})   (.{7})    (.{32})  (.*)$")
 STATE_BUDGET_SECONDS = 30
 OBSERVATION_INTERVAL_SECONDS = 0.05
-SAVED = re.compile(r"^(\d+) +(.{32}) (.+)$")
+SAVED = re.compile(r"^([0-9][0-9 ]{11}) (.*)$")
+# Android11 shell labels and Android14/16 WifiConfiguration SECURITY_TYPE_NAMES.
+SECURITY_NAME = (r"(?:open|wep|wpa2|wpa3|eap|unknown|null|wpa2-psk|wpa2-enterprise|wpa3-sae|"
+                 r"wpa3 enterprise 192-bit|owe|wapi-psk|wapi-cert|wpa3 enterprise|"
+                 r"passpoint r1/r2|passpoint r3|dpp)")
+PRIMARY_SECURITY = re.compile(SECURITY_NAME + r"\^?(?:/" + SECURITY_NAME + r"\^?)*", re.IGNORECASE)
 
 
 class WifiSetupError(ValueError):
     """Closed reason only; never network names, addresses or command output."""
-    def __init__(self, reason):
+    def __init__(self, reason, structure=None):
         super().__init__(reason)
         self.reason = reason
+        self.structure = structure
+
+
+def saved_row_structure(lines, index):
+    """Bounded format facts only: no network values, addresses, names or name hashes."""
+    row = lines[index]
+    return {"line_count": min(len(lines), 66), "row_index": min(index, 65),
+            "row_width": min(len(row), 65537),
+            "has_control": any(ord(char) < 32 or ord(char) == 127 for char in row),
+            "id_column_width": min(len(row), 12)}
+
+
+def java_width(value):
+    """Java printf pads by UTF-16 code units, not Python Unicode code points."""
+    return len(value.encode("utf-16-le")) // 2
 
 
 def open_access_point(output):
@@ -50,14 +70,33 @@ def saved_networks(output):
     if not lines or " ".join(lines[0].split()) != "Network Id SSID Security type":
         raise WifiSetupError("saved_networks_unreadable")
     result = {}
-    for line in lines[1:]:
+    for index, line in enumerate(lines[1:], 1):
         row = SAVED.fullmatch(line)
-        if row is None or int(row[1]) in result:
-            raise WifiSetupError("saved_network_row_unreadable")
-        security = row[3].strip()
+        # The ID is a fixed minimum-width column; saved SSIDs may exceed 32 characters.
+        if (row is None or len(row[1]) != 12
+                or any(ord(char) < 32 or ord(char) == 127 for char in line)):
+            raise WifiSetupError("saved_network_row_unreadable", saved_row_structure(lines, index))
+        network_id = int(row[1].strip())
+        candidates = set()
+        # At most 14 primary security names plus separators; never scan an unbounded suffix.
+        suffix_start = max(0, len(row[2]) - 1024)
+        for separator, char in enumerate(row[2][suffix_start:], suffix_start):
+            if char != " ":
+                continue
+            ssid, security = row[2][:separator].rstrip(), row[2][separator + 1:].strip()
+            if not security:
+                continue
+            canonical = (str(network_id).ljust(12) + " " + ssid
+                         + " " * max(0, 32 - java_width(ssid)) + " " + security.ljust(4))
+            if canonical == line:
+                if PRIMARY_SECURITY.fullmatch(security):
+                    candidates.add((ssid, security))
+        if len(candidates) != 1 or network_id in result:
+            raise WifiSetupError("saved_network_row_unreadable", saved_row_structure(lines, index))
+        ssid, security = candidates.pop()
         if security.lower() in ("open", "open/owe^"):
             security = security.upper()
-        result[int(row[1])] = (row[2].rstrip(), security)
+        result[network_id] = (ssid, security)
     return result
 
 

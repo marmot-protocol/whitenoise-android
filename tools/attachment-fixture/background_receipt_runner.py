@@ -156,6 +156,8 @@ def run(adb, serial, root, output, budget_profile="reference-api30-arm64"):
         report["failure_class"] = type(error).__name__
         if isinstance(error, WifiSetupError):
             report["wifi_setup_failure"] = error.reason
+            if error.structure is not None:
+                report["wifi_setup_structure"] = error.structure
     finally:
         # Failed and partial attempts stay in the ledger and report; nothing is reset.
         time.sleep(0.5)

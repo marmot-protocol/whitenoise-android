@@ -275,5 +275,43 @@ class BackgroundReceiptRunnerTest(unittest.TestCase):
         self.assertEqual("held_request_still_open", report["stages"][-1]["skipped"])
 
 
+
+class WifiStructuralFailureReportTest(unittest.TestCase):
+    def test_actual_saved_parser_failure_is_redacted_before_any_stage(self):
+        class Service:
+            def __init__(self, *_):
+                self.ledger = mock.Mock(snapshot=mock.Mock(return_value=[]))
+            def server_close(self):
+                pass
+        calls = []
+        def adb(_adb, _serial, *args, **kwargs):
+            calls.append(args)
+            if "ro.kernel.qemu" in args:
+                return "1\n"
+            if "packages" in args:
+                return f"package:{runner.APP}\n"
+            if args[-1] == "status":
+                return "Wifi is enabled\nWifi is not connected\n"
+            if args[-1] == "list-networks":
+                return "Network Id SSID Security type\nprivate-network malformed\n"
+            raise AssertionError("No association, mutation or instrumentation after malformed initial state")
+        with tempfile.TemporaryDirectory() as directory, \
+                mock.patch.object(runner, "adb_command", side_effect=adb), \
+                mock.patch.object(runner, "FixtureServer", Service), \
+                mock.patch.object(runner, "FixtureRelay", Service), \
+                mock.patch.object(runner.time, "sleep"):
+            output = Path(directory) / "out.json"
+            with self.assertRaises(RuntimeError):
+                runner.run("adb", "emulator-5554", Path(directory), output)
+            report = json.loads(output.read_text())
+        self.assertEqual(report["wifi_setup_failure"], "saved_network_row_unreadable")
+        self.assertEqual(report["wifi_setup_structure"]["row_index"], 1)
+        self.assertTrue(all(type(value) in (int, bool) for value in report["wifi_setup_structure"].values()))
+        self.assertEqual(report["stages"], [])
+        self.assertEqual(report["http_get_requests"], 0)
+        self.assertEqual(report["http_upload_requests"], 0)
+        self.assertFalse(report["qualified"])
+        self.assertNotIn("private-network", json.dumps(report))
+
 if __name__ == "__main__":
     unittest.main()
