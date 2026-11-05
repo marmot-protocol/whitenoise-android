@@ -36,6 +36,12 @@ class MediaWorkerStartupRetirementTest {
         assertDelayedBindRetirement(expireBeforeReturn = true)
     }
 
+    /** Closing during an unresolved bind must leave a stop scheduled after the successful return. */
+    @Test
+    fun closeBeforeBindReturnStillStopsTheServedWorkerAfterItsGrace() {
+        assertDelayedBindRetirement(expireBeforeReturn = false, closeBeforeReturn = true)
+    }
+
     /** Cancellation cannot strand a dead generation when its bind outcome arrives after the death callback. */
     @Test
     fun interruptedBindReturnDisposesTheAlreadyDeadWorker() {
@@ -82,7 +88,10 @@ class MediaWorkerStartupRetirementTest {
     }
 
     /** Drives a connected worker through admission and retirement while its original bind return is held. */
-    private fun assertDelayedBindRetirement(expireBeforeReturn: Boolean) {
+    private fun assertDelayedBindRetirement(
+        expireBeforeReturn: Boolean,
+        closeBeforeReturn: Boolean = false,
+    ) {
         val binding = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
         val context = DelayedBindReturn(binding)
         val lock = Any()
@@ -96,7 +105,7 @@ class MediaWorkerStartupRetirementTest {
             val worker = checkNotNull(pool.claim(Any(), false, WAIT_MS) { true })
             // The connection callback admits a request before bindIsolatedService returns on the starter thread.
             synchronized(lock) { worker.served = true }
-            pool.retire(worker)
+            if (closeBeforeReturn) pool.close() else pool.retire(worker)
             assertTrue(bound.remote.retired.await(WAIT_MS, TimeUnit.MILLISECONDS))
             if (expireBeforeReturn) {
                 // Model elapsed parent nano time independently of Robolectric's Android Handler clock.
