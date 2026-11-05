@@ -10,7 +10,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.platform.InspectableValue
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -33,8 +35,9 @@ import org.robolectric.annotation.GraphicsMode
  *
  * On a device the destination list composes and draws a frame before the arrival effect runs, and the
  * effect's snap then pulled a list already drawn at rest down by 8dp. Robolectric runs the effect before
- * that first draw, so the ordering itself is pinned by [chatFolderArrivalTranslation] and by the
- * emulator frame trace in the PR; the mounted case checks the entrance the user sees.
+ * that first draw, so [theDestinationsFirstCompositionAlreadyDrawsDisplaced] reads the layer the
+ * destination's first composition produces, before its effect. The pixel case is a smoke check that the
+ * entrance then only moves up to rest.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -76,6 +79,24 @@ class ChatFolderArrivalTest {
         assertEquals("and settles at rest: $tops", 0, tops.last())
     }
 
+    /** The layer composed for the destination, before its arrival effect has run, already sits 8dp low. */
+    @Test fun theDestinationsFirstCompositionAlreadyDrawsDisplaced() {
+        var folder by mutableStateOf<String?>(FOLDER_A)
+        val firstDestinationTranslation = mutableListOf<Float>()
+        rule.setContent {
+            val current = folder
+            val arrival = rememberChatFolderArrival(OWNER, current)
+            if (current == FOLDER_B && firstDestinationTranslation.isEmpty()) {
+                firstDestinationTranslation += arrival.layerTranslationY()
+            }
+            Box(Modifier.then(arrival).size(10.dp))
+        }
+        rule.runOnIdle { folder = FOLDER_B }
+        rule.waitForIdle()
+
+        assertEquals(listOf(ARRIVAL_PX.toFloat()), firstDestinationTranslation)
+    }
+
     /** Reselecting the current folder or the root starts nothing, so a settled list never moves. */
     @Test fun anUnchangedFolderNeverMoves() {
         var folder by mutableStateOf<String?>(null)
@@ -108,6 +129,15 @@ class ChatFolderArrivalTest {
             }
         }
         rule.waitForIdle()
+    }
+
+    /** The vertical translation this arrival modifier's layer block applies right now. */
+    @Suppress("UNCHECKED_CAST")
+    private fun Modifier.layerTranslationY(): Float {
+        val block =
+            (this as InspectableValue).inspectableElements.first { it.name == "block" }.value
+                as GraphicsLayerScope.() -> Unit
+        return GraphicsLayerScope().apply(block).translationY
     }
 
     /** The first pixel row drawn in [color], or null when this frame does not draw it. */
