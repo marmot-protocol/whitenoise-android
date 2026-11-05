@@ -251,8 +251,10 @@ class NativeMediaSandboxDeviceTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val manager = context.getSystemService(ActivityManager::class.java)
         val deadline = SystemClock.elapsedRealtime() + 5000
+        var lastInfo: ApplicationExitInfo? = null
         while (SystemClock.elapsedRealtime() < deadline) {
             val info = manager.getHistoricalProcessExitReasons(context.packageName, pid, 1).firstOrNull()
+            if (info != null) lastInfo = info
             if (info != null && info.timestamp >= startedAtMs) {
                 if (info.reason == ApplicationExitInfo.REASON_SIGNALED && info.status == signal) return
                 // Native crash reporting may replace REASON_SIGNALED; retain the exact signal check below.
@@ -260,10 +262,14 @@ class NativeMediaSandboxDeviceTest {
             SystemClock.sleep(20)
         }
         if (hasZygoteSignalExit(pid, signal, startedAtMs)) return
-        throw AssertionError("No platform exit reason for the exact qualification worker")
+        throw AssertionError(
+            "No platform exit reason for the exact qualification worker: " +
+                "pid=$pid signal=$signal reason=${lastInfo?.reason} " +
+                "status=${lastInfo?.status} timestamp=${lastInfo?.timestamp}",
+        )
     }
 
-    /** Zygote reports waitpid's exact signal; root-UID filtering excludes app-authored lookalike tags. */
+    /** Printable logger UID plus exact tag/time/PID prevents app-authored lookalike records. */
     private fun hasZygoteSignalExit(
         pid: Int,
         signal: Int,
@@ -271,8 +277,9 @@ class NativeMediaSandboxDeviceTest {
     ): Boolean {
         require(pid > 0 && pid != Process.myPid())
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
-        // executeShellCommand does not use a shell; -s already silences every other tag.
-        val command = "logcat -d -b main --uid=0 -v epoch -s Zygote:I"
+        // API 30 supports printed UID, not --uid filtering. Printable escapes embedded CR;
+        // logcat prefixes each LF-separated message line, retaining its authenticated UID.
+        val command = NativeSandboxExitEvidence.logcatCommand(startedAtMs)
         val descriptor = automation.executeShellCommand(command)
         return android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { input ->
             val bytes = ByteArray(NativeSandboxExitEvidence.MAX_BYTES + 1)
@@ -282,18 +289,30 @@ class NativeMediaSandboxDeviceTest {
                 if (count <= 0) break
                 used += count
             }
-            if (used > NativeSandboxExitEvidence.MAX_BYTES) return@use false
-            NativeSandboxExitEvidence.matches(
-                String(bytes, 0, used, Charsets.UTF_8),
-                pid,
-                signal,
-                startedAtMs,
-                System.currentTimeMillis(),
-            )
+            val output = String(bytes, 0, used, Charsets.UTF_8)
+            val matched =
+                used <= NativeSandboxExitEvidence.MAX_BYTES &&
+                    NativeSandboxExitEvidence.matches(
+                        output,
+                        pid,
+                        signal,
+                        startedAtMs,
+                        System.currentTimeMillis(),
+                    )
+            if (!matched) {
+                android.util.Log.w(
+                    "NativeSandboxExit",
+                    "Exit evidence mismatch: pid=$pid signal=$signal bytes=$used head=" +
+                        output.take(EXIT_DIAGNOSTIC_CHARS),
+                )
+                android.util.Log.w("NativeSandboxExit", "Exit evidence tail=${output.takeLast(EXIT_DIAGNOSTIC_CHARS)}")
+            }
+            matched
         }
     }
 
     private companion object {
+        const val EXIT_DIAGNOSTIC_CHARS = 1024
         val sequence = AtomicInteger()
 
         fun calibrateAlive(pid: Int): Boolean =
