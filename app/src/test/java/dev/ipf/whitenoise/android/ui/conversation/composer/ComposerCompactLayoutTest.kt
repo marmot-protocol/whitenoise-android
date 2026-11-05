@@ -108,14 +108,19 @@ class ComposerCompactLayoutTest {
                 val emoji = composeRule.onNodeWithContentDescription(context.getString(R.string.open_emoji_picker))
                 add(emoji.fetchSemanticsNode())
                 val paste = composeRule.onNodeWithContentDescription(context.getString(R.string.paste_from_clipboard))
-                add(paste.fetchSemanticsNode())
+                if (identity) {
+                    paste.assertDoesNotExist()
+                } else {
+                    add(paste.fetchSemanticsNode())
+                }
             }
         if (identity) {
             val suffix = if (direction == LayoutDirection.Rtl) "rtl" else "ltr"
             composeRule.onNodeWithTag(ROOT_TAG).captureRoboImage("src/test/snapshots/composer_icon_spacing_$suffix.png")
         }
-        // Configured actions flank Message; the legacy null-state fixture keeps one leading group.
-        val groups = if (identity) listOf(controls.take(2), controls.drop(2)) else listOf(controls)
+        // Fresh configured defaults and the legacy null-state fixture each have one leading group.
+        // This fixture has no voice controller, so it exposes no configured right-side action.
+        val groups = listOf(controls)
         groups.forEach { group ->
             group.sortedBy { it.boundsInRoot.center.x }.zipWithNext().forEach { (first, second) ->
                 assertEquals(
@@ -133,9 +138,7 @@ class ComposerCompactLayoutTest {
         if (identity) {
             val input = placeholder()
             val leftEdge = groups[0].maxOf { it.boundsInRoot.right }
-            val rightEdge = groups[1].minOf { it.boundsInRoot.left }
             assertTrue("Message clears the physical left group", leftEdge <= input.left + 1f)
-            assertTrue("Message clears the physical right group", input.right <= rightEdge + 1f)
         }
         controls.forEach { control ->
             assertTrue(

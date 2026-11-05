@@ -127,7 +127,13 @@ internal data class ComposerToolbarSettings(
                         ?: ComposerToolbarLayout.Automatic
                 val right =
                     if (version == 1) {
-                        defaultRightComposerShortcuts
+                        // Version 1 did not store sides; retain its original physical assignments.
+                        setOf(
+                            ComposerShortcut.Emoji,
+                            ComposerShortcut.Paste,
+                            ComposerShortcut.Dictation,
+                            ComposerShortcut.VoiceNote,
+                        )
                     } else {
                         val sides = record.getJSONArray("rightShortcuts")
                         require(sides.length() <= MAX_STORED_COMPOSER_SHORTCUTS)
@@ -148,15 +154,7 @@ internal val defaultComposerShortcuts =
         ComposerShortcut.SendingIdentity,
         ComposerShortcut.More,
         ComposerShortcut.Emoji,
-        ComposerShortcut.Paste,
-        ComposerShortcut.Dictation,
         ComposerShortcut.VoiceNote,
     )
 
-internal val defaultRightComposerShortcuts =
-    setOf(
-        ComposerShortcut.Emoji,
-        ComposerShortcut.Paste,
-        ComposerShortcut.Dictation,
-        ComposerShortcut.VoiceNote,
-    )
+internal val defaultRightComposerShortcuts = setOf(ComposerShortcut.VoiceNote)

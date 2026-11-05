@@ -88,6 +88,13 @@ class ComposerToolbarScreenshotTest {
             ComposerToolbarSettings(
                 ComposerShortcut.entries,
                 ComposerToolbarLayout.AlwaysExpanded,
+                rightShortcuts =
+                    setOf(
+                        ComposerShortcut.Emoji,
+                        ComposerShortcut.Paste,
+                        ComposerShortcut.Dictation,
+                        ComposerShortcut.VoiceNote,
+                    ),
             ),
             dark = true,
             amoled = true,
@@ -141,6 +148,13 @@ class ComposerToolbarScreenshotTest {
             ComposerToolbarSettings(
                 ComposerShortcut.entries,
                 ComposerToolbarLayout.AlwaysExpanded,
+                rightShortcuts =
+                    setOf(
+                        ComposerShortcut.Emoji,
+                        ComposerShortcut.Paste,
+                        ComposerShortcut.Dictation,
+                        ComposerShortcut.VoiceNote,
+                    ),
             ),
             dark = true,
             amoled = true,
@@ -337,6 +351,13 @@ class ComposerToolbarScreenshotTest {
                 ComposerShortcut.Emoji,
             ),
             ComposerToolbarLayout.AlwaysExpanded,
+            rightShortcuts =
+                setOf(
+                    ComposerShortcut.Emoji,
+                    ComposerShortcut.Paste,
+                    ComposerShortcut.Dictation,
+                    ComposerShortcut.VoiceNote,
+                ),
         )
 
     /** Checks preview targets, scrolling and scaled labels against the rendered editor bounds. */

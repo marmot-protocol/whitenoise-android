@@ -206,6 +206,13 @@ internal abstract class DictationNavigationRenderFixture {
                     ComposerShortcut.Dictation,
                     ComposerShortcut.VoiceNote,
                 ),
+                rightShortcuts =
+                    setOf(
+                        ComposerShortcut.Emoji,
+                        ComposerShortcut.Paste,
+                        ComposerShortcut.Dictation,
+                        ComposerShortcut.VoiceNote,
+                    ),
             )
         context
             .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)

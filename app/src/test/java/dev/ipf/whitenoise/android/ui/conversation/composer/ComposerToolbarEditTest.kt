@@ -17,7 +17,7 @@ class ComposerToolbarEditTest {
     private val paste = ComposerShortcut.Paste
 
     private fun editor(): ComposerToolbarEditState =
-        ComposerToolbarEditState(ComposerToolbarSettings(listOf(more, camera, paste))).apply {
+        ComposerToolbarEditState(ComposerToolbarSettings(listOf(more, camera, paste), rightShortcuts = setOf(paste))).apply {
             selectedArea = Rect(0f, 0f, 300f, 100f)
             record(more, Rect(0f, 0f, 36f, 48f))
             record(camera, Rect(36f, 0f, 72f, 48f))
@@ -130,11 +130,11 @@ class ComposerToolbarEditTest {
     fun editingOnlyChangesWorkingCopyAndRetainsRecoveryPosition() {
         val original = ComposerToolbarSettings()
         val edit = ComposerToolbarEditState(original)
-        edit.remove(paste)
+        edit.remove(ComposerShortcut.Emoji)
         edit.add(camera)
         edit.remove(more)
         assertEquals(ComposerToolbarSettings(), original)
-        assertFalse(paste in edit.draft.shortcuts)
+        assertFalse(ComposerShortcut.Emoji in edit.draft.shortcuts)
         assertTrue(camera in edit.draft.shortcuts)
         assertTrue(more in edit.draft.shortcuts)
         edit.change(original)

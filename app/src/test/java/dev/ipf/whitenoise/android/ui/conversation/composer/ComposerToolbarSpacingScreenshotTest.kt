@@ -74,8 +74,11 @@ class ComposerToolbarSpacingScreenshotTest {
 
     private lateinit var transitionVoice: VoiceRecordingController
 
-    /** The default two-account composer at 360dp places Message above the physical side groups. */
+    /** The compact default two-account composer at 360dp keeps Message between the physical groups. */
     @Test fun empty360() = render(ToolbarCase("empty360", 360))
+
+    /** An explicitly crowded selection still wraps without losing its separate action targets. */
+    @Test fun crowdedTwoAccounts360() = render(ToolbarCase("crowded360", 360, crowded = true))
 
     /** At320dp compact visual slots retain usable expanded touch targets. */
     @Test fun empty320() = render(ToolbarCase("empty320", 320))
@@ -83,7 +86,7 @@ class ComposerToolbarSpacingScreenshotTest {
     /** The default composer retains physical sides in RTL at320dp with2x text. */
     @Test fun empty320RtlLarge() = render(ToolbarCase("empty320_rtl_large", 320, rtl = true, fontScale = 2f))
 
-    /** A composer holding a draft keeps Send reachable alongside separate wrapping targets at 360dp. */
+    /** A drafted default composer keeps Send reachable beside the compact groups at 360dp. */
     @Test fun draft360() = render(ToolbarCase("draft360", 360, draft = "Ready to send"))
 
     /** A drafted composer at 320dp in RTL with 2x text retains separate targets around Send. */
@@ -132,16 +135,16 @@ class ComposerToolbarSpacingScreenshotTest {
     @Test fun lockedSingleRtlRight() = recordingTransition("single_rtl_right", true, ComposerShortcutSide.Right)
 
     /** An already wrapped two-account composer retains its row floor when locking. */
-    @Test fun lockedTwoAccountsKeepRows() = render(ToolbarCase("two_accounts_transition", 360, transition = true))
+    @Test fun lockedTwoAccountsKeepRows() = render(ToolbarCase("two_accounts_transition", 360, transition = true, crowded = true))
 
     /** Hidden toolbar rows cannot add lock height when the two-account surface is narrow. */
     @Test fun lockedNarrowTwoAccountsKeepRows() {
-        render(ToolbarCase("narrow_two_accounts_transition", 320, transition = true))
+        render(ToolbarCase("narrow_two_accounts_transition", 320, transition = true, crowded = true))
     }
 
     /** The same row floor survives large RTL type; existing label truncation is separately reviewed. */
     @Test fun lockedNarrowRtlLargeKeepRows() {
-        render(ToolbarCase("narrow_rtl_large_transition", 320, rtl = true, fontScale = 2f, transition = true))
+        render(ToolbarCase("narrow_rtl_large_transition", 320, rtl = true, fontScale = 2f, transition = true, crowded = true))
     }
 
     /** Uses the real recording controller to verify the idle, active and locked geometry sequence. */
@@ -204,20 +207,41 @@ class ComposerToolbarSpacingScreenshotTest {
         val locked: Boolean = false,
         val voiceSide: ComposerShortcutSide? = null,
         val transition: Boolean = false,
+        val crowded: Boolean = false,
     )
 
     /** Renders the toolbar for the case, asserts its slot geometry and records the Roborazzi baseline. */
     private fun render(case: ToolbarCase) {
-        case.voiceSide?.let { side ->
-            ApplicationProvider
-                .getApplicationContext<Context>()
-                .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
-                .edit()
-                .putString(
-                    "composer_toolbar_v1",
-                    ComposerToolbarSettings().withSide(ComposerShortcut.VoiceNote, side).encode(),
-                ).commit()
-        }
+        val settings =
+            if (case.crowded) {
+                ComposerToolbarSettings(
+                    listOf(
+                        ComposerShortcut.SendingIdentity,
+                        ComposerShortcut.More,
+                        ComposerShortcut.Emoji,
+                        ComposerShortcut.Paste,
+                        ComposerShortcut.Dictation,
+                        ComposerShortcut.VoiceNote,
+                    ),
+                    rightShortcuts =
+                        setOf(
+                            ComposerShortcut.Emoji,
+                            ComposerShortcut.Paste,
+                            ComposerShortcut.Dictation,
+                            ComposerShortcut.VoiceNote,
+                        ),
+                )
+            } else {
+                ComposerToolbarSettings()
+            }
+        val selected = case.voiceSide?.let { settings.withSide(ComposerShortcut.VoiceNote, it) } ?: settings
+        ApplicationProvider
+            .getApplicationContext<Context>()
+            .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+            .edit()
+            .clear()
+            .putString("composer_toolbar_v1", selected.encode())
+            .commit()
         val alice = testAccount("alice", "aa".repeat(32))
         val bob = testAccount("bob", "bb".repeat(32))
         val state =
@@ -375,17 +399,24 @@ class ComposerToolbarSpacingScreenshotTest {
             val stop = bounds("Stop recording")
             assertTargets(listOf(cancel, stop), sign)
         } else {
-            val controls =
+            val left =
                 buildList {
                     if (case.accounts > 1) {
                         add(composeRule.onNodeWithTag("composer-sending-identity").fetchSemanticsNode().boundsInRoot)
+                    } else {
+                        composeRule.onNodeWithTag("composer-sending-identity").assertDoesNotExist()
                     }
                     add(bounds("Add attachment"))
-                    add(bounds("Open emoji picker"))
-                    add(bounds("Paste from clipboard"))
+                    if (!case.crowded) add(bounds("Open emoji picker"))
                 }
-            val left = controls.take(if (case.accounts > 1) 2 else 1)
-            val right = controls.drop(left.size) + bounds("Dictate text")
+            val right =
+                if (case.crowded) {
+                    listOf(bounds("Open emoji picker"), bounds("Paste from clipboard"), bounds("Dictate text"))
+                } else {
+                    composeRule.onNodeWithContentDescription("Paste from clipboard").assertDoesNotExist()
+                    composeRule.onNodeWithContentDescription("Dictate text").assertDoesNotExist()
+                    if (case.draft.isNotEmpty()) listOf(bounds("Hold to record voice message")) else emptyList()
+                }
             assertTargets(left, sign)
             assertTargets(right, sign)
             val primary = bounds(if (case.draft.isEmpty()) "Hold to record voice message" else "Send")
@@ -396,11 +427,17 @@ class ComposerToolbarSpacingScreenshotTest {
                 "editor retains a usable composing width",
                 editor.width >= 96f * case.fontScale && editor.height > 1f,
             )
-            val all = controls + bounds("Dictate text") + primary
+            val all = left + right + primary
             val labels =
                 buildList {
                     if (case.accounts > 1) add("Sending identity")
-                    addAll(listOf("Add attachment", "Emoji", "Paste", "Dictation"))
+                    add("Add attachment")
+                    add("Emoji")
+                    if (case.crowded) {
+                        addAll(listOf("Paste", "Dictation"))
+                    } else if (case.draft.isNotEmpty()) {
+                        add("Voice")
+                    }
                     add(if (case.draft.isEmpty()) "Voice" else "Send")
                 }
             assertDistinctFootprints(all, labels)
@@ -417,7 +454,7 @@ class ComposerToolbarSpacingScreenshotTest {
         right: List<androidx.compose.ui.geometry.Rect>,
         editor: androidx.compose.ui.geometry.Rect,
     ) {
-        if (case.accounts == 1) {
+        if (!case.crowded || case.accounts == 1) {
             assertTrue("physical left actions precede the field", left.all { it.right <= editor.left + 1f })
             assertTrue("physical right actions follow the field", right.all { it.left >= editor.right - 1f })
             assertTrue(

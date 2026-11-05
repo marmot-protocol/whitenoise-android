@@ -19,6 +19,61 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 @OptIn(ExperimentalCoroutinesApi::class)
 class ComposerToolbarPreferencesTest {
+    /** Fresh preferences and Reset use the compact groups without replacing saved choices. */
+    @Test
+    fun freshDefaultsAndResetPersistCompactPhysicalGroups() =
+        runTest {
+            val prefs = preferences("compact-defaults")
+            val owner = ComposerToolbarPreference(prefs, this, Mutex())
+            val expected =
+                ComposerToolbarSettings(
+                    listOf(
+                        ComposerShortcut.SendingIdentity,
+                        ComposerShortcut.More,
+                        ComposerShortcut.Emoji,
+                        ComposerShortcut.VoiceNote,
+                    ),
+                    rightShortcuts = setOf(ComposerShortcut.VoiceNote),
+                )
+            assertEquals(expected, owner.value)
+            val custom = ComposerToolbarSettings(listOf(ComposerShortcut.More, ComposerShortcut.Dictation))
+            val saved = CompletableDeferred<Boolean>()
+            owner.save(custom) { saved.complete(it) }
+            assertTrue(saved.await())
+            val reset = CompletableDeferred<Boolean>()
+            // The editor's Reset action supplies this same default value to the preference owner.
+            owner.save(ComposerToolbarSettings()) { reset.complete(it) }
+            assertTrue(reset.await())
+            assertEquals(expected, owner.value)
+            assertEquals(expected, ComposerToolbarPreference(prefs, this, Mutex()).value)
+        }
+
+    /** Explicit version-2 order, layout and physical sides survive a new default layout. */
+    @Test
+    fun savedV2ChoicesKeepTheirOrderLayoutAndPhysicalSides() {
+        val saved =
+            ComposerToolbarSettings.decode(
+                """{"version":2,"shortcuts":["dictation","more","voice_note","emoji","paste"],"layout":"always_expanded","rightShortcuts":["more","emoji","paste"]}""",
+            )
+        assertEquals(
+            listOf(
+                ComposerShortcut.Dictation,
+                ComposerShortcut.More,
+                ComposerShortcut.VoiceNote,
+                ComposerShortcut.Emoji,
+                ComposerShortcut.Paste,
+            ),
+            saved.shortcuts,
+        )
+        assertEquals(ComposerToolbarLayout.AlwaysExpanded, saved.layout)
+        assertEquals(listOf(ComposerShortcut.Dictation, ComposerShortcut.VoiceNote), saved.onSide(ComposerShortcutSide.Left))
+        assertEquals(
+            listOf(ComposerShortcut.More, ComposerShortcut.Emoji, ComposerShortcut.Paste),
+            saved.onSide(ComposerShortcutSide.Right),
+        )
+        assertEquals(saved, ComposerToolbarSettings.decode(saved.encode()))
+    }
+
     @Test
     fun roundTripRetainsOrderAndIntentionalEmptyOptionalSelection() {
         val settings =
@@ -75,11 +130,16 @@ class ComposerToolbarPreferencesTest {
     fun v1MigrationKeepsOrderAndAssignsOriginalPhysicalSides() {
         val migrated =
             ComposerToolbarSettings.decode(
-                """{"version":1,"shortcuts":["paste","more","emoji","camera"],"layout":"automatic"}""",
+                """{"version":1,"shortcuts":["paste","more","emoji","dictation","voice_note","camera"],"layout":"automatic"}""",
             )
         assertEquals(listOf(ComposerShortcut.More, ComposerShortcut.Camera), migrated.onSide(ComposerShortcutSide.Left))
         assertEquals(
-            listOf(ComposerShortcut.Paste, ComposerShortcut.Emoji),
+            listOf(
+                ComposerShortcut.Paste,
+                ComposerShortcut.Emoji,
+                ComposerShortcut.Dictation,
+                ComposerShortcut.VoiceNote,
+            ),
             migrated.onSide(ComposerShortcutSide.Right),
         )
         val changed =
