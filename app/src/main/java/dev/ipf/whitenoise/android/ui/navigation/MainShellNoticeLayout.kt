@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -20,6 +21,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlHandoff
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.conversation.LocalShellPlaybackHost
 import dev.ipf.whitenoise.android.ui.conversation.ShellPlaybackHost
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerActionRowHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationNotificationNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationPersistentControl
 
@@ -47,6 +49,7 @@ internal fun MainShellNoticeLayout(
         )
     val anchor = remember(handoffOwner, dictationController.state.sessionId) { FloatingDictationAnchor() }
     val launcherOrigin = remember(handoffOwner) { DictationLauncherOrigin() }
+    val composerHeight = remember(handoffOwner) { mutableStateOf(ComposerActionRowHeight) }
     val dictationDestination = dictationControlOwner.takeUnless { it == ConversationDictationControlOwner.Hidden }
     val dictationMotion =
         rememberMeasuredControlHandoff(
@@ -109,6 +112,7 @@ internal fun MainShellNoticeLayout(
         LocalDictationLauncherOrigin provides launcherOrigin,
         LocalDictationControlHandoff provides dictationMotion,
         LocalComposerFabHandoff provides handoff,
+        LocalComposerFabHeight provides composerHeight,
         LocalFinishControlMorph provides {
             handoff.finish()
             dictationMotion.finish()

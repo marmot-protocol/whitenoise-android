@@ -51,6 +51,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_HANDLE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOuterVerticalPadding
+import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
 import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.ACCOUNT
 import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.COMPOSER_TAG
 import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.GROUP
@@ -237,6 +238,9 @@ internal abstract class DictationNavigationRenderFixture {
                 val group = if (chatId == origin.selectedChatId) GROUP else "other-group"
                 ComposerBar(
                     appState = fixture.toolbarState,
+                    draftKey = if (fixture.bindDraftOwner) composerDraftOwnerKey(ACCOUNT, group) else null,
+                    draftAccountRef = ACCOUNT.takeIf { fixture.bindDraftOwner },
+                    draftGroupIdHex = group.takeIf { fixture.bindDraftOwner },
                     replyingTo = null,
                     messageTextCopy = MessageTextCopy.Default,
                     onCancelReply = {},
@@ -282,6 +286,7 @@ internal abstract class DictationNavigationRenderFixture {
 
     protected class Fixture {
         var toolbarState: WhiteNoiseAppState? = null
+        var bindDraftOwner by mutableStateOf(false)
         var route by mutableStateOf(origin)
         var locked by mutableStateOf(false)
         var committedRoute = origin
