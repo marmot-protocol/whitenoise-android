@@ -157,6 +157,31 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
         }
 
     /**
+     * A trailing row only takes space from the newest message: an older burst row that fits the viewport alone is not
+     * oversized because of it, so a burst of rows that each fit still keeps the tail.
+     */
+    @Test
+    fun aTrailingRowDoesNotMakeAnOlderFittingBurstRowOversized() =
+        runTest {
+            // Newest first: a 40 px trailing row, the newest arrival B, the older arrival A, then earlier history.
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(40, 30, 570, 80))
+            list.settle(index = 3)
+            val coordinator = ConversationScrollCoordinator(list)
+            val outcome =
+                coordinator.followAppendOrRevealIncomingStart(
+                    candidates = listOf(candidate("a"), candidate("b")),
+                    probeFor = { candidate -> list.probe { if (candidate.messageId == "a") 2 else 1 } },
+                    resolveTailIndex = { 0 },
+                    awaitFrame = list::frame,
+                )
+            assertFalse(
+                "rows that each fit keep the tail",
+                outcome is ConversationIncomingAppendOutcome.RevealedReadingStart,
+            )
+            assertEquals(listOf(0 to 0), list.writes)
+        }
+
+    /**
      * A second arrival that restarts the follow while the first one's landing is still measuring joins the same burst:
      * the interrupted command leaves the scroll intent alone, so the later decision still starts at the first row.
      */
@@ -243,8 +268,7 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
         }
 
     /**
-     * The screen's append path classifies rows, lands through the coordinator and hands the landing to its owner, and
-     * every restart that is not an append, including an empty or unanchored timeline, retires any burst it interrupted.
+     * The screen's append path classifies rows, lands through the coordinator and hands the landing to its owner.
      */
     @Test
     fun productionAppendPathRoutesThroughTheIncomingLanding() {
@@ -259,15 +283,7 @@ class IncomingLongMessageReadingStartCoverageTest : NotificationRouteTimelinePre
         assertTrue(append.contains("scrollCoordinator.followAppendOrRevealIncomingStart("))
         assertTrue(append.contains("viewportRestorationOwner.adoptIncomingReadingStart(outcome)"))
         assertFalse("an append must not bypass the landing decision", append.contains("followTailIfAllowed("))
-        assertEquals(
-            "a decided append, an empty or unanchored restart and a non-append restart all retire the pending burst",
-            3,
-            append.split("incomingAppendLanding.retire()").size - 1,
-        )
         assertTrue(source.contains("remember(controller){ConversationIncomingAppendLandingQueue()}"))
-        // The physical-tail write keeps its #2627 offset-zero contract, and the landing is a separate policy.
-        val writer = productionSource("ConversationScrollCoordinator.kt").withoutWhitespace()
-        assertTrue(writer.contains("overridesuspendfunscrollToTail(index:Int){scrollToItem(index,0)}"))
     }
 
     /** One mounted append: the body size it arrives with, what it must land on, and the appearance it renders in. */

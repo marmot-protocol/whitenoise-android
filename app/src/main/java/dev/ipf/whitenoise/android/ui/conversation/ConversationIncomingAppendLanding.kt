@@ -216,9 +216,14 @@ private suspend fun awaitHiddenIncomingStart(
 ): ConversationIncomingAppendCandidate? {
     val layouts = awaitTailLayouts(candidates, probeFor, maxFrames, awaitFrame).orEmpty()
     // Rows below the newest message (a pending membership row, a load error) are not part of the burst, but they
-    // take space from it, so an arrival that fits the viewport alone can still have its beginning clipped.
-    val trailingPx = layouts.lastOrNull { it?.isMeasured == true }?.itemOffsetPx?.coerceAtLeast(0) ?: 0
-    val oversized = layouts.any { it?.isOversized(trailingPx) == true }
+    // take space from it, so an arrival that fits the viewport alone can still have its beginning clipped. Only the
+    // newest measured row sits directly above them — older rows already have newer ones below.
+    val newestMeasured = layouts.indexOfLast { it?.isMeasured == true }
+    val trailingPx = layouts.getOrNull(newestMeasured)?.itemOffsetPx?.coerceAtLeast(0) ?: 0
+    val oversized =
+        layouts.withIndex().any { (index, layout) ->
+            layout?.isOversized(if (index == newestMeasured) trailingPx else 0) == true
+        }
     if (oversized) onOversized()
     val hidden = candidates.indices.firstOrNull { layouts.getOrNull(it)?.startHiddenAtTail == true }
     return hidden?.takeIf { oversized || oversizedSeen }?.let(candidates::get)
