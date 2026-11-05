@@ -6,7 +6,9 @@ import android.content.ServiceConnection
 import android.os.Handler
 import android.os.HandlerThread
 import androidx.test.core.app.ApplicationProvider
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -16,6 +18,7 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /** Startup completion must preserve the grace of an input admitted through an earlier connection callback. */
 @RunWith(RobolectricTestRunner::class)
@@ -31,6 +34,51 @@ class MediaWorkerStartupRetirementTest {
     @Test
     fun bindReturnAfterTheGraceStillStopsTheServedWorker() {
         assertDelayedBindRetirement(expireBeforeReturn = true)
+    }
+
+    /** Cancellation cannot strand a dead generation when its bind outcome arrives after the death callback. */
+    @Test
+    fun interruptedBindReturnDisposesTheAlreadyDeadWorker() {
+        val binding = BindingFixture(ApplicationProvider.getApplicationContext(), reply = false)
+        val context = DelayedBindReturn(binding, interruptOnReturn = true)
+        val lock = Any()
+        val pool = MediaWorkerPool(context, "startup_cancel", spares = 0, lock = lock, ended = {})
+        val current = AtomicBoolean(true)
+        val failure = AtomicReference<Throwable>()
+        val interrupted = AtomicBoolean()
+        val starter =
+            Thread {
+                try {
+                    pool.claim(Any(), false, WAIT_MS) { current.get() }
+                } catch (cause: Throwable) {
+                    failure.set(cause)
+                } finally {
+                    interrupted.set(Thread.currentThread().isInterrupted)
+                }
+            }
+        starter.start()
+        try {
+            assertTrue(context.connected.await(WAIT_MS, TimeUnit.MILLISECONDS))
+            val bound = binding.next()
+            val worker = checkNotNull(pool.claim(Any(), false, WAIT_MS) { true })
+            synchronized(lock) { worker.served = true }
+            bound.remote.die()
+            assertEquals("The unresolved bind still holds the dead generation", 1, pool.liveGenerationsForTest())
+            current.set(false)
+            context.release.countDown()
+            starter.join(WAIT_MS)
+            assertFalse("The interrupted starter finished", starter.isAlive)
+            assertNull("Bind completion must not introduce an interruptible wait", failure.get())
+            assertTrue("Bind completion preserves cancellation", interrupted.get())
+            assertEquals(0, pool.liveGenerationsForTest())
+            assertTrue("The dead worker's binding was released", binding.isUnbound(bound))
+        } finally {
+            current.set(false)
+            context.release.countDown()
+            starter.join(WAIT_MS)
+            pool.close()
+            binding.dieAll()
+        }
     }
 
     /** Drives a connected worker through admission and retirement while its original bind return is held. */
@@ -85,6 +133,7 @@ class MediaWorkerStartupRetirementTest {
     /** Delivers the real fixture callback, then holds the bind return independently of subsequent claims. */
     private class DelayedBindReturn(
         private val binding: BindingFixture,
+        private val interruptOnReturn: Boolean = false,
     ) : ContextWrapper(binding) {
         val connected = CountDownLatch(1)
         val release = CountDownLatch(1)
@@ -100,6 +149,7 @@ class MediaWorkerStartupRetirementTest {
             val accepted = binding.bindIsolatedService(service, flags, instanceName, executor, conn)
             connected.countDown()
             check(release.await(WAIT_MS, TimeUnit.MILLISECONDS)) { "Bind return was never released" }
+            if (interruptOnReturn) Thread.currentThread().interrupt()
             return accepted
         }
     }

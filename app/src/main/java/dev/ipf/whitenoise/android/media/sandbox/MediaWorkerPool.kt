@@ -307,10 +307,20 @@ internal class MediaWorkerPool(
             // A callback may already have served this worker: preserve its grace or catch up an expired stop.
             val served = synchronized(lock) { worker.served }
             retire(worker, escalate = !served)
-            if (served) awaitDeath(worker, 0)
+            if (served) escalateIfOverdue(worker)
         }
         dispose(worker)
         return bound
+    }
+
+    /** Catches a stop deferred by an unresolved bind without making bind completion an interruptible wait. */
+    private fun escalateIfOverdue(worker: MediaWorker) {
+        val overdue =
+            synchronized(lock) {
+                worker.retireSent &&
+                    System.nanoTime() - worker.retiredAtNanos >= TimeUnit.MILLISECONDS.toNanos(RETIRE_ESCALATION_MS)
+            }
+        if (overdue) escalate(worker)
     }
 
     /** Registers Binder death before waking claims, capturing any retirement that preceded the connection. */
