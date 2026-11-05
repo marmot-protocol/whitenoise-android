@@ -92,7 +92,8 @@ internal fun RowScope.MessageSenderAvatarSlot(
 
 /** Reaction summary chips under a bubble. */
 @Composable
-@Suppress("LongParameterList")
+// Keep the coordinated host enter/exit and local-flight guards in one layout owner.
+@Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
 internal fun ColumnScope.MessageReactionSummary(
     tallies: List<ReactionTally>,
     mine: Boolean,

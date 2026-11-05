@@ -1,4 +1,5 @@
-@file:Suppress("FunctionNaming", "TooManyFunctions") // One row owns reaction intent, endpoint measurement and draw handoff.
+// One row owns reaction intent, endpoint measurement and draw handoff.
+@file:Suppress("FunctionNaming", "TooManyFunctions")
 
 package dev.ipf.whitenoise.android.ui.conversation.reactions
 
@@ -93,17 +94,29 @@ internal class ReactionMotionChrome(
     var recorded: Boolean = false
 }
 
+private const val REACTION_CHROME_EMERGENCE_START = 0.25f
+private const val REACTION_CHROME_EMERGENCE_DURATION = 0.25f
+
 /** The native outline forms around the moving glyph during the middle of the existing phase. */
-internal fun reactionChromeAlpha(progress: Float): Float = FastOutSlowInEasing.transform(((progress - 0.25f) / 0.25f).coerceIn(0f, 1f))
+internal fun reactionChromeAlpha(progress: Float): Float {
+    val emergence = (progress - REACTION_CHROME_EMERGENCE_START) / REACTION_CHROME_EMERGENCE_DURATION
+    return FastOutSlowInEasing.transform(emergence.coerceIn(0f, 1f))
+}
 
 /** Identical native pixels switch copies atomically; source-over crossfading would dim the glyph. */
 internal fun reactionGlyphHandoff(progress: Float): Float = if (progress >= 1f) 1f else 0f
 
 /** Overflow has a numeric label, so the arriving emoji fades instead of replacing a matching glyph. */
-internal fun reactionOverflowAlpha(progress: Float): Float = ((1f - progress) / (1f - REACTION_TRAVEL_FRACTION)).coerceIn(0f, 1f)
+internal fun reactionOverflowAlpha(progress: Float): Float {
+    val handoff = (1f - progress) / (1f - REACTION_TRAVEL_FRACTION)
+    return handoff.coerceIn(0f, 1f)
+}
 
 /** Travel decelerates into the exact destination, then stays there through the final handoff. */
-internal fun reactionFlightProgress(progress: Float): Float = FastOutSlowInEasing.transform((progress / REACTION_TRAVEL_FRACTION).coerceIn(0f, 1f))
+internal fun reactionFlightProgress(progress: Float): Float {
+    val travel = (progress / REACTION_TRAVEL_FRACTION).coerceIn(0f, 1f)
+    return FastOutSlowInEasing.transform(travel)
+}
 
 /** Matches Image's Fit behavior without stretching decoded rectangular artwork. */
 internal fun reactionArtworkFit(
@@ -207,7 +220,8 @@ internal class LocalReactionMotion {
         expected: LocalReactionEffect,
         chrome: ReactionMotionChrome,
     ) {
-        if (!mounted || !enabled || effect != expected || !chrome.recorded || chrome.bounds == null) return
+        if (!mounted || !enabled || effect != expected) return
+        if (!chrome.recorded || chrome.bounds == null) return
         val target = targets[emoji] ?: return
         if (target.glyph && target.chrome !== chrome) targets[emoji] = target.copy(chrome = chrome)
     }
@@ -303,7 +317,8 @@ internal fun Modifier.reactionSourceBounds(
 
 /** No hit target or semantics are added. The canonical chip remains the only accessible reaction. */
 @Composable
-@Suppress("LongMethod", "CyclomaticComplexMethod") // One guarded draw pass preserves endpoints and native text/art rasterization.
+// One guarded draw pass preserves endpoints and native text/art rasterization.
+@Suppress("LongMethod", "CyclomaticComplexMethod")
 internal fun Modifier.localReactionOverlay(state: LocalReactionMotion): Modifier {
     if (LocalRowReactionMotion.current === state) return this
     val measurer = rememberTextMeasurer(cacheSize = 0)
@@ -349,7 +364,9 @@ internal fun Modifier.localReactionOverlay(state: LocalReactionMotion): Modifier
             val alpha = if (target.glyph) 1f - reactionGlyphHandoff(p) else reactionOverflowAlpha(p)
             val chrome =
                 target.chrome?.takeIf {
-                    it.recorded && it.sequence == current.sequence && it.bounds?.let { bounds -> state.canFly(source, bounds) } == true
+                    it.recorded &&
+                        it.sequence == current.sequence &&
+                        it.bounds?.let { bounds -> state.canFly(source, bounds) } == true
                 }
             chrome?.layer?.alpha = reactionChromeAlpha(p)
             if (painter != null) {
@@ -421,7 +438,11 @@ internal fun Modifier.localReactionOverlay(state: LocalReactionMotion): Modifier
         }
 }
 
-/** Records native chrome without moving layout or pointer/semantics coordinates. */
+/**
+ * Records native chrome without moving layout or pointer/semantics coordinates.
+ * One native draw boundary owns capture, visibility fallback and disposal together.
+ */
+@Suppress("CyclomaticComplexMethod")
 @Composable
 internal fun Modifier.localReactionChrome(
     state: LocalReactionMotion?,
@@ -429,7 +450,8 @@ internal fun Modifier.localReactionChrome(
     newSelectedPill: Boolean,
 ): Modifier {
     val effect = state?.effect
-    if (state == null || emoji == null || !newSelectedPill || !state.enabled || effect?.emoji != emoji || effect.origin == null) return this
+    if (state == null || emoji == null || !newSelectedPill) return this
+    if (!state.enabled || effect?.emoji != emoji || effect.origin == null) return this
     val layer = rememberGraphicsLayer()
     val chrome = remember(state, effect.sequence, layer) { ReactionMotionChrome(effect.sequence, layer) }
     DisposableEffect(state, emoji, chrome) {
@@ -447,7 +469,8 @@ internal fun Modifier.localReactionChrome(
         val sourceVisible = state.canFly(source, source)
         val targetVisible = target?.let { it.glyph && state.canFly(source, it.bounds) } == true
         val chromeVisible = bounds?.let { state.canFly(source, it) } == true
-        if (current && sourceVisible && targetVisible && chromeVisible) {
+        val geometryVisible = sourceVisible && targetVisible && chromeVisible
+        if (current && geometryVisible) {
             // The glyph already has its own flight alpha. Keep measuring/recording the real
             // surface, but do not park a second outline at the destination while it travels.
             layer.record { this@drawWithContent.drawContent() }
@@ -528,7 +551,8 @@ private fun Modifier.measuredReactionTarget(
     ) {
         val current = selected && state.enabled && state.effect?.emoji == emoji
         val complete = textLayout == null || nativeLayout != null
-        if (current && complete && bounds != null && !bounds.isEmpty) {
+        val currentLayout = current && complete
+        if (currentLayout && bounds != null && !bounds.isEmpty) {
             val chrome = state.targets[emoji]?.chrome?.takeIf { it.sequence == state.effect?.sequence }
             state.targets[emoji] = ReactionMotionTarget(bounds, nativeLayout, chrome)
         } else {

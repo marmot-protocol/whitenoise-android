@@ -147,7 +147,20 @@ class LocalReactionMotionScreenshotTest {
             cropPixels(canonical, IntRect(0, 0, 360, 640)),
             cropPixels(missing, IntRect(0, 0, 360, 640)),
         )
-        assertTrue("the fallback must retain visible native emoji pixels", yellowStrength(cropPixels(missing, IntRect(0, 0, 360, 640))) > 0)
+        assertTrue(
+            "the fallback must retain visible native emoji pixels",
+            yellowStrength(
+                cropPixels(
+                    missing,
+                    IntRect(
+                        0,
+                        0,
+                        360,
+                        640,
+                    ),
+                ),
+            ) > 0,
+        )
         rule.onNodeWithTag("conversation.reaction.motion.active").assertDoesNotExist()
         captureReactionFrame("src/test/snapshots/local_reaction_motion_missing_target.png", "clipped-reaction-root")
         flushQueuedComposition(160)
@@ -249,8 +262,9 @@ class LocalReactionMotionScreenshotTest {
     /**
      * Renders the reaction fixture, accepts a thumbs-up, and captures its first, mid-flight and settled frames,
      * optionally dumping every frame when `ANIMATION_CAPTURE_FRAMES` is set.
+     * One production-component capture matrix shares these acceptance checks.
      */
-    @Suppress("LongMethod", "CyclomaticComplexMethod") // One production-component capture matrix with shared acceptance checks.
+    @Suppress("LongMethod", "CyclomaticComplexMethod")
     private fun record(
         name: String,
         rtl: Boolean,
@@ -265,7 +279,20 @@ class LocalReactionMotionScreenshotTest {
         val customBitmap =
             Bitmap.createBitmap(48, 24, Bitmap.Config.ARGB_8888).apply {
                 eraseColor(AndroidColor.rgb(255, 160, 0))
-                Canvas(this).drawRect(0f, 0f, 24f, 24f, android.graphics.Paint().apply { color = AndroidColor.rgb(35, 160, 255) })
+                Canvas(this).drawRect(
+                    0f,
+                    0f,
+                    24f,
+                    24f,
+                    android.graphics.Paint().apply {
+                        color =
+                            AndroidColor.rgb(
+                                35,
+                                160,
+                                255,
+                            )
+                    },
+                )
             }
         val custom = CustomEmojiSet(listOf(CustomEmoji(":flag:", File("flag.png"), customBitmap.asImageBitmap())))
         rule.mainClock.autoAdvance = false
@@ -305,7 +332,13 @@ class LocalReactionMotionScreenshotTest {
                                     Box(
                                         Modifier.widthIn(max = 284.dp).onGloballyPositioned {
                                             val bounds = it.boundsInWindow()
-                                            bubbleBounds = IntRect(bounds.left.toInt(), bounds.top.toInt(), bounds.right.toInt(), bounds.bottom.toInt())
+                                            bubbleBounds =
+                                                IntRect(
+                                                    bounds.left.toInt(),
+                                                    bounds.top.toInt(),
+                                                    bounds.right.toInt(),
+                                                    bounds.bottom.toInt(),
+                                                )
                                         },
                                     ) { preview() }
                                     val existing =
@@ -321,7 +354,18 @@ class LocalReactionMotionScreenshotTest {
                                             if (name == "counted") {
                                                 listOf(ReactionTally(emoji, if (accepted) 4 else 3, accepted))
                                             } else {
-                                                existing + if (accepted) listOf(ReactionTally(emoji, 1, true)) else emptyList()
+                                                existing +
+                                                    if (accepted) {
+                                                        listOf(
+                                                            ReactionTally(
+                                                                emoji,
+                                                                1,
+                                                                true,
+                                                            ),
+                                                        )
+                                                    } else {
+                                                        emptyList()
+                                                    }
                                             },
                                         mine = mine,
                                         onClick = {},
@@ -373,7 +417,11 @@ class LocalReactionMotionScreenshotTest {
             captureReactionFrame(File(folder, "frame-000.png").path, FOCUSED_OVERLAY_FRAME_TEST_TAG)
         }
         val destinationBefore = captureReactionBitmap()
-        val sourceBitmap = captureReactionFrame("src/test/snapshots/local_reaction_motion_${name}_first.png", FOCUSED_OVERLAY_FRAME_TEST_TAG)
+        val sourceBitmap =
+            captureReactionFrame(
+                "src/test/snapshots/local_reaction_motion_${name}_first.png",
+                FOCUSED_OVERLAY_FRAME_TEST_TAG,
+            )
         rule
             .onNodeWithTag("$MESSAGE_ACTION_REACTION_TEST_TAG:$emoji")
             .performSemanticsAction(SemanticsActions.OnClick) { click -> assertTrue(click()) }
@@ -389,6 +437,8 @@ class LocalReactionMotionScreenshotTest {
             if (name == "interrupted" && index == 6) rule.runOnIdle { animations = false }
             flushQueuedComposition()
             rule.onNodeWithTag("reaction-motion-root").assertExists()
+            // Native recordings publish during draw, independently of optional frame export.
+            captureReactionBitmap()
             motion.targets[emoji]
                 ?.chrome
                 ?.bounds
@@ -404,11 +454,23 @@ class LocalReactionMotionScreenshotTest {
                 }
                 flushQueuedComposition()
                 captureReactionBitmap()
-                rule.runOnIdle { assertNull("partially visible chrome must use its canonical native surface", motion.targets[emoji]?.chrome) }
+                rule.runOnIdle {
+                    assertNull(
+                        "partially visible chrome must use its canonical native surface",
+                        motion.targets[emoji]?.chrome,
+                    )
+                }
             }
-            if (name == "amoled" && motion.effect != null && motion.progress.value in 0.05f..0.2f && nativeChromeBounds != null) {
+            val earlyFlight = name == "amoled" && motion.effect != null && motion.progress.value in 0.05f..0.2f
+            if (earlyFlight && nativeChromeBounds != null) {
                 val bounds = requireNotNull(nativeChromeBounds).translate(-motion.origin)
-                val crop = IntRect(floor(bounds.left).toInt(), floor(bounds.top).toInt(), ceil(bounds.right).toInt(), ceil(bounds.bottom).toInt())
+                val crop =
+                    IntRect(
+                        floor(bounds.left).toInt(),
+                        floor(bounds.top).toInt(),
+                        ceil(bounds.right).toInt(),
+                        ceil(bounds.bottom).toInt(),
+                    )
                 assertArrayEquals(
                     "the new outline must not park at the destination before following the emoji",
                     cropPixels(destinationBefore, crop),
@@ -466,7 +528,9 @@ class LocalReactionMotionScreenshotTest {
                     }
                 }
             }
-            if (checksNativeLanding && motion.effect == null && landingSamples.containsKey(208) && !landingSamples.containsKey(224)) {
+            val completedLanding = checksNativeLanding && motion.effect == null
+            val needsCompletionSample = landingSamples.containsKey(208) && !landingSamples.containsKey(224)
+            if (completedLanding && needsCompletionSample) {
                 val crop = landingSamples.getValue(208).first
                 landingSamples[224] = crop to cropPixels(captureReactionBitmap(), crop)
             }
@@ -508,14 +572,25 @@ class LocalReactionMotionScreenshotTest {
                 rule.onNodeWithTag("$REACTION_PILL_TEST_TAG:0").assertExists()
                 if (motionEnabled && name !in setOf("interrupted", "missing_art")) {
                     rule.runOnIdle {
-                        assertTrue("a measured destination must exist before the flight capture", motion.targets[emoji] != null)
-                        assertTrue("the production quick rail must report a measured source", motion.effect?.origin != null)
+                        assertTrue(
+                            "a measured destination must exist before the flight capture",
+                            motion.targets[emoji] != null,
+                        )
+                        assertTrue(
+                            "the production quick rail must report a measured source",
+                            motion.effect?.origin != null,
+                        )
                     }
                     rule.onNodeWithTag("conversation.reaction.motion.active").assertExists()
                     rule.onNodeWithTag("reaction-motion-root").assertExists()
                 }
                 if (name == "missing_art") {
-                    rule.runOnIdle { assertTrue("missing artwork must not fly its literal shortcode", motion.effect?.origin == null) }
+                    rule.runOnIdle {
+                        assertTrue(
+                            "missing artwork must not fly its literal shortcode",
+                            motion.effect?.origin == null,
+                        )
+                    }
                     rule.onNodeWithTag("conversation.reaction.motion.active").assertDoesNotExist()
                 }
                 if (name == "counted") {
@@ -529,16 +604,33 @@ class LocalReactionMotionScreenshotTest {
                                 .bounds.width,
                             0.1f,
                         )
-                        assertTrue("count must not shift the endpoint to the whole-pill center", kotlin.math.abs(glyph.center.x - pill.center.x) > 1f)
+                        assertTrue(
+                            "count must not shift the endpoint to the whole-pill center",
+                            kotlin.math.abs(glyph.center.x - pill.center.x) > 1f,
+                        )
                     }
                 }
                 captureReactionFrame("src/test/snapshots/local_reaction_motion_${name}_mid.png")
             }
         }
-        if (name == "amoled") assertTrue("an early native frame must verify the absent destination outline", checkedPendingChrome)
+        if (name == "amoled") {
+            assertTrue(
+                "an early native frame must verify the absent destination outline",
+                checkedPendingChrome,
+            )
+        }
         val settled = captureReactionFrame("src/test/snapshots/local_reaction_motion_${name}_settled.png")
         if (checksNativeLanding) {
-            assertEquals("all late opaque-overlay frames must be checked", setOf(176, 192, 208, 224), landingSamples.keys)
+            assertEquals(
+                "all late opaque-overlay frames must be checked",
+                setOf(
+                    176,
+                    192,
+                    208,
+                    224,
+                ),
+                landingSamples.keys,
+            )
             landingSamples.forEach { (millis, sample) ->
                 assertArrayEquals(
                     "$name native destination pixels must not shift or dim at $millis ms",
@@ -549,10 +641,26 @@ class LocalReactionMotionScreenshotTest {
         }
         if (name == "overflow") {
             assertEquals(setOf(176, 192, 208), overflowSamples.keys)
-            assertTrue("overflow emoji must fade while the numeric chip remains", overflowSamples.getValue(176) > overflowSamples.getValue(192))
-            assertTrue("overflow emoji must keep fading through handoff", overflowSamples.getValue(192) > overflowSamples.getValue(208))
+            assertTrue(
+                "overflow emoji must fade while the numeric chip remains",
+                overflowSamples.getValue(176) > overflowSamples.getValue(192),
+            )
+            assertTrue(
+                "overflow emoji must keep fading through handoff",
+                overflowSamples.getValue(192) > overflowSamples.getValue(208),
+            )
         }
-        if (System.getenv("ANIMATION_CAPTURE_FRAMES") == "1") File(folder, "phases.txt").writeText(phases.joinToString("\n", postfix = "\n"))
+        if (System.getenv("ANIMATION_CAPTURE_FRAMES") == "1") {
+            File(
+                folder,
+                "phases.txt",
+            ).writeText(
+                phases.joinToString(
+                    "\n",
+                    postfix = "\n",
+                ),
+            )
+        }
     }
 
     /** A paused test clock must publish queued state before delivering the recomposition frame. */
@@ -573,7 +681,10 @@ class LocalReactionMotionScreenshotTest {
     }
 
     /** Native pixel assertions are independent of Roborazzi's baseline recording/verification mode. */
-    private fun captureReactionBitmap(tag: String = "reaction-motion-root"): Bitmap = rule.onNodeWithTag(tag).captureToImage().asAndroidBitmap()
+    private fun captureReactionBitmap(
+        tag: String =
+            "reaction-motion-root",
+    ): Bitmap = rule.onNodeWithTag(tag).captureToImage().asAndroidBitmap()
 
     /** Font hinting may change edge alpha, but the visible glyph center must stay on the rail's source. */
     private fun yellowBounds(
@@ -588,7 +699,8 @@ class LocalReactionMotionScreenshotTest {
             val red = pixel ushr 16 and 255
             val green = pixel ushr 8 and 255
             val blue = pixel and 255
-            if (red > 90 && green > 55 && blue < green * 0.65f && red > green * 0.8f) {
+            val warm = red > 90 && green > 55
+            if (warm && blue < green * 0.65f && red > green * 0.8f) {
                 val x = index % crop.width + crop.left
                 val y = index / crop.width + crop.top
                 left = minOf(left, x)

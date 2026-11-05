@@ -193,8 +193,13 @@ private fun ReactionPillItem(
             Modifier
                 .heightIn(min = ReactionTouchTargetHeight)
                 .testTag("$REACTION_PILL_TEST_TAG:$index")
-                .localReactionTarget(localMotion, motionEmoji, pill.selected, allowHostClipping, measureChip = emoji == null)
-                .then(
+                .localReactionTarget(
+                    localMotion,
+                    motionEmoji,
+                    pill.selected,
+                    allowHostClipping,
+                    measureChip = emoji == null,
+                ).then(
                     if (enabled) {
                         Modifier.combinedClickable(
                             interactionSource = interactionSource,
