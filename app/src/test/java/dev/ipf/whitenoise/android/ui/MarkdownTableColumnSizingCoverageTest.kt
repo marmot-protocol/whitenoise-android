@@ -257,6 +257,43 @@ class MarkdownTableColumnSizingCoverageTest {
         assertTrue(textLayout(DESCRIPTION_A).lineCount > 1)
     }
 
+    /**
+     * A reply-style bubble that hugs its content measures the table without a width bound. A cell whose
+     * natural one-line width exceeds what Compose can pack must still clamp to the bubble instead of
+     * throwing while the table packs fixed column widths.
+     */
+    @Test
+    fun intrinsicWidthHostSurvivesACellWiderThanComposeCanPack() {
+        val huge = "long ".repeat(LONG_CELL_WORDS).trim()
+        val document =
+            MarkdownDocumentFfi(
+                blocks =
+                    listOf(
+                        MarkdownBlockFfi.Table(
+                            alignments = listOf(MarkdownAlignmentFfi.NONE, MarkdownAlignmentFfi.NONE),
+                            header = listOf(cell("ID"), cell("Body")),
+                            rows = listOf(listOf(cell("Q1"), cell(huge))),
+                        ),
+                    ),
+                truncated = false,
+                blankLinesBefore = byteArrayOf(),
+            )
+        composeRule.setContent {
+            WhiteNoiseTheme(fontScale = 2f) {
+                Column(
+                    Modifier
+                        .widthIn(max = 260.dp)
+                        .boundedIntrinsicWidth(IntrinsicSize.Max)
+                        .testTag(HOST_TAG),
+                ) { MarkdownMessageBody(document = document) }
+            }
+        }
+        composeRule.waitForIdle()
+        val host = composeRule.onNodeWithTag(HOST_TAG).fetchSemanticsNode().boundsInRoot
+        assertEquals(260f, host.width, EDGE_TOLERANCE)
+        assertCellsInside(host, listOf("ID", "Q1"))
+    }
+
     /** Requires the paragraph [after] to start at or below the bottom of every listed table cell. */
     private fun assertBlockFollowsCells(
         after: String,
@@ -364,6 +401,9 @@ class MarkdownTableColumnSizingCoverageTest {
         const val DESCRIPTION_A =
             "Describes the first record in a full paragraph so that this column needs far more room than its label."
         const val DESCRIPTION_B = "A second paragraph that also wraps across several lines of the narrow bubble."
+
+        /** Enough words that the cell's one-line width passes Compose's packable range at 200% text. */
+        const val LONG_CELL_WORDS = 40_000
         const val UNBROKEN = "https://example.com/an-unbroken-token-without-any-spaces-at-all"
         const val ID_DESCRIPTION_SOURCE =
             "| ID | Description |\n| --- | --- |\n| Q1 | $DESCRIPTION_A |\n| Q2 | $DESCRIPTION_B |"

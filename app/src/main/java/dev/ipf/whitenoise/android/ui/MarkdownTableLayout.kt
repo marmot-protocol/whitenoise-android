@@ -125,6 +125,9 @@ internal fun MarkdownTableLayout(
     )
 }
 
+/** The widest table an unbounded measurement may produce: 15 bits fit beside any height in [Constraints]. */
+private const val MAX_UNBOUNDED_TABLE_WIDTH = 32_767
+
 private const val CELLS_SLOT = 0
 private const val ROW_MARKERS_SLOT = 1
 private const val DIVIDERS_SLOT = 2
@@ -140,7 +143,10 @@ private class MarkdownTableMeasurePolicy(
     ): MeasureResult {
         val cells = measurables[CELLS_SLOT]
         val rowMarkers = measurables[ROW_MARKERS_SLOT]
-        val available = if (constraints.hasBoundedWidth) constraints.maxWidth else Constraints.Infinity
+        // An intrinsic or wrap-content host measures without a width bound. Natural one-line widths can then
+        // be larger than Compose can pack into the fixed column constraints below, so an unbounded budget
+        // is capped at a width every packing split can represent — far wider than any real window.
+        val available = if (constraints.hasBoundedWidth) constraints.maxWidth else MAX_UNBOUNDED_TABLE_WIDTH
         val demands = columnDemands(cells, rowMarkers)
         val allocation = markdownTableColumnWidths(demands, available, MARKDOWN_TABLE_COLUMN_GAP.roundToPx())
         val rows = measureRows(cells, rowMarkers, allocation)
