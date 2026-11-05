@@ -10,6 +10,14 @@
         "test_ids": [
           "NTF-025"
         ]
+      },
+      {
+        "surface": "Reply cleanup preserves a newer message after partial content reconciliation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationNotificationRetirement.kt",
+        "anchor": "fun cancelConversationCardIfSameGeneration(",
+        "test_ids": [
+          "NTF-043"
+        ]
       }
     ]
   },

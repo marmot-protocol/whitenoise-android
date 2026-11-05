@@ -249,20 +249,6 @@ internal class ConversationNotificationRetirement(
         }
     }
 
-    /** Whether this platform card is an invite owned by the requested account and group. */
-    private fun StatusBarNotification.matchesInvite(
-        accountRef: String,
-        groupIdHex: String,
-    ): Boolean {
-        val extras = notification.extras ?: return false
-        return shouldDismissInvite(
-            extraAccountRef = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF),
-            extraGroupIdHex = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID),
-            accountRef = accountRef,
-            groupIdHex = groupIdHex,
-        )
-    }
-
     /** Whether this card is any deterministic sibling or opaque invite for the conversation. */
     private fun StatusBarNotification.matchesConversationCard(
         accountRef: String,
