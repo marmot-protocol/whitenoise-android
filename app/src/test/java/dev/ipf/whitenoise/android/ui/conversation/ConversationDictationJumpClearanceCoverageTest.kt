@@ -11,19 +11,27 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoff
+import dev.ipf.whitenoise.android.ui.navigation.ConversationDictationControlOwner
 import dev.ipf.whitenoise.android.ui.navigation.FloatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.navigation.FloatingDictationLayout
 import dev.ipf.whitenoise.android.ui.navigation.LocalFloatingDictationAnchor
@@ -51,6 +59,8 @@ class ConversationDictationJumpClearanceCoverageTest {
     private val capsuleHeight = mutableIntStateOf(48)
     private val capsuleWidth = mutableIntStateOf(168)
     private val inlineControl = mutableStateOf(false)
+    private var controlMotion: MeasuredControlHandoff? = null
+    private val handoffRequest = mutableStateOf<Any?>(null)
     private var capsuleTaps = 0
     private var newestTaps = 0
     private var mentionTaps = 0
@@ -118,6 +128,89 @@ class ConversationDictationJumpClearanceCoverageTest {
         assertStackClearsCapsule()
     }
 
+    /**
+     * Handing the capsule back to its origin composer keeps the stack above the moving capsule until the
+     * motion lands, then the stack returns to rest. Publishing the inline endpoint at once dropped the
+     * stack under a capsule that was still painted above the composer.
+     */
+    @Test
+    fun handBackToTheComposerKeepsTheStackAboveTheMovingCapsule() {
+        val motion = MeasuredControlHandoff(ConversationDictationControlOwner.Persistent, morphSurface = true)
+        controlMotion = motion
+        capsuleVisible.value = false
+        val anchor = mount()
+        val rest = bounds(NEWEST)
+        capsuleVisible.value = true
+        assertStackClearsCapsule()
+
+        composeRule.mainClock.autoAdvance = false
+        composeRule.runOnIdle {
+            inlineControl.value = true
+            handoffRequest.value = motion.prepare(ConversationDictationControlOwner.Composer, allowed = true)
+        }
+        var sawMotion = false
+        repeat(HANDOFF_FRAMES) {
+            composeRule.mainClock.advanceTimeByFrame()
+            if (motion.active) {
+                sawMotion = true
+                assertTrue("the moving capsule stays published", anchor.floatingCapsuleBounds != null)
+                assertControlsClear(bounds(CAPSULE))
+            }
+        }
+        composeRule.mainClock.autoAdvance = true
+        composeRule.waitForIdle()
+        assertTrue("the hand-back must animate", sawMotion)
+        composeRule.runOnIdle { assertNull(anchor.floatingCapsuleBounds) }
+        assertEquals(rest, bounds(NEWEST))
+    }
+
+    /**
+     * In a short window a tall capsule leaves no room above it. The stack rises only to its parent's top,
+     * so every control stays on screen and reachable instead of being lifted off the top edge.
+     */
+    @Test
+    @Config(qualifiers = "en-w360dp-h360dp-mdpi")
+    fun aTallCapsuleInAShortWindowNeverLiftsTheStackOffScreen() {
+        capsuleHeight.intValue = 300
+        mount()
+        val height =
+            composeRule
+                .onRoot()
+                .fetchSemanticsNode()
+                .boundsInWindow.bottom
+        listOf(NEWEST, MENTION, RESUME).forEach { tag ->
+            val control = bounds(tag)
+            assertTrue("$tag $control must stay on screen", control.top >= 0f && control.bottom <= height)
+        }
+        composeRule.onNodeWithTag(RESUME).assertIsDisplayed()
+    }
+
+    /**
+     * Frame by frame, the stack clears a growing capsule in the same frame the capsule takes its new
+     * size. The placement read happens after the shell publishes, so no stepped frame overlaps.
+     */
+    @Test
+    fun aGrowingCapsuleIsClearedInTheSameFrame() {
+        mount()
+        assertStackClearsCapsule()
+        composeRule.mainClock.autoAdvance = false
+        composeRule.runOnIdle { capsuleHeight.intValue = 132 }
+        repeat(3) {
+            composeRule.mainClock.advanceTimeByFrame()
+            assertControlsClear(bounds(CAPSULE))
+        }
+        composeRule.mainClock.autoAdvance = true
+        assertEquals(132f, bounds(CAPSULE).height)
+    }
+
+    /** Asserts every stack control ends at least the stack gap above [capsule]. */
+    private fun assertControlsClear(capsule: Rect) {
+        listOf(NEWEST, MENTION, RESUME).forEach { tag ->
+            val control = bounds(tag)
+            assertTrue("$tag $control must end above $capsule", control.bottom + GAP_PX - 0.5f <= capsule.top)
+        }
+    }
+
     /** Asserts every visible stack control ends at least the stack gap above the placed capsule. */
     private fun assertStackClearsCapsule() {
         composeRule.waitForIdle()
@@ -155,7 +248,10 @@ class ConversationDictationJumpClearanceCoverageTest {
                                 }
                             },
                             inlineControl = inlineControl.value,
+                            controlMotion = controlMotion,
                         )
+                        val request = handoffRequest.value
+                        LaunchedEffect(request) { if (request != null) controlMotion?.animatePrepared(request) }
                     }
                 }
             }
@@ -176,6 +272,15 @@ class ConversationDictationJumpClearanceCoverageTest {
                     .height(COMPOSER_DP.dp)
                     .floatingDictationAnchor(),
             )
+            // The composer's inline dictation slot, where a handed-back capsule lands.
+            val anchor = LocalFloatingDictationAnchor.current
+            val slot = remember { Any() }
+            Box(
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .size(capsuleWidth.intValue.dp, capsuleHeight.intValue.dp)
+                    .onPlaced { anchor?.reportComposerControls(slot, it.boundsInWindow()) },
+            )
             ConversationNavigationStack(composerOverlap = COMPOSER_DP.dp) {
                 TtsResumeFollowButton(onClick = { resumeTaps++ }, modifier = Modifier.testTag(RESUME))
                 Button(onClick = { mentionTaps++ }, modifier = Modifier.testTag(MENTION)) { Text("@ 2") }
@@ -194,6 +299,7 @@ class ConversationDictationJumpClearanceCoverageTest {
         const val MENTION = "jump.mention"
         const val RESUME = "jump.resume"
         const val COMPOSER_DP = 64
+        const val HANDOFF_FRAMES = 40
 
         /** mdpi, so the 12dp stack gap is 12px; half a pixel absorbs rounding. */
         const val GAP_PX = 12f

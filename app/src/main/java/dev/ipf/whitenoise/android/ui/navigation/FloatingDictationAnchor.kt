@@ -29,6 +29,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.layout.boundsInWindow
@@ -136,16 +137,18 @@ internal class FloatingDictationAnchor {
         }
     }
 
+    private var floatingCapsule: FloatingCapsulePlacement? by mutableStateOf(null)
+
     /**
-     * Window bounds where the shell last placed the floating capsule, or null while no floating
-     * capsule is placed — an inline composer control is not floating and publishes nothing.
+     * Window bounds where the capsule is painted, or null while no floating capsule is shown. During a
+     * handoff this follows the moving capsule, including a hand-back to its origin composer, and an
+     * inline composer control at rest is not floating and reads null.
      */
-    var floatingCapsuleBounds: Rect? by mutableStateOf(null)
-        private set
+    val floatingCapsuleBounds: Rect? get() = floatingCapsule?.painted()
 
     /** Written only by the shell's placement pass, so route overlays read but never steer the capsule. */
-    fun reportFloatingCapsule(placed: Rect?) {
-        floatingCapsuleBounds = placed
+    fun reportFloatingCapsule(placement: FloatingCapsulePlacement?) {
+        floatingCapsule = placement
     }
 
     fun remove(token: Any) {
@@ -190,9 +193,49 @@ internal fun Modifier.floatingDictationAnchor(
 }
 
 /**
+ * Where the shell placed the dictation control. [motion] is read lazily by each reader, so a handoff
+ * animating on the frame clock moves the published bounds without re-placing the shell.
+ */
+internal data class FloatingCapsulePlacement(
+    val placed: Rect,
+    val inline: Boolean,
+    val motion: MeasuredControlHandoff?,
+    val rtl: Boolean,
+) {
+    /** The painted rectangle: the placed one shifted by an active handoff, or null for an inline control at rest. */
+    fun painted(): Rect? {
+        val shift = motion?.capsuleHandoffShift(rtl)
+        return when {
+            shift != null -> placed.translate(shift)
+            inline -> null
+            else -> placed
+        }
+    }
+}
+
+/**
+ * The layer offset an active handoff paints the capsule at, or null while no handoff runs. Commands keep
+ * their logical trailing edge while recovery text changes the container width.
+ */
+internal fun MeasuredControlHandoff.capsuleHandoffShift(rtl: Boolean): Offset? {
+    val target = targetBounds
+    val moving = renderedBounds
+    if (!active || target == null || moving == null) return null
+    return Offset(
+        x = if (rtl) moving.left - target.left else moving.right - target.right,
+        y = moving.center.y - target.center.y,
+    )
+}
+
+/**
  * Lifts a bottom-aligned route overlay so it sits [gap] above the shell's placed floating capsule
  * whenever the two share horizontal space. The read is one-way — the overlay never registers as an
  * obstacle, so the capsule cannot chase the overlay it just moved. Without a capsule nothing moves.
+ *
+ * The lift never carries the overlay above its parent's top edge. When a tall capsule leaves too little
+ * room — recovery text with the keyboard open, a short landscape window — the overlay rises only as far
+ * as its parent allows and keeps the rest of its controls inside the transcript, rather than leaving
+ * the screen.
  */
 @Composable
 internal fun Modifier.floatingDictationCapsuleClearance(gap: Dp = 12.dp): Modifier {
@@ -210,6 +253,7 @@ internal fun Modifier.floatingDictationCapsuleClearance(gap: Dp = 12.dp): Modifi
                         overlay = Rect(origin.x, origin.y, origin.x + placeable.width, origin.y + placeable.height),
                         capsule = capsule,
                         gapPx = gap.toPx(),
+                        topLimit = coordinates?.parentLayoutCoordinates?.positionInWindow()?.y ?: origin.y,
                     )
                 }
             placeable.place(0, -lift)
@@ -217,14 +261,21 @@ internal fun Modifier.floatingDictationCapsuleClearance(gap: Dp = 12.dp): Modifi
     }
 }
 
-/** Upward shift that leaves [gapPx] between [overlay] and [capsule], or zero when they never meet. */
+/**
+ * Upward shift that leaves [gapPx] between [overlay] and [capsule], or zero when they never meet. The
+ * shift is capped so the overlay's top never rises above [topLimit].
+ */
 internal fun floatingCapsuleClearancePx(
     overlay: Rect,
     capsule: Rect,
     gapPx: Float,
+    topLimit: Float = Float.NEGATIVE_INFINITY,
 ): Int {
     val sharesColumn = overlay.width > 0f && overlay.left < capsule.right && overlay.right > capsule.left
-    return if (sharesColumn) ceil(overlay.bottom + gapPx - capsule.top).toInt().coerceAtLeast(0) else 0
+    if (!sharesColumn) return 0
+    val wanted = ceil(overlay.bottom + gapPx - capsule.top).toInt().coerceAtLeast(0)
+    val room = (overlay.top - topLimit).toInt().coerceAtLeast(0)
+    return minOf(wanted, room)
 }
 
 /** Insets are consumed outside the action viewport; a short viewport scrolls the capsule slot too. */
@@ -385,7 +436,7 @@ internal fun FloatingDictationLayout(
         val body = subcompose("content", contentSlots.forSpace(footerSpace)).single().measure(constraints)
         layout(constraints.maxWidth, constraints.maxHeight) {
             body.place(0, 0)
-            if (bubble == null || inlineControl) anchor.reportFloatingCapsule(null)
+            if (bubble == null) anchor.reportFloatingCapsule(null)
             if (bubble != null) {
                 val inlineBounds = anchor.composerControlBounds.takeIf { inlineControl }
                 // The composer slot reports during body placement, before its shell controls are placed.
@@ -421,24 +472,24 @@ internal fun FloatingDictationLayout(
                 val placed = Rect(rootLeft + x, rootTop + y, rootLeft + x + bubble.width, rootTop + y + bubble.height)
                 Snapshot.withoutReadObservation {
                     controlMotion?.report(owner, controlToken, placed)
-                    // Route overlays such as the conversation jump stack clear this settled position.
-                    if (!inlineControl) anchor.reportFloatingCapsule(placed)
+                    // Route overlays such as the conversation jump stack clear the painted position. An
+                    // inline control publishes too, so a hand-back to the composer is cleared until it lands.
+                    anchor.reportFloatingCapsule(
+                        FloatingCapsulePlacement(
+                            placed = placed,
+                            inline = inlineControl,
+                            motion = controlMotion,
+                            rtl = layoutDirection == LayoutDirection.Rtl,
+                        ),
+                    )
                 }
                 val localClip =
                     scrolling?.takeUnless { inlineControl }?.second?.translate(-rootLeft - x, -rootTop - y)
                 bubble.placeWithLayer(x, y) {
-                    val target = controlMotion?.targetBounds
-                    val moving = controlMotion?.renderedBounds
-                    if (controlMotion?.active == true && target != null && moving != null) {
-                        // Commands keep their logical trailing edge while recovery text changes
-                        // the container width. No command, session or editor is duplicated.
-                        translationX =
-                            if (layoutDirection == LayoutDirection.Rtl) {
-                                moving.left - target.left
-                            } else {
-                                moving.right - target.right
-                            }
-                        translationY = moving.center.y - target.center.y
+                    // No command, session or editor is duplicated by the handoff.
+                    controlMotion?.capsuleHandoffShift(layoutDirection == LayoutDirection.Rtl)?.let { shift ->
+                        translationX = shift.x
+                        translationY = shift.y
                     }
                     if (localClip != null) {
                         clip = true
