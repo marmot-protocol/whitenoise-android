@@ -13,6 +13,17 @@ import org.junit.Test
 
 @Suppress("LargeClass") // One fixture set covers every optimistic-to-projected reconciliation matcher.
 class OptimisticMessageReconciliationTest {
+    /** Native peer receipts are delivered history, never local-only rows to suppress or retry. */
+    @Test
+    fun peerConfirmedProjectionIsNotAnUnpublishedSend() {
+        val confirmed = timelineRecord("confirmed", "received by peer").copy(recipientConfirmed = true)
+        val records = mapOf(confirmed.messageIdHex to confirmed)
+        val optimistic = message("temp", plaintext = "received by peer")
+
+        assertEquals(emptyList<String>(), unpublishedProjectionIdsMatchingMessage(records, optimistic, "alice"))
+        assertNull(committedButUnpublishedProjectionForOptimistic(records, optimistic, "alice"))
+    }
+
     @Test
     fun retryEmptySummaryRetainsTempKeyedSentBubbleAndMessageById() {
         val tempId = "temp-retry"
@@ -688,6 +699,7 @@ class OptimisticMessageReconciliationTest {
             retentionExpiresAt = null,
             sticker = null,
             importedFrom = null,
+            recipientConfirmed = false,
             historyImportProvenance = null,
         )
 

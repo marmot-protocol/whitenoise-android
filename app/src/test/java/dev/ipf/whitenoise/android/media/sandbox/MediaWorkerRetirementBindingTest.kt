@@ -57,6 +57,34 @@ class MediaWorkerRetirementBindingTest {
         }
     }
 
+    /** A served generation detached before its caller sends RETIRE must start one cooperative grace. */
+    @Test
+    fun servedRetirementMarkedBeforeBindReturnsStartsOnlyOneGrace() {
+        PendingBind().use { pending ->
+            pending.pauseCallbacks()
+            val retiring =
+                synchronized(pending.lock) {
+                    pending.worker.served = true
+                    pending.pool.detachAll()
+                }
+            assertEquals(listOf(pending.worker), retiring)
+            assertFalse(pending.worker.retireSent)
+            pending.finish()
+            assertTrue(pending.bound.remote.retired.await(2, TimeUnit.SECONDS))
+            assertFalse(pending.context.isUnbound(pending.bound))
+            val retiredAt = pending.worker.retiredAtNanos
+            pending.advanceClock(MediaWorkerPool.RETIRE_ESCALATION_MS - 1)
+            retiring.forEach { pending.pool.retire(it) }
+            pending.idleCallbacks()
+            assertEquals(retiredAt, pending.worker.retiredAtNanos)
+            assertFalse(pending.context.isUnbound(pending.bound))
+            pending.advanceClock(1)
+            pending.idleCallbacks()
+            assertEquals(retiredAt, pending.worker.retiredAtNanos)
+            assertTrue(pending.context.isUnbound(pending.bound))
+        }
+    }
+
     /** An explicit close cannot lose its stop request while bindIsolatedService is still returning. */
     @Test
     fun closeBeforeBindReturnsResumesTheForcedStop() {
@@ -64,6 +92,17 @@ class MediaWorkerRetirementBindingTest {
             pending.pool.close()
             assertFalse(pending.context.isUnbound(pending.bound))
             pending.finish()
+            assertTrue(pending.context.isUnbound(pending.bound))
+        }
+    }
+
+    /** A served worker whose bind has completed still stops immediately on terminal close. */
+    @Test
+    fun closeAfterBindReturnsStillForcesTheServedWorkerToStop() {
+        PendingBind().use { pending ->
+            pending.finish()
+            synchronized(pending.lock) { pending.worker.served = true }
+            pending.pool.close()
             assertTrue(pending.context.isUnbound(pending.bound))
         }
     }
@@ -124,7 +163,8 @@ class MediaWorkerRetirementBindingTest {
                 throwAfterBind = throwAfterBind,
                 beforeBindReturn = { check(release.await(2, TimeUnit.SECONDS)) },
             )
-        val pool = MediaWorkerPool(context, "retirement_binding", spares = 0, lock = Any(), ended = {})
+        val lock = Any()
+        val pool = MediaWorkerPool(context, "retirement_binding", spares = 0, lock = lock, ended = {})
         val worker = invoke("reserve") as MediaWorker
         private val starter =
             Thread {

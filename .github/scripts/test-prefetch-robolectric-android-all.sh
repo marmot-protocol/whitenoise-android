@@ -186,11 +186,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
-        if route not in ("primary", "mirror"):
+        if route not in ("primary", "fallback"):
             self.send_error(400)
             return
         body = artifact
-        if mode[0] == "corrupt_primary" or mode[0] == "corrupt_mirror":
+        if mode[0] == "corrupt_primary" or mode[0] == "corrupt_fallback":
             body = b"not the pinned artifact\n"
         self.send_response(200)
         self.send_header("Content-Length", str(len(body)))
@@ -218,8 +218,8 @@ try:
             "import os,sys\n"
             "args=sys.argv[1:]\n"
             "url=args[-1]\n"
-            "routes={'https://repo.maven.apache.org/maven2/':'primary/',"
-            "'https://maven-central.storage-download.googleapis.com/maven2/':'mirror/'}\n"
+            "routes={'https://repo.maven.apache.org/maven2/':'fallback/',"
+            "'https://maven-central.storage-download.googleapis.com/maven2/':'primary/'}\n"
             "for prefix,route in routes.items():\n"
             " if url.startswith(prefix):\n"
             "  args[-1]='http://127.0.0.1:' + os.environ['PREFETCH_HTTP_PORT'] + '/' + route + url[len(prefix):]\n"
@@ -250,7 +250,7 @@ try:
                 PREFETCH_HTTP_PORT=str(server.server_port),
             )
             if custom:
-                env["ROBOLECTRIC_ANDROID_ALL_REMOTE"] = "https://repo.maven.apache.org/maven2"
+                env["ROBOLECTRIC_ANDROID_ALL_REMOTE"] = "https://maven-central.storage-download.googleapis.com/maven2"
             started = time.monotonic()
             process = subprocess.Popen(
                 ["bash", str(script)], env=env, stdout=subprocess.PIPE,
@@ -275,7 +275,7 @@ try:
 
         code, cache = run("default-rate-limit")
         assert code == 0, results[-1]
-        assert events == ["primary", "mirror", "mirror"], results[-1]
+        assert events == ["primary", "fallback", "fallback"], results[-1]
         for version in versions:
             jar = cache / "org/robolectric/android-all-instrumented" / version / (
                 "android-all-instrumented-" + version + ".jar"
@@ -291,9 +291,9 @@ try:
         assert code != 0 and events == ["primary"], results[-1]
         assert not [p for p in cache.rglob("*") if p.is_file()]
 
-        mode[0] = "corrupt_mirror"
-        code, cache = run("corrupt-mirror")
-        assert code != 0 and events == ["primary", "mirror"], results[-1]
+        mode[0] = "corrupt_fallback"
+        code, cache = run("corrupt-fallback")
+        assert code != 0 and events == ["primary", "fallback"], results[-1]
         assert not [p for p in cache.rglob("*") if p.is_file()]
 finally:
     server.shutdown()

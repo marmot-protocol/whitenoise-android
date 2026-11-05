@@ -8,11 +8,11 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PINS="${ROBOLECTRIC_ANDROID_ALL_PINS:-$REPO_DIR/scripts/robolectric-android-all.sha512}"
 CATALOG="${ROBOLECTRIC_VERSION_CATALOG:-$REPO_DIR/gradle/libs.versions.toml}"
-REMOTE="${ROBOLECTRIC_ANDROID_ALL_REMOTE:-https://repo.maven.apache.org/maven2}"
+REMOTE="${ROBOLECTRIC_ANDROID_ALL_REMOTE:-https://maven-central.storage-download.googleapis.com/maven2}"
 # Explicit repository overrides remain exclusive, including an explicit default URL.
 FALLBACK_REMOTE=""
 if [[ -z "${ROBOLECTRIC_ANDROID_ALL_REMOTE+x}" ]]; then
-  FALLBACK_REMOTE=https://maven-central.storage-download.googleapis.com/maven2
+  FALLBACK_REMOTE=https://repo.maven.apache.org/maven2
 fi
 LOCAL_REPO="${ROBOLECTRIC_LOCAL_REPOSITORY:-$HOME/.m2/repository}"
 ARTIFACT_PATH=org/robolectric/android-all-instrumented
@@ -40,7 +40,7 @@ check_robolectric_version() {
   fi
 }
 
-# Leave time for the mirror when the default repository rejects a download.
+# Leave time for the fallback repository when the default repository rejects a download.
 download_jar() {
   local retry_budget=0 status
   if [[ -n "$FALLBACK_REMOTE" ]]; then
@@ -70,7 +70,7 @@ fetch_jar() {
   if ! download_jar "$REMOTE/$ARTIFACT_PATH/$version/$name" "$partial"; then
     rm -f -- "$partial"
     [[ -n "$FALLBACK_REMOTE" ]] || return 1
-    # Keep using the mirror for the rest of this batch after a transport failure.
+    # Keep using the fallback repository for the rest of this batch after a transport failure.
     REMOTE="$FALLBACK_REMOTE"
     FALLBACK_REMOTE=""
     download_jar "$REMOTE/$ARTIFACT_PATH/$version/$name" "$partial"

@@ -281,7 +281,8 @@ internal class MediaDownloadIntegrationFixture(
         target: AttachmentLocalTargetFfi,
     ) = "$account/$group/${target.messageIdHex}/${target.sourceMessageIdHex}/${target.attachmentIndex}"
 
-    /** Models durable admission separately from observer lifetime and local plaintext access. */
+    /** Atomically joins concurrent automatic and explicit demands, as the native boundary does. */
+    @Synchronized
     private fun admit(
         args: Array<out Any?>,
         key: String,

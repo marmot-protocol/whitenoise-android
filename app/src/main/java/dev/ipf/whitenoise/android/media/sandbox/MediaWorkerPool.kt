@@ -382,10 +382,11 @@ internal class MediaWorkerPool(
         val escalate =
             synchronized(lock) {
                 if (!worker.retiring) return
-                worker.escalationRequested ||
-                    !worker.retireSent ||
-                    System.nanoTime() - worker.retiredAtNanos >=
-                    TimeUnit.MILLISECONDS.toNanos(RETIRE_ESCALATION_MS)
+                val graceExpired =
+                    worker.retireSent &&
+                        System.nanoTime() - worker.retiredAtNanos >=
+                        TimeUnit.MILLISECONDS.toNanos(RETIRE_ESCALATION_MS)
+                worker.escalationRequested || (!worker.served && !worker.retireSent) || graceExpired
             }
         retire(worker, escalate = escalate)
     }
@@ -494,9 +495,10 @@ internal class MediaWorkerPool(
         val live =
             synchronized(lock) {
                 closed = true
-                detachAll()
+                // Preserve a served worker's grace while its original bind outcome is unresolved.
+                detachAll().map { worker -> worker to (!worker.served || worker.bindComplete) }
             }
-        live.forEach { retire(it, escalate = true) }
+        live.forEach { (worker, escalate) -> retire(worker, escalate = escalate) }
         quitWhenIdle()
     }
 
