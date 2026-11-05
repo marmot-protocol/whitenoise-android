@@ -190,6 +190,14 @@
         "test_ids": [
           "DIC-011"
         ]
+      },
+      {
+        "surface": "Forward picker opens on a payload snapshot",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "surfaces.forwardSnapshot = forwardPayload",
+        "test_ids": [
+          "MSG-010"
+        ]
       }
     ],
     "message_rendering_contracts": [

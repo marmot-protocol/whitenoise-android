@@ -28,6 +28,14 @@
         "test_ids": [
           "TTS-001"
         ]
+      },
+      {
+        "surface": "Pending send forward eligibility in the message menu",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleDerivations.kt",
+        "anchor": "item.status == MessageStatus.Pending ->",
+        "test_ids": [
+          "MSG-010"
+        ]
       }
     ]
   },

@@ -38,6 +38,14 @@
         "test_ids": [
           "MSG-040"
         ]
+      },
+      {
+        "surface": "Forward picker snapshot",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleState.kt",
+        "anchor": "var forwardSnapshot by mutableStateOf<ForwardMessagePayload?>(null)",
+        "test_ids": [
+          "MSG-010"
+        ]
       }
     ],
     "composable_surfaces": [
