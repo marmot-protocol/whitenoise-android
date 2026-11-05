@@ -21,6 +21,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
@@ -32,8 +33,10 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.setAppLockScreenVisibleForTest
 import dev.ipf.whitenoise.android.state.AccountSwitchProfileSeed
+import dev.ipf.whitenoise.android.state.AppThemeMode
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.setTtsMediaMixEnabled
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.Dispatchers
@@ -346,6 +349,64 @@ class SettingsSearchNavigationTest {
         composeRule.runOnIdle { appState.setAppLockScreenVisibleForTest(true) }
         composeRule.runOnIdle { appState.setAppLockScreenVisibleForTest(false) }
         composeRule.onNodeWithTag("settings.search.field").assertDoesNotExist()
+    }
+
+    @Test fun eligibilityChangeAfterArrivalKeepsDetailAndToolbarBackContext() {
+        val appState = mount()
+        composeRule.runOnIdle { appState.setTtsMediaMixEnabled(true) }
+        search("speech-over-media volume")
+        composeRule.onNodeWithTag("settings.search.result.TextToSpeech.mix_volume").performClick()
+        composeRule.onNodeWithText(context.getString(R.string.tts_media_mix_volume_title)).assertIsDisplayed()
+        composeRule.runOnIdle { appState.setTtsMediaMixEnabled(false) }
+        composeRule.onNodeWithTag("speech.playback.group").assertIsDisplayed()
+        composeRule.onNodeWithTag(SETTINGS_HOME_CONTENT_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag("settings.search.field").assertDoesNotExist()
+        composeRule.onNodeWithText(context.getString(R.string.tts_media_mix_volume_title)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+        composeRule.onNodeWithTag("settings.search.field").assertTextContains("speech-over-media volume")
+        composeRule.onNodeWithTag("settings.search.result.TextToSpeech.mix_volume").assertDoesNotExist()
+    }
+
+    @Test fun nestedEligibilityChangePreservesParentThenSystemBackToSearch() {
+        val appState = mount(withAccount = true)
+        composeRule.runOnIdle { appState.updateThemeMode(AppThemeMode.Dark) }
+        search("action color")
+        composeRule.onNodeWithTag("settings.search.result.Appearance.action_color").performClick()
+        composeRule.onNodeWithText(context.getString(R.string.action_color)).performClick()
+        composeRule.onNodeWithTag("action_color.save").assertIsDisplayed()
+        composeRule.runOnIdle { appState.updateThemeMode(AppThemeMode.Amoled) }
+        composeRule.onNodeWithText(context.getString(R.string.appearance_outline_colors_fixed)).assertIsDisplayed()
+        composeRule.onNodeWithTag("settings.search.field").assertDoesNotExist()
+        composeRule.runOnIdle { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
+        composeRule.onNodeWithTag("appearance.theme.group").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings.search.field").assertDoesNotExist()
+        composeRule.runOnIdle { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
+        composeRule.onNodeWithTag("settings.search.field").assertTextContains("action color")
+    }
+
+    @Test fun explicitSearchReopenRetiresHomeControlRevealAndRestoresQuery() {
+        mount(withAccount = true)
+        search(context.getString(R.string.settings_add_profile))
+        composeRule.onNodeWithTag("settings.search.result.Home.add_profile").performClick()
+        composeRule.onNodeWithTag("settings.add_profile").assertIsDisplayed()
+        composeRule.onNodeWithTag("settings.search.field").assertDoesNotExist()
+        composeRule.onNodeWithTag("settings.search.open").performClick()
+        composeRule
+            .onNodeWithTag("settings.search.field")
+            .assertTextContains(context.getString(R.string.settings_add_profile))
+        composeRule.onNodeWithTag("settings.search.result.Home.add_profile").assertIsDisplayed()
+    }
+
+    @Test fun nonOriginDetailBackRetiresOriginAndReturnsToActiveSearch() {
+        val appState = mount()
+        composeRule.runOnIdle { appState.updateDeveloperMode(true) }
+        search("about")
+        composeRule.onNodeWithTag("settings.search.result.Help.about").performClick()
+        composeRule.onNodeWithTag("about.developer").performScrollTo()
+        composeRule.onNodeWithTag("about.developer").performClick()
+        composeRule.onNodeWithTag("settings.search.field").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+        composeRule.onNodeWithTag("settings.search.field").assertTextContains("about")
     }
 
     private fun search(query: String) {

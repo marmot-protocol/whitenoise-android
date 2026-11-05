@@ -99,10 +99,12 @@ internal fun BugReportContent(
         onBack = onBack,
         bottomBar = {
             SettingsBottomAction {
-                WhiteNoiseButton(
-                    onClick = ::openReport,
-                    modifier = Modifier.fillMaxWidth().testTag("help.bug.open"),
-                ) { Text(stringResource(R.string.report_bug_open_github)) }
+                SettingsSearchRowReveal("open_github", modifier = Modifier.fillMaxWidth()) {
+                    WhiteNoiseButton(
+                        onClick = ::openReport,
+                        modifier = Modifier.fillMaxWidth().testTag("help.bug.open"),
+                    ) { Text(stringResource(R.string.report_bug_open_github)) }
+                }
             }
         },
     ) {

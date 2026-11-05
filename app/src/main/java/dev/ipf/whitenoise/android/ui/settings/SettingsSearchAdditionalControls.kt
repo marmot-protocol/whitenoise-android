@@ -9,6 +9,8 @@ import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 @Suppress("LongMethod") // Declarative contributions, including existing enum-owned controls.
 internal fun settingsSearchAdditionalControls(): List<SettingsSearchEntry> =
     buildList {
+        addAll(settingsSearchStableActions())
+
         @Suppress("LongParameterList") // Named catalog fields mirror the typed entry.
         fun control(
             id: String,
@@ -326,3 +328,83 @@ internal fun settingsSearchAdditionalControls(): List<SettingsSearchEntry> =
         control("Home.update_available", R.string.app_updates, R.string.settings, null, "AppUpdateAvailable")
         control("Home.update_controls", R.string.app_updates, R.string.settings, null, "AppUpdateControls")
     }
+
+/** Existing stable actions, including toolbar/pinned controls outside SettingsGroup rows. */
+private fun settingsSearchStableActions(): List<SettingsSearchEntry> =
+    listOf(
+        SettingsSearchEntry(
+            id = "ShareConnect.scan_qr_code",
+            titleRes = R.string.scan_qr_code,
+            categoryRes = R.string.share_and_connect,
+            destination = SettingsDetail.ShareConnect,
+            rowKey = "scan_qr_code",
+            accountRequired = true,
+        ),
+        SettingsSearchEntry(
+            id = "ShareConnect.share",
+            titleRes = R.string.share_profile,
+            categoryRes = R.string.share_and_connect,
+            destination = SettingsDetail.ShareConnect,
+            rowKey = "share_profile",
+            accountRequired = true,
+            additionalAliasLabelRes =
+                listOf(
+                    R.string.share_profile_url,
+                    R.string.share_profile_picture,
+                    R.string.share_connect_save_to_gallery,
+                ),
+        ),
+        SettingsSearchEntry(
+            id = "ShareConnect.copy_public_key",
+            titleRes = R.string.copy_public_key,
+            categoryRes = R.string.share_and_connect,
+            destination = SettingsDetail.ShareConnect,
+            rowKey = "copy_public_key",
+            accountRequired = true,
+        ),
+    ) + settingsSearchOtherStableActions()
+
+private fun settingsSearchOtherStableActions(): List<SettingsSearchEntry> =
+    listOf(
+        SettingsSearchEntry(
+            id = "Help.open_bug_report",
+            titleRes = R.string.report_bug_open_github,
+            categoryRes = R.string.help,
+            destination = SettingsDetail.BugReport,
+            rowKey = "open_github",
+        ),
+        SettingsSearchEntry(
+            id = "KeyPackages.refresh",
+            titleRes = R.string.refresh,
+            categoryRes = R.string.key_packages,
+            destination = SettingsDetail.KeyPackages,
+            rowKey = "refresh",
+            accountRequired = true,
+        ),
+        SettingsSearchEntry(
+            id = "KeyPackages.republish",
+            titleRes = R.string.republish,
+            categoryRes = R.string.key_packages,
+            destination = SettingsDetail.KeyPackages,
+            itemKey = "search.KeyPackages.publishing",
+            rowKey = "republish",
+            accountRequired = true,
+        ),
+        SettingsSearchEntry(
+            id = "KeyPackages.publish_new",
+            titleRes = R.string.developer_publish_new,
+            categoryRes = R.string.key_packages,
+            destination = SettingsDetail.KeyPackages,
+            itemKey = "search.KeyPackages.publishing",
+            rowKey = "publish_new",
+            accountRequired = true,
+        ),
+        SettingsSearchEntry(
+            id = "Support.start_chat",
+            titleRes = R.string.start_chat,
+            categoryRes = R.string.support,
+            destination = SettingsDetail.Support,
+            itemKey = "search.SupportScreen.5",
+            accountRequired = true,
+        ),
+    )

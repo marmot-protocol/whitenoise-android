@@ -1,5 +1,8 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
@@ -44,6 +47,21 @@ class SettingsSearchCatalogTest {
         }
     }
 
+    @Test fun explicitNonRowAnchorsReferToProductionWidgets() {
+        val sources = inventory.getJSONObject("sources")
+        sources.keys().forEach { path ->
+            val controls = sources.getJSONObject(path).optJSONArray("non_row_controls")
+            if (controls != null) {
+                val source = File(root, path).readText()
+                (0 until controls.length()).forEach { index ->
+                    val control = controls.getJSONObject(index)
+                    if (control.has("anchor")) assertTrue(path, source.contains(control.getString("anchor")))
+                    assertTrue(path, catalog.any { it.id == control.getString("represented_by") })
+                }
+            }
+        }
+    }
+
     @Test fun stableIdsAndActualAnchorsAreValidAndBounded() {
         assertEquals(catalog.size, catalog.map { it.id }.distinct().size)
         assertTrue(catalog.size in 50..256)
@@ -77,6 +95,48 @@ class SettingsSearchCatalogTest {
                 assertTrue("${entry.id}: invalid row $row", literal || generated)
             }
         }
+    }
+
+    @Test fun independentStableActionLabelsResolveToTheirRealControls() {
+        // Expected labels come from the production widget inventory, not from catalog iteration.
+        val expected =
+            listOf(
+                Triple(R.string.scan_qr_code, SettingsDetail.ShareConnect, "scan_qr_code"),
+                Triple(R.string.share_profile, SettingsDetail.ShareConnect, "share_profile"),
+                Triple(R.string.copy_public_key, SettingsDetail.ShareConnect, "copy_public_key"),
+                Triple(R.string.report_bug_open_github, SettingsDetail.BugReport, "open_github"),
+                Triple(R.string.refresh, SettingsDetail.KeyPackages, "refresh"),
+                Triple(R.string.republish, SettingsDetail.KeyPackages, "republish"),
+                Triple(R.string.developer_publish_new, SettingsDetail.KeyPackages, "publish_new"),
+            )
+        expected.forEach { (label, destination, anchor) ->
+            val entry = catalog.single { it.titleRes == label && it.destination == destination }
+            assertEquals(anchor, entry.rowKey)
+            assertFalse(entry.developerRequired)
+            assertEquals(destination != SettingsDetail.BugReport, entry.accountRequired)
+        }
+        val support = catalog.single { it.titleRes == R.string.start_chat && it.destination == SettingsDetail.Support }
+        assertEquals("search.SupportScreen.5", support.itemKey)
+        assertTrue(support.accountRequired)
+        assertTrue(catalog.any { it.titleRes == R.string.settings_donate && it.destination == SettingsDetail.Donate })
+        assertTrue(catalog.any { it.titleRes == R.string.restore_default_relays })
+        assertTrue(catalog.any { it.titleRes == R.string.folder_new_title })
+    }
+
+    @Test fun localizedShareMenuLabelsResolveToOneExistingShareTrigger() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val documents =
+            prepareSettingsSearch(catalog, SettingsSearchEligibility(true, false, false, true)) {
+                context.getString(it)
+            }
+        listOf(R.string.share_profile_url, R.string.share_profile_picture, R.string.share_connect_save_to_gallery)
+            .forEach { label ->
+                val matches =
+                    searchSettings(documents, context.getString(label))
+                        .filter { it.entry.destination == SettingsDetail.ShareConnect }
+                assertEquals(listOf("ShareConnect.share"), matches.map { it.entry.id })
+                assertEquals("share_profile", matches.single().entry.rowKey)
+            }
     }
 
     @Test fun prerequisiteVariantsOmitHiddenControlsWithoutHidingVisibleDisabledControls() {

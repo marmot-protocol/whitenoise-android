@@ -490,6 +490,12 @@
           "declaration": "\"support_identity\"",
           "excluded": "Fixed support identity or transient retry; support management remains indexed, no account/contact values enter metadata."
         }
+      ],
+      "non_row_controls": [
+        {
+          "anchor": "item(key = \"search.SupportScreen.5\")",
+          "represented_by": "Support.start_chat"
+        }
       ]
     },
     "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt": {
@@ -552,15 +558,51 @@
       "controls": [
         {
           "declaration": "\"republish\"",
-          "represented_by": "Developer.key_packages"
+          "represented_by": "KeyPackages.republish"
+        }
+      ],
+      "non_row_controls": [
+        {
+          "anchor": "SettingsSearchRowReveal(\"refresh\"",
+          "represented_by": "KeyPackages.refresh"
+        },
+        {
+          "anchor": "SettingsSearchRowReveal(\"publish_new\"",
+          "represented_by": "KeyPackages.publish_new"
         }
       ]
     },
     "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt": {
-      "controls": []
+      "controls": [],
+      "non_row_controls": [
+        {
+          "anchor": "SettingsSearchRowReveal(\"scan_qr_code\"",
+          "represented_by": "ShareConnect.scan_qr_code"
+        },
+        {
+          "anchor": "SettingsSearchRowReveal(\"share_profile\"",
+          "represented_by": "ShareConnect.share"
+        },
+        {
+          "anchor": "SettingsSearchRowReveal(\"copy_public_key\"",
+          "represented_by": "ShareConnect.copy_public_key"
+        },
+        {
+          "declaration": "share_profile_url / share_profile_picture / share_connect_save_to_gallery",
+          "represented_by": "ShareConnect.share",
+          "reason": "Existing static menu labels resolve as aliases to the share trigger; search never opens the transient menu or exports."
+        }
+      ]
     },
     "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt": {
-      "controls": []
+      "controls": [],
+      "non_row_controls": [
+        {
+          "declaration": "settings_donate button",
+          "represented_by": "home.Donate",
+          "reason": "Same localized label and action concept as its single-action destination; no duplicate result."
+        }
+      ]
     },
     "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TranslationSettingsScreen.kt": {
       "controls": []
@@ -602,6 +644,12 @@
         {
           "declaration": "\"version\"",
           "excluded": "Read-only version/build/native revision/staging indicators are represented by About/Developer management, with no dynamic build-value indexing."
+        }
+      ],
+      "non_row_controls": [
+        {
+          "anchor": "SettingsSearchRowReveal(\"open_github\"",
+          "represented_by": "Help.open_bug_report"
         }
       ]
     }
@@ -709,5 +757,11 @@
     "developer demo cleanup": "Cleanup/retry actions depend on transient demo state; Review demo management remains indexed.",
     "developer seed fixture": "Seed fixture is a non-production test-only injected control, absent from shipping runtime.",
     "build information": "Read-only version/build/native revision/staging indicators are represented by About/Developer management, with no dynamic build-value indexing."
+  },
+  "non_row_exclusions": {
+    "navigation": "Back and search affordances are navigation, not searchable settings.",
+    "transactions": "Picker Save/reset/preview, dialogs, confirmations, relay editor submit/roles and connector setup copy prompt are transient flows represented by their existing owner control.",
+    "private_entities": "Per-folder/package/identity actions and profile/QR/prompt values are dynamic or private; never indexed.",
+    "recovery": "Error-only retries and dismissal actions are transient recovery controls."
   }
 }

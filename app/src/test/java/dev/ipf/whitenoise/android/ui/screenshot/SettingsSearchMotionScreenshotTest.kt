@@ -183,5 +183,7 @@ class SettingsSearchMotionScreenshotTest {
             .fetchSemanticsNode()
             .boundsInRoot.top
 
-    private fun capture(name: String) = rule.onNodeWithTag(SETTINGS_HOME_CONTENT_TAG).captureRoboImage("src/test/snapshots/$name.png")
+    private fun capture(name: String) {
+        rule.onNodeWithTag(SETTINGS_HOME_CONTENT_TAG).captureRoboImage("src/test/snapshots/$name.png")
+    }
 }

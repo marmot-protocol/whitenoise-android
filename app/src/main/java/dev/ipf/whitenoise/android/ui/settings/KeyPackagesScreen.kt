@@ -273,12 +273,16 @@ internal fun KeyPackagesContent(
         onBack = onBack,
         modifier = Modifier.testTag(KEY_PACKAGES_CONTENT_TAG),
         topBarActions = {
-            TextButton(onClick = onRefresh, enabled = state.actionsEnabled) { Text(stringResource(R.string.refresh)) }
+            SettingsSearchRowReveal("refresh", modifier = Modifier) {
+                TextButton(onClick = onRefresh, enabled = state.actionsEnabled) {
+                    Text(stringResource(R.string.refresh))
+                }
+            }
         },
     ) {
         SettingsList {
             item { SettingsSection(stringResource(R.string.publishing)) }
-            item { PublishingActions(state, onRepublish, onPublishNew) }
+            item(key = "search.KeyPackages.publishing") { PublishingActions(state, onRepublish, onPublishNew) }
             if (state.showLoadingIndicator) {
                 item {
                     Column(Modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)) {
@@ -359,14 +363,16 @@ private fun PublishingActions(
         }
     }
     SettingsExplainer(stringResource(R.string.developer_republish_help))
-    WhiteNoiseFilledTonalButton(
-        onClick = onPublishNew,
-        enabled = state.actionsEnabled,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin, vertical = WhiteNoiseSpacing.Related)
-                .testTag("key_packages.publish"),
-    ) { Text(stringResource(R.string.developer_publish_new)) }
+    SettingsSearchRowReveal("publish_new", modifier = Modifier.fillMaxWidth()) {
+        WhiteNoiseFilledTonalButton(
+            onClick = onPublishNew,
+            enabled = state.actionsEnabled,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin, vertical = WhiteNoiseSpacing.Related)
+                    .testTag("key_packages.publish"),
+        ) { Text(stringResource(R.string.developer_publish_new)) }
+    }
     SettingsExplainer(stringResource(R.string.developer_rotate_help))
 }

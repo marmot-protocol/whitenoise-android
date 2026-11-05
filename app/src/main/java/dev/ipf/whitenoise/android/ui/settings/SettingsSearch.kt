@@ -19,6 +19,7 @@ internal data class SettingsSearchEntry(
     val developerRequired: Boolean = false,
     val nonAmoledRequired: Boolean = false,
     val pushRequired: Boolean = false,
+    val additionalAliasLabelRes: List<Int> = emptyList(),
 )
 
 internal data class SettingsSearchEligibility(
@@ -72,7 +73,8 @@ internal fun prepareSettingsSearch(
             resolve(entry.titleRes),
             resolve(entry.categoryRes),
             entry.summaryRes?.let(resolve).orEmpty(),
-            entry.aliasesRes?.let(resolve).orEmpty(),
+            (listOfNotNull(entry.aliasesRes) + entry.additionalAliasLabelRes)
+                .joinToString("|") { resolve(it) },
         )
     }
 

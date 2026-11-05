@@ -14,7 +14,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -44,7 +43,6 @@ internal fun SettingsSearchRowReveal(
         anchoredTarget != null && anchoredTarget.rowKey == rowKey && anchoredTarget.itemKey == itemKey
     val consumed = LocalSettingsSearchRevealConsumed.current
     val onReveal = LocalSettingsSearchOnReveal.current
-    val view = LocalView.current
     val revealedText =
         stringResource(R.string.settings_search_revealed, target?.let { stringResource(it.titleRes) }.orEmpty())
     val requester = remember { BringIntoViewRequester() }
@@ -53,7 +51,6 @@ internal fun SettingsSearchRowReveal(
         if (selected && !consumed) {
             androidx.compose.runtime.withFrameNanos { }
             requester.bringIntoView()
-            view.announceForAccessibility(revealedText)
             onReveal()
             delay(SETTINGS_SEARCH_HIGHLIGHT_MILLIS)
             highlighted = false

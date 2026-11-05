@@ -432,12 +432,6 @@ internal fun SettingsScreen(
         remember(searchConfiguration, eligibility) {
             prepareSettingsSearch(catalog, eligibility, searchResources::getString)
         }
-    LaunchedEffect(eligibility, searchOriginId) {
-        if (searchOrigin != null && !eligibility.allows(searchOrigin)) {
-            searchOriginId = null
-            onDetailChange(null)
-        }
-    }
     LaunchedEffect(appState.appLockScreenVisible, appState.signOutInProgress, appState.wipeInProgress) {
         if (appState.appLockScreenVisible || appState.signOutInProgress || appState.wipeInProgress) {
             searchOpen = false
@@ -453,6 +447,7 @@ internal fun SettingsScreen(
             searchOriginId = null
             onDetailChange(null)
         } else {
+            if (destination == null) searchOriginId = null
             onDetailChange(destination)
         }
     }
@@ -477,7 +472,8 @@ internal fun SettingsScreen(
         contentVisible = !appState.appLockScreenVisible,
     ) { route ->
         CompositionLocalProvider(
-            LocalSettingsSearchTarget provides searchOrigin?.takeIf { it.destination == route },
+            LocalSettingsSearchTarget provides
+                searchOrigin?.takeIf { it.destination == route && eligibility.allows(it) },
             LocalSettingsSearchRevealConsumed provides searchRevealed,
             LocalSettingsSearchOnReveal provides { searchRevealed = true },
         ) {
@@ -491,6 +487,7 @@ internal fun SettingsScreen(
                     searchDocuments = searchDocuments,
                     suppressSearchMotion = suppressMotion,
                     onSearchOpenChange = {
+                        if (it) searchOriginId = null
                         searchOpen = it
                         if (!it) searchQuery = ""
                     },

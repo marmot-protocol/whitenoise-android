@@ -52,3 +52,7 @@ No representative-device latency measurement is recorded by this source change.
 
 Manual scenarios: SET-042 (matching/reveal/return), SET-043 (ownership/eligibility)
 and SET-044 (accessibility/layout/performance).
+
+Stable toolbar and pinned actions use the same reveal-only path as rows. Share menu labels are localized aliases for its existing trigger; results never open that menu or perform an export. An origin remains Back context when its control becomes unavailable after arrival; only the reveal target is suppressed. Account/runtime changes and lock/sign-out/wipe still retire the visit.
+
+Reopening search explicitly retires a home-control reveal; returning home from a different detail also retires the old origin. Accessibility reveal uses one polite live-region/state-description mechanism. The former simultaneous explicit announcement was removed to avoid duplicate speech; this risk was confirmed from source, not an observed TalkBack session.
