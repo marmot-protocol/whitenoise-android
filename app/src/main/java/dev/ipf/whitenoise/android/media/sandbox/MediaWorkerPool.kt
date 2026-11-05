@@ -270,6 +270,7 @@ internal class MediaWorkerPool(
         }
     }
 
+    /** Records the bind outcome and catches up retirement without shortening a served worker's grace. */
     @Suppress("ReturnCount") // Accepted, definitively refused and unknown bind outcomes own different lifetimes.
     private fun start(worker: MediaWorker): Boolean {
         val accepted =
@@ -290,7 +291,7 @@ internal class MediaWorkerPool(
                 warnLifetimeHold(worker, "bind-outcome")
                 return false
             }
-        val bound =
+        val (bound, retiring) =
             synchronized(lock) {
                 worker.bindComplete = true
                 worker.bound = worker.bound || accepted
@@ -300,41 +301,54 @@ internal class MediaWorkerPool(
                     worker.dead.countDown()
                     worker.connected.countDown()
                 }
-                worker.bound
+                worker.bound to worker.retiring
             }
-        if (worker.retiring) retire(worker, escalate = true)
+        if (retiring) {
+            // A callback may already have served this worker: preserve its grace or catch up an expired stop.
+            val served = synchronized(lock) { worker.served }
+            retire(worker, escalate = !served)
+            if (served) awaitDeath(worker, 0)
+        }
         dispose(worker)
         return bound
     }
 
+    /** Registers Binder death before waking claims, capturing any retirement that preceded the connection. */
     private fun connection(worker: MediaWorker): ServiceConnection =
         object : ServiceConnection {
             override fun onServiceConnected(
                 name: ComponentName,
                 service: IBinder,
             ) {
-                synchronized(lock) {
-                    if (worker.disposed || worker.binder != null) return
-                    worker.binder = service
-                    worker.bound = true
-                    worker.remote = Messenger(service)
-                    try {
-                        service.linkToDeath(worker.deathRecipient, 0)
-                        worker.linked = true
-                    } catch (_: android.os.RemoteException) {
-                        // linkToDeath can report an already-dead remote, never infer death from send failure.
-                        if (!service.isBinderAlive) worker.dead.countDown() else warnLifetimeHold(worker, "death-link")
-                        worker.retiring = true
-                    } catch (_: RuntimeException) {
-                        worker.retiring = true
-                        warnLifetimeHold(worker, "death-link")
+                val retiredBeforeConnection =
+                    synchronized(lock) {
+                        if (worker.disposed || worker.binder != null) return
+                        worker.binder = service
+                        worker.bound = true
+                        worker.remote = Messenger(service)
+                        try {
+                            service.linkToDeath(worker.deathRecipient, 0)
+                            worker.linked = true
+                        } catch (_: android.os.RemoteException) {
+                            // linkToDeath can report an already-dead remote, never infer death from send failure.
+                            if (!service.isBinderAlive) {
+                                worker.dead.countDown()
+                            } else {
+                                warnLifetimeHold(worker, "death-link")
+                            }
+                            worker.retiring = true
+                        } catch (_: RuntimeException) {
+                            worker.retiring = true
+                            warnLifetimeHold(worker, "death-link")
+                        }
+                        if (closed) worker.retiring = true
+                        val retiring = worker.retiring
+                        worker.connected.countDown()
+                        signalLocked()
+                        retiring
                     }
-                    if (closed) worker.retiring = true
-                    worker.connected.countDown()
-                    signalLocked()
-                }
                 // A generation retired before it connected never received input: stop it at once.
-                if (worker.retiring) retire(worker, escalate = true)
+                if (retiredBeforeConnection) retire(worker, escalate = true)
                 dispose(worker)
             }
 
