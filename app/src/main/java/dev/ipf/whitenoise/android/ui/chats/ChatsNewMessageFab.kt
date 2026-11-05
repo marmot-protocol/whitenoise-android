@@ -44,8 +44,8 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseContentMaxWidth
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerActionRowHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOuterVerticalPadding
 import dev.ipf.whitenoise.android.ui.navigation.ComposerFabEndpoint
-import dev.ipf.whitenoise.android.ui.navigation.LocalComposerFabHeight
 import dev.ipf.whitenoise.android.ui.navigation.LocalComposerFabHandoff
+import dev.ipf.whitenoise.android.ui.navigation.LocalComposerFabHeight
 import dev.ipf.whitenoise.android.ui.navigation.composerFabSurface
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.settings.RelaysScreen
