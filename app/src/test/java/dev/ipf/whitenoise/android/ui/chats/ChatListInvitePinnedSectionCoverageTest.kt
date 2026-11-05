@@ -12,6 +12,7 @@ import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.whitenoise.android.state.AppMarmotRuntime
+import dev.ipf.whitenoise.android.state.ChatFolderSort
 import dev.ipf.whitenoise.android.state.ChatListLiveSubscriptions
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -81,6 +82,20 @@ class ChatListInvitePinnedSectionCoverageTest {
         assertEquals(INVITE_A, model.controller.items[2].id)
     }
 
+    /** A Name-sorted folder keeps the same pinned prefix and divider as an invite arrives. */
+    @Test fun aNameSortedFolderKeepsThePinnedPrefix() {
+        val model = mount(folderSort = ChatFolderSort.NAME)
+        model.deliver(invite(INVITE_A, activity = NEWEST))
+        assertSections(pins = listOf(PIN_0, PIN_1), invites = listOf(INVITE_A), inFolder = true)
+    }
+
+    /** An Unread-sorted folder keeps the same pinned prefix and divider as an invite arrives. */
+    @Test fun anUnreadSortedFolderKeepsThePinnedPrefix() {
+        val model = mount(folderSort = ChatFolderSort.UNREAD)
+        model.deliver(invite(INVITE_A, activity = NEWEST))
+        assertSections(pins = listOf(PIN_0, PIN_1), invites = listOf(INVITE_A), inFolder = true)
+    }
+
     /**
      * Asserts the controller order and the rendered geometry: [pins] first in manual order, then
      * [invites], then only [ordinary] rows, with exactly one divider drawn between the last pin and the
@@ -90,8 +105,24 @@ class ChatListInvitePinnedSectionCoverageTest {
         pins: List<String>,
         invites: List<String>,
         ordinary: Set<String> = ORDINARY.toSet(),
+        inFolder: Boolean = false,
     ) {
-        val order = fixture!!.controller.items.map { it.id }
+        // A folder presents its own order, so the rows' drawn positions are the order under test there.
+        val rendered =
+            (pins + invites + ordinary + INVITE_A + INVITE_B)
+                .distinct()
+                .mapNotNull { id ->
+                    runCatching {
+                        id to
+                            rule
+                                .onNodeWithTag("chat.row.$id")
+                                .fetchSemanticsNode()
+                                .boundsInRoot.top
+                    }.getOrNull()
+                }.sortedBy { it.second }
+                .map { it.first }
+        val order = if (inFolder) rendered else fixture!!.controller.items.map { it.id }
+        assertEquals(pins + invites, rendered.take(pins.size + invites.size))
         assertEquals(pins + invites, order.take(pins.size + invites.size))
         assertTrue("ordinary rows follow the invites", order.drop(pins.size + invites.size).all { it in ordinary })
         rule.onAllNodesWithTag(CHAT_LIST_PINNED_BOUNDARY_TAG).assertCountEquals(1)
@@ -103,17 +134,42 @@ class ChatListInvitePinnedSectionCoverageTest {
         (pins + invites).forEach { rule.onNodeWithTag("chat.row.$it").assertIsDisplayed() }
     }
 
-    /** Mounts the production chat list over two manual-order pins and a few ordinary rows. */
-    private fun mount(): InviteFixture {
+    /**
+     * Mounts the production chat list over two manual-order pins and a few ordinary rows, inside a manual
+     * folder of every chat sorted by [folderSort] when one is given.
+     */
+    private fun mount(folderSort: ChatFolderSort? = null): InviteFixture {
         val model = InviteFixture(scope)
         fixture = model
-        rule.setContent {
-            WhiteNoiseTheme {
-                ChatsScreen(model.state, model.controller, {}, { _, _, _, _ -> })
+        val folderId =
+            folderSort?.let { sort ->
+                val store = model.state.chatFolderPreferences
+                store.foldersFor(ACCOUNT)
+                store
+                    .commitFolderDraft(
+                        accountRef = ACCOUNT,
+                        folderId = null,
+                        name = "Sorted ${sort.name}",
+                        description = "",
+                        manualChatIds = model.rows.keys + INVITE_A + INVITE_B,
+                        rule = null,
+                        sort = sort,
+                    )!!
+                    .id
+            }
+        if (folderId == null) {
+            rule.setContent {
+                WhiteNoiseTheme { ChatsScreen(model.state, model.controller, {}, { _, _, _, _ -> }) }
+            }
+        } else {
+            rule.setContent {
+                WhiteNoiseTheme {
+                    ChatsScreen(model.state, model.controller, {}, { _, _, _, _ -> }, selectedFolderId = folderId)
+                }
             }
         }
         settle()
-        assertSections(pins = listOf(PIN_0, PIN_1), invites = emptyList())
+        assertSections(pins = listOf(PIN_0, PIN_1), invites = emptyList(), inFolder = folderId != null)
         return model
     }
 

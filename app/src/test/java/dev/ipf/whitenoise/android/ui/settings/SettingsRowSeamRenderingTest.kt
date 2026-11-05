@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.settings
 
+import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
@@ -7,6 +8,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.whitenoise.android.ui.account.ProfileSwitcherSheet
+import dev.ipf.whitenoise.android.ui.account.accountSelectorState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -128,5 +132,41 @@ class SettingsRowSeamRenderingTest {
                 }
             }
         }
+    }
+
+    /** The profile switcher's row for an account mid-switch keeps the same white side edges as its siblings. */
+    @Test
+    fun amoledProfileSwitcherKeepsThePendingAccountRowOutline() {
+        val accounts =
+            listOf("a", "b", "c").map { AccountSummaryFfi(it, it.repeat(64), true, false, false, true, false) }
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                Surface(Modifier.testTag("switcher")) {
+                    ProfileSwitcherSheet(
+                        accountSelectorState(accounts, "a", false),
+                        displayName = { it },
+                        shortNpub = { "npub…$it" },
+                        avatarUrl = { null },
+                        unreadCountForAccount = { 0uL },
+                        hasUnreadForAccount = { false },
+                        onSelectProfile = {},
+                        onAddProfile = {},
+                        onSettings = {},
+                        npub = { "" },
+                        pendingLabel = "b",
+                    )
+                }
+            }
+        }
+        val root = composeRule.onNodeWithTag("switcher").fetchSemanticsNode().boundsInRoot
+        val pixels = composeRule.onNodeWithTag("switcher").captureToImage().toPixelMap()
+        val edges =
+            listOf("a", "b", "c").map { label ->
+                val row = composeRule.onNodeWithTag("profile_switcher.profile.$label").fetchSemanticsNode().boundsInRoot
+                val y = ((row.top + row.bottom) / 2 - root.top).roundToInt()
+                pixels[(row.left - root.left).roundToInt(), y]
+            }
+        assertEquals("the pending row's edge matches its siblings", edges[0], edges[1])
+        assertEquals(edges[0], edges[2])
     }
 }
