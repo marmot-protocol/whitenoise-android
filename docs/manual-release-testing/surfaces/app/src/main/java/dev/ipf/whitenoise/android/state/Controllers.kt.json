@@ -931,6 +931,15 @@
           "STB-002"
         ],
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt"
+      },
+      {
+        "surface": "Native peer receipt settles delivery and refreshes reactions in one update",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "record.sourceMessageIdHex == null && !record.recipientConfirmed",
+        "test_ids": [
+          "MSG-017",
+          "MSG-031"
+        ]
       }
     ]
   },

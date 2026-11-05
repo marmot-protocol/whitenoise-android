@@ -11,6 +11,14 @@
           "CON-004",
           "CON-005"
         ]
+      },
+      {
+        "surface": "Peer-confirmed sends are not suppressed as unpublished or reused for pending retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/OptimisticMessageReconciliation.kt",
+        "anchor": "!projected.recipientConfirmed",
+        "test_ids": [
+          "MSG-017"
+        ]
       }
     ]
   }

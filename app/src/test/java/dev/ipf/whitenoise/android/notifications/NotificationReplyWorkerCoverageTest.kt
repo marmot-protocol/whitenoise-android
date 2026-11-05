@@ -7,6 +7,25 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NotificationReplyWorkerCoverageTest {
+    /** A crash before send can leave an unrelated same-text receipt inside this attempt's recovery window. */
+    @Test
+    fun peerConfirmedReplyWithoutAttemptIdentityIsIndeterminate() =
+        runTest {
+            val outcome =
+                notificationReplyCommitProbe(
+                    recoveryState = state(),
+                    nextAttemptBoundary = null,
+                    text = "same reply",
+                ) { _, _ ->
+                    page(
+                        record(11u, "confirmed", "sent", "same reply", sourceMessageIdHex = null)
+                            .copy(recipientConfirmed = true),
+                    )
+                }
+
+            assertEquals(NotificationReplyCommitProbe.Indeterminate, outcome)
+        }
+
     @Test
     fun failedCardRestoreSucceedsOnceTheLifetimeExtendedCardAppears() =
         runTest {
@@ -33,6 +52,7 @@ class NotificationReplyWorkerCoverageTest {
             assertEquals(REPLY_DISMISS_RETRIES, attempts)
         }
 
+    /** A native message ID saved for this attempt remains ownership proof even before relay delivery. */
     @Test
     fun acceptedPendingMessageIdIsDurableProofWithoutTimelineLookup() =
         runTest {

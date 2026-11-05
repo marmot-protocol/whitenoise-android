@@ -96,8 +96,11 @@ internal fun ConversationController.nativeAttachmentSourceId(messageIdHex: Strin
 
 /**
  * Whether [item]'s send is committed but not yet delivered, read from the row in hand so a bubble need not observe the
- * whole timeline. An own send publishes after it commits and has no source event, so no native attachment target,
- * until then. Received rows always carry their source event.
+ * whole timeline. A peer reaction can confirm delivery without a known source event; that must stop the pending
+ * presentation too. Native attachment lookups still require their own authoritative target.
  */
 internal fun ConversationController.awaitingDelivery(item: TimelineMessage): Boolean =
-    item.projected?.sourceMessageIdHex == null && timelineRecords[item.record.messageIdHex]?.sourceMessageIdHex == null
+    item.projected?.sourceMessageIdHex == null &&
+        item.projected?.recipientConfirmed != true &&
+        timelineRecords[item.record.messageIdHex]?.sourceMessageIdHex == null &&
+        timelineRecords[item.record.messageIdHex]?.recipientConfirmed != true
