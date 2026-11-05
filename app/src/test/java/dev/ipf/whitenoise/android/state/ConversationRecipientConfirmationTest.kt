@@ -252,9 +252,7 @@ class ConversationRecipientConfirmationTest {
         )
 
     /** Builds a complete native window containing only the send under test. */
-    private fun page(record: TimelineMessageRecordFfi) = TimelinePageFfi(
-        messages = listOf(record),
-        hasMoreBefore = false,
-        hasMoreAfter = false,
-    )
+    private fun page(record: TimelineMessageRecordFfi): TimelinePageFfi {
+        return TimelinePageFfi(messages = listOf(record), hasMoreBefore = false, hasMoreAfter = false)
+    }
 }
