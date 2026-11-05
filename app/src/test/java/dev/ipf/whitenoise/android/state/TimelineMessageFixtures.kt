@@ -77,6 +77,7 @@ private fun projectedRecordFor(record: AppMessageRecordFfi): TimelineMessageReco
         retentionExpiresAt = null,
         sticker = null,
         importedFrom = null,
+        recipientConfirmed = false,
         historyImportProvenance = null,
     )
 
