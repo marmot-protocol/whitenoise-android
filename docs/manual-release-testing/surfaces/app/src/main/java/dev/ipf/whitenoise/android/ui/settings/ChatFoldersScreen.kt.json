@@ -74,6 +74,15 @@
           "FLD-002",
           "ACC-017"
         ]
+      },
+      {
+        "surface": "ChatFolderRestoreDefaults",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
+        "anchor": "fun ChatFolderRestoreDefaults(",
+        "test_ids": [
+          "SET-042",
+          "SET-044"
+        ]
       }
     ],
     "settings_controls": [

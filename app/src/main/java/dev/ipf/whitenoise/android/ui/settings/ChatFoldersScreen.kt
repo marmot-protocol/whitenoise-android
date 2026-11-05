@@ -289,20 +289,29 @@ internal fun ChatFoldersContent(
                 }
             }
             item(key = "search.ChatFolders.2") {
-                SettingsGroup {
-                    row("restore") { context ->
-                        SettingsAction(
-                            context = context,
-                            title = stringResource(R.string.folder_restore_defaults),
-                            onClick = onRestoreDefaults,
-                            enabled = state.defaultsMissing,
-                        )
-                    }
-                }
-                SettingsExplainer(stringResource(R.string.folder_restore_hint))
+                ChatFolderRestoreDefaults(state.defaultsMissing, onRestoreDefaults)
             }
         }
     }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun ChatFolderRestoreDefaults(
+    defaultsMissing: Boolean,
+    onRestoreDefaults: () -> Unit,
+) {
+    SettingsGroup {
+        row("restore") { context ->
+            SettingsAction(
+                context = context,
+                title = stringResource(R.string.folder_restore_defaults),
+                onClick = onRestoreDefaults,
+                enabled = defaultsMissing,
+            )
+        }
+    }
+    SettingsExplainer(stringResource(R.string.folder_restore_hint))
 }
 
 /** One folder: icon, name over "N chats · description", and the actions menu; long-press opens the same menu. */

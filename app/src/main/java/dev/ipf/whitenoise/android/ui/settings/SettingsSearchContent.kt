@@ -58,7 +58,11 @@ internal fun SettingsSearchResults(
                 ).zIndex(-rank.toFloat())
         },
     ) {
-        if (results.isEmpty()) item(key = "settings.search.empty") { SettingsExplainer(stringResource(R.string.settings_search_no_results)) }
+        if (results.isEmpty()) {
+            item(key = "settings.search.empty") {
+                SettingsExplainer(stringResource(R.string.settings_search_no_results))
+            }
+        }
         results.forEach { document ->
             item(key = document.entry.id) {
                 SettingsGroup {
@@ -66,7 +70,11 @@ internal fun SettingsSearchResults(
                         SettingsLink(
                             context = context,
                             title = document.title,
-                            subtitle = listOf(document.category, document.summary).filter(String::isNotBlank).joinToString("\n"),
+                            subtitle =
+                                listOf(
+                                    document.category,
+                                    document.summary,
+                                ).filter(String::isNotBlank).joinToString("\n"),
                             onClick = { onSelect(document.entry) },
                             modifier = Modifier.testTag("settings.search.result.${document.entry.id}"),
                         )

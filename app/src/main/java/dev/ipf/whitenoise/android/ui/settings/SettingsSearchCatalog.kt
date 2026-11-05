@@ -18,7 +18,14 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
                     itemKey = if (destination == null) row.section.name else null,
                     rowKey = if (destination == null) row.name else null,
                     accountRequired = row.section == SettingsHomeSection.Account,
-                    aliasesRes = if (destination == SettingsDetail.TextToSpeech) R.string.settings_search_alias_read_aloud else null,
+                    aliasesRes =
+                        if (destination ==
+                            SettingsDetail.TextToSpeech
+                        ) {
+                            R.string.settings_search_alias_read_aloud
+                        } else {
+                            null
+                        },
                 ),
             )
         }

@@ -232,7 +232,9 @@ internal fun DeveloperContent(
                     }
                 }
             }
-            item(key = "search.Developer.6") { SettingsExplainer(stringResource(R.string.review_demo_clear_explanation)) }
+            item(key = "search.Developer.6") {
+                SettingsExplainer(stringResource(R.string.review_demo_clear_explanation))
+            }
             item(key = "search.Developer.7") {
                 SettingsGroup(modifier = Modifier.testTag("developer.key_packages")) {
                     row("key_packages") { context ->
@@ -294,7 +296,9 @@ internal fun DeveloperContent(
                         }
                     }
                 }
-                item(key = "search.Developer.11") { SettingsExplainer(stringResource(R.string.streaming_debug_subtitle)) }
+                item(key = "search.Developer.11") {
+                    SettingsExplainer(stringResource(R.string.streaming_debug_subtitle))
+                }
             }
             item(key = "search.Developer.12") { SettingsSection(stringResource(R.string.about)) }
             item(key = "search.Developer.13") {

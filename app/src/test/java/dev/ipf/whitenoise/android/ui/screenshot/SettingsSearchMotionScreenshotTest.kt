@@ -61,7 +61,10 @@ class SettingsSearchMotionScreenshotTest {
         val settled = top()
         assertFirstAt(expectedTop)
         capture("settings_search_filter_settled")
-        assertTrue("Expected lower-row placement motion: $first > $middle > $settled", first > middle && middle > settled)
+        assertTrue(
+            "Expected lower-row placement motion: $first > $middle > $settled",
+            first > middle && middle > settled,
+        )
     }
 
     @Test fun liveReducedMotionImmediatelySettlesTheCurrentResults() {
@@ -106,7 +109,10 @@ class SettingsSearchMotionScreenshotTest {
         rule.runOnIdle { query.value = "no matching setting" }
         advanceCommittedLayout()
         rule.onNodeWithTag("settings.search.field").assertTextContains("no matching setting")
-        rule.onNodeWithText(ApplicationProvider.getApplicationContext<Context>().getString(R.string.settings_search_no_results)).assertExists()
+        rule
+            .onNodeWithText(
+                ApplicationProvider.getApplicationContext<Context>().getString(R.string.settings_search_no_results),
+            ).assertExists()
         rule.onNodeWithTag(target).assertDoesNotExist()
         rule.onNodeWithTag(removed).assertDoesNotExist()
         rule.runOnIdle { query.value = "font" }
@@ -121,7 +127,12 @@ class SettingsSearchMotionScreenshotTest {
 
     private fun mount() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val documents = prepareSettingsSearch(settingsSearchCatalog(), SettingsSearchEligibility(true, true, true, true), context::getString)
+        val documents =
+            prepareSettingsSearch(
+                settingsSearchCatalog(),
+                SettingsSearchEligibility(true, true, true, true),
+                context::getString,
+            )
         rule.mainClock.autoAdvance = false
         rule.setContent {
             WhiteNoiseTheme(darkTheme = true, amoled = true) {

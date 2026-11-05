@@ -116,7 +116,9 @@ internal fun AiAgentsContent(
                     }
                 }
             }
-            item(key = "search.AiAgents.5") { SettingsExplainer(stringResource(R.string.ai_agents_clipboard_disclosure)) }
+            item(key = "search.AiAgents.5") {
+                SettingsExplainer(stringResource(R.string.ai_agents_clipboard_disclosure))
+            }
             item(key = "search.AiAgents.6") { SettingsSection(stringResource(R.string.ai_agents_manual_setup_title)) }
             item(key = "search.AiAgents.7") {
                 SettingsGroup(modifier = Modifier.testTag("ai_agents.manual")) {

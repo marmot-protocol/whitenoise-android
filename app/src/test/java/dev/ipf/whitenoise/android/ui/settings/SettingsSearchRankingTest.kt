@@ -17,7 +17,11 @@ class SettingsSearchRankingTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
     private fun documents(context: Context = this.context) =
-        prepareSettingsSearch(settingsSearchCatalog(), SettingsSearchEligibility(true, true, false, true), context::getString)
+        prepareSettingsSearch(
+            settingsSearchCatalog(),
+            SettingsSearchEligibility(true, true, false, true),
+            context::getString,
+        )
 
     @Test fun productionQueriesFindTheirControlsImmediately() {
         val documents = documents()
@@ -30,20 +34,44 @@ class SettingsSearchRankingTest {
                 "block" to "DevicePrivacy.blocked_users",
                 "read aloud" to "home.ReadAloud",
             )
-        expected.forEach { (query, id) -> assertTrue("$query", searchSettings(documents, query).take(3).any { it.entry.id == id }) }
+        expected.forEach { (query, id) ->
+            assertTrue(
+                "$query",
+                searchSettings(documents, query).take(3).any {
+                    it.entry.id ==
+                        id
+                },
+            )
+        }
         assertEquals("Appearance.font_size", searchSettings(documents, "font size").first().entry.id)
         assertEquals("Appearance.font_size", searchSettings(documents, "text size").first().entry.id)
     }
 
     @Test fun motionFixtureUsesTheActualCrossFieldCatalogMatches() {
         val documents = documents()
-        assertEquals(listOf("Appearance.font_family", "Appearance.font_size"), searchSettings(documents, "app font").map { it.entry.id })
+        assertEquals(
+            listOf(
+                "Appearance.font_family",
+                "Appearance.font_size",
+            ),
+            searchSettings(documents, "app font").map {
+                it.entry.id
+            },
+        )
         assertEquals(listOf("Appearance.font_size"), searchSettings(documents, "font size").map { it.entry.id })
         val appearance = searchSettings(documents, "appearance").map { it.entry.id }
         assertEquals("home.Appearance", appearance.first())
         assertTrue(appearance.indexOf("Appearance.font_family") > 0)
         assertTrue(appearance.indexOf("Appearance.font_size") > appearance.indexOf("Appearance.font_family"))
-        assertEquals(listOf("Appearance.font_family", "Appearance.font_size"), searchSettings(documents, "appearance font").map { it.entry.id })
+        assertEquals(
+            listOf(
+                "Appearance.font_family",
+                "Appearance.font_size",
+            ),
+            searchSettings(documents, "appearance font").map {
+                it.entry.id
+            },
+        )
     }
 
     @Test fun normalizationInfixDeletionAndEveryTokenAreRequired() {
@@ -66,7 +94,10 @@ class SettingsSearchRankingTest {
     }
 
     @Test fun spanishTitlesAndCuratedAliasesUseActualResources() {
-        val configuration = Configuration(context.resources.configuration).apply { setLocale(Locale.forLanguageTag("es")) }
+        val configuration =
+            Configuration(
+                context.resources.configuration,
+            ).apply { setLocale(Locale.forLanguageTag("es")) }
         val documents = documents(context.createConfigurationContext(configuration))
         val entry = searchSettings(documents, "tamano de texto").first()
         assertEquals("Appearance.font_size", entry.entry.id)

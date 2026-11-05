@@ -247,8 +247,20 @@ internal fun settingsSearchAdditionalControls(): List<SettingsSearchEntry> =
             "privacy",
             R.string.privacy_policy_subtitle,
         )
-        control("Account.share_connect", R.string.share_and_connect, R.string.account, SettingsDetail.ShareConnect, account = true)
-        control("Support.relays", R.string.support_open_relays, R.string.chat_with_support, SettingsDetail.SupportRelays, account = true)
+        control(
+            "Account.share_connect",
+            R.string.share_and_connect,
+            R.string.account,
+            SettingsDetail.ShareConnect,
+            account = true,
+        )
+        control(
+            "Support.relays",
+            R.string.support_open_relays,
+            R.string.chat_with_support,
+            SettingsDetail.SupportRelays,
+            account = true,
+        )
         control(
             "ChatFolders.create",
             R.string.folder_new_title,
@@ -257,8 +269,24 @@ internal fun settingsSearchAdditionalControls(): List<SettingsSearchEntry> =
             row = "create",
             account = true,
         )
-        control("Relays.posting", R.string.nip_65, R.string.relays, SettingsDetail.Relays, "search.Relays.3", "posting", account = true)
-        control("Relays.receiving", R.string.inbox, R.string.relays, SettingsDetail.Relays, "search.Relays.3", "receiving", account = true)
+        control(
+            "Relays.posting",
+            R.string.nip_65,
+            R.string.relays,
+            SettingsDetail.Relays,
+            "search.Relays.3",
+            "posting",
+            account = true,
+        )
+        control(
+            "Relays.receiving",
+            R.string.inbox,
+            R.string.relays,
+            SettingsDetail.Relays,
+            "search.Relays.3",
+            "receiving",
+            account = true,
+        )
         control(
             "Relays.add",
             R.string.add_relay,
@@ -277,8 +305,24 @@ internal fun settingsSearchAdditionalControls(): List<SettingsSearchEntry> =
             account = true,
         )
         control("Home.sign_out", R.string.sign_out, R.string.account, null, "SignOut", account = true)
-        control("Home.add_profile", R.string.settings_add_profile, R.string.account, null, "Profile", "add_profile", account = true)
-        control("Home.switch_profile", R.string.settings_switch_profile, R.string.account, null, "Profile", "switch_profile", account = true)
+        control(
+            "Home.add_profile",
+            R.string.settings_add_profile,
+            R.string.account,
+            null,
+            "Profile",
+            "add_profile",
+            account = true,
+        )
+        control(
+            "Home.switch_profile",
+            R.string.settings_switch_profile,
+            R.string.account,
+            null,
+            "Profile",
+            "switch_profile",
+            account = true,
+        )
         control("Home.update_available", R.string.app_updates, R.string.settings, null, "AppUpdateAvailable")
         control("Home.update_controls", R.string.app_updates, R.string.settings, null, "AppUpdateControls")
     }

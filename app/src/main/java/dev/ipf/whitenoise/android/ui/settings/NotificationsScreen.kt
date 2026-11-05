@@ -91,7 +91,7 @@ internal fun NotificationsScreen(
     SettingsScaffold(title = stringResource(R.string.notifications), onBack = onBack) {
         SettingsList {
             if (!permissionGranted) {
-                item(key = "search.Notifications.1") {
+                item {
                     NotificationPermissionGroup(
                         denied = permissionDenied,
                         onRequest = { permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
@@ -121,7 +121,9 @@ internal fun NotificationsScreen(
                 }
             }
             if (!capability.isAvailable) {
-                item(key = "search.Notifications.5") { SettingsExplainer(stringResource(capability.subtitleResource())) }
+                item(key = "search.Notifications.5") {
+                    SettingsExplainer(stringResource(capability.subtitleResource()))
+                }
             }
             item(key = "search.Notifications.6") {
                 val previews = appState.notificationPreviewSettings
@@ -131,7 +133,9 @@ internal fun NotificationsScreen(
                     onRetry = { appState.launchMutation { previews.retry() } },
                 )
             }
-            item(key = "search.Notifications.7") { SettingsSection(stringResource(R.string.notification_device_policy)) }
+            item(key = "search.Notifications.7") {
+                SettingsSection(stringResource(R.string.notification_device_policy))
+            }
             item(key = "search.Notifications.8") {
                 NotificationDevicePolicyGroup(
                     permissionGranted = permissionGranted,
@@ -144,10 +148,14 @@ internal fun NotificationsScreen(
                     },
                 )
             }
-            item(key = "search.Notifications.9") { SettingsExplainer(stringResource(R.string.notification_device_policy_detail)) }
+            item(key = "search.Notifications.9") {
+                SettingsExplainer(stringResource(R.string.notification_device_policy_detail))
+            }
             item(key = "search.Notifications.10") { SettingsSection(stringResource(R.string.notification_tones)) }
             item(key = "search.Notifications.11") { NotificationToneControl() }
-            item(key = "search.Notifications.12") { SettingsExplainer(stringResource(R.string.notification_tone_scope)) }
+            item(key = "search.Notifications.12") {
+                SettingsExplainer(stringResource(R.string.notification_tone_scope))
+            }
             item(key = "search.Notifications.13") { SpokenAudioAlertControl() }
             item(key = "search.Notifications.14") { SettingsSection(stringResource(R.string.notification_categories)) }
             item(key = "search.Notifications.15") {
@@ -156,7 +164,9 @@ internal fun NotificationsScreen(
                     soundLabels = soundLabels,
                 )
             }
-            item(key = "search.Notifications.16") { SettingsExplainer(stringResource(R.string.notification_categories_detail)) }
+            item(key = "search.Notifications.16") {
+                SettingsExplainer(stringResource(R.string.notification_categories_detail))
+            }
         }
     }
 }

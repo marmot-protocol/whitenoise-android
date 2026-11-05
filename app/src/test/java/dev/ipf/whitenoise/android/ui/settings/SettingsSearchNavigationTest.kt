@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.settings
 import android.content.Context
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.getValue
@@ -71,6 +72,42 @@ class SettingsSearchNavigationTest {
         composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
         composeRule.onNodeWithTag("settings.search.field").assertTextContains("text size")
         composeRule.onNodeWithTag("settings.search.result.Appearance.font_size").assertIsDisplayed()
+    }
+
+    @Test fun settingsListKeepsMultipleItemRootsVerticallySeparated() {
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                SettingsList {
+                    item {
+                        Text("First item root")
+                        Text("Second item root")
+                    }
+                }
+            }
+        }
+        val first = composeRule.onNodeWithText("First item root").fetchSemanticsNode().boundsInRoot
+        val second = composeRule.onNodeWithText("Second item root").fetchSemanticsNode().boundsInRoot
+        assertTrue("Multiple roots must stack with their original gap", second.top > first.bottom)
+    }
+
+    @Test fun destinationOnlyCatalogTargetNeverRevealsUnkeyedItems() {
+        var reveals = 0
+        val target = settingsSearchCatalog().first { it.id == "home.Relays" }
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                CompositionLocalProvider(
+                    LocalSettingsSearchTarget provides target,
+                    LocalSettingsSearchOnReveal provides { reveals++ },
+                ) {
+                    SettingsList {
+                        item { Text("First relay warning") }
+                        item { Text("Second relay warning") }
+                    }
+                }
+            }
+        }
+        composeRule.mainClock.advanceTimeBy(64)
+        composeRule.runOnIdle { assertEquals(0, reveals) }
     }
 
     @Test fun manyFolderRestoreAnchorIsRevealedOnceWithoutExecutingRestore() {
@@ -176,7 +213,12 @@ class SettingsSearchNavigationTest {
 
     @Test fun editingAScrolledQueryPublishesTheStrongestResultAtTheTop() {
         val appState = mount()
-        val documents = prepareSettingsSearch(settingsSearchCatalog(), settingsSearchEligibilitySnapshot(appState, true), context::getString)
+        val documents =
+            prepareSettingsSearch(
+                settingsSearchCatalog(),
+                settingsSearchEligibilitySnapshot(appState, true),
+                context::getString,
+            )
         val before = searchSettings(documents, "e")
         val after = searchSettings(documents, "a")
         assertTrue(before.size > 6 && after.size > 6)
@@ -200,7 +242,9 @@ class SettingsSearchNavigationTest {
         }
         search("font")
         composeRule.runOnIdle {
-            appState.applyAccountSwitchProfileSeed(AccountSwitchProfileSeed("a".repeat(64), null, "Updated settings account", null))
+            appState.applyAccountSwitchProfileSeed(
+                AccountSwitchProfileSeed("a".repeat(64), null, "Updated settings account", null),
+            )
         }
         composeRule.onNodeWithTag("settings.search.field").performTextReplacement("")
         composeRule.onNodeWithText("Updated settings account").assertIsDisplayed()
@@ -353,7 +397,9 @@ class SettingsSearchNavigationTest {
         val content: @androidx.compose.runtime.Composable () -> Unit = {
             WhiteNoiseTheme {
                 var detail by rememberSaveable { mutableStateOf<SettingsDetail?>(null) }
-                var viewport by rememberSaveable(stateSaver = SettingsHomeViewport.Saver) { mutableStateOf(SettingsHomeViewport.Top) }
+                var viewport by rememberSaveable(
+                    stateSaver = SettingsHomeViewport.Saver,
+                ) { mutableStateOf(SettingsHomeViewport.Top) }
                 SettingsScreen(
                     appState,
                     {},

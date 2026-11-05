@@ -53,7 +53,11 @@ class SettingsHomeBehaviorTest {
 
     @Test fun searchToolbarActionIsAccessibleAndOpensOnlySearch() {
         mount(profileCount = 1)
-        composeRule.onNodeWithContentDescription(context.getString(R.string.settings_search)).assertHasClickAction().performClick()
+        composeRule
+            .onNodeWithContentDescription(
+                context.getString(R.string.settings_search),
+            ).assertHasClickAction()
+            .performClick()
         composeRule.runOnIdle {
             assertEquals(1, searchOpenCount)
             assertEquals(emptyList<SettingsDetail>(), opened)

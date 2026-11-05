@@ -57,7 +57,12 @@ class SettingsSearchScreenshotTest {
         fontScale: Float = 1f,
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val documents = prepareSettingsSearch(settingsSearchCatalog(), SettingsSearchEligibility(true, true, amoled, true), context::getString)
+        val documents =
+            prepareSettingsSearch(
+                settingsSearchCatalog(),
+                SettingsSearchEligibility(true, true, amoled, true),
+                context::getString,
+            )
         composeRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(

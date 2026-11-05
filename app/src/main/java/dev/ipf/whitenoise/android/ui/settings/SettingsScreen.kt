@@ -389,7 +389,7 @@ private fun settingsBackHandler(
 
 /** Settings root hosting the hub and every detail destination. */
 @OptIn(ExperimentalMaterial3Api::class)
-@Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod")
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList", "CyclomaticComplexMethod")
 @Composable
 internal fun SettingsScreen(
     appState: WhiteNoiseAppState,
@@ -411,9 +411,19 @@ internal fun SettingsScreen(
     val searchOwner = listOf<Any?>(appState.activeAccountRef, appState.runtimeGeneration)
     var searchOpen by rememberSaveable(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
     var searchQuery by rememberSaveable(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf("") }
-    var searchOriginId by rememberSaveable(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
-    val searchResultList = rememberSaveable(appState.activeAccountRef, appState.runtimeGeneration, saver = LazyListState.Saver) { LazyListState() }
-    var searchRevealed by rememberSaveable(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
+    var searchOriginId by rememberSaveable(appState.activeAccountRef, appState.runtimeGeneration) {
+        mutableStateOf<String?>(null)
+    }
+    val searchResultList =
+        rememberSaveable(
+            appState.activeAccountRef,
+            appState.runtimeGeneration,
+            saver = LazyListState.Saver,
+        ) { LazyListState() }
+    var searchRevealed by rememberSaveable(
+        appState.activeAccountRef,
+        appState.runtimeGeneration,
+    ) { mutableStateOf(false) }
     val catalog = remember { settingsSearchCatalog() }
     val searchOrigin = catalog.firstOrNull { it.id == searchOriginId }
     val eligibility = settingsSearchEligibility(appState)
@@ -436,7 +446,10 @@ internal fun SettingsScreen(
         }
     }
     val changeDetail: (SettingsDetail?) -> Unit = { destination ->
-        if (searchOrigin != null && detail == searchOrigin.destination && destination == detail?.let(::settingsDetailParent)) {
+        if (searchOrigin != null &&
+            detail == searchOrigin.destination &&
+            destination == detail?.let(::settingsDetailParent)
+        ) {
             searchOriginId = null
             onDetailChange(null)
         } else {
@@ -704,7 +717,13 @@ private fun SettingsHomeScreen(
     val homeConfiguration = LocalConfiguration.current
     // Query edits retain the existing header presentation without invoking cold identity/profile helpers.
     val homeAccount =
-        remember(activeAccount, appState.runtimeGeneration, appState.profileRevisionForCompose, readiness, homeConfiguration) {
+        remember(
+            activeAccount,
+            appState.runtimeGeneration,
+            appState.profileRevisionForCompose,
+            readiness,
+            homeConfiguration,
+        ) {
             activeAccount?.let { account ->
                 SettingsHomeAccount(
                     title = appState.displayName(account.accountIdHex),
@@ -724,10 +743,7 @@ private fun SettingsHomeScreen(
         searchResultList = searchResultList,
         searchAnimationsEnabled = !suppressSearchMotion && rememberSystemAnimationsEnabled(),
         onSearchSelection = { entry ->
-            val current =
-                settingsSearchEligibilitySnapshot(appState, if (entry.pushRequired) appState.nativePushCapability().isAvailable else eligibility.pushAvailable)
-            val sessionInteractive = !appState.signOutInProgress && !appState.appLockScreenVisible && !appState.wipeInProgress
-            if (current.allows(entry) && sessionInteractive) {
+            if (canActivateSettingsSearchResult(appState, entry, eligibility.pushAvailable)) {
                 keyboard?.hide()
                 onSearchSelection(entry)
             }
@@ -795,6 +811,21 @@ private fun SettingsHomeScreen(
     }
 }
 
+/** Recheck the existing memory prerequisites and live platform capability only at activation. */
+private fun canActivateSettingsSearchResult(
+    appState: WhiteNoiseAppState,
+    entry: SettingsSearchEntry,
+    pushAvailable: Boolean,
+): Boolean {
+    val current =
+        settingsSearchEligibilitySnapshot(
+            appState,
+            if (entry.pushRequired) appState.nativePushCapability().isAvailable else pushAvailable,
+        )
+    val sessionInteractive = !appState.signOutInProgress && !appState.appLockScreenVisible && !appState.wipeInProgress
+    return current.allows(entry) && sessionInteractive
+}
+
 /**
  * Settings home as the prototype lays it out: profile header, optional app updates, the labelled Account,
  * App and Support groups, sign out and the version footer, in one lazy list whose viewport survives
@@ -854,19 +885,8 @@ internal fun SettingsHomeContent(
     SettingsScaffold(
         title = stringResource(R.string.settings),
         onBack = { if (searchOpen) onSearchOpenChange(false) else onBack() },
-        titleContent =
-            if (searchOpen) {
-                { SettingsSearchField(searchQuery, onSearchQueryChange) }
-            } else {
-                null
-            },
-        topBarActions = {
-            if (!searchOpen) {
-                IconButton(onClick = { onSearchOpenChange(true) }, modifier = Modifier.testTag("settings.search.open")) {
-                    Icon(painterResource(R.drawable.ic_search), contentDescription = stringResource(R.string.settings_search))
-                }
-            }
-        },
+        titleContent = settingsHomeSearchTitle(searchOpen, searchQuery, onSearchQueryChange),
+        topBarActions = { SettingsHomeSearchAction(searchOpen) { onSearchOpenChange(true) } },
         modifier = Modifier.testTag(SETTINGS_HOME_CONTENT_TAG),
         prominentTitle = true,
     ) {
@@ -910,6 +930,26 @@ internal fun SettingsHomeContent(
                     }
                 }
             }
+        }
+    }
+}
+
+/** Build only the existing title slot; the Settings toolbar continues owning its layout. */
+private fun settingsHomeSearchTitle(
+    searchOpen: Boolean,
+    query: String,
+    onQueryChange: (String) -> Unit,
+): (@Composable () -> Unit)? = if (searchOpen) ({ SettingsSearchField(query, onQueryChange) }) else null
+
+@Composable
+@Suppress("FunctionNaming")
+private fun SettingsHomeSearchAction(
+    searchOpen: Boolean,
+    onOpen: () -> Unit,
+) {
+    if (!searchOpen) {
+        IconButton(onClick = onOpen, modifier = Modifier.testTag("settings.search.open")) {
+            Icon(painterResource(R.drawable.ic_search), contentDescription = stringResource(R.string.settings_search))
         }
     }
 }

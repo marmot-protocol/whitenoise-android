@@ -97,7 +97,9 @@ internal fun GestureSettingsContent(
                     }
                 }
             }
-            item(key = "search.GestureSettings.6") { SettingsCallout(text = stringResource(R.string.gestures_physical_hint)) }
+            item(key = "search.GestureSettings.6") {
+                SettingsCallout(text = stringResource(R.string.gestures_physical_hint))
+            }
             item(key = "search.GestureSettings.7") {
                 SettingsGroup {
                     row("reset") { rowContext ->

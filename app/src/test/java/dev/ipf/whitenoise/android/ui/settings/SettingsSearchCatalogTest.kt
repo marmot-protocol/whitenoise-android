@@ -54,7 +54,12 @@ class SettingsSearchCatalogTest {
                 .orEmpty()
                 .filter { it.extension == "kt" }
                 .associate { it.name to it.readText() }
-        val all = sources.values.joinToString("\n")
+        val translationSource =
+            File(
+                root,
+                "app/src/main/java/dev/ipf/whitenoise/android/translation/TranslationSettings.kt",
+            ).readText()
+        val all = (sources.values + translationSource).joinToString("\n")
         catalog.forEach { entry ->
             entry.itemKey?.let { key ->
                 if (key.startsWith("search.")) {
@@ -84,8 +89,22 @@ class SettingsSearchCatalogTest {
         assertTrue("Notifications.local" in public)
         assertTrue("DevicePrivacy.device_authentication" in public)
         val eligible = SettingsSearchEligibility(true, true, false, true)
-        assertTrue(ids(eligible).containsAll(listOf("Account.private_key", "Developer.quarantined_groups", "Notifications.push", "Appearance.action_color")))
-        val withdrawn = eligible.copy(hiddenIds = setOf("Privacy.auto_lock", "TextToSpeech.voice", "Home.update_controls"))
+        assertTrue(
+            ids(
+                eligible,
+            ).containsAll(
+                listOf(
+                    "Account.private_key",
+                    "Developer.quarantined_groups",
+                    "Notifications.push",
+                    "Appearance.action_color",
+                ),
+            ),
+        )
+        val withdrawn =
+            eligible.copy(
+                hiddenIds = setOf("Privacy.auto_lock", "TextToSpeech.voice", "Home.update_controls"),
+            )
         assertFalse(ids(withdrawn).contains("Privacy.auto_lock"))
         assertFalse(ids(withdrawn).contains("TextToSpeech.voice"))
         assertFalse(ids(withdrawn).contains("Home.update_controls"))

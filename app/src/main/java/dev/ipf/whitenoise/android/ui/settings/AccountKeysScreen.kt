@@ -525,7 +525,9 @@ private fun ProfileKeysList(
                 }
             }
         }
-        item(key = "search.AccountKeys.5") { ProfileKeySupportingText(stringResource(R.string.profile_public_key_help)) }
+        item(key = "search.AccountKeys.5") {
+            ProfileKeySupportingText(stringResource(R.string.profile_public_key_help))
+        }
         if (!hasLocalKey) {
             item(key = "search.AccountKeys.6") {
                 SettingsCallout(
@@ -557,7 +559,9 @@ private fun ProfileKeysList(
                     }
                 }
             }
-            item(key = "search.AccountKeys.9") { ProfileKeySupportingText(stringResource(R.string.profile_private_key_help)) }
+            item(key = "search.AccountKeys.9") {
+                ProfileKeySupportingText(stringResource(R.string.profile_private_key_help))
+            }
             item(key = "search.AccountKeys.10") { SettingsSection(stringResource(R.string.export)) }
             item(key = "search.AccountKeys.11") {
                 SettingsGroup {

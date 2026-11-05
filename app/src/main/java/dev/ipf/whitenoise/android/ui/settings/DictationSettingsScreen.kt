@@ -83,7 +83,9 @@ internal fun DictationSettingsScreen(
 
     SettingsScaffold(title = stringResource(R.string.dictation_settings_title), onBack = onBack) {
         SettingsList {
-            item(key = "search.DictationSettings.1") { DictationProviderExplainer(providerResolved, selectedProviderPackage) }
+            item(key = "search.DictationSettings.1") {
+                DictationProviderExplainer(providerResolved, selectedProviderPackage)
+            }
             if (!osttInstalled) {
                 item(key = "search.DictationSettings.2") {
                     SettingsGroup(modifier = Modifier.testTag("dictation.ostt_recommendation.group")) {
@@ -159,7 +161,9 @@ internal fun DictationSettingsScreen(
             if (preferences.finishAfterSilenceMillis != null &&
                 preferences.silenceDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish
             ) {
-                item(key = "search.DictationSettings.5") { SettingsExplainer(stringResource(R.string.dictation_send_safety_note)) }
+                item(key = "search.DictationSettings.5") {
+                    SettingsExplainer(stringResource(R.string.dictation_send_safety_note))
+                }
             }
             item(key = "search.DictationSettings.6") {
                 SettingsGroup(modifier = Modifier.testTag("dictation.system.group")) {

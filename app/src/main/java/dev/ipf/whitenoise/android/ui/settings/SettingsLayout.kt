@@ -147,9 +147,14 @@ internal fun SettingsList(
                                 CompositionLocalProvider(LocalSettingsSearchItemKey provides key) {
                                     Column(
                                         modifier = itemModifier(key),
-                                        verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
                                     ) {
-                                        SettingsSearchRowReveal(null) { content() }
+                                        SettingsSearchRowReveal(null) {
+                                            Column(
+                                                verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+                                            ) {
+                                                content()
+                                            }
+                                        }
                                     }
                                 }
                             }

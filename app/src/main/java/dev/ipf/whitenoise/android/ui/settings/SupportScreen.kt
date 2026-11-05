@@ -162,7 +162,9 @@ internal fun SupportContent(
                 SettingsExplainer(stringResource(R.string.support_contact_explainer))
             }
             if (!hasAccount) {
-                item(key = "search.SupportScreen.2") { SettingsCallout(text = stringResource(R.string.no_active_account_period)) }
+                item(key = "search.SupportScreen.2") {
+                    SettingsCallout(text = stringResource(R.string.no_active_account_period))
+                }
             } else if (!hasExistingChat && relayState != SupportRelayState.Configured) {
                 item(key = "search.SupportScreen.3") {
                     SettingsCallout(

@@ -163,6 +163,15 @@
         "test_ids": [
           "SET-033"
         ]
+      },
+      {
+        "surface": "SettingsHomeSearchAction",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "fun SettingsHomeSearchAction(",
+        "test_ids": [
+          "SET-042",
+          "SET-044"
+        ]
       }
     ],
     "settings_controls": [

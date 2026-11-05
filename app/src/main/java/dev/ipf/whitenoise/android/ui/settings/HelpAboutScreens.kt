@@ -107,7 +107,9 @@ internal fun BugReportContent(
         },
     ) {
         SettingsList {
-            item(key = "search.HelpAboutScreens.2") { SettingsSection(stringResource(R.string.report_bug_destination_section)) }
+            item(key = "search.HelpAboutScreens.2") {
+                SettingsSection(stringResource(R.string.report_bug_destination_section))
+            }
             item(key = "search.HelpAboutScreens.3") {
                 SettingsGroup(modifier = Modifier.testTag("help.bug.destination")) {
                     row("destination") { context ->
@@ -119,7 +121,9 @@ internal fun BugReportContent(
                     }
                 }
             }
-            item(key = "search.HelpAboutScreens.4") { SettingsSection(stringResource(R.string.report_bug_privacy_section)) }
+            item(key = "search.HelpAboutScreens.4") {
+                SettingsSection(stringResource(R.string.report_bug_privacy_section))
+            }
             item(key = "search.HelpAboutScreens.5") {
                 SettingsCallout(
                     text = stringResource(R.string.report_bug_no_attachments_detail),

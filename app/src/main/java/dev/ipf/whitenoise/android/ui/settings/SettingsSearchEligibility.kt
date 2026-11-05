@@ -34,7 +34,12 @@ internal fun settingsSearchEligibility(appState: WhiteNoiseAppState): SettingsSe
         }
     val mediaMix by appState.ttsMediaMixPreferences.state.collectAsState()
     val dictation by appState.conversationDictationPreferences.state.collectAsState()
-    return settingsSearchEligibilitySnapshot(appState, pushAvailable, mediaMix.enabled, dictation.finishAfterSilenceMillis != null)
+    return settingsSearchEligibilitySnapshot(
+        appState,
+        pushAvailable,
+        mediaMix.enabled,
+        dictation.finishAfterSilenceMillis != null,
+    )
 }
 
 /** Fresh activation snapshot reads only existing in-memory state; it does not discover capabilities. */
@@ -43,12 +48,18 @@ internal fun settingsSearchEligibilitySnapshot(
     appState: WhiteNoiseAppState,
     pushAvailable: Boolean,
     mediaMixEnabled: Boolean = appState.ttsMediaMixPreferences.state.value.enabled,
-    dictationAutoFinish: Boolean = appState.conversationDictationPreferences.state.value.finishAfterSilenceMillis != null,
+    dictationAutoFinish: Boolean =
+        appState.conversationDictationPreferences.state.value.finishAfterSilenceMillis !=
+            null,
 ): SettingsSearchEligibility {
     val engineChoice = appState.ttsEngineChoice()
     val hidden =
         buildSet {
-            if (!(engineChoice.showEngineChooser || engineChoice.engines.size > 1) || engineChoice.engines.isEmpty()) add("TextToSpeech.engine")
+            if (!(engineChoice.showEngineChooser || engineChoice.engines.size > 1) ||
+                engineChoice.engines.isEmpty()
+            ) {
+                add("TextToSpeech.engine")
+            }
             if (!showTtsVoicePicker(appState.ttsVoiceResolution)) add("TextToSpeech.voice")
             if (!mediaMixEnabled) add("TextToSpeech.mix_volume")
             if (appState.appLockCredentialAvailable) add("Privacy.security_settings")
@@ -62,8 +73,16 @@ internal fun settingsSearchEligibilitySnapshot(
             }
             if (appState.accounts.size != 1) add("Home.add_profile")
             if (appState.accounts.size <= 1) add("Home.switch_profile")
-            if (!BuildConfig.SELF_UPDATE_ENABLED || !appState.appUpdateInfo.isUpdateAvailable) add("Home.update_available")
-            if (!BuildConfig.SELF_UPDATE_ENABLED || appState.appUpdateInfo.isUpdateAvailable) add("Home.update_controls")
+            if (!BuildConfig.SELF_UPDATE_ENABLED ||
+                !appState.appUpdateInfo.isUpdateAvailable
+            ) {
+                add("Home.update_available")
+            }
+            if (!BuildConfig.SELF_UPDATE_ENABLED ||
+                appState.appUpdateInfo.isUpdateAvailable
+            ) {
+                add("Home.update_controls")
+            }
         }
     return SettingsSearchEligibility(
         hasAccount = appState.activeAccount != null,

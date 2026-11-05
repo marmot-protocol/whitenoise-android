@@ -2557,4 +2557,10 @@
     <string name="media_viewer_actual_size">Tamanho real (1:1)</string>
     <string name="media_viewer_zoom_out">Diminuir zoom</string>
     <string name="media_viewer_toggle_controls">Mostrar ou ocultar controles</string>
+    <string name="settings_search">Pesquisar configurações</string>
+    <string name="settings_search_no_results">Nenhuma configuração encontrada. Tente outra palavra.</string>
+    <string name="settings_search_alias_font_size">tamanho do texto|escala da fonte|texto maior|texto menor</string>
+    <string name="settings_search_alias_read_aloud">TTS|texto para fala|ler em voz alta</string>
+    <string name="settings_search_alias_sound">som de notificação|som de alerta|toque</string>
+    <string name="settings_search_revealed">%1$s. Configuração destacada.</string>
 </resources>

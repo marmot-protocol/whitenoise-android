@@ -57,7 +57,8 @@ internal class SettingsSearchDocument(
 ) {
     internal val normalizedTitle = normalizeSettingsQuery(title)
     internal val normalizedAliases = aliases.split('|').map(::normalizeSettingsQuery).filter(String::isNotEmpty)
-    internal val fields = listOf(normalizedTitle, normalizeSettingsQuery(summary), normalizeSettingsQuery(category)) + normalizedAliases
+    internal val fields =
+        listOf(normalizedTitle, normalizeSettingsQuery(summary), normalizeSettingsQuery(category)) + normalizedAliases
 }
 
 internal fun prepareSettingsSearch(
@@ -75,8 +76,11 @@ internal fun prepareSettingsSearch(
         )
     }
 
-/** Every token is required, including infixes; deterministic title strength precedes metadata. */
-@Suppress("CyclomaticComplexMethod", "MagicNumber") // Explicit deterministic numeric ranking tiers are intentionally ordered together.
+/**
+ * Every token is required, including infixes; deterministic title strength precedes metadata.
+ * Numeric ranking tiers are kept explicitly in rank order.
+ */
+@Suppress("CyclomaticComplexMethod", "MagicNumber")
 internal fun searchSettings(
     documents: List<SettingsSearchDocument>,
     query: String,

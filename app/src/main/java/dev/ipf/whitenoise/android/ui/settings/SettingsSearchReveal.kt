@@ -39,11 +39,14 @@ internal fun SettingsSearchRowReveal(
 ) {
     val target = LocalSettingsSearchTarget.current
     val itemKey = LocalSettingsSearchItemKey.current
-    val selected = target != null && target.rowKey == rowKey && target.itemKey == itemKey
+    val anchoredTarget = target?.takeIf { it.rowKey != null || it.itemKey != null }
+    val selected =
+        anchoredTarget != null && anchoredTarget.rowKey == rowKey && anchoredTarget.itemKey == itemKey
     val consumed = LocalSettingsSearchRevealConsumed.current
     val onReveal = LocalSettingsSearchOnReveal.current
     val view = LocalView.current
-    val revealedText = stringResource(R.string.settings_search_revealed, target?.let { stringResource(it.titleRes) }.orEmpty())
+    val revealedText =
+        stringResource(R.string.settings_search_revealed, target?.let { stringResource(it.titleRes) }.orEmpty())
     val requester = remember { BringIntoViewRequester() }
     var highlighted by remember(target?.id) { mutableStateOf(selected && !consumed) }
     LaunchedEffect(selected, target?.id) {
@@ -59,8 +62,17 @@ internal fun SettingsSearchRowReveal(
     Box(
         modifier
             .bringIntoViewRequester(requester)
-            .then(if (highlighted) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small) else Modifier)
-            .semantics {
+            .then(
+                if (highlighted) {
+                    Modifier.border(
+                        2.dp,
+                        MaterialTheme.colorScheme.primary,
+                        MaterialTheme.shapes.small,
+                    )
+                } else {
+                    Modifier
+                },
+            ).semantics {
                 if (highlighted) {
                     liveRegion = LiveRegionMode.Polite
                     stateDescription = revealedText

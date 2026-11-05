@@ -128,7 +128,9 @@ internal fun DiagnosticsImprovementsScreen(
                 }
             }
             item(key = "search.DiagnosticsImprovements.2") { DiagnosticsDisclosure(appState) }
-            item(key = "search.DiagnosticsImprovements.3") { SettingsSection(stringResource(R.string.stored_audit_logs)) }
+            item(key = "search.DiagnosticsImprovements.3") {
+                SettingsSection(stringResource(R.string.stored_audit_logs))
+            }
             item(key = "search.DiagnosticsImprovements.4") {
                 SettingsGroup(modifier = Modifier.testTag("diagnostics.stored.group")) {
                     row("export") { rowContext ->
