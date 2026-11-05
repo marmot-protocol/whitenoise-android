@@ -19,6 +19,8 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.ui.settings.SettingsAction
+import dev.ipf.whitenoise.android.ui.settings.SettingsChoice
 import dev.ipf.whitenoise.android.ui.settings.SettingsGroup
 import dev.ipf.whitenoise.android.ui.settings.SettingsLink
 import dev.ipf.whitenoise.android.ui.settings.SettingsSwitch
@@ -74,6 +76,26 @@ class SettingsComponentsScreenshotTest {
         capture("amoled_xxhdpi")
     }
 
+    /** Disabled and busy rows of every type leave the AMOLED perimeter one uniform outline (#3585). */
+    @Test
+    fun mixedStatesAmoledMdpi() {
+        render(darkTheme = true, amoled = true, mixedStates = true)
+        capture("mixed_states_amoled_mdpi")
+    }
+
+    /** The uniform AMOLED perimeter holds with RTL mirroring and 200% text in the mixed-state groups. */
+    @Test
+    fun mixedStatesAmoledRtlLargeFont() {
+        render(
+            darkTheme = true,
+            amoled = true,
+            layoutDirection = LayoutDirection.Rtl,
+            fontScale = 2f,
+            mixedStates = true,
+        )
+        capture("mixed_states_amoled_rtl_large_font")
+    }
+
     /**
      * Removing both neighbors recomputes a former middle row into a fully rounded singleton.
      * The three-row starting state is already pinned by [groupedRowsAmoledMdpi].
@@ -94,6 +116,7 @@ class SettingsComponentsScreenshotTest {
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
         fontScale: Float = 1f,
         expanded: MutableState<Boolean> = mutableStateOf(true),
+        mixedStates: Boolean = false,
     ) {
         // Pin the Material loading animation to the same frame for each density and theme.
         composeRule.mainClock.autoAdvance = false
@@ -110,7 +133,7 @@ class SettingsComponentsScreenshotTest {
                             modifier = Modifier.padding(vertical = 16.dp),
                             verticalArrangement = Arrangement.spacedBy(24.dp),
                         ) {
-                            SampleGroups(expanded.value)
+                            if (mixedStates) MixedStateGroups() else SampleGroups(expanded.value)
                         }
                     }
                 }
@@ -165,6 +188,65 @@ class SettingsComponentsScreenshotTest {
                     busy = true,
                     onClick = {},
                 )
+            }
+        }
+    }
+
+    /**
+     * A group whose first, middle and last rows mix enabled, disabled and busy states across all four
+     * row types, beside an all-disabled group, so any dimmed perimeter segment shows against its neighbors.
+     */
+    @Suppress("FunctionNaming", "LongMethod")
+    @Composable
+    private fun MixedStateGroups() {
+        SettingsGroup {
+            row("disabled_action") { context ->
+                SettingsAction(
+                    context = context,
+                    title = "Transfer administration",
+                    subtitle = "Every member is already an admin",
+                    enabled = false,
+                    onClick = {},
+                )
+            }
+            row("enabled_link") { context ->
+                SettingsLink(context = context, title = "Members", value = "6", onClick = {})
+            }
+            row("busy_switch") { context ->
+                SettingsSwitch(
+                    context = context,
+                    title = "Background sync",
+                    subtitle = "Saving your preference",
+                    checked = false,
+                    onCheckedChange = {},
+                    busy = true,
+                )
+            }
+            row("disabled_choice") { context ->
+                SettingsChoice(
+                    context = context,
+                    title = "Follow system",
+                    selected = true,
+                    enabled = false,
+                    onClick = {},
+                )
+            }
+            row("enabled_choice") { context ->
+                SettingsChoice(context = context, title = "Always", selected = false, onClick = {})
+            }
+        }
+        SettingsGroup {
+            row("disabled_switch") { context ->
+                SettingsSwitch(
+                    context = context,
+                    title = "Notifications",
+                    checked = true,
+                    onCheckedChange = {},
+                    enabled = false,
+                )
+            }
+            row("disabled_link") { context ->
+                SettingsLink(context = context, title = "Account details", enabled = false, onClick = {})
             }
         }
     }

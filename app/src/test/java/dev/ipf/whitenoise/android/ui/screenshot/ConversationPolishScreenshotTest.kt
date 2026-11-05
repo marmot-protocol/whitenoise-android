@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.conversation.media.FileTransferControl
@@ -99,6 +100,64 @@ class ConversationPolishScreenshotTest {
             "deleted_message_delete_only_action_font_scale_2x_rtl",
             dark = false,
             amoled = false,
+            fontScale = 2f,
+            layoutDirection = LayoutDirection.Rtl,
+        )
+
+    /** Keep on screen beside the much shorter Edit keeps both labels whole on one line (#3587). */
+    @Test
+    fun keepOnScreenBesideEditLight() =
+        captureLabelWidthMenu(
+            "message_action_menu_keep_edit_light",
+            LabelWidthActions.Even,
+            dark = false,
+        )
+
+    /** An odd action count leaves the last row's second cell empty without stretching the label. */
+    @Test
+    fun keepOnScreenOddActionsDark() =
+        captureLabelWidthMenu(
+            "message_action_menu_keep_odd_dark",
+            LabelWidthActions.Odd,
+            dark = true,
+        )
+
+    /** A lone Keep on screen action keeps the compact panel and its whole label. */
+    @Test
+    fun keepOnScreenSingleActionAmoled() =
+        captureLabelWidthMenu(
+            "message_action_menu_keep_single_amoled",
+            LabelWidthActions.Single,
+            dark = true,
+            amoled = true,
+        )
+
+    /** An unavailable Forward shows its reason beside enabled actions of uneven label width. */
+    @Test
+    fun unavailableForwardReasonLight() =
+        captureLabelWidthMenu(
+            "message_action_menu_forward_reason_light",
+            LabelWidthActions.Unavailable,
+            dark = false,
+        )
+
+    /** RTL mirrors the asymmetric Keep on screen / Edit pair without wrapping either label. */
+    @Test
+    fun keepOnScreenBesideEditRtl() =
+        captureLabelWidthMenu(
+            "message_action_menu_keep_edit_rtl",
+            LabelWidthActions.Even,
+            dark = false,
+            layoutDirection = LayoutDirection.Rtl,
+        )
+
+    /** At 200% text in RTL the long labels and the unavailable reason fall back to a readable full width. */
+    @Test
+    fun unavailableForwardReasonLargeFontRtl() =
+        captureLabelWidthMenu(
+            "message_action_menu_forward_reason_font_scale_2x_rtl",
+            LabelWidthActions.Unavailable,
+            dark = true,
             fontScale = 2f,
             layoutDirection = LayoutDirection.Rtl,
         )
@@ -292,6 +351,67 @@ class ConversationPolishScreenshotTest {
             onDelete = {},
         )
     }
+
+    /** Captures a Keep on screen action menu holding the [actions] fixture. */
+    private fun captureLabelWidthMenu(
+        name: String,
+        actions: LabelWidthActions,
+        dark: Boolean,
+        amoled: Boolean = false,
+        fontScale: Float = 1f,
+        layoutDirection: LayoutDirection = LayoutDirection.Ltr,
+    ) {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = fontScale) {
+                CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
+                    LabelWidthActionMenu(actions)
+                }
+            }
+        }
+        composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).captureRoboImage("src/test/snapshots/$name.png")
+    }
+
+    /** Keep on screen always leads; [actions] chooses which shorter or unavailable actions follow it. */
+    @Composable
+    private fun LabelWidthActionMenu(actions: LabelWidthActions) {
+        val withEdit = actions != LabelWidthActions.Single
+        MessageActionMenu(
+            expanded = true,
+            anchorBoundsInWindow = null,
+            anchorWindowYPx = 8f,
+            canReply = actions == LabelWidthActions.Odd,
+            canReact = false,
+            canDelete = actions == LabelWidthActions.Unavailable,
+            canEdit = withEdit,
+            canForward = false,
+            forwardBlockedReason =
+                ForwardBlockedReason.PendingAttachment.takeIf { actions == LabelWidthActions.Unavailable },
+            canSelect = false,
+            canCopyText = false,
+            canSpeak = false,
+            canSelectText = false,
+            canKeepOnScreen = true,
+            canSave = false,
+            canInfo = false,
+            quickReactionEmojis = emptyList(),
+            onDismissRequest = {},
+            onReact = {},
+            onOpenEmojiPicker = {},
+            onReply = {},
+            onEdit = {},
+            onForward = {},
+            onSelect = {},
+            onSelectText = {},
+            onCopyText = {},
+            onSpeak = {},
+            onSave = {},
+            onInfo = {},
+            onDelete = {},
+        )
+    }
+
+    /** Action sets for the #3587 label-width fixtures: one, two, three, and four with an unavailable Forward. */
+    private enum class LabelWidthActions { Single, Even, Odd, Unavailable }
 
     private fun captureAttachmentTypes(
         name: String,
