@@ -136,8 +136,9 @@ internal abstract class DictationNavigationRenderFixture {
         compact: Boolean = false,
         withComposerMorph: Boolean = false,
         configured: Boolean = false,
+        startImmediately: Boolean = true,
     ): Fixture {
-        val (fixture, voice) = prepareFixture(withComposerMorph, configured)
+        val (fixture, voice) = prepareFixture(withComposerMorph, configured, startImmediately)
         composeRule.setContent {
             observeImeInsets()
             val route = fixture.route
@@ -167,9 +168,11 @@ internal abstract class DictationNavigationRenderFixture {
                         ) { owner ->
                             val anchor = LocalFloatingDictationAnchor.current
                             val handoff = LocalComposerFabHandoff.current
+                            val dictationMotion = LocalDictationControlHandoff.current
                             SideEffect {
                                 fixture.anchor = anchor
                                 fixture.handoff = handoff
+                                fixture.dictationMotion = dictationMotion
                             }
                             if (!fixture.locked) {
                                 val transition =
@@ -285,6 +288,7 @@ internal abstract class DictationNavigationRenderFixture {
         var committedLocked = false
         var anchor: FloatingDictationAnchor? = null
         var handoff: MeasuredControlHandoff? = null
+        var dictationMotion: MeasuredControlHandoff? = null
         var checkedArtworkFrames = 0
         var gripTopOffset = 0f
         var incomingCapsuleLeft = 0f
@@ -334,12 +338,15 @@ internal abstract class DictationNavigationRenderFixture {
     private fun prepareFixture(
         withComposerMorph: Boolean,
         configured: Boolean,
+        startImmediately: Boolean,
     ): Pair<Fixture, VoiceRecordingController?> {
         val fixture = Fixture()
         if (configured) configurePreviewToolbar(fixture)
         renderedFixture = fixture
-        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
-        fixture.platform.listener.onReady()
+        if (startImmediately) {
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+            fixture.platform.listener.onReady()
+        }
         val voice =
             if (withComposerMorph || configured) {
                 createPreviewVoiceController(ApplicationProvider.getApplicationContext())

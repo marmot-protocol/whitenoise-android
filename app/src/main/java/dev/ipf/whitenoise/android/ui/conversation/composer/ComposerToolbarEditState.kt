@@ -18,6 +18,11 @@ internal class ComposerToolbarEditState(
         private set
     var dragging by mutableStateOf<ComposerShortcut?>(null)
         private set
+    var release by mutableStateOf<ComposerToolbarRelease?>(null)
+        private set
+    private var grabOffset = Offset.Zero
+    val dragCenter: Offset
+        get() = pointer - grabOffset
     var insertion by mutableStateOf<Int?>(null)
         private set
     var pointer by mutableStateOf(Offset.Zero)
@@ -49,8 +54,12 @@ internal class ComposerToolbarEditState(
     fun record(
         shortcut: ComposerShortcut,
         bounds: Rect,
+        released: ComposerToolbarRelease? = null,
     ) {
         selectedBounds[shortcut] = bounds
+        if (release === released && released != null && released.shortcut == shortcut && released.placed) {
+            if (bounds.isEmpty) finishRelease(released) else released.target = bounds.center
+        }
         updateInsertion()
     }
 
@@ -65,6 +74,8 @@ internal class ComposerToolbarEditState(
         shortcut: ComposerShortcut,
         position: Offset,
     ) {
+        release = null
+        grabOffset = position - (selectedBounds[shortcut]?.center ?: position)
         dragSource = draft
         dragBounds = selectedBounds.toMap()
         dragging = shortcut
@@ -118,18 +129,43 @@ internal class ComposerToolbarEditState(
     /** Commits a valid drop only while its captured draft is still current. */
     fun drop() {
         val id = dragging
+        val from = dragCenter
         val index = insertion
         if (id != null && index != null && dragSource == draft) change(draft.insertOnSide(id, insertionSide, index))
         cancelDrag()
+        if (id != null) release = ComposerToolbarRelease(id, from)
+    }
+
+    /** Marks an actual placement for the current release before accepting its root geometry. */
+    fun placed(
+        shortcut: ComposerShortcut,
+        released: ComposerToolbarRelease,
+    ) {
+        if (release === released && released.shortcut == shortcut) released.placed = true
+    }
+
+    /** Retires only the current visual settling transaction. */
+    fun finishRelease(expected: ComposerToolbarRelease) {
+        if (release === expected) release = null
     }
 
     /** Clears transient drag state without changing the draft. */
     fun cancelDrag() {
+        release = null
         dragging = null
         insertion = null
         dragSource = null
         dragBounds = emptyMap()
     }
+}
+
+/** One released glyph remains lifted until it reaches the final production slot. */
+internal class ComposerToolbarRelease(
+    val shortcut: ComposerShortcut,
+    val from: Offset,
+) {
+    var placed = false
+    var target by mutableStateOf<Offset?>(null)
 }
 
 /** Moves an existing shortcut by a bounded relative offset. */

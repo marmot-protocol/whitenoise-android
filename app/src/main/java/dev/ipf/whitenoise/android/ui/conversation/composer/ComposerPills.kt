@@ -155,6 +155,7 @@ import dev.ipf.whitenoise.android.ui.navigation.LocalComposerFabHandoff
 import dev.ipf.whitenoise.android.ui.navigation.composerFabContent
 import dev.ipf.whitenoise.android.ui.navigation.composerFabGrip
 import dev.ipf.whitenoise.android.ui.navigation.composerFabSurface
+import dev.ipf.whitenoise.android.ui.navigation.dictationLauncherOrigin
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.awaitCancellation
@@ -1985,6 +1986,7 @@ internal fun ComposerPill(
                                         enabled = inputContentVisible,
                                         modifier =
                                             Modifier
+                                                .dictationLauncherOrigin()
                                                 .width(ComposerToolbarSlotWidth)
                                                 .height(48.dp)
                                                 .alpha(if (inputContentVisible) 1f else 0f)

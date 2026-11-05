@@ -22,6 +22,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
+import dev.ipf.whitenoise.android.ui.navigation.dictationLauncherOrigin
 import kotlin.math.roundToInt
 
 private const val DISABLED_VOICE_OPACITY = 0.38f
@@ -147,7 +148,7 @@ private fun ComposerOptionalShortcutAction(
             }
         },
         enabled = shortcutEnabled,
-        modifier = modifier,
+        modifier = modifier.then(if (shortcut == ComposerShortcut.Dictation) Modifier.dictationLauncherOrigin() else Modifier),
     ) {
         Icon(
             painterResource(shortcut.iconRes),

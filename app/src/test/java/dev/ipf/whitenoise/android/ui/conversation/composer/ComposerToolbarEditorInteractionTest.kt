@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.boundsInRoot
@@ -34,9 +35,11 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ComposerShortcutSide
+import dev.ipf.whitenoise.android.state.ComposerToolbarLayout
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -55,6 +58,126 @@ import org.robolectric.annotation.GraphicsMode
 @Config(sdk = [36], qualifiers = "en-w420dp-h1000dp-mdpi")
 class ComposerToolbarEditorInteractionTest {
     @get:Rule val composeRule = createComposeRule()
+
+    @Test
+    fun liftedShortcutPreservesContactAndSettlesIntoTheCommittedSlot() = assertLiftAndSettle(rtl = false)
+
+    @Test
+    fun liftedShortcutTracksPhysicalPointerInRtl() = assertLiftAndSettle(rtl = true)
+
+    /** Real frames prove contact, the projected hole and a same-frame cross-side drop. */
+    private fun assertLiftAndSettle(rtl: Boolean) {
+        val camera = ComposerShortcut.Camera
+        val settings =
+            ComposerToolbarSettings(
+                listOf(
+                    ComposerShortcut.More,
+                    camera,
+                    ComposerShortcut.Gallery,
+                    ComposerShortcut.Files,
+                    ComposerShortcut.Paste,
+                    ComposerShortcut.Dictation,
+                ),
+                ComposerToolbarLayout.AlwaysExpanded,
+            ).withSide(ComposerShortcut.Files, ComposerShortcutSide.Right)
+                .withSide(ComposerShortcut.Paste, ComposerShortcutSide.Right)
+                .withSide(ComposerShortcut.Dictation, ComposerShortcutSide.Right)
+        val edit = ComposerToolbarEditState(settings)
+        val saves = mutableListOf<ComposerToolbarSettings>()
+        render(
+            edit,
+            { next, complete ->
+                saves += next
+                complete(true)
+            },
+            {},
+            width = if (rtl) 240 else 360,
+            fontScale = if (rtl) 2f else 1f,
+            rtl = rtl,
+            amoled = true,
+        )
+        val source = previewIcon(camera).fetchSemanticsNode().boundsInRoot.center
+        val destination =
+            listOf(ComposerShortcut.Files, ComposerShortcut.Paste, ComposerShortcut.Dictation)
+                .map { previewIcon(it).fetchSemanticsNode().boundsInRoot.center }
+                .maxBy { it.y }
+        if (rtl) assertTrue("narrow large-text destination wraps", destination.y > source.y)
+        composeRule.mainClock.autoAdvance = false
+        firstDragFrame { edit.start(camera, source + Offset(-10f, -8f)) }
+        val lifted = composeRule.onNodeWithTag("composer.toolbar.lifted.camera")
+        val heldCenter = lifted.fetchSemanticsNode().boundsInRoot.center
+        assertEquals(source.x, heldCenter.x, 1f)
+        assertEquals(source.y, heldCenter.y, 1f)
+        captureDragFrame(rtl, "pickup")
+        applyDragChange { edit.drag(Offset(12f, 0f)) }
+        composeRule.mainClock.advanceTimeBy(120)
+        val movedCenter = lifted.fetchSemanticsNode().boundsInRoot.center
+        assertEquals(source.x + 12f, movedCenter.x, 1f)
+        assertEquals(source.y, movedCenter.y, 1f)
+        captureDragFrame(rtl, "held_target")
+        lateinit var expected: ComposerToolbarSettings
+        firstDragFrame {
+            edit.drag(destination - edit.pointer)
+            expected = edit.previewSettings
+            edit.drop()
+            assertEquals("move and drop share one input frame", null, edit.release!!.target)
+        }
+        val released = edit.release!!
+        composeRule.runOnIdle {
+            assertTrue(released.placed)
+            assertNotNull(released.target)
+            assertEquals(expected, edit.draft)
+            assertEquals(listOf(expected), saves)
+        }
+        val finalCenter = previewIcon(camera).fetchSemanticsNode().boundsInRoot.center
+        assertEquals(finalCenter.x, released.target!!.x, 1f)
+        assertEquals(finalCenter.y, released.target!!.y, 1f)
+        composeRule.mainClock.advanceTimeBy(64)
+        val midCenter = lifted.fetchSemanticsNode().boundsInRoot.center
+        assertTrue("settling actually moves", (midCenter - released.from).getDistance() > 1f)
+        assertTrue("intermediate frame has not snapped to its destination", (midCenter - finalCenter).getDistance() > 1f)
+        captureDragFrame(rtl, "mid_settle")
+        composeRule.mainClock.advanceTimeBy(1_000)
+        composeRule.runOnIdle { assertEquals(null, edit.release) }
+        lifted.assertDoesNotExist()
+        val settledCenter = previewIcon(camera).fetchSemanticsNode().boundsInRoot.center
+        assertEquals(finalCenter.x, settledCenter.x, 1f)
+        assertEquals(finalCenter.y, settledCenter.y, 1f)
+        captureDragFrame(rtl, "settled")
+        composeRule.mainClock.autoAdvance = true
+    }
+
+    /** Publish one direct fixture mutation without advancing the frozen animation clock. */
+    private fun applyDragChange(change: () -> Unit) {
+        check(!composeRule.mainClock.autoAdvance)
+        val before = composeRule.mainClock.currentTime
+        composeRule.runOnUiThread {
+            change()
+            Snapshot.sendApplyNotifications()
+        }
+        composeRule.waitForIdle()
+        assertEquals("publishing fixture state does not advance animation time", before, composeRule.mainClock.currentTime)
+    }
+
+    /** Commit the changed composition on precisely its first 16 ms frame. */
+    private fun firstDragFrame(change: () -> Unit) {
+        val before = composeRule.mainClock.currentTime
+        applyDragChange(change)
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.waitForIdle()
+        assertEquals("first committed drag frame", before + 16L, composeRule.mainClock.currentTime)
+    }
+
+    /** Each frame is owned by its actual motion test in both distributions. */
+    private fun captureDragFrame(
+        rtl: Boolean,
+        frame: String,
+    ) {
+        val direction = if (rtl) "large_rtl" else "amoled"
+        composeRule
+            .onNodeWithTag("composer.customize")
+            .captureRoboImage("src/test/snapshots/composer_toolbar_drag_${direction}_$frame.png")
+    }
 
     /** Icon-only shortcuts distinguish account identity, people, contacts, files and polls. */
     @Test
@@ -484,12 +607,13 @@ class ComposerToolbarEditorInteractionTest {
         width: Int = 420,
         fontScale: Float = 1f,
         rtl: Boolean = false,
+        amoled: Boolean = false,
     ) {
         composeRule.setContent {
             CompositionLocalProvider(
                 LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {
-                WhiteNoiseTheme(fontScale = fontScale) {
+                WhiteNoiseTheme(fontScale = fontScale, darkTheme = amoled, amoled = amoled) {
                     Box(Modifier.width(width.dp).height(900.dp)) { ComposerToolbarEditor(edit, false, save, cancel) }
                 }
             }

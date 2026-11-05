@@ -5,7 +5,9 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationMode
 import dev.ipf.whitenoise.android.audio.ConversationDictationState
 import dev.ipf.whitenoise.android.audio.ConversationDictationTarget
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConversationDictationControlOwnershipTest {
@@ -70,6 +72,23 @@ class ConversationDictationControlOwnershipTest {
                 ),
             )
         }
+    }
+
+    /** A launch trajectory cannot borrow another chat/account or a retained outgoing composer's pixels. */
+    @Test
+    fun launcherOriginRequiresTheExactCurrentRenderedConversation() {
+        assertTrue(conversationDictationOriginComposerVisible(listening, origin))
+        listOf(
+            origin.copy(navigationAccountStable = false),
+            origin.copy(composerVisible = false),
+            origin.copy(selectedChatId = null),
+            origin.copy(renderedAccountRef = "other-account"),
+            origin.copy(renderedAccountRef = null),
+            origin.copy(renderedChatId = "outgoing-chat"),
+            origin.copy(renderedChatId = null),
+            origin.copy(selectedGroupIdHex = "other-group"),
+        ).forEach { assertFalse(conversationDictationOriginComposerVisible(listening, it)) }
+        assertFalse(conversationDictationOriginComposerVisible(ConversationDictationState.Idle, origin))
     }
 
     @Suppress("MaxLineLength")

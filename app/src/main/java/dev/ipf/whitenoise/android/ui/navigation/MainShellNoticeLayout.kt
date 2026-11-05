@@ -8,6 +8,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.ui.ShellTransientNoticeLayout
@@ -45,6 +46,7 @@ internal fun MainShellNoticeLayout(
             recoveryHandedToComposer = dictationController.recoveryHandedToComposer,
         )
     val anchor = remember(handoffOwner, dictationController.state.sessionId) { FloatingDictationAnchor() }
+    val launcherOrigin = remember(handoffOwner) { DictationLauncherOrigin() }
     val dictationDestination = dictationControlOwner.takeUnless { it == ConversationDictationControlOwner.Hidden }
     val dictationMotion =
         rememberMeasuredControlHandoff(
@@ -79,6 +81,14 @@ internal fun MainShellNoticeLayout(
                 dictationDestination,
                 dictationMotionAllowed,
                 continueActiveMotion = persistentContainer != null,
+                entranceOrigin =
+                    launcherOrigin.takeEntrance(
+                        sessionId = dictationController.state.sessionId,
+                        eligible =
+                            dictationMotionAllowed &&
+                                dictationDestination == ConversationDictationControlOwner.Persistent &&
+                                conversationDictationOriginComposerVisible(dictationController.state, dictationComposerRoute),
+                    ),
             )
         }
     LaunchedEffect(dictationMotion, dictationRequest) { dictationMotion.animatePrepared(dictationRequest) }
@@ -93,6 +103,8 @@ internal fun MainShellNoticeLayout(
         LocalShellPlaybackHost provides playbackHost,
         LocalFloatingDictationAnchor provides anchor,
         LocalShellDictationControls provides anchor,
+        LocalDictationLauncherOrigin provides launcherOrigin,
+        LocalDictationControlHandoff provides dictationMotion,
         LocalComposerFabHandoff provides handoff,
         LocalFinishControlMorph provides {
             handoff.finish()
@@ -132,6 +144,10 @@ internal fun MainShellNoticeLayout(
                 if (dictationControlOwner != ConversationDictationControlOwner.Hidden) {
                     ConversationDictationPersistentControl(
                         state = dictationController.state,
+                        modifier =
+                            Modifier.graphicsLayer {
+                                alpha = if (dictationMotion.entranceActive) dictationMotion.renderedDecorationAlpha else 1f
+                            },
                         controller = dictationController,
                         embedded = dictationControlOwner == ConversationDictationControlOwner.Composer,
                         movingChromeSize = {

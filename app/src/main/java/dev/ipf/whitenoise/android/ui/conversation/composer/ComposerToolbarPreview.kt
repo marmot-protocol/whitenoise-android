@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,12 +27,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
-import kotlin.math.roundToInt
 
 private val PreviewPrimaryEndInset = 4.dp
 
@@ -114,29 +111,7 @@ internal fun ComposerToolbarPreview(
             modifier = Modifier.fillMaxWidth(),
             toolbarPreview = true,
         )
-        editState?.dragging?.let { shortcut ->
-            val diameter = with(LocalDensity.current) { ComposerShortcutTarget.toPx() }
-            Box(
-                Modifier
-                    .offset {
-                        val position = editState.pointer - editState.selectedArea.topLeft
-                        IntOffset((position.x - diameter / 2).roundToInt(), (position.y - diameter / 2).roundToInt())
-                    }.size(ComposerShortcutTarget)
-                    .testTag("composer.toolbar.lifted.${shortcut.id}"),
-                contentAlignment = Alignment.Center,
-            ) {
-                if (shortcut == ComposerShortcut.VoiceNote) {
-                    MiniWaveformGlyph(MaterialTheme.colorScheme.primary)
-                } else {
-                    Icon(
-                        painterResource(shortcut.iconRes),
-                        null,
-                        Modifier.size(ComposerShortcutIconSize),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                }
-            }
-        }
+        if (editState != null) ComposerToolbarLiftedIcon(editState)
         if (!voiceSelected) {
             Box(
                 Modifier

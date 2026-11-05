@@ -1,7 +1,13 @@
 package dev.ipf.whitenoise.android.ui.common
 
+import androidx.compose.runtime.BroadcastFrameClock
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -10,6 +16,90 @@ import org.junit.Test
 
 /** Endpoint admission prevents previously hidden controls from reviving a stale decorative origin. */
 class MeasuredControlHandoffTest {
+    /** A newly created session can emerge from its measured launcher using the existing morph clock. */
+    @Test
+    fun firstPreparationAcceptsFiniteLauncherOriginOnlyOnce() {
+        val state = MeasuredControlHandoff("floating", morphSurface = true)
+        val launcher = Rect(280f, 600f, 328f, 648f)
+        state.prepare("floating", true, entranceOrigin = launcher)
+        assertTrue(state.active)
+        assertTrue(state.entranceActive)
+        assertEquals(launcher, state.renderedBounds)
+        state.finish()
+        state.prepare("floating", true, entranceOrigin = launcher)
+        assertFalse(state.active)
+        assertFalse(state.entranceActive)
+    }
+
+    /** A rapid route change keeps a genuine intermediate opacity on the captured shared clock. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun activeEntranceContinuationRetainsItsPresentationKindAndOpacity() =
+        runTest {
+            val state = MeasuredControlHandoff("floating", morphSurface = true)
+            val request = state.prepare("floating", true, entranceOrigin = Rect(280f, 600f, 328f, 648f))
+            assertEquals(0f, state.renderedDecorationAlpha, 0f)
+            state.report("floating", Any(), Rect(160f, 500f, 328f, 548f))
+            state.reportSurface("floating", ControlMorphSurface(Color.Black, Color.White, 24f, 1f, 1f))
+            val frames = BroadcastFrameClock()
+            val animation = launch(frames) { state.animatePrepared(request) }
+            runCurrent()
+            frames.sendFrame(0L)
+            runCurrent()
+            frames.sendFrame(16_000_000L)
+            runCurrent()
+            frames.sendFrame(112_000_000L)
+            runCurrent()
+            val origin = state.renderedBounds
+            val alpha = state.renderedDecorationAlpha
+            assertTrue(alpha > 0f && alpha < 1f)
+            state.prepare("floating", true, continueActiveMotion = true)
+            animation.cancelAndJoin()
+            assertTrue(state.entranceActive)
+            assertEquals(origin, state.renderedBounds)
+            assertEquals(alpha, state.renderedDecorationAlpha, 0f)
+            state.finish()
+            assertFalse(state.entranceActive)
+        }
+
+    /** Provider prompts use the normal inline handoff, not the floating entrance's whole-control fade. */
+    @Test
+    fun ownerChangeDuringEntranceUsesNormalControlHandoff() {
+        val state = MeasuredControlHandoff("floating", morphSurface = true)
+        state.prepare("floating", true, entranceOrigin = Rect(280f, 600f, 328f, 648f))
+        state.report("floating", Any(), Rect(160f, 500f, 328f, 548f))
+        state.reportSurface("floating", ControlMorphSurface(Color.Black, Color.White, 24f, 1f, 1f))
+        assertTrue(state.entranceActive)
+        val before = state.renderedBounds
+        state.report("composer", Any(), Rect(180f, 600f, 328f, 648f))
+        state.reportSurface("composer", ControlMorphSurface(Color.Transparent, null, 0f, 0f, 0f))
+        state.prepare("composer", true, continueActiveMotion = true)
+        assertTrue("Changing owner still uses the measured master handoff", state.active)
+        assertFalse("Inline commands do not inherit the floating entrance fade", state.entranceActive)
+        assertEquals(before, state.renderedBounds)
+    }
+
+    /** Missing geometry, reduced motion and lock exclusions never revive a later launcher entry. */
+    @Test
+    fun excludedOrMissingLauncherEntrySettlesWithoutRevival() {
+        val launcher = Rect(280f, 600f, 328f, 648f)
+        val reduced = MeasuredControlHandoff("floating", morphSurface = true)
+        reduced.prepare("floating", false, entranceOrigin = launcher)
+        assertFalse(reduced.active)
+        reduced.prepare("floating", true, entranceOrigin = launcher)
+        assertFalse(reduced.active)
+        val hidden = MeasuredControlHandoff(null, morphSurface = true)
+        hidden.prepare(null, true, entranceOrigin = launcher)
+        assertFalse(hidden.active)
+        val missing = MeasuredControlHandoff("floating", morphSurface = true)
+        missing.prepare("floating", true)
+        missing.prepare("floating", true, entranceOrigin = launcher)
+        assertFalse(missing.active)
+        val invalid = MeasuredControlHandoff("floating", morphSurface = true)
+        invalid.prepare("floating", true, entranceOrigin = Rect(Float.NaN, 0f, 48f, 48f))
+        assertFalse(invalid.active)
+    }
+
     /** Entering from search/selection with no current FAB uses direct presentation. */
     @Test
     fun disposedSourceCannotAdmitALaterTransition() {
