@@ -1419,9 +1419,13 @@ private fun removeAndRestoreChatRow(
             .apply { isAccessible = true }
     val snapshot = requireNotNull(snapshotMethod.invoke(controller, groupIdHex))
     ChatsController::class.java
-        .getDeclaredMethod("removeChatRow", String::class.java, java.lang.Boolean.TYPE)
-        .apply { isAccessible = true }
-        .invoke(controller, groupIdHex, false)
+        .getDeclaredMethod(
+            "removeChatRow",
+            String::class.java,
+            java.lang.Boolean.TYPE,
+            MembershipRemoval::class.java,
+        ).apply { isAccessible = true }
+        .invoke(controller, groupIdHex, false, MembershipRemoval.Ambiguous)
     ChatsController::class.java
         .getDeclaredMethod("restoreRemovedChatRow", snapshot.javaClass)
         .apply { isAccessible = true }
