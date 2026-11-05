@@ -220,8 +220,9 @@ internal class LocalReactionMotion {
         expected: LocalReactionEffect,
         chrome: ReactionMotionChrome,
     ) {
-        if (!mounted || !enabled || effect != expected) return
-        if (!chrome.recorded || chrome.bounds == null) return
+        val current = mounted && enabled && effect == expected
+        val recorded = chrome.recorded && chrome.bounds != null
+        if (!current || !recorded) return
         val target = targets[emoji] ?: return
         if (target.glyph && target.chrome !== chrome) targets[emoji] = target.copy(chrome = chrome)
     }
@@ -441,8 +442,9 @@ internal fun Modifier.localReactionOverlay(state: LocalReactionMotion): Modifier
 /**
  * Records native chrome without moving layout or pointer/semantics coordinates.
  * One native draw boundary owns capture, visibility fallback and disposal together.
+ * Independent eligibility guards run before native capture state is allocated.
  */
-@Suppress("CyclomaticComplexMethod")
+@Suppress("CyclomaticComplexMethod", "ReturnCount")
 @Composable
 internal fun Modifier.localReactionChrome(
     state: LocalReactionMotion?,

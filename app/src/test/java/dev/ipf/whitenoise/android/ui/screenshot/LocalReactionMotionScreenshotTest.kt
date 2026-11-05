@@ -81,6 +81,8 @@ import android.graphics.Color as AndroidColor
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h640dp-mdpi")
+// Keep the motion matrix with its shared production composition fixture.
+@Suppress("LargeClass")
 class LocalReactionMotionScreenshotTest {
     @get:Rule val rule = createComposeRule()
 
@@ -95,6 +97,8 @@ class LocalReactionMotionScreenshotTest {
 
     /** Losing a target restores the canonical badge immediately, including its existing pulse. */
     @Test
+    // The clipped-target transition and canonical pixel comparison form one regression case.
+    @Suppress("LongMethod")
     fun missingTargetRestoresCanonicalBadge() {
         lateinit var motion: LocalReactionMotion
         rule.mainClock.autoAdvance = false
