@@ -1,4 +1,5 @@
 import com.android.build.api.attributes.ProductFlavorAttr
+import com.android.build.api.variant.HostTestBuilder
 import groovy.json.JsonSlurper
 import kotlinx.kover.gradle.plugin.dsl.AggregationType
 import kotlinx.kover.gradle.plugin.dsl.CoverageUnit
@@ -712,6 +713,11 @@ androidComponents {
         variantBuilder.enable =
             enabled &&
             (!productionPlayBundleBuild || environment != "production" || variantBuilder.name == "productionPlayRelease")
+        // AGP 9.5 creates Compose Preview tasks for every enabled variant, including
+        // benchmark variants whose unit tests the Baseline Profile plugin disables.
+        if (variantBuilder.enable) {
+            variantBuilder.hostTests.getValue(HostTestBuilder.UNIT_TEST_TYPE).enable = true
+        }
     }
 
     // Embed short commit SHA + build date into every release APK filename so
