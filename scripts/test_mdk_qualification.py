@@ -207,6 +207,24 @@ class QualificationEvidenceTest(unittest.TestCase):
                 self.assertIn('transport timeout', evidence)
                 self.assertEqual(len(list(Path(directory).glob('*-command-error.txt'))), 5)
 
+    def test_process_diagnostics_filter_before_retaining_the_bounded_tail(self):
+        """A busy unrelated buffer must not displace earlier matching process-death evidence."""
+        def device(*args, **kwargs):
+            if args[:5] == ('logcat', '-b', 'main', '-b', 'system'):
+                self.assertNotIn('-t', args)
+                self.assertEqual(args[-4:], ('AndroidRuntime:E', 'DEBUG:F', 'ActivityManager:I', '*:S'))
+                return ''.join(f'{index}: filtered process diagnostic\n' for index in range(500))
+            return 'healthy'
+
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(campaign, 'REPORTS', Path(directory)), \
+                    patch.object(campaign, 'adb', side_effect=device):
+                campaign.retain_device_health('baseline-seed-')
+            output = (Path(directory) / 'baseline-seed-process-log.txt').read_text()
+            self.assertEqual(len(output.splitlines()), 200)
+            self.assertTrue(output.startswith('300: filtered process diagnostic\n'))
+            self.assertTrue(output.endswith('499: filtered process diagnostic\n'))
+
     def test_process_crash_keeps_phase_diagnostics_before_recovery(self):
         """A later recovery probe must not overwrite the baseline process crash evidence."""
         with tempfile.TemporaryDirectory() as directory:

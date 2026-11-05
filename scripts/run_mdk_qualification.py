@@ -56,7 +56,7 @@ def retain_device_health(prefix=''):
         ('package-service', ('shell', 'service', 'check', 'package')),
         ('boot-completed', ('shell', 'getprop', 'sys.boot_completed')),
         ('crash-log', ('logcat', '-b', 'crash', '-d', '-t', '120')),
-        ('process-log', ('logcat', '-b', 'main', '-b', 'system', '-d', '-t', '200',
+        ('process-log', ('logcat', '-b', 'main', '-b', 'system', '-d',
                          'AndroidRuntime:E', 'DEBUG:F', 'ActivityManager:I', '*:S')),
     ):
         try:
@@ -64,6 +64,8 @@ def retain_device_health(prefix=''):
         except subprocess.SubprocessError as error:
             retain_command_failure(prefix + name, error)
         else:
+            if name == 'process-log':
+                output = ''.join(output.splitlines(keepends=True)[-200:])
             (REPORTS / f'{prefix}{name}.txt').write_text(output[-32768:])
 
 
