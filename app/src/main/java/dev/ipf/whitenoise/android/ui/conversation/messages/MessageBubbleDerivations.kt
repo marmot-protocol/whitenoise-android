@@ -82,9 +82,9 @@ internal fun messageBubbleCanCopyText(
 
 /**
  * Whether a bubble can be forwarded and, when it cannot, why. A deleted, invalidated or failed committed message is
- * unsupported, a failed send that still carries pending media is a failed attachment, and an unconfirmed send is a
- * pending attachment when it carries pending media and unsupported otherwise. A sent or received message defers to
- * the projector with its cached attachments.
+ * unsupported, and a failed send that still carries pending media is a failed attachment. A pending send forwards its
+ * accepted text and blocks pending media, any other unconfirmed row is a pending attachment when it carries pending
+ * media and unsupported otherwise, and a sent or received message defers to the projector with its cached attachments.
  */
 @Suppress("LongParameterList") // Each input is supplied by the calling bubble's remember block.
 internal fun messageBubbleForwardEligibility(
@@ -102,6 +102,13 @@ internal fun messageBubbleForwardEligibility(
     return when {
         deleted || invalidated || failedCommittedMessage -> ForwardEligibility.Blocked(ForwardBlockedReason.Unsupported)
         persistedFailure -> ForwardEligibility.Blocked(ForwardBlockedReason.FailedAttachment)
+        item.status == MessageStatus.Pending ->
+            MessageProjector.pendingForwardEligibility(
+                message = record,
+                mediaReferences = attachments.references,
+                editedText = editState?.latestText?.takeIf { record.kind == CHAT_MESSAGE_KIND },
+                nowSeconds = nowSeconds,
+            )
         item.status != MessageStatus.Received && item.status != MessageStatus.Sent ->
             ForwardEligibility.Blocked(
                 if (MessageProjector.isPendingMedia(record)) {

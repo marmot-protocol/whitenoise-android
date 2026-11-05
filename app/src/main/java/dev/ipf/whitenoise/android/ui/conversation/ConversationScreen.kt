@@ -1051,7 +1051,11 @@ internal fun ConversationScreen(
                         !isBatchSelectableMessage(
                             messageId = messageId,
                             userVisibleMessage = MessageProjector.isChatKind(record.kind),
-                            committedMessage = item.status == MessageStatus.Received || item.status == MessageStatus.Sent,
+                            // A pending send joins a batch so its accepted text can be forwarded (#2794).
+                            committedMessage =
+                                item.status == MessageStatus.Received ||
+                                    item.status == MessageStatus.Sent ||
+                                    item.status == MessageStatus.Pending,
                             projectedDeleted = item.projected?.deleted == true,
                             deletedMessageIds = controller.deletedMessageIds,
                         )
@@ -1069,6 +1073,13 @@ internal fun ConversationScreen(
                     val forwardEligibility =
                         if (invalidated || persistedFailure) {
                             ForwardEligibility.Blocked(ForwardBlockedReason.Unsupported)
+                        } else if (item.status == MessageStatus.Pending) {
+                            MessageProjector.pendingForwardEligibility(
+                                message = record,
+                                mediaReferences = mediaReferences,
+                                editedText = editedText,
+                                nowSeconds = eligibilityNowSeconds,
+                            )
                         } else {
                             MessageProjector.forwardEligibility(
                                 message = record,
@@ -1110,6 +1121,7 @@ internal fun ConversationScreen(
                                 forwardPayload = (forwardEligibility as? ForwardEligibility.Eligible)?.payload,
                                 forwardBlockedReason =
                                     (forwardEligibility as? ForwardEligibility.Blocked)?.reason,
+                                pendingSend = item.status == MessageStatus.Pending,
                             ),
                         record = record,
                         status = item.status,

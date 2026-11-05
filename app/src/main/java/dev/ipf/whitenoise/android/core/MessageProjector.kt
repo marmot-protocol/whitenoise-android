@@ -472,6 +472,27 @@ object MessageProjector {
         }
     }
 
+    /**
+     * Forward eligibility for a locally authored send that is still pending. Its accepted text forwards at once as a
+     * fresh destination message, while pending media keeps waiting for a durable local source (#2794).
+     */
+    internal fun pendingForwardEligibility(
+        message: AppMessageRecordFfi,
+        mediaReferences: List<MediaAttachmentReferenceFfi>,
+        editedText: String? = null,
+        nowSeconds: ULong,
+    ): ForwardEligibility {
+        val carriesMedia =
+            isPendingMedia(message) ||
+                mediaReferences.isNotEmpty() ||
+                message.tags.any { it.values.firstOrNull() == ImetaTag }
+        return if (carriesMedia) {
+            ForwardEligibility.Blocked(ForwardBlockedReason.PendingAttachment)
+        } else {
+            forwardEligibility(message, emptyList(), editedText, emptySet(), nowSeconds)
+        }
+    }
+
     private fun forwardInitialBlockReason(
         message: AppMessageRecordFfi,
         nowSeconds: ULong,

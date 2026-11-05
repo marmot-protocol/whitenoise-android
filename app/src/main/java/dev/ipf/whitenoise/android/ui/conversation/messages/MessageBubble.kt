@@ -87,6 +87,7 @@ import dev.ipf.whitenoise.android.audio.tts.projectTtsSpeakableEntry
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableDocument
 import dev.ipf.whitenoise.android.audio.tts.resolveTtsSpeakableSource
 import dev.ipf.whitenoise.android.core.ForwardEligibility
+import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -1419,10 +1420,11 @@ internal fun MessageBubble(
         onTextSelectionModeChange(true)
     }
 
-    /** Opens the forward sheet when the message has a forwardable payload. */
+    /** Opens the forward sheet on a snapshot of the message's forwardable payload. */
     fun beginForward() {
         if (deleted || actionsReadOnly || forwardPayload == null) return
         onActionMenuOpenChange(false)
+        surfaces.forwardSnapshot = forwardPayload
         surfaces.forwardSheetOpen = true
     }
 
@@ -3334,14 +3336,20 @@ internal fun MessageBubble(
                         },
                     )
                 }
-                val openForwardPayload = forwardPayload
+                // A text snapshot is complete on its own, so a pending source that confirms, fails or reconciles
+                // while the sheet is open cannot rewrite or close it. Media still needs its live source.
+                val openForwardPayload =
+                    surfaces.forwardSnapshot?.takeIf { it is ForwardMessagePayload.Text || forwardPayload != null }
                 if (surfaces.forwardSheetOpen && !deleted && openForwardPayload != null) {
                     ForwardMessageSheet(
                         appState = appState,
                         payloads = listOf(openForwardPayload),
                         sourceAccountRef = controller.boundAccountRef,
                         originGroupIdHex = record.groupIdHex,
-                        onDismiss = { surfaces.forwardSheetOpen = false },
+                        onDismiss = {
+                            surfaces.forwardSheetOpen = false
+                            surfaces.forwardSnapshot = null
+                        },
                     )
                 }
                 if (surfaces.deleteDialogOpen) {
