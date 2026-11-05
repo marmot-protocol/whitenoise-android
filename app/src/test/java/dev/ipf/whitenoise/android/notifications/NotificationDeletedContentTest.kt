@@ -79,6 +79,35 @@ class NotificationDeletedContentTest {
         assertEquals(originalActions, actionTargets(card))
     }
 
+    /** Cleanup and reply completion share payload ownership, while stale cancellation spares the next message. */
+    @Test
+    fun reconciledHistorySurvivesReplyCompletionAndStaleCancellation() {
+        post(message("old-id", "older secret text"))
+        post(message("new-id", "newer valid text"))
+        val key = LocalNotificationFormatter.conversationDismissalKey(ACCOUNT, GROUP)
+        val original = requireNotNull(card(ACCOUNT))
+        val generation = requireNotNull(original.extras.getString(UserEventNotificationGroup.EXTRA_GENERATION))
+        val originalActions = actionTargets(original)
+
+        assertTrue(presenter.reconcileConversationContent(ACCOUNT, GROUP, true) { id, _ -> id != "old-id" })
+        assertTrue(presenter.markDirectReplyHandled(key.tag, key.id, "reply accepted"))
+
+        val handled = requireNotNull(card(ACCOUNT))
+        assertEquals(listOf("newer valid text"), messageTexts(handled))
+        assertFalse(allText(handled.extras).any { it.contains("older secret text") })
+        assertEquals("new-id", conversationCardMessageIdHex(handled))
+        assertEquals(generation, handled.extras.getString(UserEventNotificationGroup.EXTRA_GENERATION))
+        assertEquals(originalActions, actionTargets(handled))
+        assertTrue(handled.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+        assertEquals(listOf("reply accepted"), handled.extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY)?.toList())
+
+        presenter.cancelConversationCardIfSameGeneration(key.tag, key.id, "new-id")
+        assertNull(card(ACCOUNT))
+        post(message("next-id", "next valid text"))
+        presenter.cancelConversationCardIfSameGeneration(key.tag, key.id, "new-id")
+        assertEquals("next-id", conversationCardMessageIdHex(requireNotNull(card(ACCOUNT))))
+    }
+
     /** Deleting the newest entry keeps its older sibling while removing every action bound to the removed message. */
     @Test
     fun deletingTheNewestEntryKeepsTheOlderValidEntry() {

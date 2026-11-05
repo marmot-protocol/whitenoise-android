@@ -31,93 +31,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.cancellation.CancellationException
 
-private const val CONVERSATION_DISMISSAL_MAX_ATTEMPTS = 3
 private const val CONVERSATION_DISMISSAL_RETRY_DELAY_MS = 25L
-
-internal enum class ConversationCardDismissalOutcome {
-    ABSENT,
-    CANCELLED,
-    FAILED,
-    RESIDUAL,
-}
-
-/** Per-card diagnostics from one bounded conversation cancellation attempt. */
-internal data class ConversationDismissalResult(
-    val outcomes: Map<NotificationDismissalKey, ConversationCardDismissalOutcome>,
-    val inspectionFailed: Boolean,
-) {
-    /** Whether every pre-existing target card is confirmed absent. */
-    val complete: Boolean
-        get() =
-            !inspectionFailed &&
-                outcomes.values.none {
-                    it == ConversationCardDismissalOutcome.FAILED ||
-                        it == ConversationCardDismissalOutcome.RESIDUAL
-                }
-}
-
-/**
- * One app-owned conversation card in the tray: its stamped newest message, card kind, the time of its oldest
- * retained entry, and the message id of each retained entry, null where an entry carries none.
- */
-internal data class ActiveConversationCard(
-    val accountRef: String,
-    val groupIdHex: String,
-    val messageIdHex: String?,
-    val isMessageCard: Boolean,
-    val contentSinceMs: Long,
-    val entryMessageIds: List<String?>,
-)
-
-/** What reconciling one conversation card did, logged by count only. */
-internal enum class CardContentOutcome(
-    val logValue: String,
-) {
-    /** Every retained entry is still valid. */
-    UNCHANGED("unchanged"),
-
-    /** Rewritten silently with only its valid entries. */
-    REBUILT("rebuilt"),
-
-    /** Nothing valid remained, so the card was cancelled. */
-    CANCELLED("cancelled"),
-
-    /** No such card was shown. */
-    ABSENT("absent"),
-
-    /** The platform refused the read, write or cancel; reconciliation must run again. */
-    FAILED("failed"),
-}
-
-/** Opaque identity of the exact accepted platform payload, separate from dismissal ownership. */
-internal const val EXTRA_PAYLOAD_REVISION = "dev.ipf.whitenoise.android.notification.PAYLOAD_REVISION"
-
-/** Payload keys a rewritten card drops so no removed entry's text can survive outside its MessagingStyle. */
-private val REMOVED_CONTENT_EXTRAS =
-    listOf(
-        Notification.EXTRA_TEXT,
-        Notification.EXTRA_BIG_TEXT,
-        Notification.EXTRA_TEXT_LINES,
-        Notification.EXTRA_SUMMARY_TEXT,
-        Notification.EXTRA_MESSAGES,
-        Notification.EXTRA_HISTORIC_MESSAGES,
-        EXTRA_EXPANDED_SINGLE_MESSAGE_BODY,
-    )
-
-/** Opening-time boundary used to keep queued cleanup from consuming later notifications. */
-internal data class ConversationDismissalRequest(
-    val accountRef: String,
-    val groupIdHex: String,
-    val cutoffMs: Long,
-)
 
 @SuppressLint("MissingPermission")
 private fun postLocalNotification(
@@ -194,6 +114,27 @@ class LocalNotificationPresenter(
     // SharedPreferences-backed construction instead of adding disk-backed work
     // to AppState's main-thread initialization.
     private val conversationNotificationRouting by lazy { ConversationNotificationRouting(context) }
+    private val publisher =
+        NotificationCardPublisher(
+            context,
+            cardContent,
+            conversationShortcuts,
+            notificationPoster,
+            notificationCanceller,
+            activeNotificationsProvider,
+            groupReconciliation,
+        )
+    private val retirement =
+        ConversationNotificationRetirement(
+            context,
+            publisher,
+            tapTokens,
+            nowMillis,
+            dismissalRetryDelay,
+            activeNotificationsProvider,
+        )
+    private val reconciler = ConversationNotificationContentReconciler(context, publisher, retirement)
+    private val replyCompletion = NotificationReplyCompletion(context, publisher)
 
     fun ensureChannels() {
         NotificationChannels.ensureChannels(context)
@@ -258,7 +199,7 @@ class LocalNotificationPresenter(
                         ConversationCardOp.REFRESH_CONTACT_NAME,
                     ) {
                         if (!isRefreshCurrent()) return@withLock
-                        val live = activeNotification(manager, snapshot.tag, snapshot.id) ?: return@withLock
+                        val live = publisher.activeNotification(manager, snapshot.tag, snapshot.id) ?: return@withLock
                         val renamed =
                             cardContent.renamedSenderNotification(
                                 live.notification,
@@ -266,7 +207,7 @@ class LocalNotificationPresenter(
                                 senderName,
                             ) ?: return@withLock
                         if (
-                            postNotificationSafely(
+                            publisher.postNotificationSafely(
                                 NotificationManagerCompat.from(context),
                                 live.tag.orEmpty(),
                                 live.id,
@@ -290,11 +231,7 @@ class LocalNotificationPresenter(
     internal fun captureConversationDismissal(
         accountRef: String,
         groupIdHex: String,
-    ): ConversationDismissalRequest? {
-        if (accountRef.isBlank() || groupIdHex.isBlank()) return null
-        ConversationCardPostSynchronizer.markConversationDismissed(ConversationCardScope(accountRef, groupIdHex))
-        return ConversationDismissalRequest(accountRef, groupIdHex, nowMillis())
-    }
+    ): ConversationDismissalRequest? = retirement.captureConversationDismissal(accountRef, groupIdHex)
 
     /** Captures and clears every opening-time card for one conversation. */
     suspend fun dismissConversationMessages(
@@ -302,36 +239,14 @@ class LocalNotificationPresenter(
         groupIdHex: String,
         dispatcher: CoroutineDispatcher = Dispatchers.Default,
         shouldContinue: () -> Boolean = { true },
-    ): Boolean {
-        val request = captureConversationDismissal(accountRef, groupIdHex) ?: return false
-        return dismissConversationMessages(request, dispatcher, shouldContinue)
-    }
+    ): Boolean = retirement.dismissConversationMessages(accountRef, groupIdHex, dispatcher, shouldContinue)
 
     /** Clears one captured opening boundary while its navigation owner remains current. */
     internal suspend fun dismissConversationMessages(
         request: ConversationDismissalRequest,
         dispatcher: CoroutineDispatcher = Dispatchers.Default,
         shouldContinue: () -> Boolean = { true },
-    ): Boolean =
-        withContext(dispatcher) {
-            if (!shouldContinue()) return@withContext false
-            var result =
-                dismissConversationMessagesOnce(request.accountRef, request.groupIdHex, request.cutoffMs)
-            var attempts = 1
-            var retryOwned = shouldContinue()
-            while (!result.complete && attempts < CONVERSATION_DISMISSAL_MAX_ATTEMPTS && retryOwned) {
-                dismissalRetryDelay()
-                currentCoroutineContext().ensureActive()
-                retryOwned = shouldContinue()
-                if (retryOwned) {
-                    result =
-                        dismissConversationMessagesOnce(request.accountRef, request.groupIdHex, request.cutoffMs)
-                    attempts += 1
-                }
-            }
-            logConversationDismissal(request.groupIdHex, attempts, result)
-            result.complete
-        }
+    ): Boolean = retirement.dismissConversationMessages(request, dispatcher, shouldContinue)
 
     /**
      * Runs one synchronous cancellation pass for callers that already own an
@@ -341,12 +256,7 @@ class LocalNotificationPresenter(
     fun dismissConversationMessagesImmediately(
         accountRef: String,
         groupIdHex: String,
-    ): Boolean {
-        val request = captureConversationDismissal(accountRef, groupIdHex) ?: return false
-        val result = dismissConversationMessagesOnce(accountRef, groupIdHex, request.cutoffMs)
-        logConversationDismissal(groupIdHex, attempts = 1, result)
-        return result.complete
-    }
+    ): Boolean = retirement.dismissConversationMessagesImmediately(accountRef, groupIdHex)
 
     /**
      * Silently reconciles every deterministic card of one conversation with the messages that may still be shown
@@ -362,361 +272,13 @@ class LocalNotificationPresenter(
         groupIdHex: String,
         cancelReactionCards: Boolean,
         isEntryValid: (entryMessageIdHex: String?, shownAtMs: Long) -> Boolean,
-    ): Boolean {
-        if (accountRef.isBlank() || groupIdHex.isBlank()) return false
-        val compat = NotificationManagerCompat.from(context)
-        val outcomes =
-            conversationDismissalKeys(accountRef, groupIdHex).associateWith { key ->
-                when (key.id) {
-                    LocalNotificationFormatter.GROUP_MEMBERSHIP_NOTIFICATION_ID -> CardContentOutcome.UNCHANGED
-                    LocalNotificationFormatter.REACTION_NOTIFICATION_ID ->
-                        if (cancelReactionCards) {
-                            reconcileCard(compat, key) { _, _ -> false }
-                        } else {
-                            CardContentOutcome.UNCHANGED
-                        }
-                    else -> reconcileCard(compat, key, isEntryValid)
-                }
-            }
-        notificationDebug {
-            "reconciled group=${groupIdHex.take(8)} " +
-                CardContentOutcome.entries.joinToString(" ") { outcome ->
-                    "${outcome.logValue}=${outcomes.values.count { it == outcome }}"
-                }
-        }
-        return outcomes.values.none { it == CardContentOutcome.FAILED }
-    }
-
-    /** Reconciles one card under its lock: unchanged, rewritten with its valid entries, or cancelled. */
-    private fun reconcileCard(
-        compat: NotificationManagerCompat,
-        key: NotificationDismissalKey,
-        isEntryValid: (entryMessageIdHex: String?, shownAtMs: Long) -> Boolean,
-    ): CardContentOutcome =
-        // This label groups dismiss/reconcile test barriers only. Ordering uses the same tag/id lock;
-        // a silent rewrite must not advance the dismissal generation of the entries it retains.
-        ConversationCardPostSynchronizer.withLock(key.tag, key.id, ConversationCardOp.DISMISS_CANCEL) {
-            val manager =
-                context.getSystemService(NotificationManager::class.java)
-                    ?: return@withLock CardContentOutcome.FAILED
-            val liveCard = activeNotification(manager, key.tag, key.id)
-            val latestGeneration = ConversationCardPostedRegistry.latestGeneration(key.tag, key.id)
-            val observedGeneration = liveCard?.notification?.extras?.getString(EXTRA_GENERATION)
-            if (liveCard == null || (latestGeneration != null && latestGeneration != observedGeneration)) {
-                // Android can omit an accepted post or expose an older sibling. Without the actual latest payload
-                // there is no safe way to reconstruct its content: cancel rather than overwrite or report ABSENT.
-                return@withLock cancelUnverifiedContentCard(compat, key, liveCard != null)
-            }
-            val live = liveCard.notification
-            val entries =
-                retainedEntryGroups(live).filter { entry ->
-                    ConversationCardPostedRegistry.canCarryEntry(
-                        key.tag,
-                        key.id,
-                        live.extras.getString(EXTRA_PAYLOAD_REVISION),
-                        entryMessageId(entry),
-                    )
-                }
-            val kept = entries.filter { isEntryValid(entryMessageId(it), it.first().timestamp) }
-            try {
-                when {
-                    kept.size == entries.size && entries.isNotEmpty() -> CardContentOutcome.UNCHANGED
-                    kept.isEmpty() || live.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true -> {
-                        cancelUnverifiedContentCard(compat, key, platformHasCard = true)
-                    }
-                    else -> rewriteWithEntries(compat, key, live, kept, recordedAtMs = dismissalTime(liveCard))
-                }
-            } catch (exception: RuntimeException) {
-                notificationDebug { "reconcile card failed type=${exception.javaClass.simpleName}" }
-                CardContentOutcome.FAILED
-            }
-        }
-
-    /** Cancels an unobservable accepted card; absence is success only when this process has no accepted write. */
-    private fun cancelUnverifiedContentCard(
-        compat: NotificationManagerCompat,
-        key: NotificationDismissalKey,
-        platformHasCard: Boolean,
-    ): CardContentOutcome =
-        try {
-            synchronized(UserEventNotificationGroup.mutationLock) {
-                val pending = ConversationCardPostedRegistry.prepareCancellation(key.tag, key.id, platformHasCard)
-                if (pending) {
-                    ConversationCardPostSynchronizer.markDismissed(key.tag, key.id)
-                    cancelNotification(compat, key.tag, key.id)
-                    ConversationCardPostedRegistry.clearPosted(key.tag, key.id)
-                    CardContentOutcome.CANCELLED
-                } else {
-                    CardContentOutcome.ABSENT
-                }
-            }
-        } catch (_: RuntimeException) {
-            CardContentOutcome.FAILED
-        }
-
-    /**
-     * The card's retained entries as logical messages, newest last. A conversation card keeps its history in
-     * MessagingStyle; a legacy expandable-text card, a plain card or a redacted card is one entry identified by
-     * the card's stamped newest message id.
-     */
-    private fun retainedEntryGroups(notification: Notification): List<List<NotificationCompat.MessagingStyle.Message>> {
-        val redacted = notification.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true
-        val messages =
-            NotificationCompat.MessagingStyle
-                .extractMessagingStyleFromNotification(notification)
-                ?.messages
-                ?.takeUnless { redacted || it.isEmpty() }
-        if (messages != null) return notificationLogicalMessageGroups(messages)
-        val single =
-            cardContent.expandedSingleMessage(notification.extras)?.firstOrNull()
-                ?: NotificationCompat.MessagingStyle.Message(
-                    notification.extras?.getCharSequence(Notification.EXTRA_TEXT) ?: "",
-                    notification.`when`,
-                    null as Person?,
-                )
-        conversationCardMessageIdHex(notification)?.let {
-            single.extras.putString(LocalNotificationFormatter.EXTRA_ENTRY_MESSAGE_ID_HEX, it)
-        }
-        return listOf(listOf(single))
-    }
-
-    /** The message id stamped on one logical entry, or null for an entry posted before entries carried ids. */
-    private fun entryMessageId(entry: List<NotificationCompat.MessagingStyle.Message>): String? =
-        entry.firstNotNullOfOrNull { message ->
-            message.extras.getString(LocalNotificationFormatter.EXTRA_ENTRY_MESSAGE_ID_HEX)?.takeIf(String::isNotBlank)
-        }
-
-    /**
-     * Silently rewrites a live conversation card with only [kept] entries, so no removed entry's text, quote or
-     * artwork survives anywhere in the payload. The newest kept entry becomes the card's stamped message; the
-     * generation is unchanged, so the write lands only while that same card is still live. Copied actions are
-     * removed when their newest-message target no longer matches the retained card. [recordedAtMs] preserves the
-     * live card's dismissal age, so a cleanup captured before this silent rewrite can still remove it.
-     */
-    private fun rewriteWithEntries(
-        compat: NotificationManagerCompat,
-        key: NotificationDismissalKey,
-        live: Notification,
-        kept: List<List<NotificationCompat.MessagingStyle.Message>>,
-        recordedAtMs: Long,
-    ): CardContentOutcome {
-        val previous = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(live)
-        val messages = kept.flatten()
-        val user: Person = previous?.user ?: Person.Builder().setName("").build()
-        val style =
-            NotificationCompat
-                .MessagingStyle(user)
-                .setConversationTitle(previous?.conversationTitle)
-                .setGroupConversation(previous?.isGroupConversation == true)
-        messages.forEach { style.addMessage(copiedMessage(it, replacement = null)) }
-        val builder = NotificationCompat.Builder(context, live)
-        REMOVED_CONTENT_EXTRAS.forEach(builder.extras::remove)
-        val newestKeptId = entryMessageId(kept.last())
-        if (newestKeptId != conversationCardMessageIdHex(live)) {
-            builder.clearActions()
-        }
-        val rewritten =
-            builder
-                .setStyle(style)
-                .setContentText(messages.last().text)
-                .setTicker(null)
-                .setSilent(true)
-                .setOnlyAlertOnce(true)
-                .addExtras(
-                    Bundle().apply {
-                        putString(
-                            LocalNotificationFormatter.EXTRA_CONVERSATION_CARD_MESSAGE_ID_HEX,
-                            newestKeptId,
-                        )
-                    },
-                ).build()
-        val result =
-            postNotificationSafely(compat, key.tag, key.id, rewritten, recordedAtMs = recordedAtMs, mustBeLive = true)
-        val written = result == NotificationCardWriteResult.WRITTEN
-        return if (written) CardContentOutcome.REBUILT else CardContentOutcome.FAILED
-    }
+    ): Boolean = reconciler.reconcileConversationContent(accountRef, groupIdHex, cancelReactionCards, isEntryValid)
 
     /** Lists the conversation cards this app currently shows, for bounded restart reconciliation. */
-    internal fun activeConversationCards(): List<ActiveConversationCard> {
-        val platform = context.getSystemService(NotificationManager::class.java) ?: return emptyList()
-        return readActiveNotifications(platform)
-            .orEmpty()
-            .mapNotNull { sbn ->
-                val extras = sbn.notification.extras
-                val isInvite = !extras?.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF).isNullOrBlank()
-                val scope = LocalNotificationFormatter.conversationScopeOfCard(sbn.tag, sbn.id)
-                scope?.takeUnless { isInvite }?.let { (accountRef, groupIdHex) ->
-                    val entries = retainedEntryGroups(sbn.notification)
-                    ActiveConversationCard(
-                        accountRef = accountRef,
-                        groupIdHex = groupIdHex,
-                        messageIdHex = conversationCardMessageIdHex(sbn.notification),
-                        isMessageCard = sbn.id == LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID,
-                        contentSinceMs = entries.flatten().minOfOrNull { it.timestamp } ?: sbn.notification.`when`,
-                        entryMessageIds = entries.map(::entryMessageId),
-                    )
-                }
-            }
-    }
+    internal fun activeConversationCards(): List<ActiveConversationCard> = reconciler.activeConversationCards()
 
     /** Cancels [update]'s card only while it still shows that same newest message, keeping newer siblings. */
-    internal fun cancelNotificationUpdateCardIfCurrent(update: NotificationUpdateFfi) {
-        val messageIdHex = update.messageIdHex?.takeIf(String::isNotBlank) ?: return
-        val key = LocalNotificationFormatter.notificationDismissalKey(update)
-        cancelConversationCardIfSameGeneration(key.tag, key.id, messageIdHex)
-    }
-
-    /** Runs one cancellation and verification pass without invalidating genuinely later registrations. */
-    private fun dismissConversationMessagesOnce(
-        accountRef: String,
-        groupIdHex: String,
-        cutoffMs: Long,
-    ): ConversationDismissalResult {
-        val platform = context.getSystemService(NotificationManager::class.java)
-        val compat = NotificationManagerCompat.from(context)
-        val initial = platform?.let(::readActiveNotifications)
-        var inspectionFailed = platform == null
-        val outcomes = linkedMapOf<NotificationDismissalKey, ConversationCardDismissalOutcome>()
-
-        conversationDismissalKeys(accountRef, groupIdHex).forEach { key ->
-            outcomes[key] = dismissDeterministicCard(compat, key, initial, cutoffMs)
-        }
-        initial
-            ?.asSequence()
-            ?.filter { dismissalTime(it) <= cutoffMs && it.matchesInvite(accountRef, groupIdHex) }
-            ?.forEach { invite ->
-                val key = NotificationDismissalKey(invite.tag.orEmpty(), invite.id)
-                outcomes[key] = dismissInviteCard(platform, compat, invite, accountRef, groupIdHex, cutoffMs)
-            }
-
-        val remaining = platform?.let(::readActiveNotifications)
-        if (remaining == null) {
-            inspectionFailed = true
-        } else {
-            remaining
-                .asSequence()
-                .filter { dismissalTime(it) <= cutoffMs && it.matchesConversationCard(accountRef, groupIdHex) }
-                .forEach {
-                    val key = NotificationDismissalKey(it.tag.orEmpty(), it.id)
-                    if (outcomes[key] != ConversationCardDismissalOutcome.FAILED) {
-                        outcomes[key] = ConversationCardDismissalOutcome.RESIDUAL
-                    }
-                }
-        }
-        return ConversationDismissalResult(outcomes, inspectionFailed)
-    }
-
-    /** Cancels one deterministic card while isolating platform failures from sibling keys. */
-    private fun dismissDeterministicCard(
-        manager: NotificationManagerCompat,
-        key: NotificationDismissalKey,
-        active: Array<StatusBarNotification>?,
-        cutoffMs: Long,
-    ): ConversationCardDismissalOutcome =
-        ConversationCardPostSynchronizer.withLock(key.tag, key.id, ConversationCardOp.DISMISS_CANCEL) {
-            val writtenByApp =
-                ConversationCardPostedRegistry.clearPosted(key.tag, key.id, cutoffMs)
-            val listed = active?.any { it.tag == key.tag && it.id == key.id && dismissalTime(it) <= cutoffMs } == true
-            if (active != null && !writtenByApp && !listed) return@withLock ConversationCardDismissalOutcome.ABSENT
-            try {
-                cancelNotification(manager, key.tag, key.id)
-                ConversationCardDismissalOutcome.CANCELLED
-            } catch (exception: RuntimeException) {
-                notificationDebug {
-                    "dismiss cancel failed tag=${key.tag.take(16)} type=${exception.javaClass.simpleName}"
-                }
-                ConversationCardDismissalOutcome.FAILED
-            }
-        }
-
-    /** Re-reads an opaque invite under its card lock before cancelling the opening-time generation. */
-    private fun dismissInviteCard(
-        platform: NotificationManager,
-        compat: NotificationManagerCompat,
-        invite: StatusBarNotification,
-        accountRef: String,
-        groupIdHex: String,
-        cutoffMs: Long,
-    ): ConversationCardDismissalOutcome {
-        val tag = invite.tag.orEmpty()
-        return ConversationCardPostSynchronizer.withLock(tag, invite.id, ConversationCardOp.DISMISS_CANCEL) {
-            val live =
-                activeNotification(platform, invite.tag, invite.id)
-                    ?: return@withLock ConversationCardDismissalOutcome.ABSENT
-            if (dismissalTime(live) > cutoffMs || !live.matchesInvite(accountRef, groupIdHex)) {
-                return@withLock ConversationCardDismissalOutcome.ABSENT
-            }
-            try {
-                cancelNotification(compat, tag, live.id)
-                ConversationCardPostedRegistry.clearPosted(tag, live.id)
-                live.tag?.takeIf(String::isNotBlank)?.let(tapTokens::remove)
-                ConversationCardDismissalOutcome.CANCELLED
-            } catch (exception: RuntimeException) {
-                notificationDebug { "invite dismiss failed type=${exception.javaClass.simpleName}" }
-                ConversationCardDismissalOutcome.FAILED
-            }
-        }
-    }
-
-    /** Reads the system tray while preserving coroutine cancellation and converting platform faults to retry state. */
-    private fun readActiveNotifications(manager: NotificationManager): Array<StatusBarNotification>? =
-        try {
-            activeNotificationsProvider(manager)
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (_: Throwable) {
-            null
-        }
-
-    /** Produces all deterministic cards owned by one account-scoped conversation. */
-    private fun conversationDismissalKeys(
-        accountRef: String,
-        groupIdHex: String,
-    ): List<NotificationDismissalKey> =
-        listOf(
-            LocalNotificationFormatter.conversationDismissalKey(accountRef, groupIdHex),
-            LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex),
-            LocalNotificationFormatter.mentionDismissalKey(accountRef, groupIdHex),
-            LocalNotificationFormatter.agentActivityDismissalKey(accountRef, groupIdHex),
-            LocalNotificationFormatter.groupMembershipDismissalKey(accountRef, groupIdHex),
-        )
-
-    /** Emits privacy-safe convergence diagnostics without notification text or full identifiers. */
-    private fun logConversationDismissal(
-        groupIdHex: String,
-        attempts: Int,
-        result: ConversationDismissalResult,
-    ) {
-        val failed = result.outcomes.values.count { it == ConversationCardDismissalOutcome.FAILED }
-        val residual = result.outcomes.values.count { it == ConversationCardDismissalOutcome.RESIDUAL }
-        notificationDebug {
-            "dismissed group=${groupIdHex.take(8)} attempts=$attempts failed=$failed " +
-                "residual=$residual inspectionFailed=${result.inspectionFailed}"
-        }
-    }
-
-    /** Whether this platform card is an invite owned by the requested account and group. */
-    private fun StatusBarNotification.matchesInvite(
-        accountRef: String,
-        groupIdHex: String,
-    ): Boolean {
-        val extras = notification.extras ?: return false
-        return shouldDismissInvite(
-            extraAccountRef = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF),
-            extraGroupIdHex = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID),
-            accountRef = accountRef,
-            groupIdHex = groupIdHex,
-        )
-    }
-
-    /** Whether this card is any deterministic sibling or opaque invite for the conversation. */
-    private fun StatusBarNotification.matchesConversationCard(
-        accountRef: String,
-        groupIdHex: String,
-    ): Boolean {
-        val deterministic = conversationDismissalKeys(accountRef, groupIdHex).any { it.tag == tag && it.id == id }
-        return deterministic || matchesInvite(accountRef, groupIdHex)
-    }
+    internal fun cancelNotificationUpdateCardIfCurrent(update: NotificationUpdateFfi) = retirement.cancelNotificationUpdateCardIfCurrent(update)
 
     // Replying / marking read owns the acted-on card, so cancel it before taking
     // the sibling snapshot. Both action paths share this operation so their
@@ -728,10 +290,7 @@ class LocalNotificationPresenter(
         accountRef: String,
         groupIdHex: String,
         sinceMs: Long,
-    ): Boolean {
-        cancelConversationCardIfSameGeneration(notificationTag, notificationId, actedMessageIdHex)
-        return dismissConversationSiblingCardsNotNewerThan(accountRef, groupIdHex, sinceMs)
-    }
+    ): Boolean = retirement.dismissActionNotificationAndOlderSiblings(notificationTag, notificationId, actedMessageIdHex, accountRef, groupIdHex, sinceMs)
 
     // Clear reaction, mention, and invite sibling cards, but keep any that were
     // (re)posted after [sinceMs] — a reaction, mention, or invite that landed
@@ -740,54 +299,7 @@ class LocalNotificationPresenter(
         accountRef: String,
         groupIdHex: String,
         sinceMs: Long,
-    ): Boolean {
-        if (accountRef.isBlank() || groupIdHex.isBlank()) return false
-        val manager = context.getSystemService(NotificationManager::class.java) ?: return false
-        val compat = NotificationManagerCompat.from(context)
-        listOf(
-            LocalNotificationFormatter.reactionDismissalKey(accountRef, groupIdHex),
-            LocalNotificationFormatter.mentionDismissalKey(accountRef, groupIdHex),
-            LocalNotificationFormatter.agentActivityDismissalKey(accountRef, groupIdHex),
-        ).forEach { key ->
-            cancelSynchronizedNotNewerThan(manager, compat, key.tag, key.id, sinceMs)
-        }
-        val active = runCatching { activeNotificationsProvider(manager) }.getOrNull()?.toList().orEmpty()
-        active.forEach { sbn ->
-            val extras = sbn.notification.extras ?: return@forEach
-            val isInvite =
-                shouldDismissInvite(
-                    extraAccountRef = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF),
-                    extraGroupIdHex = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID),
-                    accountRef = accountRef,
-                    groupIdHex = groupIdHex,
-                )
-            if (isInvite && dismissalTime(sbn) <= sinceMs) {
-                ConversationCardPostSynchronizer.withLock(
-                    sbn.tag.orEmpty(),
-                    sbn.id,
-                    ConversationCardOp.DISMISS_CANCEL,
-                ) {
-                    val live = activeNotification(manager, sbn.tag, sbn.id) ?: return@withLock
-                    val liveExtras = live.notification.extras ?: return@withLock
-                    if (
-                        dismissalTime(live) <= sinceMs &&
-                        shouldDismissInvite(
-                            extraAccountRef =
-                                liveExtras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF),
-                            extraGroupIdHex =
-                                liveExtras.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID),
-                            accountRef = accountRef,
-                            groupIdHex = groupIdHex,
-                        )
-                    ) {
-                        cancelNotification(compat, live.tag.orEmpty(), live.id)
-                        live.tag?.takeIf(String::isNotBlank)?.let(tapTokens::remove)
-                    }
-                }
-            }
-        }
-        return true
-    }
+    ): Boolean = retirement.dismissConversationSiblingCardsNotNewerThan(accountRef, groupIdHex, sinceMs)
 
     /** Retains one dismissal lifetime across a caller's quote-only retry without replacing inner show ownership. */
     internal suspend fun withShowLifetime(
@@ -960,7 +472,7 @@ class LocalNotificationPresenter(
                                     val platform = context.getSystemService(NotificationManager::class.java)
                                     val active =
                                         platform?.let {
-                                            activeNotification(
+                                            publisher.activeNotification(
                                                 it,
                                                 notificationContent.notificationTag,
                                                 notificationContent.notificationId,
@@ -1329,17 +841,18 @@ class LocalNotificationPresenter(
                                                 null
                                             } else {
                                                 synchronized(UserEventNotificationGroup.mutationLock) {
-                                                    existingConversationMessages(
-                                                        notificationContent.notificationTag,
-                                                        notificationContent.notificationId,
-                                                        replacingMessageIdHex =
-                                                            update.messageIdHex
-                                                                ?.takeIf(String::isNotBlank)
-                                                                ?.takeIf { replaceCurrentMessage },
-                                                    )?.also { history ->
-                                                        carriedArtworkLease =
-                                                            retainNotificationEmojiHistoryArtwork(context, history)
-                                                    }
+                                                    publisher
+                                                        .existingConversationMessages(
+                                                            notificationContent.notificationTag,
+                                                            notificationContent.notificationId,
+                                                            replacingMessageIdHex =
+                                                                update.messageIdHex
+                                                                    ?.takeIf(String::isNotBlank)
+                                                                    ?.takeIf { replaceCurrentMessage },
+                                                        )?.also { history ->
+                                                            carriedArtworkLease =
+                                                                retainNotificationEmojiHistoryArtwork(context, history)
+                                                        }
                                                 }
                                             }
                                         ConversationCardPostSynchronizer.awaitTestBarrier(
@@ -1379,7 +892,7 @@ class LocalNotificationPresenter(
                                             return@withLock false
                                         }
                                         val firstPostResult =
-                                            postNotificationSafely(
+                                            publisher.postNotificationSafely(
                                                 notificationManager,
                                                 notificationContent.notificationTag,
                                                 notificationContent.notificationId,
@@ -1401,14 +914,14 @@ class LocalNotificationPresenter(
                                                 notificationContent.notificationTag,
                                                 notificationContent.notificationId,
                                             )
-                                            retainPostedCardUnlessDismissed(
+                                            publisher.retainPostedCardUnlessDismissed(
                                                 showToken,
                                                 notificationManager,
                                                 notificationContent.notificationTag,
                                                 notificationContent.notificationId,
                                             )
                                         } else if (firstPostResult == NotificationCardWriteResult.FAILED) {
-                                            cancelNotification(
+                                            publisher.cancelNotification(
                                                 notificationManager,
                                                 notificationContent.notificationTag,
                                                 notificationContent.notificationId,
@@ -1433,7 +946,7 @@ class LocalNotificationPresenter(
                                                 )
                                                 val cleanNotification = buildSettled(true)
                                                 val retryResult =
-                                                    postNotificationSafely(
+                                                    publisher.postNotificationSafely(
                                                         notificationManager,
                                                         notificationContent.notificationTag,
                                                         notificationContent.notificationId,
@@ -1455,7 +968,7 @@ class LocalNotificationPresenter(
                                                         notificationContent.notificationTag,
                                                         notificationContent.notificationId,
                                                     )
-                                                    retainPostedCardUnlessDismissed(
+                                                    publisher.retainPostedCardUnlessDismissed(
                                                         showToken,
                                                         notificationManager,
                                                         notificationContent.notificationTag,
@@ -1465,7 +978,7 @@ class LocalNotificationPresenter(
                                                     if (retryResult ==
                                                         NotificationCardWriteResult.FAILED
                                                     ) {
-                                                        cancelNotification(
+                                                        publisher.cancelNotification(
                                                             notificationManager,
                                                             notificationContent.notificationTag,
                                                             notificationContent.notificationId,
@@ -1506,7 +1019,7 @@ class LocalNotificationPresenter(
                                             return@withLock false
                                         }
                                         var postResult =
-                                            postNotificationSafely(
+                                            publisher.postNotificationSafely(
                                                 notificationManager,
                                                 notificationContent.notificationTag,
                                                 notificationContent.notificationId,
@@ -1522,7 +1035,7 @@ class LocalNotificationPresenter(
                                                 },
                                             )
                                         if (postResult == NotificationCardWriteResult.FAILED && reactionInlineArtwork) {
-                                            cancelNotification(
+                                            publisher.cancelNotification(
                                                 notificationManager,
                                                 notificationContent.notificationTag,
                                                 notificationContent.notificationId,
@@ -1538,7 +1051,7 @@ class LocalNotificationPresenter(
                                                     NotificationCompat.BigTextStyle().bigText(notificationContent.body),
                                                 )
                                             postResult =
-                                                postNotificationSafely(
+                                                publisher.postNotificationSafely(
                                                     notificationManager,
                                                     notificationContent.notificationTag,
                                                     notificationContent.notificationId,
@@ -1563,7 +1076,7 @@ class LocalNotificationPresenter(
                                                 notificationContent.notificationTag,
                                                 notificationContent.notificationId,
                                             )
-                                            retainPostedCardUnlessDismissed(
+                                            publisher.retainPostedCardUnlessDismissed(
                                                 showToken,
                                                 notificationManager,
                                                 notificationContent.notificationTag,
@@ -1573,7 +1086,7 @@ class LocalNotificationPresenter(
                                             if (postResult ==
                                                 NotificationCardWriteResult.FAILED
                                             ) {
-                                                cancelNotification(
+                                                publisher.cancelNotification(
                                                     notificationManager,
                                                     notificationContent.notificationTag,
                                                     notificationContent.notificationId,
@@ -1802,7 +1315,7 @@ class LocalNotificationPresenter(
             if (!isPostStillAllowed() || !ConversationCardPostSynchronizer.isShowCurrent(showToken)) {
                 return@withLock
             }
-            val active = activeConversationCard(content.notificationTag, content.notificationId) ?: return@withLock
+            val active = publisher.activeConversationCard(content.notificationTag, content.notificationId) ?: return@withLock
             if (!ConversationCardPostedRegistry.isCurrentPayload(
                     content.notificationTag,
                     content.notificationId,
@@ -1833,7 +1346,7 @@ class LocalNotificationPresenter(
                     isPublishAllowed = {
                         isPostStillAllowed() &&
                             ConversationCardPostSynchronizer.isShowCurrent(showToken) &&
-                            canPublishPreviewShortcut(content, active)
+                            publisher.canPublishPreviewShortcut(content, active)
                     },
                 )
             }
@@ -1854,7 +1367,7 @@ class LocalNotificationPresenter(
         content: LocalNotificationContent,
         update: NotificationUpdateFfi,
     ): Boolean {
-        val active = activeConversationCard(content.notificationTag, content.notificationId)
+        val active = publisher.activeConversationCard(content.notificationTag, content.notificationId)
         val expectedMessageId = update.messageIdHex?.takeIf(String::isNotBlank)
         val sameMessage = expectedMessageId == null || conversationCardMessageIdHex(active) == expectedMessageId
         return active != null && sameMessage
@@ -1871,7 +1384,7 @@ class LocalNotificationPresenter(
         val enriched = cardContent.enrichedIdentityNotification(active, sender, identity) ?: return
         val manager = NotificationManagerCompat.from(context)
         if (
-            postNotificationSafely(
+            publisher.postNotificationSafely(
                 manager,
                 content.notificationTag,
                 content.notificationId,
@@ -1879,7 +1392,7 @@ class LocalNotificationPresenter(
                 mustBeLive = true,
             ) == NotificationCardWriteResult.WRITTEN
         ) {
-            retainPostedCardUnlessDismissed(
+            publisher.retainPostedCardUnlessDismissed(
                 showToken,
                 manager,
                 content.notificationTag,
@@ -1957,7 +1470,7 @@ class LocalNotificationPresenter(
     ): StatusBarNotification? {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return null
         val expectedMessageId = update.messageIdHex?.takeIf(String::isNotBlank)
-        return activeNotification(manager, content.notificationTag, content.notificationId)?.takeIf { live ->
+        return publisher.activeNotification(manager, content.notificationTag, content.notificationId)?.takeIf { live ->
             val card = live.notification
             val generation = card.extras.getString(EXTRA_GENERATION)
             val latestWrite =
@@ -2013,11 +1526,11 @@ class LocalNotificationPresenter(
                 senderAvatarBitmap = senderPicture,
                 sender = sender,
                 directShareEligible = refresh.directShareEligible,
-                isPublishAllowed = { refresh.isCurrent() && canPublishPreviewShortcut(refresh.content, card) },
+                isPublishAllowed = { refresh.isCurrent() && publisher.canPublishPreviewShortcut(refresh.content, card) },
             )
         }
         return cardContent.enrichedIdentityNotification(card, sender, identity)?.let { rewritten ->
-            postNotificationSafely(
+            publisher.postNotificationSafely(
                 NotificationManagerCompat.from(context),
                 live.tag.orEmpty(),
                 live.id,
@@ -2057,7 +1570,7 @@ class LocalNotificationPresenter(
                 null
             } else {
                 synchronized(UserEventNotificationGroup.mutationLock) {
-                    activeConversationCard(notificationTag, notificationId)
+                    publisher.activeConversationCard(notificationTag, notificationId)
                 }
             }
         return quietWrite(replaceCurrentMessage, notificationId, liveCard)
@@ -2078,257 +1591,9 @@ class LocalNotificationPresenter(
         return contactAvatarOverride(scope, contact)
     }
 
-    /** Writes one card and reports success without allowing observer failures to alter delivery. */
-    private fun postNotificationSafely(
-        manager: NotificationManagerCompat,
-        tag: String,
-        id: Int,
-        notification: Notification,
-        onNotificationWritten: (() -> Unit)? = null,
-        recordedAtMs: Long? = null,
-        mustBeLive: Boolean = false,
-        finalPostAllowed: (() -> Boolean)? = null,
-        hiddenShortcut: (() -> ShortcutInfoCompat)? = null,
-    ): NotificationCardWriteResult =
-        try {
-            if (finalPostAllowed != null) {
-                ConversationCardPostSynchronizer.awaitTestBarrier(
-                    ConversationCardOp.SHOW_NOTIFY,
-                    ConversationCardBarrier.BEFORE_PLATFORM_WRITE,
-                    tag,
-                    id,
-                )
-            }
-            val written =
-                NotificationGroupReconciler.postChild(
-                    context,
-                    notification,
-                    request = groupReconciliation,
-                    isLive = { notificationWriteIsLive(notification, tag, id, mustBeLive, finalPostAllowed) },
-                ) {
-                    val payload =
-                        previewPayload(cardContent.withCurrentContactPictures(notification), tag, id, hiddenShortcut)
-                    // Rewrites of a card posted by the earlier expanded-choice build return to the standard template.
-                    val standard = withoutGroupSenderPictures(context, withoutLegacyReactionRail(context, payload))
-                    val revision = ConversationCardPostedRegistry.newPayloadRevision()
-                    // A recovery builder can discard custom views and group alert behavior. Stamp a copy of
-                    // the final platform payload so the revision describes exactly the card Android receives.
-                    val outgoing = standard.clone().apply { extras.putString(EXTRA_PAYLOAD_REVISION, revision) }
-                    notificationPoster(manager, tag, id, outgoing)
-                    recordAcceptedPayload(tag, id, outgoing, recordedAtMs)
-                }
-            if (written) {
-                runCatching { onNotificationWritten?.invoke() }
-            }
-            if (written) NotificationCardWriteResult.WRITTEN else NotificationCardWriteResult.REFUSED
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (exception: RuntimeException) {
-            notificationDebug {
-                "post failed tag=${tag.take(16)} type=${exception.javaClass.simpleName}"
-            }
-            NotificationCardWriteResult.FAILED
-        }
+    internal fun isGroupInviteNotificationActive(update: NotificationUpdateFfi): Boolean = retirement.isGroupInviteNotificationActive(update)
 
-    /** Keeps only bounded Android payload metadata, never message text or an independent removal/read policy. */
-    private fun recordAcceptedPayload(
-        tag: String,
-        id: Int,
-        payload: Notification,
-        recordedAtMs: Long?,
-    ) {
-        ConversationCardPostedRegistry.markPosted(
-            tag,
-            id,
-            recordedAtMs ?: System.currentTimeMillis(),
-            payload.extras.getString(EXTRA_GENERATION),
-            payload =
-                ConversationCardPostedRegistry.PayloadSnapshot(
-                    requireNotNull(payload.extras.getString(EXTRA_PAYLOAD_REVISION)),
-                    retainedEntryGroups(payload).mapNotNull(::entryMessageId).toSet(),
-                ),
-        )
-    }
-
-    /** The caller's final fence still holds and, for a live-only write, the tray still shows this generation. */
-    private fun notificationWriteIsLive(
-        notification: Notification,
-        tag: String,
-        id: Int,
-        mustBeLive: Boolean,
-        finalPostAllowed: (() -> Boolean)?,
-    ): Boolean =
-        if (!ConversationCardPostedRegistry.canAcceptPost(tag, id) || finalPostAllowed?.invoke() == false) {
-            false
-        } else if (!mustBeLive) {
-            true
-        } else {
-            val current =
-                context.getSystemService(NotificationManager::class.java)?.let {
-                    activeNotification(it, tag, id)
-                }
-            val candidateRevision = notification.extras.getString(EXTRA_PAYLOAD_REVISION)
-            current != null &&
-                ConversationCardPostedRegistry.isCurrentPayload(
-                    tag,
-                    id,
-                    current.notification.extras.getString(EXTRA_PAYLOAD_REVISION),
-                ) &&
-                (
-                    candidateRevision == null ||
-                        ConversationCardPostedRegistry.isCurrentPayload(tag, id, candidateRevision)
-                ) &&
-                current.notification.extras.getString(EXTRA_GENERATION) ==
-                notification.extras.getString(EXTRA_GENERATION)
-        }
-
-    private fun canPublishPreviewShortcut(
-        content: LocalNotificationContent,
-        expected: Notification,
-    ): Boolean {
-        val latest = activeConversationCard(content.notificationTag, content.notificationId) ?: return false
-        val sameGeneration = latest.extras.getString(EXTRA_GENERATION) == expected.extras.getString(EXTRA_GENERATION)
-        return sameGeneration &&
-            ConversationCardPostedRegistry.isCurrentPayload(
-                content.notificationTag,
-                content.notificationId,
-                latest.extras.getString(EXTRA_PAYLOAD_REVISION),
-            ) &&
-            NotificationPreviewPreferences.canExpose(context, latest, latest)
-    }
-
-    /** What Android receives: the rich card when its preview may be shown, otherwise the generic hidden card. */
-    private fun previewPayload(
-        notification: Notification,
-        tag: String,
-        id: Int,
-        hiddenShortcut: (() -> ShortcutInfoCompat)?,
-    ): Notification {
-        val needsLiveProof =
-            notification.extras.getBoolean(NotificationPreviewPreferences.EXTRA_CORRECTION) ||
-                !NotificationPreviewPreferences.hasCurrentProvenance(context, notification)
-        val current = if (needsLiveProof) activeConversationCard(tag, id) else null
-        return if (NotificationPreviewPreferences.canExpose(context, notification, current)) {
-            notification
-        } else {
-            // A hidden card leaves its conversation shortcut generic, so the next rich post must publish it again.
-            notification.shortcutId?.let(conversationShortcuts::forgetShortcutSnapshot)
-            notificationWithoutPreview(context, notification, shortcut = hiddenShortcut?.invoke())
-        }
-    }
-
-    private fun cancelNotification(
-        manager: NotificationManagerCompat,
-        tag: String,
-        id: Int,
-    ) {
-        NotificationGroupReconciler.mutate(context, groupReconciliation) { notificationCanceller(manager, tag, id) }
-    }
-
-    /** Cancels a completed write when its conversation was dismissed during the platform call. */
-    private fun retainPostedCardUnlessDismissed(
-        showToken: ConversationCardShowToken,
-        manager: NotificationManagerCompat,
-        tag: String,
-        id: Int,
-    ): Boolean {
-        if (ConversationCardPostSynchronizer.isShowNotDismissed(showToken)) return true
-        ConversationCardPostedRegistry.clearPosted(tag, id)
-        cancelNotification(manager, tag, id)
-        return false
-    }
-
-    /**
-     * Cancels one card under its lock. With [onlyIfLive] the platform cancel is skipped for a card that is
-     * neither on screen nor written by this process since its last cancel, both checked inside the lock so a
-     * post that lands first is still removed even before the platform lists it; the dismissal generation
-     * advances either way so an in-flight post for the key cannot resurrect it afterwards.
-     */
-    private fun cancelSynchronized(
-        manager: NotificationManagerCompat,
-        tag: String,
-        id: Int,
-        onlyIfLive: Boolean = false,
-    ) {
-        ConversationCardPostSynchronizer.withLock(tag, id, ConversationCardOp.DISMISS_CANCEL) {
-            ConversationCardPostSynchronizer.markDismissed(tag, id)
-            val writtenByApp = ConversationCardPostedRegistry.clearPosted(tag, id)
-            if (!onlyIfLive || writtenByApp || cardIsLive(tag, id)) cancelNotification(manager, tag, id)
-        }
-    }
-
-    /** Whether the platform currently shows this card; a failed read counts as live so the cancel still goes out. */
-    private fun cardIsLive(
-        tag: String,
-        id: Int,
-    ): Boolean {
-        val manager = context.getSystemService(NotificationManager::class.java) ?: return true
-        return try {
-            activeNotificationsProvider(manager).any { it.tag == tag && it.id == id }
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (_: Throwable) {
-            true
-        }
-    }
-
-    private fun cancelSynchronizedNotNewerThan(
-        manager: NotificationManager,
-        compat: NotificationManagerCompat,
-        tag: String,
-        id: Int,
-        sinceMs: Long,
-    ) {
-        ConversationCardPostSynchronizer.withLock(tag, id, ConversationCardOp.DISMISS_CANCEL) {
-            val live = activeNotification(manager, tag, id) ?: return@withLock
-            if (dismissalTime(live) <= sinceMs) {
-                ConversationCardPostedRegistry.clearPosted(tag, id)
-                cancelNotification(compat, tag, id)
-            }
-        }
-    }
-
-    private fun activeNotification(
-        manager: NotificationManager,
-        tag: String?,
-        id: Int,
-    ): StatusBarNotification? =
-        try {
-            activeNotificationsProvider(manager).firstOrNull { it.tag == tag && it.id == id }
-        } catch (cancellation: CancellationException) {
-            throw cancellation
-        } catch (_: Throwable) {
-            null
-        }
-
-    internal fun isGroupInviteNotificationActive(update: NotificationUpdateFfi): Boolean {
-        val manager = context.getSystemService(NotificationManager::class.java)
-        val active =
-            manager?.let {
-                activeNotification(it, update.notificationKey, LocalNotificationFormatter.MESSAGE_NOTIFICATION_ID)
-            }
-        val extras = active?.notification?.extras
-        return update.trigger == NotificationTriggerFfi.GROUP_INVITE &&
-            extras != null &&
-            shouldDismissInvite(
-                extraAccountRef = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF),
-                extraGroupIdHex = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID),
-                accountRef = update.accountRef,
-                groupIdHex = update.groupIdHex,
-            )
-    }
-
-    internal fun isNotificationUpdateCurrentForEnrichment(update: NotificationUpdateFfi): Boolean {
-        val expectedMessageIdHex = update.messageIdHex?.takeIf(String::isNotBlank)
-        return when {
-            update.trigger == NotificationTriggerFfi.GROUP_INVITE -> isGroupInviteNotificationActive(update)
-            expectedMessageIdHex == null -> false
-            else -> {
-                val key = LocalNotificationFormatter.notificationDismissalKey(update)
-                conversationCardMessageIdHex(key.tag, key.id) == expectedMessageIdHex
-            }
-        }
-    }
+    internal fun isNotificationUpdateCurrentForEnrichment(update: NotificationUpdateFfi): Boolean = retirement.isNotificationUpdateCurrentForEnrichment(update)
 
     private fun stampConversationCardMessageId(
         builder: NotificationCompat.Builder,
@@ -2385,58 +1650,25 @@ class LocalNotificationPresenter(
     fun cancel(
         notificationTag: String,
         notificationId: Int,
-    ) {
-        cancelSynchronized(NotificationManagerCompat.from(context), notificationTag, notificationId)
-        notificationDebug { "cancelled tag=${notificationTag.take(16)} id=$notificationId" }
-    }
+    ) = retirement.cancel(notificationTag, notificationId)
 
     /** Reads only the acted card's platform identity before dismissal is allowed to inspect siblings. */
     internal fun conversationCardMessageIdHex(
         notificationTag: String,
         notificationId: Int,
-    ): String? =
-        conversationCardMessageIdHex(
-            runCatching {
-                context
-                    .getSystemService(NotificationManager::class.java)
-                    ?.activeNotifications
-                    ?.firstOrNull { it.tag == notificationTag && it.id == notificationId }
-                    ?.notification
-            }.getOrNull(),
-        )
+    ): String? = publisher.conversationCardMessageIdHex(notificationTag, notificationId)
 
     internal fun cancelRepliedConversationCardIfSameGeneration(
         notificationTag: String,
         notificationId: Int,
         repliedMessageIdHex: String?,
-    ) {
-        cancelConversationCardIfSameGeneration(notificationTag, notificationId, repliedMessageIdHex)
-    }
+    ) = retirement.cancelRepliedConversationCardIfSameGeneration(notificationTag, notificationId, repliedMessageIdHex)
 
     internal fun cancelConversationCardIfSameGeneration(
         notificationTag: String,
         notificationId: Int,
         actedMessageIdHex: String?,
-    ) {
-        ConversationCardPostSynchronizer.withLock(
-            notificationTag,
-            notificationId,
-            ConversationCardOp.CANCEL_IF_SAME_GENERATION,
-        ) {
-            val liveCardMessageIdHex = conversationCardMessageIdHex(notificationTag, notificationId)
-            ConversationCardPostSynchronizer.awaitTestBarrier(
-                ConversationCardOp.CANCEL_IF_SAME_GENERATION,
-                ConversationCardBarrier.AFTER_READ,
-                notificationTag,
-                notificationId,
-            )
-            if (shouldCancelRepliedConversationCard(actedMessageIdHex, liveCardMessageIdHex)) {
-                ConversationCardPostedRegistry.clearPosted(notificationTag, notificationId)
-                cancelNotification(NotificationManagerCompat.from(context), notificationTag, notificationId)
-                notificationDebug { "cancelled tag=${notificationTag.take(16)} id=$notificationId" }
-            }
-        }
-    }
+    ) = retirement.cancelConversationCardIfSameGeneration(notificationTag, notificationId, actedMessageIdHex)
 
     /**
      * Re-post the (tag, id) notification carrying a RemoteInput history entry —
@@ -2459,7 +1691,7 @@ class LocalNotificationPresenter(
         notificationTag: String,
         notificationId: Int,
         replyText: String,
-    ): Boolean = markRemoteInputHandled(notificationTag, notificationId, expectedMessageIdHex = null, replyText)
+    ): Boolean = replyCompletion.markDirectReplyHandled(notificationTag, notificationId, replyText)
 
     /**
      * Clear a reaction chip's direct-reply lifetime extension only while the
@@ -2472,73 +1704,7 @@ class LocalNotificationPresenter(
         notificationId: Int,
         reactedMessageIdHex: String?,
         reaction: String,
-    ): Boolean = markRemoteInputHandled(notificationTag, notificationId, reactedMessageIdHex, reaction)
-
-    /**
-     * Re-posts the live (tag, id) card with [handledText] as its RemoteInput history, ending
-     * SystemUI's reply spinner. Skipped when [expectedMessageIdHex] no longer matches the live card.
-     */
-    @SuppressLint("MissingPermission")
-    private fun markRemoteInputHandled(
-        notificationTag: String,
-        notificationId: Int,
-        expectedMessageIdHex: String?,
-        handledText: String,
-    ): Boolean =
-        ConversationCardPostSynchronizer.withLock(
-            notificationTag,
-            notificationId,
-            ConversationCardOp.MARK_REPLY_HANDLED,
-        ) {
-            val active =
-                runCatching {
-                    context
-                        .getSystemService(NotificationManager::class.java)
-                        ?.activeNotifications
-                        ?.firstOrNull { it.tag == notificationTag && it.id == notificationId }
-                }.getOrNull() ?: return@withLock false
-            if (
-                expectedMessageIdHex != null &&
-                !shouldCancelRepliedConversationCard(
-                    expectedMessageIdHex,
-                    conversationCardMessageIdHex(active.notification),
-                )
-            ) {
-                return@withLock false
-            }
-            ConversationCardPostSynchronizer.awaitTestBarrier(
-                ConversationCardOp.MARK_REPLY_HANDLED,
-                ConversationCardBarrier.AFTER_READ,
-                notificationTag,
-                notificationId,
-            )
-            runCatching {
-                val resolved =
-                    NotificationCompat
-                        .Builder(context, active.notification)
-                        .apply {
-                            extras.remove(Notification.EXTRA_REMOTE_INPUT_HISTORY)
-                            extras.remove(EXTRA_REMOTE_INPUT_HISTORY_ITEMS)
-                        }.setRemoteInputHistory(arrayOf(handledText))
-                        .setSilent(true)
-                        .setOnlyAlertOnce(true)
-                        .build()
-                        .withoutApi30RemoteInputHistoryItems()
-                if (postNotificationSafely(
-                        NotificationManagerCompat.from(context),
-                        notificationTag,
-                        notificationId,
-                        resolved,
-                        mustBeLive = true,
-                    ) !=
-                    NotificationCardWriteResult.WRITTEN
-                ) {
-                    return@runCatching false
-                }
-                notificationDebug { "remote-input-handled re-post tag=${notificationTag.take(16)} id=$notificationId" }
-                true
-            }.getOrDefault(false)
-        }
+    ): Boolean = replyCompletion.markReactionHandledIfSameGeneration(notificationTag, notificationId, reactedMessageIdHex, reaction)
 
     /**
      * Re-post the (tag, id) conversation card after a direct reply failed
@@ -2556,98 +1722,7 @@ class LocalNotificationPresenter(
         notificationId: Int,
         repliedMessageIdHex: String?,
         failureNotice: String,
-    ): Boolean =
-        ConversationCardPostSynchronizer.withLock(
-            notificationTag,
-            notificationId,
-            ConversationCardOp.MARK_REPLY_FAILED,
-        ) {
-            val active =
-                runCatching {
-                    context
-                        .getSystemService(NotificationManager::class.java)
-                        ?.activeNotifications
-                        ?.firstOrNull { it.tag == notificationTag && it.id == notificationId }
-                }.getOrNull() ?: return@withLock false
-            val liveCardMessageIdHex = conversationCardMessageIdHex(active.notification)
-            if (!shouldCancelRepliedConversationCard(repliedMessageIdHex, liveCardMessageIdHex)) {
-                return@withLock false
-            }
-            runCatching {
-                val resolved =
-                    NotificationCompat
-                        .Builder(context, active.notification)
-                        .apply {
-                            extras.remove(Notification.EXTRA_REMOTE_INPUT_HISTORY)
-                            extras.remove(EXTRA_REMOTE_INPUT_HISTORY_ITEMS)
-                        }.setRemoteInputHistory(arrayOf(failureNotice))
-                        .setSilent(true)
-                        .setOnlyAlertOnce(true)
-                        .build()
-                        .withoutApi30RemoteInputHistoryItems()
-                if (postNotificationSafely(
-                        NotificationManagerCompat.from(context),
-                        notificationTag,
-                        notificationId,
-                        resolved,
-                        mustBeLive = true,
-                    ) !=
-                    NotificationCardWriteResult.WRITTEN
-                ) {
-                    return@runCatching false
-                }
-                notificationDebug { "reply-failed re-post tag=${notificationTag.take(16)} id=$notificationId" }
-                true
-            }.getOrDefault(false)
-        }
-
-    private fun activeConversationCard(
-        tag: String,
-        id: Int,
-    ): Notification? =
-        runCatching {
-            context
-                .getSystemService(NotificationManager::class.java)
-                ?.let(activeNotificationsProvider)
-                ?.firstOrNull { it.tag == tag && it.id == id }
-                ?.notification
-        }.getOrNull()
-
-    private fun existingConversationMessages(
-        tag: String,
-        id: Int,
-        replacingMessageIdHex: String? = null,
-    ): List<NotificationCompat.MessagingStyle.Message>? {
-        val existing =
-            activeConversationCard(tag, id)
-                ?.takeUnless { it.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true }
-                ?.takeIf { NotificationPreviewPreferences.canRetainPreview(context, it) }
-                ?: return null
-        val messages =
-            NotificationCompat.MessagingStyle
-                .extractMessagingStyleFromNotification(existing)
-                ?.messages
-                ?: cardContent.expandedSingleMessage(existing.extras)
-        val retained =
-            messages
-                ?.let(::notificationLogicalMessageGroups)
-                ?.filter { entry ->
-                    ConversationCardPostedRegistry.canCarryEntry(
-                        tag,
-                        id,
-                        existing.extras.getString(EXTRA_PAYLOAD_REVISION),
-                        entryMessageId(entry),
-                    )
-                }?.flatten()
-        return if (
-            replacingMessageIdHex != null &&
-            conversationCardMessageIdHex(existing) == replacingMessageIdHex
-        ) {
-            retained?.let(::dropLastNotificationLogicalMessage)
-        } else {
-            retained
-        }
-    }
+    ): Boolean = replyCompletion.markDirectReplyFailed(notificationTag, notificationId, repliedMessageIdHex, failureNotice)
 }
 
 private data class MessagingPostContext(

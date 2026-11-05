@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationCardPublisher.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "notification_content_contracts": [
+      {
+        "surface": "Accepted payload revision fences asynchronously stale notification history",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationCardPublisher.kt",
+        "anchor": "fun existingConversationMessages(",
+        "test_ids": [
+          "NTF-043",
+          "NTF-044"
+        ]
+      },
+      {
+        "surface": "live-card eligibility remains before content rewriting and serialized publication",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationCardPublisher.kt",
+        "anchor": "cardContent.withCurrentContactPictures(notification)",
+        "test_ids": [
+          "NTF-025",
+          "NTF-042"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
