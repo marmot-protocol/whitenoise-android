@@ -2521,4 +2521,10 @@
     <string name="media_viewer_actual_size">实际大小 (1:1)</string>
     <string name="media_viewer_zoom_out">缩小</string>
     <string name="media_viewer_toggle_controls">显示或隐藏控件</string>
+    <string name="settings_search">搜索设置</string>
+    <string name="settings_search_no_results">未找到设置，请尝试其他关键词。</string>
+    <string name="settings_search_alias_font_size">文字大小|字体缩放|放大文字|缩小文字</string>
+    <string name="settings_search_alias_read_aloud">TTS|文字转语音|朗读</string>
+    <string name="settings_search_alias_sound">通知声音|提示音|铃声</string>
+    <string name="settings_search_revealed">%1$s。设置已突出显示。</string>
 </resources>

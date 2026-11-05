@@ -142,8 +142,8 @@ internal fun CustomEmojiContent(
 ) {
     SettingsScaffold(title = stringResource(R.string.custom_emoji), onBack = onBack) {
         SettingsList(modifier = Modifier.testTag(CUSTOM_EMOJI_CONTENT_TAG)) {
-            item { SettingsExplainer(stringResource(R.string.custom_emoji_detail)) }
-            item {
+            item(key = "search.CustomEmoji.1") { SettingsExplainer(stringResource(R.string.custom_emoji_detail)) }
+            item(key = "search.CustomEmoji.2") {
                 SettingsGroup(modifier = Modifier.testTag("custom_emoji.add")) {
                     row("choose_photo") { context ->
                         SettingsAction(
@@ -164,9 +164,9 @@ internal fun CustomEmojiContent(
                 }
             }
             if (emoji.entries.isEmpty()) {
-                item { SettingsExplainer(stringResource(R.string.custom_emoji_empty)) }
+                item(key = "search.CustomEmoji.3") { SettingsExplainer(stringResource(R.string.custom_emoji_empty)) }
             } else {
-                item {
+                item(key = "search.CustomEmoji.4") {
                     SettingsGroup(modifier = Modifier.testTag("custom_emoji.list")) {
                         emoji.entries.forEach { entry ->
                             row(entry.shortcode) { context ->

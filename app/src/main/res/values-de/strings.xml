@@ -2575,4 +2575,10 @@
     <string name="media_viewer_actual_size">Originalgröße (1:1)</string>
     <string name="media_viewer_zoom_out">Verkleinern</string>
     <string name="media_viewer_toggle_controls">Steuerelemente anzeigen oder ausblenden</string>
+    <string name="settings_search">Einstellungen durchsuchen</string>
+    <string name="settings_search_no_results">Keine Einstellungen gefunden. Versuche ein anderes Wort.</string>
+    <string name="settings_search_alias_font_size">Textgröße|Schriftgröße|größerer Text|kleinerer Text</string>
+    <string name="settings_search_alias_read_aloud">TTS|Sprachausgabe|vorlesen</string>
+    <string name="settings_search_alias_sound">Benachrichtigungston|Hinweiston|Klingelton</string>
+    <string name="settings_search_revealed">%1$s. Einstellung hervorgehoben.</string>
 </resources>

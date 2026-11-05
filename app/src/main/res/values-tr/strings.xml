@@ -2556,4 +2556,10 @@
     <string name="media_viewer_actual_size">Gerçek boyut (1:1)</string>
     <string name="media_viewer_zoom_out">Uzaklaştır</string>
     <string name="media_viewer_toggle_controls">Kontrolleri göster veya gizle</string>
+    <string name="settings_search">Ayarlarda ara</string>
+    <string name="settings_search_no_results">Ayar bulunamadı. Başka bir sözcük deneyin.</string>
+    <string name="settings_search_alias_font_size">metin boyutu|yazı tipi ölçeği|daha büyük metin|daha küçük metin</string>
+    <string name="settings_search_alias_read_aloud">TTS|metin okuma|sesli oku</string>
+    <string name="settings_search_alias_sound">bildirim sesi|uyarı sesi|zil sesi</string>
+    <string name="settings_search_revealed">%1$s. Ayar vurgulandı.</string>
 </resources>

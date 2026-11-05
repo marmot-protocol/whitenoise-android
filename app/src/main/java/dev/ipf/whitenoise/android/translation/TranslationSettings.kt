@@ -34,6 +34,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.settings.SettingsSearchRowReveal
 
 /**
  * The one source of picker entries: detection plus catalog sources, or catalog targets only. Empty or
@@ -88,19 +89,23 @@ internal fun TranslationGlobalSettingsContent(preferences: TranslationPreference
     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(stringResource(R.string.translation_engine_managed))
         Text(stringResource(R.string.translation_privacy_warning))
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.translation_automatic), Modifier.weight(1f))
-            Switch(
-                checked = choice.enabled,
-                onCheckedChange = { preferences.setGlobal(it, choice.target) },
-                modifier = Modifier.testTag("translation.automatic"),
+        SettingsSearchRowReveal("automatic") {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.translation_automatic), Modifier.weight(1f))
+                Switch(
+                    checked = choice.enabled,
+                    onCheckedChange = { preferences.setGlobal(it, choice.target) },
+                    modifier = Modifier.testTag("translation.automatic"),
+                )
+            }
+        }
+        SettingsSearchRowReveal("target") {
+            TranslationLanguagePicker(
+                stringResource(R.string.translation_target_language),
+                choice.target.orEmpty(),
+                { preferences.setGlobal(choice.enabled, it) },
             )
         }
-        TranslationLanguagePicker(
-            stringResource(R.string.translation_target_language),
-            choice.target.orEmpty(),
-            { preferences.setGlobal(choice.enabled, it) },
-        )
         if (choice.target == null) TranslationTargetRecovery()
         OfflineTranslatorEngineAction(onOpen = { openOfflineTranslator(context) })
     }

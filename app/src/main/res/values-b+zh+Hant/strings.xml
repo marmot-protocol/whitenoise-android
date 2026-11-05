@@ -2521,4 +2521,10 @@
     <string name="media_viewer_actual_size">實際大小（1:1）</string>
     <string name="media_viewer_fit_image">適應圖片</string>
     <string name="media_viewer_image_scale">縮放 %1$d%%</string>
+    <string name="settings_search">搜尋設定</string>
+    <string name="settings_search_no_results">找不到設定。請試試其他字詞。</string>
+    <string name="settings_search_alias_font_size">文字大小|字型縮放|放大文字|縮小文字</string>
+    <string name="settings_search_alias_read_aloud">TTS|文字轉語音|朗讀</string>
+    <string name="settings_search_alias_sound">通知音效|提示音|鈴聲</string>
+    <string name="settings_search_revealed">%1$s。已醒目標示設定。</string>
 </resources>

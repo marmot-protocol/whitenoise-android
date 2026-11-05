@@ -143,8 +143,8 @@ internal fun AppearanceScreen(
     }
     SettingsScaffold(title = stringResource(R.string.appearance), onBack = onBack) {
         SettingsList {
-            item { SettingsSection(stringResource(R.string.appearance_colors_heading)) }
-            item {
+            item(key = "search.Appearance.1") { SettingsSection(stringResource(R.string.appearance_colors_heading)) }
+            item(key = "search.Appearance.2") {
                 SettingsGroup(modifier = Modifier.testTag("appearance.colors.group")) {
                     row("theme") { context ->
                         SettingsLink(
@@ -174,8 +174,8 @@ internal fun AppearanceScreen(
                     }
                 }
             }
-            item { SettingsSection(stringResource(R.string.appearance_text_heading)) }
-            item {
+            item(key = "search.Appearance.3") { SettingsSection(stringResource(R.string.appearance_text_heading)) }
+            item(key = "search.Appearance.4") {
                 SettingsGroup {
                     row("font_family") { context ->
                         SettingsLink(
@@ -204,8 +204,10 @@ internal fun AppearanceScreen(
                     }
                 }
             }
-            item { SettingsSection(stringResource(R.string.appearance_conversation_heading)) }
-            item {
+            item(key = "search.Appearance.5") {
+                SettingsSection(stringResource(R.string.appearance_conversation_heading))
+            }
+            item(key = "search.Appearance.6") {
                 SettingsGroup {
                     row("composer") { context ->
                         SettingsLink(
@@ -243,7 +245,7 @@ internal fun AppearanceScreen(
                     }
                 }
             }
-            item {
+            item(key = "search.Appearance.7") {
                 val previewTheme = BubbleTheme.resolve(appState.themeMode, isSystemInDarkTheme())
                 AppearanceAccessibilitySample(
                     state = previewState,

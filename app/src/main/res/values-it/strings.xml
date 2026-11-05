@@ -2561,4 +2561,10 @@
     <string name="media_viewer_actual_size">Dimensioni reali (1:1)</string>
     <string name="media_viewer_zoom_out">Riduci</string>
     <string name="media_viewer_toggle_controls">Mostra o nascondi i controlli</string>
+    <string name="settings_search">Cerca nelle impostazioni</string>
+    <string name="settings_search_no_results">Nessuna impostazione trovata. Prova un’altra parola.</string>
+    <string name="settings_search_alias_font_size">dimensione del testo|scala del carattere|testo più grande|testo più piccolo</string>
+    <string name="settings_search_alias_read_aloud">TTS|sintesi vocale|leggi ad alta voce</string>
+    <string name="settings_search_alias_sound">suono delle notifiche|suono di avviso|suoneria</string>
+    <string name="settings_search_revealed">%1$s. Impostazione evidenziata.</string>
 </resources>

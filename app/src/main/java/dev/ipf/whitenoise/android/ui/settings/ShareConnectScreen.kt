@@ -350,25 +350,27 @@ private fun ShareConnectShareAction(
     LaunchedEffect(exporting) { if (exporting) menuExpanded = false }
 
     Box {
-        IconButton(
-            onClick = { menuExpanded = true },
-            enabled = !exporting,
-            modifier =
-                Modifier.testTag("share_connect.share").semantics {
-                    if (exporting) contentDescription = shareLabel
-                    if (gallerySaveInProgress) stateDescription = savingLabel
-                },
-        ) {
-            if (exporting) {
-                CircularProgressIndicator(
-                    Modifier.size(ShareConnectDefaults.IconSize),
-                    strokeWidth = 2.dp,
-                )
-            } else {
-                Icon(
-                    painter = painterResource(R.drawable.ic_share),
-                    contentDescription = shareLabel,
-                )
+        SettingsSearchRowReveal("share_profile", modifier = Modifier) {
+            IconButton(
+                onClick = { menuExpanded = true },
+                enabled = !exporting,
+                modifier =
+                    Modifier.testTag("share_connect.share").semantics {
+                        if (exporting) contentDescription = shareLabel
+                        if (gallerySaveInProgress) stateDescription = savingLabel
+                    },
+            ) {
+                if (exporting) {
+                    CircularProgressIndicator(
+                        Modifier.size(ShareConnectDefaults.IconSize),
+                        strokeWidth = 2.dp,
+                    )
+                } else {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_share),
+                        contentDescription = shareLabel,
+                    )
+                }
             }
         }
         WhiteNoiseDropdownMenu(
@@ -453,18 +455,19 @@ private fun ShareProfileContent(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            IdentifierCopyCapsule(
-                value = profile.npub,
-                copied = copied,
-                onCopy = onCopy,
-                copyContentDescription = stringResource(R.string.copy_public_key),
-                copiedContentDescription = stringResource(R.string.copied),
-                notCopiedStateDescription = copyState,
-                copiedStateDescription = copyState,
-                targetTestTag = "share_connect.copy_public_key",
-                visualTestTag = "share_connect.copy_public_key.visual",
-                modifier = Modifier.padding(top = 4.dp),
-            )
+            SettingsSearchRowReveal("copy_public_key", modifier = Modifier.padding(top = 4.dp)) {
+                IdentifierCopyCapsule(
+                    value = profile.npub,
+                    copied = copied,
+                    onCopy = onCopy,
+                    copyContentDescription = stringResource(R.string.copy_public_key),
+                    copiedContentDescription = stringResource(R.string.copied),
+                    notCopiedStateDescription = copyState,
+                    copiedStateDescription = copyState,
+                    targetTestTag = "share_connect.copy_public_key",
+                    visualTestTag = "share_connect.copy_public_key.visual",
+                )
+            }
             // The capsule abbreviates; the whole key stays readable for comparison (#3321).
             if (profile.npub.isNotBlank()) {
                 FullPublicKey(
@@ -517,17 +520,19 @@ private fun ShareConnectBottomAction(onClick: () -> Unit) {
                         .padding(WhiteNoiseSpacing.PinnedActionInset),
                 contentAlignment = Alignment.Center,
             ) {
-                WhiteNoiseButton(
-                    onClick = onClick,
-                    modifier = Modifier.fillMaxWidth().testTag("share_connect.open_scanner"),
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_qr_code_scanner),
-                        contentDescription = null,
-                        modifier = Modifier.size(ShareConnectDefaults.IconSize),
-                    )
-                    Spacer(Modifier.width(WhiteNoiseSpacing.Related))
-                    Text(stringResource(R.string.scan_qr_code))
+                SettingsSearchRowReveal("scan_qr_code", modifier = Modifier.fillMaxWidth()) {
+                    WhiteNoiseButton(
+                        onClick = onClick,
+                        modifier = Modifier.fillMaxWidth().testTag("share_connect.open_scanner"),
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_qr_code_scanner),
+                            contentDescription = null,
+                            modifier = Modifier.size(ShareConnectDefaults.IconSize),
+                        )
+                        Spacer(Modifier.width(WhiteNoiseSpacing.Related))
+                        Text(stringResource(R.string.scan_qr_code))
+                    }
                 }
             }
         }

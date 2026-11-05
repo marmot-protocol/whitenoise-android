@@ -239,15 +239,15 @@ internal fun RelaysContent(
                     )
                 }
             }
-            item { SettingsSection(stringResource(R.string.relay_lists_section)) }
-            item {
+            item(key = "search.Relays.2") { SettingsSection(stringResource(R.string.relay_lists_section)) }
+            item(key = "search.Relays.3") {
                 SettingsGroup(modifier = Modifier.testTag("relay.publication.group")) {
                     relayPublicationRows(state, onRefresh, onPublishMissing)
                 }
             }
-            item { SettingsExplainer(stringResource(relayListsHelpRes(lists))) }
-            item { SettingsSection(stringResource(R.string.profile_relays)) }
-            item {
+            item(key = "search.Relays.4") { SettingsExplainer(stringResource(relayListsHelpRes(lists))) }
+            item(key = "search.Relays.5") { SettingsSection(stringResource(R.string.profile_relays)) }
+            item(key = "search.Relays.6") {
                 SettingsGroup(modifier = Modifier.testTag("relays.group")) {
                     relays.forEach { relay ->
                         row(relay.url) { context ->
@@ -272,8 +272,8 @@ internal fun RelaysContent(
                     }
                 }
             }
-            item { SettingsExplainer(stringResource(R.string.relays_explanation)) }
-            item {
+            item(key = "search.Relays.7") { SettingsExplainer(stringResource(R.string.relays_explanation)) }
+            item(key = "search.Relays.8") {
                 WhiteNoiseFilledTonalButton(
                     onClick = onRestore,
                     modifier =
@@ -287,7 +287,7 @@ internal fun RelaysContent(
                     enabled = lists != null && !defaultsInUse && !busy,
                 ) { Text(stringResource(R.string.restore_default_relays)) }
             }
-            item {
+            item(key = "search.Relays.9") {
                 SettingsExplainer(
                     stringResource(if (defaultsInUse) R.string.relay_defaults_in_use else R.string.relay_restore_help),
                 )
@@ -400,14 +400,14 @@ internal fun RelayDetailsScreen(
         relay.roles.filter { role -> lists != null && !canRemoveRelay(lists.relaysFor(role.kind), relay.url) }
     SettingsScaffold(title = stringResource(R.string.relay), onBack = onBack) {
         SettingsList {
-            item {
+            item(key = "search.Relays.10") {
                 SettingsGroup(modifier = Modifier.testTag("relay.details.metadata")) {
                     row("name") { context -> SettingsValue(context, stringResource(R.string.name), relay.name) }
                     row("url") { context -> SettingsValue(context, stringResource(R.string.url), relay.url) }
                 }
             }
-            item { SettingsSection(stringResource(R.string.use_for)) }
-            item {
+            item(key = "search.Relays.11") { SettingsSection(stringResource(R.string.use_for)) }
+            item(key = "search.Relays.12") {
                 SettingsGroup(modifier = Modifier.testTag("relay.details.roles")) {
                     AccountRelayRole.entries.forEach { role ->
                         row(role.name) { context ->
@@ -424,7 +424,7 @@ internal fun RelayDetailsScreen(
                 }
             }
             if (blockingRoles.isNotEmpty()) {
-                item {
+                item(key = "search.Relays.13") {
                     SettingsExplainer(
                         stringResource(
                             R.string.relay_remove_last_detail,
@@ -433,7 +433,7 @@ internal fun RelayDetailsScreen(
                     )
                 }
             }
-            item {
+            item(key = "search.Relays.14") {
                 SettingsGroup {
                     row("remove") { context ->
                         SettingsAction(
