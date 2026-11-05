@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -26,6 +27,7 @@ import dev.ipf.whitenoise.android.state.PendingAttachment
 import dev.ipf.whitenoise.android.state.PreparedForwardMessage
 import dev.ipf.whitenoise.android.ui.conversation.BatchMessageActionItem
 import dev.ipf.whitenoise.android.ui.conversation.batchForwardPayloads
+import dev.ipf.whitenoise.android.ui.conversation.batchForwardSnapshotFor
 import dev.ipf.whitenoise.android.ui.conversation.batchSelectionActionAvailability
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -33,6 +35,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -74,6 +77,36 @@ class PendingTextForwardCoverageTest {
         composeRule.runOnIdle { robot.item = robot.item.copy(status = MessageStatus.Failed) }
 
         composeRule.onNodeWithTag(FORWARD_CHAT_PICKER_SCREEN_TEST_TAG).assertIsDisplayed()
+    }
+
+    /** A sent message whose edit is in flight is not a pending send, so its Forward stays blocked as before. */
+    @Test
+    fun aSentMessageWithAnEditInFlightIsNotAPendingSend() {
+        val robot = PendingBubbleRobot()
+        robot.item = robot.item.copy(statusFromEdit = true)
+        assertFalse(robot.item.isPendingSend)
+        robot.render()
+
+        if (composeRule.onAllNodesWithText("Forward", substring = false).fetchSemanticsNodes().isNotEmpty()) {
+            composeRule.onNodeWithText("Forward", substring = false).performClick()
+        }
+        composeRule.onNodeWithTag(FORWARD_CHAT_PICKER_SCREEN_TEST_TAG).assertDoesNotExist()
+    }
+
+    /**
+     * A mixed batch picker forwards the payloads it opened with, even after a pending send drops out of the live
+     * selection, and closes once nothing forwardable is left.
+     */
+    @Test
+    fun aMixedBatchPickerKeepsItsOpeningSnapshot() {
+        val committed = actionItem("m1", "first", pending = false)
+        val pending = actionItem(TEMP_ID, "second", pending = true)
+        val opened = batchForwardPayloads(listOf(committed, pending))
+
+        val afterFailure = batchForwardSnapshotFor(opened, batchForwardPayloads(listOf(committed)))
+        assertEquals(listOf("first", "second"), afterFailure?.texts())
+        assertNull(batchForwardSnapshotFor(opened, emptyList()))
+        assertNull(batchForwardSnapshotFor(null, opened))
     }
 
     /** Pending text forwards exactly the accepted body, while pending media keeps its pending-attachment reason. */

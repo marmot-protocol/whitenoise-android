@@ -13732,9 +13732,10 @@ class ConversationController(
         val edit = optimisticEdits[record.messageIdHex] ?: return this
         val durablePending = edit.durableIntent != null && status == MessageStatus.Pending
         if (status != MessageStatus.Sent && !durablePending) return this
+        val fromEdit = status == MessageStatus.Sent
         return when (edit.status) {
-            MessageStatus.Pending -> copy(status = MessageStatus.Pending)
-            MessageStatus.Failed -> copy(status = MessageStatus.Failed)
+            MessageStatus.Pending -> copy(status = MessageStatus.Pending, statusFromEdit = fromEdit)
+            MessageStatus.Failed -> copy(status = MessageStatus.Failed, statusFromEdit = fromEdit)
             else -> this
         }
     }

@@ -184,10 +184,14 @@ internal fun batchForwardSheetOpenForBodies(
     forwardBodies: List<String>,
 ): Boolean = currentlyOpen && forwardBodies.isNotEmpty()
 
-internal fun batchForwardSheetOpenForPayloads(
-    currentlyOpen: Boolean,
+/**
+ * The payloads an open batch picker keeps forwarding. The picker holds the list captured when it opened, so a pending
+ * send that fails mid-pick doesn't silently drop out of a mixed batch, and it closes once nothing forwardable is left.
+ */
+internal fun batchForwardSnapshotFor(
+    snapshot: List<ForwardMessagePayload>?,
     forwardPayloads: List<ForwardMessagePayload>,
-): Boolean = currentlyOpen && forwardPayloads.isNotEmpty()
+): List<ForwardMessagePayload>? = snapshot?.takeIf { forwardPayloads.isNotEmpty() }
 
 internal fun reconcileBatchSelections(
     selected: Map<String, BatchMessageSelection>,

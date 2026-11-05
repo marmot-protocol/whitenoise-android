@@ -775,8 +775,11 @@ internal fun ConversationScreen(
     // composition state deliberately: serializing decrypted message snapshots into
     // Android saved state would extend their lifetime and privacy footprint.
     val selectedMessages = presentationState.selectedMessages
-    var batchForwardSheetOpen by
-        remember(chat.id, conversationAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
+    // Non-null while the batch picker is open: the payloads captured when it opened.
+    var batchForwardSnapshot by
+        remember(chat.id, conversationAccountRef, appState.runtimeGeneration) {
+            mutableStateOf<List<ForwardMessagePayload>?>(null)
+        }
     var batchAttachmentSaveInFlight by
         remember(chat.id, conversationAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
     var batchInfoSelection by
@@ -1051,11 +1054,12 @@ internal fun ConversationScreen(
                         !isBatchSelectableMessage(
                             messageId = messageId,
                             userVisibleMessage = MessageProjector.isChatKind(record.kind),
-                            // A pending send joins a batch so its accepted text can be forwarded (#2794).
+                            // A pending send joins a batch so its accepted text can be forwarded (#2794), while a
+                            // sent message with an edit in flight stays out of selection as before.
                             committedMessage =
                                 item.status == MessageStatus.Received ||
                                     item.status == MessageStatus.Sent ||
-                                    item.status == MessageStatus.Pending,
+                                    item.isPendingSend,
                             projectedDeleted = item.projected?.deleted == true,
                             deletedMessageIds = controller.deletedMessageIds,
                         )
@@ -1073,7 +1077,7 @@ internal fun ConversationScreen(
                     val forwardEligibility =
                         if (invalidated || persistedFailure) {
                             ForwardEligibility.Blocked(ForwardBlockedReason.Unsupported)
-                        } else if (item.status == MessageStatus.Pending) {
+                        } else if (item.isPendingSend) {
                             MessageProjector.pendingForwardEligibility(
                                 message = record,
                                 mediaReferences = mediaReferences,
@@ -1121,7 +1125,7 @@ internal fun ConversationScreen(
                                 forwardPayload = (forwardEligibility as? ForwardEligibility.Eligible)?.payload,
                                 forwardBlockedReason =
                                     (forwardEligibility as? ForwardEligibility.Blocked)?.reason,
-                                pendingSend = item.status == MessageStatus.Pending,
+                                pendingSend = item.isPendingSend,
                             ),
                         record = record,
                         status = item.status,
@@ -1348,7 +1352,7 @@ internal fun ConversationScreen(
         }
         controller.acknowledgeTimelineRemovals(pendingTimelineRemovals)
         if (selectedMessages.isEmpty()) {
-            batchForwardSheetOpen = false
+            batchForwardSnapshot = null
             showBatchDeleteConfirm = false
         }
     }
@@ -3864,11 +3868,7 @@ internal fun ConversationScreen(
 
     val openDetailsDescription = stringResource(R.string.details)
     LaunchedEffect(batchSelectionUi.forwardPayloads.isEmpty()) {
-        batchForwardSheetOpen =
-            batchForwardSheetOpenForPayloads(
-                currentlyOpen = batchForwardSheetOpen,
-                forwardPayloads = batchSelectionUi.forwardPayloads,
-            )
+        batchForwardSnapshot = batchForwardSnapshotFor(batchForwardSnapshot, batchSelectionUi.forwardPayloads)
     }
     ComposerSendMotionMediaGate(composerSendMotion, mediaViewerSessionState, sendMotionEnabled)
     ComposerSendMotionHost(composerSendMotion, surfaceMotionEnabled) {
@@ -4003,7 +4003,9 @@ internal fun ConversationScreen(
                         }
                     },
                     onForwardSelection = {
-                        if (batchSelectionUi.forwardPayloads.isNotEmpty()) batchForwardSheetOpen = true
+                        if (batchSelectionUi.forwardPayloads.isNotEmpty()) {
+                            batchForwardSnapshot = batchSelectionUi.forwardPayloads
+                        }
                     },
                     onSaveSelection = {
                         if (batchSelectionUi.actionAvailability.canSave && !batchAttachmentSaveInFlight) {
@@ -4978,14 +4980,14 @@ internal fun ConversationScreen(
     @Composable
     @Suppress("LongMethod", "CyclomaticComplexMethod")
     fun conversationOverlays() {
-        if (batchForwardSheetOpen && batchSelectionUi.forwardPayloads.isNotEmpty()) {
+        batchForwardSnapshot?.let { payloads ->
             ForwardMessageSheet(
                 appState = appState,
-                payloads = batchSelectionUi.forwardPayloads,
+                payloads = payloads,
                 sourceAccountRef = controller.boundAccountRef,
                 originGroupIdHex = controller.group.groupIdHex,
                 onDismiss = {
-                    batchForwardSheetOpen = false
+                    batchForwardSnapshot = null
                     selectedMessages.clear()
                 },
             )

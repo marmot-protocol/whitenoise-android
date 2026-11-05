@@ -320,7 +320,7 @@
       {
         "surface": "Pending sends join batch selection",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "anchor": "pendingSend = item.status == MessageStatus.Pending,",
+        "anchor": "pendingSend = item.isPendingSend,",
         "test_ids": [
           "MSG-010"
         ]

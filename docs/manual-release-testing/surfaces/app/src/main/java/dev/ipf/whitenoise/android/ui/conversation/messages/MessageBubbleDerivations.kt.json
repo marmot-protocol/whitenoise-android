@@ -32,7 +32,7 @@
       {
         "surface": "Pending send forward eligibility in the message menu",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleDerivations.kt",
-        "anchor": "item.status == MessageStatus.Pending ->",
+        "anchor": "item.isPendingSend ->",
         "test_ids": [
           "MSG-010"
         ]
