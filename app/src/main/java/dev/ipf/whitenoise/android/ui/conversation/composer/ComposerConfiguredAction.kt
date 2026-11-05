@@ -148,7 +148,14 @@ private fun ComposerOptionalShortcutAction(
             }
         },
         enabled = shortcutEnabled,
-        modifier = modifier.then(if (shortcut == ComposerShortcut.Dictation) Modifier.dictationLauncherOrigin() else Modifier),
+        modifier =
+            modifier.then(
+                if (shortcut == ComposerShortcut.Dictation) {
+                    Modifier.dictationLauncherOrigin()
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         Icon(
             painterResource(shortcut.iconRes),

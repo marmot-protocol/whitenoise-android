@@ -68,34 +68,10 @@ class ComposerToolbarEditorInteractionTest {
     /** Real frames prove contact, the projected hole and a same-frame cross-side drop. */
     private fun assertLiftAndSettle(rtl: Boolean) {
         val camera = ComposerShortcut.Camera
-        val settings =
-            ComposerToolbarSettings(
-                listOf(
-                    ComposerShortcut.More,
-                    camera,
-                    ComposerShortcut.Gallery,
-                    ComposerShortcut.Files,
-                    ComposerShortcut.Paste,
-                    ComposerShortcut.Dictation,
-                ),
-                ComposerToolbarLayout.AlwaysExpanded,
-            ).withSide(ComposerShortcut.Files, ComposerShortcutSide.Right)
-                .withSide(ComposerShortcut.Paste, ComposerShortcutSide.Right)
-                .withSide(ComposerShortcut.Dictation, ComposerShortcutSide.Right)
+        val settings = liftAndSettleSettings(camera)
         val edit = ComposerToolbarEditState(settings)
         val saves = mutableListOf<ComposerToolbarSettings>()
-        render(
-            edit,
-            { next, complete ->
-                saves += next
-                complete(true)
-            },
-            {},
-            width = if (rtl) 240 else 360,
-            fontScale = if (rtl) 2f else 1f,
-            rtl = rtl,
-            amoled = true,
-        )
+        renderLiftAndSettle(edit, saves, rtl)
         val source = previewIcon(camera).fetchSemanticsNode().boundsInRoot.center
         val destination =
             listOf(ComposerShortcut.Files, ComposerShortcut.Paste, ComposerShortcut.Dictation)
@@ -135,7 +111,10 @@ class ComposerToolbarEditorInteractionTest {
         composeRule.mainClock.advanceTimeBy(64)
         val midCenter = lifted.fetchSemanticsNode().boundsInRoot.center
         assertTrue("settling actually moves", (midCenter - released.from).getDistance() > 1f)
-        assertTrue("intermediate frame has not snapped to its destination", (midCenter - finalCenter).getDistance() > 1f)
+        assertTrue(
+            "intermediate frame has not snapped to its destination",
+            (midCenter - finalCenter).getDistance() > 1f,
+        )
         captureDragFrame(rtl, "mid_settle")
         composeRule.mainClock.advanceTimeBy(1_000)
         composeRule.runOnIdle { assertEquals(null, edit.release) }
@@ -147,6 +126,42 @@ class ComposerToolbarEditorInteractionTest {
         composeRule.mainClock.autoAdvance = true
     }
 
+    /** The unchanged six-shortcut fixture keeps the physical cross-side and wrapping cases. */
+    private fun liftAndSettleSettings(camera: ComposerShortcut): ComposerToolbarSettings =
+        ComposerToolbarSettings(
+            listOf(
+                ComposerShortcut.More,
+                camera,
+                ComposerShortcut.Gallery,
+                ComposerShortcut.Files,
+                ComposerShortcut.Paste,
+                ComposerShortcut.Dictation,
+            ),
+            ComposerToolbarLayout.AlwaysExpanded,
+        ).withSide(ComposerShortcut.Files, ComposerShortcutSide.Right)
+            .withSide(ComposerShortcut.Paste, ComposerShortcutSide.Right)
+            .withSide(ComposerShortcut.Dictation, ComposerShortcutSide.Right)
+
+    /** Rendering and save completion stay before the frozen clock and pointer mutations. */
+    private fun renderLiftAndSettle(
+        edit: ComposerToolbarEditState,
+        saves: MutableList<ComposerToolbarSettings>,
+        rtl: Boolean,
+    ) {
+        render(
+            edit,
+            { next, complete ->
+                saves += next
+                complete(true)
+            },
+            {},
+            width = if (rtl) 240 else 360,
+            fontScale = if (rtl) 2f else 1f,
+            rtl = rtl,
+            amoled = true,
+        )
+    }
+
     /** Publish one direct fixture mutation without advancing the frozen animation clock. */
     private fun applyDragChange(change: () -> Unit) {
         check(!composeRule.mainClock.autoAdvance)
@@ -156,7 +171,11 @@ class ComposerToolbarEditorInteractionTest {
             Snapshot.sendApplyNotifications()
         }
         composeRule.waitForIdle()
-        assertEquals("publishing fixture state does not advance animation time", before, composeRule.mainClock.currentTime)
+        assertEquals(
+            "publishing fixture state does not advance animation time",
+            before,
+            composeRule.mainClock.currentTime,
+        )
     }
 
     /** Commit the changed composition on precisely its first 16 ms frame. */

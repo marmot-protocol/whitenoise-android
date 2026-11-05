@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.IntOffset
 import dev.ipf.whitenoise.android.state.ComposerShortcut
 import kotlin.math.roundToInt
 
+private const val COMPOSER_LIFTED_SHORTCUT_SCALE = 1.15f
+
 /** Keeps the grab point attached to the finger, then settles into the actual laid-out slot. */
 @Composable
 internal fun BoxScope.ComposerToolbarLiftedIcon(state: ComposerToolbarEditState) {
@@ -36,7 +38,7 @@ internal fun BoxScope.ComposerToolbarLiftedIcon(state: ComposerToolbarEditState)
     val settling = remember(state, released) { Animatable(released?.from ?: Offset.Zero, Offset.VectorConverter) }
     LaunchedEffect(state, shortcut, state.dragging) {
         scale.animateTo(
-            if (state.dragging != null) 1.15f else 1f,
+            if (state.dragging != null) COMPOSER_LIFTED_SHORTCUT_SCALE else 1f,
             spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMedium),
         )
     }
@@ -56,7 +58,8 @@ internal fun BoxScope.ComposerToolbarLiftedIcon(state: ComposerToolbarEditState)
         Modifier
             .align(AbsoluteAlignment.TopLeft)
             .absoluteOffset {
-                val center = (if (state.dragging != null) state.dragCenter else settling.value) - state.selectedArea.topLeft
+                val absoluteCenter = if (state.dragging != null) state.dragCenter else settling.value
+                val center = absoluteCenter - state.selectedArea.topLeft
                 IntOffset((center.x - diameter / 2f).roundToInt(), (center.y - diameter / 2f).roundToInt())
             }.size(ComposerShortcutTarget)
             .graphicsLayer {

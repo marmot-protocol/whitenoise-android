@@ -85,9 +85,12 @@ internal fun MainShellNoticeLayout(
                     launcherOrigin.takeEntrance(
                         sessionId = dictationController.state.sessionId,
                         eligible =
-                            dictationMotionAllowed &&
-                                dictationDestination == ConversationDictationControlOwner.Persistent &&
-                                conversationDictationOriginComposerVisible(dictationController.state, dictationComposerRoute),
+                            canUseDictationLauncherOrigin(
+                                dictationMotionAllowed,
+                                dictationDestination,
+                                dictationController,
+                                dictationComposerRoute,
+                            ),
                     ),
             )
         }
@@ -146,7 +149,12 @@ internal fun MainShellNoticeLayout(
                         state = dictationController.state,
                         modifier =
                             Modifier.graphicsLayer {
-                                alpha = if (dictationMotion.entranceActive) dictationMotion.renderedDecorationAlpha else 1f
+                                alpha =
+                                    if (dictationMotion.entranceActive) {
+                                        dictationMotion.renderedDecorationAlpha
+                                    } else {
+                                        1f
+                                    }
                             },
                         controller = dictationController,
                         embedded = dictationControlOwner == ConversationDictationControlOwner.Composer,
@@ -179,3 +187,14 @@ internal fun MainShellNoticeLayout(
         )
     }
 }
+
+/** Reads session route state only after the existing motion and persistent-owner exclusions pass. */
+private fun canUseDictationLauncherOrigin(
+    motionAllowed: Boolean,
+    destination: ConversationDictationControlOwner?,
+    controller: ConversationDictationController,
+    route: ConversationDictationComposerRoute,
+): Boolean =
+    motionAllowed &&
+        destination == ConversationDictationControlOwner.Persistent &&
+        conversationDictationOriginComposerVisible(controller.state, route)

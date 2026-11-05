@@ -85,7 +85,10 @@ internal class DictationLauncherEntranceScreenshotTest : DictationNavigationScen
         composeRule.onAllNodes(hasTestTag(APP_DICTATION_CONTROL_TAG)).assertCountEquals(0)
         firstNavigationFrame { fixture.locked = false }
         assertPaintedComposerGap()
-        assertTrue("Unlocking a current session does not restart entry", !requireNotNull(fixture.dictationMotion).entranceActive)
+        assertTrue(
+            "Unlocking a current session does not restart entry",
+            !requireNotNull(fixture.dictationMotion).entranceActive,
+        )
         assertSingleActionSet()
         assertEquals(0, fixture.platform.cancels)
         assertTrue(fixture.writes.isEmpty())

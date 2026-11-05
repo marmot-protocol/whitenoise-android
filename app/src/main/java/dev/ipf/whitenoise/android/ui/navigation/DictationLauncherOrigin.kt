@@ -35,17 +35,17 @@ internal class DictationLauncherOrigin {
         token: Any,
         bounds: Rect,
     ) {
-        if (bounds.width > 0f &&
-            bounds.height > 0f &&
-            bounds.left.isFinite() &&
-            bounds.top.isFinite() &&
-            bounds.right.isFinite() &&
-            bounds.bottom.isFinite()
-        ) {
+        if (bounds.width > 0f && bounds.height > 0f && hasFiniteCoordinates(bounds)) {
             current = token to bounds
         } else {
             remove(token)
         }
+    }
+
+    /** Coordinate checks retain their original order and short-circuit after the first invalid edge. */
+    private fun hasFiniteCoordinates(bounds: Rect): Boolean {
+        val finiteStart = bounds.left.isFinite() && bounds.top.isFinite()
+        return finiteStart && bounds.right.isFinite() && bounds.bottom.isFinite()
     }
 
     /** Outgoing launcher disposal cannot remove a replacement slot's registration. */

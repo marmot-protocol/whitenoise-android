@@ -57,8 +57,10 @@ internal class ComposerToolbarEditState(
         released: ComposerToolbarRelease? = null,
     ) {
         selectedBounds[shortcut] = bounds
-        if (release === released && released != null && released.shortcut == shortcut && released.placed) {
-            if (bounds.isEmpty) finishRelease(released) else released.target = bounds.center
+        if (release === released && released != null) {
+            if (released.shortcut == shortcut && released.placed) {
+                if (bounds.isEmpty) finishRelease(released) else released.target = bounds.center
+            }
         }
         updateInsertion()
     }
