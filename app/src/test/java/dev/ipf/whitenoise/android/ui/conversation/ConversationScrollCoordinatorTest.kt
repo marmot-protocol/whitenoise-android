@@ -2110,6 +2110,72 @@ class ConversationScrollCoordinatorTest {
             assertEquals(ConversationScrollMode.ReadingHistory("long", 300), coordinator.mode)
         }
 
+    /**
+     * A passive tail correction, such as the membership-row follow, still in flight when a tall message arrives must
+     * not make the landing look like a history reader. The landing supersedes the correction and reaches the beginning.
+     */
+    @Test
+    fun anIncomingLandingDuringAPassiveTailCorrectionStillRevealsTheBeginning() =
+        runTest {
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(900, 80, 80))
+            list.settle(index = 1)
+            val coordinator = ConversationScrollCoordinator(list)
+            val correctionFrame = CompletableDeferred<Unit>()
+            val correction =
+                async {
+                    coordinator.followTailIfAllowed(
+                        resolveTailIndex = { 0 },
+                        reason = ConversationScrollReason.NewMessage,
+                        awaitFrame = { correctionFrame.await() },
+                    )
+                }
+            runCurrent()
+            assertEquals(
+                ConversationScrollMode.ProgrammaticJump(null, ConversationScrollReason.NewMessage),
+                coordinator.mode,
+            )
+            val outcome =
+                coordinator.followAppendOrRevealIncomingStart(
+                    candidates = listOf(incoming("long")),
+                    probeFor = { list.probe { 0 } },
+                    resolveTailIndex = { 0 },
+                    awaitFrame = list::frame,
+                )
+            val revealed = outcome as ConversationIncomingAppendOutcome.RevealedReadingStart
+            assertEquals(ConversationReadingStartPlacement(0, 300), revealed.placement)
+            assertFalse("the superseded correction reports no settle", correction.await())
+            assertEquals(ConversationScrollMode.ReadingHistory("long", 300), coordinator.mode)
+        }
+
+    /** An explicit jump in flight, such as a mention, keeps refusing an incoming landing that would override it. */
+    @Test
+    fun anIncomingLandingDuringExplicitNavigationIsNotTaken() =
+        runTest {
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(900, 80, 80))
+            list.settle(index = 1)
+            val coordinator = ConversationScrollCoordinator(list)
+            val jumpFrame = CompletableDeferred<Unit>()
+            val jump =
+                async {
+                    coordinator.programmaticJump(
+                        targetMessageId = "mention",
+                        reason = ConversationScrollReason.Mention,
+                    ) { jumpFrame.await() }
+                }
+            runCurrent()
+            assertEquals(
+                ConversationIncomingAppendOutcome.NotFollowing,
+                coordinator.followAppendOrRevealIncomingStart(
+                    candidates = listOf(incoming("long")),
+                    probeFor = { list.probe { 0 } },
+                    resolveTailIndex = { 0 },
+                    awaitFrame = list::frame,
+                ),
+            )
+            jumpFrame.complete(Unit)
+            assertTrue(jump.await())
+        }
+
     /** A drag while the appended row is still being measured supersedes the landing before any reading-start write. */
     @Test
     fun dragDuringIncomingMeasurementSupersedesTheLanding() =

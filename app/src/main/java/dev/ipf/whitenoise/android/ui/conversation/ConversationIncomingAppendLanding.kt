@@ -120,7 +120,8 @@ internal class ConversationIncomingAppendLandingQueue {
  * in the occlusion-aware reading layout, waiting a bounded number of frames for the newest of them to be laid out,
  * and the existing reading-start settle places and validates the beginning. A drag, a navigation, a send or any
  * newer command supersedes it before a stale correction can be written. Only a reader who was following the tail is
- * moved, and a history reader is left exactly where they are. [probeFor] resolves each row by message identity on
+ * moved, including one whose only command in flight is a passive tail correction, and a history reader or a reader
+ * mid-navigation is left exactly where they are. [probeFor] resolves each row by message identity on
  * every read, so paging or structural rows that move its index cannot misplace the landing.
  *
  * [oversizedSeen] carries an oversized row an earlier, cancelled decision over the same burst measured, and
@@ -136,9 +137,9 @@ internal suspend fun ConversationScrollCoordinator.followAppendOrRevealIncomingS
     maxMeasureFrames: Int = INCOMING_APPEND_MEASURE_FRAMES,
     awaitFrame: suspend () -> Unit = { withFrameNanos { } },
 ): ConversationIncomingAppendOutcome {
-    if (!isFollowingTail || mode !is ConversationScrollMode.FollowingTail) {
-        return ConversationIncomingAppendOutcome.NotFollowing
-    }
+    // A passive correction in flight, such as the membership-row follow, would otherwise make a tail follower look
+    // like a history reader and silently consume the arrival. This latest-wins command supersedes it instead.
+    if (!isFollowingTailThroughPassiveCorrection) return ConversationIncomingAppendOutcome.NotFollowing
     var landed: Pair<ConversationIncomingAppendCandidate, ConversationReadingStartPlacement>? = null
     val completed =
         programmaticJump(
