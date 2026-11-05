@@ -138,14 +138,12 @@ class RecipientConfirmationNativeDeviceTest {
         withTimeout(60_000L) {
             var found: TimelineMessageRecordFfi? = null
             while (found == null) {
-                found =
-                    participant.native
-                        .timelineMessages(
-                            participant.account.label,
-                            TimelineMessageQueryFfi(group, null, null, null, null, null, 100u),
-                        )
-                        .messages
-                        .singleOrNull { it.plaintext == body && matches(it) }
+                val page =
+                    participant.native.timelineMessages(
+                        participant.account.label,
+                        TimelineMessageQueryFfi(group, null, null, null, null, null, 100u),
+                    )
+                found = page.messages.singleOrNull { it.plaintext == body && matches(it) }
                 if (found == null) delay(100L)
             }
             requireNotNull(found)
@@ -234,19 +232,20 @@ class RecipientConfirmationNativeDeviceTest {
     private suspend fun open(
         directory: File,
         relay: LoopbackNostrRelay,
-    ): Marmot =
-        Marmot.newWithConfiguration(
-            directory.path,
-            listOf(relay.url),
-            MarmotOptions(
-                relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
-                deployment = marmotDeploymentWhiteNoise(),
-            ),
-        )
-            .also {
-                runtimes += it
-                it.start()
-            }
+    ): Marmot {
+        val native =
+            Marmot.newWithConfiguration(
+                directory.path,
+                listOf(relay.url),
+                MarmotOptions(
+                    relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
+                    deployment = marmotDeploymentWhiteNoise(),
+                ),
+            )
+        runtimes += native
+        native.start()
+        return native
+    }
 
     /** Stops only a generated runtime so no own-publication echo can settle the controlled failure. */
     private suspend fun close(participant: Participant) {
