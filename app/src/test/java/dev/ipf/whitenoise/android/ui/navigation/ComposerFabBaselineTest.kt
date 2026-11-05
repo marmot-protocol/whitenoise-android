@@ -103,7 +103,9 @@ class ComposerFabBaselineTest {
                         },
                     ) { padding ->
                         Box(
-                            Modifier.fillMaxSize().padding(padding)
+                            Modifier
+                                .fillMaxSize()
+                                .padding(padding)
                                 .onPlaced { measuredContentTop = it.positionInWindow().y }
                                 .testTag(VIEWPORT),
                         )
@@ -115,15 +117,19 @@ class ComposerFabBaselineTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val body = rule.onNodeWithTag(VIEWPORT).fetchSemanticsNode().boundsInWindow
         val initialPen =
-            rule.onNodeWithContentDescription(context.getString(R.string.new_message))
-                .fetchSemanticsNode().boundsInWindow
+            rule
+                .onNodeWithContentDescription(context.getString(R.string.new_message))
+                .fetchSemanticsNode()
+                .boundsInWindow
         assertTrue("Missing current measurement keeps the pen below the header", initialPen.top >= body.top)
         assertTrue("The initial pen stays inside the body", initialPen.bottom <= body.bottom + 1.1f)
         rule.runOnIdle { contentTop.value = requireNotNull(measuredContentTop) }
         rule.waitForIdle()
         val pen =
-            rule.onNodeWithContentDescription(context.getString(R.string.new_message))
-                .fetchSemanticsNode().boundsInWindow
+            rule
+                .onNodeWithContentDescription(context.getString(R.string.new_message))
+                .fetchSemanticsNode()
+                .boundsInWindow
         assertEquals("The tall retained reference clamps to the actual content boundary", body.top, pen.top, 1.1f)
         assertTrue("The complete pen stays inside the current body", pen.bottom <= body.bottom + 1.1f)
         assertEquals("Viewport clamping keeps the pen width", 48f, pen.width, 1.1f)
