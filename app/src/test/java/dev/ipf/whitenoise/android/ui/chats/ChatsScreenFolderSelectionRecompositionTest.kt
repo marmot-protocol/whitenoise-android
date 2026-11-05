@@ -222,7 +222,8 @@ class ChatsScreenFolderSelectionRecompositionTest {
             }
         }
         composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(composeRule)
-        composeRule.waitUntil { reads == 1 }
+        // The prepared read, then the reconciling read the opening starts, held here.
+        composeRule.waitUntil { reads == 2 }
         composeRule.waitForIdle()
         composeRule.runOnIdle {
             appState.chatFolderPreferences.setFolderRule(
@@ -236,6 +237,10 @@ class ChatsScreenFolderSelectionRecompositionTest {
         composeRule.runOnIdle { reread.complete(emptyList()) }
     }
 
+    /**
+     * A row-level revision while the reconciling read is held keeps the row mounted with no progress, since
+     * retained rows override the snapshot, and the replacement lands with none either.
+     */
     @Test fun unreadRefreshKeepsUsefulRowsMountedUntilReplacementIsReady() {
         val appState = testAppState()
         val replacement = CompletableDeferred<List<dev.ipf.marmotkit.PresentedChatRowFfi>>()
@@ -262,7 +267,8 @@ class ChatsScreenFolderSelectionRecompositionTest {
                 WhiteNoiseTheme { ChatsScreen(appState, controller, {}, { _, _, _, _ -> }) }
             }
             composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(composeRule)
-            composeRule.waitUntil { reads == 1 }
+            // The prepared read, then the reconciling read the opening starts, held on the replacement.
+            composeRule.waitUntil { reads == 2 }
             composeRule.waitForIdle()
             composeRule.onNodeWithTag("chat.row.$id").assertExists()
             val revisionBeforeUpdate =
@@ -279,7 +285,7 @@ class ChatsScreenFolderSelectionRecompositionTest {
             composeRule.runOnIdle { assertTrue(controller.forwardTargetsRevision > revisionBeforeUpdate) }
             composeRule.waitUntil { reads >= 2 }
             composeRule.onNodeWithTag("chat.row.$id").assertExists()
-            composeRule.onNodeWithTag("chats.unread_refresh").assertExists()
+            composeRule.onNodeWithTag("chats.unread_refresh").assertDoesNotExist()
             composeRule
                 .onNodeWithTag(dev.ipf.whitenoise.android.ui.common.FULL_SCREEN_LOADING_TEST_TAG)
                 .assertDoesNotExist()
@@ -321,7 +327,8 @@ class ChatsScreenFolderSelectionRecompositionTest {
                 WhiteNoiseTheme { ChatsScreen(appState, controller, {}, { _, _, _, _ -> }) }
             }
             composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(composeRule)
-            composeRule.waitUntil { reads == 1 }
+            // The prepared read, then the reconciling read the opening starts, held on the replacement.
+            composeRule.waitUntil { reads == 2 }
             composeRule.waitForIdle()
             composeRule.onNodeWithTag("chat.row.$deleted").assertExists()
             composeRule.onNodeWithTag("chat.row.$surviving").assertExists()

@@ -92,6 +92,7 @@ import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.core.localeInvariantFold
 import dev.ipf.whitenoise.android.core.projectChatListSearchSections
 import dev.ipf.whitenoise.android.core.unreadMemberCandidateIds
+import dev.ipf.whitenoise.android.core.unreadNeedsMembers
 import dev.ipf.whitenoise.android.state.AccountWideForwardTargets
 import dev.ipf.whitenoise.android.state.AccountWideRead
 import dev.ipf.whitenoise.android.state.ChatListActionOwner
@@ -379,6 +380,8 @@ internal fun ChatsScreen(
     var unreadRetry by remember(controller, selectedFolderId) { mutableIntStateOf(0) }
     var unreadLoadedFolderState by remember(controller, selectedFolderId) { mutableStateOf(folderStoreState) }
     var unreadUnavailable by remember(controller, selectedFolderId) { mutableStateOf(false) }
+    var unreadUnavailableWhileOpen by remember(controller, selectedFolderId) { mutableStateOf(false) }
+    val currentUnreadOnly by rememberUpdatedState(unreadOnly)
     val unreadRevision = controller.forwardTargetsRevision
     // Search replaces the list and resets the filter, so it is the one mounted state with nothing to prepare.
     val unreadPrepared =
@@ -394,62 +397,83 @@ internal fun ChatsScreen(
             unreadSnapshot = null
             unreadReadFailed = false
             unreadUnavailable = false
+            unreadUnavailableWhileOpen = false
             return@LaunchedEffect
         }
-        // Projection bursts and folder edits, including the store's first load, request one latest
-        // follow-up without cancelling the active native read.
+        // Membership and folder changes, including the store's first load, request one latest follow-up
+        // without cancelling the active native read. While the filter is closed, row-level revisions start
+        // none, since retained rows already override the snapshot. Opening the filter starts one, because an
+        // off-window row can change with no event here, such as a chat read on another device, and while it
+        // is open its rows' revisions, including committed commands on them, keep it current. The prepared
+        // result shows at once in both cases; closing starts no read.
+        var previousTrigger: UnreadSnapshotTrigger? = null
         snapshotFlow {
-            Triple(controller.forwardTargetsRevision, controller.materializedGroupsRevision, folderStoreState)
+            UnreadSnapshotTrigger(
+                controller.materializedGroupsRevision,
+                folderStoreState,
+                controller.forwardTargetsRevision.takeIf { currentUnreadOnly },
+            )
         }.conflate()
-            .collect { (_, _, folders) ->
+            .collect { trigger ->
+                val closedOnly = trigger.closesFilterAfter(previousTrigger)
+                previousTrigger = trigger
+                if (closedOnly) return@collect
+                val folders = trigger.folders
                 unreadReadFailed = false
+                val timing = UnreadSnapshotPreparationTiming()
                 when (val read = controller.readAccountWideForwardTargets()) {
                     is AccountWideRead.Loaded -> {
+                        timing.readFinished()
                         val account = appState.activeAccountRef
                         val rule =
                             account?.let { owner ->
                                 selectedFolderId?.let { appState.chatFolderPreferences.folderRule(owner, it) }
                             }
-                        val rows = read.snapshot.chatListItems(controller.items + controller.archivedItems)
-                        val manual =
-                            account
-                                ?.let { owner ->
-                                    selectedFolderId?.let { appState.chatFolderPreferences.membershipFor(owner, it) }
-                                }.orEmpty()
-                        val excluded =
-                            account
-                                ?.let { owner ->
-                                    selectedFolderId?.let { appState.chatFolderPreferences.excludedChats(owner, it) }
-                                }.orEmpty()
-                        val ids =
-                            rule.unreadMemberCandidateIds(rows, manual, excluded, controller.boundAccountIdHex()) {
-                                chatListItemDisplayTitle(it, appState, groupTitleCopy)
+                        // Only participant folders need rosters, so others skip projecting every row here.
+                        val unresolved =
+                            if (account != null && selectedFolderId != null && rule.unreadNeedsMembers()) {
+                                val preferences = appState.chatFolderPreferences
+                                val rows = read.snapshot.chatListItems(controller.items + controller.archivedItems)
+                                val ids =
+                                    rule.unreadMemberCandidateIds(
+                                        rows,
+                                        preferences.membershipFor(account, selectedFolderId),
+                                        preferences.excludedChats(account, selectedFolderId),
+                                        controller.boundAccountIdHex(),
+                                    ) { chatListItemDisplayTitle(it, appState, groupTitleCopy) }
+                                read.snapshot.resolveChatListMembers(ids).also { timing.rostersFinished(ids.size) }
+                            } else {
+                                emptySet()
                             }
-                        val unresolved = read.snapshot.resolveChatListMembers(ids)
                         if (read.snapshot.isCurrent) {
                             unreadSnapshot = read.snapshot
                             unreadLoadedFolderState = folders
                             unreadReadFailed = unresolved.isNotEmpty()
                         }
                         unreadUnavailable = !read.snapshot.isCurrent
+                        unreadUnavailableWhileOpen = unreadUnavailable && currentUnreadOnly
                     }
                     AccountWideRead.Failed -> unreadReadFailed = true
-                    AccountWideRead.Unavailable -> unreadUnavailable = true
+                    AccountWideRead.Unavailable -> {
+                        unreadUnavailable = true
+                        unreadUnavailableWhileOpen = currentUnreadOnly
+                    }
                 }
             }
     }
-    // A list with no complete reader cannot honor the filter, so opening it falls back to every chat.
-    LaunchedEffect(unreadOnly, unreadUnavailable) {
-        if (unreadOnly && unreadUnavailable) setUnreadOnly(false)
+    // A list with no complete reader cannot honor the filter, so opening it falls back to every chat, but
+    // only once a read made while it is open says so. A background read that failed or found no reader
+    // before the filter opened gets one fresh attempt on opening instead.
+    LaunchedEffect(unreadOnly, unreadUnavailableWhileOpen) {
+        if (unreadOnly && unreadUnavailableWhileOpen) setUnreadOnly(false)
     }
-    // A background read that failed before the filter opened gets one fresh attempt on opening.
     LaunchedEffect(unreadOnly) {
-        if (unreadOnly && unreadReadFailed) unreadRetry++
+        if (unreadOnly && (unreadReadFailed || unreadUnavailable)) unreadRetry++
     }
-    // Retained rows override the snapshot, so a row revision keeps it usable, while a membership change
-    // withholds its off-window rows until the next read completes it again.
+    // Retained rows override the snapshot, so row revisions, new chats and local deletions keep it complete.
+    // Only a removal of unknown cause withholds its off-window rows until the next read completes it again.
     val displayUnreadSnapshot = unreadSnapshot?.takeIf { unreadLoadedFolderState == folderStoreState && it.isCurrent }
-    val completeUnreadSnapshot = displayUnreadSnapshot?.takeIf { it.hasCurrentMembership }
+    val completeUnreadSnapshot = displayUnreadSnapshot?.takeIf { it.coversCurrentMembership }
     val unreadItems =
         remember(
             unreadOnly,
@@ -915,6 +939,11 @@ internal fun ChatsScreen(
                 ) { chatListItemDisplayTitle(it, appState, groupTitleCopy) }
             }
         }
+    RecordUnreadFilterFirstResultFrame(
+        active = unreadOnly,
+        complete = completeUnreadSnapshot != null,
+        rowCount = visibleItems.size,
+    )
 
     fun visibleRowId(item: ChatListItem): String =
         if (searchActive) {

@@ -182,6 +182,14 @@ private fun chatMatchesKeyword(
                 localeInvariantFold(item.group.description).contains(ciKeyword)
         )
 
+/** Whether this folder's membership depends on participants, so its unread view needs member rosters. */
+internal fun ChatFolderRule?.unreadNeedsMembers(): Boolean =
+    if (this?.smartFilter != null) {
+        SmartFolderCodec.decode(smartFilter)?.references(FolderField.PARTICIPANTS) == true
+    } else {
+        this?.includeMemberPubkeys?.isNotEmpty() == true
+    }
+
 /** Missing rosters matter only for unread rows whose other folder constraints can still match. */
 internal fun ChatFolderRule?.unreadMemberCandidateIds(
     items: List<ChatListItem>,
@@ -191,13 +199,7 @@ internal fun ChatFolderRule?.unreadMemberCandidateIds(
     displayTitle: (ChatListItem) -> String,
 ): Set<String> {
     val advanced = this?.smartFilter?.let(SmartFolderCodec::decode)
-    val needsMembers =
-        if (this?.smartFilter != null) {
-            advanced?.references(FolderField.PARTICIPANTS) == true
-        } else {
-            this?.includeMemberPubkeys?.isNotEmpty() == true
-        }
-    val rule = this?.takeIf { needsMembers } ?: return emptySet()
+    val rule = this?.takeIf { it.unreadNeedsMembers() } ?: return emptySet()
     val unread = items.filter { it.effectiveHasUnread(activeAccountIdHex) }
     val muted = unread.filter { it.engineMuted() }.mapTo(hashSetOf()) { it.group.groupIdHex }
     val known =
