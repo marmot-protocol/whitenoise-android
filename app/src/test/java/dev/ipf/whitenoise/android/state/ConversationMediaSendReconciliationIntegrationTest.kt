@@ -1090,6 +1090,7 @@ private fun projectedMediaMessage(
     retentionExpiresAt = null,
     sticker = null,
     importedFrom = null,
+    recipientConfirmed = false,
     historyImportProvenance = null,
 )
 
