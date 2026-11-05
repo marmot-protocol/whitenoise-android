@@ -122,7 +122,7 @@ internal fun SupportContent(
     val canStart = hasAccount && (hasExistingChat || relayState == SupportRelayState.Configured)
     SettingsScaffold(title = stringResource(R.string.chat_with_support), onBack = onBack) {
         SettingsList {
-            item {
+            item(key = "search.SupportScreen.1") {
                 SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Section)) {
                     row("support_identity") { context ->
                         SettingsGroupPanel(context) {
@@ -162,9 +162,11 @@ internal fun SupportContent(
                 SettingsExplainer(stringResource(R.string.support_contact_explainer))
             }
             if (!hasAccount) {
-                item { SettingsCallout(text = stringResource(R.string.no_active_account_period)) }
+                item(key = "search.SupportScreen.2") {
+                    SettingsCallout(text = stringResource(R.string.no_active_account_period))
+                }
             } else if (!hasExistingChat && relayState != SupportRelayState.Configured) {
-                item {
+                item(key = "search.SupportScreen.3") {
                     SettingsCallout(
                         title = stringResource(R.string.support_relays_attention),
                         icon = R.drawable.ic_warning,
@@ -180,7 +182,7 @@ internal fun SupportContent(
                     )
                 }
                 if (relayState != SupportRelayState.Loading) {
-                    item {
+                    item(key = "search.SupportScreen.4") {
                         SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Related)) {
                             row("relays") { context ->
                                 SettingsLink(
@@ -207,7 +209,7 @@ internal fun SupportContent(
                     }
                 }
             }
-            item {
+            item(key = "search.SupportScreen.5") {
                 WhiteNoiseButton(
                     onClick = onStart,
                     enabled = canStart && !busy,

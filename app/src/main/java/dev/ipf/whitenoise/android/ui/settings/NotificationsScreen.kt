@@ -99,8 +99,8 @@ internal fun NotificationsScreen(
                     )
                 }
             }
-            item { SettingsSection(stringResource(R.string.delivery)) }
-            item {
+            item(key = "search.Notifications.2") { SettingsSection(stringResource(R.string.delivery)) }
+            item(key = "search.Notifications.3") {
                 NotificationDeliverySelector(
                     selectedMode = selectedMode,
                     capability = capability,
@@ -112,7 +112,7 @@ internal fun NotificationsScreen(
                 appState.pushStorageRecovery != PushStorageRecovery.Checking &&
                 appState.pushStorageRecovery != PushStorageRecovery.Ready
             ) {
-                item {
+                item(key = "search.Notifications.4") {
                     PushStorageRecoveryControl(
                         state = appState.pushStorageRecovery,
                         busy = appState.pushStorageRecoveryBusy,
@@ -121,9 +121,11 @@ internal fun NotificationsScreen(
                 }
             }
             if (!capability.isAvailable) {
-                item { SettingsExplainer(stringResource(capability.subtitleResource())) }
+                item(key = "search.Notifications.5") {
+                    SettingsExplainer(stringResource(capability.subtitleResource()))
+                }
             }
-            item {
+            item(key = "search.Notifications.6") {
                 val previews = appState.notificationPreviewSettings
                 NotificationPreviewControl(
                     state = NotificationPreviewControlState(previews.enabled, previews.busy, previews.failed),
@@ -131,8 +133,10 @@ internal fun NotificationsScreen(
                     onRetry = { appState.launchMutation { previews.retry() } },
                 )
             }
-            item { SettingsSection(stringResource(R.string.notification_device_policy)) }
-            item {
+            item(key = "search.Notifications.7") {
+                SettingsSection(stringResource(R.string.notification_device_policy))
+            }
+            item(key = "search.Notifications.8") {
                 NotificationDevicePolicyGroup(
                     permissionGranted = permissionGranted,
                     batteryPolicy = appState.notificationBatteryPolicy,
@@ -144,19 +148,25 @@ internal fun NotificationsScreen(
                     },
                 )
             }
-            item { SettingsExplainer(stringResource(R.string.notification_device_policy_detail)) }
-            item { SettingsSection(stringResource(R.string.notification_tones)) }
-            item { NotificationToneControl() }
-            item { SettingsExplainer(stringResource(R.string.notification_tone_scope)) }
-            item { SpokenAudioAlertControl() }
-            item { SettingsSection(stringResource(R.string.notification_categories)) }
-            item {
+            item(key = "search.Notifications.9") {
+                SettingsExplainer(stringResource(R.string.notification_device_policy_detail))
+            }
+            item(key = "search.Notifications.10") { SettingsSection(stringResource(R.string.notification_tones)) }
+            item(key = "search.Notifications.11") { NotificationToneControl() }
+            item(key = "search.Notifications.12") {
+                SettingsExplainer(stringResource(R.string.notification_tone_scope))
+            }
+            item(key = "search.Notifications.13") { SpokenAudioAlertControl() }
+            item(key = "search.Notifications.14") { SettingsSection(stringResource(R.string.notification_categories)) }
+            item(key = "search.Notifications.15") {
                 GlobalNotificationCategories(
                     onOpenChannel = { openNotificationChannelSettings(context, it) },
                     soundLabels = soundLabels,
                 )
             }
-            item { SettingsExplainer(stringResource(R.string.notification_categories_detail)) }
+            item(key = "search.Notifications.16") {
+                SettingsExplainer(stringResource(R.string.notification_categories_detail))
+            }
         }
     }
 }

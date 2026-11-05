@@ -2721,4 +2721,10 @@
     <string name="media_viewer_actual_size">Actual size (1:1)</string>
     <string name="media_viewer_zoom_out">Zoom out</string>
     <string name="media_viewer_toggle_controls">Show or hide controls</string>
+    <string name="settings_search">Search settings</string>
+    <string name="settings_search_no_results">No settings found. Try another word.</string>
+    <string name="settings_search_alias_font_size">text size|font scale|larger text|smaller text</string>
+    <string name="settings_search_alias_read_aloud">TTS|text to speech|read aloud</string>
+    <string name="settings_search_alias_sound">notification sound|alert sound|ringtone</string>
+    <string name="settings_search_revealed">%1$s. Setting highlighted.</string>
 </resources>

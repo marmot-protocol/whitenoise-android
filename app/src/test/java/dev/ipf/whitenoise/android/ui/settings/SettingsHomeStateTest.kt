@@ -7,6 +7,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SettingsHomeStateTest {
+    @Test fun searchHomeMetadataReusesEveryExistingLabelAndDestination() {
+        val catalog = settingsSearchCatalog().associateBy { it.id }
+        SettingsHomeRow.entries.forEach { row ->
+            val entry = catalog.getValue("home.${row.name}")
+            assertEquals(row.titleRes, entry.titleRes)
+            assertEquals(row.detail, entry.destination)
+            assertEquals(row.section.groupTitleRes, entry.categoryRes)
+        }
+    }
+
     /** An update worth installing leads the screen, above the labelled groups. */
     @Test
     fun anAvailableUpdateLeadsTheSettingsSections() {
