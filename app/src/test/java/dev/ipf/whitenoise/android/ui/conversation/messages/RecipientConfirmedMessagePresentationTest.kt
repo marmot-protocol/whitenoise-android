@@ -59,7 +59,9 @@ class RecipientConfirmedMessagePresentationTest {
         fixture.controller.testApplyLiveTimelineChangesAndRegisterStreams(listOf(upsert(deleted)))
         composeRule.setContent { SwipeTestBubbleHost(fixture.copy(item = fixture.controller.timeline.single())) }
 
-        composeRule.onAllNodesWithText(TimelineProjector.displayBody(deleted), useUnmergedTree = true).assertCountEquals(1)
+        composeRule
+            .onAllNodesWithText(TimelineProjector.displayBody(deleted), useUnmergedTree = true)
+            .assertCountEquals(1)
         composeRule.onAllNodesWithContentDescription("Sent", useUnmergedTree = true).assertCountEquals(0)
         composeRule.onAllNodesWithText("Delivery not confirmed", useUnmergedTree = true).assertCountEquals(0)
     }
@@ -77,7 +79,10 @@ class RecipientConfirmedMessagePresentationTest {
         composeRule.setContent { SwipeTestBubbleHost(fixture.copy(item = fixture.controller.timeline.single())) }
 
         composeRule
-            .onAllNodesWithText(requireNotNull(TimelineProjector.invalidationWarning(invalidated)), useUnmergedTree = true)
+            .onAllNodesWithText(
+                requireNotNull(TimelineProjector.invalidationWarning(invalidated)),
+                useUnmergedTree = true,
+            )
             .assertCountEquals(1)
         composeRule.onAllNodesWithContentDescription("Sent", useUnmergedTree = true).assertCountEquals(0)
     }
@@ -141,7 +146,7 @@ class RecipientConfirmedMessagePresentationTest {
         assertWarningState(confirmed = false)
     }
 
-    /** Checks visible warning copy and the accessibility status rather than inferring delivery from an icon's pixels. */
+    /** Checks visible warning copy and accessible status instead of inferring delivery from icon pixels. */
     private fun assertWarningState(confirmed: Boolean) {
         composeRule
             .onAllNodesWithText("Delivery not confirmed", useUnmergedTree = true)
@@ -160,9 +165,7 @@ class RecipientConfirmedMessagePresentationTest {
             if (shape == Shape.Image) {
                 initial.media.map { outcome ->
                     val accepted = outcome as MediaAttachmentOutcomeFfi.Accepted
-                    MediaAttachmentOutcomeFfi.Accepted(
-                        accepted.reference.copy(fileName = "photo.jpg", mediaType = "image/jpeg"),
-                    )
+                    accepted.copy(reference = accepted.reference.copy(fileName = "photo.jpg", mediaType = "image/jpeg"))
                 }
             } else {
                 initial.media

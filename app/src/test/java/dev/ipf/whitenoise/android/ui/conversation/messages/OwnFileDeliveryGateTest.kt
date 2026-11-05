@@ -113,7 +113,10 @@ class OwnFileDeliveryGateTest : MessageBubbleFileAttachmentFixtures() {
         assertTrue(fixture.calls.isEmpty())
 
         composeRule.runOnIdle {
-            row = delivered.copy(projected = delivered.projected?.copy(sourceMessageIdHex = null, recipientConfirmed = true))
+            row =
+                delivered.copy(
+                    projected = delivered.projected?.copy(sourceMessageIdHex = null, recipientConfirmed = true),
+                )
         }
 
         awaitOneFetch()

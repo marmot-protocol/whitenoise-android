@@ -29,7 +29,10 @@ class ConversationRecipientConfirmationReplayTest {
             val failed = failedRecord()
             val confirmed = receipt(failed).copy(recipientConfirmed = true, invalidationStatus = null)
             withSnapshot(page(failed)) { controller ->
-                assertEquals("Delivery not confirmed", TimelineProjector.invalidationWarning(controller.timelineRecords.getValue(ID)))
+                assertEquals(
+                    "Delivery not confirmed",
+                    TimelineProjector.invalidationWarning(controller.timelineRecords.getValue(ID)),
+                )
                 controller.testApplyLiveTimelineChangesAndRegisterStreams(listOf(upsert(confirmed)))
                 assertSettled(controller)
             }
@@ -67,7 +70,10 @@ class ConversationRecipientConfirmationReplayTest {
                 val item = controller.timeline.single()
                 assertEquals(MessageStatus.Pending, item.status)
                 assertTrue(controller.awaitingDelivery(item))
-                assertEquals("Delivery not confirmed", TimelineProjector.invalidationWarning(requireNotNull(item.projected)))
+                assertEquals(
+                    "Delivery not confirmed",
+                    TimelineProjector.invalidationWarning(requireNotNull(item.projected)),
+                )
                 assertTrue(controller.reactions[ID].isNullOrEmpty())
             }
         }
@@ -89,7 +95,10 @@ class ConversationRecipientConfirmationReplayTest {
                     val item = controller.timeline.single()
                     assertEquals(MessageStatus.Pending, item.status)
                     assertTrue(controller.awaitingDelivery(item))
-                    assertEquals("Delivery not confirmed", TimelineProjector.invalidationWarning(requireNotNull(item.projected)))
+                    assertEquals(
+                        "Delivery not confirmed",
+                        TimelineProjector.invalidationWarning(requireNotNull(item.projected)),
+                    )
                 }
             }
         }
