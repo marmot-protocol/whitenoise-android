@@ -41,7 +41,7 @@ internal fun HelpScreen(
 ) {
     SettingsScaffold(title = stringResource(R.string.help), onBack = onBack) {
         SettingsList {
-            item {
+            item(key = "search.HelpAboutScreens.1") {
                 SettingsGroup(modifier = Modifier.testTag("help.destinations")) {
                     row("bug_report") { context ->
                         SettingsLink(
@@ -99,16 +99,20 @@ internal fun BugReportContent(
         onBack = onBack,
         bottomBar = {
             SettingsBottomAction {
-                WhiteNoiseButton(
-                    onClick = ::openReport,
-                    modifier = Modifier.fillMaxWidth().testTag("help.bug.open"),
-                ) { Text(stringResource(R.string.report_bug_open_github)) }
+                SettingsSearchRowReveal("open_github", modifier = Modifier.fillMaxWidth()) {
+                    WhiteNoiseButton(
+                        onClick = ::openReport,
+                        modifier = Modifier.fillMaxWidth().testTag("help.bug.open"),
+                    ) { Text(stringResource(R.string.report_bug_open_github)) }
+                }
             }
         },
     ) {
         SettingsList {
-            item { SettingsSection(stringResource(R.string.report_bug_destination_section)) }
-            item {
+            item(key = "search.HelpAboutScreens.2") {
+                SettingsSection(stringResource(R.string.report_bug_destination_section))
+            }
+            item(key = "search.HelpAboutScreens.3") {
                 SettingsGroup(modifier = Modifier.testTag("help.bug.destination")) {
                     row("destination") { context ->
                         SettingsValue(
@@ -119,8 +123,10 @@ internal fun BugReportContent(
                     }
                 }
             }
-            item { SettingsSection(stringResource(R.string.report_bug_privacy_section)) }
-            item {
+            item(key = "search.HelpAboutScreens.4") {
+                SettingsSection(stringResource(R.string.report_bug_privacy_section))
+            }
+            item(key = "search.HelpAboutScreens.5") {
                 SettingsCallout(
                     text = stringResource(R.string.report_bug_no_attachments_detail),
                     modifier = Modifier.testTag("help.bug.privacy"),
@@ -128,7 +134,7 @@ internal fun BugReportContent(
                     leading = { HelpLeadingIcon(R.drawable.ic_settings_front_hand) },
                 )
             }
-            item {
+            item(key = "search.HelpAboutScreens.6") {
                 SettingsCallout(
                     text = stringResource(R.string.report_bug_public_reminder),
                     modifier = Modifier.testTag("help.bug.public"),
@@ -216,8 +222,8 @@ internal fun AboutContent(
 
     SettingsScaffold(title = stringResource(R.string.about_and_licenses), onBack = onBack) {
         SettingsList {
-            item { SettingsSection(stringResource(R.string.about_app_section)) }
-            item {
+            item(key = "search.HelpAboutScreens.7") { SettingsSection(stringResource(R.string.about_app_section)) }
+            item(key = "search.HelpAboutScreens.8") {
                 SettingsGroup(modifier = Modifier.testTag("about.app")) {
                     row("version") { context ->
                         SettingsValue(
@@ -243,7 +249,7 @@ internal fun AboutContent(
                 }
             }
             if (developerMode) {
-                item {
+                item(key = "search.HelpAboutScreens.9") {
                     SettingsGroup {
                         row("developer") { context ->
                             SettingsLink(
@@ -257,8 +263,8 @@ internal fun AboutContent(
                     }
                 }
             }
-            item { SettingsSection(stringResource(R.string.about_legal_section)) }
-            item {
+            item(key = "search.HelpAboutScreens.10") { SettingsSection(stringResource(R.string.about_legal_section)) }
+            item(key = "search.HelpAboutScreens.11") {
                 SettingsGroup(modifier = Modifier.testTag("about.legal")) {
                     row("licenses") { context ->
                         SettingsLink(

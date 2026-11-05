@@ -2632,4 +2632,10 @@
     <string name="media_viewer_actual_size">Исходный размер (1:1)</string>
     <string name="media_viewer_zoom_out">Уменьшить</string>
     <string name="media_viewer_toggle_controls">Показать или скрыть элементы управления</string>
+    <string name="settings_search">Поиск настроек</string>
+    <string name="settings_search_no_results">Настройки не найдены. Попробуйте другое слово.</string>
+    <string name="settings_search_alias_font_size">размер текста|масштаб шрифта|крупный текст|мелкий текст</string>
+    <string name="settings_search_alias_read_aloud">TTS|синтез речи|читать вслух</string>
+    <string name="settings_search_alias_sound">звук уведомлений|сигнал уведомления|мелодия</string>
+    <string name="settings_search_revealed">%1$s. Настройка выделена.</string>
 </resources>

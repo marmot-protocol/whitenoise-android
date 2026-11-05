@@ -5,10 +5,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -18,6 +21,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -42,6 +46,7 @@ class ShareConnectScreenBehaviorTest {
     private var copyCount = 0
     private var scannerCount = 0
     private var saveCount = 0
+    private var searchTarget: String? = null
     private val savingState = mutableStateOf(false)
     private val sharingState = mutableStateOf(false)
 
@@ -214,6 +219,63 @@ class ShareConnectScreenBehaviorTest {
         composeRule.onNodeWithTag("share_connect.share").performClick()
     }
 
+    /** Search reveals the existing pinned scanner control without opening the scanner. */
+    @Test
+    fun scannerSearchRevealDoesNotInvokeUntilExplicitTap() {
+        searchTarget = "ShareConnect.scan_qr_code"
+        composeRule.mainClock.autoAdvance = false
+        mount()
+        assertTargetRevealed("share_connect.open_scanner")
+        composeRule.runOnIdle { assertEquals(0, scannerCount) }
+        composeRule.onNodeWithTag("share_connect.open_scanner").performClick()
+        composeRule.runOnIdle { assertEquals(1, scannerCount) }
+    }
+
+    /** A toolbar reveal must not expand its menu or export anything. */
+    @Test
+    fun shareSearchRevealPreservesClosedMenuAndCallbacks() {
+        searchTarget = "ShareConnect.share"
+        composeRule.mainClock.autoAdvance = false
+        mount()
+        assertTargetRevealed("share_connect.share")
+        composeRule.onNodeWithTag(SAVE_ENTRY).assertDoesNotExist()
+        composeRule.runOnIdle {
+            assertEquals(0, urlShareCount)
+            assertEquals(0, pictureShareCount)
+            assertEquals(0, saveCount)
+        }
+        composeRule.onNodeWithTag("share_connect.share").performClick()
+        composeRule.onNodeWithTag(SAVE_ENTRY).assertIsDisplayed()
+    }
+
+    /** The capsule retains its existing explicit-copy action under a reveal wrapper. */
+    @Test
+    fun copySearchRevealDoesNotCopyUntilExplicitTap() {
+        searchTarget = "ShareConnect.copy_public_key"
+        composeRule.mainClock.autoAdvance = false
+        mount()
+        assertTargetRevealed("share_connect.copy_public_key")
+        composeRule.runOnIdle { assertEquals(0, copyCount) }
+        composeRule.onNodeWithTag("share_connect.copy_public_key").performClick()
+        composeRule.runOnIdle { assertEquals(1, copyCount) }
+    }
+
+    /** Verifies the actual widget is inside its resource-labelled reveal before the highlight expires. */
+    private fun assertTargetRevealed(tag: String) {
+        composeRule.mainClock.advanceTimeBy(32)
+        val context =
+            androidx.test.core.app.ApplicationProvider
+                .getApplicationContext<android.content.Context>()
+        val target = settingsSearchCatalog().single { it.id == searchTarget }
+        val description = context.getString(R.string.settings_search_revealed, context.getString(target.titleRes))
+        val revealed = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, description)
+        composeRule
+            .onNodeWithTag(tag, useUnmergedTree = true)
+            .assertIsDisplayed()
+            .assert(revealed or hasAnyAncestor(revealed))
+        composeRule.mainClock.autoAdvance = true
+    }
+
     /** Mounts the composable under test. */
     private fun mount(
         copied: Boolean = false,
@@ -226,6 +288,7 @@ class ShareConnectScreenBehaviorTest {
         composeRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(
+                LocalSettingsSearchTarget provides settingsSearchCatalog().find { it.id == searchTarget },
                 LocalDensity provides Density(density.density, if (largeTextRtl) 2f else 1f),
                 LocalLayoutDirection provides if (largeTextRtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
             ) {

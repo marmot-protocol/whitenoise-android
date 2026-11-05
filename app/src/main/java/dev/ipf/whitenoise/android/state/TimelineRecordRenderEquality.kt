@@ -20,6 +20,7 @@ private fun timelineRecordEnvelopeEqual(
     a.messageIdHex == b.messageIdHex &&
         a.sourceMessageIdHex == b.sourceMessageIdHex &&
         a.clientToken == b.clientToken &&
+        a.recipientConfirmed == b.recipientConfirmed &&
         a.direction == b.direction &&
         a.groupIdHex == b.groupIdHex &&
         a.sender == b.sender &&

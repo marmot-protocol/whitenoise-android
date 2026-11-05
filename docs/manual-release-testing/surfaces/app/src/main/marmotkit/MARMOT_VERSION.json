@@ -4,9 +4,9 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "Testing-only MarmotKit November 4 nightly from 0f3fe9e0: verified archive/API; every offline-queued send publishes; media sends keep their upload branch identity; one-way migrations 0165 and 0167-0172 over the November 2 baseline need the hosted populated upgrade, cold restart, pending upload and recovery; backups and device groups stay gated off; no downgrade",
+        "surface": "Testing-only MarmotKit November 5 nightly from 5286f86c: native recipient-confirmed delivery and reaction refresh; one-way migrations 0173\u20130176 over the November 4 baseline; retained account/history/media/avatar bytes, original pending upload with branch identity, cold restart and recovery; experimental device groups stay disabled",
         "source": "app/src/main/marmotkit/MARMOT_VERSION",
-        "anchor": "artifact-id=0.15.0-nightly.20261104",
+        "anchor": "artifact-id=0.15.0-nightly.20261105",
         "test_ids": [
           "INT-010",
           "INT-003",
@@ -26,7 +26,8 @@
           "MED-020",
           "NCH-006",
           "GRP-032",
-          "MED-035"
+          "MED-035",
+          "MSG-031"
         ]
       }
     ]

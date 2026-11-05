@@ -2557,4 +2557,10 @@
     <string name="media_viewer_actual_size">Taille réelle (1:1)</string>
     <string name="media_viewer_zoom_out">Réduire</string>
     <string name="media_viewer_toggle_controls">Afficher ou masquer les commandes</string>
+    <string name="settings_search">Rechercher dans les paramètres</string>
+    <string name="settings_search_no_results">Aucun paramètre trouvé. Essayez un autre mot.</string>
+    <string name="settings_search_alias_font_size">taille du texte|taille de police|texte plus grand|texte plus petit</string>
+    <string name="settings_search_alias_read_aloud">TTS|synthèse vocale|lire à voix haute</string>
+    <string name="settings_search_alias_sound">son de notification|son d’alerte|sonnerie</string>
+    <string name="settings_search_revealed">%1$s. Paramètre mis en évidence.</string>
 </resources>

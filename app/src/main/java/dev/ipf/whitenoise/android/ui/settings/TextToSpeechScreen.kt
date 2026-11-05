@@ -103,7 +103,7 @@ internal fun TextToSpeechScreen(
 
     SettingsScaffold(title = stringResource(R.string.settings_read_aloud), onBack = onBack) {
         SettingsList {
-            item {
+            item(key = "search.TextToSpeech.1") {
                 SettingsGroup(modifier = Modifier.testTag("speech.engine.group")) {
                     if (showEngineChooser && engineChoice.engines.isNotEmpty()) {
                         row("engine") { rowContext ->
@@ -153,7 +153,7 @@ internal fun TextToSpeechScreen(
                 }
             }
             if (status != null) {
-                item {
+                item(key = "search.TextToSpeech.2") {
                     SettingsCallout(
                         text = stringResource(status.textRes),
                         modifier = Modifier.testTag("speech.status"),
@@ -161,7 +161,7 @@ internal fun TextToSpeechScreen(
                     )
                 }
             }
-            item {
+            item(key = "search.TextToSpeech.3") {
                 SettingsGroup(modifier = Modifier.testTag("speech.playback.group")) {
                     row("auto_read") { context ->
                         SettingsSwitch(
@@ -194,7 +194,7 @@ internal fun TextToSpeechScreen(
                     }
                 }
             }
-            item {
+            item(key = "search.TextToSpeech.4") {
                 SettingsGroup(modifier = Modifier.testTag("speech.system.group")) {
                     row("refresh") { rowContext ->
                         SettingsAction(
@@ -213,7 +213,7 @@ internal fun TextToSpeechScreen(
                 }
             }
             if (settingsFailed) {
-                item {
+                item(key = "search.TextToSpeech.5") {
                     SettingsCallout(
                         text = stringResource(R.string.speech_settings_failed),
                         modifier = Modifier.testTag("speech.settings_failed"),
