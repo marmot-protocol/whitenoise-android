@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationNotificationRetirement.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "notification_content_contracts": [
+      {
+        "surface": "bounded conversation-open notification cancellation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationNotificationRetirement.kt",
+        "anchor": "suspend fun dismissConversationMessages(",
+        "test_ids": [
+          "NTF-025"
+        ]
+      },
+      {
+        "surface": "Reply cleanup preserves a newer message after partial content reconciliation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/ConversationNotificationRetirement.kt",
+        "anchor": "fun cancelConversationCardIfSameGeneration(",
+        "test_ids": [
+          "NTF-043"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

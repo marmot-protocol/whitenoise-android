@@ -68,7 +68,7 @@ class NotificationIdentityImageCoverageTest {
         assertTrue("through the existing shortcut owner", "publishConversationShortcut(" in before)
         assertFalse("never a second card write", "postNotificationSafely" in before || "notificationPoster" in before)
         assertFalse("no network wait on the posting path", "avatarBitmapResolver" in before)
-        val payload = presenter.functionBody("previewPayload")
+        val payload = source("NotificationCardPublisher.kt").functionBody("previewPayload")
         assertTrue(
             "a hidden card makes the next rich post publish again",
             "conversationShortcuts::forgetShortcutSnapshot" in payload,
@@ -105,8 +105,7 @@ class NotificationIdentityImageCoverageTest {
     /** Every final write applies the current private contact choice to a direct chat's picture. */
     @Test
     fun finalWriteRefreshesTheDirectChatPictureFromTheContactChoice() {
-        val presenter = source("LocalNotificationPresenter.kt")
-        val post = presenter.functionBody("postNotificationSafely")
+        val post = source("NotificationCardPublisher.kt").functionBody("postNotificationSafely")
         assertTrue("the final write uses the combined refresh", "withCurrentContactPictures(notification)" in post)
         val refresh = source("NotificationCardContent.kt").functionBody("withCurrentContactPictures")
         assertTrue("the identity picture follows the contact choice", "withCurrentIdentityContact(" in refresh)
@@ -211,7 +210,7 @@ class NotificationIdentityImageCoverageTest {
     /** Every rich-group rewrite normalizes sender pixels after private overrides while retaining native style. */
     @Test
     fun groupSenderPicturesAreSuppressedAtTheFinalWriteBoundary() {
-        val write = source("LocalNotificationPresenter.kt").functionBody("postNotificationSafely")
+        val write = source("NotificationCardPublisher.kt").functionBody("postNotificationSafely")
         val normalize = write.indexOf("withoutGroupSenderPictures(")
         assertTrue("normalization is in the final write", normalize >= 0)
         assertTrue("after private picture reconciliation", write.indexOf("withCurrentContactPictures(") < normalize)

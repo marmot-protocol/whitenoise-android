@@ -13,14 +13,6 @@
         ]
       },
       {
-        "surface": "bounded conversation-open notification cancellation",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
-        "anchor": "suspend fun dismissConversationMessages(",
-        "test_ids": [
-          "NTF-025"
-        ]
-      },
-      {
         "surface": "plain notification body and privacy presentation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
         "anchor": "suspend fun show(",
@@ -94,30 +86,12 @@
         ]
       },
       {
-        "surface": "Accepted payload revision fences asynchronously stale notification history",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
-        "anchor": "private fun existingConversationMessages(",
-        "test_ids": [
-          "NTF-043",
-          "NTF-044"
-        ]
-      },
-      {
         "surface": "notification card orchestration shares shortcut and interaction owners",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
         "anchor": "private val interactions = NotificationInteractionFactory(context, tapTokens)",
         "test_ids": [
           "NTF-042",
           "NTF-011"
-        ]
-      },
-      {
-        "surface": "live-card eligibility remains before content rewriting and serialized publication",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
-        "anchor": "cardContent.withCurrentContactPictures(notification)",
-        "test_ids": [
-          "NTF-025",
-          "NTF-042"
         ]
       }
     ],
@@ -141,15 +115,6 @@
         "anchor": "suspend fun show(",
         "test_ids": [
           "STB-005"
-        ]
-      },
-      {
-        "surface": "Silent per-entry card retraction after deletion, hide or read",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
-        "anchor": "fun reconcileConversationContent(",
-        "test_ids": [
-          "NTF-043",
-          "NTF-044"
         ]
       },
       {
