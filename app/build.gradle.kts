@@ -1251,9 +1251,14 @@ tasks.register<Test>("replayAppFuzzSyntheticCorpus") {
     dependsOn(":fuzz:syncAppFuzzSyntheticCorpus")
 }
 
-tasks.matching { it.name.startsWith("process") && it.name.endsWith("UnitTestJavaRes") }.configureEach {
-    dependsOn(":fuzz:syncAppFuzzSyntheticCorpus")
-}
+// AGP 9.5 compresses unit-test resources directly; older AGP versions process them first.
+// Both consumers must wait for the generated corpus before reading its source directory.
+tasks
+    .matching {
+        (it.name.startsWith("process") || it.name.startsWith("compress")) && it.name.endsWith("UnitTestJavaRes")
+    }.configureEach {
+        dependsOn(":fuzz:syncAppFuzzSyntheticCorpus")
+    }
 
 tasks.named<Test>("replayAppFuzzSyntheticCorpus").configure {
     val reference = tasks.named<Test>("testDevZapstoreDebugUnitTest").get()
