@@ -39,17 +39,16 @@ internal suspend fun MarmotInterface.sendComposerText(
 /** Publishes a completed non-reply dictation after its conversation UI controller has detached. */
 internal suspend fun WhiteNoiseAppState.sendDetachedDictationText(request: ConversationDictationSendRequest): Boolean {
     val pendingClear = captureDraftForSend(request.accountRef, request.groupIdHex)
-    val summary =
-        withConversationTextSendOrder(request.accountRef, request.groupIdHex) {
-            retryPendingConversationSend(validatedConnectivityRecoveryGeneration) {
-                withGroupCommitLock(request.accountRef, request.groupIdHex) {
-                    marmotIo(MarmotTraceSection.TEXT_SEND) {
-                        sendComposerText(request.accountRef, request.groupIdHex, null, request.payload)
-                    }
+    withConversationTextSendOrder(request.accountRef, request.groupIdHex) {
+        retryPendingConversationSend(validatedConnectivityRecoveryGeneration) {
+            withGroupCommitLock(request.accountRef, request.groupIdHex) {
+                marmotIo(MarmotTraceSection.TEXT_SEND) {
+                    sendComposerText(request.accountRef, request.groupIdHex, null, request.payload)
                 }
             }
         }
-    if (summary.messageIds.isEmpty()) return false
+    }
+    // A normal native return is accepted, including retained sends awaiting an event id.
     pendingClear?.let(::clearDraftAfterSuccessfulSend)
     runCatching(request.onPendingShown)
     return true

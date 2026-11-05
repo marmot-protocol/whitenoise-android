@@ -112,7 +112,11 @@ class ConversationDictationSendLifetimeCoverageTest {
         runTest {
             val draft = TextFieldValue("draft")
             val target = ConversationDictationTarget("account", "group", draft, 1L, ConversationDictationMode.InApp)
-            val recovery = ConversationDictationDraftRecovery({ _, _ -> ConversationDictationDraftSnapshot(draft, 1L) }, { _, _, _, _ -> 2L })
+            val recovery =
+                ConversationDictationDraftRecovery(
+                    { _, _ -> ConversationDictationDraftSnapshot(draft, 1L) },
+                    { _, _, _, _ -> 2L },
+                )
             val owner = ConversationDictationCompletionDispatchOwner { recovery }
             var session: Long? = 1L
             var pending = 0
@@ -131,7 +135,12 @@ class ConversationDictationSendLifetimeCoverageTest {
                     true
                 },
                 ConversationDictationCompletionDispatchOwner.DispatchCallbacks(
-                    ConversationDictationCompletionDispatchOwner.DispatchGuards({ session }, { session != null }, { 2L }, { _, _ -> 3L }),
+                    ConversationDictationCompletionDispatchOwner.DispatchGuards(
+                        currentSessionId = { session },
+                        processing = { session != null },
+                        emptyDraft = { 2L },
+                        restoreDraft = { _, _ -> 3L },
+                    ),
                     ConversationDictationCompletionDispatchOwner.DispatchOutcomes(
                         onPending = {
                             pending += 1
