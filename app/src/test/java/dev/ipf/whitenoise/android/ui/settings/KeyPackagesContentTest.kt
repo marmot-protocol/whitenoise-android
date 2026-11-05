@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -16,6 +17,7 @@ import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
 import org.junit.Rule
 import org.junit.Test
@@ -141,31 +143,63 @@ class KeyPackagesContentTest {
             .assertIsNotEnabled()
     }
 
+    @Test
+    fun publishSearchRevealDoesNotPublishUntilExplicitClick() {
+        var calls = 0
+        render(emptyList(), searchTarget = "KeyPackages.publish_new", onAction = { calls++ })
+        composeRule.runOnIdle { assertEquals(0, calls) }
+        composeRule.onNodeWithTag("key_packages.publish").performClick()
+        composeRule.runOnIdle { assertEquals(1, calls) }
+    }
+
+    @Test
+    fun refreshSearchRevealPreservesWorkingDisabledState() {
+        var calls = 0
+        render(emptyList(), working = true, searchTarget = "KeyPackages.refresh", onAction = { calls++ })
+        composeRule.onNodeWithText(app.getString(R.string.refresh)).assertIsNotEnabled()
+        composeRule.runOnIdle { assertEquals(0, calls) }
+    }
+
+    @Test
+    fun republishSearchRevealDoesNotRepublishUntilExplicitClick() {
+        var calls = 0
+        render(emptyList(), searchTarget = "KeyPackages.republish", onAction = { calls++ })
+        composeRule.runOnIdle { assertEquals(0, calls) }
+        composeRule.onNodeWithText(app.getString(R.string.republish)).performClick()
+        composeRule.runOnIdle { assertEquals(1, calls) }
+    }
+
     /** Composes the surface under test with the given fixture. */
     private fun render(
         packages: List<AccountKeyPackageFfi>,
         onDelete: (AccountKeyPackageFfi) -> Unit = {},
         working: Boolean = false,
+        searchTarget: String? = null,
+        onAction: () -> Unit = {},
     ) {
         composeRule.setContent {
             WhiteNoiseTheme {
                 Surface {
-                    KeyPackagesContent(
-                        state =
-                            keyPackagesState(
-                                hasActiveAccount = true,
-                                loaded = true,
-                                loading = false,
-                                working = working,
-                                packageCount = packages.count { it.relay },
-                            ),
-                        packages = packages,
-                        onBack = {},
-                        onRefresh = {},
-                        onRepublish = {},
-                        onPublishNew = {},
-                        onDelete = onDelete,
-                    )
+                    CompositionLocalProvider(
+                        LocalSettingsSearchTarget provides settingsSearchCatalog().find { it.id == searchTarget },
+                    ) {
+                        KeyPackagesContent(
+                            state =
+                                keyPackagesState(
+                                    hasActiveAccount = true,
+                                    loaded = true,
+                                    loading = false,
+                                    working = working,
+                                    packageCount = packages.count { it.relay },
+                                ),
+                            packages = packages,
+                            onBack = {},
+                            onRefresh = onAction,
+                            onRepublish = onAction,
+                            onPublishNew = onAction,
+                            onDelete = onDelete,
+                        )
+                    }
                 }
             }
         }

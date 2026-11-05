@@ -70,7 +70,10 @@ class MediaWorkerRetirementBindingTest {
             assertEquals(listOf(pending.worker), retiring)
             assertFalse(pending.worker.retireSent)
             pending.finish()
-            assertTrue(pending.bound.remote.retired.await(2, TimeUnit.SECONDS))
+            assertTrue(
+                pending.bound.remote.retired
+                    .await(2, TimeUnit.SECONDS),
+            )
             assertFalse(pending.context.isUnbound(pending.bound))
             val retiredAt = pending.worker.retiredAtNanos
             pending.advanceClock(MediaWorkerPool.RETIRE_ESCALATION_MS - 1)

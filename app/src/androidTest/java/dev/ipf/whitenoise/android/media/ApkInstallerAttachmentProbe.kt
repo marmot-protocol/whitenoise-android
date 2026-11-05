@@ -582,10 +582,15 @@ internal object ApkInstallerAttachmentProbe {
         permission: String,
         expectInstaller: Boolean = false,
     ) {
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        val installers = installerPackages(context)
+        check(installers.isNotEmpty()) { "installer package discovery is unavailable" }
+        requireCleanInstallerBoundary(automation, installers, received.key, "before-dispatch")
+        val dispatchContext = RecordingOpenContext(context)
         val started = SystemClock.elapsedRealtimeNanos()
         val result =
             openAttachmentExternally(
-                context = context,
+                context = dispatchContext,
                 source = received.file,
                 mediaType = received.mediaType,
                 fileName = received.fileName,
@@ -599,6 +604,10 @@ internal object ApkInstallerAttachmentProbe {
                 .put("case", received.key)
                 .put("permission", permission)
                 .put("result", result.name)
+                .put("received_media_type", received.mediaType)
+                .put("intent_attempt_count", dispatchContext.attempts)
+                .put("intent_action", dispatchContext.action ?: JSONObject.NULL)
+                .put("intent_type", dispatchContext.mediaType ?: JSONObject.NULL)
                 .put("installer_shown", installer.shown)
                 .put("installer_observed_ms", installer.observedMillis)
                 .put("installer_settled", installer.settled)
@@ -607,6 +616,67 @@ internal object ApkInstallerAttachmentProbe {
                 .put("dispatch_ms", dispatchMillis)
                 .put("transfer_reused", received.file.isFile),
         )
+        requireCleanInstallerBoundary(automation, installers, received.key, "after-dismiss")
+    }
+
+    /** Records actual dispatch attempts without retaining a URI, account, filename or window text. */
+    private class RecordingOpenContext(
+        base: Context,
+    ) : ContextWrapper(base) {
+        var attempts: Int = 0
+            private set
+        var action: String? = null
+            private set
+        var mediaType: String? = null
+            private set
+
+        override fun startActivity(intent: Intent) {
+            attempts++
+            action = intent.action
+            mediaType = intent.type
+            super.startActivity(intent)
+        }
+    }
+
+    /** A missing accessibility root is unknown, not proof of a clean screen. */
+    private suspend fun requireCleanInstallerBoundary(
+        automation: UiAutomation,
+        installers: Set<String>,
+        case: String,
+        boundary: String,
+    ) {
+        val started = SystemClock.elapsedRealtime()
+        var cleanSince: Long? = null
+        var clean = false
+        var packageName: String? = null
+        var windowClass: String? = null
+        while (SystemClock.elapsedRealtime() - started < INSTALLER_TIMEOUT_MILLIS) {
+            val root = automation.rootInActiveWindow
+            packageName = root?.packageName?.toString()
+            windowClass = root?.className?.toString()
+            val now = SystemClock.elapsedRealtime()
+            if (packageName != null && packageName !in installers) {
+                val since = cleanSince ?: now.also { cleanSince = it }
+                if (now - since >= UNEXPECTED_OBSERVE_MILLIS) {
+                    clean = true
+                    break
+                }
+            } else {
+                cleanSince = null
+            }
+            delay(POLL_MILLIS)
+        }
+        ControlledAttachmentProbe.report(
+            JSONObject()
+                .put("phase", "apk-ui-boundary")
+                .put("case", case)
+                .put("boundary", boundary)
+                .put("clean", clean)
+                .put("foreground_package", packageName ?: JSONObject.NULL)
+                .put("foreground_window_class", windowClass ?: JSONObject.NULL)
+                .put("installer_packages", JSONArray(installers.sorted())),
+        )
+        check(clean) { "installer boundary did not become clean: $boundary" }
     }
 
     /**
@@ -673,7 +743,7 @@ internal object ApkInstallerAttachmentProbe {
     ): Boolean {
         val deadline = SystemClock.elapsedRealtime() + UNEXPECTED_OBSERVE_MILLIS
         while (SystemClock.elapsedRealtime() < deadline) {
-            if (foregroundPackage(automation) in installers) return true
+            if (observeInstallerForeground(automation, installers)) return true
             delay(POLL_MILLIS)
         }
         return false
@@ -719,13 +789,24 @@ internal object ApkInstallerAttachmentProbe {
         automation: UiAutomation,
         installers: Set<String>,
     ): Boolean {
-        while (foregroundPackage(automation) !in installers) delay(POLL_MILLIS)
+        while (!observeInstallerForeground(automation, installers)) delay(POLL_MILLIS)
         return true
     }
 
-    /** The package that owns the active accessibility window, or null when none is exposed. */
-    private fun foregroundPackage(automation: UiAutomation): String? {
+    /** Accessibility root class is recorded as a window class, not mislabelled as an activity component. */
+    private fun observeInstallerForeground(
+        automation: UiAutomation,
+        installers: Set<String>,
+    ): Boolean {
         val root = automation.rootInActiveWindow
-        return root?.packageName?.toString()
+        val packageName = root?.packageName?.toString()
+        if (packageName !in installers) return false
+        ControlledAttachmentProbe.report(
+            JSONObject()
+                .put("phase", "apk-installer-foreground")
+                .put("foreground_package", packageName)
+                .put("foreground_window_class", root?.className?.toString() ?: JSONObject.NULL),
+        )
+        return true
     }
 }
