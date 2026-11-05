@@ -99,6 +99,10 @@ class MediaWorkerStartupRetirementTest {
             pool.retire(worker)
             assertTrue(bound.remote.retired.await(WAIT_MS, TimeUnit.MILLISECONDS))
             if (expireBeforeReturn) {
+                // Model elapsed parent nano time independently of Robolectric's Android Handler clock.
+                synchronized(lock) {
+                    worker.retiredAtNanos -= TimeUnit.MILLISECONDS.toNanos(MediaWorkerPool.RETIRE_ESCALATION_MS + 1)
+                }
                 advancePastGrace(pool)
                 assertFalse("An unresolved bind cannot be unbound yet", binding.isUnbound(bound))
             }
