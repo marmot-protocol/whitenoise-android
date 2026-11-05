@@ -490,10 +490,9 @@ class IsolatedMediaDecoderDeviceTest {
             )
             val retired = stubbornEndpoint.getLong("retire_elapsed_ns")
             val died = stubbornEndpoint.getLong("death_observed_elapsed_ns")
-            val grace =
-                java.util.concurrent.TimeUnit.MILLISECONDS
-                    .toNanos(MediaWorkerPool.RETIRE_ESCALATION_MS)
-            assertTrue("The worker ignored RETIRE and outlived the escalation grace", died - retired >= grace)
+            // The full pool-clock grace is checked by MediaWorkerRetirementBindingTest.
+            // This later Binder-send witness establishes ordering, not that clock's origin.
+            assertTrue("The parent requested RETIRE before observing death", died > retired)
             assertTrue("The next input was queued while the stubborn worker lived", queued < died)
             assertDeathPrecedesEachNextInput(inputs)
             assertFalse(WorkerCanary.processAlive(canary.pid))
@@ -538,10 +537,9 @@ class IsolatedMediaDecoderDeviceTest {
             )
             val retired = abandoned.getLong("retire_elapsed_ns")
             val died = abandoned.getLong("death_observed_elapsed_ns")
-            val grace =
-                java.util.concurrent.TimeUnit.MILLISECONDS
-                    .toNanos(MediaWorkerPool.RETIRE_ESCALATION_MS)
-            assertTrue("The worker ignored RETIRE and outlived the escalation grace", died - retired >= grace)
+            // The full pool-clock grace is checked by MediaWorkerRetirementBindingTest.
+            // This later Binder-send witness establishes ordering, not that clock's origin.
+            assertTrue("The parent requested RETIRE before observing death", died > retired)
             // Its own watchdog would end it after six seconds; the escalation must stop it far sooner.
             val watchdog =
                 java.util.concurrent.TimeUnit.MILLISECONDS
@@ -580,13 +578,12 @@ class IsolatedMediaDecoderDeviceTest {
             assertFalse("No request is waiting, yet the worker must die", endpoint.isNull("death_observed_elapsed_ns"))
             val retired = endpoint.getLong("retire_elapsed_ns")
             val died = endpoint.getLong("death_observed_elapsed_ns")
-            val grace =
-                java.util.concurrent.TimeUnit.MILLISECONDS
-                    .toNanos(MediaWorkerPool.RETIRE_ESCALATION_MS)
             val watchdog =
                 java.util.concurrent.TimeUnit.MILLISECONDS
                     .toNanos(MediaDecodePolicy.WATCHDOG_MS)
-            assertTrue("The worker ignored RETIRE", died - retired >= grace)
+            // The full pool-clock grace is checked by MediaWorkerRetirementBindingTest.
+            // This later Binder-send witness establishes ordering, not that clock's origin.
+            assertTrue("The parent requested RETIRE before observing death", died > retired)
             assertTrue("Android stopped it before the watchdog", died - retired < watchdog / 2)
             assertEquals(1, context.inputEndpoints().size)
             val exit = awaitExitRecordFor(endpoint.getString("instance"), since)

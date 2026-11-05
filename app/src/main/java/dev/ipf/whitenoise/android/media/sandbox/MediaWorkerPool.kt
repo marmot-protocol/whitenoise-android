@@ -288,6 +288,7 @@ internal class MediaWorkerPool(
                     worker.retiring = true
                 }
                 warnLifetimeHold(worker, "bind-outcome")
+                resumeRetirementAfterBinding(worker)
                 return false
             }
         val bound =
@@ -302,7 +303,7 @@ internal class MediaWorkerPool(
                 }
                 worker.bound
             }
-        if (worker.retiring) retire(worker, escalate = true)
+        resumeRetirementAfterBinding(worker)
         dispose(worker)
         return bound
     }
@@ -333,8 +334,8 @@ internal class MediaWorkerPool(
                     worker.connected.countDown()
                     signalLocked()
                 }
-                // A generation retired before it connected never received input: stop it at once.
-                if (worker.retiring) retire(worker, escalate = true)
+                // Resume the existing retirement reason without shortening a served request's grace.
+                resumeRetirementAfterBinding(worker)
                 dispose(worker)
             }
 
@@ -374,6 +375,19 @@ internal class MediaWorkerPool(
             signalLocked()
         }
         dispose(worker)
+    }
+
+    /** Resumes a pending retirement without treating a newly served request as a pre-connection failure. */
+    private fun resumeRetirementAfterBinding(worker: MediaWorker) {
+        val escalate =
+            synchronized(lock) {
+                if (!worker.retiring) return
+                worker.escalationRequested ||
+                    !worker.retireSent ||
+                    System.nanoTime() - worker.retiredAtNanos >=
+                    TimeUnit.MILLISECONDS.toNanos(RETIRE_ESCALATION_MS)
+            }
+        retire(worker, escalate = escalate)
     }
 
     /**
@@ -440,6 +454,7 @@ internal class MediaWorkerPool(
         val unbind =
             synchronized(lock) {
                 worker.retiring = true
+                worker.escalationRequested = true
                 (worker.binder != null && worker.bindComplete && worker.bound && !worker.unbound).also {
                     if (it) worker.unbound = true
                 }
@@ -572,6 +587,7 @@ internal class MediaWorker(
     var bindComplete = false
     var retiring = false
     var retireSent = false
+    var escalationRequested = false
     var unbound = false
     var disposed = false
     var holdReported = false

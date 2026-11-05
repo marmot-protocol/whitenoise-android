@@ -12,6 +12,13 @@ import background_receipt_runner as runner
 class BackgroundReceiptRunnerTest(unittest.TestCase):
     """Host-only guard rails; the Android behavior is qualified by the device run, not by these."""
 
+    def setUp(self):
+        self.wifi = mock.Mock()
+        self.wifi.prepare.return_value = "546573744150"
+        patcher = mock.patch.object(runner, "WifiAssociation", return_value=self.wifi)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_a_physical_serial_or_unknown_profile_is_refused_before_any_adb_call(self):
         """The fixture is for disposable emulators only; nothing reaches adb for a refused device or profile."""
         with tempfile.TemporaryDirectory() as directory, mock.patch.object(runner, "adb_command") as adb:
@@ -27,19 +34,20 @@ class BackgroundReceiptRunnerTest(unittest.TestCase):
         for stage in runner.STAGES:
             with mock.patch.object(runner.subprocess, "run") as run:
                 run.return_value.stdout = "OK (1 test)"
-                runner.instrument("adb", "emulator-5554", (4001, 4002), stage, "session")
+                runner.instrument("adb", "emulator-5554", (4001, 4002), stage, "session", "546573744150")
             command = run.call_args.args[0]
             self.assertEqual(["adb", "-s", "emulator-5554"], command[:3])
             self.assertEqual(runner.TEST, command[command.index("class") + 1])
             self.assertEqual(stage, command[command.index("fixtureBackgroundStage") + 1])
             self.assertEqual("session", command[command.index("fixtureRestartSession") + 1])
+            self.assertEqual("546573744150", command[command.index("fixtureWifiSsidHex") + 1])
             self.assertTrue(command[-1].startswith("dev.ipf.whitenoise.android.medialatency.test/"))
             self.assertFalse({"uninstall", "install", "clear"} & set(command))
 
     def test_an_unknown_stage_is_refused_before_adb(self):
         """Only the two declared stages can be launched."""
         with mock.patch.object(runner.subprocess, "run") as run, self.assertRaises(ValueError):
-            runner.instrument("adb", "emulator-5554", (4001, 4002), "prepare", "session")
+            runner.instrument("adb", "emulator-5554", (4001, 4002), "prepare", "session", "546573744150")
         run.assert_not_called()
 
     def test_only_a_crash_after_the_held_row_counts_as_the_hand_off(self):
@@ -155,6 +163,55 @@ class BackgroundReceiptRunnerTest(unittest.TestCase):
             self.assertFalse(report["process_ended_abruptly"])
             self.assertEqual(1, instrument.call_count, "a timeout never launches resume")
             self.assertNotIn("private-account", json.dumps(report))
+            self.wifi.prepare.assert_called_once()
+            self.wifi.cleanup.assert_called_once()
+            self.wifi.reset_mock()
+
+    def test_two_stage_oracle_cannot_pass_failed_wifi_cleanup(self):
+        """A complete two-process ledger still fails if the runner cannot clean its owned Wi-Fi configuration."""
+        from test_background_receipt_checker import MAIN, HELD, RESUMED, ledger
+        prefix = "INSTRUMENTATION_STATUS: controlled_attachment_json="
+        main = "\n".join(prefix + json.dumps(row) for row in (MAIN, HELD)) + "\nProcess crashed.\n"
+        resume = prefix + json.dumps(RESUMED) + "\nOK (1 test)\nINSTRUMENTATION_CODE: -1\n"
+        for cleanup_fails in (False, True):
+            self.wifi.reset_mock()
+            self.wifi.cleanup.side_effect = ValueError("controlled cleanup failure") if cleanup_fails else None
+            events = ledger()
+            snapshots = iter([[], events])
+            server = mock.Mock(server_port=4001, ledger=mock.Mock(snapshot=mock.Mock(
+                side_effect=lambda: next(snapshots, events))))
+            relay = mock.Mock(port=4002)
+
+            def adb(_adb, _serial, *args):
+                if "ro.kernel.qemu" in args:
+                    return "1\n"
+                if "list" in args:
+                    return f"package:{runner.APP}\n"
+                if "ro.build.version.sdk" in args:
+                    return "30\n"
+                return "arm64-v8a\n"
+
+            with self.subTest(cleanup_fails=cleanup_fails), tempfile.TemporaryDirectory() as directory, \
+                    mock.patch.object(runner, "adb_command", side_effect=adb), \
+                    mock.patch.object(runner, "FixtureServer", return_value=server), \
+                    mock.patch.object(runner, "FixtureRelay", return_value=relay), \
+                    mock.patch.object(runner, "instrument", side_effect=[main, resume]) as instrument, \
+                    mock.patch.object(runner, "release_held_body"), \
+                    mock.patch.object(runner.time, "sleep"):
+                output = Path(directory) / "out.json"
+                if cleanup_fails:
+                    with self.assertRaises(RuntimeError):
+                        runner.run("adb", "emulator-5554", Path(directory), output)
+                else:
+                    runner.run("adb", "emulator-5554", Path(directory), output)
+                report = json.loads(output.read_text())
+            self.assertTrue(report["receipt_check"]["passed"])
+            self.assertTrue(report["instrumentation_passed"])
+            self.assertEqual(report["qualified"], not cleanup_fails)
+            self.assertEqual(report["wifi_cleanup_failed"], cleanup_fails)
+            self.assertEqual(instrument.call_count, 2)
+            self.wifi.prepare.assert_called_once()
+            self.wifi.cleanup.assert_called_once()
 
     def test_only_the_held_request_ending_releases_the_hand_off(self):
         """An unrelated disconnect after the stop does not end the wait; the held request's own disconnect does."""
