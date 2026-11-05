@@ -1289,7 +1289,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt",
       "calls": {
-        "WhiteNoiseLazyColumn": 1
+        "SettingsList": 1
       },
       "family": "settings",
       "policy": "ordinary",
@@ -1831,6 +1831,22 @@
         "AXY-001",
         "SET-004",
         "SET-005"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchContent.kt",
+      "calls": {
+        "SettingsList": 1
+      },
+      "family": "settings",
+      "policy": "ordinary",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004",
+        "SET-042",
+        "SET-044"
       ]
     }
   ],

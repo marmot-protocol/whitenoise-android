@@ -127,7 +127,7 @@ internal fun AppearanceScreen(
     }
     SettingsScaffold(title = stringResource(R.string.appearance), onBack = onBack) {
         SettingsList {
-            item {
+            item(key = "search.Appearance.1") {
                 SettingsGroup(modifier = Modifier.testTag("appearance.quick_account_switching")) {
                     row("quick_account_switching") { context ->
                         SettingsSwitch(
@@ -140,8 +140,8 @@ internal fun AppearanceScreen(
                     }
                 }
             }
-            item { SettingsSection(stringResource(R.string.appearance_theme)) }
-            item {
+            item(key = "search.Appearance.2") { SettingsSection(stringResource(R.string.appearance_theme)) }
+            item(key = "search.Appearance.3") {
                 SettingsGroup(modifier = Modifier.selectableGroup().testTag("appearance.theme.group")) {
                     AppThemeMode.entries.forEach { mode ->
                         row(mode.preferenceValue) { context ->
@@ -162,8 +162,8 @@ internal fun AppearanceScreen(
                     }
                 }
             }
-            item { SettingsExplainer(stringResource(R.string.appearance_theme_help)) }
-            item {
+            item(key = "search.Appearance.4") { SettingsExplainer(stringResource(R.string.appearance_theme_help)) }
+            item(key = "search.Appearance.5") {
                 SettingsGroup(modifier = Modifier.testTag("appearance.colors.group")) {
                     // AMOLED keeps white action buttons, while bubble outlines remain customizable.
                     if (!amoled) {
@@ -184,7 +184,7 @@ internal fun AppearanceScreen(
                     }
                 }
             }
-            item {
+            item(key = "search.Appearance.6") {
                 SettingsGroup {
                     row("font_family") { context ->
                         SettingsLink(
@@ -212,7 +212,7 @@ internal fun AppearanceScreen(
                     }
                 }
             }
-            item {
+            item(key = "search.Appearance.7") {
                 SettingsGroup(modifier = Modifier.testTag("appearance.custom_emoji.group")) {
                     row("custom_emoji") { context ->
                         SettingsLink(
@@ -223,7 +223,7 @@ internal fun AppearanceScreen(
                     }
                 }
             }
-            item {
+            item(key = "search.Appearance.8") {
                 SettingsGroup(modifier = Modifier.testTag("appearance.language.group")) {
                     row("language") { context ->
                         SettingsLink(
@@ -235,7 +235,7 @@ internal fun AppearanceScreen(
                     }
                 }
             }
-            item {
+            item(key = "search.Appearance.9") {
                 val previewTheme = BubbleTheme.resolve(appState.themeMode, isSystemInDarkTheme())
                 AppearanceAccessibilitySample(
                     state = previewState,

@@ -10261,6 +10261,7 @@ class WhiteNoiseAppState private constructor(
                                 sourceMessageIdHex = record.sourceMessageIdHex,
                                 direction = record.direction,
                                 plaintext = record.plaintext,
+                                recipientConfirmed = record.recipientConfirmed,
                             )
                         },
                     hasMoreAfter = page.hasMoreAfter,

@@ -31,6 +31,7 @@ internal data class NotificationReplyTimelineRecord(
     val sourceMessageIdHex: String?,
     val direction: String,
     val plaintext: String,
+    val recipientConfirmed: Boolean = false,
 )
 
 internal data class NotificationReplyTimelinePage(
@@ -68,6 +69,7 @@ internal fun notificationReplySendWindowReady(
     nowMillis: Long,
 ): Boolean = (nowMillis.coerceAtLeast(0L) / 1_000L).toULong() > boundary.timelineAt
 
+/** Recovers published replies, requiring saved attempt ownership before relying on a peer receipt. */
 internal suspend fun notificationReplyCommitProbe(
     recoveryState: NotificationReplyRecoveryState,
     nextAttemptBoundary: NotificationReplyRecoveryBoundary?,
@@ -104,7 +106,9 @@ internal suspend fun notificationReplyCommitProbe(
                 record.direction.equals("sent", ignoreCase = true) &&
                 record.plaintext.trim() == body
             ) {
-                return if (record.sourceMessageIdHex == null) {
+                // A receipt proves delivery of this row, not that this reply attempt created it.
+                // Saved attempt-owned message IDs were handled before the content-based lookup.
+                return if (record.sourceMessageIdHex == null || record.recipientConfirmed) {
                     NotificationReplyCommitProbe.Indeterminate
                 } else {
                     NotificationReplyCommitProbe.Committed

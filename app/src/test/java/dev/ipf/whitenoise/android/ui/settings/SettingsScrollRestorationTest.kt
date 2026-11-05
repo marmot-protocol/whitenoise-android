@@ -12,14 +12,18 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.whitenoise.android.R
@@ -46,6 +50,20 @@ class SettingsScrollRestorationTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val help = context.getString(R.string.help)
     private val back = context.getString(R.string.back)
+
+    @Test fun searchResultOffsetSurvivesARealDetailVisit() {
+        mountSettings()
+        composeRule.onNodeWithTag("settings.search.open").performClick()
+        composeRule.onNodeWithTag("settings.search.field").performTextReplacement("e")
+        val tag = "settings.search.result.Appearance.font_size"
+        composeRule.onNodeWithTag("settings.search.results").performScrollToNode(hasTestTag(tag))
+        val expected = composeRule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+        composeRule.onNodeWithTag(tag).performClick()
+        composeRule.onNodeWithContentDescription(back).performClick()
+        composeRule.onNodeWithTag("settings.search.field").assertTextContains("e")
+        val actual = composeRule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+        assertTrue("$expected vs $actual", kotlin.math.abs(expected.top - actual.top) <= 1f)
+    }
 
     @Test
     fun toolbarBackRestoresTheSameSettingsViewport() {

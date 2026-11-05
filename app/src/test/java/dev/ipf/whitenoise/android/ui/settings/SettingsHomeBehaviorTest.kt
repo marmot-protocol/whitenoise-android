@@ -43,11 +43,27 @@ class SettingsHomeBehaviorTest {
     private var signOutCount = 0
     private var appUpdateCount = 0
     private var backCount = 0
+    private var searchOpenCount = 0
 
     @Test
     fun translationUsesTheDedicatedLanguageGlyph() {
         assertEquals(R.drawable.ic_translate, SettingsHomeRow.Translation.iconRes)
         org.junit.Assert.assertNotEquals(R.drawable.ic_text_fields, SettingsHomeRow.Translation.iconRes)
+    }
+
+    @Test fun searchToolbarActionIsAccessibleAndOpensOnlySearch() {
+        mount(profileCount = 1)
+        composeRule
+            .onNodeWithContentDescription(
+                context.getString(R.string.settings_search),
+            ).assertHasClickAction()
+            .performClick()
+        composeRule.runOnIdle {
+            assertEquals(1, searchOpenCount)
+            assertEquals(emptyList<SettingsDetail>(), opened)
+            assertEquals(0, appUpdateCount)
+            assertEquals(0, signOutCount)
+        }
     }
 
     /** Signed-out Settings retains its Profile action without claiming a profile read is running. */
@@ -267,6 +283,7 @@ class SettingsHomeBehaviorTest {
                     onAppUpdateAction = { appUpdateCount++ },
                     onChatWithSupport = { supportChatCount++ },
                     onSignOut = { signOutCount++ },
+                    onSearchOpenChange = { if (it) searchOpenCount++ },
                 )
             }
         }

@@ -497,12 +497,12 @@ private fun ProfileKeysList(
     val exportsEnabled = ui.pendingExport == null && !ui.exportBusy
     SettingsList {
         if (identity == null) {
-            item { SettingsExplainer(stringResource(R.string.no_active_account_period)) }
+            item(key = "search.AccountKeys.1") { SettingsExplainer(stringResource(R.string.no_active_account_period)) }
             return@SettingsList
         }
-        item { AccountKeysIdentityHeader(identity) }
-        item { SettingsSection(stringResource(R.string.public_key)) }
-        item {
+        item(key = "search.AccountKeys.2") { AccountKeysIdentityHeader(identity) }
+        item(key = "search.AccountKeys.3") { SettingsSection(stringResource(R.string.public_key)) }
+        item(key = "search.AccountKeys.4") {
             SettingsGroup {
                 row("public_key") { context ->
                     ProfileKeyValueRow(
@@ -525,9 +525,11 @@ private fun ProfileKeysList(
                 }
             }
         }
-        item { ProfileKeySupportingText(stringResource(R.string.profile_public_key_help)) }
+        item(key = "search.AccountKeys.5") {
+            ProfileKeySupportingText(stringResource(R.string.profile_public_key_help))
+        }
         if (!hasLocalKey) {
-            item {
+            item(key = "search.AccountKeys.6") {
                 SettingsCallout(
                     title = stringResource(R.string.access_amber_signed_in),
                     text = stringResource(R.string.access_amber_owns_key),
@@ -535,8 +537,8 @@ private fun ProfileKeysList(
                 )
             }
         } else {
-            item { SettingsSection(stringResource(R.string.private_key)) }
-            item {
+            item(key = "search.AccountKeys.7") { SettingsSection(stringResource(R.string.private_key)) }
+            item(key = "search.AccountKeys.8") {
                 SettingsGroup {
                     row("private_key") { context ->
                         PrivateKeyValueRow(context, ui.privateKey, revealed, onToggleReveal)
@@ -557,9 +559,11 @@ private fun ProfileKeysList(
                     }
                 }
             }
-            item { ProfileKeySupportingText(stringResource(R.string.profile_private_key_help)) }
-            item { SettingsSection(stringResource(R.string.export)) }
-            item {
+            item(key = "search.AccountKeys.9") {
+                ProfileKeySupportingText(stringResource(R.string.profile_private_key_help))
+            }
+            item(key = "search.AccountKeys.10") { SettingsSection(stringResource(R.string.export)) }
+            item(key = "search.AccountKeys.11") {
                 SettingsGroup {
                     row("export_encrypted") { context ->
                         SettingsAction(
@@ -583,8 +587,8 @@ private fun ProfileKeysList(
                 }
             }
         }
-        item { SettingsSection(stringResource(R.string.account_keys_session)) }
-        item {
+        item(key = "search.AccountKeys.12") { SettingsSection(stringResource(R.string.account_keys_session)) }
+        item(key = "search.AccountKeys.13") {
             SettingsGroup {
                 row("sign_out") { context ->
                     SettingsAction(
@@ -597,7 +601,7 @@ private fun ProfileKeysList(
             }
         }
         if (showWipe) {
-            item {
+            item(key = "search.AccountKeys.14") {
                 SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Section)) {
                     row("wipe") { context ->
                         SettingsAction(

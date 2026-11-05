@@ -6,6 +6,16 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SettingsDetailNavigationTest {
+    @Test fun nestedSearchControlsRetainTheirOrdinaryRouteParents() {
+        val catalog = settingsSearchCatalog().associateBy { it.id }
+        assertEquals(SettingsDetail.About, catalog.getValue("About.privacy").destination)
+        assertEquals(SettingsDetail.Help, settingsDetailParent(SettingsDetail.About))
+        assertEquals(SettingsDetail.Appearance, catalog.getValue("Appearance.font_size").destination)
+        assertNull(settingsDetailParent(SettingsDetail.Appearance))
+        assertNull(catalog.getValue("home.ChatWithSupport").destination)
+        assertEquals("ChatWithSupport", catalog.getValue("home.ChatWithSupport").rowKey)
+    }
+
     /** Key Packages returns to Developer Tools, a hub destination; About returns to Help, which returns home. */
     @Test
     fun developerToolsAndHelpFormBackStacksDownToHome() {

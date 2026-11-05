@@ -98,8 +98,8 @@ internal fun DataUsageScreen(
     val qualityDetails = MediaQuality.entries.associateWith { stringResource(it.subtitleRes) }
     SettingsScaffold(title = stringResource(R.string.data_usage_title), onBack = onBack) {
         SettingsList {
-            item { SettingsSection(stringResource(R.string.download_automatic)) }
-            item {
+            item(key = "search.DataUsage.1") { SettingsSection(stringResource(R.string.download_automatic)) }
+            item(key = "search.DataUsage.2") {
                 SettingsGroup(modifier = Modifier.testTag("data_usage.downloads.group")) {
                     DownloadMediaOrder.forEach { type ->
                         row(type.preferenceKey) { context ->
@@ -127,9 +127,9 @@ internal fun DataUsageScreen(
                     }
                 }
             }
-            item { SettingsExplainer(stringResource(R.string.download_rules_help)) }
-            item { SettingsSection(stringResource(R.string.download_queue)) }
-            item {
+            item(key = "search.DataUsage.3") { SettingsExplainer(stringResource(R.string.download_rules_help)) }
+            item(key = "search.DataUsage.4") { SettingsSection(stringResource(R.string.download_queue)) }
+            item(key = "search.DataUsage.5") {
                 SettingsGroup(modifier = Modifier.testTag("data_usage.queue")) {
                     row("queue") { context ->
                         SettingsAction(
@@ -145,8 +145,8 @@ internal fun DataUsageScreen(
                     }
                 }
             }
-            item { SettingsSection(stringResource(R.string.download_sent_media)) }
-            item {
+            item(key = "search.DataUsage.6") { SettingsSection(stringResource(R.string.download_sent_media)) }
+            item(key = "search.DataUsage.7") {
                 SettingsGroup(modifier = Modifier.testTag("data_usage.sent_media.group")) {
                     row("quality") { context ->
                         SettingsLink(
@@ -158,11 +158,11 @@ internal fun DataUsageScreen(
                     }
                 }
             }
-            item {
+            item(key = "search.DataUsage.8") {
                 SettingsExplainer(stringResource(R.string.download_quality_help))
                 SettingsExplainer(stringResource(R.string.media_quality_footer))
             }
-            item {
+            item(key = "search.DataUsage.9") {
                 SettingsGroup {
                     row("public_jpeg_previews") { context ->
                         SettingsSwitch(

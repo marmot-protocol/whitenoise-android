@@ -12,6 +12,6 @@ import dev.ipf.whitenoise.android.translation.rememberTranslationPreferences
 internal fun TranslationSettingsScreen(onBack: () -> Unit) {
     val preferences = rememberTranslationPreferences()
     SettingsScaffold(title = stringResource(R.string.translation_title), onBack = onBack) {
-        SettingsList { item { TranslationGlobalSettingsContent(preferences) } }
+        SettingsList { item(key = "search.TranslationSettings.1") { TranslationGlobalSettingsContent(preferences) } }
     }
 }
