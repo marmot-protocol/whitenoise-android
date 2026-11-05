@@ -52,7 +52,10 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
         "anchor": "fun SettingsHomeContent(",
         "test_ids": [
-          "SET-001"
+          "SET-001",
+          "SET-042",
+          "SET-043",
+          "SET-044"
         ]
       },
       {
@@ -60,7 +63,10 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
         "anchor": "fun SettingsHomeScreen(",
         "test_ids": [
-          "SET-001"
+          "SET-001",
+          "SET-042",
+          "SET-043",
+          "SET-044"
         ]
       },
       {
@@ -135,7 +141,10 @@
         "anchor": "fun SettingsScreen(",
         "test_ids": [
           "SET-001",
-          "SET-039"
+          "SET-039",
+          "SET-042",
+          "SET-043",
+          "SET-044"
         ]
       },
       {
@@ -445,6 +454,27 @@
         "test_ids": [
           "SET-001",
           "NCH-007"
+        ]
+      },
+      {
+        "surface": "setting:settings_search",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.settings_search",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Query edits reset results; detail return retains viewport",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "searchResultList.requestScrollToItem(0)",
+        "test_ids": [
+          "SET-042",
+          "SET-044"
         ]
       }
     ]

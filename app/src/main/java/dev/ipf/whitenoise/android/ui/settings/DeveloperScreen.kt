@@ -151,7 +151,7 @@ internal fun DeveloperContent(
         if (demoHasSavedSetup) R.string.review_demo_resume_confirm_action else R.string.review_demo_confirm_action
     SettingsScaffold(title = stringResource(R.string.settings_developer_tools), onBack = onBack) {
         SettingsList {
-            item {
+            item(key = "search.Developer.1") {
                 SettingsCallout(
                     text = stringResource(R.string.developer_testing_only_detail),
                     modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("developer.warning"),
@@ -159,7 +159,7 @@ internal fun DeveloperContent(
                     icon = R.drawable.ic_warning,
                 )
             }
-            item {
+            item(key = "search.Developer.2") {
                 SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Section).testTag("developer.mode")) {
                     row("developer_mode") { context ->
                         SettingsSwitch(
@@ -172,9 +172,9 @@ internal fun DeveloperContent(
                     }
                 }
             }
-            item { SettingsExplainer(stringResource(R.string.developer_mode_subtitle)) }
-            item { SettingsSection(stringResource(R.string.review_demo_section)) }
-            item {
+            item(key = "search.Developer.3") { SettingsExplainer(stringResource(R.string.developer_mode_subtitle)) }
+            item(key = "search.Developer.4") { SettingsSection(stringResource(R.string.review_demo_section)) }
+            item(key = "search.Developer.5") {
                 SettingsGroup(modifier = Modifier.testTag("developer.demo")) {
                     row("review_demo") { context ->
                         SettingsLink(
@@ -232,8 +232,8 @@ internal fun DeveloperContent(
                     }
                 }
             }
-            item { SettingsExplainer(stringResource(R.string.review_demo_clear_explanation)) }
-            item {
+            item(key = "search.Developer.6") { SettingsExplainer(stringResource(R.string.review_demo_clear_explanation)) }
+            item(key = "search.Developer.7") {
                 SettingsGroup(modifier = Modifier.testTag("developer.key_packages")) {
                     row("key_packages") { context ->
                         SettingsLink(
@@ -247,7 +247,7 @@ internal fun DeveloperContent(
                 }
             }
             if (developerMode) {
-                item {
+                item(key = "search.Developer.8") {
                     SettingsGroup {
                         row("quarantined_groups") { context ->
                             SettingsLink(
@@ -260,8 +260,8 @@ internal fun DeveloperContent(
                         }
                     }
                 }
-                item { SettingsSection(stringResource(R.string.developer_debugging)) }
-                item {
+                item(key = "search.Developer.9") { SettingsSection(stringResource(R.string.developer_debugging)) }
+                item(key = "search.Developer.10") {
                     SettingsGroup(modifier = Modifier.testTag("developer.debugging")) {
                         row("streaming_debug") { context ->
                             SettingsSwitch(
@@ -294,10 +294,10 @@ internal fun DeveloperContent(
                         }
                     }
                 }
-                item { SettingsExplainer(stringResource(R.string.streaming_debug_subtitle)) }
+                item(key = "search.Developer.11") { SettingsExplainer(stringResource(R.string.streaming_debug_subtitle)) }
             }
-            item { SettingsSection(stringResource(R.string.about)) }
-            item {
+            item(key = "search.Developer.12") { SettingsSection(stringResource(R.string.about)) }
+            item(key = "search.Developer.13") {
                 SettingsGroup(modifier = Modifier.testTag("developer.build")) {
                     row("version") { context ->
                         SettingsValue(context, stringResource(R.string.about_version), build.versionName)
@@ -311,7 +311,7 @@ internal fun DeveloperContent(
                 }
             }
             if (build.staging) {
-                item { DeveloperStagingBadge() }
+                item(key = "search.Developer.14") { DeveloperStagingBadge() }
             }
         }
     }

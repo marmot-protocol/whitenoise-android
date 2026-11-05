@@ -84,14 +84,14 @@ internal fun AiAgentsContent(
     val manualSetup = stringResource(R.string.ai_agents_manual_setup_body, stringResource(R.string.new_message))
     SettingsScaffold(title = stringResource(R.string.ai_agents), onBack = onBack) {
         SettingsList {
-            item {
+            item(key = "search.AiAgents.1") {
                 SettingsCallout(
                     text = stringResource(R.string.ai_agents_intro),
                     title = stringResource(R.string.ai_agents_about_title),
                 )
             }
             if (npub == null) {
-                item {
+                item(key = "search.AiAgents.2") {
                     SettingsCallout(
                         text = stringResource(R.string.ai_agents_public_key_unavailable),
                         modifier = Modifier.testTag("ai_agents.public_key_unavailable"),
@@ -99,8 +99,8 @@ internal fun AiAgentsContent(
                     )
                 }
             }
-            item { SettingsSection(stringResource(R.string.ai_agents_connectors_title)) }
-            item {
+            item(key = "search.AiAgents.3") { SettingsSection(stringResource(R.string.ai_agents_connectors_title)) }
+            item(key = "search.AiAgents.4") {
                 SettingsGroup(modifier = Modifier.testTag("ai_agents.connectors")) {
                     agentConnectors.forEach { connector ->
                         row(connector.id) { rowContext ->
@@ -116,9 +116,9 @@ internal fun AiAgentsContent(
                     }
                 }
             }
-            item { SettingsExplainer(stringResource(R.string.ai_agents_clipboard_disclosure)) }
-            item { SettingsSection(stringResource(R.string.ai_agents_manual_setup_title)) }
-            item {
+            item(key = "search.AiAgents.5") { SettingsExplainer(stringResource(R.string.ai_agents_clipboard_disclosure)) }
+            item(key = "search.AiAgents.6") { SettingsSection(stringResource(R.string.ai_agents_manual_setup_title)) }
+            item(key = "search.AiAgents.7") {
                 SettingsGroup(modifier = Modifier.testTag("ai_agents.manual")) {
                     row("public_key") { rowContext ->
                         SettingsAction(
@@ -149,10 +149,10 @@ internal fun AiAgentsContent(
                     }
                 }
             }
-            item { SettingsExplainer(manualSetup) }
-            item { SettingsExplainer(stringResource(R.string.ai_agents_project_groups_tip)) }
+            item(key = "search.AiAgents.8") { SettingsExplainer(manualSetup) }
+            item(key = "search.AiAgents.9") { SettingsExplainer(stringResource(R.string.ai_agents_project_groups_tip)) }
             feedback?.let { message ->
-                item {
+                item(key = "search.AiAgents.10") {
                     SettingsCallout(
                         text = stringResource(message),
                         modifier =

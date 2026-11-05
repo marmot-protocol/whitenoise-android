@@ -92,7 +92,7 @@ internal fun DiagnosticsImprovementsScreen(
     }
     SettingsScaffold(title = stringResource(R.string.diagnostics_improvements), onBack = onBack) {
         SettingsList {
-            item {
+            item(key = "search.DiagnosticsImprovements.1") {
                 SettingsGroup(modifier = Modifier.testTag("diagnostics.choices.group")) {
                     row("usage") { rowContext ->
                         SettingsSwitch(
@@ -127,9 +127,9 @@ internal fun DiagnosticsImprovementsScreen(
                     }
                 }
             }
-            item { DiagnosticsDisclosure(appState) }
-            item { SettingsSection(stringResource(R.string.stored_audit_logs)) }
-            item {
+            item(key = "search.DiagnosticsImprovements.2") { DiagnosticsDisclosure(appState) }
+            item(key = "search.DiagnosticsImprovements.3") { SettingsSection(stringResource(R.string.stored_audit_logs)) }
+            item(key = "search.DiagnosticsImprovements.4") {
                 SettingsGroup(modifier = Modifier.testTag("diagnostics.stored.group")) {
                     row("export") { rowContext ->
                         SettingsAction(
@@ -153,7 +153,7 @@ internal fun DiagnosticsImprovementsScreen(
                     }
                 }
             }
-            item {
+            item(key = "search.DiagnosticsImprovements.5") {
                 Text(
                     stringResource(R.string.delete_audit_logs_subtitle),
                     modifier =

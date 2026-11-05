@@ -1,0 +1,668 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "setting:about",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.about",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:about_and_licenses",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.about_and_licenses",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.account",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:add_relay",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.add_relay",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:app_updates",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.app_updates",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:appearance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.appearance",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:appearance_theme",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.appearance_theme",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:auto_lock",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.auto_lock",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:chat_folders_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.chat_folders_title",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:chat_with_support",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.chat_with_support",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.chats",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:dictation_result_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.dictation_result_title",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:dictation_settings_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.dictation_settings_title",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:download_automatic",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.download_automatic",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:download_queue",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.download_queue",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:download_rules_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.download_rules_help",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:folder_new_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.folder_new_title",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:gestures_left",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.gestures_left",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:gestures_messages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.gestures_messages",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:gestures_right",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.gestures_right",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:gestures_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.gestures_title",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.help",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:inbox",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.inbox",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:local_notifications",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.local_notifications",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:nip_65",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.nip_65",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:notification_battery_policy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.notification_battery_policy",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:notification_categories",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.notification_categories",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:notification_categories_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.notification_categories_detail",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:notification_delivery_local_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.notification_delivery_local_detail",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:notification_delivery_push",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.notification_delivery_push",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:notification_delivery_push_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.notification_delivery_push_detail",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:notification_permission_status",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.notification_permission_status",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:notification_quiet_during_spoken_audio",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.notification_quiet_during_spoken_audio",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:notification_quiet_during_spoken_audio_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.notification_quiet_during_spoken_audio_detail",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:notification_show_previews",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.notification_show_previews",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:notification_show_previews_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.notification_show_previews_detail",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:notification_tones",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.notification_tones",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:notifications",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.notifications",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:open_android_security_settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.open_android_security_settings",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:open_source_licenses",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.open_source_licenses",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:open_source_licenses_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.open_source_licenses_subtitle",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:privacy_policy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.privacy_policy",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:privacy_policy_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.privacy_policy_subtitle",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:private_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.private_key",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:public_key",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.public_key",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:pull_unread_setting",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.pull_unread_setting",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.relays",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:report_a_bug",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.report_a_bug",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:reset_to_default",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.reset_to_default",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:restore_default_relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.restore_default_relays",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:review_demo_section",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.review_demo_section",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.settings",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:settings_add_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.settings_add_profile",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:settings_data_usage",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.settings_data_usage",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:settings_developer_tools",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.settings_developer_tools",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:settings_privacy_security",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.settings_privacy_security",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:settings_profile_keys",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.settings_profile_keys",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:settings_search_alias_sound",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.settings_search_alias_sound",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:settings_switch_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.settings_switch_profile",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:share_and_connect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.share_and_connect",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:sign_out",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.sign_out",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:support_open_relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.support_open_relays",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:translation_automatic",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.translation_automatic",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:translation_privacy_warning",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.translation_privacy_warning",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:translation_target_language",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.translation_target_language",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:translation_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.translation_title",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,713 @@
+{
+  "schema": 1,
+  "policy": "Only static Settings UI metadata. Picker options are represented by their owner control. User-generated entity rows and transient recovery-only actions are excluded. New source row declarations require disposition review.",
+  "sources": {
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"add_profile\"",
+          "represented_by": "Home.add_profile"
+        },
+        {
+          "declaration": "\"app_updates\"",
+          "represented_by": "Home.update_controls"
+        },
+        {
+          "declaration": "\"profile\"",
+          "represented_by": "Account.share_connect"
+        },
+        {
+          "declaration": "\"sign_out\"",
+          "represented_by": "Home.sign_out"
+        },
+        {
+          "declaration": "\"switch_profile\"",
+          "represented_by": "Home.switch_profile"
+        },
+        {
+          "declaration": "entry.name",
+          "represented_by": "home.Appearance"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"action_color\"",
+          "represented_by": "Appearance.action_color"
+        },
+        {
+          "declaration": "\"chat_bubble_colors\"",
+          "represented_by": "Appearance.chat_bubble_colors"
+        },
+        {
+          "declaration": "\"custom_emoji\"",
+          "represented_by": "Appearance.custom_emoji"
+        },
+        {
+          "declaration": "\"enter_behavior\"",
+          "represented_by": "Appearance.enter_behavior"
+        },
+        {
+          "declaration": "\"font_family\"",
+          "represented_by": "Appearance.font_family"
+        },
+        {
+          "declaration": "\"font_size\"",
+          "represented_by": "Appearance.font_size"
+        },
+        {
+          "declaration": "\"language\"",
+          "represented_by": "Appearance.language"
+        },
+        {
+          "declaration": "\"quick_account_switching\"",
+          "represented_by": "Appearance.quick_account_switching"
+        },
+        {
+          "declaration": "mode.preferenceValue",
+          "represented_by": "Appearance.theme"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"copy_private_key\"",
+          "represented_by": "AccountKeys.copy_private_key"
+        },
+        {
+          "declaration": "\"export_encrypted\"",
+          "represented_by": "AccountKeys.export_encrypted"
+        },
+        {
+          "declaration": "\"export_raw\"",
+          "represented_by": "AccountKeys.export_raw"
+        },
+        {
+          "declaration": "\"private_key\"",
+          "represented_by": "Account.private_key"
+        },
+        {
+          "declaration": "\"public_key\"",
+          "represented_by": "Account.public_key"
+        },
+        {
+          "declaration": "\"sign_out\"",
+          "represented_by": "AccountKeys.sign_out"
+        },
+        {
+          "declaration": "\"wipe\"",
+          "represented_by": "AccountKeys.wipe"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/RelaysScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"add\"",
+          "represented_by": "Relays.add"
+        },
+        {
+          "declaration": "\"name\"",
+          "excluded": "Per-relay fields or state-dependent publication action; private relay data/live status excluded, relay management stays indexed."
+        },
+        {
+          "declaration": "\"posting\"",
+          "represented_by": "Relays.posting"
+        },
+        {
+          "declaration": "\"publish\"",
+          "excluded": "Per-relay fields or state-dependent publication action; private relay data/live status excluded, relay management stays indexed."
+        },
+        {
+          "declaration": "\"receiving\"",
+          "represented_by": "Relays.receiving"
+        },
+        {
+          "declaration": "\"refresh\"",
+          "excluded": "Per-relay fields or state-dependent publication action; private relay data/live status excluded, relay management stays indexed."
+        },
+        {
+          "declaration": "\"remove\"",
+          "excluded": "Per-relay fields or state-dependent publication action; private relay data/live status excluded, relay management stays indexed."
+        },
+        {
+          "declaration": "\"retry\"",
+          "excluded": "Retry, permission-grant failure, storage recovery and update-install progress actions exist only during a transient state and retain their visible parent management entry."
+        },
+        {
+          "declaration": "\"running\"",
+          "excluded": "Retry, permission-grant failure, storage recovery and update-install progress actions exist only during a transient state and retain their visible parent management entry."
+        },
+        {
+          "declaration": "\"url\"",
+          "excluded": "Per-relay fields or state-dependent publication action; private relay data/live status excluded, relay management stays indexed."
+        },
+        {
+          "declaration": "relay.url",
+          "excluded": "Relay URLs/names, live publication status and per-relay edit/remove rows are user data. Add/restore management remains indexed."
+        },
+        {
+          "declaration": "role.name",
+          "excluded": "Relay URLs/names, live publication status and per-relay edit/remove rows are user data. Add/restore management remains indexed."
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"allow\"",
+          "excluded": "Retry, permission-grant failure, storage recovery and update-install progress actions exist only during a transient state and retain their visible parent management entry."
+        },
+        {
+          "declaration": "\"battery\"",
+          "represented_by": "Notifications.battery"
+        },
+        {
+          "declaration": "\"blocked\"",
+          "excluded": "Retry, permission-grant failure, storage recovery and update-install progress actions exist only during a transient state and retain their visible parent management entry."
+        },
+        {
+          "declaration": "\"fcm\"",
+          "represented_by": "Notifications.push"
+        },
+        {
+          "declaration": "\"local\"",
+          "represented_by": "Notifications.local"
+        },
+        {
+          "declaration": "\"permission\"",
+          "represented_by": "Notifications.permission"
+        },
+        {
+          "declaration": "channel.id",
+          "represented_by": "Notifications.categories"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationToneControl.kt": {
+      "controls": [
+        {
+          "declaration": "\"import\"",
+          "represented_by": "Notifications.sound"
+        },
+        {
+          "declaration": "tone.token",
+          "represented_by": "Notifications.sound"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationPreviewControlState.kt": {
+      "controls": [
+        {
+          "declaration": "\"previews\"",
+          "represented_by": "Notifications.previews"
+        },
+        {
+          "declaration": "\"retry\"",
+          "excluded": "Retry, permission-grant failure, storage recovery and update-install progress actions exist only during a transient state and retain their visible parent management entry."
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SpokenAudioAlertControl.kt": {
+      "controls": [
+        {
+          "declaration": "\"spoken-audio\"",
+          "represented_by": "Notifications.spoken_audio"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DevicePrivacyScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"auto_lock\"",
+          "represented_by": "Privacy.auto_lock"
+        },
+        {
+          "declaration": "\"blocked_users\"",
+          "represented_by": "DevicePrivacy.blocked_users"
+        },
+        {
+          "declaration": "\"default_disappearing_messages\"",
+          "represented_by": "DevicePrivacy.default_disappearing_messages"
+        },
+        {
+          "declaration": "\"device_authentication\"",
+          "represented_by": "DevicePrivacy.device_authentication"
+        },
+        {
+          "declaration": "\"diagnostics\"",
+          "represented_by": "DevicePrivacy.diagnostics"
+        },
+        {
+          "declaration": "\"incognito_keyboard\"",
+          "represented_by": "DevicePrivacy.incognito_keyboard"
+        },
+        {
+          "declaration": "\"screen_security\"",
+          "represented_by": "DevicePrivacy.screen_security"
+        },
+        {
+          "declaration": "\"security_settings\"",
+          "represented_by": "Privacy.security_settings"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DiagnosticsImprovementsScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"audit_logs\"",
+          "represented_by": "DiagnosticsImprovements.audit_logs"
+        },
+        {
+          "declaration": "\"delete\"",
+          "represented_by": "DiagnosticsImprovements.delete"
+        },
+        {
+          "declaration": "\"export\"",
+          "represented_by": "DiagnosticsImprovements.export"
+        },
+        {
+          "declaration": "\"usage\"",
+          "represented_by": "DiagnosticsImprovements.usage"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TextToSpeechScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"android_settings\"",
+          "represented_by": "TextToSpeech.android_settings"
+        },
+        {
+          "declaration": "\"auto_read\"",
+          "represented_by": "TextToSpeech.auto_read"
+        },
+        {
+          "declaration": "\"engine\"",
+          "represented_by": "TextToSpeech.engine"
+        },
+        {
+          "declaration": "\"media_mix\"",
+          "represented_by": "TextToSpeech.media_mix"
+        },
+        {
+          "declaration": "\"mix_volume\"",
+          "represented_by": "TextToSpeech.mix_volume"
+        },
+        {
+          "declaration": "\"rate\"",
+          "represented_by": "TextToSpeech.rate"
+        },
+        {
+          "declaration": "\"refresh\"",
+          "represented_by": "TextToSpeech.refresh"
+        },
+        {
+          "declaration": "\"voice\"",
+          "represented_by": "TextToSpeech.voice"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DictationSettingsScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"android_settings\"",
+          "represented_by": "Dictation.android_settings"
+        },
+        {
+          "declaration": "\"finish\"",
+          "represented_by": "Dictation.finish"
+        },
+        {
+          "declaration": "\"open\"",
+          "excluded": "Optional external-provider installation recommendation depends on installed packages and is represented by Dictation management, not an always-present control."
+        },
+        {
+          "declaration": "\"pause_other_audio\"",
+          "represented_by": "Dictation.pause_other_audio"
+        },
+        {
+          "declaration": "\"provider\"",
+          "represented_by": "Dictation.provider"
+        },
+        {
+          "declaration": "\"result\"",
+          "represented_by": "Dictation.result"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DataUsageScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"public_jpeg_previews\"",
+          "represented_by": "Data.public_jpeg_previews"
+        },
+        {
+          "declaration": "\"quality\"",
+          "represented_by": "Data.quality"
+        },
+        {
+          "declaration": "\"queue\"",
+          "represented_by": "Data.queue"
+        },
+        {
+          "declaration": "\"reset\"",
+          "represented_by": "Data.reset"
+        },
+        {
+          "declaration": "type.preferenceKey",
+          "represented_by": "Data.download.Image"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/GestureSettingsScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"pull_unread\"",
+          "represented_by": "Gestures.pull_unread"
+        },
+        {
+          "declaration": "\"reset\"",
+          "represented_by": "Gestures.reset"
+        },
+        {
+          "declaration": "binding.name",
+          "represented_by": "Gestures.MessageLeft"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatFoldersScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"restore\"",
+          "represented_by": "ChatFolders.restore"
+        },
+        {
+          "declaration": "folder.id",
+          "excluded": "Custom folder names/order and folder editor values are private user data. Chat folders management and restore remain indexed."
+        }
+      ],
+      "non_row_controls": [
+        {
+          "anchor": "SettingsSearchRowReveal(\"create\"",
+          "represented_by": "ChatFolders.create"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"choose_file\"",
+          "represented_by": "CustomEmoji.choose_file"
+        },
+        {
+          "declaration": "\"choose_photo\"",
+          "represented_by": "CustomEmoji.choose_photo"
+        },
+        {
+          "declaration": "entry.shortcode",
+          "excluded": "Shortcodes, imported images and per-image removal identify user content. Import management remains indexed."
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"docs\"",
+          "represented_by": "AiAgents.docs"
+        },
+        {
+          "declaration": "\"public_key\"",
+          "represented_by": "AiAgents.public_key"
+        },
+        {
+          "declaration": "connector.id",
+          "represented_by": "home.AiAgents"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DeveloperScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"build\"",
+          "excluded": "Read-only version/build/native revision/staging indicators are represented by About/Developer management, with no dynamic build-value indexing."
+        },
+        {
+          "declaration": "\"developer_mode\"",
+          "represented_by": "Developer.developer_mode"
+        },
+        {
+          "declaration": "\"diagnostics\"",
+          "represented_by": "Developer.diagnostics"
+        },
+        {
+          "declaration": "\"key_packages\"",
+          "represented_by": "Developer.key_packages"
+        },
+        {
+          "declaration": "\"mdk\"",
+          "excluded": "Read-only version/build/native revision/staging indicators are represented by About/Developer management, with no dynamic build-value indexing."
+        },
+        {
+          "declaration": "\"quarantined_groups\"",
+          "represented_by": "Developer.quarantined_groups"
+        },
+        {
+          "declaration": "\"review_demo\"",
+          "represented_by": "Developer.review_demo"
+        },
+        {
+          "declaration": "\"review_demo_clear\"",
+          "excluded": "Cleanup/retry actions depend on transient demo state; Review demo management remains indexed."
+        },
+        {
+          "declaration": "\"seed_fixture\"",
+          "excluded": "Seed fixture is a non-production test-only injected control, absent from shipping runtime."
+        },
+        {
+          "declaration": "\"streaming_debug\"",
+          "represented_by": "Developer.streaming_debug"
+        },
+        {
+          "declaration": "\"version\"",
+          "excluded": "Read-only version/build/native revision/staging indicators are represented by About/Developer management, with no dynamic build-value indexing."
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SupportScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"relays\"",
+          "represented_by": "Support.relays"
+        },
+        {
+          "declaration": "\"retry\"",
+          "excluded": "Retry, permission-grant failure, storage recovery and update-install progress actions exist only during a transient state and retain their visible parent management entry."
+        },
+        {
+          "declaration": "\"support_identity\"",
+          "excluded": "Fixed support identity or transient retry; support management remains indexed, no account/contact values enter metadata."
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ActionColorScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"controls\"",
+          "represented_by": "Appearance.action_color"
+        },
+        {
+          "declaration": "\"preview\"",
+          "excluded": "Noninteractive visual preview, not a preference control."
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ChatBubbleColorsScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"mine\"",
+          "represented_by": "Appearance.chat_bubble_colors"
+        },
+        {
+          "declaration": "\"other\"",
+          "represented_by": "Appearance.chat_bubble_colors"
+        },
+        {
+          "declaration": "\"preview\"",
+          "excluded": "Noninteractive visual preview, not a preference control."
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/LanguageScreen.kt": {
+      "controls": [
+        {
+          "declaration": "option.tag.ifEmpty { \"system\" }",
+          "represented_by": "Appearance.language"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/BlockedUsersScreen.kt": {
+      "controls": [
+        {
+          "declaration": "user.publicKey",
+          "excluded": "Individual blocked identities are private user data. Blocked users management remains indexed."
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/QuarantinedGroupsScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"recovery\"",
+          "represented_by": "Developer.quarantined_groups"
+        },
+        {
+          "declaration": "\"refresh\"",
+          "represented_by": "Developer.quarantined_groups"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/KeyPackagesScreen.kt": {
+      "controls": [
+        {
+          "declaration": "\"republish\"",
+          "represented_by": "Developer.key_packages"
+        }
+      ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ShareConnectScreen.kt": {
+      "controls": []
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DonateScreen.kt": {
+      "controls": []
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/TranslationSettingsScreen.kt": {
+      "controls": []
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/HelpAboutScreens.kt": {
+      "controls": [
+        {
+          "declaration": "\"about\"",
+          "represented_by": "Help.about"
+        },
+        {
+          "declaration": "\"bug_report\"",
+          "excluded": "Read-only external destination/privacy explanation; discover Help or About management rather than indexing external URL or dynamic values."
+        },
+        {
+          "declaration": "\"build\"",
+          "excluded": "Read-only version/build/native revision/staging indicators are represented by About/Developer management, with no dynamic build-value indexing."
+        },
+        {
+          "declaration": "\"destination\"",
+          "excluded": "Read-only external destination/privacy explanation; discover Help or About management rather than indexing external URL or dynamic values."
+        },
+        {
+          "declaration": "\"developer\"",
+          "represented_by": "home.DeveloperTools"
+        },
+        {
+          "declaration": "\"licenses\"",
+          "represented_by": "About.licenses"
+        },
+        {
+          "declaration": "\"mdk\"",
+          "excluded": "Read-only version/build/native revision/staging indicators are represented by About/Developer management, with no dynamic build-value indexing."
+        },
+        {
+          "declaration": "\"privacy\"",
+          "represented_by": "About.privacy"
+        },
+        {
+          "declaration": "\"version\"",
+          "excluded": "Read-only version/build/native revision/staging indicators are represented by About/Developer management, with no dynamic build-value indexing."
+        }
+      ]
+    }
+  },
+  "destinations": {
+    "ShareConnect": {
+      "owner": "Account sharing management; static screen destination",
+      "catalog_id": "Account.share_connect"
+    },
+    "Appearance": {
+      "catalog_id": "home.Appearance"
+    },
+    "ActionColor": {
+      "catalog_id": "Appearance.action_color"
+    },
+    "ChatBubbleColors": {
+      "catalog_id": "Appearance.chat_bubble_colors"
+    },
+    "Language": {
+      "catalog_id": "Appearance.language"
+    },
+    "CustomEmoji": {
+      "catalog_id": "Appearance.custom_emoji"
+    },
+    "Data": {
+      "catalog_id": "home.DataUsage"
+    },
+    "Profile": {
+      "catalog_id": "home.Profile"
+    },
+    "AccountKeys": {
+      "catalog_id": "home.ProfileKeys"
+    },
+    "Relays": {
+      "catalog_id": "home.Relays"
+    },
+    "Support": {
+      "catalog_id": "home.ChatWithSupport"
+    },
+    "SupportRelays": {
+      "catalog_id": "Support.relays"
+    },
+    "KeyPackages": {
+      "catalog_id": "Developer.key_packages"
+    },
+    "QuarantinedGroups": {
+      "catalog_id": "Developer.quarantined_groups"
+    },
+    "Notifications": {
+      "catalog_id": "home.Notifications"
+    },
+    "DevicePrivacy": {
+      "catalog_id": "home.PrivacySecurity"
+    },
+    "DiagnosticsImprovements": {
+      "catalog_id": "DevicePrivacy.diagnostics"
+    },
+    "BlockedUsers": {
+      "catalog_id": "DevicePrivacy.blocked_users"
+    },
+    "AiAgents": {
+      "catalog_id": "home.AiAgents"
+    },
+    "Donate": {
+      "catalog_id": "home.Donate"
+    },
+    "TextToSpeech": {
+      "catalog_id": "home.ReadAloud"
+    },
+    "Translation": {
+      "catalog_id": "home.Translation"
+    },
+    "Dictation": {
+      "catalog_id": "home.Dictation"
+    },
+    "ChatFolders": {
+      "catalog_id": "home.ChatFolders"
+    },
+    "Gestures": {
+      "catalog_id": "home.Gestures"
+    },
+    "Help": {
+      "catalog_id": "home.Help"
+    },
+    "BugReport": {
+      "catalog_id": "Help.bug_report"
+    },
+    "About": {
+      "catalog_id": "Help.about"
+    },
+    "Developer": {
+      "catalog_id": "home.DeveloperTools"
+    }
+  },
+  "exclusions": {
+    "account values": "Names, npubs, keys, profile text and pictures are never metadata; index only static management labels.",
+    "relay entities": "Relay URLs/names, live publication status and per-relay edit/remove rows are user data. Add/restore management remains indexed.",
+    "blocked entities": "Individual blocked identities are private user data. Blocked users management remains indexed.",
+    "folder entities": "Custom folder names/order and folder editor values are private user data. Chat folders management and restore remain indexed.",
+    "emoji entities": "Shortcodes, imported images and per-image removal identify user content. Import management remains indexed.",
+    "agent connectors": "Connector setup options are represented by the AI Agents management destination; copied setup payload and account key are never indexed.",
+    "picker choices": "Theme/font/color/voice/engine/language/network/gesture choices are reached through their owning controls, rather than indexed as independent settings.",
+    "transient errors": "Retry, permission-grant failure, storage recovery and update-install progress actions exist only during a transient state and retain their visible parent management entry.",
+    "dictation recommendation": "Optional external-provider installation recommendation depends on installed packages and is represented by Dictation management, not an always-present control.",
+    "developer demo cleanup": "Cleanup/retry actions depend on transient demo state; Review demo management remains indexed.",
+    "developer seed fixture": "Seed fixture is a non-production test-only injected control, absent from shipping runtime.",
+    "build information": "Read-only version/build/native revision/staging indicators are represented by About/Developer management, with no dynamic build-value indexing."
+  }
+}

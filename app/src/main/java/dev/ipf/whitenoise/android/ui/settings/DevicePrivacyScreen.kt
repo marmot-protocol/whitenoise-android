@@ -66,8 +66,8 @@ internal fun DevicePrivacyScreen(
         )
     SettingsScaffold(title = stringResource(R.string.settings_privacy_security), onBack = onBack) {
         SettingsList {
-            item { SettingsSection(stringResource(R.string.device_protection)) }
-            item {
+            item(key = "search.DevicePrivacy.1") { SettingsSection(stringResource(R.string.device_protection)) }
+            item(key = "search.DevicePrivacy.2") {
                 SettingsGroup(modifier = Modifier.testTag("privacy.device_protection.group")) {
                     row("screen_security") { rowContext ->
                         SettingsSwitch(
@@ -122,8 +122,8 @@ internal fun DevicePrivacyScreen(
                     }
                 }
             }
-            item { SettingsSection(stringResource(R.string.blocked_users)) }
-            item {
+            item(key = "search.DevicePrivacy.3") { SettingsSection(stringResource(R.string.blocked_users)) }
+            item(key = "search.DevicePrivacy.4") {
                 SettingsGroup(modifier = Modifier.testTag("privacy.blocked_users.group")) {
                     row("blocked_users") { rowContext ->
                         SettingsLink(
@@ -137,8 +137,8 @@ internal fun DevicePrivacyScreen(
                     }
                 }
             }
-            item { SettingsSection(stringResource(R.string.message_privacy)) }
-            item {
+            item(key = "search.DevicePrivacy.5") { SettingsSection(stringResource(R.string.message_privacy)) }
+            item(key = "search.DevicePrivacy.6") {
                 SettingsGroup(modifier = Modifier.testTag("privacy.default_disappearing.group")) {
                     row("default_disappearing_messages") { rowContext ->
                         SettingsLink(
@@ -152,8 +152,8 @@ internal fun DevicePrivacyScreen(
                     }
                 }
             }
-            item { SettingsSection(stringResource(R.string.diagnostics)) }
-            item {
+            item(key = "search.DevicePrivacy.7") { SettingsSection(stringResource(R.string.diagnostics)) }
+            item(key = "search.DevicePrivacy.8") {
                 SettingsGroup(modifier = Modifier.testTag("privacy.diagnostics.group")) {
                     row("diagnostics") { rowContext ->
                         SettingsLink(
@@ -165,7 +165,7 @@ internal fun DevicePrivacyScreen(
                     }
                 }
             }
-            item { SettingsExplainer(stringResource(R.string.diagnostics_controls_detail)) }
+            item(key = "search.DevicePrivacy.9") { SettingsExplainer(stringResource(R.string.diagnostics_controls_detail)) }
         }
     }
     if (autoLockPicker) {

@@ -24,6 +24,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +47,8 @@ import dev.ipf.whitenoise.android.ui.common.WhiteNoiseTopBar
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationFooter
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 
 /** True inside a [SettingsList], where the list owns the spacing between headings, groups and helpers. */
 internal val LocalSettingsList = staticCompositionLocalOf { false }
@@ -62,6 +66,7 @@ internal fun SettingsScaffold(
     topBarContainerColor: Color = MaterialTheme.colorScheme.surfaceContainerLow,
     topBarScrolledContainerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
     topBarActions: @Composable RowScope.() -> Unit = {},
+    titleContent: (@Composable () -> Unit)? = null,
     bottomBar: @Composable () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
@@ -71,6 +76,7 @@ internal fun SettingsScaffold(
         topBar = {
             WhiteNoiseTopBar(
                 title = title,
+                titleContent = titleContent,
                 onBack = onBack,
                 titleStyle =
                     if (prominentTitle) {
@@ -95,20 +101,37 @@ internal fun SettingsScaffold(
 }
 
 /** Lazy settings column with 8 dp top and peer spacing, 24 dp bottom clearance, 8 dp between roots in one item. */
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 @Composable
 internal fun SettingsList(
     modifier: Modifier = Modifier,
     state: LazyListState = rememberLazyListState(),
+    contentPadding: PaddingValues = PaddingValues(top = WhiteNoiseSpacing.Related, bottom = WhiteNoiseSpacing.Section),
+    verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+    listTag: String = "settings.list",
+    itemModifier: @Composable LazyItemScope.(Any?) -> Modifier = { Modifier },
     content: LazyListScope.() -> Unit,
 ) {
+    val searchTarget = LocalSettingsSearchTarget.current
+    val itemIndices = remember { MutableStateFlow<Map<Any, Int>?>(null) }
+    val revealConsumed = LocalSettingsSearchRevealConsumed.current
+    LaunchedEffect(searchTarget?.id, revealConsumed) {
+        if (!revealConsumed) {
+            searchTarget?.itemKey?.let { key ->
+                val indices = itemIndices.first { it != null }.orEmpty()
+                indices[key]?.let { state.scrollToItem(it) }
+            }
+        }
+    }
     CompositionLocalProvider(LocalSettingsList provides true) {
         WhiteNoiseLazyColumn(
-            modifier = modifier.fillMaxSize().testTag("settings.list"),
+            modifier = modifier.fillMaxSize().testTag(listTag),
             state = state,
-            contentPadding = PaddingValues(top = WhiteNoiseSpacing.Related, bottom = WhiteNoiseSpacing.Section),
-            verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+            contentPadding = contentPadding,
+            verticalArrangement = verticalArrangement,
             content = {
+                val indices = mutableMapOf<Any, Int>()
+                var itemIndex = 0
                 val list = this
                 val scope =
                     object : LazyListScope by list {
@@ -118,14 +141,22 @@ internal fun SettingsList(
                             contentType: Any?,
                             content: @Composable LazyItemScope.() -> Unit,
                         ) {
+                            if (key != null) indices[key] = itemIndex
+                            itemIndex++
                             list.item(key, contentType) {
-                                Column(verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related)) {
-                                    content()
+                                CompositionLocalProvider(LocalSettingsSearchItemKey provides key) {
+                                    Column(
+                                        modifier = itemModifier(key),
+                                        verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
+                                    ) {
+                                        SettingsSearchRowReveal(null) { content() }
+                                    }
                                 }
                             }
                         }
                     }
                 scope.content()
+                itemIndices.value = indices
             },
         )
     }

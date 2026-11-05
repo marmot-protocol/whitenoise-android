@@ -83,9 +83,9 @@ internal fun DictationSettingsScreen(
 
     SettingsScaffold(title = stringResource(R.string.dictation_settings_title), onBack = onBack) {
         SettingsList {
-            item { DictationProviderExplainer(providerResolved, selectedProviderPackage) }
+            item(key = "search.DictationSettings.1") { DictationProviderExplainer(providerResolved, selectedProviderPackage) }
             if (!osttInstalled) {
-                item {
+                item(key = "search.DictationSettings.2") {
                     SettingsGroup(modifier = Modifier.testTag("dictation.ostt_recommendation.group")) {
                         row("open") { rowContext ->
                             SettingsAction(
@@ -103,7 +103,7 @@ internal fun DictationSettingsScreen(
                     }
                 }
                 if (osttOpenFailed) {
-                    item {
+                    item(key = "search.DictationSettings.3") {
                         SettingsCallout(
                             text = stringResource(R.string.dictation_ostt_recommendation_open_failed),
                             modifier = Modifier.testTag("dictation.ostt_recommendation.open_failed"),
@@ -112,7 +112,7 @@ internal fun DictationSettingsScreen(
                     }
                 }
             }
-            item {
+            item(key = "search.DictationSettings.4") {
                 SettingsGroup(modifier = Modifier.testTag("dictation.preferences.group")) {
                     row("provider") { context ->
                         SettingsLink(
@@ -159,9 +159,9 @@ internal fun DictationSettingsScreen(
             if (preferences.finishAfterSilenceMillis != null &&
                 preferences.silenceDeliveryMode == ConversationDictationDeliveryMode.SendOnFinish
             ) {
-                item { SettingsExplainer(stringResource(R.string.dictation_send_safety_note)) }
+                item(key = "search.DictationSettings.5") { SettingsExplainer(stringResource(R.string.dictation_send_safety_note)) }
             }
-            item {
+            item(key = "search.DictationSettings.6") {
                 SettingsGroup(modifier = Modifier.testTag("dictation.system.group")) {
                     row("android_settings") { rowContext ->
                         SettingsAction(
@@ -174,7 +174,7 @@ internal fun DictationSettingsScreen(
                 }
             }
             if (settingsFailed) {
-                item {
+                item(key = "search.DictationSettings.7") {
                     SettingsCallout(
                         text = stringResource(R.string.speech_settings_failed),
                         modifier = Modifier.testTag("dictation.settings_failed"),

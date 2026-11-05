@@ -78,7 +78,9 @@ internal fun SettingsGroup(
     ) {
         group.rows.forEachIndexed { index, entry ->
             key(entry.key) {
-                entry.content(settingsRowContext(index, group.rows.size, containerColor))
+                SettingsSearchRowReveal(entry.key) {
+                    entry.content(settingsRowContext(index, group.rows.size, containerColor))
+                }
             }
         }
     }

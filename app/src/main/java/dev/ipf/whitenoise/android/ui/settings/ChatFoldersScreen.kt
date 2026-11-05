@@ -53,7 +53,6 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseEmptyState
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseListItemDefaults
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.rememberGroupTitleCopy
@@ -250,19 +249,22 @@ internal fun ChatFoldersContent(
         title = stringResource(R.string.chat_folders_title),
         onBack = onBack,
         topBarActions = {
-            IconButton(onClick = onCreate) {
-                Icon(painterResource(R.drawable.ic_add), stringResource(R.string.folder_new_title))
+            SettingsSearchRowReveal("create", modifier = Modifier) {
+                IconButton(onClick = onCreate) {
+                    Icon(painterResource(R.drawable.ic_add), stringResource(R.string.folder_new_title))
+                }
             }
         },
     ) {
-        WhiteNoiseLazyColumn(
+        SettingsList(
             state = list,
+            listTag = CHAT_FOLDERS_CONTENT_TAG,
             modifier = Modifier.fillMaxSize().testTag(CHAT_FOLDERS_CONTENT_TAG),
             contentPadding = PaddingValues(vertical = WhiteNoiseSpacing.CompactScreenMargin),
             verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
         ) {
             if (state.folders.isEmpty()) {
-                item {
+                item(key = "search.ChatFolders.1") {
                     WhiteNoiseEmptyState(
                         title = stringResource(R.string.folder_none),
                         detail = stringResource(R.string.folder_none_detail),
@@ -286,7 +288,7 @@ internal fun ChatFoldersContent(
                     }
                 }
             }
-            item {
+            item(key = "search.ChatFolders.2") {
                 SettingsGroup {
                     row("restore") { context ->
                         SettingsAction(

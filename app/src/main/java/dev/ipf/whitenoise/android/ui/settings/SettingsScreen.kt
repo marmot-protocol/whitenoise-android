@@ -13,15 +13,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -37,7 +40,9 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -56,6 +61,7 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
+import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.icons.filled.Help
 import dev.ipf.whitenoise.android.ui.icons.filled.Notifications
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
@@ -383,6 +389,7 @@ private fun settingsBackHandler(
 
 /** Settings root hosting the hub and every detail destination. */
 @OptIn(ExperimentalMaterial3Api::class)
+@Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod")
 @Composable
 internal fun SettingsScreen(
     appState: WhiteNoiseAppState,
@@ -400,7 +407,52 @@ internal fun SettingsScreen(
     // back fell through to the Activity and exited the app. Always
     // claim back here — pop the detail when on a subscreen, otherwise
     // hand control to the chats list (mirroring the top-bar back arrow).
-    settingsBackHandler(appState.signOutInProgress, detail, onBackToChats, onDetailChange)
+    val searchResources = LocalContext.current.resources
+    val searchOwner = listOf<Any?>(appState.activeAccountRef, appState.runtimeGeneration)
+    var searchOpen by rememberSaveable(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
+    var searchQuery by rememberSaveable(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf("") }
+    var searchOriginId by rememberSaveable(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf<String?>(null) }
+    val searchResultList = rememberSaveable(appState.activeAccountRef, appState.runtimeGeneration, saver = LazyListState.Saver) { LazyListState() }
+    var searchRevealed by rememberSaveable(appState.activeAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
+    val catalog = remember { settingsSearchCatalog() }
+    val searchOrigin = catalog.firstOrNull { it.id == searchOriginId }
+    val eligibility = settingsSearchEligibility(appState)
+    val searchConfiguration = LocalConfiguration.current
+    val searchDocuments =
+        remember(searchConfiguration, eligibility) {
+            prepareSettingsSearch(catalog, eligibility, searchResources::getString)
+        }
+    LaunchedEffect(eligibility, searchOriginId) {
+        if (searchOrigin != null && !eligibility.allows(searchOrigin)) {
+            searchOriginId = null
+            onDetailChange(null)
+        }
+    }
+    LaunchedEffect(appState.appLockScreenVisible, appState.signOutInProgress, appState.wipeInProgress) {
+        if (appState.appLockScreenVisible || appState.signOutInProgress || appState.wipeInProgress) {
+            searchOpen = false
+            searchQuery = ""
+            searchOriginId = null
+        }
+    }
+    val changeDetail: (SettingsDetail?) -> Unit = { destination ->
+        if (searchOrigin != null && detail == searchOrigin.destination && destination == detail?.let(::settingsDetailParent)) {
+            searchOriginId = null
+            onDetailChange(null)
+        } else {
+            onDetailChange(destination)
+        }
+    }
+    settingsBackHandler(appState.signOutInProgress, detail, {
+        if (searchOrigin != null) {
+            searchOriginId = null
+        } else if (searchOpen) {
+            searchOpen = false
+            searchQuery = ""
+        } else {
+            onBackToChats()
+        }
+    }, changeDetail)
 
     var openProfilePictureActions by
         rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
@@ -411,35 +463,75 @@ internal fun SettingsScreen(
         suppressMotion = suppressMotion,
         contentVisible = !appState.appLockScreenVisible,
     ) { route ->
-        if (route == null) {
-            SettingsHomeScreen(
-                appState = appState,
-                onBackToChats = onBackToChats,
-                onOpenDetail = {
-                    if (it == SettingsDetail.Profile) openProfilePictureActions = false
-                    onDetailChange(it)
-                },
-                onOpenProfilePictureActions = {
-                    openProfilePictureActions = true
-                    onDetailChange(SettingsDetail.Profile)
-                },
-                viewport = homeViewport,
-                onViewportChange = onHomeViewportChange,
-            )
-        } else {
-            SettingsDetailRoute(
-                appState = appState,
-                detail = route,
-                onOpenSupportChat = onOpenSupportChat,
-                onOpenDiagnostics = onOpenDiagnostics,
-                onDetailChange = onDetailChange,
-                openProfilePictureActionsOnEntry = openProfilePictureActions,
-                onProfilePictureActionsOpened = { openProfilePictureActions = false },
-                onProfileBack = {
-                    openProfilePictureActions = false
-                    onDetailChange(null)
-                },
-            )
+        CompositionLocalProvider(
+            LocalSettingsSearchTarget provides searchOrigin?.takeIf { it.destination == route },
+            LocalSettingsSearchRevealConsumed provides searchRevealed,
+            LocalSettingsSearchOnReveal provides { searchRevealed = true },
+        ) {
+            if (route == null) {
+                SettingsHomeScreen(
+                    appState = appState,
+                    onBackToChats = { if (searchOrigin != null) searchOriginId = null else onBackToChats() },
+                    searchOpen = searchOpen && searchOrigin == null,
+                    searchQuery = searchQuery,
+                    searchEligibility = eligibility,
+                    searchDocuments = searchDocuments,
+                    suppressSearchMotion = suppressMotion,
+                    onSearchOpenChange = {
+                        searchOpen = it
+                        if (!it) searchQuery = ""
+                    },
+                    onSearchQueryChange = { value ->
+                        val next = value.take(SETTINGS_SEARCH_MAX_QUERY)
+                        if (next != searchQuery) {
+                            searchQuery = next
+                            // An edit starts at the strongest result. Detail return does not edit
+                            // the query, so its saved result viewport remains unchanged.
+                            searchResultList.requestScrollToItem(0)
+                        }
+                    },
+                    searchResultList = searchResultList,
+                    onSearchSelection = { entry ->
+                        val currentDocument =
+                            prepareSettingsSearch(
+                                listOf(entry),
+                                settingsSearchEligibilitySnapshot(appState, eligibility.pushAvailable),
+                                searchResources::getString,
+                            )
+                        if (searchOwner == listOf<Any?>(appState.activeAccountRef, appState.runtimeGeneration) &&
+                            searchSettings(currentDocument, searchQuery).isNotEmpty()
+                        ) {
+                            searchOriginId = entry.id
+                            searchRevealed = false
+                            onDetailChange(entry.destination)
+                        }
+                    },
+                    onOpenDetail = {
+                        if (it == SettingsDetail.Profile) openProfilePictureActions = false
+                        onDetailChange(it)
+                    },
+                    onOpenProfilePictureActions = {
+                        openProfilePictureActions = true
+                        onDetailChange(SettingsDetail.Profile)
+                    },
+                    viewport = homeViewport,
+                    onViewportChange = onHomeViewportChange,
+                )
+            } else {
+                SettingsDetailRoute(
+                    appState = appState,
+                    detail = route,
+                    onOpenSupportChat = onOpenSupportChat,
+                    onOpenDiagnostics = onOpenDiagnostics,
+                    onDetailChange = changeDetail,
+                    openProfilePictureActionsOnEntry = openProfilePictureActions,
+                    onProfilePictureActionsOpened = { openProfilePictureActions = false },
+                    onProfileBack = {
+                        openProfilePictureActions = false
+                        changeDetail(null)
+                    },
+                )
+            }
         }
     }
 }
@@ -563,11 +655,20 @@ internal data class SettingsHomeAccount(
 
 /** The Settings hub. */
 @Composable
-@Suppress("FunctionNaming", "LongMethod")
+@Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 private fun SettingsHomeScreen(
     appState: WhiteNoiseAppState,
     onBackToChats: () -> Unit,
     onOpenDetail: (SettingsDetail) -> Unit,
+    searchOpen: Boolean,
+    searchQuery: String,
+    searchEligibility: SettingsSearchEligibility,
+    searchDocuments: List<SettingsSearchDocument>,
+    onSearchOpenChange: (Boolean) -> Unit,
+    onSearchQueryChange: (String) -> Unit,
+    searchResultList: LazyListState,
+    suppressSearchMotion: Boolean,
+    onSearchSelection: (SettingsSearchEntry) -> Unit,
     onOpenProfilePictureActions: () -> Unit,
     viewport: SettingsHomeViewport,
     onViewportChange: (SettingsHomeViewport) -> Unit,
@@ -598,14 +699,12 @@ private fun SettingsHomeScreen(
         if (showAddIdentity) showAddIdentity = false
     }
 
-    SettingsHomeContent(
-        state =
-            settingsHomeState(
-                hasActiveAccount = activeAccount != null,
-                selfUpdateEnabled = BuildConfig.SELF_UPDATE_ENABLED,
-                updateAvailable = appState.appUpdateInfo.isUpdateAvailable,
-            ),
-        account =
+    val keyboard = LocalSoftwareKeyboardController.current
+    val eligibility = searchEligibility
+    val homeConfiguration = LocalConfiguration.current
+    // Query edits retain the existing header presentation without invoking cold identity/profile helpers.
+    val homeAccount =
+        remember(activeAccount, appState.runtimeGeneration, appState.profileRevisionForCompose, readiness, homeConfiguration) {
             activeAccount?.let { account ->
                 SettingsHomeAccount(
                     title = appState.displayName(account.accountIdHex),
@@ -614,7 +713,32 @@ private fun SettingsHomeScreen(
                     pictureUrl = appState.avatarUrl(account.accountIdHex),
                     npub = appState.npubForDisplay(account.accountIdHex),
                 )
-            },
+            }
+        }
+    SettingsHomeContent(
+        searchOpen = searchOpen,
+        searchQuery = searchQuery,
+        onSearchOpenChange = onSearchOpenChange,
+        onSearchQueryChange = onSearchQueryChange,
+        searchResults = searchSettings(searchDocuments, searchQuery),
+        searchResultList = searchResultList,
+        searchAnimationsEnabled = !suppressSearchMotion && rememberSystemAnimationsEnabled(),
+        onSearchSelection = { entry ->
+            val current =
+                settingsSearchEligibilitySnapshot(appState, if (entry.pushRequired) appState.nativePushCapability().isAvailable else eligibility.pushAvailable)
+            val sessionInteractive = !appState.signOutInProgress && !appState.appLockScreenVisible && !appState.wipeInProgress
+            if (current.allows(entry) && sessionInteractive) {
+                keyboard?.hide()
+                onSearchSelection(entry)
+            }
+        },
+        state =
+            settingsHomeState(
+                hasActiveAccount = activeAccount != null,
+                selfUpdateEnabled = BuildConfig.SELF_UPDATE_ENABLED,
+                updateAvailable = appState.appUpdateInfo.isUpdateAvailable,
+            ),
+        account = homeAccount,
         profileReadiness = readiness,
         profileCount = appState.accounts.size,
         appUpdateInfo = appState.appUpdateInfo,
@@ -696,6 +820,14 @@ internal fun SettingsHomeContent(
     onSignOut: () -> Unit = {},
     viewport: SettingsHomeViewport = SettingsHomeViewport.Top,
     onViewportChange: (SettingsHomeViewport) -> Unit = {},
+    searchOpen: Boolean = false,
+    searchQuery: String = "",
+    onSearchOpenChange: (Boolean) -> Unit = {},
+    onSearchQueryChange: (String) -> Unit = {},
+    searchResults: List<SettingsSearchDocument> = emptyList(),
+    searchResultList: LazyListState = rememberLazyListState(),
+    searchAnimationsEnabled: Boolean = rememberSystemAnimationsEnabled(),
+    onSearchSelection: (SettingsSearchEntry) -> Unit = {},
 ) {
     val currentOnViewportChange by rememberUpdatedState(onViewportChange)
     val listState =
@@ -721,43 +853,60 @@ internal fun SettingsHomeContent(
     }
     SettingsScaffold(
         title = stringResource(R.string.settings),
-        onBack = onBack,
+        onBack = { if (searchOpen) onSearchOpenChange(false) else onBack() },
+        titleContent =
+            if (searchOpen) {
+                { SettingsSearchField(searchQuery, onSearchQueryChange) }
+            } else {
+                null
+            },
+        topBarActions = {
+            if (!searchOpen) {
+                IconButton(onClick = { onSearchOpenChange(true) }, modifier = Modifier.testTag("settings.search.open")) {
+                    Icon(painterResource(R.drawable.ic_search), contentDescription = stringResource(R.string.settings_search))
+                }
+            }
+        },
         modifier = Modifier.testTag(SETTINGS_HOME_CONTENT_TAG),
         prominentTitle = true,
     ) {
-        SettingsList(state = listState) {
-            state.sections.forEach { section ->
-                item(key = section.name) {
-                    when (section) {
-                        SettingsHomeSection.Profile ->
-                            account?.let {
-                                SettingsProfileHeader(
-                                    account = it,
-                                    profileCount = profileCount,
-                                    onOpenShareConnect = onOpenShareConnect,
-                                    onOpenProfilePictureActions = onOpenProfilePictureActions,
-                                    onAddProfile = onAddProfile,
-                                    onSwitchProfile = onSwitchProfile,
-                                )
-                            }
-                        SettingsHomeSection.AppUpdateAvailable ->
-                            AppUpdateGroup(appUpdateInfo, onAppUpdateAction, prominent = true)
-                        SettingsHomeSection.AppUpdateControls ->
-                            AppUpdateGroup(appUpdateInfo, onAppUpdateAction, prominent = false)
-                        SettingsHomeSection.Account,
-                        SettingsHomeSection.AppPreferences,
-                        SettingsHomeSection.Support,
-                        ->
-                            state.groups.firstOrNull { it.section == section }?.let { group ->
-                                SettingsHubSection(
-                                    group,
-                                    onOpenDetail,
-                                    onChatWithSupport,
-                                    profileReadiness.takeIf { account != null },
-                                )
-                            }
-                        SettingsHomeSection.SignOut -> SignOutGroup(onSignOut)
-                        SettingsHomeSection.Version -> SettingsVersionFooter(versionName)
+        if (searchOpen && searchQuery.isNotBlank()) {
+            SettingsSearchResults(searchResults, searchResultList, onSearchSelection, searchAnimationsEnabled)
+        } else {
+            SettingsList(state = listState) {
+                state.sections.forEach { section ->
+                    item(key = section.name) {
+                        when (section) {
+                            SettingsHomeSection.Profile ->
+                                account?.let {
+                                    SettingsProfileHeader(
+                                        account = it,
+                                        profileCount = profileCount,
+                                        onOpenShareConnect = onOpenShareConnect,
+                                        onOpenProfilePictureActions = onOpenProfilePictureActions,
+                                        onAddProfile = onAddProfile,
+                                        onSwitchProfile = onSwitchProfile,
+                                    )
+                                }
+                            SettingsHomeSection.AppUpdateAvailable ->
+                                AppUpdateGroup(appUpdateInfo, onAppUpdateAction, prominent = true)
+                            SettingsHomeSection.AppUpdateControls ->
+                                AppUpdateGroup(appUpdateInfo, onAppUpdateAction, prominent = false)
+                            SettingsHomeSection.Account,
+                            SettingsHomeSection.AppPreferences,
+                            SettingsHomeSection.Support,
+                            ->
+                                state.groups.firstOrNull { it.section == section }?.let { group ->
+                                    SettingsHubSection(
+                                        group,
+                                        onOpenDetail,
+                                        onChatWithSupport,
+                                        profileReadiness.takeIf { account != null },
+                                    )
+                                }
+                            SettingsHomeSection.SignOut -> SignOutGroup(onSignOut)
+                            SettingsHomeSection.Version -> SettingsVersionFooter(versionName)
+                        }
                     }
                 }
             }
