@@ -53,7 +53,8 @@ class ComposerToolbarPreferencesTest {
     fun savedV2ChoicesKeepTheirOrderLayoutAndPhysicalSides() {
         val saved =
             ComposerToolbarSettings.decode(
-                """{"version":2,"shortcuts":["dictation","more","voice_note","emoji","paste"],"layout":"always_expanded","rightShortcuts":["more","emoji","paste"]}""",
+                """{"version":2,"shortcuts":["dictation","more","voice_note","emoji","paste"],""" +
+                    """"layout":"always_expanded","rightShortcuts":["more","emoji","paste"]}""",
             )
         assertEquals(
             listOf(
@@ -66,7 +67,10 @@ class ComposerToolbarPreferencesTest {
             saved.shortcuts,
         )
         assertEquals(ComposerToolbarLayout.AlwaysExpanded, saved.layout)
-        assertEquals(listOf(ComposerShortcut.Dictation, ComposerShortcut.VoiceNote), saved.onSide(ComposerShortcutSide.Left))
+        assertEquals(
+            listOf(ComposerShortcut.Dictation, ComposerShortcut.VoiceNote),
+            saved.onSide(ComposerShortcutSide.Left),
+        )
         assertEquals(
             listOf(ComposerShortcut.More, ComposerShortcut.Emoji, ComposerShortcut.Paste),
             saved.onSide(ComposerShortcutSide.Right),
@@ -130,7 +134,8 @@ class ComposerToolbarPreferencesTest {
     fun v1MigrationKeepsOrderAndAssignsOriginalPhysicalSides() {
         val migrated =
             ComposerToolbarSettings.decode(
-                """{"version":1,"shortcuts":["paste","more","emoji","dictation","voice_note","camera"],"layout":"automatic"}""",
+                """{"version":1,"shortcuts":["paste","more","emoji","dictation","voice_note","camera"],""" +
+                    """"layout":"automatic"}""",
             )
         assertEquals(listOf(ComposerShortcut.More, ComposerShortcut.Camera), migrated.onSide(ComposerShortcutSide.Left))
         assertEquals(

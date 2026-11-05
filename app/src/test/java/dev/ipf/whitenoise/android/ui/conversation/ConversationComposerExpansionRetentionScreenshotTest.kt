@@ -734,7 +734,10 @@ class ConversationComposerExpansionRetentionScreenshotTest {
             assertEquals(0f, captured.topRadius, 0f)
             assertEquals(0f, captured.bottomRadius, 0f)
             val toolbarBounds = composeRule.onNodeWithTag("composer.shortcut.emoji").fetchSemanticsNode().boundsInWindow
-            assertTrue("Captured accepted text cannot include toolbar pixels", !captured.surface.overlaps(toolbarBounds))
+            assertTrue(
+                "Captured accepted text cannot include toolbar pixels",
+                !captured.surface.overlaps(toolbarBounds),
+            )
             traceAcceptedGeometry(
                 checkNotNull(observedMotion),
                 acceptedPresentationId,

@@ -135,7 +135,9 @@ class ComposerToolbarSpacingScreenshotTest {
     @Test fun lockedSingleRtlRight() = recordingTransition("single_rtl_right", true, ComposerShortcutSide.Right)
 
     /** An already wrapped two-account composer retains its row floor when locking. */
-    @Test fun lockedTwoAccountsKeepRows() = render(ToolbarCase("two_accounts_transition", 360, transition = true, crowded = true))
+    @Test fun lockedTwoAccountsKeepRows() {
+        render(ToolbarCase("two_accounts_transition", 360, transition = true, crowded = true))
+    }
 
     /** Hidden toolbar rows cannot add lock height when the two-account surface is narrow. */
     @Test fun lockedNarrowTwoAccountsKeepRows() {
@@ -144,7 +146,9 @@ class ComposerToolbarSpacingScreenshotTest {
 
     /** The same row floor survives large RTL type; existing label truncation is separately reviewed. */
     @Test fun lockedNarrowRtlLargeKeepRows() {
-        render(ToolbarCase("narrow_rtl_large_transition", 320, rtl = true, fontScale = 2f, transition = true, crowded = true))
+        render(
+            ToolbarCase("narrow_rtl_large_transition", 320, rtl = true, fontScale = 2f, transition = true, crowded = true),
+        )
     }
 
     /** Uses the real recording controller to verify the idle, active and locked geometry sequence. */
@@ -427,25 +431,26 @@ class ComposerToolbarSpacingScreenshotTest {
                 "editor retains a usable composing width",
                 editor.width >= 96f * case.fontScale && editor.height > 1f,
             )
-            val all = left + right + primary
-            val labels =
-                buildList {
-                    if (case.accounts > 1) add("Sending identity")
-                    add("Add attachment")
-                    add("Emoji")
-                    if (case.crowded) {
-                        addAll(listOf("Paste", "Dictation"))
-                    } else if (case.draft.isNotEmpty()) {
-                        add("Voice")
-                    }
-                    add(if (case.draft.isEmpty()) "Voice" else "Send")
-                }
-            assertDistinctFootprints(all, labels)
+            assertDistinctFootprints(left + right + primary, expectedToolbarLabels(case))
             if (case.width == 360 && case.fontScale == 1f && case.draft.isEmpty()) {
                 assertDefaultFieldPlacement(case, left, right + primary, editor)
             }
         }
     }
+
+    /** Labels for the visible toolbar targets, in the order [assertToolbarGeometry] collects their bounds. */
+    private fun expectedToolbarLabels(case: ToolbarCase): List<String> =
+        buildList {
+            if (case.accounts > 1) add("Sending identity")
+            add("Add attachment")
+            add("Emoji")
+            if (case.crowded) {
+                addAll(listOf("Paste", "Dictation"))
+            } else if (case.draft.isNotEmpty()) {
+                add("Voice")
+            }
+            add(if (case.draft.isEmpty()) "Voice" else "Send")
+        }
 
     /** Defaults retain inline spacing when they fit, otherwise the editor sits above separated side groups. */
     private fun assertDefaultFieldPlacement(

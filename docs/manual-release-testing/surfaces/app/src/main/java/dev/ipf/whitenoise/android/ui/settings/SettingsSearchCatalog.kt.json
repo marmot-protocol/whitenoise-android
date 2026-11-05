@@ -154,6 +154,28 @@
         ]
       },
       {
+        "surface": "setting:composer_settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.composer_settings",
+        "test_ids": [
+          "CON-041",
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:composer_settings_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.composer_settings_detail",
+        "test_ids": [
+          "CON-041",
+          "SET-042",
+          "SET-043",
+          "SET-044"
+        ]
+      },
+      {
         "surface": "setting:copy_private_key",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
         "anchor": "R.string.copy_private_key",

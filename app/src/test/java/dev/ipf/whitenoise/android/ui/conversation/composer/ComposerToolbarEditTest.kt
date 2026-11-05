@@ -17,7 +17,9 @@ class ComposerToolbarEditTest {
     private val paste = ComposerShortcut.Paste
 
     private fun editor(): ComposerToolbarEditState =
-        ComposerToolbarEditState(ComposerToolbarSettings(listOf(more, camera, paste), rightShortcuts = setOf(paste))).apply {
+        ComposerToolbarEditState(
+            ComposerToolbarSettings(listOf(more, camera, paste), rightShortcuts = setOf(paste)),
+        ).apply {
             selectedArea = Rect(0f, 0f, 300f, 100f)
             record(more, Rect(0f, 0f, 36f, 48f))
             record(camera, Rect(36f, 0f, 72f, 48f))

@@ -704,7 +704,8 @@ private fun ConversationDictationPersistentControlTest.assertFloatingControlsHav
     val compact = composeRule.onNodeWithTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG).getUnclippedBoundsInRoot()
     val labels = listOf("Cancel", transcriptPasteLabel, "Send")
     val controls = labels.associateWith { composeRule.onNodeWithContentDescription(it).getUnclippedBoundsInRoot() }
-    val touches = labels.associateWith { composeRule.onNodeWithContentDescription(it).fetchSemanticsNode().touchBoundsInRoot }
+    val touches =
+        labels.associateWith { composeRule.onNodeWithContentDescription(it).fetchSemanticsNode().touchBoundsInRoot }
     val details = "capsule=$capsule compact=$compact controls=$controls touch=$touches"
     assertTrue(details, compact.left >= capsule.left + 8.dp && compact.right <= capsule.right - 8.dp)
     controls.values.forEach { bounds ->
