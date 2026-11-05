@@ -192,10 +192,9 @@ class ConversationRecipientConfirmationReplayTest {
     )
 
     /** Uses the native delivery trigger, which can also introduce or withdraw a reaction. */
-    private fun upsert(record: TimelineMessageRecordFfi) = TimelineMessageChangeFfi.Upsert(
-        TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED,
-        record,
-    )
+    private fun upsert(
+        record: TimelineMessageRecordFfi,
+    ) = TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED, record)
 
     /** An authoritative bounded page with no implicit Android reconstruction of delivery fields. */
     private fun page(vararg records: TimelineMessageRecordFfi) = TimelinePageFfi(records.toList(), false, false)
