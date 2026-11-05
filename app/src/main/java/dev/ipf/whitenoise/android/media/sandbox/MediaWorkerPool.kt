@@ -232,8 +232,9 @@ internal class MediaWorkerPool(
 
     /**
      * The [domains] a claim could take now without starting, evicting or waiting for a generation's death: each one
-     * that owns a connected generation, then others in order while clean spares last. It never changes the pool, so
-     * a caller can skip work rather than wait for a worker to start; a later claim may still find the pool changed.
+     * that owns a connected generation, then, in order while clean spares last, those that own no live generation at
+     * all: a domain whose generation is still starting or retiring must wait for it. It never changes the pool, so a
+     * caller can skip work rather than wait for a worker to start; a later claim may still find the pool changed.
      */
     fun servableNow(domains: List<Any>): Set<Any> =
         synchronized(lock) {
@@ -245,7 +246,9 @@ internal class MediaWorkerPool(
             var spares = generations.count(MediaWorker::clean)
             for (domain in domains) {
                 if (spares == 0) break
-                if (ready.add(domain)) spares--
+                // A claim takes the domain's own live generation before any spare, waiting while it retires.
+                val owned = generations.any { it.domain == domain && it.dead.count != 0L }
+                if (!owned && ready.add(domain)) spares--
             }
             ready
         }
