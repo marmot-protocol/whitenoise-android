@@ -87,6 +87,14 @@ class SettingsSearchRankingTest {
         assertEquals(searchSettings(documents, "font"), searchSettings(documents, "font"))
     }
 
+    @Test fun equallyRankedMatchesKeepCatalogOrderInsteadOfSortingIds() {
+        val entry = settingsSearchCatalog().first()
+        val first = SettingsSearchDocument(entry.copy(id = "z-first"), "Font", "Appearance", "", "")
+        val second = SettingsSearchDocument(entry.copy(id = "a-second"), "Font", "Appearance", "", "")
+        assertEquals(listOf(first, second), searchSettings(listOf(first, second), "font"))
+        assertEquals(listOf(second, first), searchSettings(listOf(second, first), "font"))
+    }
+
     @Test fun lateSummaryTermsAreNotTruncatedByTheQueryLengthLimit() {
         val entry = settingsSearchCatalog().first()
         val document = SettingsSearchDocument(entry, "Title", "Category", "prefix ".repeat(40) + "lateword", "")

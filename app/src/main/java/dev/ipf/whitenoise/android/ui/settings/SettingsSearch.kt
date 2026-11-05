@@ -78,6 +78,14 @@ internal fun prepareSettingsSearch(
         )
     }
 
+private data class SettingsSearchMatch(
+    val document: SettingsSearchDocument,
+    val tier: Int,
+    val titleCoverage: Int,
+    val fieldStrength: Int,
+    val catalogIndex: Int,
+)
+
 /**
  * Every token is required, including infixes; deterministic title strength precedes metadata.
  * Numeric ranking tiers are kept explicitly in rank order.
@@ -106,7 +114,13 @@ internal fun searchSettings(
                 }
             val titleCoverage = tokens.count { it in title }
             val fieldStrength = tokens.sumOf { token -> document.fields.indexOfFirst { token in it }.coerceAtLeast(0) }
-            Triple(document, listOf(tier, -titleCoverage, fieldStrength, index), document.entry.id)
-        }.sortedWith(compareBy({ it.second[0] }, { it.second[1] }, { it.second[2] }, { it.second[3] }, { it.third }))
-        .map { it.first }
+            SettingsSearchMatch(document, tier, titleCoverage, fieldStrength, index)
+        }.sortedWith(
+            compareBy<SettingsSearchMatch>(
+                { it.tier },
+                { -it.titleCoverage },
+                { it.fieldStrength },
+                { it.catalogIndex },
+            ),
+        ).map { it.document }
 }
