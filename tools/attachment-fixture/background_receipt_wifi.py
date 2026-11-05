@@ -22,13 +22,24 @@ class WifiSetupError(ValueError):
         self.structure = structure
 
 
-def saved_row_structure(lines, index):
+def saved_row_structure(lines, index, *, frame_valid=False, id_checked=False, duplicate=False,
+                        canonical_count=0, primary_count=0, security_seen=False,
+                        same_ssid=False, same_security=False):
     """Bounded format facts only: no network values, addresses, names or name hashes."""
     row = lines[index]
     return {"line_count": min(len(lines), 66), "row_index": min(index, 65),
             "row_width": min(len(row), 65537),
             "has_control": any(ord(char) < 32 or ord(char) == 127 for char in row),
-            "id_column_width": min(len(row), 12)}
+            "id_column_width": min(len(row), 12), "row_frame_valid": frame_valid,
+            "id_checked": id_checked, "id_duplicate": duplicate,
+            "id_negative_prefix": re.match(r"^-[0-9]+ +", row) is not None,
+            "id_column_canonical": (re.fullmatch(r"[0-9]+ *", row[:12]) is not None
+                                    and str(int(row[:12])).ljust(12) == row[:12]),
+            "id_separator_at12": len(row) > 12 and row[12] == " ",
+            "empty_security_tail": len(row) >= 46 and not row[46:].strip(),
+            "duplicate_same_ssid": same_ssid, "duplicate_same_security": same_security,
+            "canonical_candidate_count": min(canonical_count, 2),
+            "primary_candidate_count": min(primary_count, 2), "primary_security_seen": security_seen}
 
 
 def java_width(value):
@@ -75,9 +86,11 @@ def saved_networks(output):
         # The ID is a fixed minimum-width column; saved SSIDs may exceed 32 characters.
         if (row is None or len(row[1]) != 12
                 or any(ord(char) < 32 or ord(char) == 127 for char in line)):
-            raise WifiSetupError("saved_network_row_unreadable", saved_row_structure(lines, index))
+            raise WifiSetupError("saved_network_row_unreadable", saved_row_structure(
+                lines, index, frame_valid=row is not None and len(row[1]) == 12))
         network_id = int(row[1].strip())
-        candidates = set()
+        candidates, canonical_candidates = set(), set()
+        security_seen = False
         # At most 14 primary security names plus separators; never scan an unbounded suffix.
         suffix_start = max(0, len(row[2]) - 1024)
         for separator, char in enumerate(row[2][suffix_start:], suffix_start):
@@ -88,11 +101,25 @@ def saved_networks(output):
                 continue
             canonical = (str(network_id).ljust(12) + " " + ssid
                          + " " * max(0, 32 - java_width(ssid)) + " " + security.ljust(4))
+            primary_security = PRIMARY_SECURITY.fullmatch(security) is not None
+            security_seen = security_seen or primary_security
             if canonical == line:
-                if PRIMARY_SECURITY.fullmatch(security):
+                if len(canonical_candidates) < 2:
+                    canonical_candidates.add((ssid, security))
+                if primary_security:
                     candidates.add((ssid, security))
         if len(candidates) != 1 or network_id in result:
-            raise WifiSetupError("saved_network_row_unreadable", saved_row_structure(lines, index))
+            same_ssid = same_security = False
+            if network_id in result and len(candidates) == 1:
+                candidate_ssid, candidate_security = next(iter(candidates))
+                if candidate_security.lower() in ("open", "open/owe^"):
+                    candidate_security = candidate_security.upper()
+                same_ssid = candidate_ssid == result[network_id][0]
+                same_security = candidate_security == result[network_id][1]
+            raise WifiSetupError("saved_network_row_unreadable", saved_row_structure(
+                lines, index, frame_valid=True, id_checked=True, duplicate=network_id in result,
+                canonical_count=len(canonical_candidates), primary_count=len(candidates), security_seen=security_seen,
+                same_ssid=same_ssid, same_security=same_security))
         ssid, security = candidates.pop()
         if security.lower() in ("open", "open/owe^"):
             security = security.upper()

@@ -279,4 +279,54 @@ class SavedNetworkPrimaryFormatTests(unittest.TestCase):
         self.assertEqual(caught.exception.structure["row_index"], 1)
         self.assertNotIn("private-network", str(caught.exception.structure))
 
+
+class SavedNetworkBranchDiagnosticTests(unittest.TestCase):
+    def branch(self, output):
+        with self.assertRaises(WifiSetupError) as caught:
+            saved_networks(output)
+        structure = caught.exception.structure
+        self.assertTrue(all(type(value) in (int, bool) for value in structure.values()))
+        self.assertNotIn("private-network", str(structure))
+        return structure
+    def test_row_frame_and_duplicate_are_distinct_without_id_values(self):
+        good = networks({7: ("private-network", "OPEN")})
+        malformed = self.branch(good.replace("7 ", "-1 "))
+        self.assertFalse(malformed["row_frame_valid"])
+        self.assertFalse(malformed["id_checked"])
+        self.assertTrue(malformed["id_negative_prefix"])
+        duplicate = self.branch(good + good.split("\n", 1)[1])
+        self.assertTrue(duplicate["row_frame_valid"])
+        self.assertTrue(duplicate["id_duplicate"])
+        self.assertEqual(duplicate["primary_candidate_count"], 1)
+        self.assertEqual(duplicate["row_width"], 50)
+    def test_equal_observation_shapes_get_distinct_branch_facts(self):
+        header = "Network Id SSID Security type\n"
+        first = "%-12d %-32s %-4s\n" % (7, "private-network", "OPEN")
+        rows = ["%-12d %-32s %-4s\n" % (-1, "private-network", "OPEN"), first,
+                "%-12d %-32s %-4s\n" % (8, "private-network", ""),
+                "%-12d %-32s %-4s\n" % (8, "private-network", "zzzz"),
+                "%-12s %-32s %-4s\n" % ("08", "private-network", "OPEN")]
+        facts = [self.branch(header + first + row) for row in rows]
+        self.assertTrue(all(value["line_count"] == 3 and value["row_width"] == 50 for value in facts))
+        self.assertTrue(facts[0]["id_negative_prefix"])
+        self.assertTrue(facts[1]["id_duplicate"])
+        self.assertTrue(facts[1]["duplicate_same_ssid"])
+        self.assertTrue(facts[1]["duplicate_same_security"])
+        self.assertTrue(facts[2]["empty_security_tail"])
+        self.assertFalse(facts[3]["empty_security_tail"])
+        self.assertEqual(facts[3]["primary_candidate_count"], 0)
+        self.assertTrue(facts[4]["row_frame_valid"])
+        self.assertFalse(facts[4]["id_column_canonical"])
+        self.assertEqual(len({tuple(sorted(value.items())) for value in facts}), 5)
+    def test_canonical_and_security_failures_are_distinct(self):
+        short = networks({7: ("private-network", "OPEN")})
+        padding = self.branch(short.replace("private-network                 ", "private-network "))
+        self.assertTrue(padding["row_frame_valid"])
+        self.assertEqual(padding["canonical_candidate_count"], 0)
+        self.assertTrue(padding["primary_security_seen"])
+        security = self.branch(short.replace("OPEN", "not-supported"))
+        self.assertGreater(security["canonical_candidate_count"], 0)
+        self.assertEqual(security["primary_candidate_count"], 0)
+        self.assertFalse(security["id_duplicate"])
+
 if __name__ == "__main__": unittest.main()

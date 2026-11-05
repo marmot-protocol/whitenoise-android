@@ -306,6 +306,8 @@ class WifiStructuralFailureReportTest(unittest.TestCase):
             report = json.loads(output.read_text())
         self.assertEqual(report["wifi_setup_failure"], "saved_network_row_unreadable")
         self.assertEqual(report["wifi_setup_structure"]["row_index"], 1)
+        self.assertFalse(report["wifi_setup_structure"]["row_frame_valid"])
+        self.assertFalse(report["wifi_setup_structure"]["id_checked"])
         self.assertTrue(all(type(value) in (int, bool) for value in report["wifi_setup_structure"].values()))
         self.assertEqual(report["stages"], [])
         self.assertEqual(report["http_get_requests"], 0)

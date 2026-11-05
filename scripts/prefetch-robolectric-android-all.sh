@@ -8,9 +8,15 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PINS="${ROBOLECTRIC_ANDROID_ALL_PINS:-$REPO_DIR/scripts/robolectric-android-all.sha512}"
 CATALOG="${ROBOLECTRIC_VERSION_CATALOG:-$REPO_DIR/gradle/libs.versions.toml}"
-REMOTE="${ROBOLECTRIC_ANDROID_ALL_REMOTE:-https://repo1.maven.org/maven2}"
+REMOTE="${ROBOLECTRIC_ANDROID_ALL_REMOTE:-https://repo.maven.apache.org/maven2}"
 LOCAL_REPO="${ROBOLECTRIC_LOCAL_REPOSITORY:-$HOME/.m2/repository}"
 ARTIFACT_PATH=org/robolectric/android-all-instrumented
+# One cumulative hard deadline includes every transfer and retry sleep.
+BUDGET_SECONDS="${ROBOLECTRIC_PREFETCH_BUDGET_SECONDS:-240}"
+if [[ ! "$BUDGET_SECONDS" =~ ^[1-9][0-9]{0,2}$ ]] || ((BUDGET_SECONDS < 2 || BUDGET_SECONDS > 240)); then
+  printf 'error: prefetch budget must be between 2 and 240 seconds\n' >&2
+  exit 1
+fi
 
 # Prints the SHA-512 of a file.
 sha512_of() {
@@ -34,7 +40,7 @@ fetch_jar() {
   local version="$1" expected="$2"
   local name="android-all-instrumented-$version.jar"
   local dir="$LOCAL_REPO/$ARTIFACT_PATH/$version"
-  local partial="$dir/$name.part"
+  local partial="$DOWNLOAD_DIR/$name.part"
 
   if [[ -f "$dir/$name" && "$(sha512_of "$dir/$name")" == "$expected" ]]; then
     printf '%s: already present\n' "$name"
@@ -69,4 +75,14 @@ main() {
   fi
 }
 
-main "$@"
+# The parent owns cleanup; the hard deadline kills the entire worker process group.
+mkdir -p "$LOCAL_REPO/$ARTIFACT_PATH"
+DOWNLOAD_DIR="$(mktemp -d "$LOCAL_REPO/$ARTIFACT_PATH/.prefetch.XXXXXX")"
+trap 'rm -rf -- "$DOWNLOAD_DIR"' EXIT
+export PINS CATALOG REMOTE LOCAL_REPO ARTIFACT_PATH DOWNLOAD_DIR
+export -f sha512_of check_robolectric_version fetch_jar main
+if ! timeout --signal=KILL "${BUDGET_SECONDS}s" \
+    bash -c 'set -euo pipefail; main'; then
+  printf 'error: Android jar prefetch failed within its cumulative budget\n' >&2
+  exit 1
+fi
