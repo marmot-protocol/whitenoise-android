@@ -83,8 +83,7 @@ class RecipientConfirmedMessagePresentationTest {
             .onAllNodesWithText(
                 requireNotNull(TimelineProjector.invalidationWarning(invalidated)),
                 useUnmergedTree = true,
-            )
-            .assertCountEquals(1)
+            ).assertCountEquals(1)
         composeRule.onAllNodesWithContentDescription("Sent", useUnmergedTree = true).assertCountEquals(0)
     }
 
@@ -139,7 +138,10 @@ class RecipientConfirmedMessagePresentationTest {
             fixture.controller.testApplyLiveTimelineChangesAndRegisterStreams(listOf(upsert(confirmed(failed))))
         }
         assertWarningState(confirmed = true)
-        composeRule.runOnIdle { assertEquals(MessageStatus.Sent, fixture.controller.timeline.single().status) }
+        composeRule.runOnIdle {
+            val item = fixture.controller.timeline.single()
+            assertEquals(MessageStatus.Sent, item.status)
+        }
 
         composeRule.runOnIdle {
             fixture.controller.testApplyLiveTimelineChangesAndRegisterStreams(listOf(upsert(failed)))
@@ -194,8 +196,10 @@ class RecipientConfirmedMessagePresentationTest {
         )
 
     /** Reactions and status may arrive together under the delivery-state trigger. */
-    private fun upsert(record: TimelineMessageRecordFfi) =
-        TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED, record)
+    private fun upsert(record: TimelineMessageRecordFfi) = TimelineMessageChangeFfi.Upsert(
+        TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED,
+        record,
+    )
 
     private enum class Shape { Text, File, Image }
 }

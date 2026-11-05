@@ -174,27 +174,28 @@ class ConversationRecipientConfirmationReplayTest {
         record: TimelineMessageRecordFfi,
         sender: String = ConversationTimelineTestIds.SENDER_ID,
         target: String = record.messageIdHex,
-    ) =
-        record.copy(
-            reactions =
-                TimelineReactionSummaryFfi(
-                    byEmoji = listOf(TimelineReactionEmojiFfi("+", 1u, listOf(sender))),
-                    userReactions =
-                        listOf(
-                            TimelineUserReactionFfi(
-                                reactionMessageIdHex = "reaction",
-                                targetMessageIdHex = target,
-                                sender = sender,
-                                emoji = "+",
-                                reactedAt = 2uL,
-                            ),
+    ) = record.copy(
+        reactions =
+            TimelineReactionSummaryFfi(
+                byEmoji = listOf(TimelineReactionEmojiFfi("+", 1u, listOf(sender))),
+                userReactions =
+                    listOf(
+                        TimelineUserReactionFfi(
+                            reactionMessageIdHex = "reaction",
+                            targetMessageIdHex = target,
+                            sender = sender,
+                            emoji = "+",
+                            reactedAt = 2uL,
                         ),
-                ),
-        )
+                    ),
+            ),
+    )
 
     /** Uses the native delivery trigger, which can also introduce or withdraw a reaction. */
-    private fun upsert(record: TimelineMessageRecordFfi) =
-        TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED, record)
+    private fun upsert(record: TimelineMessageRecordFfi) = TimelineMessageChangeFfi.Upsert(
+        TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED,
+        record,
+    )
 
     /** An authoritative bounded page with no implicit Android reconstruction of delivery fields. */
     private fun page(vararg records: TimelineMessageRecordFfi) = TimelinePageFfi(records.toList(), false, false)
