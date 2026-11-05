@@ -65,13 +65,14 @@ class ConversationRecipientConfirmationTest {
             }
         }
 
-    /** A peer receipt replaces the retained failed bubble even when its legacy native row has no caller token. */
+    /** A peer receipt uses the caller token to replace its failed bubble during a delivery-state update. */
     @Test
-    fun peerConfirmationReconcilesFailedLegacyOptimisticSend() =
+    fun peerConfirmationReconcilesFailedSendByCallerToken() =
         runBlocking {
             val failed =
                 timelineRecord(messageId = "native-send", timelineAt = 1uL).copy(
                     sourceMessageIdHex = null,
+                    clientToken = "temp-send",
                     direction = "sent",
                     sender = ConversationTimelineTestIds.ACCOUNT_ID,
                     invalidationStatus = "local_publish_failed",
@@ -97,10 +98,7 @@ class ConversationRecipientConfirmationTest {
                     initialMemberSnapshot = conversationTimelineMemberSnapshot(),
                 )
             try {
-                controller.testApplyLiveTimelineChangesAndRegisterStreams(
-                    listOf(TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED, failed)),
-                )
-                assertEquals(MessageStatus.Failed, controller.timeline.single().status)
+                assertEquals(MessageStatus.Failed, optimistic["msg:temp-send"]?.status)
 
                 controller.testApplyLiveTimelineChangesAndRegisterStreams(
                     listOf(
@@ -120,50 +118,97 @@ class ConversationRecipientConfirmationTest {
             }
         }
 
-    /** An old peer receipt cannot acknowledge a distinct new submission with identical text and timestamp. */
+    /** A legacy history row cannot acknowledge another send with identical text, whether pending or failed. */
     @Test
-    fun legacyPeerConfirmationDoesNotConsumeAnUnrelatedPendingSend() =
+    fun legacyPeerConfirmationDoesNotConsumeUnrelatedSends() =
         runBlocking {
-            val historical =
-                confirmedRecord(
-                    timelineRecord(messageId = "old-send", timelineAt = 1uL).copy(
-                        sourceMessageIdHex = null,
-                        direction = "sent",
-                        sender = ConversationTimelineTestIds.ACCOUNT_ID,
-                    ),
-                )
-            val scripted =
-                ScriptedConversationLiveSubscriptions(
-                    timelineScripts = emptyList(),
-                    group = conversationTimelineTestGroup(),
-                )
-            val state = conversationTimelineTestAppState(scripted.subscriptions)
-            val optimistic =
-                state.optimisticMessages(ConversationTimelineTestIds.ACCOUNT_REF, ConversationTimelineTestIds.GROUP_ID)
-            optimistic["msg:new-send"] =
-                TimelineMessage(
-                    id = "msg:new-send",
-                    record = TimelineProjector.toAppMessageRecord(historical).copy(messageIdHex = "new-send"),
-                    status = MessageStatus.Pending,
-                )
-            val controller =
-                ConversationController(
-                    appState = state,
-                    initialGroup = conversationTimelineTestGroup(),
-                    initialMemberSnapshot = conversationTimelineMemberSnapshot(),
-                )
-            try {
-                controller.testApplyLiveTimelineChangesAndRegisterStreams(
-                    listOf(TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED, historical)),
-                )
-
-                assertEquals(MessageStatus.Pending, optimistic["msg:new-send"]?.status)
-                assertEquals(2, controller.timeline.size)
-                assertEquals(setOf(MessageStatus.Pending, MessageStatus.Sent), controller.timeline.map { it.status }.toSet())
-            } finally {
-                controller.onCleared()
+            for (status in listOf(MessageStatus.Pending, MessageStatus.Failed)) {
+                assertUnrelatedSendSurvivesLegacyReceipt(status)
             }
         }
+
+    /** Exercises live confirmation and window replay with separate sends whose timestamp and content coincide. */
+    private suspend fun assertUnrelatedSendSurvivesLegacyReceipt(status: MessageStatus) {
+        val historical =
+            confirmedRecord(
+                timelineRecord(messageId = "old-send", timelineAt = 1uL).copy(
+                    sourceMessageIdHex = null,
+                    direction = "sent",
+                    sender = ConversationTimelineTestIds.ACCOUNT_ID,
+                ),
+            )
+        val scripted =
+            ScriptedConversationLiveSubscriptions(
+                timelineScripts = emptyList(),
+                group = conversationTimelineTestGroup(),
+            )
+        val state = conversationTimelineTestAppState(scripted.subscriptions)
+        val optimistic =
+            state.optimisticMessages(ConversationTimelineTestIds.ACCOUNT_REF, ConversationTimelineTestIds.GROUP_ID)
+        optimistic["msg:new-send"] =
+            TimelineMessage(
+                id = "msg:new-send",
+                record = TimelineProjector.toAppMessageRecord(historical).copy(messageIdHex = "new-send"),
+                status = status,
+            )
+        val controller =
+            ConversationController(
+                appState = state,
+                initialGroup = conversationTimelineTestGroup(),
+                initialMemberSnapshot = conversationTimelineMemberSnapshot(),
+            )
+        try {
+            controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                listOf(TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED, historical)),
+            )
+
+            controller.applyTimelinePage(page(historical), replaceWindow = true, updatePagination = true)
+
+            assertEquals(status, optimistic["msg:new-send"]?.status)
+            assertEquals(2, controller.timeline.size)
+            assertEquals(setOf(status, MessageStatus.Sent), controller.timeline.map { it.status }.toSet())
+        } finally {
+            controller.onCleared()
+        }
+    }
+
+    /** Confirming one native send cannot delete a separate invalidated native send with identical content. */
+    @Test
+    fun peerConfirmationPreservesUnrelatedInvalidatedNativeSend() {
+        val failed =
+            timelineRecord(messageId = "failed-native", timelineAt = 1uL).copy(
+                sourceMessageIdHex = null,
+                direction = "sent",
+                sender = ConversationTimelineTestIds.ACCOUNT_ID,
+                invalidationStatus = "local_publish_failed",
+            )
+        val historical = confirmedRecord(failed.copy(messageIdHex = "old-native", invalidationStatus = null))
+        val scripted =
+            ScriptedConversationLiveSubscriptions(
+                timelineScripts = emptyList(),
+                group = conversationTimelineTestGroup(),
+            )
+        val controller =
+            ConversationController(
+                appState = conversationTimelineTestAppState(scripted.subscriptions),
+                initialGroup = conversationTimelineTestGroup(),
+                initialMemberSnapshot = conversationTimelineMemberSnapshot(),
+            )
+        try {
+            controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                listOf(TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED, failed)),
+            )
+            controller.testApplyLiveTimelineChangesAndRegisterStreams(
+                listOf(TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED, historical)),
+            )
+
+            assertEquals(setOf("failed-native", "old-native"), controller.timelineRecords.keys)
+            assertEquals("local_publish_failed", controller.timelineRecords["failed-native"]?.invalidationStatus)
+            assertEquals(2, controller.timeline.size)
+        } finally {
+            controller.onCleared()
+        }
+    }
 
     /** Models the single native update that both proves receipt and introduces the peer reaction. */
     private fun confirmedRecord(pending: TimelineMessageRecordFfi) =

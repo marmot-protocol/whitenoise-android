@@ -42,8 +42,9 @@ The normal Android constructor and deployment/keychain identity remain unchanged
 - A peer reaction settles an own send previously judged to have reached no relay
   (mdk#2899). The native timeline and chat-list projections report delivery.
 - Explicit Leave becomes account-wide across linked devices; an eligible nonlast
-  admin is demoted by core as part of Leave (mdk#2925). Android already obeys the
-  native `canLeave` and `requiresSelfDemoteBeforeLeave` projections.
+  admin is demoted by core as part of Leave (mdk#2925). Android retains its existing
+  explicit pre-demotion compatibility flow before calling Leave; this bump does
+  not adopt the native eligibility projections.
 - Experimental sibling Welcome repair uses heartbeat activity (mdk#2936), and
   device-group moves/backups gain additional APIs (mdk#2948, mdk#2951, mdk#2954).
   Android adds no UI or experimental constructor for these capabilities.
@@ -75,8 +76,9 @@ can have no `sourceMessageIdHex`, and the reaction that settles it arrives as
 
 All synthetic timeline constructors explicitly default this field to false.
 Regression tests cover the live controller's delivery/reaction update, including
-replacement of a retained failed legacy optimistic bubble without consuming an
-unrelated same-content pending send, render equality,
+caller-token handoff of a retained failed optimistic bubble without consuming
+unrelated same-content pending/failed optimistic sends or invalidated native rows
+during live updates and window replay, render equality,
 unpublished-send matching and notification reply deduplication.
 Existing bubble layouts do not change; no new screenshot baseline is required.
 

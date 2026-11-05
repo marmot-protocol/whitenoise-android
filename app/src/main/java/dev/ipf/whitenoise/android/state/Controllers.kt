@@ -12967,7 +12967,7 @@ class ConversationController(
         }
     }
 
-    /** Installs a native row and hands off its optimistic bubble when admission or a peer receipt proves ownership. */
+    /** Installs a native row; peer receipts reconcile only exact send ownership, never same-content legacy guesses. */
     private fun upsertProjectedRecord(
         record: TimelineMessageRecordFfi,
         reconcileOptimistic: Boolean = false,
@@ -13074,7 +13074,7 @@ class ConversationController(
             messageById[record.messageIdHex] = actionRecord
             return actionRecord
         }
-        if (record.invalidationStatus == null) {
+        if (record.invalidationStatus == null && !record.recipientConfirmed) {
             invalidatedProjectionIdsMatchingMessage(timelineRecords, actionRecord)
                 .filterNot { it == record.messageIdHex }
                 .forEach(::removeProjectedRecord)
@@ -13087,23 +13087,17 @@ class ConversationController(
             actionRecord,
             displayedProjectedStreamItemIds,
         )
-        // A receipt can settle a retained failure, but cannot identify a new same-content pending send.
-        val legacyOptimisticMessages =
-            if (record.recipientConfirmed) {
-                optimisticMessages.values.filter { it.status == MessageStatus.Failed }
-            } else {
-                optimisticMessages.values
-            }
+        // A peer receipt proves delivery of this native row, not ownership of a same-content optimistic send.
         val reconciledOptimisticId =
             acceptedPendingOptimisticId
-                ?: if (hasAcceptedPendingTextBridge || record.clientToken != null) {
+                ?: if (hasAcceptedPendingTextBridge || record.clientToken != null || record.recipientConfirmed) {
                     null
                 } else {
                     optimisticMessageIdForProjection(
-                        legacyOptimisticMessages,
+                        optimisticMessages.values,
                         actionRecord,
-                        allowDelayedProjection = allowDelayedProjection || record.recipientConfirmed,
-                    ).takeIf { reconcilesSend }
+                        allowDelayedProjection = allowDelayedProjection,
+                    ).takeIf { reconcileOptimistic }
                 }
         acceptedPendingOptimisticId?.let { optimisticId ->
             appState.commitOptimisticSentPreview(
