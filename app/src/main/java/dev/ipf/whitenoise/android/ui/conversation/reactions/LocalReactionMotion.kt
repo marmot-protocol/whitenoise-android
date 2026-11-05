@@ -186,8 +186,7 @@ internal class LocalReactionMotion {
     fun canFly(
         source: Rect,
         target: Rect,
-    ): Boolean =
-        (readViewport?.invoke() ?: viewport)?.let { it.encloses(source) && it.encloses(target) } ?: true
+    ): Boolean = (readViewport?.invoke() ?: viewport)?.let { it.encloses(source) && it.encloses(target) } ?: true
 
     /** The measured target of the current flight for [emoji], or null when nothing visibly travels to it. */
     fun flightTarget(emoji: String): ReactionMotionTarget? {
@@ -565,8 +564,7 @@ private fun Modifier.measuredReactionTarget(
 
 private const val MAX_REACTION_GLYPH_LENGTH = 32
 
-private fun Rect.encloses(other: Rect): Boolean =
-    other.left >= left && other.right <= right && other.top >= top && other.bottom <= bottom
+private fun Rect.encloses(box: Rect) = box.left >= left && box.top >= top && box.right <= right && box.bottom <= bottom
 
 /** Raise the whole lazy item, so a flying glyph cannot disappear behind a later-painted message. */
 @Composable
