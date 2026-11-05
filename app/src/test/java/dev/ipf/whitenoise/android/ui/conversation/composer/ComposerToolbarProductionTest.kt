@@ -239,7 +239,11 @@ class ComposerToolbarProductionTest {
     fun manyShortcutsWrapWithoutOverlappingTheEditorInRtl() {
         extraInventory = true
         render(
-            ComposerToolbarSettings(ComposerShortcut.entries, ComposerToolbarLayout.AlwaysExpanded),
+            ComposerToolbarSettings(
+                ComposerShortcut.entries,
+                ComposerToolbarLayout.AlwaysExpanded,
+                rightShortcuts = WRAPPING_RIGHT_SHORTCUTS,
+            ),
             direction = LayoutDirection.Rtl,
         )
         val field = composeRule.onNodeWithTag(COMPOSER_EDITOR_VIEWPORT_TAG).fetchSemanticsNode().boundsInRoot
@@ -583,3 +587,7 @@ class ComposerToolbarProductionTest {
         extraCalls[id] = (extraCalls[id] ?: 0) + 1
     }
 }
+
+/** Several actions on the right, so the crowded right side must wrap its own rows. */
+private val WRAPPING_RIGHT_SHORTCUTS =
+    setOf(ComposerShortcut.Emoji, ComposerShortcut.Paste, ComposerShortcut.Dictation, ComposerShortcut.VoiceNote)

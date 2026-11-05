@@ -34,10 +34,14 @@ import dev.ipf.marmotkit.SendMaintenanceDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.ComposerShortcut
+import dev.ipf.whitenoise.android.state.ComposerShortcutSide
+import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.defaultComposerShortcuts
 import dev.ipf.whitenoise.android.ui.conversation.ConversationScreen
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
@@ -138,6 +142,16 @@ class ConversationSendFirstFrameTest {
     @Test
     @Suppress("LongMethod")
     fun emptyComposerPasteAndSendDoNotOpenImeAfterDraftPersistence() {
+        // Paste is optional in the default toolbar; this case saves a layout that shows it.
+        context
+            .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+            .edit()
+            .putString(
+                "composer_toolbar_v1",
+                ComposerToolbarSettings(defaultComposerShortcuts + ComposerShortcut.Paste)
+                    .withSide(ComposerShortcut.Paste, ComposerShortcutSide.Right)
+                    .encode(),
+            ).commit()
         val appState = appState()
         val controller =
             ConversationController(

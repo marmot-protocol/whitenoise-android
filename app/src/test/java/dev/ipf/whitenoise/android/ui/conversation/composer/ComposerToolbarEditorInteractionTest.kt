@@ -522,6 +522,7 @@ class ComposerToolbarEditorInteractionTest {
                         ComposerShortcut.Camera,
                         ComposerShortcut.Gallery,
                     ),
+                    rightShortcuts = setOf(ComposerShortcut.Emoji, ComposerShortcut.Paste, ComposerShortcut.Dictation),
                 ),
             )
         render(edit, { _, _ -> }, {}, width = 240, rtl = true)
