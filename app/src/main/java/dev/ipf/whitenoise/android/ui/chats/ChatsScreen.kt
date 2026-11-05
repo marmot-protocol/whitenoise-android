@@ -465,7 +465,12 @@ internal fun ChatsScreen(
     // only once a read made while it is open says so. A background read that failed or found no reader
     // before the filter opened gets one fresh attempt on opening instead.
     LaunchedEffect(unreadOnly, unreadUnavailableWhileOpen) {
-        if (unreadOnly && unreadUnavailableWhileOpen) setUnreadOnly(false)
+        // An unavailable answer only applies to the opening it was read for, so a later opening waits for its own read.
+        if (!unreadOnly) {
+            unreadUnavailableWhileOpen = false
+        } else if (unreadUnavailableWhileOpen) {
+            setUnreadOnly(false)
+        }
     }
     LaunchedEffect(unreadOnly) {
         if (unreadOnly && (unreadReadFailed || unreadUnavailable)) unreadRetry++
