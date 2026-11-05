@@ -18,7 +18,7 @@ import dev.ipf.whitenoise.android.ui.theme.amoledRowSeamColor
 import dev.ipf.whitenoise.android.ui.theme.connectedRowBorder
 
 internal object SettingsRowDefaults {
-    /** Material's disabled content alpha, shared by blocked row text and the AMOLED row edge. */
+    /** Material's disabled content alpha for a blocked row's text and icons — its connected outline never dims. */
     const val DisabledAlpha = 0.38f
 
     /** The existing settings rows size their busy indicator like the switch it replaces. */
