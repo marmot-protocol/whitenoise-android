@@ -128,17 +128,22 @@ internal fun ColumnScope.MessageReactionSummary(
             label = "messageReactionHostSize",
         ) { if (it) 1f else 0f }
     val hostAnimating = transition.currentState != transition.targetState || transition.isRunning
+    val flying = localMotion?.effect?.origin != null
     val hostGraphicsModifier =
         if (hostAnimating) {
             Modifier.graphicsLayer {
                 alpha = hostAlpha
-                scaleX = hostScale
-                scaleY = hostScale
+                // A flying emoji targets measured text; scaling its ancestor would move that
+                // endpoint while the separate draw layer travels toward it.
+                scaleX = if (flying) 1f else hostScale
+                scaleY = if (flying) 1f else hostScale
             }
         } else {
             Modifier
         }
-    val hostClipModifier = if (hostAnimating) Modifier.clipToBounds() else Modifier
+    // The attached pill starts 8.5dp above this host. Keep its destination whole during
+    // handoff; ordinary enter/exit transitions retain their existing clipping and size motion.
+    val hostClipModifier = if (hostAnimating && !flying) Modifier.clipToBounds() else Modifier
     Box(
         modifier =
             reactionHostModifier(

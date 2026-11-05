@@ -71,8 +71,8 @@ class ReactionMotionSurfaceTest {
         }
     }
 
-    /** The first summary measures its chip target while still entering, and an empty viewport hides the flight. */
-    @Test fun firstRealSummaryGetsATargetDuringItsClippedEntranceAndRespectsClearViewport() {
+    /** The first summary measures its glyph target while entering, and an empty viewport hides the flight. */
+    @Test fun firstRealSummaryGetsATargetDuringItsEntranceAndRespectsClearViewport() {
         var tallies by mutableStateOf(emptyList<ReactionTally>())
         var viewport by mutableStateOf<Rect?>(null)
         val visibility = MutableTransitionState(false)
@@ -122,7 +122,7 @@ class ReactionMotionSurfaceTest {
                 enteringWithTarget = visibility.targetState &&
                     !visibility.currentState &&
                     !visibility.isIdle &&
-                    motion.targets["👍"]?.isEmpty == false
+                    motion.targets["👍"]?.bounds?.isEmpty == false
             }
             if (enteringWithTarget) break
         }
