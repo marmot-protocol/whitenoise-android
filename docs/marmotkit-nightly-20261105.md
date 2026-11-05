@@ -33,6 +33,26 @@ The builder maps these to `otlp-export,product-analytics-export`; no ABI job ena
 explicit builder opt-in, initialized to zero for ordinary release invocations.
 The normal Android constructor and deployment/keychain identity remain unchanged.
 
+
+Retained feature-input excerpts from the successful ABI jobs in run `41982881940`
+(source and builder `5286f86c`, ZIP digest recorded above):
+
+- [arm64-v8a job](https://github.com/marmot-protocol/mdk/actions/runs/41982881940/job/127097099009)
+- [armeabi-v7a job](https://github.com/marmot-protocol/mdk/actions/runs/41982881940/job/127097099014)
+- [x86 job](https://github.com/marmot-protocol/mdk/actions/runs/41982881940/job/127097098970)
+- [x86_64 job](https://github.com/marmot-protocol/mdk/actions/runs/41982881940/job/127097099025)
+
+```text
+MarmotKit / Build Android input (arm64-v8a)    2026-11-05T06:49:17.3042185Z   OTLP_EXPORT: 1
+MarmotKit / Build Android input (arm64-v8a)    2026-11-05T06:49:17.3042628Z   PRODUCT_ANALYTICS_EXPORT: 1
+MarmotKit / Build Android input (armeabi-v7a)    2026-11-05T06:49:16.9124294Z   OTLP_EXPORT: 1
+MarmotKit / Build Android input (armeabi-v7a)    2026-11-05T06:49:16.9124656Z   PRODUCT_ANALYTICS_EXPORT: 1
+MarmotKit / Build Android input (x86)    2026-11-05T06:49:17.1686288Z   OTLP_EXPORT: 1
+MarmotKit / Build Android input (x86)    2026-11-05T06:49:17.1686736Z   PRODUCT_ANALYTICS_EXPORT: 1
+MarmotKit / Build Android input (x86_64)    2026-11-05T06:49:17.2018075Z   OTLP_EXPORT: 1
+MarmotKit / Build Android input (x86_64)    2026-11-05T06:49:17.2018467Z   PRODUCT_ANALYTICS_EXPORT: 1
+```
+
 ## Runtime changes
 
 - Recovery replaces leaves atomically and preserves recovery/publication state
@@ -72,14 +92,16 @@ can have no `sourceMessageIdHex`, and the reaction that settles it arrives as
 - refreshes reactions on delivery-state changes;
 - excludes confirmed rows from unpublished-send suppression/retry matching;
 - stops pending attachment presentation while preserving native target lookup;
-- treats a matching peer-confirmed notification reply as committed.
+- keeps peer-confirmed notification replies indeterminate unless this attempt
+  already saved its native committed message ID; same text and a receipt alone
+  cannot establish which send the attempt owns.
 
 All synthetic timeline constructors explicitly default this field to false.
 Regression tests cover the live controller's delivery/reaction update, including
 caller-token handoff of a retained failed optimistic bubble without consuming
 unrelated same-content pending/failed optimistic sends or invalidated native rows
 during live updates and window replay, render equality,
-unpublished-send matching and notification reply deduplication.
+unpublished-send matching and notification reply ownership recovery.
 Existing bubble layouts do not change; no new screenshot baseline is required.
 
 ## Retained-data qualification

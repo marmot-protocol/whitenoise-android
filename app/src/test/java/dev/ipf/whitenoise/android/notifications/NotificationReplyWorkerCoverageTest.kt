@@ -7,9 +7,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NotificationReplyWorkerCoverageTest {
-    /** Peer-confirmed replies must not be retried merely because no relay event id was recorded. */
+    /** A crash before send can leave an unrelated same-text receipt inside this attempt's recovery window. */
     @Test
-    fun peerConfirmedReplyIsCommittedWithoutSourceEvent() =
+    fun peerConfirmedReplyWithoutAttemptIdentityIsIndeterminate() =
         runTest {
             val outcome =
                 notificationReplyCommitProbe(
@@ -20,7 +20,7 @@ class NotificationReplyWorkerCoverageTest {
                     page(record(11u, "confirmed", "sent", "same reply", sourceMessageIdHex = null).copy(recipientConfirmed = true))
                 }
 
-            assertEquals(NotificationReplyCommitProbe.Committed, outcome)
+            assertEquals(NotificationReplyCommitProbe.Indeterminate, outcome)
         }
 
     @Test
@@ -49,6 +49,7 @@ class NotificationReplyWorkerCoverageTest {
             assertEquals(REPLY_DISMISS_RETRIES, attempts)
         }
 
+    /** A native message ID saved for this attempt remains ownership proof even before relay delivery. */
     @Test
     fun acceptedPendingMessageIdIsDurableProofWithoutTimelineLookup() =
         runTest {
