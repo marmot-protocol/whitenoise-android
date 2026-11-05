@@ -115,8 +115,9 @@ class ConversationRecipientConfirmationTest {
                 )
 
                 assertTrue(optimistic.isEmpty())
-                assertEquals("native-send", controller.timeline.single().record.messageIdHex)
-                assertEquals(MessageStatus.Sent, controller.timeline.single().status)
+                val sent = controller.timeline.single()
+                assertEquals("native-send", sent.record.messageIdHex)
+                assertEquals(MessageStatus.Sent, sent.status)
                 assertEquals("+", controller.reactions[failed.messageIdHex]?.single()?.emoji)
             } finally {
                 controller.onCleared()
@@ -251,6 +252,9 @@ class ConversationRecipientConfirmationTest {
         )
 
     /** Builds a complete native window containing only the send under test. */
-    private fun page(record: TimelineMessageRecordFfi) =
-        TimelinePageFfi(messages = listOf(record), hasMoreBefore = false, hasMoreAfter = false)
+    private fun page(record: TimelineMessageRecordFfi) = TimelinePageFfi(
+        messages = listOf(record),
+        hasMoreBefore = false,
+        hasMoreAfter = false,
+    )
 }
