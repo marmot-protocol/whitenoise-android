@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.SelectedMessageDraftContentFfi
 import dev.ipf.marmotkit.SelectedMessageDraftFfi
+import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import dev.ipf.whitenoise.android.core.isMediaReferenceRefusal
@@ -39,16 +40,19 @@ internal suspend fun MarmotInterface.sendComposerText(
 /** Publishes a completed non-reply dictation after its conversation UI controller has detached. */
 internal suspend fun WhiteNoiseAppState.sendDetachedDictationText(request: ConversationDictationSendRequest): Boolean {
     val pendingClear = captureDraftForSend(request.accountRef, request.groupIdHex)
-    withConversationTextSendOrder(request.accountRef, request.groupIdHex) {
-        retryPendingConversationSend(validatedConnectivityRecoveryGeneration) {
-            withGroupCommitLock(request.accountRef, request.groupIdHex) {
-                marmotIo(MarmotTraceSection.TEXT_SEND) {
-                    sendComposerText(request.accountRef, request.groupIdHex, null, request.payload)
+    val summary =
+        withConversationTextSendOrder(request.accountRef, request.groupIdHex) {
+            retryPendingConversationSend(validatedConnectivityRecoveryGeneration) {
+                withGroupCommitLock(request.accountRef, request.groupIdHex) {
+                    marmotIo(MarmotTraceSection.TEXT_SEND) {
+                        sendComposerText(request.accountRef, request.groupIdHex, null, request.payload)
+                    }
                 }
             }
         }
-    }
-    // A normal native return is accepted, including retained sends awaiting an event id.
+    // Without a projected message, retained native ownership still needs dictation recovery.
+    // False keeps delivery unknown and the existing claim; it never authorizes another send.
+    if (summary.messageIds.isEmpty() && summary.acceptDisposition != SendAcceptDispositionFfi.PUBLISHED) return false
     pendingClear?.let(::clearDraftAfterSuccessfulSend)
     runCatching(request.onPendingShown)
     return true

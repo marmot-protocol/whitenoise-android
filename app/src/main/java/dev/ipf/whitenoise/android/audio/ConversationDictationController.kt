@@ -3485,7 +3485,7 @@ internal class ConversationDictationController internal constructor(
                                 complete(target)
                             },
                             onRetained = { claim, accepted ->
-                                val reason = if (accepted == null) "timeout_or_interrupted" else "rejected"
+                                val reason = if (accepted == null) "timeout_or_interrupted" else "not_confirmed"
                                 conversationDictationDiagnostic("event=send_outcome outcome=retained reason=$reason")
                                 retainFailedDispatchDraft(sessionId, target, admissionTarget, transcript, claim)
                             },
