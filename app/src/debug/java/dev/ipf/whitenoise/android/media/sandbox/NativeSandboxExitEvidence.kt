@@ -31,7 +31,8 @@ internal object NativeSandboxExitEvidence {
         endedAtMs: Long,
     ): Boolean {
         val invalidIdentity = pid <= 0 || signal <= 0
-        if (output.length > MAX_BYTES || '\r' in output || invalidIdentity || startedAtMs > endedAtMs) return false
+        val invalidOutput = output.length > MAX_BYTES || '\r' in output
+        if (invalidOutput || invalidIdentity || startedAtMs > endedAtMs) return false
         return output.lineSequence().any { line ->
             val match = record.matchEntire(line)
             val timestamp =
