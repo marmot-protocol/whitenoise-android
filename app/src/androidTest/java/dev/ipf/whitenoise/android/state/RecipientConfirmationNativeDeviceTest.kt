@@ -161,7 +161,7 @@ class RecipientConfirmationNativeDeviceTest {
     }
 
     /** A real native subscription feeds the same controller used by the app's conversation screen. */
-    private fun controller(
+    private suspend fun controller(
         participant: Participant,
         group: String,
     ): ConversationController {
