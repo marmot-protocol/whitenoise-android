@@ -8,7 +8,8 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PINS="${ROBOLECTRIC_ANDROID_ALL_PINS:-$REPO_DIR/scripts/robolectric-android-all.sha512}"
 CATALOG="${ROBOLECTRIC_VERSION_CATALOG:-$REPO_DIR/gradle/libs.versions.toml}"
-REMOTE="${ROBOLECTRIC_ANDROID_ALL_REMOTE:-https://repo1.maven.org/maven2}"
+# Shared hosted-runner egress can be throttled by Central; this mirror serves the same checksum-pinned jars.
+REMOTE="${ROBOLECTRIC_ANDROID_ALL_REMOTE:-https://maven-central.storage-download.googleapis.com/maven2}"
 LOCAL_REPO="${ROBOLECTRIC_LOCAL_REPOSITORY:-$HOME/.m2/repository}"
 ARTIFACT_PATH=org/robolectric/android-all-instrumented
 

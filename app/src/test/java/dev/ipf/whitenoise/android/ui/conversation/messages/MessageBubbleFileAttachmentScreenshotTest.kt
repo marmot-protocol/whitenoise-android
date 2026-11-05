@@ -856,6 +856,7 @@ open class MessageBubbleFileAttachmentFixtures {
                 retentionExpiresAt = retentionExpiresAt,
                 sticker = null,
                 importedFrom = null,
+                recipientConfirmed = false,
                 historyImportProvenance = null,
             )
         return TimelineMessage(

@@ -173,6 +173,7 @@ class ConversationRetentionPolicyTransitionTest {
             retentionExpiresAt = retentionExpiresAt,
             sticker = null,
             importedFrom = null,
+            recipientConfirmed = false,
             historyImportProvenance = null,
         )
 

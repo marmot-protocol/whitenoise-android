@@ -205,7 +205,42 @@ class QualificationEvidenceTest(unittest.TestCase):
                 captured_stdout = evidence.split('stdout:\n', 1)[1].split('\nstderr:\n', 1)[0]
                 self.assertEqual(len(captured_stdout), 32768)
                 self.assertIn('transport timeout', evidence)
-                self.assertEqual(len(list(Path(directory).glob('*-command-error.txt'))), 4)
+                self.assertEqual(len(list(Path(directory).glob('*-command-error.txt'))), 5)
+
+    def test_process_diagnostics_filter_before_retaining_the_bounded_tail(self):
+        """A busy unrelated buffer must not displace earlier matching process-death evidence."""
+        def device(*args, **kwargs):
+            if args[:5] == ('logcat', '-b', 'main', '-b', 'system'):
+                self.assertNotIn('-t', args)
+                self.assertEqual(args[-4:], ('AndroidRuntime:E', 'DEBUG:F', 'ActivityManager:I', '*:S'))
+                return ''.join(f'{index}: filtered process diagnostic\n' for index in range(500))
+            return 'healthy'
+
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(campaign, 'REPORTS', Path(directory)), \
+                    patch.object(campaign, 'adb', side_effect=device):
+                campaign.retain_device_health('baseline-seed-')
+            output = (Path(directory) / 'baseline-seed-process-log.txt').read_text()
+            self.assertEqual(len(output.splitlines()), 200)
+            self.assertTrue(output.startswith('300: filtered process diagnostic\n'))
+            self.assertTrue(output.endswith('499: filtered process diagnostic\n'))
+
+    def test_process_crash_keeps_phase_diagnostics_before_recovery(self):
+        """A later recovery probe must not overwrite the baseline process crash evidence."""
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(campaign, 'REPORTS', Path(directory)), \
+                    patch.object(campaign, 'adb', side_effect=[
+                        'INSTRUMENTATION_RESULT: shortMsg=Process crashed.\nINSTRUMENTATION_CODE: 0',
+                        'activity ready', 'package ready', '1', 'baseline crash', 'baseline process',
+                        'activity ready', 'package ready', '1', 'recovery crash', 'recovery process',
+                    ]):
+                with self.assertRaises(RuntimeError):
+                    campaign.instrument('baseline-seed', campaign.UPGRADE, {'retained'})
+                campaign.retain_device_health()
+            reports = Path(directory)
+            self.assertEqual((reports / 'baseline-seed-crash-log.txt').read_text(), 'baseline crash')
+            self.assertEqual((reports / 'baseline-seed-process-log.txt').read_text(), 'baseline process')
+            self.assertEqual((reports / 'crash-log.txt').read_text(), 'recovery crash')
 
     def test_recovery_requires_both_formerly_ignored_cases(self):
         """The adopted replay fixes must execute; ignored, missing and failed cases are all blocking."""
@@ -690,7 +725,7 @@ class BaselineStagingTest(unittest.TestCase):
             destination = Path(directory)
             pin = destination / 'app/src/main/marmotkit/MARMOT_VERSION'
             pin.parent.mkdir(parents=True)
-            pin.write_text('mdk-sha=2854335c6e29f6bf236b1f986c62c1b9ab31114c\n')
+            pin.write_text('mdk-sha=0f3fe9e02828f57a4e4c10592df05b3835fc9f39\n')
             original = pin.read_bytes()
             with patch.object(staging.shutil, 'copytree') as copy:
                 staging.stage(destination)
@@ -701,8 +736,8 @@ class BaselineStagingTest(unittest.TestCase):
     def test_other_native_revisions_cannot_seed_the_reviewed_pair(self):
         """The former baseline, candidate itself and a partial SHA all fail before any source overlay."""
         from scripts import stage_mdk_baseline_fixture as staging
-        for source in ('f7178f0e997e3d6d450fb0af45a32e4780ed862c',
-                       '0f3fe9e02828f57a4e4c10592df05b3835fc9f39', '2854335c'):
+        for source in ('2854335c6e29f6bf236b1f986c62c1b9ab31114c',
+                       '5286f86cd66af12705d33e1e7bf766bc7889441b', '0f3fe9e0'):
             with self.subTest(source=source), tempfile.TemporaryDirectory() as directory:
                 destination = Path(directory)
                 pin = destination / 'app/src/main/marmotkit/MARMOT_VERSION'
