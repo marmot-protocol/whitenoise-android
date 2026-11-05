@@ -74,6 +74,23 @@ class LocalReactionMotionTest {
         assertFalse(motion.canFly(Rect(30f, 90f, 58f, 118f), chip))
     }
 
+    /** Overlay, chip pulse and glyph handoff share one answer to whether this emoji is visibly in flight. */
+    @Test fun flightTargetRequiresTheCurrentVisibleFlight() {
+        val motion = LocalReactionMotion()
+        val target = ReactionMotionTarget(Rect(100f, 300f, 114f, 314f))
+        motion.targets["👍"] = target
+        motion.accept("👍", true)
+        assertNull(motion.flightTarget("👍"))
+        motion.accept("👍", true, Rect(10f, 200f, 40f, 230f))
+        assertEquals(target, motion.flightTarget("👍"))
+        assertNull(motion.flightTarget("🎉"))
+        motion.viewport = Rect(0f, 250f, 360f, 520f)
+        assertNull(motion.flightTarget("👍"))
+        motion.viewport = null
+        motion.enabled = false
+        assertNull(motion.flightTarget("👍"))
+    }
+
     /** The target stays hidden until the final handoff, while the traveling glyph stays opaque. */
     @Test fun glyphHandoffHappensOnlyAtTheDestination() {
         assertEquals(0f, reactionGlyphHandoff(0f), 0f)

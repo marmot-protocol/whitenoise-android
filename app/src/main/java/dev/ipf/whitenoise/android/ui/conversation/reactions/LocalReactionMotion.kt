@@ -187,13 +187,13 @@ internal class LocalReactionMotion {
         source: Rect,
         target: Rect,
     ): Boolean =
-        (readViewport?.invoke() ?: viewport)?.let { bounds ->
-            listOf(source, target).all {
-                val horizontal = it.left >= bounds.left && it.right <= bounds.right
-                val vertical = it.top >= bounds.top && it.bottom <= bounds.bottom
-                horizontal && vertical
-            }
-        } ?: true
+        (readViewport?.invoke() ?: viewport)?.let { it.encloses(source) && it.encloses(target) } ?: true
+
+    /** The measured target of the current flight for [emoji], or null when nothing visibly travels to it. */
+    fun flightTarget(emoji: String): ReactionMotionTarget? {
+        val source = effect?.takeIf { enabled && it.emoji == emoji }?.origin
+        return source?.let { targets[emoji]?.takeIf { target -> canFly(it, target.bounds) } }
+    }
 
     /**
      * Starts an effect only for an accepted local add. The fresh animator starts at the source immediately,
@@ -326,26 +326,23 @@ internal fun Modifier.localReactionOverlay(state: LocalReactionMotion): Modifier
     val effect = state.effect
     val density = LocalDensity.current
     val sourceCell = with(density) { (effect?.origin?.height ?: 28.dp.toPx()).toDp() }
-    val metrics = emojiPickerCellTextMetrics(sourceCell, MaterialTheme.typography.headlineMedium, density.fontScale)
-    val layout =
-        effect?.let {
-            measurer.measure(
-                it.emoji,
-                MaterialTheme.typography.headlineMedium.copy(
-                    fontSize = metrics.first,
-                    lineHeight = metrics.second,
-                    color = MaterialTheme.colorScheme.onSurface,
-                ),
-            )
-        }
+    val typography = MaterialTheme.typography.headlineMedium
+    val metrics = emojiPickerCellTextMetrics(sourceCell, typography, density.fontScale)
+    val sourceStyle =
+        typography.copy(fontSize = metrics.first, lineHeight = metrics.second, color = MaterialTheme.colorScheme.onSurface)
     val art = effect?.let { EmojiShortcodes.art(it.emoji, LocalCustomEmoji.current, emptyMap()) }
+    // Artwork draws its painter, so only text glyphs are measured, once per effect rather than per recomposition.
+    val layout =
+        remember(effect?.emoji, art == null, sourceStyle, measurer) {
+            effect?.takeIf { art == null }?.let { measurer.measure(it.emoji, sourceStyle) }
+        }
     val painter = art?.let { rememberEmojiArtPainter(it) }
     val targetFontPx = with(density) { ReactionEmojiSize.toPx() }
     val direction = LocalLayoutDirection.current
     val sourceFontPx = with(density) { metrics.first.toPx() }
     val owner =
         if (effect?.origin != null) {
-            semantics { if (state.hasVisibleFlight(effect)) testTag = "conversation.reaction.motion.active" }
+            semantics { if (state.flightTarget(effect.emoji) != null) testTag = "conversation.reaction.motion.active" }
         } else {
             this
         }
@@ -358,7 +355,6 @@ internal fun Modifier.localReactionOverlay(state: LocalReactionMotion): Modifier
             if (!state.enabled || current != effect) return@drawWithContent
             val source = current?.origin ?: return@drawWithContent
             val target = state.targets[current.emoji] ?: return@drawWithContent
-            val glyph = layout ?: return@drawWithContent
             if (!state.canFly(source, target.bounds)) return@drawWithContent
             val p = state.progress.value
             val travel = reactionFlightProgress(p)
@@ -392,6 +388,7 @@ internal fun Modifier.localReactionOverlay(state: LocalReactionMotion): Modifier
                     with(painter) { draw(frame.size, alpha = alpha) }
                 }
             } else {
+                val glyph = layout ?: return@drawWithContent
                 // Draw the destination's own native layout at landing. Scaling a separately
                 // rasterized source font down can shift the baseline/advance by a pixel.
                 val native = target.layout
@@ -497,12 +494,8 @@ internal fun Modifier.localReactionTarget(
     if (state == null || emoji == null) return this
     val measured = if (measureChip) measuredReactionTarget(state, emoji, selected, allowHostClipping) else this
     return measured.graphicsLayer {
-        val effect = state.effect
-        val active = state.enabled && selected && effect?.emoji == emoji
-        val flying =
-            effect?.origin?.let { source ->
-                state.targets[emoji]?.let { it.glyph && state.canFly(source, it.bounds) }
-            } == true
+        val active = state.enabled && selected && state.effect?.emoji == emoji
+        val flying = state.flightTarget(emoji)?.glyph == true
         val p = if (active && !flying) FastOutSlowInEasing.transform(state.progress.value) else 1f
         val scale = 1f + 0.12f * sin(PI.toFloat() * p)
         scaleX = scale
@@ -521,13 +514,7 @@ internal fun Modifier.localReactionGlyphTarget(
 ): Modifier {
     if (state == null) return this
     return measuredReactionTarget(state, emoji, selected, allowHostClipping, textLayout).graphicsLayer {
-        val effect = state.effect
-        val target = state.targets[emoji]
-        val flying =
-            state.enabled &&
-                selected &&
-                effect?.emoji == emoji &&
-                effect.origin?.let { source -> target?.let { state.canFly(source, it.bounds) } } == true
+        val flying = selected && state.flightTarget(emoji) != null
         alpha = if (flying) reactionGlyphHandoff(state.progress.value) else 1f
     }
 }
@@ -556,7 +543,9 @@ private fun Modifier.measuredReactionTarget(
         val currentLayout = current && complete
         if (currentLayout && bounds != null && !bounds.isEmpty) {
             val chrome = state.targets[emoji]?.chrome?.takeIf { it.sequence == state.effect?.sequence }
-            state.targets[emoji] = ReactionMotionTarget(bounds, nativeLayout, chrome)
+            val next = ReactionMotionTarget(bounds, nativeLayout, chrome)
+            // SideEffect republishes after every recomposition; an unchanged write would invalidate readers.
+            if (state.targets[emoji] != next) state.targets[emoji] = next
         } else {
             state.targets.remove(emoji)
         }
@@ -572,6 +561,9 @@ private fun Modifier.measuredReactionTarget(
 
 private const val MAX_REACTION_GLYPH_LENGTH = 32
 
+private fun Rect.encloses(other: Rect): Boolean =
+    other.left >= left && other.right <= right && other.top >= top && other.bottom <= bottom
+
 /** Raise the whole lazy item, so a flying glyph cannot disappear behind a later-painted message. */
 @Composable
 internal fun ReactionMotionRow(
@@ -586,12 +578,6 @@ internal fun ReactionMotionRow(
     CompositionLocalProvider(LocalRowReactionMotion provides state) {
         Column(row, content = content)
     }
-}
-
-/** The direct owner tag follows the same endpoint eligibility as its production draw pass. */
-private fun LocalReactionMotion.hasVisibleFlight(effect: LocalReactionEffect?): Boolean {
-    val source = effect?.origin ?: return false
-    return enabled && targets[effect.emoji]?.let { canFly(source, it.bounds) } == true
 }
 
 /** One screen/window conversion shared by transcript endpoints; popup windows keep their own origin. */
