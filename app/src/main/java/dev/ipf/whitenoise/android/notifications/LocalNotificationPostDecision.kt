@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.notifications
 
 import android.app.Notification
+import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
 import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
@@ -118,6 +119,20 @@ internal fun shouldDismissInvite(
 ): Boolean {
     if (accountRef.isBlank() || groupIdHex.isBlank()) return false
     return extraAccountRef == accountRef && extraGroupIdHex == groupIdHex
+}
+
+/** Whether this platform card is an invite owned by the requested account and group. */
+internal fun StatusBarNotification.matchesInvite(
+    accountRef: String,
+    groupIdHex: String,
+): Boolean {
+    val extras = notification.extras ?: return false
+    return shouldDismissInvite(
+        extraAccountRef = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_ACCOUNT_REF),
+        extraGroupIdHex = extras.getString(LocalNotificationFormatter.EXTRA_DISMISS_GROUP_ID),
+        accountRef = accountRef,
+        groupIdHex = groupIdHex,
+    )
 }
 
 internal fun conversationCardMessageIdHex(notification: Notification?): String? =

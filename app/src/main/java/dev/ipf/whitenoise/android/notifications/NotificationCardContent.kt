@@ -19,7 +19,7 @@ private const val EXTRA_EXPANDED_SINGLE_MESSAGE_GROUP_TITLE =
 internal const val CONTACT_PICTURE_ACCOUNT_SCOPE_EXTRA =
     "dev.ipf.whitenoise.android.notify.contact_picture_account_scope"
 
-/** Builds and copies notification payloads; platform ownership and write eligibility stay with the presenter. */
+/** Builds and copies notification payloads; platform ownership and write eligibility stay with the card publisher. */
 internal class NotificationCardContent(
     private val context: Context,
     private val contactAvatarOverride: (String, String) -> Pair<Boolean, Bitmap?>,
