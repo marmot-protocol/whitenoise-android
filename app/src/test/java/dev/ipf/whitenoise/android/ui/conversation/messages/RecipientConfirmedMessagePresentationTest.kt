@@ -11,6 +11,7 @@ import dev.ipf.marmotkit.TimelineMessageChangeFfi
 import dev.ipf.marmotkit.TimelineMessageRecordFfi
 import dev.ipf.marmotkit.TimelinePageFfi
 import dev.ipf.marmotkit.TimelineUpdateTriggerFfi
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.TimelineProjector
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -60,7 +61,7 @@ class RecipientConfirmedMessagePresentationTest {
         composeRule.setContent { SwipeTestBubbleHost(fixture.copy(item = fixture.controller.timeline.single())) }
 
         composeRule
-            .onAllNodesWithText(TimelineProjector.displayBody(deleted), useUnmergedTree = true)
+            .onAllNodesWithText(context.getString(R.string.message_deleted_by_you), useUnmergedTree = true)
             .assertCountEquals(1)
         composeRule.onAllNodesWithContentDescription("Sent", useUnmergedTree = true).assertCountEquals(0)
         composeRule.onAllNodesWithText("Delivery not confirmed", useUnmergedTree = true).assertCountEquals(0)

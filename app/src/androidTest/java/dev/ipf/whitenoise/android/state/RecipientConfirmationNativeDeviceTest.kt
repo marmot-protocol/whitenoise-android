@@ -143,7 +143,9 @@ class RecipientConfirmationNativeDeviceTest {
                         .timelineMessages(
                             participant.account.label,
                             TimelineMessageQueryFfi(group, null, null, null, null, null, 100u),
-                        ).messages.singleOrNull { it.plaintext == body && matches(it) }
+                        )
+                        .messages
+                        .singleOrNull { it.plaintext == body && matches(it) }
                 if (found == null) delay(100L)
             }
             requireNotNull(found)
@@ -240,10 +242,11 @@ class RecipientConfirmationNativeDeviceTest {
                 relayPolicy = RelayPolicyFfi.ALLOW_LOOPBACK_RELAYS_AND_BLOBS,
                 deployment = marmotDeploymentWhiteNoise(),
             ),
-        ).also {
-            runtimes += it
-            it.start()
-        }
+        )
+            .also {
+                runtimes += it
+                it.start()
+            }
 
     /** Stops only a generated runtime so no own-publication echo can settle the controlled failure. */
     private suspend fun close(participant: Participant) {
@@ -257,7 +260,11 @@ class RecipientConfirmationNativeDeviceTest {
         relay: LoopbackNostrRelay,
     ) = participant.copy(native = open(participant.root, relay))
 
-    private data class Participant(val root: File, val native: Marmot, val account: AccountSummaryFfi)
+    private data class Participant(
+        val root: File,
+        val native: Marmot,
+        val account: AccountSummaryFfi,
+    )
 
     private companion object {
         const val GROUP_KIND = 445
