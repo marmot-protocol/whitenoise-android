@@ -329,7 +329,11 @@ internal fun Modifier.localReactionOverlay(state: LocalReactionMotion): Modifier
     val typography = MaterialTheme.typography.headlineMedium
     val metrics = emojiPickerCellTextMetrics(sourceCell, typography, density.fontScale)
     val sourceStyle =
-        typography.copy(fontSize = metrics.first, lineHeight = metrics.second, color = MaterialTheme.colorScheme.onSurface)
+        typography.copy(
+            fontSize = metrics.first,
+            lineHeight = metrics.second,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     val art = effect?.let { EmojiShortcodes.art(it.emoji, LocalCustomEmoji.current, emptyMap()) }
     // Artwork draws its painter, so only text glyphs are measured, once per effect rather than per recomposition.
     val layout =
