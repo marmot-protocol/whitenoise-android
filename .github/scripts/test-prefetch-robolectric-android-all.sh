@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Exercises scripts/prefetch-robolectric-android-all.sh against a local file:// repository.
+# Exercises cache, integrity, deadlines and rate-limit fallback with local repositories.
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -78,6 +78,7 @@ printf 'partial must never be admitted\n' >"$output"
 if [[ "$PREFETCH_MODE" == cumulative && "$url" == "$PREFETCH_GOOD_URL" ]]; then
   sleep 1
   cp -- "$PREFETCH_GOOD_JAR" "$output"
+  printf 200
   exit 0
 fi
 if [[ "$PREFETCH_MODE" == stall || "$PREFETCH_MODE" == cumulative ]]; then
@@ -152,5 +153,153 @@ if run_fake "$FIXTURE/two.pins" "$FIXTURE/fail-m2" >/dev/null 2>&1; then
 fi
 [[ "$(wc -l <"$PREFETCH_CALLS")" -eq 1 ]] || fail 'failure escaped the exclusive source or advanced jars'
 [[ -z "$(find "$FIXTURE/fail-m2" -type f)" ]] || fail 'failed partial was retained'
+
+# Real curl receives HTTP 429 and a long Retry-After from a loopback server.
+python3 - "$SCRIPT" "$FIXTURE" <<'HTTP_REGRESSION'
+import hashlib
+import http.server
+import json
+import os
+from pathlib import Path
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+
+script = Path(sys.argv[1]).resolve()
+artifact = b"synthetic Android runtime fixture\n"
+digest = hashlib.sha512(artifact).hexdigest()
+events = []
+mode = ["rate_limit"]
+
+
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        route = self.path.split("/")[1]
+        events.append(route)
+        if route == "primary" and mode[0] != "corrupt_primary":
+            self.send_response(429)
+            self.send_header("Retry-After", "3600")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        if route not in ("primary", "mirror"):
+            self.send_error(400)
+            return
+        body = artifact
+        if mode[0] == "corrupt_primary" or mode[0] == "corrupt_mirror":
+            body = b"not the pinned artifact\n"
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
+server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+thread = threading.Thread(target=server.serve_forever, daemon=True)
+thread.start()
+results = []
+try:
+    with tempfile.TemporaryDirectory(prefix="prefetch-http-", dir=sys.argv[2]) as tmp:
+        root = Path(tmp)
+        binary = root / "bin"
+        binary.mkdir()
+        real_curl = shutil.which("curl")
+        assert real_curl
+        wrapper = binary / "curl"
+        wrapper.write_text(
+            "#!" + sys.executable + "\n"
+            "import os,sys\n"
+            "args=sys.argv[1:]\n"
+            "url=args[-1]\n"
+            "routes={'https://repo.maven.apache.org/maven2/':'primary/',"
+            "'https://maven-central.storage-download.googleapis.com/maven2/':'mirror/'}\n"
+            "for prefix,route in routes.items():\n"
+            " if url.startswith(prefix):\n"
+            "  args[-1]='http://127.0.0.1:' + os.environ['PREFETCH_HTTP_PORT'] + '/' + route + url[len(prefix):]\n"
+            "  break\n"
+            "else: raise SystemExit('unexpected endpoint; external requests forbidden')\n"
+            "real=os.environ['PREFETCH_REAL_CURL']\n"
+            "os.execv(real,[real,'--disable','--noproxy','*']+args)\n"
+        )
+        wrapper.chmod(0o755)
+        catalog = root / "libs.versions.toml"
+        catalog.write_text('robolectric = "4.17"\n')
+        pins = root / "runtime.pins"
+        versions = ("fixture-one", "fixture-two")
+        pins.write_text("robolectric=4.17\n" + "".join(v + " " + digest + "\n" for v in versions))
+
+        def run(name, custom=False):
+            events.clear()
+            cache = root / name
+            env = dict(os.environ)
+            env.pop("ROBOLECTRIC_ANDROID_ALL_REMOTE", None)
+            env.update(
+                PATH=str(binary) + os.pathsep + env["PATH"],
+                ROBOLECTRIC_ANDROID_ALL_PINS=str(pins),
+                ROBOLECTRIC_VERSION_CATALOG=str(catalog),
+                ROBOLECTRIC_LOCAL_REPOSITORY=str(cache),
+                ROBOLECTRIC_PREFETCH_BUDGET_SECONDS="4",
+                PREFETCH_REAL_CURL=real_curl,
+                PREFETCH_HTTP_PORT=str(server.server_port),
+            )
+            if custom:
+                env["ROBOLECTRIC_ANDROID_ALL_REMOTE"] = "https://repo.maven.apache.org/maven2"
+            started = time.monotonic()
+            process = subprocess.Popen(
+                ["bash", str(script)], env=env, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, start_new_session=True,
+            )
+            try:
+                stdout, stderr = process.communicate(timeout=8)
+            except subprocess.TimeoutExpired:
+                os.killpg(process.pid, signal.SIGKILL)
+                process.communicate()
+                raise AssertionError("consumer escaped the cumulative deadline")
+            elapsed = time.monotonic() - started
+            result = {
+                "case": name, "returncode": process.returncode,
+                "elapsed_seconds": elapsed, "routes": list(events),
+                "stderr": stderr.decode(),
+            }
+            results.append(result)
+            assert elapsed < 6, result
+            assert not list(cache.rglob(".prefetch.*")), result
+            return process.returncode, cache
+
+        code, cache = run("default-rate-limit")
+        assert code == 0, results[-1]
+        assert events == ["primary", "mirror", "mirror"], results[-1]
+        for version in versions:
+            jar = cache / "org/robolectric/android-all-instrumented" / version / (
+                "android-all-instrumented-" + version + ".jar"
+            )
+            assert jar.read_bytes() == artifact
+
+        code, cache = run("explicit-primary", custom=True)
+        assert code != 0 and events == ["primary"], results[-1]
+        assert not [p for p in cache.rglob("*") if p.is_file()]
+
+        mode[0] = "corrupt_primary"
+        code, cache = run("corrupt-primary")
+        assert code != 0 and events == ["primary"], results[-1]
+        assert not [p for p in cache.rglob("*") if p.is_file()]
+
+        mode[0] = "corrupt_mirror"
+        code, cache = run("corrupt-mirror")
+        assert code != 0 and events == ["primary", "mirror"], results[-1]
+        assert not [p for p in cache.rglob("*") if p.is_file()]
+finally:
+    server.shutdown()
+    server.server_close()
+    thread.join()
+    print(json.dumps({"script": str(script), "results": results}, indent=2))
+HTTP_REGRESSION
 
 printf 'test-prefetch-robolectric-android-all.sh passed\n'
