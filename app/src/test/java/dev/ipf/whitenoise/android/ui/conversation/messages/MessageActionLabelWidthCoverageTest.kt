@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
+import android.content.Context
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -13,6 +14,9 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -95,6 +99,46 @@ class MessageActionLabelWidthCoverageTest {
         }
     }
 
+    /**
+     * A wide window lets the action panel grow past the 560dp column, so 300% labels keep two one-line
+     * columns there, while the lifted message keeps the centred column it was placed in before.
+     */
+    @Test
+    @Config(qualifiers = "en-rUS-w900dp-h780dp-mdpi")
+    fun aWideWindowLetsTheActionsOutgrowTheColumn() {
+        render(fontScale = 3f)
+
+        val columnWidth = with(composeRule.density) { (560.dp - 32.dp).toPx() }
+        val cells = MAXIMUM_LABELS.map(::cell)
+        assertEquals("two columns at 300% on a wide window", cell("Keep on screen").top, cell("Edit").top, 0.5f)
+        assertTrue("the panel outgrows the column", cells.maxOf { it.right } - cells.minOf { it.left } > columnWidth)
+        MAXIMUM_LABELS.forEach { assertEquals("$it wrapped on a wide window", 1, labelLines(it)) }
+        val stack = composeRule.onNodeWithTag(MESSAGE_ACTION_MENU_TEST_TAG).boundsInRoot()
+        val preview = composeRule.onNodeWithTag("message-actions-preview").boundsInRoot()
+        // The tagged stack bounds are already inside its 16dp padding.
+        val columnStart = stack.left + (stack.width - columnWidth) / 2
+        assertEquals("the received preview keeps the column's start edge", columnStart, preview.left, 1f)
+        assertTrue("and the panel stays inside the window", cells.maxOf { it.right } <= stack.right)
+    }
+
+    /** An unavailable Forward keeps its whole reason in two lines instead of shrinking to its short label. */
+    @Test
+    fun anUnavailableActionKeepsItsWholeReason() {
+        render(fontScale = 1f, forwardBlockedReason = ForwardBlockedReason.PendingAttachment)
+
+        composeRule.onNodeWithText("Forward", substring = false).performScrollTo()
+        val reasonText =
+            ApplicationProvider.getApplicationContext<Context>().getString(R.string.forward_blocked_pending)
+        val layouts = mutableListOf<TextLayoutResult>()
+        composeRule
+            .onNodeWithText(reasonText, useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val reason = layouts.single()
+        assertTrue("the reason fits two lines: ${reason.lineCount}", reason.lineCount <= 2)
+        assertTrue("and is never ellipsized", (0 until reason.lineCount).none(reason::isLineEllipsized))
+        assertEquals("the label stays on one line", 1, labelLines("Forward"))
+    }
+
     /** Right-to-left mirrors the label-sized columns and keeps their one-line labels. */
     @Test
     fun rightToLeftMirrorsTheLabelSizedColumns() {
@@ -122,10 +166,14 @@ class MessageActionLabelWidthCoverageTest {
         return layouts.first { it.layoutInput.text.text == label }
     }
 
-    /** Composes the maximum received-text action set, Keep on screen first, through the production menu. */
+    /**
+     * Composes the maximum received-text action set, Keep on screen first, through the production menu.
+     * A [forwardBlockedReason] disables Forward with its explanation.
+     */
     private fun render(
         fontScale: Float,
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
+        forwardBlockedReason: ForwardBlockedReason? = null,
     ) {
         composeRule.setContent {
             WhiteNoiseTheme(fontScale = fontScale) {
@@ -138,7 +186,8 @@ class MessageActionLabelWidthCoverageTest {
                         canReact = false,
                         canDelete = true,
                         canEdit = true,
-                        canForward = true,
+                        canForward = forwardBlockedReason == null,
+                        forwardBlockedReason = forwardBlockedReason,
                         canSelect = true,
                         canCopyText = true,
                         canSpeak = true,

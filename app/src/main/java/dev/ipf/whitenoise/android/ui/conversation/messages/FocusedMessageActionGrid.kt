@@ -26,12 +26,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
-import kotlin.math.ceil
 
 private val FocusedActionCellHorizontalPadding = 12.dp
 private val FocusedActionIconSize = 24.dp
@@ -83,27 +85,60 @@ internal fun FocusedActionMenu(actions: List<FocusedMessageAction>) {
  * Each action's cell width with its whole label on one line, in the label's real typography.
  *
  * The density carries the app and system text scale, so a larger font asks for wider cells and drops the
- * grid to one column on its own, rather than at a fixed scale threshold.
+ * grid to one column on its own, rather than at a fixed scale threshold. A cell that explains why its
+ * action is unavailable is also wide enough for that reason to fit its two lines, so the explanation is
+ * never cut down to the width of a short label.
  */
 @Composable
 private fun rememberOneLineActionCellWidths(actions: List<FocusedMessageAction>): List<Dp> {
     val density = LocalDensity.current
     val textMeasurer = rememberTextMeasurer()
     val actionTextStyle = MaterialTheme.typography.titleMedium
-    return remember(actions.map { it.label }, actionTextStyle, density, textMeasurer) {
-        with(density) {
-            actions.map { action ->
-                val labelPx =
-                    textMeasurer
-                        .measure(AnnotatedString(action.label), style = actionTextStyle, maxLines = 1, softWrap = false)
-                        .size.width
-                // Rounded up with a little slack, so pixel rounding in the cell's padding and icon slot
-                // can never leave the label a fraction of a pixel short of its one line.
-                ceil(labelPx.toFloat()).toDp() + FocusedActionLabelSlack + FocusedActionCellChrome
-            }
+    val supportingTextStyle = MaterialTheme.typography.bodySmall
+    return remember(
+        actions.map { it.label to it.supportingLabel },
+        actionTextStyle,
+        supportingTextStyle,
+        density,
+        textMeasurer,
+    ) {
+        actions.map { action ->
+            val labelPx = textMeasurer.oneLineWidth(action.label, actionTextStyle)
+            val reasonPx =
+                action.supportingLabel?.let { textMeasurer.twoLineWidth(it, supportingTextStyle) } ?: 0
+            // Rounded up with a little slack, so pixel rounding in the cell's padding and icon slot
+            // can never leave the text a fraction of a pixel short of its lines.
+            with(density) { maxOf(labelPx, reasonPx).toDp() + FocusedActionLabelSlack + FocusedActionCellChrome }
         }
     }
 }
+
+/** The width [text] needs on one unwrapped line. */
+private fun TextMeasurer.oneLineWidth(
+    text: String,
+    style: TextStyle,
+): Int = measure(AnnotatedString(text), style = style, maxLines = 1, softWrap = false).size.width
+
+/**
+ * The narrowest width, from half the one-line width upward, at which [text] wraps onto at most two lines.
+ * Word breaks make the exact width uneven, so it widens in small steps until a real layout fits.
+ */
+private fun TextMeasurer.twoLineWidth(
+    text: String,
+    style: TextStyle,
+): Int {
+    val oneLine = oneLineWidth(text, style)
+    var width = (oneLine + 1) / 2
+    val step = (oneLine / TWO_LINE_WIDTH_STEPS).coerceAtLeast(1)
+    while (width < oneLine) {
+        val lines = measure(AnnotatedString(text), style = style, constraints = Constraints(maxWidth = width)).lineCount
+        if (lines <= 2) return width
+        width += step
+    }
+    return oneLine
+}
+
+private const val TWO_LINE_WIDTH_STEPS = 16
 
 /**
  * How tall a cell has to be for the type it holds.
