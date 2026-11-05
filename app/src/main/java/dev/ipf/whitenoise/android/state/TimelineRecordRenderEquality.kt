@@ -45,6 +45,7 @@ private fun timelineRecordContentEqual(
         a.deleted == b.deleted &&
         a.deletedByMessageIdHex == b.deletedByMessageIdHex &&
         a.invalidationStatus == b.invalidationStatus &&
+        a.recipientConfirmed == b.recipientConfirmed &&
         a.retentionSeconds == b.retentionSeconds &&
         a.retentionExpiresAt == b.retentionExpiresAt &&
         a.reactions == b.reactions

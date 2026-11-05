@@ -17,14 +17,13 @@ internal fun MediaAttachmentReferenceFfi.upgradeReceipt(): JSONObject =
         .put("mediaType", mediaType)
         .put("version", version.name)
         .put("sourceEpoch", sourceEpoch.toString())
+        .put("sourceEpochIdentity", sourceEpochIdentity ?: JSONObject.NULL)
         .put("dim", dim ?: JSONObject.NULL)
         .put("thumbhash", thumbhash ?: JSONObject.NULL)
 
-/** Reconstructs the baseline's saved upload reference, which a candidate must refuse as stale after the upgrade. */
+/** Restores the exact baseline upload, including the branch identity required to send it after an upgrade. */
 internal fun JSONObject.upgradeMediaReference(): MediaAttachmentReferenceFfi {
     val values = getJSONArray("locators")
-    // Named arguments compile against both the baseline and candidate bindings; the baseline
-    // result predates `sourceEpochIdentity`, so the candidate's default stands in for it.
     return MediaAttachmentReferenceFfi(
         locators =
             List(values.length()) { index ->
@@ -37,6 +36,7 @@ internal fun JSONObject.upgradeMediaReference(): MediaAttachmentReferenceFfi {
         mediaType = getString("mediaType"),
         version = EncryptedMediaVersionFfi.valueOf(getString("version")),
         sourceEpoch = getString("sourceEpoch").toULong(),
+        sourceEpochIdentity = if (isNull("sourceEpochIdentity")) null else getString("sourceEpochIdentity"),
         dim = if (isNull("dim")) null else getString("dim"),
         thumbhash = if (isNull("thumbhash")) null else getString("thumbhash"),
     )

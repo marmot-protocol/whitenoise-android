@@ -7,6 +7,22 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NotificationReplyWorkerCoverageTest {
+    /** Peer-confirmed replies must not be retried merely because no relay event id was recorded. */
+    @Test
+    fun peerConfirmedReplyIsCommittedWithoutSourceEvent() =
+        runTest {
+            val outcome =
+                notificationReplyCommitProbe(
+                    recoveryState = state(),
+                    nextAttemptBoundary = null,
+                    text = "same reply",
+                ) { _, _ ->
+                    page(record(11u, "confirmed", "sent", "same reply", sourceMessageIdHex = null).copy(recipientConfirmed = true))
+                }
+
+            assertEquals(NotificationReplyCommitProbe.Committed, outcome)
+        }
+
     @Test
     fun failedCardRestoreSucceedsOnceTheLifetimeExtendedCardAppears() =
         runTest {

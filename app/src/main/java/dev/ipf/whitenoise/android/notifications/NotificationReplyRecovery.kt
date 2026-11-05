@@ -31,6 +31,7 @@ internal data class NotificationReplyTimelineRecord(
     val sourceMessageIdHex: String?,
     val direction: String,
     val plaintext: String,
+    val recipientConfirmed: Boolean = false,
 )
 
 internal data class NotificationReplyTimelinePage(
@@ -68,6 +69,7 @@ internal fun notificationReplySendWindowReady(
     nowMillis: Long,
 ): Boolean = (nowMillis.coerceAtLeast(0L) / 1_000L).toULong() > boundary.timelineAt
 
+/** Uses native publication or peer-confirmed delivery to prevent duplicate notification replies after restart. */
 internal suspend fun notificationReplyCommitProbe(
     recoveryState: NotificationReplyRecoveryState,
     nextAttemptBoundary: NotificationReplyRecoveryBoundary?,
@@ -104,7 +106,7 @@ internal suspend fun notificationReplyCommitProbe(
                 record.direction.equals("sent", ignoreCase = true) &&
                 record.plaintext.trim() == body
             ) {
-                return if (record.sourceMessageIdHex == null) {
+                return if (record.sourceMessageIdHex == null && !record.recipientConfirmed) {
                     NotificationReplyCommitProbe.Indeterminate
                 } else {
                     NotificationReplyCommitProbe.Committed

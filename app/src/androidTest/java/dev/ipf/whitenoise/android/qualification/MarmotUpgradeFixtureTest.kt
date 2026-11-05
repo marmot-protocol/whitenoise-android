@@ -178,6 +178,7 @@ class MarmotUpgradeFixtureTest {
                 ),
             )
         val reference = pending.attachments.single().reference
+        assertEquals(reference, reference.upgradeReceipt().upgradeMediaReference())
         val value =
             JSONObject(receipt.readText())
                 .put("pendingReference", reference.upgradeReceipt())
@@ -286,55 +287,27 @@ class MarmotUpgradeFixtureTest {
         if (fileStoreBaseline()) verifyUpgradeAvatar(runtime, value)
     }
 
-    /**
-     * Requires MDK to refuse the baseline's saved reference as stale (mdk#2891), then uploads the same bytes
-     * again and returns the fresh reference, which must not reuse the refused ciphertext.
-     */
-    private suspend fun uploadAfterStaleRefusal(
+    /** Rejects deliberately stripped provenance while retaining the baseline's complete upload unchanged. */
+    private suspend fun retainedPendingReference(
         runtime: Marmot,
         account: String,
         group: String,
         value: JSONObject,
     ): MediaAttachmentReferenceFfi {
-        val stale = value.getJSONObject("pendingReference").upgradeMediaReference()
+        val reference = value.getJSONObject("pendingReference").upgradeMediaReference()
+        requireNotNull(reference.sourceEpochIdentity) { "Baseline upload must retain its branch identity" }
         val refused =
             try {
-                runtime.sendMediaReference(account, group, stale, "Promoted baseline pending upload")
+                runtime.sendMediaReference(account, group, reference.copy(sourceEpochIdentity = null), "Missing upload identity")
                 false
             } catch (_: MarmotKitException.MediaReferenceStaleEpoch) {
                 true
             }
-        assertTrue("A pre-upgrade reference without upload branch identity must be refused as stale", refused)
-        val blobPort = requireNotNull(InstrumentationRegistry.getArguments().getString("blobPort"))
-        val reference =
-            runtime
-                .uploadMedia(
-                    account,
-                    group,
-                    MediaUploadRequestFfi(
-                        listOf(
-                            MediaUploadAttachmentRequestFfi("pending.txt", "text/plain", payload(1), null, null),
-                        ),
-                        null,
-                        false,
-                        "http://127.0.0.1:$blobPort",
-                    ),
-                ).attachments
-                .single()
-                .reference
-        assertNotEquals(
-            "The fresh upload must not reuse the refused ciphertext",
-            stale.ciphertextSha256,
-            reference.ciphertextSha256,
-        )
+        assertTrue("An upload stripped of its branch identity must be refused as stale", refused)
         return reference
     }
 
-    /**
-     * Sends the baseline's pending bytes after the upgrade, then verifies their distinct retained plaintext.
-     * The receipt's reference predates MDK's upload branch identity (mdk#2891), so MDK must refuse it as
-     * stale; the same bytes are uploaded again and sent once, as the app's stale-upload recovery does.
-     */
+    /** Sends the baseline's original pending upload unchanged, then verifies its plaintext after another restart. */
     private suspend fun verifyPendingUpload(
         runtime: Marmot,
         receipt: File,
@@ -344,7 +317,7 @@ class MarmotUpgradeFixtureTest {
         val account = value.getString("sender")
         val group = value.getString("group")
         if (phase == "promote") {
-            val reference = uploadAfterStaleRefusal(runtime, account, group, value)
+            val reference = retainedPendingReference(runtime, account, group, value)
             val sent = runtime.sendMediaReference(account, group, reference, "Promoted baseline pending upload")
             value.put("pendingMessage", sent.messageIds.single())
             receipt.writeText(value.toString())

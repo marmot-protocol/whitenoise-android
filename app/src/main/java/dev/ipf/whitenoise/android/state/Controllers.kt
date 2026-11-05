@@ -5501,6 +5501,7 @@ private fun logStaleChatListUnreadRejected(
     )
 }
 
+/** Delivery changes can carry the peer reaction that confirms a previously failed send. */
 private fun TimelineUpdateTriggerFfi.recomputesReactions(): Boolean =
     when (this) {
         TimelineUpdateTriggerFfi.REACTION_ADDED,
@@ -5508,12 +5509,12 @@ private fun TimelineUpdateTriggerFfi.recomputesReactions(): Boolean =
         TimelineUpdateTriggerFfi.MESSAGE_DELETED,
         TimelineUpdateTriggerFfi.MESSAGE_EDITED_OR_REPROJECTED,
         TimelineUpdateTriggerFfi.SNAPSHOT_REFRESH,
+        TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED,
         -> true
         TimelineUpdateTriggerFfi.NEW_MESSAGE,
         TimelineUpdateTriggerFfi.REPLY_PREVIEW_CHANGED,
         TimelineUpdateTriggerFfi.AGENT_STREAM_STARTED,
         TimelineUpdateTriggerFfi.AGENT_STREAM_FINISHED,
-        TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED,
         TimelineUpdateTriggerFfi.RECEIPT_CHANGED,
         // Typed agent, group-system, and custom-event updates do not mutate
         // reaction tallies, so they fall in the false bucket — kept explicit
@@ -12966,6 +12967,7 @@ class ConversationController(
         }
     }
 
+    /** Installs a native row and hands off its optimistic bubble when admission or a peer receipt proves ownership. */
     private fun upsertProjectedRecord(
         record: TimelineMessageRecordFfi,
         reconcileOptimistic: Boolean = false,
@@ -12973,6 +12975,7 @@ class ConversationController(
         displayedProjectedStreamItemIds: Set<String> = emptySet(),
         preparedAction: AppMessageRecordFfi? = null,
     ): AppMessageRecordFfi {
+        val reconcilesSend = reconcileOptimistic || record.recipientConfirmed
         pendingTimelineRemovedMessageIds = pendingTimelineRemovedMessageIds - record.messageIdHex
         // Defensive guard against the Rust core re-emitting an identical
         // record (own-publish + own-relay-echo both fire
@@ -13015,7 +13018,7 @@ class ConversationController(
         val draftAction = preparedAction ?: TimelineProjector.toAppMessageRecord(record)
         val projectedIsMediaUpsert = draftAction.tags.any { it.values.firstOrNull() == "imeta" }
         val hasAcceptedPendingTextBridge =
-            reconcileOptimistic && record.messageIdHex in acceptedPendingTextOptimisticIds
+            reconcilesSend && record.messageIdHex in acceptedPendingTextOptimisticIds
         val acceptedPendingTextOptimisticId =
             if (hasAcceptedPendingTextBridge) {
                 acceptedPendingTextOptimisticIdForProjection(record.messageIdHex)
@@ -13023,9 +13026,9 @@ class ConversationController(
                 null
             }
         val acceptedPendingMediaOptimisticId =
-            acceptedPendingMediaOptimisticIdForProjection(record.messageIdHex).takeIf { reconcileOptimistic }
+            acceptedPendingMediaOptimisticIdForProjection(record.messageIdHex).takeIf { reconcilesSend }
         val acceptedPendingOptimisticId =
-            record.clientToken?.takeIf { reconcileOptimistic && "msg:$it" in optimisticMessages }
+            record.clientToken?.takeIf { reconcilesSend && "msg:$it" in optimisticMessages }
                 ?: acceptedPendingTextOptimisticId ?: acceptedPendingMediaOptimisticId
         val hasExactBridge =
             optimisticMessages.values.any { it.record.messageIdHex == record.messageIdHex } ||
@@ -13060,7 +13063,7 @@ class ConversationController(
             }
             return actionRecord
         }
-        val unownedLegacyRecord = record.clientToken == null && record.sourceMessageIdHex == null
+        val unownedLegacyRecord = record.clientToken == null && record.sourceMessageIdHex == null && !record.recipientConfirmed
         if (
             unownedLegacyRecord &&
             record.invalidationStatus == null &&
@@ -13084,16 +13087,23 @@ class ConversationController(
             actionRecord,
             displayedProjectedStreamItemIds,
         )
+        // A receipt can settle a retained failure, but cannot identify a new same-content pending send.
+        val legacyOptimisticMessages =
+            if (record.recipientConfirmed) {
+                optimisticMessages.values.filter { it.status == MessageStatus.Failed }
+            } else {
+                optimisticMessages.values
+            }
         val reconciledOptimisticId =
             acceptedPendingOptimisticId
                 ?: if (hasAcceptedPendingTextBridge || record.clientToken != null) {
                     null
                 } else {
                     optimisticMessageIdForProjection(
-                        optimisticMessages.values,
+                        legacyOptimisticMessages,
                         actionRecord,
-                        allowDelayedProjection = allowDelayedProjection,
-                    ).takeIf { reconcileOptimistic }
+                        allowDelayedProjection = allowDelayedProjection || record.recipientConfirmed,
+                    ).takeIf { reconcilesSend }
                 }
         acceptedPendingOptimisticId?.let { optimisticId ->
             appState.commitOptimisticSentPreview(
@@ -13494,7 +13504,7 @@ class ConversationController(
                 when {
                     streamId != null -> MessageStatus.Streaming
                     MessageProjector.isMine(actionRecord, conversationAccountIdHex) ->
-                        if (record.sourceMessageIdHex == null) {
+                        if (record.sourceMessageIdHex == null && !record.recipientConfirmed) {
                             MessageStatus.Pending
                         } else {
                             MessageStatus.Sent
