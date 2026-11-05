@@ -102,7 +102,7 @@ class WifiTest(unittest.TestCase):
             owner = WifiAssociation(commands)
             self.assertEqual(bytes.fromhex(owner.prepare()).decode(), value)
     def test_saved_format_security_conflict_and_duplicate_ids_fail_closed(self):
-        self.assertEqual(saved_networks(networks({1: ("saved space", "OPEN")})), {1: ("saved space", "OPEN")})
+        self.assertEqual(saved_networks(networks({1: ("saved space", "OPEN")})), {1: ("saved space", frozenset({"OPEN"}))})
         duplicate = networks({1: ("saved", "OPEN")}) + networks({1: ("saved", "OPEN")}).split("\n", 1)[1]
         with self.assertRaises(WifiSetupError): saved_networks(duplicate)
         owner = WifiAssociation(Commands({1: ("Fixture AP", "wpa2-psk")}))
@@ -110,7 +110,7 @@ class WifiTest(unittest.TestCase):
     def test_existing_open_ap_is_reusable_and_other_saved_networks_untouched(self):
         commands = Commands({1: ("Fixture AP", "OPEN"), 9: ("Other", "wpa2-psk")})
         owner = WifiAssociation(commands); owner.prepare(); owner.cleanup()
-        self.assertEqual(commands.networks, owner.before)
+        self.assertEqual(saved_networks(networks(commands.networks)), owner.before)
         self.assertFalse(any(c[2] == "forget-network" for c in commands.calls))
     def test_only_new_matching_config_is_removed_and_original_radio_restored(self):
         commands = Commands({9: ("Other", "wpa2-psk")}, enabled=False)
@@ -252,14 +252,14 @@ class SavedNetworkPrimaryFormatTests(unittest.TestCase):
         for name in ("short", "0123456789abcdef" * 4, "a space inside " * 3, " leading space"):
             with self.subTest(width=len(name)):
                 self.assertEqual(saved_networks(networks({7: (name.rstrip(), "OPEN")})),
-                                 {7: (name.rstrip(), "OPEN")})
+                                 {7: (name.rstrip(), frozenset({"OPEN"}))})
     def test_primary_security_names_with_spaces_hyphens_and_upgrades(self):
         for security in ("null", "unknown", "wpa2-psk", "wpa3 enterprise 192-bit", "passpoint r1/r2",
                          "open/owe^", "wpa2-psk/wpa3-sae^"):
             with self.subTest(security=security):
                 value = saved_networks(networks({7: (("saved space " * 4).rstrip(), security)}))
                 expected = "OPEN/OWE^" if security == "open/owe^" else security
-                self.assertEqual(value, {7: (("saved space " * 4).rstrip(), expected)})
+                self.assertEqual(value, {7: (("saved space " * 4).rstrip(), frozenset({expected}))})
     def test_malformed_padding_ids_and_controls_never_skip(self):
         good = networks({7: ("private-network", "OPEN")})
         for bad in (good.replace("7            ", "7 "), good.replace("OPEN", "OPEN!"), good.replace("OPEN", "opaque"), good.replace("OPEN", "future enterprise"),
@@ -328,5 +328,120 @@ class SavedNetworkBranchDiagnosticTests(unittest.TestCase):
         self.assertGreater(security["canonical_candidate_count"], 0)
         self.assertEqual(security["primary_candidate_count"], 0)
         self.assertFalse(security["id_duplicate"])
+
+
+class SavedNetworkAliasTests(unittest.TestCase):
+    def rows(self, values):
+        return "Network Id SSID Security type\n" + "".join(
+            "%-12d %-32s %-4s\n" % row for row in values)
+
+    def commands(self, values, enabled=False):
+        commands = Commands(enabled=enabled)
+        commands.rows = list(values)
+        original = commands.__call__
+        def shell(*args, timeout=None):
+            if args[2] == "list-networks":
+                commands.calls.append(args)
+                return self.rows(commands.rows) if commands.rows else "No networks\n"
+            if args[2] == "forget-network":
+                commands.calls.append(args)
+                key = int(args[3])
+                commands.rows = [row for row in commands.rows if row[0] != key]
+                return "Forget successful\n"
+            return original(*args, timeout=timeout)
+        return commands, shell
+
+    def test_primary_alias_rows_group_completely_in_either_order(self):
+        rows = [(7, "Fixture AP", "OPEN"), (7, "Fixture AP", "OWE^")]
+        expected = {7: ("Fixture AP", frozenset({"OPEN", "OWE^"}))}
+        self.assertEqual(saved_networks(self.rows(rows)), expected)
+        self.assertEqual(saved_networks(self.rows(list(reversed(rows)))), expected)
+        secured = [(8, "Other", "wpa2-psk"), (8, "Other", "wpa3-sae^")]
+        self.assertEqual(saved_networks(self.rows(secured))[8][1], frozenset({"wpa2-psk", "wpa3-sae^"}))
+
+    def test_same_id_other_ssid_and_identical_duplicate_remain_errors(self):
+        for rows in [[(7, "one", "OPEN"), (7, "other", "OWE^")],
+                     [(7, "one", "OPEN"), (7, "one", "OPEN")]]:
+            with self.subTest(rows=rows), self.assertRaises(WifiSetupError):
+                saved_networks(self.rows(rows))
+
+    def test_existing_alias_group_reused_without_forget_or_alias_loss(self):
+        rows = [(7, "Fixture AP", "OPEN"), (7, "Fixture AP", "OWE^"), (9, "Other", "wpa2-psk")]
+        commands, shell = self.commands(rows)
+        owner = WifiAssociation(shell); owner.prepare()
+        commands.rows.reverse()  # API ordering is not configuration identity.
+        owner.cleanup()
+        self.assertEqual(saved_networks(self.rows(commands.rows)), owner.before)
+        self.assertFalse(any(call[2] == "forget-network" for call in commands.calls))
+        self.assertFalse(commands.enabled)
+
+    def test_target_requires_explicit_open_and_every_alias_open_family(self):
+        for security in [("OWE^",), ("OWE",), ("OPEN", "OWE"), ("OPEN", "wpa2-psk")]:
+            commands, shell = self.commands([(7, "Fixture AP", value) for value in security])
+            owner = WifiAssociation(shell)
+            try:
+                with self.subTest(security=security), self.assertRaisesRegex(WifiSetupError, "saved_security_conflict"):
+                    owner.prepare()
+            finally:
+                owner.cleanup()
+            self.assertFalse(commands.enabled)
+            self.assertFalse(any(call[2] == "forget-network" for call in commands.calls))
+
+    def test_owned_alias_group_forgets_id_once_and_preserves_other_ids(self):
+        commands, shell = self.commands([(9, "Other", "wpa2-psk")])
+        owner = WifiAssociation(shell); owner.prepare()
+        commands.rows += [(10, "Fixture AP", "OPEN"), (10, "Fixture AP", "OWE^"), (11, "Unrelated", "OPEN")]
+        owner.cleanup()
+        self.assertEqual(sum(call[2] == "forget-network" for call in commands.calls), 1)
+        self.assertEqual(commands.rows, [(9, "Other", "wpa2-psk"), (11, "Unrelated", "OPEN")])
+        self.assertFalse(commands.enabled)
+
+    def test_new_matching_mixed_security_fails_closed_without_any_forget(self):
+        for aliases in [("OPEN", "wpa2-psk"), ("OWE",), ("OWE^",)]:
+            commands, shell = self.commands([])
+            owner = WifiAssociation(shell); owner.prepare()
+            commands.rows += [(10, "Fixture AP", security) for security in aliases]
+            with self.subTest(aliases=aliases), self.assertRaisesRegex(WifiSetupError, "owned_security_conflict"):
+                owner.cleanup()
+            self.assertFalse(any(call[2] == "forget-network" for call in commands.calls))
+            self.assertFalse(commands.enabled)
+
+    def test_unrelated_new_secured_alias_group_is_preserved(self):
+        commands, shell = self.commands([])
+        owner = WifiAssociation(shell); owner.prepare()
+        other = [(11, "Unrelated", "wpa2-psk"), (11, "Unrelated", "wpa3-sae^")]
+        commands.rows += other
+        owner.cleanup()
+        self.assertEqual(commands.rows, other)
+        self.assertFalse(any(call[2] == "forget-network" for call in commands.calls))
+        self.assertFalse(commands.enabled)
+
+    def test_prior_alias_removal_change_and_addition_are_cleanup_failures(self):
+        original = [(7, "Fixture AP", "OPEN"), (7, "Fixture AP", "OWE^")]
+        changes = [original[:1], [(7, "Fixture AP", "OPEN"), (7, "Fixture AP", "OWE")],
+                   original + [(7, "Fixture AP", "wpa2-psk")]]
+        for rows in changes:
+            commands, shell = self.commands(original)
+            owner = WifiAssociation(shell); owner.prepare(); commands.rows = rows
+            with self.subTest(rows=rows), self.assertRaisesRegex(WifiSetupError, "prior_config_changed"):
+                owner.cleanup()
+            self.assertFalse(commands.enabled)
+            self.assertFalse(any(call[2] == "forget-network" for call in commands.calls))
+
+    def test_partial_alias_disappearance_is_not_complete_id_cleanup(self):
+        clock = FakeClock(); commands, shell = self.commands([])
+        owner = WifiAssociation(shell, clock=clock, sleep=clock.sleep); owner.prepare()
+        commands.rows += [(10, "Fixture AP", "OPEN"), (10, "Fixture AP", "OWE^")]
+        def partial(*args, timeout=None):
+            if args[2] == "forget-network":
+                commands.calls.append(args); commands.rows = [(10, "Fixture AP", "OWE^")]
+                return "Forget successful\n"
+            return shell(*args, timeout=timeout)
+        owner.shell = partial
+        with self.assertRaisesRegex(WifiSetupError, "config_cleanup_deadline_expired"):
+            owner.cleanup()
+        self.assertEqual(sum(call[2] == "forget-network" for call in commands.calls), 1)
+        self.assertFalse(commands.enabled)
+        self.assertEqual(commands.rows, [(10, "Fixture AP", "OWE^")])
 
 if __name__ == "__main__": unittest.main()

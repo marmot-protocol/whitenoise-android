@@ -112,19 +112,29 @@ def saved_networks(output):
             same_ssid = same_security = False
             if network_id in result and len(candidates) == 1:
                 candidate_ssid, candidate_security = next(iter(candidates))
-                if candidate_security.lower() in ("open", "open/owe^"):
+                if candidate_security.lower() in ("open", "open/owe^", "owe^"):
                     candidate_security = candidate_security.upper()
                 same_ssid = candidate_ssid == result[network_id][0]
-                same_security = candidate_security == result[network_id][1]
+                same_security = candidate_security in result[network_id][1]
+            if same_ssid and not same_security:
+                # API31+ may expose one canonical row per security type for the same config ID.
+                result[network_id] = (candidate_ssid, result[network_id][1] | {candidate_security})
+                continue
             raise WifiSetupError("saved_network_row_unreadable", saved_row_structure(
                 lines, index, frame_valid=True, id_checked=True, duplicate=network_id in result,
                 canonical_count=len(canonical_candidates), primary_count=len(candidates), security_seen=security_seen,
                 same_ssid=same_ssid, same_security=same_security))
         ssid, security = candidates.pop()
-        if security.lower() in ("open", "open/owe^"):
+        if security.lower() in ("open", "open/owe^", "owe^"):
             security = security.upper()
-        result[network_id] = (ssid, security)
+        result[network_id] = (ssid, frozenset({security}))
     return result
+
+
+def open_aliases(securities):
+    """Every alias must be open-family, with an explicit OPEN representation retained."""
+    return (bool(securities & {"OPEN", "OPEN/OWE^"})
+            and securities <= {"OPEN", "OPEN/OWE^", "OWE^"})
 
 
 class WifiAssociation:
@@ -177,7 +187,7 @@ class WifiAssociation:
                 self.sleep(min(OBSERVATION_INTERVAL_SECONDS, self.remaining(self.deadline)))
         if any(value != ssid for value in self.connected):
             raise WifiSetupError("different_connection_present")
-        if any(name == ssid and security not in ("OPEN", "OPEN/OWE^") for name, security in self.before.values()):
+        if any(name == ssid and not open_aliases(securities) for name, securities in self.before.values()):
             raise WifiSetupError("saved_security_conflict")
         self.ssid = ssid
         return ssid.encode("ascii").hex()
@@ -188,7 +198,9 @@ class WifiAssociation:
         try:
             after = saved_networks(self.command(deadline, "list-networks"))
             owned = [(key, value) for key, value in after.items()
-                     if key not in self.before and value[0] == self.ssid and value[1] in ("OPEN", "OPEN/OWE^")]
+                     if key not in self.before and value[0] == self.ssid]
+            if any(not open_aliases(value[1]) for _, value in owned):
+                raise WifiSetupError("owned_security_conflict")
             for key, _ in owned:
                 result = self.command(deadline, "forget-network", str(key))
                 if "Forget successful" not in result:
