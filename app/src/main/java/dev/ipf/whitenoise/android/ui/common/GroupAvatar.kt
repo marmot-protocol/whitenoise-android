@@ -15,6 +15,7 @@ import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
 import dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.state.ChatListAvatarSeed
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -54,10 +55,12 @@ internal fun rememberGroupAvatarPresentation(
         ownedFallback
             ?.takeUnless { groupOwnsPicture }
             ?.takeIf(dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader::isPrivate)
-    val privateImage by key(appState, accountRef, privateSource, AvatarImageLoader.currentCacheLifetime()) {
+    val lifetime = AvatarImageLoader.currentCacheLifetime()
+    val privateImage by key(appState, accountRef, privateSource, lifetime) {
         rememberRecoverableAvatar(
             initialImage = privateSource?.let { PrivateContactAvatarLoader.peek(it, accountRef) },
             enabled = privateSource != null,
+            awaitCached = { PrivateContactAvatarLoader.awaitCached(checkNotNull(privateSource), accountRef, lifetime) },
         ) {
             PrivateContactAvatarLoader.load(checkNotNull(privateSource), accountRef)
         }
@@ -110,14 +113,17 @@ private fun rememberLegacyRemoteGroupAvatar(
     accountRef: String?,
     legacyUrl: String?,
 ): ImageBitmap? =
-    key(appState, appState.runtimeGeneration, accountRef, legacyUrl) {
-        val image by rememberRecoverableAvatar(
-            initialImage = AvatarImageLoader.peek(legacyUrl),
-            enabled = legacyUrl != null,
-        ) {
-            AvatarImageLoader.load(checkNotNull(legacyUrl), dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique)
+    AvatarImageLoader.currentCacheLifetime().let { lifetime ->
+        key(appState, appState.runtimeGeneration, accountRef, legacyUrl, lifetime) {
+            val image by rememberRecoverableAvatar(
+                initialImage = AvatarImageLoader.peek(legacyUrl),
+                enabled = legacyUrl != null,
+                awaitCached = { AvatarImageLoader.awaitCached(checkNotNull(legacyUrl), lifetime) },
+            ) {
+                AvatarImageLoader.load(checkNotNull(legacyUrl), MediaTrustDomain.Unique)
+            }
+            image
         }
-        image
     }
 
 /** A legacy viewer/thumbnail reads only the still-selected image of a current authoritative row. */

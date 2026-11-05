@@ -17,24 +17,27 @@ internal fun MediaAttachmentReferenceFfi.upgradeReceipt(): JSONObject =
         .put("mediaType", mediaType)
         .put("version", version.name)
         .put("sourceEpoch", sourceEpoch.toString())
+        .put("sourceEpochIdentity", sourceEpochIdentity ?: JSONObject.NULL)
         .put("dim", dim ?: JSONObject.NULL)
         .put("thumbhash", thumbhash ?: JSONObject.NULL)
 
-/** Reconstructs exactly the baseline's native result so MDK can promote its own pending upload after upgrade. */
+/** Restores the exact baseline upload, including the branch identity required to send it after an upgrade. */
 internal fun JSONObject.upgradeMediaReference(): MediaAttachmentReferenceFfi {
     val values = getJSONArray("locators")
     return MediaAttachmentReferenceFfi(
-        List(values.length()) { index ->
-            values.getJSONObject(index).let { MediaLocatorFfi(it.getString("kind"), it.getString("value")) }
-        },
-        getString("ciphertextSha256"),
-        getString("plaintextSha256"),
-        getString("nonceHex"),
-        getString("fileName"),
-        getString("mediaType"),
-        EncryptedMediaVersionFfi.valueOf(getString("version")),
-        getString("sourceEpoch").toULong(),
-        if (isNull("dim")) null else getString("dim"),
-        if (isNull("thumbhash")) null else getString("thumbhash"),
+        locators =
+            List(values.length()) { index ->
+                values.getJSONObject(index).let { MediaLocatorFfi(it.getString("kind"), it.getString("value")) }
+            },
+        ciphertextSha256 = getString("ciphertextSha256"),
+        plaintextSha256 = getString("plaintextSha256"),
+        nonceHex = getString("nonceHex"),
+        fileName = getString("fileName"),
+        mediaType = getString("mediaType"),
+        version = EncryptedMediaVersionFfi.valueOf(getString("version")),
+        sourceEpoch = getString("sourceEpoch").toULong(),
+        sourceEpochIdentity = if (isNull("sourceEpochIdentity")) null else getString("sourceEpochIdentity"),
+        dim = if (isNull("dim")) null else getString("dim"),
+        thumbhash = if (isNull("thumbhash")) null else getString("thumbhash"),
     )
 }

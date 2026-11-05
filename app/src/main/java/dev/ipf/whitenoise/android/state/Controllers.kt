@@ -1975,7 +1975,10 @@ class ChatsController private constructor(
                             chatListWindows === chatListStream,
                     )
                     if (!isActiveBindEpoch(epoch)) break
-                    chatListStream.publishIfCurrent(initialFrame, ::replacePresentedChatRows)
+                    chatListStream.publishIfCurrent(initialFrame) { rows ->
+                        replacePresentedChatRows(rows)
+                        stagedChatListFrame = ChatListFrameMark(chatListStream, initialFrame.revision)
+                    }
                     appState.schedulePendingLocalGroupDeleteCleanup()
                     appState.recordAccountSwitchLocalRowsReady(accountRef, chatRows.size)
                     val initialGroups =
@@ -3172,6 +3175,7 @@ class ChatsController private constructor(
             else -> {
                 windows.publishIfCurrent(frame) { rows ->
                     replacePresentedChatRows(rows)
+                    stagedChatListFrame = ChatListFrameMark(windows, frame.revision)
                     scheduleRecompute()
                 }
                 !windows.closed
@@ -4841,6 +4845,51 @@ class ChatsController private constructor(
     /** Keeps folded native updates synchronous while coalescing only their visible publication. */
     private fun scheduleRecompute() = presentationLifetime.schedule()
 
+    /** The window frame whose rows wait for the next visible projection. */
+    @Volatile private var stagedChatListFrame: ChatListFrameMark? = null
+
+    /** The window frame whose rows [items] last published; snapshot state, so a pin follow can wait on it. */
+    private var presentedChatListFrame by mutableStateOf<ChatListFrameMark?>(null)
+
+    /**
+     * Returns [view] to its top and marks the frame a caller should wait for with [chatListFramePresented]: the
+     * one holding the restored head, or, when the command installed nothing itself (a newer frame from the
+     * receive loop already won, or MDK answered stale), the live set's current frame, which may still sit in
+     * the projection debounce. Null only when no live window set remains to wait on.
+     */
+    internal suspend fun returnChatListToTopFrame(view: ChatListViewFfi): ChatListFrameMark? {
+        val windows = chatListWindows
+        val account = accountRef
+        return when {
+            windows == null || account == null -> null
+            windows.returnToTop(view) == null -> windows.currentFrameMarkIfLive()
+            else ->
+                ChatListFrameMark(windows, windows.frame().revision)
+                    .takeIf { applyChatListWindowRows(account, windows) }
+        }
+    }
+
+    /** This set's current frame while it is still open and still the controller's window set, else null. */
+    private fun ChatListWindowSet.currentFrameMarkIfLive(): ChatListFrameMark? =
+        takeIf { !closed && chatListWindows === it }?.let { ChatListFrameMark(it, it.frame().revision) }
+
+    /**
+     * Whether [items] now shows [mark]'s frame or a newer one from the same window set. A replaced or
+     * closed window set also counts, since that frame will never be shown and the caller must not wait on it.
+     */
+    internal fun chatListFramePresented(mark: ChatListFrameMark): Boolean {
+        val presented = presentedChatListFrame
+        if (chatListWindows !== mark.windows) return true
+        return presented != null && presented.windows === mark.windows && presented.revision >= mark.revision
+    }
+
+    /** Whether [items] shows a frame newer than [mark] from its window set, or that set was replaced or closed. */
+    internal fun chatListFrameSuperseded(mark: ChatListFrameMark): Boolean {
+        val presented = presentedChatListFrame
+        if (chatListWindows !== mark.windows) return true
+        return presented != null && presented.windows === mark.windows && presented.revision > mark.revision
+    }
+
     /**
      * Dispose every reference this controller owns. The chat-list screen calls
      * this once when it disposes the controller, which happens on every account
@@ -4955,6 +5004,7 @@ class ChatsController private constructor(
         val avatarWarmTargets = visible.take(CHAT_LIST_AVATAR_WARM_ROWS)
         items = visible
         archivedItems = archived
+        presentedChatListFrame = stagedChatListFrame
         val recoveryGeneration = pendingRecoveryProjectionGeneration.consume()
         if (recoveryGeneration > 0L) {
             if (
@@ -5451,6 +5501,7 @@ private fun logStaleChatListUnreadRejected(
     )
 }
 
+/** Delivery changes can carry the peer reaction that confirms a previously failed send. */
 private fun TimelineUpdateTriggerFfi.recomputesReactions(): Boolean =
     when (this) {
         TimelineUpdateTriggerFfi.REACTION_ADDED,
@@ -5458,12 +5509,12 @@ private fun TimelineUpdateTriggerFfi.recomputesReactions(): Boolean =
         TimelineUpdateTriggerFfi.MESSAGE_DELETED,
         TimelineUpdateTriggerFfi.MESSAGE_EDITED_OR_REPROJECTED,
         TimelineUpdateTriggerFfi.SNAPSHOT_REFRESH,
+        TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED,
         -> true
         TimelineUpdateTriggerFfi.NEW_MESSAGE,
         TimelineUpdateTriggerFfi.REPLY_PREVIEW_CHANGED,
         TimelineUpdateTriggerFfi.AGENT_STREAM_STARTED,
         TimelineUpdateTriggerFfi.AGENT_STREAM_FINISHED,
-        TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED,
         TimelineUpdateTriggerFfi.RECEIPT_CHANGED,
         // Typed agent, group-system, and custom-event updates do not mutate
         // reaction tallies, so they fall in the false bucket — kept explicit
@@ -8663,9 +8714,6 @@ class ConversationController(
                                         )
                                     }
                                 }.also { retained.uploadedReferences = it }
-                                // A publish-only retry reuses these references, so large snapshots can go now
-                                // instead of waiting, possibly offline for hours, for the send to settle.
-                                .also { retained.releaseStagedSources(appState::closeStagedUploadSourceOffMain) }
                         }
                 // Stop before publication after a discard; an unreferenced Blossom blob is inert.
                 if (discardedDuringRetry.remove(key)) {
@@ -8704,6 +8752,9 @@ class ConversationController(
                                     accepted
                                 }.also { diagnostics.finishMediaPublish(tempId, startedAtMs) }
                         }
+                // Once MDK has accepted the send, no retry uploads again, so large snapshots can go now instead of
+                // waiting, possibly offline for hours, for it to settle. Until then a stale-epoch refusal needs them.
+                retained.releaseStagedSources(appState::closeStagedUploadSourceOffMain)
                 completeDurableAcceptance(key)
                 if (retained.replyTarget != null && replySelectionVersion == retained.replyVersion) replyingTo = null
                 sendHostAttempt.success()
@@ -8981,6 +9032,9 @@ class ConversationController(
                     if (BuildConfig.DEBUG) Log.w("DMConversation", "post-acceptance media settlement failed", throwable)
                     return
                 }
+                // MDK refuses references whose upload epoch or branch is no longer current (mdk#2891), and
+                // reusing them would fail every Retry the same way, so the next attempt uploads again.
+                if (isStaleMediaReferenceEpoch(throwable)) retained.uploadedReferences = null
                 // A failed bubble offers Retry, not the bytes of the attempt that failed.
                 retained.clearTransferProgress()
                 optimisticMessages[key] =
@@ -12913,6 +12967,7 @@ class ConversationController(
         }
     }
 
+    /** Installs a native row; peer receipts reconcile only exact send ownership, never same-content legacy guesses. */
     private fun upsertProjectedRecord(
         record: TimelineMessageRecordFfi,
         reconcileOptimistic: Boolean = false,
@@ -12920,6 +12975,7 @@ class ConversationController(
         displayedProjectedStreamItemIds: Set<String> = emptySet(),
         preparedAction: AppMessageRecordFfi? = null,
     ): AppMessageRecordFfi {
+        val reconcilesSend = reconcileOptimistic || record.recipientConfirmed
         pendingTimelineRemovedMessageIds = pendingTimelineRemovedMessageIds - record.messageIdHex
         // Defensive guard against the Rust core re-emitting an identical
         // record (own-publish + own-relay-echo both fire
@@ -12962,7 +13018,7 @@ class ConversationController(
         val draftAction = preparedAction ?: TimelineProjector.toAppMessageRecord(record)
         val projectedIsMediaUpsert = draftAction.tags.any { it.values.firstOrNull() == "imeta" }
         val hasAcceptedPendingTextBridge =
-            reconcileOptimistic && record.messageIdHex in acceptedPendingTextOptimisticIds
+            reconcilesSend && record.messageIdHex in acceptedPendingTextOptimisticIds
         val acceptedPendingTextOptimisticId =
             if (hasAcceptedPendingTextBridge) {
                 acceptedPendingTextOptimisticIdForProjection(record.messageIdHex)
@@ -12970,9 +13026,9 @@ class ConversationController(
                 null
             }
         val acceptedPendingMediaOptimisticId =
-            acceptedPendingMediaOptimisticIdForProjection(record.messageIdHex).takeIf { reconcileOptimistic }
+            acceptedPendingMediaOptimisticIdForProjection(record.messageIdHex).takeIf { reconcilesSend }
         val acceptedPendingOptimisticId =
-            record.clientToken?.takeIf { reconcileOptimistic && "msg:$it" in optimisticMessages }
+            record.clientToken?.takeIf { reconcilesSend && "msg:$it" in optimisticMessages }
                 ?: acceptedPendingTextOptimisticId ?: acceptedPendingMediaOptimisticId
         val hasExactBridge =
             optimisticMessages.values.any { it.record.messageIdHex == record.messageIdHex } ||
@@ -13007,7 +13063,8 @@ class ConversationController(
             }
             return actionRecord
         }
-        val unownedLegacyRecord = record.clientToken == null && record.sourceMessageIdHex == null
+        val unownedLegacyRecord =
+            record.clientToken == null && record.sourceMessageIdHex == null && !record.recipientConfirmed
         if (
             unownedLegacyRecord &&
             record.invalidationStatus == null &&
@@ -13018,7 +13075,7 @@ class ConversationController(
             messageById[record.messageIdHex] = actionRecord
             return actionRecord
         }
-        if (record.invalidationStatus == null) {
+        if (record.invalidationStatus == null && !record.recipientConfirmed) {
             invalidatedProjectionIdsMatchingMessage(timelineRecords, actionRecord)
                 .filterNot { it == record.messageIdHex }
                 .forEach(::removeProjectedRecord)
@@ -13031,9 +13088,10 @@ class ConversationController(
             actionRecord,
             displayedProjectedStreamItemIds,
         )
+        // A peer receipt proves delivery of this native row, not ownership of a same-content optimistic send.
         val reconciledOptimisticId =
             acceptedPendingOptimisticId
-                ?: if (hasAcceptedPendingTextBridge || record.clientToken != null) {
+                ?: if (hasAcceptedPendingTextBridge || record.clientToken != null || record.recipientConfirmed) {
                     null
                 } else {
                     optimisticMessageIdForProjection(
@@ -13441,7 +13499,7 @@ class ConversationController(
                 when {
                     streamId != null -> MessageStatus.Streaming
                     MessageProjector.isMine(actionRecord, conversationAccountIdHex) ->
-                        if (record.sourceMessageIdHex == null) {
+                        if (record.sourceMessageIdHex == null && !record.recipientConfirmed) {
                             MessageStatus.Pending
                         } else {
                             MessageStatus.Sent

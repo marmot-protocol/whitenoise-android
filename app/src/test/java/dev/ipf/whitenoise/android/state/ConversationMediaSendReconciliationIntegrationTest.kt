@@ -693,20 +693,94 @@ class ConversationMediaSendReconciliationIntegrationTest {
             )
         }
 
-    /** One queued video whose retained bytes stand in for a real clip's poster source. */
-    private fun pendingVideo() =
-        PendingAttachment(
-            plaintextBytes = VIDEO_BYTES,
-            mediaType = VIDEO_MEDIA_TYPE,
-            fileName = "clip.mp4",
-            dim = "1280x720",
-        )
-
     /** A voice reply carries one exact target in its pending row and token-bound native draft admission. */
     @Test
     fun voiceReplyKeepsOriginalTargetWhenSelectionChangesDuringUpload() =
         assertDraftlessMediaUsesTokenBoundNativeAdmission("audio/mp4", "voice.m4a", replyTarget = "poll-original")
 }
+
+/** Covers which publish failures make a composer media Retry upload again (mdk#2891). */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36], qualifiers = "en")
+class ConversationMediaPublishRefusalRetryTest {
+    /** A stale-epoch refusal uploads the retained bytes again on Retry instead of resending the refused references. */
+    @Test
+    fun staleEpochRefusalUploadsAgainOnRetry() {
+        assertPublishRefusalRetry(
+            MarmotKitException.MediaReferenceStaleEpoch(sourceEpoch = 2uL, currentEpoch = 2uL),
+            expectedUploads = 2,
+        )
+    }
+
+    /** Any other publish failure keeps the uploaded references, so Retry publishes them without uploading again. */
+    @Test
+    fun otherPublishFailureReusesUploadedReferencesOnRetry() {
+        assertPublishRefusalRetry(IllegalStateException("relay unavailable"), expectedUploads = 1)
+    }
+
+    /** Fails the first publish with [refusal], retries once, and checks how many uploads the whole send took. */
+    private fun assertPublishRefusalRetry(
+        refusal: Throwable,
+        expectedUploads: Int,
+    ) = runTest {
+        val appState = mediaSendReconciliationAppState()
+        attachedChatsController(appState)
+        val reference = mediaReference()
+        var uploadAttempts = 0
+        var publishAttempts = 0
+        lateinit var controller: ConversationController
+        controller =
+            ConversationController(
+                appState = appState,
+                initialGroup = group(),
+                initialMemberSnapshot = memberSnapshot(),
+                groupRosterReader = { _, _ -> authoritativeRoster() },
+                mediaUploader = { _, _, _ ->
+                    uploadAttempts += 1
+                    uploadResult(reference)
+                },
+                mediaImetaTagsBuilder = { _, _, _ -> listOf(mediaImetaTag()) },
+                mediaPublisher = { _, _, _, _ ->
+                    publishAttempts += 1
+                    if (publishAttempts == 1) throw refusal
+                    val optimistic = controller.timeline.single()
+                    applyProjection(
+                        controller,
+                        projectedMediaMessage(
+                            recordedAt = optimistic.record.recordedAt,
+                            reference = reference,
+                        ),
+                    )
+                    acceptedPendingSummary()
+                },
+            )
+
+        controller.retryMembers()
+        controller.sendAttachments(attachments = listOf(pendingVideo()), caption = null)
+
+        val failedMessage = controller.timeline.single()
+        assertEquals(MessageStatus.Failed, failedMessage.status)
+        controller.retryFailedSend(failedMessage)
+
+        assertEquals(2, publishAttempts)
+        assertEquals(expectedUploads, uploadAttempts)
+        assertEquals(
+            CONFIRMED_MESSAGE_ID,
+            controller.timeline
+                .single()
+                .record.messageIdHex,
+        )
+    }
+}
+
+/** One queued video whose retained bytes stand in for a real clip's poster source. */
+private fun pendingVideo() =
+    PendingAttachment(
+        plaintextBytes = VIDEO_BYTES,
+        mediaType = VIDEO_MEDIA_TYPE,
+        fileName = "clip.mp4",
+        dim = "1280x720",
+    )
 
 /** Covers native echo ordering while host-only thumbnail decoding suspends. */
 @RunWith(RobolectricTestRunner::class)
@@ -1016,6 +1090,8 @@ private fun projectedMediaMessage(
     retentionExpiresAt = null,
     sticker = null,
     importedFrom = null,
+    recipientConfirmed = false,
+    historyImportProvenance = null,
 )
 
 /** Builds a single account owner with process-local drafts and no real relay connection. */

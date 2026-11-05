@@ -1,0 +1,12 @@
+# Robolectric's runtime Android jars, one per SDK the unit tests run on, with the
+# SHA-512 that Maven Central publishes for each. Robolectric downloads these inside
+# the test JVMs; scripts/prefetch-robolectric-android-all.sh fetches them first.
+# Update this list with every Robolectric bump: versions come from that release's
+# DefaultSdkProvider, hashes from the sibling .sha512 files on Maven Central.
+robolectric=4.17
+11-robolectric-6757853-i7 686c3d5faf7772795fc28f356baf9a92dcd89dedc2f7a16720ce4eb8d7b5ee5932500c623c3028355cc13a14c855210bcba796180681a01b0a7f2a276eb5303d
+12-robolectric-7732740-i7 1fe2738ae44f06ec77ddfd61a04ab80d6d070a7692724d983855157065b13d31a2dc98363846d7f6178e287b0a445a71adf4f6661e8443b21b4682b433ca5399
+12.1-robolectric-8229987-i7 747d403cd1e80a898a9ffb917920ce094216312b3dabaa312410e100647102b4141d2fbd1efca32251308e713fd69dca72c0971f93f7d6f1247d19a13cbac4ef
+14-robolectric-10818077-i7 7cdc0b1306e7865f1acd25a363073149654caee5b8e278c5ae37ff4724185724eff39f0b0111800b521e640bb28698d9d2e655134a801569a0f07470e7b5f455
+15-robolectric-13954326-i7 5fc64ffccf4788154162686b3966ddd63abea8326542c465e2a7f0129fc92770d0e1e8ddcfabd7f1500e491ec02e3b4104b9e51b61fccd9cf08006c9dc02987c
+16-robolectric-13921718-i7 0576318b89abb0a1c9a760a61bb68ccd2d509b33164b8265d6b1fb587a4b7629e1e805b6c7f8fbefab94fc03c8db8100b1d4856a32728803c242d2677aa7ec76

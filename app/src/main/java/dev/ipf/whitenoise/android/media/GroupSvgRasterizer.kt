@@ -42,6 +42,10 @@ internal object GroupSvgRasterizer {
             }
         }
 
+    /**
+     * Renders policy-checked identity SVG bytes into a bounded PNG, recycling temporary pixels on success or
+     * failure.
+     */
     internal suspend fun rasterizeInDecoder(
         bytes: ByteArray,
         dispatcher: CoroutineDispatcher = Dispatchers.Default,
@@ -52,7 +56,7 @@ internal object GroupSvgRasterizer {
                 val xml = GroupSvgPolicy.validate(bytes)
                 // Defence in depth; the policy already refuses declarations before either parser runs.
                 SVG.setInternalEntitiesEnabled(false)
-                val svg = SVG.getFromString(xml)
+                val svg = xml.byteInputStream(Charsets.UTF_8).use { SVG.getFromInputStream(it) }
                 val viewBox = svg.documentViewBox
                 if (viewBox != null) {
                     require(

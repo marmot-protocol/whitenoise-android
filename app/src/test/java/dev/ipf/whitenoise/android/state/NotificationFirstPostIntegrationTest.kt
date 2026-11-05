@@ -771,6 +771,8 @@ class NotificationFirstPostIntegrationTest {
             retentionExpiresAt = null,
             sticker = null,
             importedFrom = null,
+            recipientConfirmed = false,
+            historyImportProvenance = null,
         )
 
     /** Creates one history record used by captionless-media fallback detection. */

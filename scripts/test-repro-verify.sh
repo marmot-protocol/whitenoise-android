@@ -59,6 +59,8 @@ if [[ -n "$jvm_report" ]]; then
     printf 'java.vendor=FakeVendor\n'
     printf 'java.version=21.0.0\n'
     printf 'java.runtime.version=21.0.0+0\n'
+    printf 'android.compileSdk=android-37.1\n'
+    printf 'android.buildTools=36.0.0\n'
   } >"$jvm_report"
 fi
 EOF
@@ -87,6 +89,42 @@ repro_verify_write_jvm_report_init_script "$fake_init"
 repro_verify_build "$fake_tree" deadbeefdeadbeefdeadbeefdeadbeefdeadbeef \
   "$fake_gradle_home" "$fake_jvm_report" "$fake_init" "$fake_expected_jvm_report"
 repro_verify_assert_build_jvm "$fake_jvm_report" "$fake_expected_jvm_report" tree1
+
+# The environment report fingerprints only the platform and build-tools the build named.
+mkdir -p "$fake_tree/gradle/wrapper" "$fake_sdk/platforms/android-37.1" \
+  "$fake_sdk/platforms/android-37.2" "$fake_sdk/build-tools/36.0.0"
+touch "$fake_tree/gradle/wrapper/gradle-wrapper.jar" "$fake_tree/gradle/wrapper/gradle-wrapper.properties"
+for sdk_file in platforms/android-37.1/source.properties platforms/android-37.1/android.jar \
+  platforms/android-37.2/source.properties platforms/android-37.2/android.jar \
+  build-tools/36.0.0/source.properties; do
+  printf '%s\n' "$sdk_file" >"$fake_sdk/$sdk_file"
+done
+fake_evidence="$FIXTURE_DIR/fake-evidence"
+repro_verify_record_build_environment "$fake_evidence" deadbeef "$fake_expected_jvm_report" \
+  "$fake_jvm_report" "" "$fake_tree"
+for used in platforms/android-37.1/source.properties platforms/android-37.1/android.jar \
+  build-tools/36.0.0/source.properties; do
+  grep -Fq "  $fake_sdk/$used" "$fake_evidence/repro-build-environment.txt" || {
+    echo "error: environment report did not fingerprint $used" >&2
+    exit 1
+  }
+done
+if grep -Fq android-37.2 "$fake_evidence/repro-build-environment.txt"; then
+  echo 'error: environment report fingerprinted a platform the build did not use' >&2
+  exit 1
+fi
+grep -Ev '^android\.' "$fake_jvm_report" >"$fake_work/unnamed-sdk.properties"
+if repro_verify_record_build_environment "$FIXTURE_DIR/unnamed-evidence" deadbeef \
+  "$fake_expected_jvm_report" "$fake_work/unnamed-sdk.properties" "" "$fake_tree" 2>/dev/null; then
+  echo 'error: environment report accepted a build that named no Android SDK packages' >&2
+  exit 1
+fi
+rm "$fake_sdk/build-tools/36.0.0/source.properties"
+if repro_verify_record_build_environment "$FIXTURE_DIR/missing-sdk-evidence" deadbeef \
+  "$fake_expected_jvm_report" "$fake_jvm_report" "" "$fake_tree" 2>/dev/null; then
+  echo 'error: environment report accepted a missing build-tools package' >&2
+  exit 1
+fi
 unset WHITENOISE_PRODUCTION_KEYSTORE_PATH WHITENOISE_OTLP_AUTH_TOKEN
 unset WHITENOISE_AUDIT_OTLP_AUTH_TOKEN JAVA_TOOL_OPTIONS
 

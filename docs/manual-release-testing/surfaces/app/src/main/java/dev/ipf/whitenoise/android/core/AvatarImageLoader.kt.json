@@ -20,6 +20,14 @@
         "test_ids": [
           "MED-031"
         ]
+      },
+      {
+        "surface": "Mounted placeholders adopt same-key cached pixels",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/core/AvatarImageLoader.kt",
+        "anchor": "internal suspend fun awaitCached(",
+        "test_ids": [
+          "INT-011"
+        ]
       }
     ]
   },

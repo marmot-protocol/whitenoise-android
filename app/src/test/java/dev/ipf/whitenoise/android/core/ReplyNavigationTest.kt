@@ -355,5 +355,7 @@ class ReplyNavigationTest {
         retentionExpiresAt = null,
         sticker = null,
         importedFrom = null,
+        recipientConfirmed = false,
+        historyImportProvenance = null,
     )
 }

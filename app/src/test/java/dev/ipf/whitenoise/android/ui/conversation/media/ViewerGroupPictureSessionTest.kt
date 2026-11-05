@@ -211,5 +211,6 @@ class ViewerGroupPictureSessionTest {
             1uL,
             null,
             null,
+            null,
         )
 }

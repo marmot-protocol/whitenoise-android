@@ -154,6 +154,7 @@ class AnimationSessionTerminationTest {
                 AnimationAdmission.Lease::class.java,
                 kotlin.jvm.functions.Function0::class.java,
                 kotlin.jvm.functions.Function2::class.java,
+                ViewerAnimationOutput::class.java,
             ).apply { isAccessible = true }
             .newInstance(
                 ApplicationProvider.getApplicationContext<Context>(),
@@ -163,6 +164,7 @@ class AnimationSessionTerminationTest {
                 { signal: java.util.concurrent.CountDownLatch, remaining: Long ->
                     signal.await(remaining, java.util.concurrent.TimeUnit.NANOSECONDS)
                 },
+                null,
             )
 
     /** Reflectively reads the session's private field [name]. */

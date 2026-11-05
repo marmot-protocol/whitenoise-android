@@ -405,8 +405,31 @@ class ConversationDictationPersistentControlTest {
         render(fixture)
 
         val context = ApplicationProvider.getApplicationContext<Context>()
+        composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed().assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.StateDescription,
+                context.getString(R.string.dictation_provider_unavailable),
+            ),
+        )
         composeRule.onNodeWithText(context.getString(R.string.dictation_provider_unavailable)).assertIsDisplayed()
         composeRule.onAllNodesWithText(context.getString(R.string.dictation_network_error)).assertCountEquals(0)
+        composeRule.onNodeWithContentDescription("Open the speech service").assertIsDisplayed()
+    }
+
+    /** The embedded shell hides its retained label while the visible capsule keeps a text target. */
+    @Test
+    fun embeddedFailureDoesNotExposeItsHiddenRecoveryLabel() {
+        val fixture = fixture(TextFieldValue(""))
+        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+        fixture.platform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+        render(fixture, embedded = true)
+
+        val status =
+            ApplicationProvider.getApplicationContext<Context>().getString(R.string.dictation_provider_unavailable)
+        composeRule.onAllNodesWithText(status, useUnmergedTree = true).assertCountEquals(0)
+        composeRule.onNodeWithTag("composer-dictation-shell-control").assert(
+            SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, status),
+        )
         composeRule.onNodeWithContentDescription("Open the speech service").assertIsDisplayed()
     }
 
@@ -690,6 +713,7 @@ private fun ConversationDictationPersistentControlTest.render(
     displayedState: ConversationDictationState? = null,
     darkTheme: Boolean? = null,
     amoled: Boolean = false,
+    embedded: Boolean = false,
 ) {
     composeRule.setContent {
         val density = LocalDensity.current
@@ -705,6 +729,7 @@ private fun ConversationDictationPersistentControlTest.render(
                     ConversationDictationPersistentControl(
                         state = displayedState ?: fixture.controller.state,
                         controller = fixture.controller,
+                        embedded = embedded,
                     )
                 }
             }

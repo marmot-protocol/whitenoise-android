@@ -318,6 +318,8 @@ class TimelineFullPageRefreshRaceTest {
             retentionExpiresAt = null,
             sticker = null,
             importedFrom = null,
+            recipientConfirmed = false,
+            historyImportProvenance = null,
         )
 
     private fun emptyMarkdown(): MarkdownDocumentFfi =

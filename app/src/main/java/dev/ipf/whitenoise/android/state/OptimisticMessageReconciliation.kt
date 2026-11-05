@@ -126,6 +126,7 @@ internal fun invalidatedProjectionIdsMatchingMessage(
                 )
         }.map { it.messageIdHex }
 
+/** Finds only unresolved local sends; peer-confirmed history must remain visible. */
 internal fun unpublishedProjectionIdsMatchingMessage(
     timelineRecords: Map<String, TimelineMessageRecordFfi>,
     message: AppMessageRecordFfi,
@@ -136,6 +137,7 @@ internal fun unpublishedProjectionIdsMatchingMessage(
             !projected.deleted &&
                 projected.invalidationStatus == null &&
                 projected.sourceMessageIdHex == null &&
+                !projected.recipientConfirmed &&
                 messagesHaveSameRenderableSendShape(
                     left = TimelineProjector.toAppMessageRecord(projected),
                     right = message,
@@ -185,7 +187,9 @@ internal fun committedButUnpublishedProjectionForOptimistic(
 ): TimelineMessageRecordFfi? {
     val optimisticIsMediaPending = optimistic.tags.any { it.values.firstOrNull() == "_media_pending" }
     return timelineRecords.values.firstOrNull { projected ->
-        if (projected.deleted || projected.sourceMessageIdHex != null) return@firstOrNull false
+        if (projected.deleted || projected.sourceMessageIdHex != null || projected.recipientConfirmed) {
+            return@firstOrNull false
+        }
         if (projected.direction != "sent") return@firstOrNull false
         val projectedAction = TimelineProjector.toAppMessageRecord(projected)
         if (!MessageProjector.isMine(projectedAction, activeAccountIdHex)) return@firstOrNull false

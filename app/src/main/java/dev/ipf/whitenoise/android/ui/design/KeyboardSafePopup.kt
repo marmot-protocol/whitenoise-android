@@ -89,20 +89,34 @@ internal object BottomAnchoredPopupPositionProvider : PopupPositionProvider {
     }
 }
 
+/**
+ * Registers [callback] at [priority] and returns its unregistration, letting a host route the overlay's
+ * Back callback through its own seam instead of the view's [OnBackInvokedDispatcher].
+ */
+internal typealias KeyboardSafePopupBackRegistration = (priority: Int, callback: OnBackInvokedCallback) -> () -> Unit
+
+/**
+ * Shows [content] in a non-focusable popup above a full-window scrim that consumes outside taps as a
+ * pure dismissal. [modifier] sizes the zero-content anchor the position provider receives, and
+ * [backRegistration] replaces the platform dispatcher as the single Back owner on Android 13+.
+ */
 @Composable
 internal fun KeyboardSafePopup(
     expanded: Boolean,
     onDismissRequest: () -> Unit,
     popupPositionProvider: PopupPositionProvider,
+    modifier: Modifier = Modifier,
     scrimModifier: Modifier = Modifier,
+    backRegistration: KeyboardSafePopupBackRegistration? = null,
     content: @Composable () -> Unit,
 ) {
     val currentOnDismissRequest by rememberUpdatedState(onDismissRequest)
-    Box {
+    Box(modifier) {
         if (!expanded) return@Box
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             KeyboardSafePopupPlatformBackHandler(
                 priority = OnBackInvokedDispatcher.PRIORITY_OVERLAY,
+                backRegistration = backRegistration,
                 onBack = { currentOnDismissRequest() },
             )
         } else {
@@ -133,22 +147,32 @@ internal fun KeyboardSafePopup(
     }
 }
 
+/** Registers one overlay Back callback — through [backRegistration] when given, else the view's dispatcher. */
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
 @Composable
 @Suppress("FunctionNaming")
 private fun KeyboardSafePopupPlatformBackHandler(
     priority: Int,
+    backRegistration: KeyboardSafePopupBackRegistration?,
     onBack: () -> Unit,
 ) {
     val currentOnBack by rememberUpdatedState(onBack)
     val backDispatcher = LocalView.current.findOnBackInvokedDispatcher()
-    DisposableEffect(backDispatcher, priority) {
-        if (backDispatcher == null) return@DisposableEffect onDispose {}
+    DisposableEffect(backDispatcher, backRegistration, priority) {
         val callback = OnBackInvokedCallback { currentOnBack() }
-        backDispatcher.registerOnBackInvokedCallback(priority, callback)
-        onDispose { backDispatcher.unregisterOnBackInvokedCallback(callback) }
+        val unregister =
+            when {
+                backRegistration != null -> backRegistration(priority, callback)
+                backDispatcher != null -> {
+                    backDispatcher.registerOnBackInvokedCallback(priority, callback)
+                    val unregisterCallback: () -> Unit = { backDispatcher.unregisterOnBackInvokedCallback(callback) }
+                    unregisterCallback
+                }
+                else -> null
+            }
+        onDispose { unregister?.invoke() }
     }
-    if (backDispatcher == null) {
+    if (backRegistration == null && backDispatcher == null) {
         BackHandler(enabled = true) { currentOnBack() }
     }
 }

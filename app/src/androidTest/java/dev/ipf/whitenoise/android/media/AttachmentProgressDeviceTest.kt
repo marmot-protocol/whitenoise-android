@@ -123,5 +123,6 @@ class AttachmentProgressDeviceTest {
             1u,
             null,
             null,
+            null,
         )
 }

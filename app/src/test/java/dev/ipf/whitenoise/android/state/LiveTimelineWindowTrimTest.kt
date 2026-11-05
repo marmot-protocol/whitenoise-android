@@ -140,6 +140,8 @@ class LiveTimelineWindowTrimTest {
         retentionExpiresAt = null,
         sticker = null,
         importedFrom = null,
+        recipientConfirmed = false,
+        historyImportProvenance = null,
     )
 
     /** Builds a received app message record with the given id and recorded timestamp. */

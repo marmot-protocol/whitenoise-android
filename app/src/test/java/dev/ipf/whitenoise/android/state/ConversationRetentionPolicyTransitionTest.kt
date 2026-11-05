@@ -173,6 +173,8 @@ class ConversationRetentionPolicyTransitionTest {
             retentionExpiresAt = retentionExpiresAt,
             sticker = null,
             importedFrom = null,
+            recipientConfirmed = false,
+            historyImportProvenance = null,
         )
 
     /** Supplies the minimum account-owned state required by the controller. */

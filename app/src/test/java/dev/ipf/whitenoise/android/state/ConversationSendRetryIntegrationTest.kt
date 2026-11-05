@@ -3922,6 +3922,8 @@ class ConversationSendRetryIntegrationTest {
         retentionExpiresAt = retentionExpiresAt,
         sticker = null,
         importedFrom = null,
+        recipientConfirmed = false,
+        historyImportProvenance = null,
     )
 
     /** Creates the density-independent manual-height record used by send lifecycle assertions. */

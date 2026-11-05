@@ -17,6 +17,7 @@ import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
+@Suppress("TooManyFunctions") // One codec protocol; vector inspection/rendering retain the same isolated transport.
 internal interface MediaDecodeTransport {
     fun decode(
         bytes: ByteArray,
@@ -32,6 +33,14 @@ internal interface MediaDecodeTransport {
     fun region(
         bytes: ByteArray,
         region: MediaImageRegion,
+        edge: Int,
+    ): Bitmap? = null
+
+    fun svgInspect(bytes: ByteArray): ImageInspection? = null
+
+    fun svgRegion(
+        bytes: ByteArray,
+        region: ViewerSvgRegion,
         edge: Int,
     ): Bitmap? = null
 
@@ -240,22 +249,67 @@ internal class IsolatedMediaTransport(
             }
         }
 
-    override fun inspect(bytes: ByteArray): ImageInspection? =
+    override fun svgInspect(bytes: ByteArray): ImageInspection? =
+        inspection(
+            bytes,
+            MediaDecodePolicy.VIEWER_SVG_INSPECT,
+        )
+
+    override fun svgRegion(
+        bytes: ByteArray,
+        region: ViewerSvgRegion,
+        edge: Int,
+    ): Bitmap? =
         serialized(MediaTrustScope.current()) { ticket ->
-            val spec = MediaDecodeRequest(1, false, MediaDecodePolicy.INSPECT)
+            if (edge !in 1..ViewerSvgDecoder.MAX_VIEWPORT_EDGE) return@serialized null
+            if (
+                bytes.size !in 1..dev.ipf.whitenoise.android.media.GroupSvgPolicy.MAX_BYTES ||
+                !region.validFor(VIEWER_SVG_SOURCE_EDGE, VIEWER_SVG_SOURCE_EDGE)
+            ) {
+                return@serialized null
+            }
+            val capacity = region.targetSize(edge)?.capacity ?: return@serialized null
+            if (!claimWorker(ticket)) return@serialized null
+            withOutput("media-vector-region", capacity) { output ->
+                ticket.session.sources.withInput(bytes) { input ->
+                    exchange(
+                        ticket,
+                        input,
+                        output,
+                        MediaDecodeRequest(
+                            edge,
+                            false,
+                            MediaDecodePolicy.VIEWER_SVG_REGION,
+                            svgRegion = region,
+                        ),
+                    )?.let { copyPixels(ticket, it, output, edge) }
+                }
+            }
+        }
+
+    override fun inspect(bytes: ByteArray): ImageInspection? = inspection(bytes, MediaDecodePolicy.INSPECT)
+
+    private fun inspection(
+        bytes: ByteArray,
+        operation: Int,
+    ): ImageInspection? =
+        serialized(MediaTrustScope.current()) { ticket ->
+            if (operation == MediaDecodePolicy.VIEWER_SVG_INSPECT &&
+                bytes.size !in 1..dev.ipf.whitenoise.android.media.GroupSvgPolicy.MAX_BYTES
+            ) {
+                return@serialized null
+            }
+            val spec = MediaDecodeRequest(1, false, operation)
             request(ticket, bytes, spec, "media-inspection", Int.SIZE_BYTES) { result, _ ->
                 val width = result.getInt("width")
                 val height = result.getInt("height")
-                if (width <= 0 || height <= 0) {
-                    null
-                } else {
-                    ImageInspection(
-                        width,
-                        height,
-                        result.getString("mime").orEmpty().take(MediaDecodePolicy.MAX_MIME_CHARS),
-                        result.getInt("orientation"),
-                    )
-                }
+                validatedImageInspection(
+                    width,
+                    height,
+                    result.getString("mime").orEmpty(),
+                    result.getInt("orientation"),
+                    svg = operation == MediaDecodePolicy.VIEWER_SVG_INSPECT,
+                )
             }
         }
 
@@ -560,6 +614,13 @@ internal class IsolatedMediaTransport(
             putBoolean("oriented", request.option)
             putLong("offset", request.offset)
             putLong("length", request.length ?: input.statSize)
+            request.svgRegion?.let {
+                check(request.operation == MediaDecodePolicy.VIEWER_SVG_REGION && request.region == null)
+                putDouble("svgLeft", it.left)
+                putDouble("svgTop", it.top)
+                putDouble("svgRight", it.right)
+                putDouble("svgBottom", it.bottom)
+            }
             request.region?.let {
                 putInt("left", it.left)
                 putInt("top", it.top)
@@ -656,6 +717,7 @@ internal class IsolatedMediaTransport(
     }
 }
 
+@Suppress("LongParameterList") // Fixed IPC request tuple, with mutually exclusive raster/vector region shapes.
 internal data class MediaDecodeRequest(
     val edge: Int,
     val option: Boolean,
@@ -663,4 +725,5 @@ internal data class MediaDecodeRequest(
     val offset: Long = 0L,
     val length: Long? = null,
     val region: MediaImageRegion? = null,
+    val svgRegion: ViewerSvgRegion? = null,
 )

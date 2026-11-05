@@ -1,10 +1,17 @@
 package dev.ipf.whitenoise.android.share
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.FileProviderStrategyCacheRule
+import dev.ipf.whitenoise.android.state.AUDIT_LOG_ARCHIVE_MIME_TYPE
+import dev.ipf.whitenoise.android.state.AUDIT_LOG_ARCHIVE_NAME
+import dev.ipf.whitenoise.android.state.auditLogShareChooserIntent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -13,6 +20,29 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class ShareIntentTest {
+    @get:Rule
+    val fileProviderStrategyCacheRule = FileProviderStrategyCacheRule()
+
+    /** The diagnostic export's chooser target parses as one ZIP stream carrying the exact issued URI. */
+    @Test
+    fun diagnosticExportChooserTargetParsesAsOneZipStream() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val archive =
+            java.io.File(context.cacheDir, "audit_logs/session/$AUDIT_LOG_ARCHIVE_NAME").apply {
+                parentFile!!.mkdirs()
+                writeText("zip")
+            }
+        val chooser = auditLogShareChooserIntent(context, archive, "Share")
+        val send = chooser.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)!!
+
+        val request = parseShareRequest(send)!!
+
+        assertEquals(listOf(send.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)), request.payload.streamUris)
+        assertEquals(AUDIT_LOG_ARCHIVE_MIME_TYPE, request.payload.intentMimeType)
+        assertNull(request.payload.text)
+        archive.parentFile!!.deleteRecursively()
+    }
+
     @Test
     fun sendText_plain_returnsPayload() {
         val intent =

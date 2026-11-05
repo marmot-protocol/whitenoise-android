@@ -15,6 +15,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TimelineRecordRenderEqualityTest {
+    /** A peer receipt can settle delivery without changing the source event or message content. */
+    @Test
+    fun recipientConfirmationInvalidatesRenderedRecord() {
+        val pending = record().copy(sourceMessageIdHex = null, direction = "sent")
+
+        assertFalse(timelineRecordsRenderEqual(pending, pending.copy(recipientConfirmed = true)))
+    }
+
     /** Correlation arriving after the body must trigger exact optimistic reconciliation. */
     @Test
     fun callerTokenChangeInvalidatesRenderedRecord() {
@@ -109,6 +117,8 @@ class TimelineRecordRenderEqualityTest {
             retentionExpiresAt = null,
             sticker = null,
             importedFrom = null,
+            recipientConfirmed = false,
+            historyImportProvenance = null,
         )
 
     private fun reference() =

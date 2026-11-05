@@ -4,14 +4,6 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "Media viewer save action",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
-        "anchor": "R.string.media_save",
-        "test_ids": [
-          "MED-015"
-        ]
-      },
-      {
         "surface": "ConversationMediaViewer",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
         "anchor": "fun ConversationMediaViewer(",
@@ -43,7 +35,8 @@
           "MED-001",
           "MED-015",
           "MED-033",
-          "MED-044"
+          "MED-044",
+          "RDR-004"
         ]
       },
       {
@@ -62,7 +55,8 @@
         "test_ids": [
           "MED-001",
           "MED-015",
-          "MED-033"
+          "MED-033",
+          "RDR-004"
         ]
       }
     ],
@@ -79,14 +73,6 @@
         "surface": "R.string.group_preparing_photo",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
         "anchor": "R.string.group_preparing_photo",
-        "test_ids": [
-          "GRP-003"
-        ]
-      },
-      {
-        "surface": "R.string.media_set_group_picture",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
-        "anchor": "R.string.media_set_group_picture",
         "test_ids": [
           "GRP-003"
         ]
@@ -119,14 +105,6 @@
         "surface": "R.string.share",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
         "anchor": "R.string.share",
-        "test_ids": [
-          "MED-015"
-        ]
-      },
-      {
-        "surface": "R.string.shared_content_go_to_message",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaViewer.kt",
-        "anchor": "R.string.shared_content_go_to_message",
         "test_ids": [
           "MED-015"
         ]

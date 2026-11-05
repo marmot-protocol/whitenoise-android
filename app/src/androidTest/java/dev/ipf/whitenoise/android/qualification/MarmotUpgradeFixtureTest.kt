@@ -6,6 +6,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.AttachmentLocalTargetFfi
 import dev.ipf.marmotkit.AttachmentPageReadFfi
 import dev.ipf.marmotkit.Marmot
+import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
 import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.TimelineMessageQueryFfi
@@ -176,6 +178,7 @@ class MarmotUpgradeFixtureTest {
                 ),
             )
         val reference = pending.attachments.single().reference
+        assertEquals(reference, reference.upgradeReceipt().upgradeMediaReference())
         val value =
             JSONObject(receipt.readText())
                 .put("pendingReference", reference.upgradeReceipt())
@@ -284,7 +287,32 @@ class MarmotUpgradeFixtureTest {
         if (fileStoreBaseline()) verifyUpgradeAvatar(runtime, value)
     }
 
-    /** Promotes the baseline upload without uploading it again, then verifies its distinct retained plaintext. */
+    /** Rejects deliberately stripped provenance while retaining the baseline's complete upload unchanged. */
+    private suspend fun retainedPendingReference(
+        runtime: Marmot,
+        account: String,
+        group: String,
+        value: JSONObject,
+    ): MediaAttachmentReferenceFfi {
+        val reference = value.getJSONObject("pendingReference").upgradeMediaReference()
+        requireNotNull(reference.sourceEpochIdentity) { "Baseline upload must retain its branch identity" }
+        val refused =
+            try {
+                runtime.sendMediaReference(
+                    account,
+                    group,
+                    reference.copy(sourceEpochIdentity = null),
+                    "Missing upload identity",
+                )
+                false
+            } catch (_: MarmotKitException.MediaReferenceStaleEpoch) {
+                true
+            }
+        assertTrue("An upload stripped of its branch identity must be refused as stale", refused)
+        return reference
+    }
+
+    /** Sends the baseline's original pending upload unchanged, then verifies its plaintext after another restart. */
     private suspend fun verifyPendingUpload(
         runtime: Marmot,
         receipt: File,
@@ -294,7 +322,7 @@ class MarmotUpgradeFixtureTest {
         val account = value.getString("sender")
         val group = value.getString("group")
         if (phase == "promote") {
-            val reference = value.getJSONObject("pendingReference").upgradeMediaReference()
+            val reference = retainedPendingReference(runtime, account, group, value)
             val sent = runtime.sendMediaReference(account, group, reference, "Promoted baseline pending upload")
             value.put("pendingMessage", sent.messageIds.single())
             receipt.writeText(value.toString())
