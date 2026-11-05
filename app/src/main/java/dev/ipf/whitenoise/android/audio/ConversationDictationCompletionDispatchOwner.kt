@@ -3,12 +3,10 @@ package dev.ipf.whitenoise.android.audio
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 
 /** Owns the immutable send claim until admission, rejection or pending transport. */
 internal class ConversationDictationCompletionDispatchOwner(
@@ -95,7 +93,7 @@ internal class ConversationDictationCompletionDispatchOwner(
             scope.launch(start = CoroutineStart.LAZY) {
                 if (callbacks.guards.currentSessionId() != context.sessionId) return@launch
                 try {
-                    val accepted = dispatch(transport.timeoutMillis, guardedRequest, transport.send)
+                    val accepted = sendDictationUntilHandoff(transport.timeoutMillis, guardedRequest, transport.send)
                     if (dispatchClaim !== claim ||
                         callbacks.guards.currentSessionId() != context.sessionId ||
                         !callbacks.guards.processing()
@@ -173,20 +171,6 @@ internal class ConversationDictationCompletionDispatchOwner(
             },
         )
     }
-
-    /** A timeout or uncertain transport result never authorizes a second dispatch. */
-    suspend fun dispatch(
-        timeoutMillis: Long,
-        request: ConversationDictationSendRequest,
-        send: suspend (ConversationDictationSendRequest) -> Boolean,
-    ): Boolean? =
-        try {
-            withTimeoutOrNull(timeoutMillis) { send(request) }
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Throwable) {
-            false
-        }
 }
 
 /** Conditional composer-empty write and its reversible pre-transport restoration. */
