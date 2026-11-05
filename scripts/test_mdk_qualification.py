@@ -205,7 +205,24 @@ class QualificationEvidenceTest(unittest.TestCase):
                 captured_stdout = evidence.split('stdout:\n', 1)[1].split('\nstderr:\n', 1)[0]
                 self.assertEqual(len(captured_stdout), 32768)
                 self.assertIn('transport timeout', evidence)
-                self.assertEqual(len(list(Path(directory).glob('*-command-error.txt'))), 4)
+                self.assertEqual(len(list(Path(directory).glob('*-command-error.txt'))), 5)
+
+    def test_process_crash_keeps_phase_diagnostics_before_recovery(self):
+        """A later recovery probe must not overwrite the baseline process crash evidence."""
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(campaign, 'REPORTS', Path(directory)), \
+                    patch.object(campaign, 'adb', side_effect=[
+                        'INSTRUMENTATION_RESULT: shortMsg=Process crashed.\nINSTRUMENTATION_CODE: 0',
+                        'activity ready', 'package ready', '1', 'baseline crash', 'baseline process',
+                        'activity ready', 'package ready', '1', 'recovery crash', 'recovery process',
+                    ]):
+                with self.assertRaises(RuntimeError):
+                    campaign.instrument('baseline-seed', campaign.UPGRADE, {'retained'})
+                campaign.retain_device_health()
+            reports = Path(directory)
+            self.assertEqual((reports / 'baseline-seed-crash-log.txt').read_text(), 'baseline crash')
+            self.assertEqual((reports / 'baseline-seed-process-log.txt').read_text(), 'baseline process')
+            self.assertEqual((reports / 'crash-log.txt').read_text(), 'recovery crash')
 
     def test_recovery_requires_both_formerly_ignored_cases(self):
         """The adopted replay fixes must execute; ignored, missing and failed cases are all blocking."""

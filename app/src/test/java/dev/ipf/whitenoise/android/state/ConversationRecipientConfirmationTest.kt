@@ -52,7 +52,12 @@ class ConversationRecipientConfirmationTest {
 
                 val confirmed = confirmedRecord(pending)
                 controller.testApplyLiveTimelineChangesAndRegisterStreams(
-                    listOf(TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED, confirmed)),
+                    listOf(
+                        TimelineMessageChangeFfi.Upsert(
+                            TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED,
+                            confirmed,
+                        ),
+                    ),
                 )
 
                 assertEquals(MessageStatus.Sent, controller.timeline.single().status)
@@ -159,7 +164,12 @@ class ConversationRecipientConfirmationTest {
             )
         try {
             controller.testApplyLiveTimelineChangesAndRegisterStreams(
-                listOf(TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED, historical)),
+                listOf(
+                    TimelineMessageChangeFfi.Upsert(
+                        TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED,
+                        historical,
+                    ),
+                ),
             )
 
             controller.applyTimelinePage(page(historical), replaceWindow = true, updatePagination = true)
@@ -196,10 +206,20 @@ class ConversationRecipientConfirmationTest {
             )
         try {
             controller.testApplyLiveTimelineChangesAndRegisterStreams(
-                listOf(TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED, failed)),
+                listOf(
+                    TimelineMessageChangeFfi.Upsert(
+                        TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED,
+                        failed,
+                    ),
+                ),
             )
             controller.testApplyLiveTimelineChangesAndRegisterStreams(
-                listOf(TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED, historical)),
+                listOf(
+                    TimelineMessageChangeFfi.Upsert(
+                        TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED,
+                        historical,
+                    ),
+                ),
             )
 
             assertEquals(setOf("failed-native", "old-native"), controller.timelineRecords.keys)

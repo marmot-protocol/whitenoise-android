@@ -20,6 +20,7 @@ private fun timelineRecordEnvelopeEqual(
     a.messageIdHex == b.messageIdHex &&
         a.sourceMessageIdHex == b.sourceMessageIdHex &&
         a.clientToken == b.clientToken &&
+        a.recipientConfirmed == b.recipientConfirmed &&
         a.direction == b.direction &&
         a.groupIdHex == b.groupIdHex &&
         a.sender == b.sender &&
@@ -45,7 +46,6 @@ private fun timelineRecordContentEqual(
         a.deleted == b.deleted &&
         a.deletedByMessageIdHex == b.deletedByMessageIdHex &&
         a.invalidationStatus == b.invalidationStatus &&
-        a.recipientConfirmed == b.recipientConfirmed &&
         a.retentionSeconds == b.retentionSeconds &&
         a.retentionExpiresAt == b.retentionExpiresAt &&
         a.reactions == b.reactions

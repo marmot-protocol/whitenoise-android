@@ -298,7 +298,12 @@ class MarmotUpgradeFixtureTest {
         requireNotNull(reference.sourceEpochIdentity) { "Baseline upload must retain its branch identity" }
         val refused =
             try {
-                runtime.sendMediaReference(account, group, reference.copy(sourceEpochIdentity = null), "Missing upload identity")
+                runtime.sendMediaReference(
+                    account,
+                    group,
+                    reference.copy(sourceEpochIdentity = null),
+                    "Missing upload identity",
+                )
                 false
             } catch (_: MarmotKitException.MediaReferenceStaleEpoch) {
                 true

@@ -17,7 +17,10 @@ class NotificationReplyWorkerCoverageTest {
                     nextAttemptBoundary = null,
                     text = "same reply",
                 ) { _, _ ->
-                    page(record(11u, "confirmed", "sent", "same reply", sourceMessageIdHex = null).copy(recipientConfirmed = true))
+                    page(
+                        record(11u, "confirmed", "sent", "same reply", sourceMessageIdHex = null)
+                            .copy(recipientConfirmed = true),
+                    )
                 }
 
             assertEquals(NotificationReplyCommitProbe.Indeterminate, outcome)

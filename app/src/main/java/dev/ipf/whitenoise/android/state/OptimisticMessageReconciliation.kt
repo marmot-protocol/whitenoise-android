@@ -187,7 +187,9 @@ internal fun committedButUnpublishedProjectionForOptimistic(
 ): TimelineMessageRecordFfi? {
     val optimisticIsMediaPending = optimistic.tags.any { it.values.firstOrNull() == "_media_pending" }
     return timelineRecords.values.firstOrNull { projected ->
-        if (projected.deleted || projected.sourceMessageIdHex != null || projected.recipientConfirmed) return@firstOrNull false
+        if (projected.deleted || projected.sourceMessageIdHex != null || projected.recipientConfirmed) {
+            return@firstOrNull false
+        }
         if (projected.direction != "sent") return@firstOrNull false
         val projectedAction = TimelineProjector.toAppMessageRecord(projected)
         if (!MessageProjector.isMine(projectedAction, activeAccountIdHex)) return@firstOrNull false

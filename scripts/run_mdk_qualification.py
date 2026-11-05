@@ -49,20 +49,22 @@ def retain_command_failure(name, error):
     (REPORTS / f'{name}-command-error.txt').write_text('\n'.join(parts) + '\n')
 
 
-def retain_device_health():
-    """Observe disposable emulator services and crash diagnostics without restarting or repairing them."""
+def retain_device_health(prefix=''):
+    """Retain phase-specific emulator diagnostics before a later recovery process can replace the evidence."""
     for name, command in (
         ('activity-service', ('shell', 'service', 'check', 'activity')),
         ('package-service', ('shell', 'service', 'check', 'package')),
         ('boot-completed', ('shell', 'getprop', 'sys.boot_completed')),
         ('crash-log', ('logcat', '-b', 'crash', '-d', '-t', '120')),
+        ('process-log', ('logcat', '-b', 'main', '-b', 'system', '-d', '-t', '200',
+                         'AndroidRuntime:E', 'DEBUG:F', 'ActivityManager:I', '*:S')),
     ):
         try:
             output = adb(*command, timeout=10)
         except subprocess.SubprocessError as error:
-            retain_command_failure(name, error)
+            retain_command_failure(prefix + name, error)
         else:
-            (REPORTS / f'{name}.txt').write_text(output[-32768:])
+            (REPORTS / f'{prefix}{name}.txt').write_text(output[-32768:])
 
 
 def instrument(name, test_class, expected, extra=()):
@@ -77,6 +79,7 @@ def instrument(name, test_class, expected, extra=()):
         if isinstance(partial, bytes):
             partial = partial.decode('utf-8', errors='replace')
         (REPORTS / f'{name}.txt').write_text(partial + '\nHOST_COMMAND_FAILED: qualification incomplete\n')
+        retain_device_health(name + '-')
         raise
     (REPORTS / f'{name}.txt').write_text(output)
     statuses = {}
@@ -96,8 +99,10 @@ def instrument(name, test_class, expected, extra=()):
     fact = {'passed': sorted(passed), 'skipped': sorted(skipped), 'failed': unexpected}
     (REPORTS / f'{name}.json').write_text(json.dumps(fact, indent=2) + '\n')
     if passed != expected or unexpected or skipped:
+        retain_device_health(name + '-')
         raise RuntimeError(f'{name}: required cases did not all pass; see retained transcript')
     if 'INSTRUMENTATION_CODE: -1' not in output:
+        retain_device_health(name + '-')
         raise RuntimeError(f'{name}: runner did not finish successfully')
     print(f'{name}: passed {len(passed)} cases; explicitly ignored {len(skipped)} cases', flush=True)
 

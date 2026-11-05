@@ -13063,7 +13063,8 @@ class ConversationController(
             }
             return actionRecord
         }
-        val unownedLegacyRecord = record.clientToken == null && record.sourceMessageIdHex == null && !record.recipientConfirmed
+        val unownedLegacyRecord =
+            record.clientToken == null && record.sourceMessageIdHex == null && !record.recipientConfirmed
         if (
             unownedLegacyRecord &&
             record.invalidationStatus == null &&
