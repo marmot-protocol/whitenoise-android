@@ -36,3 +36,17 @@ name: preferences-font-cancel
     id: "font_family.done"
 - assertNotVisible:
     id: "font_family.dialog"
+- scrollUntilVisible:
+    element:
+      text: "Date and time"
+    direction: DOWN
+- tapOn: "Date and time"
+- assertVisible:
+    id: "date_time_format.dialog"
+- assertVisible:
+    id: "date_time_format.time.automatic"
+- assertVisible:
+    id: "date_time_format.date.automatic"
+- tapOn: "Done"
+- assertNotVisible:
+    id: "date_time_format.dialog"

@@ -6026,6 +6026,28 @@
       "remaining": "All-family selection and persistence, preview typography and independent scrolling, font/RTL/AMOLED layout, lifecycle and accessibility remain separately qualified. The native short-window regressions do not grant executed Maestro or physical proof."
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+      "symbol": "DateTimeFormatDialog",
+      "bindings": [
+        {
+          "case": "preferences-font-cancel",
+          "entry_assertion": {
+            "id": "date_time_format.dialog"
+          },
+          "opened_by": {
+            "tapOn": {
+              "text": "Date and time"
+            }
+          },
+          "selector": {
+            "id": "date_time_format.time.automatic"
+          },
+          "scope": "The existing runtime preferences fixture opens the real Date and time dialog, directly asserts its Automatic time and date choices, then dismisses with Done without changing either format. Source registration only; actual Maestro execution remains separately required."
+        }
+      ],
+      "remaining": "Explicit 12/24-hour and date-order selection, persistence, Reset, phone-region automatic samples, font/RTL/AMOLED layout, lifecycle and accessibility remain separately qualified. A registered direct assertion is not executed Maestro or physical proof."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ComposerSendMotion.kt",
       "symbol": "Overlay",
       "bindings": [
