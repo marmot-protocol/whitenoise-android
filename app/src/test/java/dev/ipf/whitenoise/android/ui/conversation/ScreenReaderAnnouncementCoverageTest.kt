@@ -64,14 +64,19 @@ class ScreenReaderAnnouncementCoverageTest {
     }
 
     @Test
-    fun rowsAlreadyRenderedBeforeTheAppendAreNotAnnouncedAfterAReorder() {
-        // A display-position change moved "earlier" past the anchor while "new" arrived.
-        val timeline = listOf(row("anchor"), row("earlier"), row("new"))
+    fun olderPageRowsMovedPastTheAnchorAreNotAnnounced() {
+        val baseline = ConversationArrivalBaseline()
+        baseline.markAllRendered(listOf(row("anchor")))
+        // An older page loads above the anchor without changing the latest row.
+        baseline.noteRendered(listOf(row("older"), row("anchor")), "msg:anchor")
+        // A display-position change then moves "older" past the anchor while "new" arrives.
+        val timeline = listOf(row("anchor"), row("older"), row("new"))
 
-        val rendered = setOf("msg:anchor", "msg:earlier")
-        val arrivals = conversationIncomingArrivals(timeline, "msg:anchor", rendered) { false }
+        val arrivals = baseline.follow(timeline, "msg:anchor") { false }
 
         assertEquals(listOf("new"), arrivals.map { it.record.messageIdHex })
+        assertEquals(emptyList<TimelineMessage>(), baseline.follow(timeline + row("later"), null) { false })
+        assertEquals(emptyList<TimelineMessage>(), baseline.follow(timeline + row("later"), "msg:new") { false })
     }
 
     @Test

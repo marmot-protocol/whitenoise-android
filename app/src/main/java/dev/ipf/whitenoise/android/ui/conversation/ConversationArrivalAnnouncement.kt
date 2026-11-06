@@ -25,6 +25,46 @@ internal fun conversationIncomingArrivals(
 }
 
 /**
+ * Which rows the open chat has already rendered, so a row that a display-position reorder moves past the followed
+ * anchor is never announced as an arrival. Rows the follow pass saw and rows an older page added above the anchor
+ * both count.
+ */
+internal class ConversationArrivalBaseline {
+    private val renderedIds = HashSet<String>()
+
+    /** After any timeline change, rows up to the followed [anchorId] are known, including an older page above it. */
+    fun noteRendered(
+        timeline: List<TimelineMessage>,
+        anchorId: String?,
+    ) {
+        val end = timeline.indexOfFirst { it.presentationId == anchorId }
+        for (index in 0..end) renderedIds += timeline[index].presentationId
+    }
+
+    /** A follow pass that cannot be an append: every row it shows is known. */
+    fun markAllRendered(timeline: List<TimelineMessage>) {
+        timeline.mapTo(renderedIds) { it.presentationId }
+    }
+
+    /**
+     * A follow pass: the arrivals after [previousLatestId], or none when the pass is not an append. Every row it
+     * shows is known afterwards.
+     */
+    fun follow(
+        timeline: List<TimelineMessage>,
+        previousLatestId: String?,
+        isMine: (TimelineMessage) -> Boolean,
+    ): List<TimelineMessage> {
+        val arrivals =
+            previousLatestId
+                ?.let { conversationIncomingArrivals(timeline, it, renderedIds, isMine) }
+                .orEmpty()
+        markAllRendered(timeline)
+        return arrivals
+    }
+}
+
+/**
  * What the screen reader hears when messages arrive in the open chat, or null when nothing arrived. One message names
  * its sender; a burst is counted, so a busy group does not queue one announcement per message.
  */

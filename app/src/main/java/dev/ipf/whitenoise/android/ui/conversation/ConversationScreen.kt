@@ -3317,12 +3317,14 @@ internal fun ConversationScreen(
         val incomingAppendLanding = remember(controller) { ConversationIncomingAppendLandingQueue() }
         val arrivalView = LocalView.current
         val arrivalResources = LocalResources.current
-        // Rows the previous pass rendered, so a reorder that moves an older row to the end is not announced.
-        var rowIdsAtLastFollow by remember(controller) { mutableStateOf(emptySet<String>()) }
+        val arrivalBaseline = remember(controller) { ConversationArrivalBaseline() }
+        // An older page changes the first row and size but not the latest id, so the follow pass would miss it.
+        LaunchedEffect(controller, renderedTimeline.firstOrNull()?.presentationId, renderedTimeline.size) {
+            arrivalBaseline.noteRendered(renderedTimeline, navigationState.lastFollowedLatestId)
+        }
         LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored) {
-            val previousRowIds = rowIdsAtLastFollow
-            rowIdsAtLastFollow = renderedTimeline.mapTo(HashSet()) { it.presentationId }
             if (!initialTimelineAnchored || renderedTimeline.isEmpty()) {
+                arrivalBaseline.markAllRendered(renderedTimeline)
                 // A restart that cannot be an append still interrupts the burst, so its rows never join a later one.
                 incomingAppendLanding.retire()
                 return@LaunchedEffect
@@ -3337,14 +3339,15 @@ internal fun ConversationScreen(
                     latestId != previousId &&
                     renderedTimeline.any { it.presentationId == previousId }
             navigationState.lastFollowedLatestId = latestId ?: previousId
+            val arrivals =
+                arrivalBaseline.follow(renderedTimeline, previousId.takeIf { isAppend }) { row ->
+                    controller.isMessageMine(row.record)
+                }
             if (isAppend && previousId != null) {
                 // Before any suspension, so a later append restarting this effect cannot drop the notice. Group details
                 // cover the transcript, so arrivals are not read over that screen.
                 conversationArrivalAnnouncement(
-                    arrivals =
-                        conversationIncomingArrivals(renderedTimeline, previousId, previousRowIds) { row ->
-                            controller.isMessageMine(row.record)
-                        },
+                    arrivals = arrivals,
                     senderName = { row -> appState.displayName(row.record.sender) },
                     resources = arrivalResources,
                 )?.takeUnless { showDetails }?.let { notice ->
