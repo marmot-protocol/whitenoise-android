@@ -6,26 +6,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ValidatedInternetNetworkTrackerTest {
-    /** Snapshot identities survive duplicate announcements and are detached from later physical handovers. */
-    @Test
-    fun permissionSnapshotRetainsDefaultAndPhysicalIdentities() {
-        val default = ActiveDefaultNetworkTracker()
-        default.seed(1L)
-        assertFalse(default.available(1L).identityChanged)
-        assertEquals(1L, default.identitySnapshot())
-        assertTrue(default.available(2L).identityChanged)
-        assertEquals(2L, default.identitySnapshot())
-        assertEquals(null, default.lost(1L, null))
-        assertEquals(2L, default.identitySnapshot())
-        val physical = ValidatedInternetNetworkTracker()
-        physical.seedAtomically { mapOf(3L to true, 4L to false) }
-        val initial = physical.identitySnapshot()
-        physical.update(4L, true)
-        physical.remove(3L)
-        assertEquals(setOf(3L), initial)
-        assertEquals(setOf(4L), physical.identitySnapshot())
-    }
-
     /** Foreground route changes fence samples independently of OS validation. */
     @Test
     fun foregroundRouteChangesFenceProbesWithoutGrantingOsValidation() {

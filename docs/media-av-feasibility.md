@@ -7,9 +7,10 @@ baseline. The current implementation is documented in
 [Multimedia containment](media-containment.md): automatic output, local attachment
 playback, voice playback and transcription now use isolated software decoders.
 Media3 controls operate over raw output; historical app-process parser entries
-below do not describe the new local-attachment path. Current-source build,
-API 30/current-API, corpus, visual and performance qualification remain pending.
-Remote Nostr network playback retains its separate platform path.
+below do not describe the new local-attachment path. Remote Nostr network
+playback retains its separate platform path. What has been measured on the
+current playback code is listed under
+[Measured playback timing](#measured-playback-timing).
 
 ## Historical process and capability inventory
 
@@ -127,5 +128,31 @@ contracts require current-source kernel and device qualification.
 
 The implementation now includes the native source build, isolated automatic
 poster/duration/waveform route, raw-output playback, attachment transcription and
-report validation. Positive current-source build, platform, compatibility and
-performance evidence remain required; #3374 stays open.
+report validation. #3374 stays open until playback has a timing budget and a
+slow physical device has been timed against it.
+
+## Measured playback timing
+
+The paced campaign (`MediaAvPlaybackPerformanceDeviceTest`) ran on API 30 and
+API 36 emulators at `bebf420a`. The playback, decoder and native sources are
+unchanged from that revision to the current head. Each run covered the
+ten-file corpus three times from a fresh player, plus ten resume and ten seek
+cycles on one video and one WAV file. All 32 rows per run were observed with
+no failed rows.
+
+| Run | Emulator | Play to first progress, median (max) | Resume to audio progress, median (max) | Seek to matching progress, median (max) |
+| --- | --- | --- | --- | --- |
+| [42178841131](https://github.com/marmot-protocol/whitenoise-android/actions/runs/42178841131) | API 30 | 943 ms (1167 ms) | 912 ms (1265 ms) | 90 ms (361 ms) |
+| [42178845019](https://github.com/marmot-protocol/whitenoise-android/actions/runs/42178845019) | API 36 | 436 ms (516 ms) | 521 ms (802 ms) | 71 ms (300 ms) |
+| [42178849042](https://github.com/marmot-protocol/whitenoise-android/actions/runs/42178849042) | API 36 | 508 ms (616 ms) | 606 ms (922 ms) | 81 ms (361 ms) |
+
+These are observations, not a pass or fail. No timing budget or comparator has
+been agreed, so each row records
+`threshold_verdict: pending_frozen_budget_or_valid_comparator`. The campaign does
+not measure physical presentation, acoustic output or worker memory over a
+lifetime.
+
+A physical phone passed a manual check of the `c439df8` preview build. The check
+covered video start inline and fullscreen, voice and audio playback with pause,
+resume and seek, rotation, scrolling a long chat with videos, and data retained
+after the upgrade. Nothing was timed. No slow physical device has been timed.
