@@ -66,17 +66,40 @@ class ScreenReaderAnnouncementCoverageTest {
     @Test
     fun olderPageRowsMovedPastTheAnchorAreNotAnnounced() {
         val baseline = ConversationArrivalBaseline()
-        baseline.markAllRendered(listOf(row("anchor")))
+        baseline.markAllRendered(listOf(row("anchor")), reachesLiveTail = true)
         // An older page loads above the anchor without changing the latest row.
         baseline.noteRendered(listOf(row("older"), row("anchor")), "msg:anchor")
         // A display-position change then moves "older" past the anchor while "new" arrives.
         val timeline = listOf(row("anchor"), row("older"), row("new"))
 
-        val arrivals = baseline.follow(timeline, "msg:anchor") { false }
+        val arrivals = baseline.follow(timeline, "msg:anchor", reachesLiveTail = true) { false }
 
         assertEquals(listOf("new"), arrivals.map { it.record.messageIdHex })
-        assertEquals(emptyList<TimelineMessage>(), baseline.follow(timeline + row("later"), null) { false })
-        assertEquals(emptyList<TimelineMessage>(), baseline.follow(timeline + row("later"), "msg:new") { false })
+        assertEquals(
+            emptyList<TimelineMessage>(),
+            baseline.follow(timeline + row("later"), null, reachesLiveTail = true) { false },
+        )
+        assertEquals(
+            emptyList<TimelineMessage>(),
+            baseline.follow(timeline + row("later"), "msg:new", reachesLiveTail = true) { false },
+        )
+    }
+
+    @Test
+    fun newerPagesLoadedFromHistoryAreNotAnnounced() {
+        val baseline = ConversationArrivalBaseline()
+        // A jump to an old message leaves the window short of the live tail.
+        val jumped = listOf(row("old"))
+        baseline.markAllRendered(jumped, reachesLiveTail = false)
+        val middle = jumped + row("middle")
+        val tail = middle + row("newest")
+
+        assertEquals(emptyList<TimelineMessage>(), baseline.follow(middle, "msg:old", reachesLiveTail = false) { false })
+        // The page that reaches the tail is still history the reader scrolled to.
+        assertEquals(emptyList<TimelineMessage>(), baseline.follow(tail, "msg:middle", reachesLiveTail = true) { false })
+        // Only a message arriving after the window reached the tail is new.
+        val arrivals = baseline.follow(tail + row("live"), "msg:newest", reachesLiveTail = true) { false }
+        assertEquals(listOf("live"), arrivals.map { it.record.messageIdHex })
     }
 
     @Test

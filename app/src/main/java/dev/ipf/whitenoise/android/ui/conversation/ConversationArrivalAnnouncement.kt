@@ -41,25 +41,37 @@ internal class ConversationArrivalBaseline {
         for (index in 0..end) renderedIds += timeline[index].presentationId
     }
 
-    /** A follow pass that cannot be an append: every row it shows is known. */
-    fun markAllRendered(timeline: List<TimelineMessage>) {
+    // Rows a newer page adds while the window is detached from the live tail are history, not arrivals.
+    private var followedAtLiveTail = false
+
+    /**
+     * A follow pass that cannot be an append: every row it shows is known. [reachesLiveTail] says whether the window
+     * now ends at the newest message.
+     */
+    fun markAllRendered(
+        timeline: List<TimelineMessage>,
+        reachesLiveTail: Boolean,
+    ) {
         timeline.mapTo(renderedIds) { it.presentationId }
+        followedAtLiveTail = reachesLiveTail
     }
 
     /**
-     * A follow pass: the arrivals after [previousLatestId], or none when the pass is not an append. Every row it
-     * shows is known afterwards.
+     * A follow pass: the arrivals after [previousLatestId], or none when the pass is not an append or the previous
+     * window did not reach the live tail. Every row it shows is known afterwards.
      */
     fun follow(
         timeline: List<TimelineMessage>,
         previousLatestId: String?,
+        reachesLiveTail: Boolean,
         isMine: (TimelineMessage) -> Boolean,
     ): List<TimelineMessage> {
         val arrivals =
             previousLatestId
+                ?.takeIf { followedAtLiveTail }
                 ?.let { conversationIncomingArrivals(timeline, it, renderedIds, isMine) }
                 .orEmpty()
-        markAllRendered(timeline)
+        markAllRendered(timeline, reachesLiveTail)
         return arrivals
     }
 }

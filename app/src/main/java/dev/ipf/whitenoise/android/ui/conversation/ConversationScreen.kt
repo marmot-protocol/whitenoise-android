@@ -3324,7 +3324,7 @@ internal fun ConversationScreen(
         }
         LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored) {
             if (!initialTimelineAnchored || renderedTimeline.isEmpty()) {
-                arrivalBaseline.markAllRendered(renderedTimeline)
+                arrivalBaseline.markAllRendered(renderedTimeline, !controller.hasMoreAfterTimeline)
                 // A restart that cannot be an append still interrupts the burst, so its rows never join a later one.
                 incomingAppendLanding.retire()
                 return@LaunchedEffect
@@ -3340,9 +3340,11 @@ internal fun ConversationScreen(
                     renderedTimeline.any { it.presentationId == previousId }
             navigationState.lastFollowedLatestId = latestId ?: previousId
             val arrivals =
-                arrivalBaseline.follow(renderedTimeline, previousId.takeIf { isAppend }) { row ->
-                    controller.isMessageMine(row.record)
-                }
+                arrivalBaseline.follow(
+                    timeline = renderedTimeline,
+                    previousLatestId = previousId.takeIf { isAppend },
+                    reachesLiveTail = !controller.hasMoreAfterTimeline,
+                ) { row -> controller.isMessageMine(row.record) }
             if (isAppend && previousId != null) {
                 // Before any suspension, so a later append restarting this effect cannot drop the notice. Group details
                 // cover the transcript, so arrivals are not read over that screen.
