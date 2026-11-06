@@ -34,18 +34,19 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.os.ConfigurationCompat
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.DateTimeDisplay
 import dev.ipf.whitenoise.android.core.EditState
 import dev.ipf.whitenoise.android.core.EditVersion
+import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
+import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
-import java.time.DateTimeException
 import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
 
@@ -118,7 +119,11 @@ internal fun EditHistoryDialog(
 private fun EditHistoryVersionRow(row: EditHistoryRow) {
     val locale = ConfigurationCompat.getLocales(LocalConfiguration.current)[0] ?: Locale.ROOT
     val zone = ZoneId.systemDefault()
-    val time = remember(row.recordedAt, locale, zone) { editHistoryRevisionTime(row.recordedAt, locale, zone) }
+    val display = currentDateTimeDisplay()
+    val time =
+        remember(row.recordedAt, locale, zone, display) {
+            editHistoryRevisionTime(row.recordedAt, locale, zone, display)
+        }
     Text(
         text =
             if (row.versionNumber == 0) {
@@ -148,20 +153,20 @@ private fun EditHistoryVersionRow(row: EditHistoryRow) {
     }
 }
 
-/** Localized medium date-time with the zone id, the prototype's exact-time format. */
+/**
+ * Medium date-time with the zone id, the prototype's exact-time format, honoring the user's
+ * date and time formats (#3602).
+ */
 internal fun editHistoryRevisionTime(
     seconds: ULong,
     locale: Locale,
     zone: ZoneId,
+    display: DateTimeDisplay = DateTimeDisplay.LocaleDefault,
 ): String {
     if (seconds > Instant.MAX.epochSecond.toULong()) return ""
-    return try {
-        DateTimeFormatter
-            .ofLocalizedDateTime(FormatStyle.MEDIUM)
-            .withLocale(locale)
-            .withZone(zone)
-            .format(Instant.ofEpochSecond(seconds.toLong())) + " (${zone.id})"
-    } catch (_: DateTimeException) {
-        ""
-    }
+    return IdentityFormatter
+        .dateTime(Instant.ofEpochSecond(seconds.toLong()), locale, zone, display, FormatStyle.MEDIUM, FormatStyle.MEDIUM)
+        .takeIf { it.isNotEmpty() }
+        ?.let { "$it (${zone.id})" }
+        .orEmpty()
 }

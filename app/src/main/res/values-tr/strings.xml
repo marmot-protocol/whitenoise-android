@@ -2563,4 +2563,12 @@
     <string name="settings_search_alias_read_aloud">TTS|metin okuma|sesli oku</string>
     <string name="settings_search_alias_sound">bildirim sesi|uyarı sesi|zil sesi</string>
     <string name="settings_search_revealed">%1$s. Ayar vurgulandı.</string>
+    <string name="date_time_format">Tarih ve saat</string>
+    <string name="date_time_format_time">Saat</string>
+    <string name="date_time_format_date">Tarih</string>
+    <string name="date_time_format_automatic">Otomatik</string>
+    <string name="time_format_12_hour">12 saat</string>
+    <string name="time_format_24_hour">24 saat</string>
+    <string name="date_time_format_help">Otomatik, uygulama dilini ve telefonunuzun bölgesini kullanır.</string>
+    <string name="settings_search_alias_date_time_format">saat biçimi|tarih biçimi|saat|12 saat|24 saat|ÖÖ/ÖS</string>
 </resources>

@@ -10,6 +10,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.layout.onSizeChanged
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
+import dev.ipf.whitenoise.android.core.DateTimeFormatState
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.MentionComposer
 import dev.ipf.whitenoise.android.core.MessageDebugClassifier
@@ -91,10 +92,11 @@ internal fun TimelineRow(
 ) = traceConversationUiSection(ConversationUiTrace.ROW) {
     val reactionMotion = rememberTimelineReactionMotion(item, controller, appState, composerGate, selectionMode)
     ReactionMotionRow(reactionMotion, modifier, reactionViewport) {
+        val dateFormat = DateTimeFormatState.dateFormat
         val daySeparatorLabel =
-            remember(older?.record?.recordedAt, item.record.recordedAt, transcriptLocale) {
+            remember(older?.record?.recordedAt, item.record.recordedAt, transcriptLocale, dateFormat) {
                 if (older == null || differentDay(older.record.recordedAt, item.record.recordedAt)) {
-                    messageDayLabel(item.record.recordedAt, transcriptLocale)
+                    messageDayLabel(item.record.recordedAt, transcriptLocale, dateFormat)
                 } else {
                     null
                 }

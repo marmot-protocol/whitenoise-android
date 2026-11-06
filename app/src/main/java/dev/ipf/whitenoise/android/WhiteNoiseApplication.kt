@@ -6,6 +6,7 @@ import androidx.work.Configuration
 import androidx.work.Operation
 import dev.ipf.whitenoise.android.audio.DictationDiagnostics
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
+import dev.ipf.whitenoise.android.core.DateTimeFormatState
 import dev.ipf.whitenoise.android.diagnostics.DmCreationDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.PerformanceDiagnostics
 import dev.ipf.whitenoise.android.diagnostics.StartupDiagnostics
@@ -124,6 +125,7 @@ open class WhiteNoiseApplication :
         // AppCompat must receive custom-stored locales before MainActivity's
         // onCreate on API 32 and lower so it can wrap the Activity context.
         applyApplicationLanguageTag(persistedApplicationLanguageTag(this))
+        DateTimeFormatState.refreshSystem(this)
         VoicePlaybackController.attach(this)
         AttachmentTransfers.install(this)
         applicationScope.launch { PushWakeRecoveryScheduler.schedule(this@WhiteNoiseApplication) }

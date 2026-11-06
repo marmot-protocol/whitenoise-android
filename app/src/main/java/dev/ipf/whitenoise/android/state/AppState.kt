@@ -90,6 +90,8 @@ import dev.ipf.whitenoise.android.audio.tts.resolveTtsOnDispatcher
 import dev.ipf.whitenoise.android.audio.tts.runtimeTrustForSelectionWarning
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.AvatarLoadRecovery
+import dev.ipf.whitenoise.android.core.DateFormatPreference
+import dev.ipf.whitenoise.android.core.DateTimeFormatState
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
@@ -102,6 +104,7 @@ import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
+import dev.ipf.whitenoise.android.core.TimeFormatPreference
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
 import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
@@ -2328,6 +2331,12 @@ class WhiteNoiseAppState private constructor(
         EnterKeyBehavior.fromPreference(preferences.getString(ENTER_KEY_BEHAVIOR_KEY, null)),
     )
         private set
+
+    init {
+        // DateTimeFormatState owns the live values every formatter reads; this state persists them.
+        DateTimeFormatState.timeFormat = TimeFormatPreference.fromPreference(preferences.getString(TIME_FORMAT_KEY, null))
+        DateTimeFormatState.dateFormat = DateFormatPreference.fromPreference(preferences.getString(DATE_FORMAT_KEY, null))
+    }
 
     /** App-wide preference owner, retained across account changes and reset by erased app preferences. */
     internal val quickAccountSwitchingPreference = QuickAccountSwitchingPreference(preferences)
@@ -9114,6 +9123,18 @@ class WhiteNoiseAppState private constructor(
         persistHostSetting { putString(ENTER_KEY_BEHAVIOR_KEY, behavior.preferenceValue) }
     }
 
+    /** Sets the clock system for every time label (#3602); Automatic follows Android and the region. */
+    fun updateTimeFormat(format: TimeFormatPreference) {
+        DateTimeFormatState.timeFormat = format
+        persistHostSetting { putString(TIME_FORMAT_KEY, format.preferenceValue) }
+    }
+
+    /** Sets the numeric date order for compact date labels (#3602); Automatic follows the region. */
+    fun updateDateFormat(format: DateFormatPreference) {
+        DateTimeFormatState.dateFormat = format
+        persistHostSetting { putString(DATE_FORMAT_KEY, format.preferenceValue) }
+    }
+
     /**
      * Update the outgoing-media quality ceiling (image downscale/JPEG quality
      * and voice-note bitrate). Persists immediately so the selection survives
@@ -14460,6 +14481,8 @@ class WhiteNoiseAppState private constructor(
         private const val MEDIA_AUTO_DOWNLOAD_MATRIX_KEY_PREFIX = "media_auto_download_matrix:"
         private const val MEDIA_QUALITY_KEY = "media_quality"
         private const val ENTER_KEY_BEHAVIOR_KEY = "enter_key_behavior"
+        private const val TIME_FORMAT_KEY = "time_format"
+        private const val DATE_FORMAT_KEY = "date_format"
         private const val DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY = "default_notifications_enable_attempted"
         private const val DISAPPEARING_TOOLTIP_SHOWN_KEY = "disappearing_tooltip_shown"
 

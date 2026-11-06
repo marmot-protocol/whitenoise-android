@@ -84,6 +84,17 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
         )
         add(
             SettingsSearchEntry(
+                "Appearance.date_time_format",
+                R.string.date_time_format,
+                R.string.appearance,
+                SettingsDetail.Appearance,
+                itemKey = "search.Appearance.4",
+                rowKey = "date_time_format",
+                aliasesRes = R.string.settings_search_alias_date_time_format,
+            ),
+        )
+        add(
+            SettingsSearchEntry(
                 "Appearance.enter_behavior",
                 R.string.enter_key_behavior_title,
                 R.string.appearance,

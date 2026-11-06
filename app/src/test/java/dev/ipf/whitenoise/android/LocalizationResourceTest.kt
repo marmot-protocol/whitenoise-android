@@ -1298,6 +1298,8 @@ class LocalizationResourceTest {
                     ),
                 "values-fr" to
                     setOf(
+                        // "Date" is also the French word for the date-format group label.
+                        "date_time_format_date",
                         // "minute"/"minutes" is the French word for the spoken read-aloud unit.
                         "tts_bar_spoken_minutes",
                         // "Messages" is also the French plural.

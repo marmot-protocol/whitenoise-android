@@ -1,7 +1,9 @@
 package dev.ipf.whitenoise.android.core
 
 import java.text.BreakIterator
+import java.time.DateTimeException
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.chrono.IsoChronology
 import java.time.format.DateTimeFormatter
@@ -33,6 +35,16 @@ object IdentityFormatter {
     private val shortDateFormatters = ConcurrentHashMap<Locale, DateTimeFormatter>()
     private val shortTimeFormatters = ConcurrentHashMap<Locale, DateTimeFormatter>()
     private val coercedClockFormatters = ConcurrentHashMap<Pair<Locale, Boolean>, DateTimeFormatter>()
+    private val displayFormatters = ConcurrentHashMap<DisplayFormatterKey, DateTimeFormatter>()
+    private val numericDateFormatters = ConcurrentHashMap<String, DateTimeFormatter>()
+
+    private data class DisplayFormatterKey(
+        val locale: Locale,
+        val display: DateTimeDisplay,
+        val dateStyle: FormatStyle?,
+        val timeStyle: FormatStyle?,
+        val withoutYear: Boolean,
+    )
 
     fun short(
         value: String,
@@ -127,6 +139,7 @@ object IdentityFormatter {
         locale: Locale = Locale.getDefault(),
         now: Instant = Instant.now(),
         zone: ZoneId = ZoneId.systemDefault(),
+        dateFormat: DateFormatPreference = DateFormatPreference.Automatic,
     ): String {
         if (epochSeconds == 0uL) return ""
         val seconds = epochSeconds.toLong().coerceIn(0L, MAX_DISPLAYABLE_EPOCH_SECONDS)
@@ -148,6 +161,7 @@ object IdentityFormatter {
             // last move" without the minute. No time component at any rung here.
             else -> {
                 runCatching {
+                    val formattingLocale = DateTimeFormatState.formattingLocale(locale)
                     val messageDate = instant.atZone(zone).toLocalDate()
                     val days = ChronoUnit.DAYS.between(messageDate, now.atZone(zone).toLocalDate())
                     when {
@@ -158,8 +172,13 @@ object IdentityFormatter {
                         days == 0L -> copy.hours((delta / 3_600).toInt())
                         days == 1L -> copy.yesterday
                         days < 7L -> messageDate.dayOfWeek.getDisplayName(TextStyle.SHORT, locale)
-                        days < 365L -> localizedDateWithoutYearFormatter(locale).format(messageDate)
-                        else -> shortDateFormatter(locale).format(messageDate)
+                        days < 365L ->
+                            dateFormat.withoutYearPattern?.let { pattern ->
+                                numericDateFormatter(pattern).format(messageDate)
+                            } ?: localizedDateWithoutYearFormatter(formattingLocale).format(messageDate)
+                        else ->
+                            dateFormat.pattern?.let { pattern -> numericDateFormatter(pattern).format(messageDate) }
+                                ?: shortDateFormatter(formattingLocale).format(messageDate)
                     }
                 }.getOrDefault(copy.now)
             }
@@ -175,10 +194,11 @@ object IdentityFormatter {
     ): String {
         if (epochSeconds == 0uL) return ""
         val seconds = epochSeconds.toLong().coerceIn(0L, MAX_DISPLAYABLE_EPOCH_SECONDS)
+        val formattingLocale = DateTimeFormatState.formattingLocale(locale)
         val formatter =
             when (force24Hour) {
-                null -> shortTimeFormatter(locale)
-                else -> coercedClockFormatter(locale, force24Hour)
+                null -> shortTimeFormatter(formattingLocale)
+                else -> coercedClockFormatter(formattingLocale, force24Hour)
             }
         return runCatching {
             Instant
@@ -208,6 +228,153 @@ object IdentityFormatter {
             relativeTime(epochSeconds, copy, locale, now, zone)
         } else {
             clockTime(epochSeconds, locale, zone, force24Hour)
+        }
+    }
+
+    /** A calendar day in the user's explicit numeric order, else the locale's [style] date. */
+    fun date(
+        date: LocalDate,
+        locale: Locale = Locale.getDefault(),
+        dateFormat: DateFormatPreference = DateFormatPreference.Automatic,
+        style: FormatStyle = FormatStyle.MEDIUM,
+    ): String =
+        runCatching {
+            dateFormat.pattern?.let { pattern -> numericDateFormatter(pattern).format(date) }
+                ?: displayFormatter(locale, DateTimeDisplay.LocaleDefault, style, null, withoutYear = false).format(date)
+        }.getOrDefault("")
+
+    /**
+     * Absolute date and/or time for [instant] honoring [display]. A null [dateStyle] renders the
+     * time only and a null [timeStyle] the date only; [withoutYear] drops the year from the date.
+     * Returns an empty string when out of range.
+     */
+    @Suppress("LongParameterList")
+    fun dateTime(
+        instant: Instant,
+        locale: Locale = Locale.getDefault(),
+        zone: ZoneId = ZoneId.systemDefault(),
+        display: DateTimeDisplay = DateTimeDisplay.LocaleDefault,
+        dateStyle: FormatStyle? = FormatStyle.MEDIUM,
+        timeStyle: FormatStyle? = FormatStyle.SHORT,
+        withoutYear: Boolean = false,
+    ): String {
+        require(dateStyle != null || timeStyle != null) { "A date or time style is required" }
+        return try {
+            displayFormatter(locale, display, dateStyle, timeStyle, withoutYear && dateStyle != null).format(instant.atZone(zone))
+        } catch (_: DateTimeException) {
+            ""
+        } catch (_: ArithmeticException) {
+            ""
+        }
+    }
+
+    /** [dateTime] for an epoch-second stamp; zero and unrepresentable stamps render empty. */
+    @Suppress("LongParameterList")
+    fun dateTime(
+        epochSeconds: ULong,
+        locale: Locale = Locale.getDefault(),
+        zone: ZoneId = ZoneId.systemDefault(),
+        display: DateTimeDisplay = DateTimeDisplay.LocaleDefault,
+        dateStyle: FormatStyle? = FormatStyle.MEDIUM,
+        timeStyle: FormatStyle? = FormatStyle.SHORT,
+        withoutYear: Boolean = false,
+    ): String {
+        if (epochSeconds == 0uL || epochSeconds > MAX_DISPLAYABLE_EPOCH_SECONDS.toULong()) return ""
+        val instant = Instant.ofEpochSecond(epochSeconds.toLong())
+        return dateTime(instant, locale, zone, display, dateStyle, timeStyle, withoutYear)
+    }
+
+    /** Whether an epoch-second stamp falls in [now]'s calendar year in [zone], for year-free labels. */
+    fun isCurrentYear(
+        epochSeconds: ULong,
+        zone: ZoneId = ZoneId.systemDefault(),
+        now: Instant = Instant.now(),
+    ): Boolean =
+        epochSeconds <= MAX_DISPLAYABLE_EPOCH_SECONDS.toULong() &&
+            runCatching {
+                Instant.ofEpochSecond(epochSeconds.toLong()).atZone(zone).year == now.atZone(zone).year
+            }.getOrDefault(false)
+
+    private fun numericDateFormatter(pattern: String): DateTimeFormatter =
+        numericDateFormatters.computeIfAbsent(pattern) { DateTimeFormatter.ofPattern(it, Locale.ROOT) }
+
+    private fun displayFormatter(
+        locale: Locale,
+        display: DateTimeDisplay,
+        dateStyle: FormatStyle?,
+        timeStyle: FormatStyle?,
+        withoutYear: Boolean,
+    ): DateTimeFormatter {
+        // The region only reaches the formatter through the locale; drop it from the cache key.
+        val key =
+            DisplayFormatterKey(
+                DateTimeFormatState.formattingLocale(locale),
+                display.copy(region = null),
+                dateStyle,
+                timeStyle,
+                withoutYear,
+            )
+        return displayFormatters.computeIfAbsent(key) { request ->
+            if (request.display == DateTimeDisplay.LocaleDefault && !request.withoutYear) {
+                // No override: the platform's localized formatter, exactly as before #3602.
+                when {
+                    request.timeStyle == null -> DateTimeFormatter.ofLocalizedDate(request.dateStyle)
+                    request.dateStyle == null -> DateTimeFormatter.ofLocalizedTime(request.timeStyle)
+                    else -> DateTimeFormatter.ofLocalizedDateTime(request.dateStyle, request.timeStyle)
+                }.withLocale(request.locale)
+            } else {
+                val pattern =
+                    displayPattern(request.locale, request.display, request.dateStyle, request.timeStyle, request.withoutYear)
+                DateTimeFormatter.ofPattern(pattern, request.locale)
+            }
+        }
+    }
+
+    /**
+     * The pattern for [display]. The date and time parts are rewritten on their own, so the clock
+     * rewrite never sees date fields: an explicit numeric date replaces the localized date part,
+     * [withoutYear] strips its year, and an explicit clock system rewrites the time part's hours.
+     * The rewritten parts go back into the locale's combined pattern, keeping its own glue.
+     */
+    internal fun displayPattern(
+        locale: Locale,
+        display: DateTimeDisplay,
+        dateStyle: FormatStyle?,
+        timeStyle: FormatStyle?,
+        withoutYear: Boolean = false,
+    ): String {
+        fun localized(
+            date: FormatStyle?,
+            time: FormatStyle?,
+        ) = DateTimeFormatterBuilder.getLocalizedDateTimePattern(date, time, IsoChronology.INSTANCE, locale)
+
+        val localizedDate = dateStyle?.let { localized(it, null) }
+        val localizedTime = timeStyle?.let { localized(null, it) }
+        val date =
+            localizedDate?.let { pattern ->
+                val numeric = if (withoutYear) display.dateFormat.withoutYearPattern else display.dateFormat.pattern
+                numeric ?: if (withoutYear) stripYearFromLocalizedDatePattern(pattern).ifBlank { pattern } else pattern
+            }
+        val time = localizedTime?.let { pattern -> display.use24Hour?.let { coerceClockPattern(pattern, it) } ?: pattern }
+        if (date == null || time == null) return requireNotNull(date ?: time)
+        val combined = localized(dateStyle, timeStyle)
+        val dateStart = combined.indexOf(localizedDate)
+        val timeStart = combined.indexOf(localizedTime)
+        val separate =
+            dateStart >= 0 &&
+                timeStart >= 0 &&
+                (dateStart + localizedDate.length <= timeStart || timeStart + localizedTime.length <= dateStart)
+        if (!separate) return "$date $time"
+        return buildString {
+            var index = 0
+            listOf(dateStart to (localizedDate.length to date), timeStart to (localizedTime.length to time))
+                .sortedBy { it.first }
+                .forEach { (start, part) ->
+                    append(combined, index, start)
+                    append(part.second)
+                    index = start + part.first
+                }
+            append(combined, index, combined.length)
         }
     }
 
@@ -279,10 +446,17 @@ object IdentityFormatter {
                     index = endOfPatternRun(pattern, index)
                 }
                 char in DAY_PERIOD_PATTERN_TOKENS && use24Hour -> {
-                    // Drop the day-period token and the separator space before
-                    // it; a leading one falls to the final trim.
-                    while (out.isNotEmpty() && out.last() == ' ') out.deleteCharAt(out.length - 1)
+                    // Drop the day-period token with one separator run (a plain or
+                    // narrow no-break space): the one after it ("a h:mm"), else the
+                    // one before it at the end ("h:mm a"). Glued to a field
+                    // ("Bh:mm") it goes alone.
                     index = endOfPatternRun(pattern, index)
+                    when {
+                        index < pattern.length && pattern[index].isWhitespace() ->
+                            while (index < pattern.length && pattern[index].isWhitespace()) index += 1
+                        index == pattern.length || !pattern[index].isLetter() ->
+                            while (out.isNotEmpty() && out.last().isWhitespace()) out.deleteCharAt(out.length - 1)
+                    }
                 }
                 else -> {
                     out.append(char)

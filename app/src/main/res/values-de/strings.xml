@@ -2582,4 +2582,12 @@
     <string name="settings_search_alias_read_aloud">TTS|Sprachausgabe|vorlesen</string>
     <string name="settings_search_alias_sound">Benachrichtigungston|Hinweiston|Klingelton</string>
     <string name="settings_search_revealed">%1$s. Einstellung hervorgehoben.</string>
+    <string name="date_time_format">Datum und Uhrzeit</string>
+    <string name="date_time_format_time">Uhrzeit</string>
+    <string name="date_time_format_date">Datum</string>
+    <string name="date_time_format_automatic">Automatisch</string>
+    <string name="time_format_12_hour">12-Stunden</string>
+    <string name="time_format_24_hour">24-Stunden</string>
+    <string name="date_time_format_help">Automatisch nutzt die App-Sprache und die Region deines Telefons.</string>
+    <string name="settings_search_alias_date_time_format">Zeitformat|Datumsformat|Uhr|12-Stunden|24-Stunden|AM/PM</string>
 </resources>

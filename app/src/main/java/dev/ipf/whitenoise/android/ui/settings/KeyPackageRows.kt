@@ -8,6 +8,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -17,10 +18,10 @@ import androidx.compose.ui.text.AnnotatedString
 import dev.ipf.marmotkit.AccountKeyPackageFfi
 import dev.ipf.marmotkit.AccountKeyPackageLocalStateFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.DateTimeDisplay
 import dev.ipf.whitenoise.android.core.IdentityFormatter
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
+import java.time.format.FormatStyle
 import java.util.Locale
 
 /** A relay record with explicit provenance, full-value copy and a validated deletion target. */
@@ -52,6 +53,8 @@ internal fun PublishedKeyPackage(
                 formatPublishedAt(
                     kp.publishedAt,
                     stringResource(R.string.unknown_publish_time),
+                    LocalConfiguration.current.locales[0],
+                    currentDateTimeDisplay(),
                 ),
             )
         }
@@ -174,17 +177,16 @@ private fun keyPackageSourceLabels(
     return out
 }
 
-private val publishedAtFormatter: DateTimeFormatter =
-    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.getDefault()).withZone(ZoneId.systemDefault())
-
-/** Formats a valid relay timestamp, falling back for absent or hostile out-of-range values. */
+/**
+ * Formats a valid relay timestamp in the user's date and time format, falling back for absent or
+ * hostile out-of-range values (the formatter renders those empty instead of throwing).
+ */
 private fun formatPublishedAt(
     unixSeconds: ULong,
     unknown: String,
-): String {
-    if (unixSeconds == 0uL || unixSeconds > Long.MAX_VALUE.toULong()) return unknown
-    // Validate both conversion and formatting: hostile relay timestamps must not crash this screen.
-    return runCatching {
-        publishedAtFormatter.format(Instant.ofEpochSecond(unixSeconds.toLong()))
-    }.getOrDefault(unknown)
-}
+    locale: Locale,
+    display: DateTimeDisplay,
+): String =
+    IdentityFormatter
+        .dateTime(unixSeconds, locale, display = display, dateStyle = FormatStyle.SHORT)
+        .ifEmpty { unknown }

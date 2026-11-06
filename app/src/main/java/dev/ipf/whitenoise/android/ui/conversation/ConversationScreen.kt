@@ -90,6 +90,7 @@ import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.ChatListMessageSearch
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
+import dev.ipf.whitenoise.android.core.DateTimeFormatState
 import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.core.ForwardEligibility
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
@@ -2698,7 +2699,7 @@ internal fun ConversationScreen(
                     .getOrNull(i)
                     ?.record
                     ?.recordedAt
-                    ?.let { messageDayLabel(it, transcriptLocale) }
+                    ?.let { messageDayLabel(it, transcriptLocale, DateTimeFormatState.dateFormat) }
                     .orEmpty()
             }
         }

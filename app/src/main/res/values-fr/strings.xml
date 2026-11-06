@@ -2568,4 +2568,12 @@
     <string name="settings_search_alias_read_aloud">TTS|synthèse vocale|lire à voix haute</string>
     <string name="settings_search_alias_sound">son de notification|son d’alerte|sonnerie</string>
     <string name="settings_search_revealed">%1$s. Paramètre mis en évidence.</string>
+    <string name="date_time_format">Date et heure</string>
+    <string name="date_time_format_time">Heure</string>
+    <string name="date_time_format_date">Date</string>
+    <string name="date_time_format_automatic">Automatique</string>
+    <string name="time_format_12_hour">12 heures</string>
+    <string name="time_format_24_hour">24 heures</string>
+    <string name="date_time_format_help">Automatique utilise la langue de l\'app et la région de votre téléphone.</string>
+    <string name="settings_search_alias_date_time_format">format de l\'heure|format de date|horloge|12 heures|24 heures|AM/PM</string>
 </resources>

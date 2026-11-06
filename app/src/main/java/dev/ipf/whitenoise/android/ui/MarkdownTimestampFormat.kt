@@ -1,9 +1,11 @@
 package dev.ipf.whitenoise.android.ui
 
-import java.time.DateTimeException
+import dev.ipf.whitenoise.android.core.DateFormatPreference
+import dev.ipf.whitenoise.android.core.DateTimeDisplay
+import dev.ipf.whitenoise.android.core.DateTimeFormatState
+import dev.ipf.whitenoise.android.core.IdentityFormatter
 import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
 
@@ -88,28 +90,33 @@ private fun timestampRelativeScaleIndex(distance: ULong): Int {
     return index
 }
 
-/** Formats [seconds] in [style] for [locale] and [zone], falling back to the canonical token out of range. */
+/**
+ * Formats [seconds] in [style] for [locale] and [zone], falling back to the canonical token out of range.
+ * The clock follows [display]; its numeric date order replaces only the short date styles, since the
+ * long styles were chosen for their written-out month and weekday.
+ */
 internal fun markdownTimestampAbsolute(
     seconds: Long,
     style: Char,
     locale: Locale = Locale.getDefault(),
     zone: ZoneId = ZoneId.systemDefault(),
+    display: DateTimeDisplay = DateTimeFormatState.display,
 ): String {
-    val formatter =
+    val (dateStyle, timeStyle) =
         when (style) {
-            't' -> DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)
-            'T' -> DateTimeFormatter.ofLocalizedTime(FormatStyle.MEDIUM)
-            'd' -> DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
-            'D' -> DateTimeFormatter.ofLocalizedDate(FormatStyle.LONG)
-            'F' -> DateTimeFormatter.ofLocalizedDateTime(FormatStyle.FULL, FormatStyle.SHORT)
-            's' -> DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT, FormatStyle.SHORT)
-            'S' -> DateTimeFormatter.ofLocalizedDateTime(FormatStyle.SHORT, FormatStyle.MEDIUM)
-            else -> DateTimeFormatter.ofLocalizedDateTime(FormatStyle.LONG, FormatStyle.SHORT)
+            't' -> null to FormatStyle.SHORT
+            'T' -> null to FormatStyle.MEDIUM
+            'd' -> FormatStyle.SHORT to null
+            'D' -> FormatStyle.LONG to null
+            'F' -> FormatStyle.FULL to FormatStyle.SHORT
+            's' -> FormatStyle.SHORT to FormatStyle.SHORT
+            'S' -> FormatStyle.SHORT to FormatStyle.MEDIUM
+            else -> FormatStyle.LONG to FormatStyle.SHORT
         }
-    return try {
-        formatter.withLocale(locale).withZone(zone).format(Instant.ofEpochSecond(seconds))
-    } catch (_: DateTimeException) {
-        // The parser accepts all i64 seconds; java.time has a smaller calendar range.
-        markdownTimestampToken(seconds, style)
-    }
+    val styleDisplay = if (dateStyle == FormatStyle.SHORT) display else display.copy(dateFormat = DateFormatPreference.Automatic)
+    // The parser accepts all i64 seconds; java.time has a smaller range, so Instant.ofEpochSecond
+    // itself can throw before the formatter (which renders its own range failures empty) runs.
+    val instant = runCatching { Instant.ofEpochSecond(seconds) }.getOrNull()
+    val label = instant?.let { IdentityFormatter.dateTime(it, locale, zone, styleDisplay, dateStyle, timeStyle) }.orEmpty()
+    return label.ifEmpty { markdownTimestampToken(seconds, style) }
 }

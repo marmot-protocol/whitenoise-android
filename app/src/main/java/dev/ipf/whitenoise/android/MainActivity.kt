@@ -32,6 +32,7 @@ import androidx.lifecycle.lifecycleScope
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.HostPerformanceOutcomeFfi
 import dev.ipf.whitenoise.android.amber.AmberActivityCoordinator
+import dev.ipf.whitenoise.android.core.DateTimeFormatState
 import dev.ipf.whitenoise.android.diagnostics.AndroidFramePerformanceReporter
 import dev.ipf.whitenoise.android.diagnostics.FramePerformanceCallbackGuard
 import dev.ipf.whitenoise.android.notifications.InboundIntentRouting
@@ -498,6 +499,8 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         WarmResumeTrace.lifecycle(warmResumeTraceToken, "activity-resumed")
+        // The 12/24-hour switch and phone region can change while the app is in the background.
+        DateTimeFormatState.refreshSystem(this)
         if (::appState.isInitialized) {
             appState.appUnlockSessions.clearForegroundReturn()
             if (foregroundConversationDismissal.consumeShouldDismissOnResume()) {

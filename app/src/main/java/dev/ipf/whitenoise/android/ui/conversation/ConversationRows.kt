@@ -36,6 +36,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.DateFormatPreference
+import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Add
@@ -45,7 +47,6 @@ import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
@@ -97,11 +98,13 @@ internal fun differentDay(
         Instant.ofEpochSecond(b.toLong()).atZone(zone).toLocalDate()
 }
 
-// Today/Yesterday, then weekday within a week, then a locale-medium date —
-// all sourced from the platform so the ribbon needs no new translation keys.
+// Today/Yesterday, then weekday within a week, then a locale-medium date (or the
+// user's numeric date format, #3602) — all sourced from the platform so the
+// ribbon needs no new translation keys.
 internal fun messageDayLabel(
     epochSeconds: ULong,
     locale: Locale,
+    dateFormat: DateFormatPreference = DateFormatPreference.Automatic,
 ): String {
     if (epochSeconds == 0uL) return ""
     val zone = ZoneId.systemDefault()
@@ -116,7 +119,7 @@ internal fun messageDayLabel(
                     DateUtils.DAY_IN_MILLIS,
                 ).toString()
         days in 2L..6L -> date.dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, locale)
-        else -> date.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale))
+        else -> IdentityFormatter.date(date, locale, dateFormat, FormatStyle.MEDIUM)
     }
 }
 
