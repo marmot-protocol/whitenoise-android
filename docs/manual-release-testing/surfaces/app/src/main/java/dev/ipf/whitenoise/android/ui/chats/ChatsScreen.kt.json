@@ -217,6 +217,14 @@
         ]
       },
       {
+        "surface": "R.string.toast_chat_list_select_all_loaded_only",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "R.string.toast_chat_list_select_all_loaded_only",
+        "test_ids": [
+          "CHL-034"
+        ]
+      },
+      {
         "surface": "R.string.toast_couldnt_update_chat",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "R.string.toast_couldnt_update_chat",

@@ -4666,15 +4666,20 @@ class ChatsController private constructor(
         groupIds: List<String>,
         owner: ChatListActionOwner,
     ): List<String>? {
-        if (groupIds.isEmpty()) return emptyList()
-        val revalidate =
-            liveSubscriptions.revalidateChatListIds?.takeIf { chatListActionSessionIsCurrent(owner) } ?: return null
-        val kept = revalidate(owner.accountRef, view, groupIds).mapTo(hashSetOf()) { it.lowercase(Locale.ROOT) }
-        val outside = groupIds.filter { it.lowercase(Locale.ROOT) !in kept }
-        if (outside.isNotEmpty()) {
-            revalidate(owner.accountRef, ChatListViewFfi.LEFT, outside).mapTo(kept) { it.lowercase(Locale.ROOT) }
+        val revalidate = liveSubscriptions.revalidateChatListIds?.takeIf { chatListActionSessionIsCurrent(owner) }
+        return when {
+            groupIds.isEmpty() -> emptyList()
+            revalidate == null -> null
+            else -> {
+                val kept = revalidate(owner.accountRef, view, groupIds).mapTo(hashSetOf()) { it.lowercase(Locale.ROOT) }
+                val outside = groupIds.filter { it.lowercase(Locale.ROOT) !in kept }
+                if (outside.isNotEmpty()) {
+                    revalidate(owner.accountRef, ChatListViewFfi.LEFT, outside)
+                        .mapTo(kept) { it.lowercase(Locale.ROOT) }
+                }
+                groupIds.filter { it.lowercase(Locale.ROOT) in kept }.takeIf { chatListActionSessionIsCurrent(owner) }
+            }
         }
-        return groupIds.filter { it.lowercase(Locale.ROOT) in kept }.takeIf { chatListActionSessionIsCurrent(owner) }
     }
 
     /** Resolves a displayed full-list row without materializing it into the bounded controller window. */
