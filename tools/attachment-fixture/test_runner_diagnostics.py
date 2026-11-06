@@ -11,6 +11,27 @@ import device_runner
 class RunnerDiagnosticsTest(unittest.TestCase):
     """Keep diagnostics read-only, explicit-device, privacy safe and independent of qualification."""
 
+    def test_partial_checkpoints_are_closed_bounded_and_never_measurements(self):
+        """Malformed, oversized and private rows cannot enter a timeout report or stand in for completion proof."""
+        prefix = "INSTRUMENTATION_STATUS: controlled_attachment_json="
+        safe = {"phase": "fixture-stage", "stage": "resume-cleanup-start"}
+        rows = [safe, safe, {"phase": "fixture-stage", "stage": []},
+                {"phase": "fixture-stage", "stage": {"PRIVATE": True}},
+                {"phase": "fixture-stage", "stage": "PRIVATE"},
+                {**safe, "private": "PRIVATE"}, {"phase": "received-cold", "success": True},
+                [], "PRIVATE", None]
+        transcript = "\n".join(prefix + json.dumps(row) for row in rows)
+        transcript += "\n" + prefix + " " * 256 + json.dumps(safe)
+        transcript += "\n" + prefix + '{"phase":"fixture-stage","stage":'
+        for value in (transcript, transcript.encode(), None):
+            with self.subTest(output_type=type(value).__name__):
+                error = subprocess.TimeoutExpired("PRIVATE", 180, output=value)
+                self.assertEqual([safe] if value else [], device_runner.partial_checkpoints(error))
+        # A large captured stream has a fixed scan window and still retains the last complete checkpoint.
+        error = subprocess.TimeoutExpired("PRIVATE", 180, output=b"PRIVATE" * 200_000 +
+                                         ("\n" + prefix + json.dumps(safe)).encode())
+        self.assertEqual([safe], device_runner.partial_checkpoints(error))
+
     def test_mapping_receipt_matches_both_ends_without_exporting_other_owners(self):
         """A correct device listener aimed at the wrong host port is distinguished from the expected mapping."""
         listing = "UsbFfs tcp:45001 tcp:32001\nUsbFfs tcp:45002 tcp:32003\nPRIVATE tcp:60000 tcp:61000\n"
