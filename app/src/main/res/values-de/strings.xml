@@ -1270,7 +1270,7 @@
     <string name="group_system_you_avatar_changed">Du hast das Gruppenbild geändert</string>
     <string name="media_attachment_add_more">Mehr hinzufügen</string>
     <string name="media_attachment_remove">Anhang entfernen</string>
-    <string name="voice_message_record">Sprachnachricht aufnehmen</string>
+    <string name="voice_message_record">Halten zum Aufnehmen</string>
     <string name="voice_message_too_short">Länger halten zum Aufnehmen</string>
     <string name="voice_message_permission_denied">Mikrofonberechtigung erforderlich</string>
     <string name="voice_message_recording_failed">Sprachnachricht konnte nicht aufgenommen werden</string>

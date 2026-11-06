@@ -302,7 +302,7 @@ class ComposerToolbarSpacingScreenshotTest {
             val trailing =
                 listOf(
                     bounds("Dictate text"),
-                    bounds(if (case.draft.isEmpty()) "Record voice message" else "Send"),
+                    bounds(if (case.draft.isEmpty()) "Hold to record voice message" else "Send"),
                 )
             assertTargets(trailing, sign)
             val row = (controls + trailing).sortedBy { it.left }

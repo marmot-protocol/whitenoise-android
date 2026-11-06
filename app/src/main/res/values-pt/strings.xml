@@ -1272,7 +1272,7 @@
     <string name="group_system_you_avatar_changed">Você alterou a imagem do grupo</string>
     <string name="media_attachment_add_more">Adicionar mais</string>
     <string name="media_attachment_remove">Remover anexo</string>
-    <string name="voice_message_record">Gravar mensagem de voz</string>
+    <string name="voice_message_record">Segure para gravar</string>
     <string name="voice_message_too_short">Segure por mais tempo</string>
     <string name="voice_message_permission_denied">Permissão de microfone necessária</string>
     <string name="voice_message_recording_failed">Não foi possível gravar a mensagem de voz</string>

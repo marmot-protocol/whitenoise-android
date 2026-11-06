@@ -1270,7 +1270,7 @@
     <string name="group_system_you_avatar_changed">Grup avatarını değiştirdiniz</string>
     <string name="media_attachment_add_more">Daha fazla ekle</string>
     <string name="media_attachment_remove">Eki kaldır</string>
-    <string name="voice_message_record">Sesli mesaj kaydet</string>
+    <string name="voice_message_record">Kaydetmek için basılı tutun</string>
     <string name="voice_message_too_short">Daha uzun süre basılı tutun</string>
     <string name="voice_message_permission_denied">Kayıt için mikrofon izni gerekli</string>
     <string name="voice_message_recording_failed">Sesli mesaj kaydedilemedi</string>

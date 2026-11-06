@@ -1637,7 +1637,7 @@
     <string name="relative_time_yesterday">Yesterday</string>
     <string name="media_attachment_add_more">Add more</string>
     <string name="media_attachment_remove">Remove attachment</string>
-    <string name="voice_message_record">Record voice message</string>
+    <string name="voice_message_record">Hold to record voice message</string>
     <string name="voice_message_too_short">Hold longer to record</string>
     <string name="voice_message_permission_denied">Microphone permission needed to record</string>
     <string name="voice_message_recording_failed">Couldn\'t record voice message</string>

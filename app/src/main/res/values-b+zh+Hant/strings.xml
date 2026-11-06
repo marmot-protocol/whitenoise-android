@@ -1251,7 +1251,7 @@
     <string name="group_system_you_avatar_changed">你更換了群組頭像</string>
     <string name="media_attachment_add_more">新增更多</string>
     <string name="media_attachment_remove">移除附件</string>
-    <string name="voice_message_record">錄製語音訊息</string>
+    <string name="voice_message_record">按住錄製</string>
     <string name="voice_message_too_short">按住更久以錄製</string>
     <string name="voice_message_permission_denied">需要麥克風權限才能錄製</string>
     <string name="voice_message_recording_failed">無法錄製語音訊息</string>

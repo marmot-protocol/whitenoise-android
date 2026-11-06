@@ -1318,7 +1318,7 @@
     <string name="group_system_you_avatar_changed">Вы изменили аватар группы</string>
     <string name="media_attachment_add_more">Добавить ещё</string>
     <string name="media_attachment_remove">Удалить вложение</string>
-    <string name="voice_message_record">Записать голосовое сообщение</string>
+    <string name="voice_message_record">Удерживайте для записи</string>
     <string name="voice_message_too_short">Удерживайте дольше</string>
     <string name="voice_message_permission_denied">Требуется доступ к микрофону</string>
     <string name="voice_message_recording_failed">Не удалось записать голосовое сообщение</string>

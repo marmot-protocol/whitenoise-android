@@ -1272,7 +1272,7 @@
     <string name="group_system_you_avatar_changed">Vous avez changé l\'avatar du groupe</string>
     <string name="media_attachment_add_more">Ajouter plus</string>
     <string name="media_attachment_remove">Retirer la pièce jointe</string>
-    <string name="voice_message_record">Enregistrer un message vocal</string>
+    <string name="voice_message_record">Maintenir pour enregistrer</string>
     <string name="voice_message_too_short">Maintenir plus longtemps</string>
     <string name="voice_message_permission_denied">Autorisation du microphone requise</string>
     <string name="voice_message_recording_failed">Impossible d’enregistrer le message vocal</string>
