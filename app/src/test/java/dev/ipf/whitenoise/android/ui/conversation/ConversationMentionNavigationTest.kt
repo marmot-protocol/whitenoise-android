@@ -269,7 +269,11 @@ class ConversationMentionNavigationTest {
             assertEquals(listOf(Write(false, 190, 0), Write(true, 200, 300)), writer.writes)
         }
 
-    /** The re-resolved approach already lands correctly, so settlement must not write it a second time. */
+    /**
+     * From older history the approach targets the re-resolved mention's older neighbour, whose newest edge is the
+     * mention's reading start whatever the mention's unmeasured height (#3150). It already lands correctly, so
+     * settlement must not write it a second time.
+     */
     @Test
     fun farMentionTowardNewestReResolvesAfterHeaderChange() =
         runTest {
@@ -284,7 +288,23 @@ class ConversationMentionNavigationTest {
                     awaitLayout = {},
                 ),
             )
-            assertEquals(listOf(Write(false, 11, 0), Write(true, 2, 300)), writer.writes)
+            assertEquals(listOf(Write(false, 11, 0), Write(true, 3, -500)), writer.writes)
+        }
+
+    /** The oldest loaded row has no older neighbour to stop at, so it keeps its own measured approach. */
+    @Test
+    fun oldestRowMentionFromHistoryTargetsItselfWithoutANeighbour() =
+        runTest {
+            val writer = RecordingWriter().apply { firstVisibleItemIndex = 6 }
+            assertTrue(
+                ConversationScrollCoordinator(writer).jumpToMentionReadingStart(
+                    targetMessageId = "oldest-mention",
+                    resolveTargetIndex = { 2 },
+                    readLayout = { ConversationMentionJumpLayout(500, 800, hasOlderNeighbour = false) },
+                    awaitLayout = {},
+                ),
+            )
+            assertEquals(listOf(Write(true, 2, 300)), writer.writes)
         }
 
     @Test

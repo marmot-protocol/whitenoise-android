@@ -815,6 +815,10 @@ internal class ConversationScrollCoordinator(
     internal inner class ConversationScrollCommandScope internal constructor(
         private val serial: Long,
     ) {
+        /** The newest row currently laid out; the reversed list puts it nearest the composer. */
+        val firstVisibleItemIndex: Int
+            get() = writer.firstVisibleItemIndex
+
         suspend fun scrollToItem(
             index: Int,
             scrollOffset: Int = 0,
@@ -839,14 +843,15 @@ internal class ConversationScrollCoordinator(
          * Keeps distance-independent navigation responsive: snap near a far target, then animate only
          * the final few rows. Message-backed callers can re-resolve after each snap because paging may
          * insert or remove list headers while the command is suspended.
-         * [resolveScrollOffset] reads geometry after prepositioning so a later settle pass can use
-         * the actual approach coordinate instead of an obsolete measurement.
+         * [resolveDestination] reads geometry after prepositioning so a later settle pass can use
+         * the actual approach coordinate instead of an obsolete measurement. It returns the
+         * (index, scroll offset) write for the resolved target, which may name a neighbouring row.
          */
         suspend fun animateScrollToItem(
             index: Int,
             scrollOffset: Int = 0,
             traceMentionJump: Boolean = false,
-            resolveScrollOffset: (Int) -> Int = { scrollOffset },
+            resolveDestination: (Int) -> Pair<Int, Int> = { it to scrollOffset },
             resolveIndex: () -> Int? = { index },
         ): Boolean {
             ensureCurrent()
@@ -864,14 +869,14 @@ internal class ConversationScrollCoordinator(
             val resolvedTargetIndex = targetIndex ?: return false
             // Prepositioning can suspend through a keyboard/header/row measurement change.
             // Use the geometry now available, not an offset captured before that handoff.
-            val resolvedScrollOffset = resolveScrollOffset(resolvedTargetIndex)
+            val (destinationIndex, destinationOffset) = resolveDestination(resolvedTargetIndex)
             if (isFar(resolvedTargetIndex)) {
                 traceMentionWrite(traceMentionJump, ConversationMentionJumpTrace.POSITION) {
-                    writer.scrollToItem(resolvedTargetIndex, resolvedScrollOffset)
+                    writer.scrollToItem(destinationIndex, destinationOffset)
                 }
             } else {
                 traceMentionWrite(traceMentionJump, ConversationMentionJumpTrace.ANIMATION) {
-                    writer.animateScrollToItem(resolvedTargetIndex, resolvedScrollOffset)
+                    writer.animateScrollToItem(destinationIndex, destinationOffset)
                 }
             }
             ensureCurrent()
