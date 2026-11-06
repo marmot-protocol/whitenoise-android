@@ -391,7 +391,11 @@ internal class RawAvPlaybackEngine(
             if (handlesFocus) focus.release()
             return false
         }
-        if (claim.previous !== this) claim.previous?.pause(false)
+        if (claim.previous !== this) {
+            claim.previous?.pause(false)
+            // The new source's opener would otherwise wait for the paused source's worker teardown.
+            claim.previous?.renderer?.retireWorker()
+        }
         synchronized(lock) {
             if (!current()) return false
             val outputRefusal = renderer.volume(volume)
@@ -800,6 +804,7 @@ internal class RawAvPlaybackEngine(
         activation++
         revision++
         renderer.pause()?.let { if (it !== failure) failure.addSuppressed(it) }
+        renderer.retireWorker()
         notifyChanged()
         releaseFocus(false)
         main.post { if (!intent().playing) unregisterNoisy() }
@@ -829,7 +834,7 @@ internal class RawAvPlaybackEngine(
         ) {
             // Release closed the conflated command signal.
         } finally {
-            renderer.pause()
+            renderer.close()
             synchronized(frameLock) {
                 lastBitmap?.recycle()
                 lastBitmap = null
@@ -1024,7 +1029,8 @@ internal class RawAvPlaybackEngine(
             activation++
             revision++
         }
-        renderer.pause()
+        // Release also retires the paused worker kept for warm resume.
+        renderer.close()
         focus.close()
         releaseFocus(true)
         prepared.setException(IOException("Media source owner retired"))

@@ -159,8 +159,9 @@ timed out after the instrumented tests had passed. Its timing rows are complete.
 
 The same test ran once on a Pixel 6a (API 37, Android 17 `CP3A.261005.002.A1`)
 with the CI debug build of merge commit `c258423e` (PR head `5541df88` on master
-`ae53e478`). The playback, decoder and native sources are unchanged from that
-build to the current head. All 32 rows were observed with no failed rows.
+`ae53e478`). All 32 rows were observed with no failed rows. That build predates
+warm resume and preroll frame skipping, described in
+[media containment](media-containment.md#native-audiovideo-policy).
 
 | Device | Play to first progress, median (max) | Resume to audio progress, median (max) | Seek to matching progress, median (max) |
 | --- | --- | --- | --- |
@@ -169,8 +170,8 @@ build to the current head. All 32 rows were observed with no failed rows.
 The isolated worker accounts for most of the start time. Its median time from the
 play request to a ready worker was 1552 ms (1708 ms max), and first progress
 followed a median 59 ms later. The API 30 emulator needed 885 ms for the same
-step. Each resume starts a new worker activation, so resume costs about the same
-as a cold start: the start and ten resumes on each file ran in 11 separate
+step. In that build each resume started a new worker, so resume cost about the
+same as a cold start: the start and ten resumes on each file ran in 11 separate
 worker processes.
 
 The long tails all come from `original-video.mp4`. Resume on that file took

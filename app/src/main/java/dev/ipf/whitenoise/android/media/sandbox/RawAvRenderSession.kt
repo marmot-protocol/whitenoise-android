@@ -114,6 +114,12 @@ internal class RawAvRenderSession(
 
     @Volatile private var stream: IsolatedAvStream? = null
 
+    // The paused worker of this exact source; only run() parks it and only run()/close() take it.
+    private var parked: IsolatedAvStream? = null
+    private var closed = false
+    private var startedRun = -1L
+    private var refusedThrough = -1L
+
     @Volatile private var pcm: RawPcmSink? = null
 
     @Volatile var activeRun = -1L
@@ -141,28 +147,80 @@ internal class RawAvRenderSession(
         }
 
     /**
-     * Retires the current run, detaches and closes its PCM sink, then closes the exact stream.
+     * Retires the current run and detaches and closes its PCM sink. The run then parks its healthy
+     * stream for a warm resume of this same source instead of starting a new worker.
      * Device pause refusal is returned as an output failure; sink cleanup is still attempted.
      */
     @Suppress("TooGenericExceptionCaught") // Retirement closes the exact sink even when the device rejects pause.
     fun pause(): RawOutputFailure? =
-        try {
-            synchronized(clockLock) {
-                cancelledRun = activeRun
-                val selected = pcm
-                pcm = null
-                try {
-                    selected?.pause()
-                    null
-                } catch (failure: Exception) {
-                    RawOutputFailure("Raw audio pause refused", failure)
-                } finally {
-                    selected?.let { runCatching { it.close() } }
-                }
+        synchronized(clockLock) {
+            cancelledRun = activeRun
+            val selected = pcm
+            pcm = null
+            try {
+                selected?.pause()
+                null
+            } catch (failure: Exception) {
+                RawOutputFailure("Raw audio pause refused", failure)
+            } finally {
+                selected?.let { runCatching { it.close() } }
             }
+        }
+
+    /**
+     * Pauses output, then closes the running and parked streams; a later run never parks again.
+     */
+    fun close(): RawOutputFailure? =
+        try {
+            pause()
         } finally {
+            val retired = synchronized(clockLock) {
+                closed = true
+                parked.also { parked = null }
+            }
+            retired?.close()
             stream?.close()
         }
+
+    /**
+     * Retires the parked worker and refuses parking for every activation started so far: playback
+     * failure or another source's activation must not keep this worker alive.
+     */
+    fun retireWorker() {
+        synchronized(clockLock) {
+            refusedThrough = maxOf(refusedThrough, startedRun)
+            parked.also { parked = null }
+        }?.close()
+    }
+
+    /** Takes the parked worker only if it still serves this owner's current account generation. */
+    private fun takeParked(activation: Long): IsolatedAvStream? {
+        val candidate =
+            synchronized(clockLock) {
+                startedRun = maxOf(startedRun, activation)
+                parked.also { parked = null }
+            } ?: return null
+        if (candidate.unpark()) return candidate
+        candidate.close()
+        return null
+    }
+
+    /** Parks one healthy stream, replacing none: run() is serial and takes the parked worker first. */
+    private fun park(
+        selected: IsolatedAvStream,
+        activation: Long,
+    ) {
+        val accepted =
+            synchronized(clockLock) {
+                if (closed || parked != null || activation <= refusedThrough) {
+                    false
+                } else {
+                    parked = selected
+                    true
+                }
+            }
+        if (accepted) selected.park(PARKED_IDLE_MS) else selected.close()
+    }
 
     /**
      * Applies gain under the clock lock and retains it for future sinks; returns typed device refusal.
@@ -205,11 +263,13 @@ internal class RawAvRenderSession(
     @Suppress("TooGenericExceptionCaught")
     suspend fun run(activation: Long) {
         var selected: IsolatedAvStream? = null
+        var reusable = false
         try {
             operationSeek = null
             owner.awaitPrepared()
             if (!valid(activation)) return
-            selected = IsolatedAvStream.openUri(context, uri, wantVideo, wantAudio)
+            // A resumed activation seeks the parked worker; the first applied seek below always runs.
+            selected = takeParked(activation) ?: IsolatedAvStream.openUri(context, uri, wantVideo, wantAudio)
             observation?.let { selected?.observeReady(it, activation) }
             stream = selected
             activeRun = activation
@@ -217,6 +277,7 @@ internal class RawAvRenderSession(
             synchronized(clockLock) { sourceHasAudio = wantAudio && info.hasAudio }
             owner.opened(info, activation)
             consumeFrames(info, activation, selected::read, selected::seek)
+            reusable = true
         } catch (failure: Exception) {
             if (valid(
                     activation,
@@ -234,12 +295,13 @@ internal class RawAvRenderSession(
                 owner.failed(activation, operationSeek, IOException("Raw playback output memory unavailable", failure))
             }
         } finally {
-            selected?.close()
             if (stream === selected) stream = null
             pcm?.close()
             pcm = null
             activeRun = -1L
             appliedSeek = -1L
+            // Any failure retires the worker; a paused or ended run keeps it for this source only.
+            selected?.let { if (reusable) park(it, activation) else it.close() }
         }
     }
 
@@ -678,5 +740,8 @@ internal class RawAvRenderSession(
 
     private companion object {
         const val AUDIO_RESERVE_US = 100_000L
+
+        /** A paused worker beyond this idle time is retired; resuming later starts a new worker. */
+        const val PARKED_IDLE_MS = 30_000L
     }
 }

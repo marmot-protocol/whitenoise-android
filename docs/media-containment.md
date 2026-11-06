@@ -120,6 +120,23 @@ a separate eight-million-pixel budget, so some large outputs are downscaled with
 preserved framing. Actual HDR fidelity, common-format support, performance and
 four-ABI compatibility require current-source build and device evidence.
 
+Pausing playback keeps the worker of that exact source for up to 30 seconds, and
+resume and replay seek that same process. The parked worker
+gets no new descriptor, memory region or capability. It can only be claimed by
+the next activation of the player that parked it, and only while its account
+generation is current and its parent resources are healthy. Any of these
+retires it, after which it goes through the same process-absence release as any
+other stream: another player starting, another opener on the same lane, idle
+expiry, player release, account reset, a playback failure, or a run that ends
+in an exception. A paused worker can keep running code for that window, which an
+active worker of the same source could already do.
+
+After a seek, the worker drops decoded video frames before the target without
+converting them to RGBA, because the parent would discard them. It stops
+dropping while half of the compressed lookahead is queued or after 500 ms of
+its 1.5-second call deadline, and then returns the frame for
+the parent's existing preroll handling.
+
 ## MDK boundary
 
 MDK retains reference validation, authenticated encryption/hash verification, safe public-address/TLS/redirect transport, transfer policy, resumable acquisition and retained state. Native receive memory and low-space recovery remain tracked by [MDK #2241](https://github.com/marmot-protocol/mdk/issues/2241) and [MDK #2239](https://github.com/marmot-protocol/mdk/issues/2239). Shared public-image qualification/admission remains [MDK #2232](https://github.com/marmot-protocol/mdk/issues/2232). This Android boundary neither duplicates those rules nor claims an upstream fix is shipped.

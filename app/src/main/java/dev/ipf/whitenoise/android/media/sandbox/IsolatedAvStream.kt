@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicIntegerArray
 
 internal sealed interface AvStreamFrame {
     data class Video(
@@ -87,6 +88,8 @@ internal class IsolatedAvStream private constructor(
     private var input: MediaParentResource<ParcelFileDescriptor>? = null
     private var sequence = 0L
     private var bindingAttempted = false
+    private val idle = AtomicBoolean()
+    private val idleExpiry = Runnable { preemptIdle() }
 
     @Volatile private var deathRegistered = false
     private var readyIdentity: Pair<Int, Int>? = null
@@ -559,6 +562,29 @@ internal class IsolatedAvStream private constructor(
         }
     }
 
+    /**
+     * Keeps this exact worker for the same owner's next activation while it is paused.
+     * An idle worker receives no new capability; expiry, a waiting opener or account retirement closes it.
+     */
+    fun park(idleMs: Long) {
+        idle.set(true)
+        callbackHandler.postDelayed(idleExpiry, idleMs)
+        // Pairs with reserve(): either the waiter observes idle, or this park observes the waiter.
+        if (reserveWaiters.get(lane.ordinal) > 0) preemptIdle()
+    }
+
+    /** Reclaims a parked worker; false means it was preempted or can no longer serve its owner. */
+    fun unpark(): Boolean {
+        if (!idle.compareAndSet(true, false)) return false
+        callbackHandler.removeCallbacks(idleExpiry)
+        return !lifetime.closed && admissions.isCurrent(lane, ownerEpoch, this) && parentResources.healthy()
+    }
+
+    /** Closes this worker only if it is parked; an active stream is never revoked here. */
+    private fun preemptIdle() {
+        if (idle.compareAndSet(true, false)) close()
+    }
+
     /** Close is nonblocking; the next source waits for calibrated kernel process absence and cleanup. */
     override fun close() {
         lifetime.close()
@@ -710,6 +736,7 @@ internal class IsolatedAvStream private constructor(
     companion object {
         private val ids = AtomicInteger()
         private val admissions = AvStreamAdmissions<IsolatedAvStream>()
+        private val reserveWaiters = AtomicIntegerArray(AvStreamLane.entries.size)
 
         /** Account teardown revokes the exact current source; it never frees an unconfirmed worker slot. */
         fun retireActive() {
@@ -831,9 +858,16 @@ internal class IsolatedAvStream private constructor(
                     if (created != null) return created
                 } else {
                     val left = (deadline - SystemClock.elapsedRealtime()).coerceAtLeast(0)
-                    if (!current.released.await(left, TimeUnit.MILLISECONDS)) {
-                        throw MediaAdmissionFailure("Previous media worker lifetime is unresolved")
-                    }
+                    reserveWaiters.incrementAndGet(lane.ordinal)
+                    val released =
+                        try {
+                            // A paused owner's parked worker yields its lane to any new opener.
+                            current.preemptIdle()
+                            current.released.await(left, TimeUnit.MILLISECONDS)
+                        } finally {
+                            reserveWaiters.decrementAndGet(lane.ordinal)
+                        }
+                    if (!released) throw MediaAdmissionFailure("Previous media worker lifetime is unresolved")
                 }
                 if (SystemClock.elapsedRealtime() >= deadline) throw MediaAdmissionFailure("Media admission timed out")
             }
