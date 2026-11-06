@@ -18,7 +18,7 @@ import dev.ipf.whitenoise.android.ui.theme.amoledRowSeamColor
 import dev.ipf.whitenoise.android.ui.theme.connectedRowBorder
 
 internal object SettingsRowDefaults {
-    /** Material's disabled content alpha, shared by blocked row text and the AMOLED row edge. */
+    /** Material's disabled content alpha for a blocked row's text and icons — its connected outline never dims. */
     const val DisabledAlpha = 0.38f
 
     /** The existing settings rows size their busy indicator like the switch it replaces. */
@@ -100,14 +100,15 @@ internal fun Color.dimmedUnless(editable: Boolean): Color =
 /**
  * Each AMOLED row owns its side edges in the group's outline colour and the preceding row owns the
  * single-pixel shared divider, drawn as the dimmed seam so the outer outline stays the only white edge.
+ *
+ * The outline is group chrome, not row state — a disabled or busy row greys its content but keeps the
+ * shared perimeter and seam in the group's colours, so one unavailable action never cuts a grey
+ * segment into the box.
  */
-internal fun Modifier.settingsRowBorder(
-    context: SettingsRowContext,
-    editable: Boolean,
-): Modifier {
+internal fun Modifier.settingsRowBorder(context: SettingsRowContext): Modifier {
     val shape = context.shapes.shape
     return if (shape is ConnectedRowShape) {
-        val outline = context.borderColor.dimmedUnless(editable)
+        val outline = context.borderColor
         connectedRowBorder(shape, outline, seamColor = amoledRowSeamColor(outline))
     } else {
         this

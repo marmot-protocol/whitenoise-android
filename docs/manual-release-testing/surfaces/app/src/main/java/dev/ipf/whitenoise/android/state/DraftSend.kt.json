@@ -1,0 +1,28 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DraftSend.kt",
+  "legacy_sha256": "08c13922a2b6e9fa6430013f6e6ed1ac0345fbab2934b9c4dbf64ac1d0778d5d",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "A text or reply send publishes with one engine call and reads no draft",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DraftSend.kt",
+        "anchor": "internal suspend fun MarmotInterface.sendComposerText(",
+        "test_ids": [
+          "CON-005",
+          "CON-008",
+          "CON-012"
+        ]
+      },
+      {
+        "surface": "A detached completed dictation sends through the process-owned transport order",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/DraftSend.kt",
+        "anchor": "internal suspend fun WhiteNoiseAppState.sendDetachedDictationText(",
+        "test_ids": [
+          "DIC-002",
+          "DIC-010"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

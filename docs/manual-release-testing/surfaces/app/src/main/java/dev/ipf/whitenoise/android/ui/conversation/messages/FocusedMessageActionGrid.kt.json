@@ -1,0 +1,36 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActionGrid.kt",
+  "legacy_sha256": "8d8561ef78ebc6ffc08b709ed011606c16bf9de85dc5a34164184319b291c3f3",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "FocusedActionMenu",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActionGrid.kt",
+        "anchor": "fun FocusedActionMenu(",
+        "test_ids": [
+          "MSG-004",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "FocusedActionCell",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActionGrid.kt",
+        "anchor": "fun FocusedActionCell(",
+        "test_ids": [
+          "MSG-004"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "The long-press actions form a two-column labelled grid, falling back to one readable column",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/FocusedMessageActionGrid.kt",
+        "anchor": "fun FocusedActionMenu(",
+        "test_ids": [
+          "MSG-004"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

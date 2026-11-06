@@ -4,6 +4,7 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListRowFfi
+import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.PresentationResolutionFfi
 import dev.ipf.marmotkit.PresentationSourceFfi
@@ -136,9 +137,9 @@ class ChatListDirectPeerPresentationLifecycleTest {
     /** Installs a newer coherent window frame the way a window replacement does, then republishes. */
     private fun ChatsController.replacePresented(vararg rows: PresentedChatRowFfi) {
         ChatsController::class.java
-            .getDeclaredMethod("replacePresentedChatRows", List::class.java)
+            .getDeclaredMethod("replacePresentedChatRows", List::class.java, ChatListWindowSnapshotFfi::class.java)
             .apply { isAccessible = true }
-            .invoke(this, rows.toList())
+            .invoke(this, rows.toList(), null)
         ChatsController::class.java
             .getDeclaredMethod("recompute", Boolean::class.javaPrimitiveType)
             .apply { isAccessible = true }

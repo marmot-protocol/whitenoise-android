@@ -120,7 +120,7 @@ all seven native replay cases with relay comparison refused and ignored.
 
 ```sh
 gh workflow run android-instrumented.yml --repo marmot-protocol/whitenoise-android \
-  --ref chore/marmotkit-nightly-20261106 -f mdk_qualification=true
+  --ref '<candidate-branch>' -f mdk_qualification=true
 ```
 
 The permanent `INT-010` manual case records this upgrade pair and migration.
@@ -143,13 +143,14 @@ preview. Pending-Welcome row preservation is untested on Android: the hosted
 fixture does not seed that row, and no seeded-row Android procedure or result
 is claimed.
 
-The final reviewed head, `52ce95f3763eb746cdb55998748c77c24f019de5`, passed
+The previous head from PR #3609, `52ce95f3763eb746cdb55998748c77c24f019de5`, passed
 [all seven native adoption cases](https://github.com/marmot-protocol/whitenoise-android/actions/runs/42209190799)
 with zero failures, errors or skipped cases. Its
 [populated-upgrade campaign](https://github.com/marmot-protocol/whitenoise-android/actions/runs/42209196047)
 passed all 11 phases, including seven replay cases under each comparison mode;
 [full core CI](https://github.com/marmot-protocol/whitenoise-android/actions/runs/42209053048)
-also passed. The six-case count above belongs to the first candidate, not this reviewed head.
+also passed. The six-case count above belongs to the first candidate. These runs
+qualify only the stated revisions; follow-up changes require their own head-specific validation.
 
 The first candidate's PR merge commit also passed
 [minified production API 36 and staging API 37 ART checks](https://github.com/marmot-protocol/whitenoise-android/actions/runs/42192570945),

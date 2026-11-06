@@ -355,7 +355,7 @@ private fun FolderManageRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .settingsRowBorder(context, editable = true)
+                .settingsRowBorder(context)
                 .testTag("folder.row.${folder.id}")
                 .semantics {
                     role = Role.Button

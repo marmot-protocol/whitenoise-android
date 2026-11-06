@@ -29,6 +29,15 @@ internal fun missingActiveTopChatRows(
     }
 }
 
+/**
+ * Whether this previously shown active row left [window] by ranking past its retained tail, rather than by a
+ * removal. Unknown windows and rows the window should still hold are never treated as evicted.
+ */
+internal fun ChatListRowFfi.evictedFrom(window: ChatListWindowSnapshotFfi?): Boolean {
+    val bounded = window ?: return false
+    return belongsInActiveChats() && !bounded.shouldContain(this)
+}
+
 /** The keyed MDK row is authoritative for archive, leave and deletion transitions. */
 internal fun ChatListRowFfi.belongsInActiveChats(): Boolean =
     !archived &&

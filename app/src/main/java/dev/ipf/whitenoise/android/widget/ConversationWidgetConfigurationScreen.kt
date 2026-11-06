@@ -154,7 +154,7 @@ private fun WidgetAccountChoice(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .settingsRowBorder(context, true)
+                .settingsRowBorder(context)
                 .testTag("widget.profile.${profile.reference}")
                 .semantics { role = Role.RadioButton },
         leadingContent = {

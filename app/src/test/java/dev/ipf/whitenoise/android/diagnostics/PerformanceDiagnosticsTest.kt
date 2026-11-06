@@ -219,6 +219,7 @@ class PerformanceDiagnosticSchemaTest {
                 "group_membership_projection",
                 "message_forward",
                 "account_switch",
+                "unread_filter",
             ),
             PerformanceOperation.entries.mapTo(mutableSetOf()) { it.wireName },
         )

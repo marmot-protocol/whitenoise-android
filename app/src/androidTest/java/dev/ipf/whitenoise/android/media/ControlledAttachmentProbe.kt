@@ -142,7 +142,7 @@ internal object ControlledAttachmentProbe {
                     }
                 val failing =
                     sendFailingFixture(bodyCase == PHASES_CASE, context, root, marmot, sender, group, blobPort)
-                report(JSONObject().put("phase", "fixture-stage").put("stage", "upload-published"))
+                checkpoint("upload-published")
                 marmot.catchUpAccounts()
                 val request = projectedRequest(marmot, receiver.label, group, reference)
                 // History lookup is native authority; no retained row or attachment state is seeded.
@@ -162,7 +162,7 @@ internal object ControlledAttachmentProbe {
                         )
                     }
                 fixtureState = state
-                report(JSONObject().put("phase", "fixture-stage").put("stage", "received-projected"))
+                checkpoint("received-projected")
                 if (bodyCase != null) {
                     val inputs =
                         BodyCaseInputs(bodyCase, onUnknownLengthProgress, failing) {
@@ -277,13 +277,12 @@ internal object ControlledAttachmentProbe {
                 } else {
                     accounts.map { runCatching { withTimeout(5_000L) { marmot.removeAccount(it) } } }
                 }
-            checkpoint("fixture-accounts-removed")
+            if (!preserveRestartFixture && cleanup.all { it.isSuccess }) checkpoint("fixture-accounts-removed")
             try {
                 marmot.shutdownAndClose()
                 checkpoint("fixture-native-closed")
             } finally {
-                if (!preserveRestartFixture) root.deleteRecursively()
-                checkpoint("fixture-files-removed")
+                if (!preserveRestartFixture && root.deleteRecursively()) checkpoint("fixture-files-removed")
             }
             check(cleanup.all { it.isSuccess }) { "fixture account cleanup failed" }
         }

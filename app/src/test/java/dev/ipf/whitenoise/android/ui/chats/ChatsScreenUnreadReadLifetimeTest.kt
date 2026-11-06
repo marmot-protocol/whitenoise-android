@@ -67,7 +67,10 @@ class ChatsScreenUnreadReadLifetimeTest {
         }
     }
 
-    /** Incoming projection bursts cannot cancel the first read or enqueue more than one latest follow-up. */
+    /**
+     * A burst of arriving chats cannot cancel the first read or enqueue more than one latest follow-up. Once
+     * the filter is closed, row-level revisions start no read, since retained rows override the snapshot.
+     */
     @Test fun mountedUnreadReadFinishesDuringProjectionBurstAndCoalescesLatestRefresh() {
         val model = OffWindowActionFixture(scope).also { fixture = it }
         val release = CompletableDeferred<Unit>().also { releaseRead = it }
@@ -86,9 +89,7 @@ class ChatsScreenUnreadReadLifetimeTest {
         rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(rule)
         awaitProgress { model.snapshotReads == 1 }
         repeat(4) { index ->
-            rule.runOnIdle {
-                model.controller.applyChatListRow(model.retainedRow.get().copy(activitySortAt = (index + 1).toULong()))
-            }
+            rule.runOnIdle { model.controller.applyChatListRow(chatRow("%032x".format(0xf000 + index))) }
             ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
             rule.waitForIdle()
         }
@@ -100,13 +101,32 @@ class ChatsScreenUnreadReadLifetimeTest {
         rule.onNodeWithTag("chat.row.$ACTION_TARGET").assertExists()
         rule.onNodeWithTag("chats.unread_refresh").assertDoesNotExist()
         assertEquals(2, model.snapshotReads)
+        rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(rule)
+        awaitProgress { true }
+        rule.waitForIdle()
+        val closedReads = model.snapshotReads
+        repeat(3) { index ->
+            rule.runOnIdle {
+                model.controller.applyChatListRow(model.retainedRow.get().copy(activitySortAt = (index + 1).toULong()))
+            }
+            ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
+            rule.waitForIdle()
+        }
+        scope.testScheduler.runCurrent()
+        assertEquals("closed, row-level revisions start no account-wide read", closedReads, model.snapshotReads)
     }
 
-    /** The production list activates its temporary filter only after a deliberate top pull is released. */
+    /**
+     * A released top pull opens the prepared filter, including off-window unread, without waiting for a read;
+     * the opening starts at most one reconciling read behind it.
+     */
     @Test fun mountedChatsTopPullActivatesOnReleaseAndIncludesOffWindowUnread() {
         val model = OffWindowActionFixture(scope).also { fixture = it }
         model.state.swipePreferences.setPullUnread(true)
         mount(model)
+        awaitProgress { model.snapshotReads >= 1 }
+        settle()
+        val preparedReads = model.snapshotReads
         val row = rule.onNodeWithTag("chat.row.$ACTION_SURVIVOR")
         awaitProgress { row.fetchSemanticsNode().config.contains(SemanticsActions.OnLongClick) }
         val distance = with(rule.density) { 100.dp.toPx() }
@@ -115,11 +135,12 @@ class ChatsScreenUnreadReadLifetimeTest {
             moveTo(Offset(width * 0.6f, 10f + distance), 120)
         }
         rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
-        assertEquals(0, model.snapshotReads)
         row.performTouchInput { up() }
-        awaitProgress { model.snapshotReads == 1 }
+        rule.waitForIdle()
         rule.onNodeWithText(rule.activity.getString(R.string.pull_unread_filtered)).assertExists()
         rule.onNodeWithTag("chat.row.$ACTION_TARGET").assertExists()
+        rule.onNodeWithTag("chats.unread_refresh").assertDoesNotExist()
+        assertTrue("one reconciling read at most", model.snapshotReads <= preparedReads + 1)
         assertTrue("pulling must not issue a read, pin, archive or mute command", model.calls.isEmpty())
         rule.onNodeWithTag("chats.unread_surface").performTouchInput {
             down(Offset(width * 0.6f, height * 0.3f))
@@ -149,11 +170,10 @@ class ChatsScreenUnreadReadLifetimeTest {
         pull()
         settle()
         rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
-        assertEquals(0, model.snapshotReads)
         rule.runOnIdle { model.state.swipePreferences.setPullUnread(true) }
         rule.waitForIdle()
         pull()
-        awaitProgress { model.snapshotReads == 1 }
+        settle()
         rule.onNodeWithTag("chats.unread_filter").assertExists()
         surface.performUnreadFilterAction(rule)
         rule.onNodeWithTag("chats.unread_filter").assertDoesNotExist()
@@ -171,7 +191,7 @@ class ChatsScreenUnreadReadLifetimeTest {
         rule.runOnIdle { model.state.swipePreferences.setPullUnread(true) }
         rule.waitForIdle()
         pull()
-        awaitProgress { model.snapshotReads > readsBeforeCancelledPull }
+        settle()
         rule.onNodeWithTag("chats.unread_filter").assertExists()
         rule.onNodeWithTag("chat.row.$ACTION_TARGET").assertExists()
         assertTrue(model.calls.isEmpty())
@@ -295,8 +315,10 @@ class ChatsScreenUnreadReadLifetimeTest {
     /** Each production dismissal path restores read pinned predecessors above the surviving unread row. */
     @Test fun mountedUnreadPillDismissalRestoresPinnedHead() = assertPinnedHeadRestored(Exit.Pill)
 
+    /** A second pull dismisses the filter and restores the read pinned predecessor. */
     @Test fun mountedUnreadSecondPullRestoresPinnedHead() = assertPinnedHeadRestored(Exit.Pull)
 
+    /** The accessible toggle dismisses the filter and restores the read pinned predecessor. */
     @Test fun mountedUnreadAccessibilityDismissalRestoresPinnedHead() = assertPinnedHeadRestored(Exit.Accessibility)
 
     private fun assertPinnedHeadRestored(exit: Exit) {
@@ -308,7 +330,7 @@ class ChatsScreenUnreadReadLifetimeTest {
         mount(model)
         val listId = rule.onNodeWithTag("chats.list").fetchSemanticsNode().id
         rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(rule)
-        awaitProgress { model.snapshotReads == 1 }
+        awaitProgress { model.snapshotReads >= 1 }
         val row = rule.onNodeWithTag("chat.row.$ACTION_TARGET")
         awaitProgress { row.fetchSemanticsNode().config.contains(SemanticsActions.OnLongClick) }
         when (exit) {

@@ -73,6 +73,23 @@ class ChatListReplacementGuardTest {
         assertTrue(missingActiveTopChatRows(listOf(pinnedDm, group), incoming, shifted).isEmpty())
     }
 
+    /**
+     * #3586: a full window that admits an off-window chat drops its tail by eviction, which keeps an earlier full
+     * read complete, while a row the window should still hold, or an unknown window, stays an ambiguous removal.
+     */
+    @Test
+    fun aRowPushedPastAFullWindowsTailIsEvictedNotRemoved() {
+        val evicted = chatRow("evicted").copy(activitySortAt = 10uL)
+        val incoming = listOf(presentedRow(tail.groupIdHex).copy(row = tail))
+        val full = topWindow(incoming, hasMoreAfter = true)
+
+        assertTrue(evicted.evictedFrom(full))
+        assertFalse("a row ranking ahead of the tail left for another reason", group.evictedFrom(full))
+        assertFalse("a complete window holds every active row", evicted.evictedFrom(topWindow(incoming)))
+        assertFalse("an archived row is a real removal", evicted.copy(archived = true).evictedFrom(full))
+        assertFalse("no window means no proof", evicted.evictedFrom(null))
+    }
+
     /** A viewport anchor does not imply earlier rows were evicted from the retained window. */
     @Test
     fun anchoredCompleteWindowStillChecksMissingPinnedAndActiveChats() {

@@ -89,11 +89,11 @@ class FirstFrameDurableAvatarsTest {
     }
 
     /**
-     * Past the 24-row window, a pending invitation and the chat at manual pin position 0 sort first in the
-     * visible list even though 25 other pinned chats have newer activity, so both must be decoded.
+     * The chat at manual pin position 0 sorts first even though 25 other pinned chats have newer activity, so
+     * it must be decoded. A pending invitation follows the whole pinned block, here past the 24-row window.
      */
     @Test
-    fun pendingInvitationAndFirstManualPinAreDecodedPastTheWindow() {
+    fun firstManualPinIsDecodedAndAnInviteFollowsThePinnedBlock() {
         val pinnedByActivity =
             (1..FIRST_FRAME_DURABLE_AVATAR_ROWS + 1).map { position ->
                 pinnedRow("pinned-$position", position.toUInt(), activity = 1_000uL + position.toULong())
@@ -105,7 +105,8 @@ class FirstFrameDurableAvatarsTest {
         val selected = firstFrameDurableAvatarAssets(rows).map(AvatarAssetFfi::target)
 
         assertEquals(FIRST_FRAME_DURABLE_AVATAR_ROWS, selected.size)
-        assertEquals(listOf(PENDING, FIRST_PIN), selected.take(2))
+        assertEquals(listOf(FIRST_PIN, "pinned-1"), selected.take(2))
+        assertTrue("the invite sorts after every pin", PENDING !in selected)
     }
 
     /** Past the 24-row window, a chat raised by a newer draft sorts first and must be decoded. */
