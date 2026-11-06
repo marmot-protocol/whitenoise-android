@@ -49,6 +49,8 @@ internal fun RowScope.MessageSenderAvatarSlot(
     enabled: Boolean,
     alignToBubbleBottom: Boolean,
     onClick: () -> Unit,
+    // The merged message row offers Open profile instead of a separate avatar stop (#3603).
+    rowOwnsSemantics: Boolean = false,
     // Decoded bytes MarmotKit stores for the sender (0.10.1); when present the URL is not fetched.
     picture: ImageBitmap? = null,
 ) {
@@ -69,6 +71,7 @@ internal fun RowScope.MessageSenderAvatarSlot(
                 modifier =
                     Modifier
                         .clip(CircleShape)
+                        .messageRowChrome(rowOwnsSemantics)
                         .clickable(enabled = enabled, onClick = onClick),
             ) {
                 Avatar(
@@ -101,6 +104,8 @@ internal fun ColumnScope.MessageReactionSummary(
     enabled: Boolean = true,
     onClick: (String?) -> Unit,
     localMotion: dev.ipf.whitenoise.android.ui.conversation.reactions.LocalReactionMotion? = null,
+    // In a merged message row the pills read as one summary and View reactions is a row action (#3603).
+    rowOwnsSemantics: Boolean = false,
 ) {
     val reactionChipPadding = reactionChipPadding(mine)
     val targetVisible = tallies.isNotEmpty()
@@ -152,6 +157,9 @@ internal fun ColumnScope.MessageReactionSummary(
                 padding = reactionChipPadding,
                 clipModifier = hostClipModifier,
                 sizeFraction = hostSizeFraction,
+            ).messageRowChrome(
+                rowOwnsSemantics,
+                if (rowOwnsSemantics && targetVisible) messageReactionSummaryDescription(displayTallies) else null,
             ),
     ) {
         if (targetVisible || transition.currentState || transition.isRunning) {

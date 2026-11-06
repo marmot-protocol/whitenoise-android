@@ -62,6 +62,7 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -167,6 +168,7 @@ import dev.ipf.whitenoise.android.ui.conversation.reactions.rememberLocalReactio
 import dev.ipf.whitenoise.android.ui.conversation.rememberConversationMotionEnabled
 import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.replies.isOwnReplySender
+import dev.ipf.whitenoise.android.ui.conversation.replies.replyQuoteAccessibilityText
 import dev.ipf.whitenoise.android.ui.conversation.replies.senderTitleForReply
 import dev.ipf.whitenoise.android.ui.conversation.share.VCARD_MIME_TYPE
 import dev.ipf.whitenoise.android.ui.conversation.share.isBareLocationShare
@@ -1616,6 +1618,67 @@ internal fun MessageBubble(
             )
         }
 
+        // Resolved before the row so its presence can pick the content
+        // column's width strategy (#428) and offer Go to message on the row.
+        //
+        // Projected items: the preview is a pure function of
+        // item.projected, so caching keyed on the item is always
+        // correct (a reprojection replaces the instance). The
+        // optimistic fallback instead resolves the target from
+        // controller.messageById, which can gain the target after
+        // this bubble composes — resolve those live. Display names
+        // resolve outside the cache either way so a late profile
+        // load still updates them. See #131.
+        val replyPreview =
+            if (deleted) {
+                // A tombstone keeps only its body, reactions and footer;
+                // the quoted target is part of the removed content.
+                null
+            } else if (item.projected != null) {
+                remember(item, messageTextCopy) {
+                    controller.replyPreview(item, messageTextCopy)
+                }
+            } else {
+                controller.replyPreview(item, messageTextCopy)
+            }
+        // Outside batch and text selection the row is one screen-reader stop
+        // (#3603): its nested controls read as text and their actions move here.
+        val rowMerged = !selectionMode && !textSelectionMode
+        val rowTextActions = LocalMessageRowTextActions.current
+        val rowActions =
+            listOf(
+                MessageRowAction(stringResource(R.string.reply), !deleted && !actionsReadOnly, ::beginReply),
+                MessageRowAction(stringResource(R.string.message_react), !deleted && !actionsReadOnly) {
+                    onActionMenuOpenChange(false)
+                    surfaces.emojiPickerOpen = true
+                },
+                MessageRowAction(
+                    stringResource(R.string.copy),
+                    messageBubbleCanCopyText(item, deleted, persistedFailure, displayedBody, messageTextCopy),
+                    ::copyMessageText,
+                ),
+                MessageRowAction(
+                    stringResource(R.string.forward),
+                    !deleted && !actionsReadOnly && forwardPayload != null,
+                    ::beginForward,
+                ),
+                MessageRowAction(stringResource(R.string.delete), deleteCapability.canDeleteAtAll, ::requestDelete),
+                MessageRowAction(stringResource(R.string.info), !deleted, ::openInfoSheet),
+                MessageRowAction(stringResource(R.string.go_to_message), replyPreview != null) {
+                    onReplyPreviewClick(item)
+                },
+                MessageRowAction(
+                    stringResource(R.string.chat_list_search_open_profile),
+                    !mine && (showSenderName || showSenderAvatar),
+                ) { appState.presentProfile(appState.npub(record.sender)) },
+                MessageRowAction(stringResource(R.string.view_reactors), reactionTallies.isNotEmpty()) {
+                    surfaces.reactionSheetOpen = true
+                },
+                MessageRowAction(stringResource(R.string.edit_history), editState != null) {
+                    surfaces.editHistoryOpen = true
+                },
+            )
+
         Row(
             // Both reply-swipe and long-press hitboxes cover the ENTIRE row,
             // not just the bubble: a swipe-right or long-press starting on the
@@ -1816,20 +1879,29 @@ internal fun MessageBubble(
                         // without a hold gesture. Tombstones expose this only for
                         // their focused local cleanup; batch/text selection still
                         // owns all other row interaction.
-                        if (tombstoneCleanupUnavailable || selectionMode || textSelectionMode) {
+                        //
+                        // The merged row also carries every action its nested
+                        // controls and text offered, since Android exposes only
+                        // the merging node's own actions (#3603). The forwarded
+                        // text actions are read here, inside the semantics block,
+                        // so a change refreshes semantics without recomposing.
+                        if (!rowMerged) {
                             Modifier
                         } else {
-                            Modifier.semantics {
-                                onLongClick(label = messageActionsLabel) {
-                                    // Accessibility entry has no touch point;
-                                    // anchor to the bubble top and seed the first word.
-                                    pressState.longPressWindowPosition = null
-                                    pressState.selectionSeedVisibleOffset = null
-                                    longPressWindowY = null
-                                    pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0]
-                                    if (deleted) requestDelete() else onActionMenuOpenChange(true)
-                                    true
+                            Modifier.semantics(mergeDescendants = true) {
+                                if (!tombstoneCleanupUnavailable) {
+                                    onLongClick(label = messageActionsLabel) {
+                                        // Accessibility entry has no touch point;
+                                        // anchor to the bubble top and seed the first word.
+                                        pressState.longPressWindowPosition = null
+                                        pressState.selectionSeedVisibleOffset = null
+                                        longPressWindowY = null
+                                        pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0]
+                                        if (deleted) requestDelete() else onActionMenuOpenChange(true)
+                                        true
+                                    }
                                 }
+                                customActions = messageRowCustomActions(rowActions, rowTextActions?.actions.orEmpty())
                             }
                         },
                     )
@@ -1872,6 +1944,7 @@ internal fun MessageBubble(
                         },
                     enabled = !textSelectionMode,
                     alignToBubbleBottom = reactionHostPresent,
+                    rowOwnsSemantics = rowMerged,
                     onClick = { appState.presentProfile(appState.npub(record.sender)) },
                 )
             }
@@ -1900,29 +1973,6 @@ internal fun MessageBubble(
                         },
                 horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
             ) {
-                // Resolved before the content column so its presence can pick
-                // the column's width strategy (#428).
-                //
-                // Projected items: the preview is a pure function of
-                // item.projected, so caching keyed on the item is always
-                // correct (a reprojection replaces the instance). The
-                // optimistic fallback instead resolves the target from
-                // controller.messageById, which can gain the target after
-                // this bubble composes — resolve those live. Display names
-                // resolve outside the cache either way so a late profile
-                // load still updates them. See #131.
-                val replyPreview =
-                    if (deleted) {
-                        // A tombstone keeps only its body, reactions and footer;
-                        // the quoted target is part of the removed content.
-                        null
-                    } else if (item.projected != null) {
-                        remember(item, messageTextCopy) {
-                            controller.replyPreview(item, messageTextCopy)
-                        }
-                    } else {
-                        controller.replyPreview(item, messageTextCopy)
-                    }
                 val replyReceivedEmoji =
                     rememberReplyReceivedEmoji(
                         controller.replyTargetMessageId(item).takeUnless { replyPreview?.originalUnavailable != false },
@@ -2293,19 +2343,21 @@ internal fun MessageBubble(
                                     groupAuthorColor(record.sender)
                                 },
                             modifier =
-                                Modifier.combinedClickable(
-                                    enabled = !textSelectionMode,
-                                    onClick = { appState.presentProfile(appState.npub(record.sender)) },
-                                    onLongClick = {
-                                        if (!deleted && !selectionMode && !textSelectionMode) {
-                                            pressState.longPressWindowPosition = null
-                                            pressState.selectionSeedVisibleOffset = null
-                                            longPressWindowY = null
-                                            pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0]
-                                            onActionMenuOpenChange(true)
-                                        }
-                                    },
-                                ),
+                                Modifier
+                                    .messageRowChrome(rowMerged, appState.displayName(record.sender))
+                                    .combinedClickable(
+                                        enabled = !textSelectionMode,
+                                        onClick = { appState.presentProfile(appState.npub(record.sender)) },
+                                        onLongClick = {
+                                            if (!deleted && !selectionMode && !textSelectionMode) {
+                                                pressState.longPressWindowPosition = null
+                                                pressState.selectionSeedVisibleOffset = null
+                                                longPressWindowY = null
+                                                pressState.actionMenuAnchorBounds = pressState.messageBoundsInWindow[0]
+                                                onActionMenuOpenChange(true)
+                                            }
+                                        },
+                                    ),
                         )
                     }
                 }
@@ -2324,49 +2376,59 @@ internal fun MessageBubble(
                                 customBubbleColorActive = customBubbleColorActive,
                                 presentation = bubblePresentation,
                             )
-                        ReplyPreviewCard(
-                            appState = appState,
-                            receivedEmoji = replyReceivedEmoji,
-                            senderTitle =
-                                if (preview.originalUnavailable) {
-                                    ""
-                                } else {
-                                    senderTitleForReply(preview.sender, appState)
+                        // The quote reads as text in the row summary; Go to message is a row action.
+                        Box(
+                            modifier =
+                                Modifier.messageRowChrome(
+                                    rowMerged,
+                                    if (rowMerged) replyQuoteAccessibilityText(preview, appState) else null,
+                                ),
+                            propagateMinConstraints = true,
+                        ) {
+                            ReplyPreviewCard(
+                                appState = appState,
+                                receivedEmoji = replyReceivedEmoji,
+                                senderTitle =
+                                    if (preview.originalUnavailable) {
+                                        ""
+                                    } else {
+                                        senderTitleForReply(preview.sender, appState)
+                                    },
+                                isOwn =
+                                    if (preview.originalUnavailable) {
+                                        mine
+                                    } else {
+                                        isOwnReplySender(preview.sender, appState)
+                                    },
+                                body = preview.body,
+                                mediaKind = preview.mediaKind,
+                                mediaFileName = preview.mediaFileName,
+                                mediaType = preview.mediaType,
+                                originalUnavailable = preview.originalUnavailable,
+                                warning = preview.warning,
+                                onClick = {
+                                    if (!textSelectionMode) onReplyPreviewClick(item)
                                 },
-                            isOwn =
-                                if (preview.originalUnavailable) {
-                                    mine
-                                } else {
-                                    isOwnReplySender(preview.sender, appState)
-                                },
-                            body = preview.body,
-                            mediaKind = preview.mediaKind,
-                            mediaFileName = preview.mediaFileName,
-                            mediaType = preview.mediaType,
-                            originalUnavailable = preview.originalUnavailable,
-                            warning = preview.warning,
-                            onClick = {
-                                if (!textSelectionMode) onReplyPreviewClick(item)
-                            },
-                            onDismiss = null,
-                            // Fill the content width: in the text bubble the
-                            // column is sized to its widest child (IntrinsicSize.Max
-                            // below) so the quote matches the bubble instead of
-                            // hugging its own text; above a media card it lines up
-                            // with the media width. A short quote + short reply
-                            // still keeps a narrow bubble because the widest child
-                            // is then small.
-                            fillWidth = true,
-                            mentionDisplayName =
-                                remember(appState, appState.profileRevisionForCompose) {
-                                    { bech32: String -> appState.mentionDisplayName(bech32) }
-                                },
-                            containerColor = replyFillColor.takeIf { insideBubble },
-                            contentColor = bubbleContentColor.takeIf { insideBubble },
-                            accentColor = replyAccentArgb?.let(::colorFromArgb) ?: pairedReplyAccent,
-                            secondaryColor = replySecondaryColor.takeIf { insideBubble },
-                            warningColor = replyQuoteColors.warning.takeIf { insideBubble },
-                        )
+                                onDismiss = null,
+                                // Fill the content width: in the text bubble the
+                                // column is sized to its widest child (IntrinsicSize.Max
+                                // below) so the quote matches the bubble instead of
+                                // hugging its own text; above a media card it lines up
+                                // with the media width. A short quote + short reply
+                                // still keeps a narrow bubble because the widest child
+                                // is then small.
+                                fillWidth = true,
+                                mentionDisplayName =
+                                    remember(appState, appState.profileRevisionForCompose) {
+                                        { bech32: String -> appState.mentionDisplayName(bech32) }
+                                    },
+                                containerColor = replyFillColor.takeIf { insideBubble },
+                                contentColor = bubbleContentColor.takeIf { insideBubble },
+                                accentColor = replyAccentArgb?.let(::colorFromArgb) ?: pairedReplyAccent,
+                                secondaryColor = replySecondaryColor.takeIf { insideBubble },
+                                warningColor = replyQuoteColors.warning.takeIf { insideBubble },
+                            )
+                        }
                     }
                 }
 
@@ -3370,6 +3432,7 @@ internal fun MessageBubble(
                     visibilityState = reactionVisibilityState,
                     localMotion = localReactionMotion,
                     enabled = !deleted,
+                    rowOwnsSemantics = rowMerged,
                     onClick = {
                         if (!deleted) {
                             surfaces.reactionSheetOpen = true

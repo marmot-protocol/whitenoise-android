@@ -3,7 +3,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.messages
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.padding
@@ -197,7 +196,7 @@ private fun MessageInlineFooterItems(
             text = it,
             style = MaterialTheme.typography.labelSmall,
             color = color,
-            modifier = if (onEditedClick != null) Modifier.clickable(onClick = onEditedClick) else Modifier,
+            modifier = Modifier.editedLabelTarget(it, onEditedClick),
         )
     }
     if (showStatus) {

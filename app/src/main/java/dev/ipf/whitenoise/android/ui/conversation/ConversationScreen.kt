@@ -1503,35 +1503,61 @@ internal fun ConversationScreen(
         )
     }
 
-    /** Lets user drags, never programmatic movement, cancel navigation and update reading intent. */
+    /** The reader moved the transcript: cancel navigation and take over reading intent and older paging. */
+    fun onReaderScrollStarted() {
+        navigationState.targetNavigation.cancel()
+        navigationState.targetHighlight.clear()
+        ttsFollowHandle.suspendForDirectDrag(
+            state = appState.ttsController.state.value,
+            ownsSession = appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
+        )
+        scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
+        controller.onOlderPagingGestureStarted()
+    }
+
+    fun onReaderScrollSettled() {
+        scrollCoordinator.onUserGestureSettled(currentScrollAnchor(), liveNearBottom())
+    }
+
+    /**
+     * Lets reader movement, never programmatic movement, cancel navigation and update reading intent.
+     *
+     * Touch drags report themselves through drag interactions. Every other scroll run, from a screen reader,
+     * keyboard or mouse wheel, is the reader's too unless a coordinator command, the read-aloud hold or
+     * drag-selection edge scrolling started it (#3603).
+     */
     @Composable
-    fun dragInteractionEffect() {
-        // Drag interactions are the authority for user intent. Programmatic list
-        // movement never emits these, so it cannot accidentally downgrade a tail
-        // follower or overwrite a history anchor.
+    fun readerScrollIntentEffects() {
+        var touchDragActive by remember(listState) { mutableStateOf(false) }
         LaunchedEffect(listState, scrollCoordinator) {
             listState.interactionSource.interactions.collectConversationDragInteractions(
                 onStarted = {
-                    navigationState.targetNavigation.cancel()
-                    navigationState.targetHighlight.clear()
-                    ttsFollowHandle.suspendForDirectDrag(
-                        state = appState.ttsController.state.value,
-                        ownsSession = appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
-                    )
-                    scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
-                    controller.onOlderPagingGestureStarted()
+                    touchDragActive = true
+                    onReaderScrollStarted()
                 },
                 awaitScrollSettled = {
                     snapshotFlow { listState.isScrollInProgress }.filter { !it }.first()
                 },
                 onSettled = {
-                    val liveHasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
-                    scrollCoordinator.onUserGestureSettled(currentScrollAnchor(), liveNearBottom())
+                    touchDragActive = false
+                    onReaderScrollSettled()
                 },
             )
         }
+        LaunchedEffect(listState, scrollCoordinator) {
+            snapshotFlow { listState.isScrollInProgress }.collectUnclaimedScrollRuns(
+                claimedByApp = {
+                    scrollCoordinator.mode.ownsListMovement ||
+                        ttsQuickTransportViewportLock.holdsViewport ||
+                        dragAnchorTimelineId != null
+                },
+                touchDragActive = { touchDragActive },
+                onStarted = { onReaderScrollStarted() },
+                onSettled = { onReaderScrollSettled() },
+            )
+        }
     }
-    dragInteractionEffect()
+    readerScrollIntentEffects()
     // The read anchor, badge and unread jump target are written from callbacks and reconciled by
     // ConversationUnreadTracking, never read while composing this screen: a send moves all three in turn, and
     // each read here recomposed the whole conversation once more.

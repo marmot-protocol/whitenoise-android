@@ -496,6 +496,7 @@
     <string name="message_reacted">Reacted %1$s</string>
     <string name="message_reaction_fallback">to a message</string>
     <string name="message_actions">Message actions</string>
+    <string name="message_reply_quote_description">Replying to %1$s: %2$s</string>
     <string name="message_read_more">Read More</string>
     <string name="message_react">React</string>
     <string name="message_deleted_preview">Deleted a message</string>
