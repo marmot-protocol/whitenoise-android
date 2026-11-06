@@ -74,19 +74,20 @@ class DeletedNotificationContentCoverageTest {
     /** Tray snapshots may lag app writes: carried history and every live rewrite need accepted-payload proof. */
     @Test
     fun stalePlatformPayloadsCannotBypassContentReconciliation() {
-        val presenter = source("notifications/LocalNotificationPresenter.kt")
+        val publisher = source("notifications/NotificationCardPublisher.kt")
+        val reconciler = source("notifications/ConversationNotificationContentReconciler.kt")
         assertTrue(
-            "ConversationCardPostedRegistry.canCarryEntry(" in functionBody(presenter, "existingConversationMessages"),
+            "ConversationCardPostedRegistry.canCarryEntry(" in functionBody(publisher, "existingConversationMessages"),
         )
         val liveWrite =
-            presenter
+            publisher
                 .substringAfter("private fun notificationWriteIsLive(")
-                .substringBefore("private fun canPublishPreviewShortcut(")
+                .substringBefore("fun canPublishPreviewShortcut(")
         assertTrue("ConversationCardPostedRegistry.isCurrentPayload(" in liveWrite)
-        val reconcile = functionBody(presenter, "reconcileCard")
+        val reconcile = functionBody(reconciler, "reconcileCard")
         assertTrue("ConversationCardPostedRegistry.latestGeneration(" in reconcile)
         assertTrue("cancelUnverifiedContentCard(" in reconcile)
-        val cancel = functionBody(presenter, "cancelUnverifiedContentCard")
+        val cancel = functionBody(reconciler, "cancelUnverifiedContentCard")
         assertTrue("ConversationCardPostedRegistry.clearPosted(" in cancel)
         assertTrue("cancelNotification(" in cancel)
         assertTrue("ConversationCardPostedRegistry.prepareCancellation(" in cancel)

@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -50,6 +51,44 @@ internal class LazyListConversationScrollWriterEvidenceTest {
     /** An unmeasured animated tail needs no measuring pass before its request. */
     @Test
     fun unmeasuredAnimatedTailReportsOneOriginWrite() = assertTailWrites(animated = true, visible = false)
+
+    /**
+     * On the real reversed list, an appended incoming row taller than the viewport is first reached at its newest edge
+     * with the unchanged offset-zero tail write, then corrected by exactly its measured overhang so its beginning
+     * meets the viewport's far edge.
+     */
+    @Test
+    fun oversizedIncomingAppendWritesTailThenMeasuredReadingStart() {
+        val fixture = mountReversedList()
+        fixture.runWriterCommand {
+            val viewport = ConversationTimelineViewport(listState)
+            val coordinator = ConversationScrollCoordinator(writer)
+            val outcome =
+                coordinator.followAppendOrRevealIncomingStart(
+                    candidates = listOf(ConversationIncomingAppendCandidate("incoming", "msg:incoming")),
+                    probeFor = {
+                        ConversationReadingStartProbe(
+                            resolveTargetIndex = { 0 },
+                            readLayout = { index -> viewport.readingStartLayout(index) },
+                            traceSections = false,
+                        )
+                    },
+                    resolveTailIndex = { 0 },
+                )
+            assertTrue(outcome is ConversationIncomingAppendOutcome.RevealedReadingStart)
+        }
+        composeRule.runOnIdle {
+            val layout = fixture.listState.layoutInfo
+            val row = layout.visibleItemsInfo.first { it.index == 0 }
+            val overhang = row.size - layout.viewportEndOffset
+            assertTrue(overhang > 0)
+            assertEquals(
+                listOf(scrollEvidence(false, 0, 0), scrollEvidence(false, 0, overhang)),
+                fixture.evidence.writes,
+            )
+            assertEquals(layout.viewportEndOffset, row.offset + row.size)
+        }
+    }
 
     /** Checks the selected command's complete ordered writes after proving its initial measurement state. */
     private fun assertTailWrites(
@@ -97,6 +136,36 @@ internal class LazyListConversationScrollWriterEvidenceTest {
         return WriterFixture(listState, writer, scope, evidence)
     }
 
+    /** Mounts a reversed transcript whose newest row is taller than the viewport, resting on the row above it. */
+    private fun mountReversedList(): WriterFixture {
+        val evidence = RecordingEvidence()
+        lateinit var listState: LazyListState
+        lateinit var writer: LazyListConversationScrollWriter
+        lateinit var scope: CoroutineScope
+        composeRule.setContent {
+            listState = rememberLazyListState(initialFirstVisibleItemIndex = 1)
+            writer = remember(listState, evidence) { LazyListConversationScrollWriter(listState, evidence) }
+            scope = rememberCoroutineScope()
+            LazyColumn(
+                state = listState,
+                reverseLayout = true,
+                modifier = Modifier.height(VIEWPORT_HEIGHT_DP.dp),
+            ) {
+                items(ITEM_COUNT, key = { it }) { index ->
+                    Text(
+                        text = "Message $index",
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(if (index == 0) ROW_HEIGHT_DP.dp else SHORT_ROW_HEIGHT_DP.dp),
+                    )
+                }
+            }
+        }
+        composeRule.waitForIdle()
+        return WriterFixture(listState, writer, scope, evidence)
+    }
+
     /** Describes the exact boundary event expected from one list-state mutation. */
     private fun scrollEvidence(
         animated: Boolean,
@@ -106,7 +175,7 @@ internal class LazyListConversationScrollWriterEvidenceTest {
 
     /** Owns one mounted list and executes a writer command on its composition coroutine. */
     private inner class WriterFixture(
-        private val listState: LazyListState,
+        val listState: LazyListState,
         val writer: LazyListConversationScrollWriter,
         private val scope: CoroutineScope,
         val evidence: RecordingEvidence,
@@ -158,6 +227,7 @@ internal class LazyListConversationScrollWriterEvidenceTest {
         const val UNMEASURED_TARGET_INDEX = 12
         const val VIEWPORT_HEIGHT_DP = 96
         const val ROW_HEIGHT_DP = 128
+        const val SHORT_ROW_HEIGHT_DP = 24
         const val COMMAND_TIMEOUT_MILLIS = 10_000L
     }
 }

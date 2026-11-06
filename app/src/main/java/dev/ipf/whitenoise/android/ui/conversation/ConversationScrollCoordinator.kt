@@ -27,6 +27,15 @@ private const val DEFAULT_TAIL_LAYOUT_SETTLE_FRAMES = 8
 private const val MIN_TAIL_LAYOUT_SETTLE_FRAMES = 4
 private const val REQUIRED_STABLE_TAIL_LAYOUT_FRAMES = 2
 
+/** Reasons a target-less jump only keeps a tail follower at the newest edge, never a reader's own navigation. */
+private val PASSIVE_TAIL_CORRECTIONS =
+    setOf(
+        ConversationScrollReason.NewMessage,
+        ConversationScrollReason.ReactionLayout,
+        ConversationScrollReason.ViewportChange,
+        ConversationScrollReason.ImeTransition,
+    )
+
 /** The durable reading intent behind the conversation's transient list geometry. */
 internal sealed interface ConversationScrollMode {
     data object FollowingTail : ConversationScrollMode
@@ -279,6 +288,21 @@ internal class ConversationScrollCoordinator(
 
     val isFollowingTail: Boolean
         get() = settledMode is ConversationScrollMode.FollowingTail
+
+    /**
+     * True for a tail follower, including one whose only in-flight command is a passive tail correction — a
+     * target-less jump that keeps the newest edge pinned for a new row, a reaction, a viewport or an IME change.
+     * Explicit navigation in flight still reads as not following.
+     */
+    val isFollowingTailThroughPassiveCorrection: Boolean
+        get() =
+            isFollowingTail &&
+                when (val current = mode) {
+                    ConversationScrollMode.FollowingTail -> true
+                    is ConversationScrollMode.ProgrammaticJump ->
+                        current.targetMessageId == null && current.reason in PASSIVE_TAIL_CORRECTIONS
+                    else -> false
+                }
 
     /** Captures the current durable navigation intent for deferred restoration. */
     val intentToken: ConversationScrollIntentToken

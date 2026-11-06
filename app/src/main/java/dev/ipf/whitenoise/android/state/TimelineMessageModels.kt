@@ -68,7 +68,12 @@ data class TimelineMessage(
     val retentionAtSendSeconds: ULong? = null,
     /** Transient row identity retained across an exact local-send handoff; actions still use [record]. */
     val presentationId: String = id,
-)
+    /** True when [status] shows an in-flight edit of this already-sent message rather than its own send. */
+    val statusFromEdit: Boolean = false,
+) {
+    /** A local send that is still unconfirmed, as opposed to a sent message whose edit is pending. */
+    val isPendingSend: Boolean get() = status == MessageStatus.Pending && !statusFromEdit
+}
 
 /**
  * Local optimistic state for an in-flight edit of one's own message: the new

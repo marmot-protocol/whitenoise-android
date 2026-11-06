@@ -72,7 +72,7 @@ class MessageMultiSelectCoverageTest {
         assertTrue(source.contains("chatId = chat.id"))
         assertTrue(source.contains("activeAccountRef = conversationAccountRef"))
         assertTrue(source.contains("runtimeGeneration = appState.runtimeGeneration"))
-        assertTrue(source.contains("var batchForwardSheetOpen by remember($chatRuntimeIdentity)"))
+        assertTrue(source.contains("var batchForwardSnapshot by remember($chatRuntimeIdentity)"))
         assertTrue(source.contains("var showBatchDeleteConfirm by remember($controllerIdentity)"))
     }
 
@@ -116,10 +116,12 @@ class MessageMultiSelectCoverageTest {
     @Test
     fun forwardingClearsSelectionThroughThePickerDismissalBoundary() {
         val source = source("ConversationScreen.kt").replace(Regex("\\s+"), " ")
-        val forwardSheet = source.substringAfter("if (batchForwardSheetOpen").substringBefore("batchInfoSelection?.let")
+        val forwardSheet = source.substringAfter("batchForwardSnapshot?.let").substringBefore("batchInfoSelection?.let")
 
-        assertTrue("onDismiss = { batchForwardSheetOpen = false selectedMessages.clear() }" in forwardSheet)
-        assertTrue("payloads = batchSelectionUi.forwardPayloads" in forwardSheet)
+        assertTrue("onDismiss = { batchForwardSnapshot = null selectedMessages.clear() }" in forwardSheet)
+        // The picker forwards the payloads captured when it opened, not the live selection.
+        assertTrue("payloads = payloads" in forwardSheet)
+        assertTrue("batchForwardSnapshot = batchSelectionUi.forwardPayloads" in source)
         assertTrue("sourceAccountRef = controller.boundAccountRef" in forwardSheet)
         assertFalse(
             Regex("onForward.*selectedMessages\\.clear\\(\\)").containsMatchIn(forwardSheet),

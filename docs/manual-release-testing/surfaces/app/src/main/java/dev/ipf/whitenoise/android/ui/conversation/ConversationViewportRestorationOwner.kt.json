@@ -20,6 +20,14 @@
         "test_ids": [
           "CON-033"
         ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationViewportRestorationOwner.kt",
+        "surface": "A revealed incoming beginning keeps its reading position through later row, viewport and structure changes",
+        "anchor": "fun adoptIncomingReadingStart(",
+        "test_ids": [
+          "CON-025"
+        ]
       }
     ]
   },
