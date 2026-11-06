@@ -146,8 +146,7 @@ class IncomingAttachmentSchedulingCoverageTest {
         val refresh = appState().functionBody("refreshNativeAttachmentPermissions")
         val sweep = refresh.indexOf("widenWaitingAutomaticDownloads(accountRefs)")
         assertTrue("a permission refresh must widen waiting work", sweep >= 0)
-        val runtimeGuard = refresh.indexOf("return runtime?.let")
-        assertTrue("native permission application must require a runtime", runtimeGuard >= 0)
+        val runtimeGuard = refresh.indexOf("runtime?.marmot ?: return")
         assertTrue("the sweep must not wait for the native runtime", sweep < runtimeGuard)
         assertTrue(
             "a duplicate receipt must widen the spec it keeps",
