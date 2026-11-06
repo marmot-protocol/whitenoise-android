@@ -141,6 +141,36 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
     @Test
     fun otherChatPaintedComposerGapLargeRtlDark() = captureOtherChatGap(largeRtl = true)
 
+    /** Light: another chat's jump stack rests above the floating capsule. */
+    @Test
+    fun otherChatJumpStackAboveCapsuleLight() =
+        captureOtherChatJumpStack(
+            dark = false,
+            amoled = false,
+            largeRtl = false,
+            variant = "light",
+        )
+
+    /** AMOLED: the lifted jump stack stays legible above the capsule on pure black. */
+    @Test
+    fun otherChatJumpStackAboveCapsuleAmoled() =
+        captureOtherChatJumpStack(
+            dark = true,
+            amoled = true,
+            largeRtl = false,
+            variant = "amoled",
+        )
+
+    /** Dark RTL at 200% text: the mirrored stack and the larger capsule keep clear of each other. */
+    @Test
+    fun otherChatJumpStackAboveCapsuleLargeRtlDark() =
+        captureOtherChatJumpStack(
+            dark = true,
+            amoled = false,
+            largeRtl = true,
+            variant = "large_rtl_dark",
+        )
+
     @Test
     @Config(qualifiers = "w360dp-h480dp-mdpi")
     fun compactExpandedOtherChatLight() = captureCompactExpanded(largeRtl = false)

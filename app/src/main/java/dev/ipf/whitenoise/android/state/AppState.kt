@@ -3106,7 +3106,11 @@ class WhiteNoiseAppState private constructor(
             composerDraftExpansionBridge.writeDraftIfCurrent(accountRef, groupIdHex, expectedRevision, value)
         }
 
-    /** Dictation conditionally empties only its unchanged origin; failed or unknown sends restore that exact text. */
+    /**
+     * Runs on the process mutationsScope's main dispatcher, as do composer mode changes.
+     * Origin resolution, the draft claim and mounted-controller admission have no suspension between them.
+     * Failed or unknown sends preserve their captured text instead of borrowing another editor's state.
+     */
     internal suspend fun sendDictationTranscriptIfOriginUnchanged(request: ConversationDictationSendRequest): Boolean {
         val current = conversationDictationDraftSnapshot(request.accountRef, request.groupIdHex)
         val initialReply =
@@ -3160,10 +3164,15 @@ class WhiteNoiseAppState private constructor(
             ?.takeIf(StagedAttachmentSender::hasStagedAttachments)
             ?.let { staged -> return sendDictationWithStagedAttachments(staged, request) }
         val replyTarget = controller.replyingTo
+        var pendingShown = false
         var durablyAccepted = false
         return try {
-            durablyAccepted = sendConversationText(controller, request.payload, onAccepted = request.onPendingShown)
-            durablyAccepted
+            durablyAccepted =
+                sendConversationText(controller, request.payload, onAccepted = {
+                    pendingShown = true
+                    request.onPendingShown()
+                })
+            if (!durablyAccepted && !pendingShown) rejectDictationDispatchBeforeTransport(request) else durablyAccepted
         } finally {
             if (!durablyAccepted && replyTarget != null && controller.replyingTo == null) {
                 controller.replyingTo = replyTarget
@@ -6594,7 +6603,12 @@ class WhiteNoiseAppState private constructor(
                     presentedChatList(accountRef, includeArchived = true)
                 }.rows
             val rows = presentedRows.map { it.row }
-            val firstFrameAvatars = prewarmFirstFrameDurableAvatars(accountRef, presentedRows)
+            val firstFrameAvatars =
+                prewarmFirstFrameDurableAvatars(
+                    accountRef,
+                    presentedRows,
+                    awaitColdWorkers = plan.awaitColdAvatarWorkers,
+                )
             ensureAccountSwitchRequestIsCurrent(generation)
             recordAccountSwitchPreloadStage(accountRef, "cached-chat-rows-ready", rows.size)
             val presentation =

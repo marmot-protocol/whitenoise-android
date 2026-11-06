@@ -131,7 +131,9 @@ class AccountWideLocalRemovalTest {
                 val old = requireNotNull(reading.await())
                 assertFalse(old.hasCurrentMembership)
                 assertTrue(old.items().isEmpty())
-                assertTrue(old.chatListItems(emptyList()).isEmpty())
+                // The deletion is known, so the pre-delete read stays complete without the deleted chat.
+                assertTrue(old.coversCurrentMembership)
+                assertEquals(listOf(SURVIVOR), old.chatListItems(emptyList()).map { it.id })
                 val fresh = requireNotNull(fixture.controller.loadAccountWideForwardTargets())
                 assertEquals(listOf(SURVIVOR), fresh.chatListItems(emptyList()).map { it.id })
             } finally {
@@ -139,6 +141,34 @@ class AccountWideLocalRemovalTest {
                 reading.cancelAndJoin()
                 deletion?.cancelAndJoin()
             }
+        }
+
+    /** A chat entering the window keeps an earlier read complete, while an ambiguous native removal ends it. */
+    @Test fun additionsKeepAFullReadCompleteAndAnAmbiguousRemovalEndsIt() =
+        runTest {
+            val fixture =
+                localGroupDeleteFixture(
+                    controllers,
+                    configureState = { state, _ ->
+                        state.liveSubscriptionOverrides.chatList =
+                            reader { listOf(presentedRow(LOCAL_DELETE_GROUP), presentedRow(SURVIVOR)) }
+                    },
+                )
+            val read = requireNotNull(fixture.controller.loadAccountWideForwardTargets())
+            fixture.controller.applyChatListRow(chatRow(ARRIVAL))
+            assertFalse("membership did change", read.hasCurrentMembership)
+            assertTrue("an addition keeps the read complete", read.coversCurrentMembership)
+            assertTrue(read.chatListItems(emptyList()).any { it.id == SURVIVOR })
+
+            fixture.controller.applyChatListSubscriptionUpdate(
+                LOCAL_DELETE_ACCOUNT,
+                dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi.RemoveRow(
+                    dev.ipf.marmotkit.ChatListUpdateTriggerFfi.REMOVED,
+                    ARRIVAL,
+                ),
+            )
+            assertFalse("a removal of unknown cause ends the proof", read.coversCurrentMembership)
+            assertEquals(emptyList<String>(), read.chatListItems(emptyList()).map { it.id })
         }
 
     /** The first native response captures rows before deletion, then returns them only after release. */
@@ -201,5 +231,6 @@ class AccountWideLocalRemovalTest {
 
     private companion object {
         val SURVIVOR = "c1".repeat(16)
+        val ARRIVAL = "d1".repeat(16)
     }
 }

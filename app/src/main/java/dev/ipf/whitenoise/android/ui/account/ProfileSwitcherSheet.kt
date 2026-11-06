@@ -168,7 +168,7 @@ internal fun ProfileSwitcherSheet(
                             ),
                         modifier =
                             Modifier
-                                .settingsRowBorder(rowContext, enabled && pendingLabel != account.label)
+                                .settingsRowBorder(rowContext)
                                 .testTag("profile_switcher.profile.${account.label}")
                                 .semantics(mergeDescendants = true) { selected = account.isActive },
                     )

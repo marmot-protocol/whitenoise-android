@@ -59,7 +59,7 @@ class MessageActionMenuLayoutTest {
         assertEquals(listOf("showLess"), callbacks)
     }
 
-    /** Maximum menu uses prototype single column with delete last. */
+    /** The maximum menu pairs actions into two label-sized columns with delete last. */
     @Test
     fun maximumMenuUsesTwoBalancedColumnsWithDeleteLast() {
         renderMenu(fontScale = 1f)
@@ -73,7 +73,7 @@ class MessageActionMenuLayoutTest {
 
         assertEquals("the first two actions share a row", keepOnScreen.top, edit.top, 0.5f)
         assertTrue("and sit in different columns", edit.left > keepOnScreen.left)
-        assertEquals("columns are balanced", keepOnScreen.width, edit.width, 0.5f)
+        assertEquals("a column keeps one width", keepOnScreen.width, selectText.width, 0.5f)
         assertTrue("later actions come below the first row", selectText.top > keepOnScreen.top)
         assertEquals("the left column stays aligned", keepOnScreen.left, selectText.left, 0.5f)
         assertEquals("and the row below pairs in order", selectText.top, reply.top, 0.5f)
@@ -142,7 +142,7 @@ class MessageActionMenuLayoutTest {
         assertTrue(
             "literal-code label must fit: " +
                 layouts.joinToString { "size=${it.size}, lines=${it.lineCount}, height=${it.multiParagraph.height}" },
-            layouts.none { it.hasVisualOverflow },
+            layouts.all { it.fitsItsSlot() },
         )
     }
 

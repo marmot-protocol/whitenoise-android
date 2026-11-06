@@ -1326,9 +1326,9 @@ internal const val MARKDOWN_TABLE_DIVIDER_ALPHA = 0.25f
 internal const val MARKDOWN_TABLE_DIVIDER_TAG = "markdown_table_row_divider"
 
 /**
- * Simple v1 table: equal-weight columns, a rule under the bolded header row and
- * between adjacent body rows, column alignment honored via [TextAlign]. No
- * per-column intrinsic sizing — acceptable inside a chat bubble's width budget.
+ * Table with one shared column allocation, a rule under the bolded header row and between adjacent
+ * body rows, and column alignment honored via [TextAlign]. [MarkdownTableLayout] sizes each column
+ * from its visible cells: short columns keep their text width and wide ones take the rest (#3562).
  */
 @Composable
 private fun MarkdownTableView(
@@ -1337,27 +1337,31 @@ private fun MarkdownTableView(
     path: String,
 ) {
     val visibleTable = markdownVisibleTable(block.header, block.rows)
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        MarkdownTableRowView(visibleTable.header, block.alignments, header = true, ctx, path = path, rowIndex = null)
-        // An empty body — or a header that exhausted the cell budget — would
-        // otherwise leave a rule under the header separating nothing.
-        if (visibleTable.rows.isNotEmpty()) {
-            MarkdownTableRowDivider()
-        }
-        visibleTable.rows.forEachIndexed { index, row ->
-            MarkdownTableRowView(row, block.alignments, header = false, ctx, path = path, rowIndex = index)
-            // Separates adjacent body rows only: a Column child sits below the
-            // whole row, so wrapped cells get one rule after the full row height
-            // rather than one per text line. No trailing rule after the last row,
-            // and none before the elision marker, which is not itself a row.
-            if (index < visibleTable.rows.lastIndex) {
-                MarkdownTableRowDivider()
+    val rows = listOf(visibleTable.header) + visibleTable.rows
+    val shape = MarkdownTableShape(rows.map { it.cells.size }, rows.map { it.cellsElided })
+    MarkdownTableLayout(
+        shape = shape,
+        cells = {
+            rows.forEachIndexed { index, row ->
+                val rowIndex = (index - 1).takeIf { index > 0 }
+                MarkdownTableRowCells(row, block.alignments, ctx, path = path, rowIndex = rowIndex)
             }
-        }
-        if (visibleTable.rowsElided) {
-            MarkdownElisionMarker(leafId = markdownElisionLeafId(path, sourceIndexOffset = null))
-        }
-    }
+        },
+        rowMarkers = {
+            rows.forEachIndexed { index, row ->
+                if (row.cellsElided) MarkdownTableCellElisionMarker(path, rowIndex = (index - 1).takeIf { index > 0 })
+            }
+        },
+        // One rule under the header and one between each adjacent body-row pair: an empty body —
+        // or a header that exhausted the cell budget — draws none, wrapped cells get one rule after
+        // the whole row, and the elision marker, which is not itself a row, gets none before it.
+        dividers = { repeat(rows.size - 1) { MarkdownTableRowDivider() } },
+        tableMarker = {
+            if (visibleTable.rowsElided) {
+                MarkdownElisionMarker(leafId = markdownElisionLeafId(path, sourceIndexOffset = null))
+            }
+        },
+    )
 }
 
 /** Row rule for markdown tables; derives from [LocalContentColor] so it stays visible on every bubble surface. */
@@ -1369,53 +1373,50 @@ private fun MarkdownTableRowDivider() {
     )
 }
 
+/** Emits one selectable text leaf per visible cell of [row], the header row has a null [rowIndex]. */
+@Suppress("FunctionNaming")
 @Composable
-private fun MarkdownTableRowView(
+private fun MarkdownTableRowCells(
     row: MarkdownTableRowWindow<MarkdownTableCellFfi>,
     alignments: List<MarkdownAlignmentFfi>,
-    header: Boolean,
     ctx: MarkdownBodyContext,
     path: String,
     rowIndex: Int?,
 ) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        row.cells.forEachIndexed { index, cell ->
-            val cellPath =
-                if (rowIndex == null) {
-                    "$path/h$index"
-                } else {
-                    "$path/r$rowIndex/c$index"
-                }
-            MarkdownBodyText(
-                leafId = cellPath,
-                text = rememberMarkdownInlineText(cell.inlines, ctx),
-                style =
-                    MaterialTheme.typography.bodyMedium.copy(
-                        fontWeight = if (header) FontWeight.SemiBold else FontWeight.Normal,
-                    ),
-                textAlign =
-                    when (alignments.getOrNull(index)) {
-                        MarkdownAlignmentFfi.CENTER -> TextAlign.Center
-                        MarkdownAlignmentFfi.RIGHT -> TextAlign.End
-                        else -> TextAlign.Start
-                    },
-                modifier = Modifier.weight(1f),
-            )
-        }
-        if (row.cellsElided) {
-            val rowPath = rowIndex?.let { "$path/r$it" } ?: path
-            MarkdownElisionMarker(
-                leafId =
-                    if (header) {
-                        markdownTableHeaderCellElisionLeafId(rowPath)
-                    } else {
-                        markdownElisionLeafId(rowPath, sourceIndexOffset = null)
-                    },
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-        }
+    row.cells.forEachIndexed { index, cell ->
+        MarkdownBodyText(
+            leafId = if (rowIndex == null) "$path/h$index" else "$path/r$rowIndex/c$index",
+            text = rememberMarkdownInlineText(cell.inlines, ctx),
+            style =
+                MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = if (rowIndex == null) FontWeight.SemiBold else FontWeight.Normal,
+                ),
+            textAlign =
+                when (alignments.getOrNull(index)) {
+                    MarkdownAlignmentFfi.CENTER -> TextAlign.Center
+                    MarkdownAlignmentFfi.RIGHT -> TextAlign.End
+                    else -> TextAlign.Start
+                },
+        )
     }
+}
+
+/** The marker a row shows in the shared elision column when the table window drops its later cells. */
+@Suppress("FunctionNaming")
+@Composable
+private fun MarkdownTableCellElisionMarker(
+    path: String,
+    rowIndex: Int?,
+) {
+    MarkdownElisionMarker(
+        leafId =
+            if (rowIndex == null) {
+                markdownTableHeaderCellElisionLeafId(path)
+            } else {
+                markdownElisionLeafId("$path/r$rowIndex", sourceIndexOffset = null)
+            },
+        style = MaterialTheme.typography.bodyMedium,
+    )
 }
 
 /** Projects [inlines] once per content, colour, mention or timestamp revision change. */

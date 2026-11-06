@@ -17,10 +17,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
@@ -46,6 +49,9 @@ import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.ChatsNewMessageFabContent
 import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoff
+import dev.ipf.whitenoise.android.ui.conversation.ConversationJumpToNewestButton
+import dev.ipf.whitenoise.android.ui.conversation.ConversationNavigationStack
+import dev.ipf.whitenoise.android.ui.conversation.TtsResumeFollowButton
 import dev.ipf.whitenoise.android.ui.conversation.compactTopClearanceFor
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_HANDLE_TAG
@@ -55,6 +61,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
 import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.ACCOUNT
 import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.COMPOSER_TAG
 import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.GROUP
+import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.JUMP_TO_NEWEST_TAG
 import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.origin
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -138,6 +145,7 @@ internal abstract class DictationNavigationRenderFixture {
         withComposerMorph: Boolean = false,
         configured: Boolean = false,
         startImmediately: Boolean = true,
+        jumpStack: Boolean = false,
     ): Fixture {
         val (fixture, voice) = prepareFixture(withComposerMorph, configured, startImmediately)
         composeRule.setContent {
@@ -184,7 +192,7 @@ internal abstract class DictationNavigationRenderFixture {
                                     suppressMotion = false,
                                     contentKey = { it ?: "chat-list" },
                                 ) { chatId ->
-                                    RenderRouteContents(fixture, owner, chatId, largeRtl, compact, voice)
+                                    RenderRouteContents(fixture, owner, chatId, largeRtl, compact, voice, jumpStack)
                                 }
                             }
                         }
@@ -231,7 +239,9 @@ internal abstract class DictationNavigationRenderFixture {
         largeRtl: Boolean,
         compact: Boolean,
         voice: VoiceRecordingController?,
+        jumpStack: Boolean,
     ) {
+        var composerHeightPx by remember { mutableIntStateOf(0) }
         Box(Modifier.fillMaxSize()) {
             if (chatId == null) {
                 Scaffold(
@@ -275,8 +285,20 @@ internal abstract class DictationNavigationRenderFixture {
                             .floatingDictationAnchor(
                                 topInset = ComposerOuterVerticalPadding,
                                 followsComposerFab = true,
-                            ),
+                            ).onSizeChanged { composerHeightPx = it.height },
                 )
+                // The production jump stack over this composer, so another chat's capsule must lift it (#3584).
+                if (jumpStack) {
+                    val composerOverlap = with(LocalDensity.current) { composerHeightPx.toDp() }
+                    ConversationNavigationStack(composerOverlap = composerOverlap) {
+                        TtsResumeFollowButton(onClick = {})
+                        ConversationJumpToNewestButton(
+                            unreadIncomingCount = 3,
+                            onClick = {},
+                            modifier = Modifier.testTag(JUMP_TO_NEWEST_TAG),
+                        )
+                    }
+                }
             }
         }
     }
@@ -459,5 +481,6 @@ internal object DictationNavigationFixtureValues {
     const val ACCOUNT = "account"
     const val GROUP = "group"
     const val COMPOSER_TAG = "navigation-origin-composer"
+    const val JUMP_TO_NEWEST_TAG = "navigation-jump-to-newest"
     val origin = ConversationDictationComposerRoute("chat", GROUP, "chat", ACCOUNT, true, true)
 }

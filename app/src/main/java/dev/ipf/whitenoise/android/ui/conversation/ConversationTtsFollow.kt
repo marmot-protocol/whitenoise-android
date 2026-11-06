@@ -660,11 +660,18 @@ internal suspend fun followTtsTargetInViewport(
                 (measured.sentenceBoundsInWindow.top - viewportWindowTop).roundToInt() + viewportStart
             val sentenceBottom =
                 (measured.sentenceBoundsInWindow.bottom - viewportWindowTop).roundToInt() + viewportStart
+            // The registry's interval, not the list's, bounds the decision: speech may exclude a painted
+            // fade the list still lays out under, and both edges must come from the same accepted measure.
+            val viewportEnd =
+                viewportStart +
+                    measured.viewportBoundsInWindow.height
+                        .roundToInt()
+                        .coerceAtMost(layoutInfo.viewportEndOffset - viewportStart)
             when (
                 val decision =
                     TtsFollowViewport.decide(
-                        viewportStart = layoutInfo.viewportStartOffset,
-                        viewportEnd = layoutInfo.viewportEndOffset,
+                        viewportStart = viewportStart,
+                        viewportEnd = viewportEnd,
                         itemOffset = visibleTarget.offset,
                         sentenceTop = sentenceTop,
                         sentenceBottom = sentenceBottom,

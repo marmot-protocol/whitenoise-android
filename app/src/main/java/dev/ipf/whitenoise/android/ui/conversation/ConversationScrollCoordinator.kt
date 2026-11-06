@@ -27,6 +27,15 @@ private const val DEFAULT_TAIL_LAYOUT_SETTLE_FRAMES = 8
 private const val MIN_TAIL_LAYOUT_SETTLE_FRAMES = 4
 private const val REQUIRED_STABLE_TAIL_LAYOUT_FRAMES = 2
 
+/** Reasons a target-less jump only keeps a tail follower at the newest edge, never a reader's own navigation. */
+private val PASSIVE_TAIL_CORRECTIONS =
+    setOf(
+        ConversationScrollReason.NewMessage,
+        ConversationScrollReason.ReactionLayout,
+        ConversationScrollReason.ViewportChange,
+        ConversationScrollReason.ImeTransition,
+    )
+
 /** The durable reading intent behind the conversation's transient list geometry. */
 internal sealed interface ConversationScrollMode {
     data object FollowingTail : ConversationScrollMode
@@ -279,6 +288,21 @@ internal class ConversationScrollCoordinator(
 
     val isFollowingTail: Boolean
         get() = settledMode is ConversationScrollMode.FollowingTail
+
+    /**
+     * True for a tail follower, including one whose only in-flight command is a passive tail correction — a
+     * target-less jump that keeps the newest edge pinned for a new row, a reaction, a viewport or an IME change.
+     * Explicit navigation in flight still reads as not following.
+     */
+    val isFollowingTailThroughPassiveCorrection: Boolean
+        get() =
+            isFollowingTail &&
+                when (val current = mode) {
+                    ConversationScrollMode.FollowingTail -> true
+                    is ConversationScrollMode.ProgrammaticJump ->
+                        current.targetMessageId == null && current.reason in PASSIVE_TAIL_CORRECTIONS
+                    else -> false
+                }
 
     /** Captures the current durable navigation intent for deferred restoration. */
     val intentToken: ConversationScrollIntentToken
@@ -791,6 +815,10 @@ internal class ConversationScrollCoordinator(
     internal inner class ConversationScrollCommandScope internal constructor(
         private val serial: Long,
     ) {
+        /** The newest row currently laid out; the reversed list puts it nearest the composer. */
+        val firstVisibleItemIndex: Int
+            get() = writer.firstVisibleItemIndex
+
         suspend fun scrollToItem(
             index: Int,
             scrollOffset: Int = 0,
@@ -815,14 +843,15 @@ internal class ConversationScrollCoordinator(
          * Keeps distance-independent navigation responsive: snap near a far target, then animate only
          * the final few rows. Message-backed callers can re-resolve after each snap because paging may
          * insert or remove list headers while the command is suspended.
-         * [resolveScrollOffset] reads geometry after prepositioning so a later settle pass can use
-         * the actual approach coordinate instead of an obsolete measurement.
+         * [resolveDestination] reads geometry after prepositioning so a later settle pass can use
+         * the actual approach coordinate instead of an obsolete measurement. It returns the
+         * (index, scroll offset) write for the resolved target, which may name a neighbouring row.
          */
         suspend fun animateScrollToItem(
             index: Int,
             scrollOffset: Int = 0,
             traceMentionJump: Boolean = false,
-            resolveScrollOffset: (Int) -> Int = { scrollOffset },
+            resolveDestination: (Int) -> Pair<Int, Int> = { it to scrollOffset },
             resolveIndex: () -> Int? = { index },
         ): Boolean {
             ensureCurrent()
@@ -840,14 +869,14 @@ internal class ConversationScrollCoordinator(
             val resolvedTargetIndex = targetIndex ?: return false
             // Prepositioning can suspend through a keyboard/header/row measurement change.
             // Use the geometry now available, not an offset captured before that handoff.
-            val resolvedScrollOffset = resolveScrollOffset(resolvedTargetIndex)
+            val (destinationIndex, destinationOffset) = resolveDestination(resolvedTargetIndex)
             if (isFar(resolvedTargetIndex)) {
                 traceMentionWrite(traceMentionJump, ConversationMentionJumpTrace.POSITION) {
-                    writer.scrollToItem(resolvedTargetIndex, resolvedScrollOffset)
+                    writer.scrollToItem(destinationIndex, destinationOffset)
                 }
             } else {
                 traceMentionWrite(traceMentionJump, ConversationMentionJumpTrace.ANIMATION) {
-                    writer.animateScrollToItem(resolvedTargetIndex, resolvedScrollOffset)
+                    writer.animateScrollToItem(destinationIndex, destinationOffset)
                 }
             }
             ensureCurrent()

@@ -4,6 +4,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
+import dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -21,8 +23,8 @@ internal const val FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS = 250L
 /**
  * The renderable stored avatars of the rows the restored chat list draws first. The rows are projected and
  * ordered exactly as the first frame orders them: [chatListItemFromProjection] and [sortChatListItems] with
- * the same [draftedAtSeconds] lookup `ChatsController` uses (pending confirmation, pinned block and manual pin
- * position, draft-aware recency, arrival order, title). Archived rows are not on the first frame and are
+ * the same [draftedAtSeconds] lookup `ChatsController` uses (pinned block in manual pin position, pending
+ * confirmation, draft-aware recency, arrival order, title). Archived rows are not on the first frame and are
  * skipped. Each asset is the one the row itself adopts, so a picture the row would not draw is not decoded.
  */
 internal fun firstFrameDurableAvatarAssets(
@@ -67,18 +69,25 @@ internal class FirstFrameDurableAvatar(
  * [installFirstFrameDurableAvatars] can put them back after an interactive account switch evicts that
  * cache. No acquisition is started and nothing is written to an Android store. The wait is bounded by
  * [FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS]; avatars not decoded by then keep the ordinary lazy path.
+ *
+ * Unless [awaitColdWorkers], only avatars already decoded or whose domain has a worker ready are awaited. A quick
+ * account switch sets it false: the switch resets the decoder workers, so each group picture needs a new isolated
+ * worker, which can take longer than the whole budget to start (#3496). Waiting for one would delay the switch
+ * and still draw the generated initials.
  */
 internal suspend fun WhiteNoiseAppState.prewarmFirstFrameDurableAvatars(
     accountRef: String,
     rows: List<PresentedChatRowFfi>,
+    awaitColdWorkers: Boolean = true,
 ): List<FirstFrameDurableAvatar> {
     val selections =
         firstFrameDurableAvatarSelections(rows, accountRef) { groupIdHex ->
             draftStore.draftedAtSecondsFor(accountRef, groupIdHex)
         }.takeIf { it.isNotEmpty() } ?: return emptyList()
+    val awaited = if (awaitColdWorkers) selections else selectionsServableNow(selections, accountRef)
     withTimeoutOrNull(FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS) {
         coroutineScope {
-            selections
+            awaited
                 .map { (asset, domain) -> async { durableAvatar(asset, accountRef, acquireMissing = false, domain) } }
                 .awaitAll()
         }
@@ -93,6 +102,17 @@ internal suspend fun WhiteNoiseAppState.prewarmFirstFrameDurableAvatars(
                 AvatarImageLoader.cachedAnimationClassification(key),
             )
         }
+    }
+}
+
+/** The [selections] that need no new decoder worker: pixels already cached, or a domain a worker serves now. */
+private fun selectionsServableNow(
+    selections: List<Pair<AvatarAssetFfi, MediaTrustDomain>>,
+    accountRef: String,
+): List<Pair<AvatarAssetFfi, MediaTrustDomain>> {
+    val ready = IsolatedMediaDecoder.servableNow(selections.map { it.second })
+    return selections.filter { (asset, domain) ->
+        domain in ready || asset.cacheKey(accountRef)?.let(AvatarImageLoader::cachedImage) != null
     }
 }
 

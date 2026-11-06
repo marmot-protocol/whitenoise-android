@@ -17,6 +17,59 @@ import androidx.compose.ui.unit.dp
 private val SCROLL_SHADOW_OUTSET = 30.dp
 private val SCROLL_LAYER_OUTSETS = LayerOutsets(left = SCROLL_SHADOW_OUTSET, right = SCROLL_SHADOW_OUTSET)
 
+/** The resolved bands of one vertical edge mask, in px of the masked content's height. */
+private class VerticalEdgeFadeBands(
+    val clear: Float,
+    val top: Float,
+    val bottom: Float,
+)
+
+/**
+ * The single arithmetic behind both the painted mask and its fully opaque interval.
+ *
+ * [bottomInsetPx] reserves a strip painted underneath foreground chrome. Fades that would overlap
+ * share the remaining clear height rather than inverting their stops.
+ */
+private fun verticalEdgeFadeBands(
+    heightPx: Float,
+    topFadePx: Float,
+    bottomFadePx: Float,
+    bottomInsetPx: Float,
+    maxBandFraction: Float,
+): VerticalEdgeFadeBands {
+    val inset = bottomInsetPx.coerceIn(0f, heightPx)
+    val clear = heightPx - inset
+    // Preserve proportional legacy composer geometry; ordinary viewports opt into the tighter cap.
+    val bandLimit = if (maxBandFraction >= 1f) Float.POSITIVE_INFINITY else clear * maxBandFraction.coerceIn(0f, 1f)
+    val requestedTop = topFadePx.coerceIn(0f, bandLimit)
+    val requestedBottom =
+        bottomFadePx.coerceIn(0f, bandLimit).let { if (inset > 0f) it.coerceAtLeast(1f) else it }
+    val requested = requestedTop + requestedBottom
+    val scale = if (requested > clear && requested > 0f) clear / requested else 1f
+    return VerticalEdgeFadeBands(clear = clear, top = requestedTop * scale, bottom = requestedBottom * scale)
+}
+
+/**
+ * The interval, in px from the content's top, that the same mask leaves at full opacity.
+ *
+ * Callers that must keep something fully legible — speech follow placing a sentence — exclude the
+ * fade through its opaque edge with this, rather than adding an offset of their own. Returns null
+ * when nothing is left at full opacity.
+ */
+internal fun verticalEdgeFadeOpaqueRange(
+    heightPx: Float,
+    topFadePx: Float,
+    bottomFadePx: Float,
+    bottomInsetPx: Float = 0f,
+    maxBandFraction: Float = 1f,
+): ClosedFloatingPointRange<Float>? {
+    if (heightPx <= 0f) return null
+    val bands = verticalEdgeFadeBands(heightPx, topFadePx, bottomFadePx, bottomInsetPx, maxBandFraction)
+    val top = bands.top
+    val bottom = bands.clear - bands.bottom
+    return if (bottom > top) top..bottom else null
+}
+
 /**
  * Produces monotonic alpha-mask stops for content that dissolves at its vertical edges.
  *
@@ -31,17 +84,11 @@ internal fun verticalEdgeFadeStops(
     maxBandFraction: Float = 1f,
 ): List<Pair<Float, Color>>? {
     if (heightPx <= 0f) return null
-    val inset = bottomInsetPx.coerceIn(0f, heightPx)
-    val clear = heightPx - inset
-    // Preserve proportional legacy composer geometry; ordinary viewports opt into the tighter cap.
-    val bandLimit = if (maxBandFraction >= 1f) Float.POSITIVE_INFINITY else clear * maxBandFraction.coerceIn(0f, 1f)
-    val requestedTop = topFadePx.coerceIn(0f, bandLimit)
-    val requestedBottom =
-        bottomFadePx.coerceIn(0f, bandLimit).let { if (inset > 0f) it.coerceAtLeast(1f) else it }
-    val requested = requestedTop + requestedBottom
-    val scale = if (requested > clear && requested > 0f) clear / requested else 1f
-    val topBand = requestedTop * scale
-    val bottomBand = requestedBottom * scale
+    val bands = verticalEdgeFadeBands(heightPx, topFadePx, bottomFadePx, bottomInsetPx, maxBandFraction)
+    val inset = heightPx - bands.clear
+    val clear = bands.clear
+    val topBand = bands.top
+    val bottomBand = bands.bottom
     val topStop = (topBand / heightPx).coerceIn(0f, 1f)
     val bottomStop = ((clear - bottomBand) / heightPx).coerceIn(topStop, 1f)
     val clearStop = (clear / heightPx).coerceIn(bottomStop, 1f)

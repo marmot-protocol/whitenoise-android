@@ -17,6 +17,7 @@ import dev.ipf.marmotkit.ChatListMessageDeliveryStateFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
+import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
 import dev.ipf.marmotkit.ChatPinStateFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
@@ -1374,9 +1375,9 @@ private fun replaceRows(
     rows: List<ChatListRowFfi>,
 ) {
     ChatsController::class.java
-        .getDeclaredMethod("replaceChatRows", List::class.java)
+        .getDeclaredMethod("replaceChatRows", List::class.java, ChatListWindowSnapshotFfi::class.java)
         .apply { isAccessible = true }
-        .invoke(controller, rows)
+        .invoke(controller, rows, null)
 }
 
 private fun applySubscriptionChatListRow(
@@ -1419,9 +1420,13 @@ private fun removeAndRestoreChatRow(
             .apply { isAccessible = true }
     val snapshot = requireNotNull(snapshotMethod.invoke(controller, groupIdHex))
     ChatsController::class.java
-        .getDeclaredMethod("removeChatRow", String::class.java, java.lang.Boolean.TYPE)
-        .apply { isAccessible = true }
-        .invoke(controller, groupIdHex, false)
+        .getDeclaredMethod(
+            "removeChatRow",
+            String::class.java,
+            java.lang.Boolean.TYPE,
+            MembershipRemoval::class.java,
+        ).apply { isAccessible = true }
+        .invoke(controller, groupIdHex, false, MembershipRemoval.Ambiguous)
     ChatsController::class.java
         .getDeclaredMethod("restoreRemovedChatRow", snapshot.javaClass)
         .apply { isAccessible = true }

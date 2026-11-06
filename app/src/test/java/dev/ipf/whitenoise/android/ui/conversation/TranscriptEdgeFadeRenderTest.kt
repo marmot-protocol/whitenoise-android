@@ -23,6 +23,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -92,13 +93,62 @@ class TranscriptEdgeFadeRenderTest {
     }
 
     /**
+     * The interval the fade publishes for read aloud is the one it paints: full strength from its
+     * opaque top edge down to the composer, and already dimmed a pixel either side of it.
+     */
+    @Test
+    fun thePublishedOpaqueIntervalIsWhereThePaintedMaskIsAtFullStrength() {
+        val geometry = TranscriptEdgeFadeGeometry()
+        render(geometry)
+        rule.runOnIdle { scope.launch { list.scrollToItem(MIDDLE_ROW) } }
+        rule.waitForIdle()
+        val pixels = rule.onNodeWithTag(FRAME).captureToImage().toPixelMap()
+        val opaque = rule.runOnIdle { checkNotNull(geometry.opaqueRangePx(480f)) }
+
+        assertEquals("the settled band ends at the fade height", TOP_BAND_MIDPOINT * 2f, opaque.start)
+        assertEquals("the composer edge closes the interval", COMPOSER_TOP_EDGE.toFloat(), opaque.endInclusive)
+        val top = opaque.start.toInt()
+        val bottom = opaque.endInclusive.toInt()
+        assertEquals("the opaque edge must be at full strength", ROW, pixels[COLUMN, top])
+        assertNotEquals("just above the edge the band is still dimming", ROW, pixels[COLUMN, top - 2])
+        assertEquals("the last opaque line must be at full strength", ROW, pixels[COLUMN, bottom - 1])
+        assertNotEquals("past the composer edge the row is dissolving", ROW, pixels[COLUMN, bottom + 2])
+    }
+
+    /**
+     * Without a composer overlap the transcript falls back to the ordinary edge cues. The interval it
+     * publishes must still match that painted mask, with both 28 px bands while history lies both ways.
+     */
+    @Test
+    fun theNoOverlapFallbackPublishesTheIntervalItPaints() {
+        val geometry = TranscriptEdgeFadeGeometry()
+        render(geometry, composerOverlapDp = 0)
+        rule.runOnIdle { scope.launch { list.scrollToItem(MIDDLE_ROW) } }
+        rule.waitForIdle()
+        val pixels = rule.onNodeWithTag(FRAME).captureToImage().toPixelMap()
+        val opaque = rule.runOnIdle { checkNotNull(geometry.opaqueRangePx(480f)) }
+
+        assertEquals(TOP_BAND_MIDPOINT * 2f, opaque.start)
+        assertEquals(480f - TOP_BAND_MIDPOINT * 2f, opaque.endInclusive)
+        val top = opaque.start.toInt()
+        val bottom = opaque.endInclusive.toInt()
+        assertEquals("the opaque edge must be at full strength", ROW, pixels[COLUMN, top])
+        assertNotEquals("just above the edge the band is still dimming", ROW, pixels[COLUMN, top - 2])
+        assertEquals("the last opaque line must be at full strength", ROW, pixels[COLUMN, bottom - 1])
+        assertNotEquals("past the bottom edge the band is dimming", ROW, pixels[COLUMN, bottom + 2])
+    }
+
+    /**
      * True when the sample sits between the row and the background. The two differ only in red, so
      * that channel alone reports how far the mask has dissolved the row towards the page.
      */
     private fun Color.isPartlyFaded(): Boolean = red > 0.3f && red < 0.7f
 
     /** Mirrors the transcript's geometry: reversed rows, a covered strip, and a known background. */
-    private fun render() {
+    private fun render(
+        geometry: TranscriptEdgeFadeGeometry? = null,
+        composerOverlapDp: Int = COVERED_STRIP_DP,
+    ) {
         rule.setContent {
             list = rememberLazyListState()
             scope = rememberCoroutineScope()
@@ -109,7 +159,11 @@ class TranscriptEdgeFadeRenderTest {
                     modifier =
                         Modifier
                             .fillMaxSize()
-                            .transcriptEdgeFade(listState = list, composerOverlap = COVERED_STRIP_DP.dp),
+                            .transcriptEdgeFade(
+                                listState = list,
+                                composerOverlap = composerOverlapDp.dp,
+                                geometry = geometry,
+                            ),
                 ) {
                     items((0 until ROW_COUNT).toList(), key = { it }) {
                         Box(Modifier.fillMaxWidth().height(ROW_HEIGHT_DP.dp).background(ROW))

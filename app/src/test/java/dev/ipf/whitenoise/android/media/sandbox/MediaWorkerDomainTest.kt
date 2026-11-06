@@ -40,6 +40,44 @@ class MediaWorkerDomainTest {
         }
     }
 
+    /**
+     * Only a domain that owns a connected generation is servable now, and a single-use input never is (#3496): each
+     * one waits for a fresh generation, so a caller that will not wait for a worker to start skips it.
+     */
+    @Test
+    fun servableNowReportsOnlyDomainsWithAConnectedGeneration() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), validReplyAt = { true })
+        val transport = domainLane(context)
+        try {
+            assertEquals(emptySet<MediaTrustDomain>(), transport.servableNow(listOf(A, B, MediaTrustDomain.Unique)))
+            finish(decodeIn(transport, 1, A))
+            assertEquals(setOf(A), transport.servableNow(listOf(A, B, MediaTrustDomain.Unique)))
+        } finally {
+            context.dieAll()
+            transport.close()
+        }
+        assertEquals(emptySet<MediaTrustDomain>(), transport.servableNow(listOf(A)))
+    }
+
+    /** A domain whose retiring worker still lives cannot take a clean spare, so only the other domain is servable. */
+    @Test
+    fun servableNowSkipsADomainWaitingForItsRetiringWorkerToDie() {
+        val context = BindingFixture(ApplicationProvider.getApplicationContext(), validReplyAt = { true })
+        val transport =
+            IsolatedMediaTransport(context, "images", spares = 1, deadlineMs = RECOVERY_DEADLINE_MS)
+        try {
+            finish(decodeIn(transport, 1, A))
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+            while (transport.servableNow(listOf(B)).isEmpty() && System.nanoTime() < deadline) Thread.sleep(10)
+            assertEquals("the warmed spare can serve a new domain", setOf(B), transport.servableNow(listOf(B)))
+            transport.retireDomain(A)
+            assertEquals(setOf(B), transport.servableNow(listOf(A, B)))
+        } finally {
+            context.dieAll()
+            transport.close()
+        }
+    }
+
     /** A domain's later inputs reuse its generation, and no input of another domain ever reaches it. */
     @Test
     fun domainGenerationServesOnlyItsOwnDomain() {

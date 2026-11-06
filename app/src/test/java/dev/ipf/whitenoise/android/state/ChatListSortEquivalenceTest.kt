@@ -63,7 +63,7 @@ class ChatListSortEquivalenceTest {
         assertEquals("no pending-confirmation rows in the corpus", true, pending > 0)
     }
 
-    /** The comparator as it read before the keys were precomputed. */
+    /** The comparator as it read before the keys were precomputed, with pins ahead of pending invites. */
     private fun referenceSort(
         items: List<ChatListItem>,
         draftedAtSeconds: (ChatListItem) -> ULong?,
@@ -74,9 +74,9 @@ class ChatListSortEquivalenceTest {
                 .filter { referenceComesFromDraft(it, draftedAtById[it.id]) }
                 .mapTo(mutableSetOf()) { referenceTie(it, draftedAtById[it.id]) }
         return items.sortedWith(
-            compareByDescending<ChatListItem> { it.group.pendingConfirmation }
-                .thenByDescending { it.pinned() }
+            compareByDescending<ChatListItem> { it.pinned() }
                 .thenBy { it.pinnedPosition()?.toLong() ?: Long.MAX_VALUE }
+                .thenByDescending { it.group.pendingConfirmation }
                 .thenByDescending { chatListItemDraftSortAt(it.latestAt, draftedAtById[it.id]) }
                 .thenByDescending { item ->
                     val tie = referenceTie(item, draftedAtById[item.id])

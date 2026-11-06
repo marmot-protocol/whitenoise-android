@@ -132,6 +132,34 @@ class ConversationTailSettleWritesTest {
             assertEquals(listOf(0, 0), writer.writes)
         }
 
+    /**
+     * Physical-tail follows keep writing offset zero for an oversized row (#2627), and only the distinct incoming
+     * landing adds the overhang that places that row's beginning at the top.
+     */
+    @Test
+    fun physicalTailStaysAtOffsetZeroWhileIncomingLandingWritesItsBeginning() =
+        runTest {
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(900, 80))
+            val coordinator = ConversationScrollCoordinator(list)
+            coordinator.followTailIfAllowed({ 0 }, ConversationScrollReason.NewMessage, awaitFrame = list::frame)
+            coordinator.settleTailAfterLayoutChange(
+                resolveTailIndex = { 0 },
+                captureLayout = { ConversationTailLayout(900, 0, 900, 600, measuredTailKey = "tail") },
+                maxSettleFrames = 4,
+                awaitFrame = list::frame,
+            )
+            assertTrue(list.writes.isNotEmpty())
+            assertTrue(list.writes.all { (_, offset) -> offset == 0 })
+            val physicalTailWrites = list.writes.size
+            coordinator.followAppendOrRevealIncomingStart(
+                candidates = listOf(ConversationIncomingAppendCandidate("long", "msg:long")),
+                probeFor = { list.probe { 0 } },
+                resolveTailIndex = { 0 },
+                awaitFrame = list::frame,
+            )
+            assertEquals(listOf(0 to 0, 0 to 300), list.writes.drop(physicalTailWrites))
+        }
+
     /** Builds a ready tail layout with a single measured 48 px row and a stable tail key. */
     private fun readyLayout() =
         ConversationTailLayout(

@@ -16,6 +16,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import dev.ipf.marmotkit.ContentReportFfi
+import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.RecentEmojiList
 import dev.ipf.whitenoise.android.ui.MarkdownLinkLayoutRegistry
 import dev.ipf.whitenoise.android.ui.MarkdownLinkTextLayoutReporter
@@ -47,6 +48,9 @@ internal class MessageBubbleSurfaceState {
         private set
     var infoSheetOpen by mutableStateOf(false)
     var forwardSheetOpen by mutableStateOf(false)
+
+    /** The payload captured when the forward sheet opened, so a pending source changing state cannot rewrite it. */
+    var forwardSnapshot by mutableStateOf<ForwardMessagePayload?>(null)
     var editHistoryOpen by mutableStateOf(false)
     var reactionSheetOpen by mutableStateOf(false)
     var customizeReactionsOpen by mutableStateOf(false)

@@ -57,6 +57,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInParent
@@ -320,6 +321,7 @@ internal fun FocusedMessageActions(
             // FocusedReactionGrowthFrameHeight can spare, and that growth comes out of the preview instead of the
             // action viewport. On an ordinary full-height frame, the preview keeps its original footprint.
             val railWidth = minOf(maxWidth, FocusedStackMaximumWidth) - FocusedStackHorizontalPadding * 2
+            val actionPanelMaximumWidth = maxWidth - FocusedStackHorizontalPadding * 2
             val railAllowance =
                 FocusedReactionRailBudget + (maxHeight - FocusedReactionGrowthFrameHeight).coerceAtLeast(0.dp)
             val reactionCount = quickReactions.size + 1
@@ -348,7 +350,6 @@ internal fun FocusedMessageActions(
                 modifier =
                     Modifier
                         .align(Alignment.TopCenter)
-                        .widthIn(max = FocusedStackMaximumWidth)
                         .fillMaxWidth()
                         .heightIn(max = maxHeight)
                         .offset { IntOffset(0, travel.offset.value.roundToInt()) }
@@ -373,20 +374,25 @@ internal fun FocusedMessageActions(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
             ) {
+                // The rail and the lifted message keep the centred 560dp column they were designed in;
+                // only the action panel below may widen into the rest of the window.
                 if (canReact) {
-                    FocusedReactionRail(
-                        quickReactions = quickReactions,
-                        sizing = reactionSizing,
-                        selectedReactions = selectedReactions,
-                        onReact = onReact,
-                        onReactionOrigin = onReactionOrigin,
-                        onMoreReactions = onMoreReactions,
-                    )
+                    Box(Modifier.focusedColumnSlot(railWidth, railWidth, mine)) {
+                        FocusedReactionRail(
+                            quickReactions = quickReactions,
+                            sizing = reactionSizing,
+                            selectedReactions = selectedReactions,
+                            onReact = onReact,
+                            onReactionOrigin = onReactionOrigin,
+                            onMoreReactions = onMoreReactions,
+                        )
+                    }
                 }
                 if (preview != null) {
                     Box(
                         modifier =
                             Modifier
+                                .focusedColumnSlot(railWidth, railWidth, mine)
                                 // The tag precedes clearAndSetSemantics, which wipes semantics set after it.
                                 .testTag("message-actions-preview")
                                 // A five-line text excerpt with a reply/footer can be as tall as
@@ -431,6 +437,9 @@ internal fun FocusedMessageActions(
                     modifier =
                         Modifier
                             .weight(1f, fill = false)
+                            // Labels that need more than the column may use the whole padded window, so a
+                            // wide window never wraps an action the 560dp column could not hold (#3587).
+                            .focusedColumnSlot(railWidth, actionPanelMaximumWidth, mine)
                             .fadingVerticalScroll(rememberScrollState())
                             .testTag(FOCUSED_ACTION_MENU_SCROLL_TEST_TAG),
                 ) {
@@ -440,6 +449,30 @@ internal fun FocusedMessageActions(
         }
     }
 }
+
+/**
+ * Places a stack child as if the stack were still the centred column of [columnWidth], aligned to its end
+ * edge for [mine] and its start edge otherwise, while letting it measure up to [maximumWidth].
+ *
+ * A child no wider than the column sits exactly where the capped stack put it. A wider one keeps that edge
+ * until it would leave the window, then slides back inside it, so it grows across the window rather than
+ * past either side. Offsets are start-relative, so RTL mirrors them like the column alignment did.
+ */
+internal fun Modifier.focusedColumnSlot(
+    columnWidth: Dp,
+    maximumWidth: Dp,
+    mine: Boolean,
+): Modifier =
+    layout { measurable, constraints ->
+        val maxChild = maximumWidth.roundToPx().coerceIn(0, constraints.maxWidth)
+        val placeable = measurable.measure(constraints.copy(minWidth = 0, maxWidth = maxChild))
+        val width = constraints.maxWidth
+        val column = columnWidth.roundToPx().coerceIn(0, width)
+        val columnStart = (width - column) / 2
+        val preferred = if (mine) columnStart + column - placeable.width else columnStart
+        val start = preferred.coerceIn(0, (width - placeable.width).coerceAtLeast(0))
+        layout(width, placeable.height) { placeable.placeRelative(start, 0) }
+    }
 
 /**
  * Balances the reaction rail over as few rows as the width allows, so every configured choice keeps

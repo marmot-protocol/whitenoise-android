@@ -19,6 +19,11 @@ import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.marmotkit.ProductRecordResultFfi
 import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
+import dev.ipf.whitenoise.android.media.sandbox.IsolatedMediaDecoder
+import dev.ipf.whitenoise.android.media.sandbox.MediaDecodeTransport
+import dev.ipf.whitenoise.android.media.sandbox.MediaWorkerReadiness
+import dev.ipf.whitenoise.android.media.sandbox.TestMediaDecodeTransport
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -84,11 +89,11 @@ class FirstFrameDurableAvatarsTest {
     }
 
     /**
-     * Past the 24-row window, a pending invitation and the chat at manual pin position 0 sort first in the
-     * visible list even though 25 other pinned chats have newer activity, so both must be decoded.
+     * The chat at manual pin position 0 sorts first even though 25 other pinned chats have newer activity, so
+     * it must be decoded. A pending invitation follows the whole pinned block, here past the 24-row window.
      */
     @Test
-    fun pendingInvitationAndFirstManualPinAreDecodedPastTheWindow() {
+    fun firstManualPinIsDecodedAndAnInviteFollowsThePinnedBlock() {
         val pinnedByActivity =
             (1..FIRST_FRAME_DURABLE_AVATAR_ROWS + 1).map { position ->
                 pinnedRow("pinned-$position", position.toUInt(), activity = 1_000uL + position.toULong())
@@ -100,7 +105,8 @@ class FirstFrameDurableAvatarsTest {
         val selected = firstFrameDurableAvatarAssets(rows).map(AvatarAssetFfi::target)
 
         assertEquals(FIRST_FRAME_DURABLE_AVATAR_ROWS, selected.size)
-        assertEquals(listOf(PENDING, FIRST_PIN), selected.take(2))
+        assertEquals(listOf(FIRST_PIN, "pinned-1"), selected.take(2))
+        assertTrue("the invite sorts after every pin", PENDING !in selected)
     }
 
     /** Past the 24-row window, a chat raised by a newer draft sorts first and must be decoded. */
@@ -162,6 +168,82 @@ class FirstFrameDurableAvatarsTest {
         assertTrue("prewarm took ${elapsedMs}ms", elapsedMs < FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS * 4)
         assertNull(AvatarImageLoader.cachedImage(checkNotNull(asset(GROUP).cacheKey(ACCOUNT))))
         assertNull(firstFrame(fixture.state, stored).items.single().firstFrameAvatar)
+    }
+
+    /** A quick switch neither reads nor waits for an avatar whose decode needs a new worker (#3496). */
+    @Test
+    fun quickSwitchSkipsAnAvatarThatNeedsANewWorker() =
+        withDecoderWorkers(ready = false) {
+            val fixture = NativeAvatars { awaitCancellation() }
+            val stored = presented(row(GROUP), asset(GROUP), peerPresentation())
+
+            val started = System.nanoTime()
+            val handoff =
+                runBlocking {
+                    fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored), awaitColdWorkers = false)
+                }
+            val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MS
+
+            assertEquals("no stored bytes are read for a cold worker", 0, fixture.reads.get())
+            assertTrue("prewarm took ${elapsedMs}ms", elapsedMs < FIRST_FRAME_DURABLE_AVATAR_BUDGET_MS)
+            assertTrue(handoff.isEmpty())
+        }
+
+    /** A quick switch still decodes an avatar whose domain a running worker serves. */
+    @Test
+    fun quickSwitchDecodesAnAvatarARunningWorkerServes() =
+        withDecoderWorkers(ready = true) {
+            val storedBytes = payload()
+            val fixture = NativeAvatars { listOf(storedBytes) }
+            val stored = presented(row(GROUP), asset(GROUP), peerPresentation())
+
+            val handoff =
+                runBlocking {
+                    fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored), awaitColdWorkers = false)
+                }
+
+            assertEquals(1, fixture.reads.get())
+            assertEquals(listOf(asset(GROUP).cacheKey(ACCOUNT)), handoff.map(FirstFrameDurableAvatar::key))
+        }
+
+    /** Pixels already decoded are handed off on a quick switch even when no worker is running. */
+    @Test
+    fun quickSwitchHandsOffPixelsAlreadyDecoded() {
+        val storedBytes = payload()
+        val fixture = NativeAvatars { listOf(storedBytes) }
+        val stored = presented(row(GROUP), asset(GROUP), peerPresentation())
+        runBlocking { fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored)) }
+
+        withDecoderWorkers(ready = false) {
+            val handoff =
+                runBlocking {
+                    fixture.state.prewarmFirstFrameDurableAvatars(ACCOUNT, listOf(stored), awaitColdWorkers = false)
+                }
+
+            assertEquals("the cached pixels need no second read", 1, fixture.reads.get())
+            assertEquals(listOf(asset(GROUP).cacheKey(ACCOUNT)), handoff.map(FirstFrameDurableAvatar::key))
+        }
+    }
+
+    /** Runs [block] with a codec fixture whose workers are all running when [ready], or none when not. */
+    private fun withDecoderWorkers(
+        ready: Boolean,
+        block: () -> Unit,
+    ) {
+        IsolatedMediaDecoder.installTestTransport(if (ready) TestMediaDecodeTransport else ColdWorkers)
+        try {
+            block()
+        } finally {
+            IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)
+        }
+    }
+
+    /** The JVM codec fixture, reporting that no domain has a running worker. */
+    private object ColdWorkers :
+        MediaDecodeTransport by TestMediaDecodeTransport,
+        MediaWorkerReadiness {
+        /** No decode can start without a new worker. */
+        override fun servableNow(domains: List<MediaTrustDomain>): Set<MediaTrustDomain> = emptySet()
     }
 
     /** Builds a controller whose first frame is the restored MDK snapshot. */

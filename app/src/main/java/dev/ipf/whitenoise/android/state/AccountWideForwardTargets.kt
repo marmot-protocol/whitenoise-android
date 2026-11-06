@@ -13,6 +13,8 @@ import java.util.Locale
 //
 // A profile's groups in common and its Add to Groups and Promote pickers read the same snapshot (#2983),
 // held for as long as that profile surface is open.
+//
+// The mounted chat list keeps one current too, so its unread filter opens complete on the first frame (#3586).
 
 /**
  * Every eligible forward target MDK presents for the bound account that the retained window does not
@@ -43,6 +45,7 @@ internal suspend fun ChatsController.readAccountWideForwardTargets(): AccountWid
     if (account == null || read == null) return AccountWideRead.Unavailable
     val epoch = bindEpoch
     val membershipRevision = materializedGroupsRevision
+    val membership = AccountWideMembershipMark(ambiguousMembershipRemovalsRevision, locallyDeletedGroupCount)
     val result =
         runCatchingCancellable {
             readAfterRemovals {
@@ -55,7 +58,13 @@ internal suspend fun ChatsController.readAccountWideForwardTargets(): AccountWid
         result.getOrThrow() == null -> AccountWideRead.Unavailable
         else ->
             AccountWideRead.Loaded(
-                AccountWideForwardTargets(this, epoch, checkNotNull(result.getOrThrow()), membershipRevision),
+                AccountWideForwardTargets(
+                    this,
+                    epoch,
+                    checkNotNull(result.getOrThrow()),
+                    membershipRevision,
+                    membership,
+                ),
             )
     }
 }
@@ -70,6 +79,7 @@ internal class AccountWideForwardTargets(
     private val epoch: Long,
     private val presented: List<PresentedChatRowFfi>,
     private val membershipRevision: Long,
+    private val membership: AccountWideMembershipMark,
 ) {
     /** A successful read stops proving completeness when its controller is rebound or cleared. */
     val isCurrent: Boolean get() = controller.isActiveBindEpoch(epoch)
@@ -77,6 +87,14 @@ internal class AccountWideForwardTargets(
     /** A window membership change invalidates old extras, including locally deleted conversations. */
     val hasCurrentMembership: Boolean
         get() = isCurrent && controller.materializedGroupsRevision == membershipRevision
+
+    /**
+     * Whether this read still proves the complete chat list once merged with the retained window. Additions
+     * since the read reach the window, which overrides the snapshot, and local deletions are dropped by id,
+     * so only a removal of unknown cause — an eviction or a remote deletion — ends the proof.
+     */
+    val coversCurrentMembership: Boolean
+        get() = isCurrent && controller.ambiguousMembershipRemovalsRevision == membership.ambiguousRemovals
 
     /** Rejects expired bindings and prefers the current retained window over the account-wide snapshot. */
     fun items(): List<ChatListItem> {
@@ -94,16 +112,20 @@ internal class AccountWideForwardTargets(
         draftedAtSeconds: (ChatListItem) -> ULong? = { null },
     ): List<ChatListItem> {
         if (!isCurrent) return emptyList()
-        // Keep the live window useful while a replacement read is pending or has failed. An old
-        // off-window row cannot distinguish window eviction from deletion, so withhold all extras.
+        // Keep the live window useful while a replacement read is pending or has failed. After a removal
+        // of unknown cause an old off-window row cannot distinguish eviction from deletion, so withhold
+        // all extras then. Chats deleted locally since the read are known, and only they are dropped.
         val rows =
-            if (hasCurrentMembership) {
+            if (coversCurrentMembership) {
                 val retainedIds = retained.mapTo(hashSetOf()) { it.foldedId }
+                val deletedIds = controller.locallyDeletedGroupIdsSince(membership.localDeletions)
                 val accountId = controller.boundAccountIdHex()
                 retained +
                     presented
-                        .filterNot { it.row.groupIdHex.lowercase(Locale.ROOT) in retainedIds }
-                        .map { controller.projectPresentedRow(it, accountId) }
+                        .filterNot { row ->
+                            val id = row.row.groupIdHex.lowercase(Locale.ROOT)
+                            id in retainedIds || id in deletedIds
+                        }.map { controller.projectPresentedRow(it, accountId) }
             } else {
                 retained
             }
@@ -175,3 +197,9 @@ internal fun mergeForwardTargets(
     val extra = accountWide.filterNot { it.group.groupIdHex.lowercase(Locale.ROOT) in retainedIds }
     return if (extra.isEmpty()) retained else sortChatListItems(retained + extra)
 }
+
+/** The controller's membership marks a full-list read captured before it started (#3586). */
+internal data class AccountWideMembershipMark(
+    val ambiguousRemovals: Long,
+    val localDeletions: Int,
+)

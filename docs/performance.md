@@ -185,6 +185,27 @@ profile identity. Switching back to the current account, sign-in and first
 activation are not traced. Debug builds also log the same stages to Logcat as
 `account-switch <stage> +<ms>`, so release and debug runs can be compared.
 
+`cached_chat_rows_ready` includes the first-frame avatar decode. Every switch
+resets the isolated decoder workers, so on a quick switch it waits only for
+avatars already decoded or served by a running worker, never for a worker to
+start. On a GrapheneOS Pixel 9a a new worker took 0.4–0.6 s to start, longer
+than the 250 ms avatar budget. Before #3496, a switch to an account whose
+chats had group photos spent that whole budget and still drew placeholders.
+
+### Unread filter
+
+`op=unread_filter` covers the chat list's prepared unread snapshot and the filter that opens over it (#3586):
+
+| Phase | Stage |
+| --- | --- |
+| `unread_filter_snapshot_read` | One background account-wide presented-list read finished. `duration_ms` is the native read. Spans under 5 ms are dropped. |
+| `unread_filter_roster_ready` | Participant-folder rosters for the unread candidates resolved. `count=` is the candidates. It runs only for folders with participant rules, and spans under 5 ms are dropped. |
+| `unread_filter_first_result_frame` | The frame after the opened filter's complete result was composed. `elapsed_ms` is measured from activation. `result=success` means the snapshot was ready when the filter opened, `result=pending` that the filter waited for it. `count=` is the visible rows. |
+
+Preparation reads start on chat-list membership and folder changes. Opening the filter starts one
+reconciling read behind the prepared result, and while it is open row-level revisions start more. Reads
+are conflated, so repeated changes never stack. Lines carry no account, chat or folder identity.
+
 ### Send and attachment diagnosis
 
 `op=text_send` and `op=media_send` follow one process-local operation from the

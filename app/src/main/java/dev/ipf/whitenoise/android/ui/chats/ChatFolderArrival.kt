@@ -37,5 +37,18 @@ internal fun rememberChatFolderArrival(
             offset.animateTo(0f, tween(CHAT_FOLDER_TRANSITION_MILLIS))
         }
     }
-    return Modifier.graphicsLayer { translationY = if (enabled) offset.value else 0f }
+    // The destination composes, and can draw, a frame before the effect above runs. Until it does, the
+    // layer applies the displacement the effect will snap to, so the new list never shows at rest and
+    // then jumps down to start its entrance.
+    val arrivalPending = previousFolder != folderId
+    return Modifier.graphicsLayer {
+        translationY = if (enabled) chatFolderArrivalTranslation(arrivalPending, offset.value, distance) else 0f
+    }
 }
+
+/** The arrival displacement to draw: a not-yet-started entrance begins at [distance], a running one continues. */
+internal fun chatFolderArrivalTranslation(
+    arrivalPending: Boolean,
+    offset: Float,
+    distance: Float,
+): Float = if (arrivalPending && offset == 0f) distance else offset

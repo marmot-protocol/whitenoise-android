@@ -6,6 +6,7 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MessageDraftRevisionFfi
 import dev.ipf.marmotkit.SelectedMessageDraftContentFfi
 import dev.ipf.marmotkit.SelectedMessageDraftFfi
+import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.whitenoise.android.audio.ConversationDictationSendRequest
 import dev.ipf.whitenoise.android.core.isMediaReferenceRefusal
@@ -49,7 +50,9 @@ internal suspend fun WhiteNoiseAppState.sendDetachedDictationText(request: Conve
                 }
             }
         }
-    if (summary.messageIds.isEmpty()) return false
+    // Without a projected message, retained native ownership still needs dictation recovery.
+    // False keeps delivery unknown and the existing claim; it never authorizes another send.
+    if (summary.messageIds.isEmpty() && summary.acceptDisposition != SendAcceptDispositionFfi.PUBLISHED) return false
     pendingClear?.let(::clearDraftAfterSuccessfulSend)
     runCatching(request.onPendingShown)
     return true
