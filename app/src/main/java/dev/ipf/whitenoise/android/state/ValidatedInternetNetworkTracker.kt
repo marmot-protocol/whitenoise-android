@@ -100,6 +100,9 @@ internal class ActiveDefaultNetworkTracker {
     }
 
     @Synchronized
+    fun identitySnapshot(): Long? = currentNetworkHandle
+
+    @Synchronized
     fun isCurrent(networkHandle: Long): Boolean = currentNetworkHandle == networkHandle
 
     /** Returns null when [networkHandle] is a stale loss for an older default. */
@@ -162,6 +165,9 @@ internal class ValidatedInternetNetworkTracker {
         validatedNetworkHandles -= networkHandle
         return validatedNetworkHandles.isNotEmpty()
     }
+
+    @Synchronized
+    fun identitySnapshot(): Set<Long> = validatedNetworkHandles.toSet()
 
     @Synchronized
     fun hasValidatedInternet(): Boolean = validatedNetworkHandles.isNotEmpty()
