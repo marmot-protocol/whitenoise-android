@@ -20,6 +20,8 @@ internal data class ConversationMentionJumpLayout(
     val itemOffsetPx: Int? = null,
     val viewportStartOffsetPx: Int = 0,
     val isAtNaturalTail: Boolean = false,
+    val itemSpacingPx: Int = 0,
+    val hasOlderNeighbour: Boolean = true,
 ) {
     val isMeasured: Boolean
         get() = viewportEndOffsetPx > 0 && itemHeightPx != null && itemHeightPx > 0
@@ -35,6 +37,13 @@ internal data class ConversationMentionJumpLayout(
 
     val readingStartOffset: Int
         get() = ReplyNavigation.readingStartScrollOffset(viewportEndOffsetPx, itemHeightPx ?: estimatedItemHeightPx)
+
+    /**
+     * The offset that puts the target's older neighbour just past the clear viewport end. Its newest edge
+     * is the target's reading start, so this lands that start at the top without knowing the target's height.
+     */
+    val olderNeighbourReadingStartOffset: Int
+        get() = -(viewportEndOffsetPx + itemSpacingPx)
 
     /** A clamped target is readable without inventing blank space below the newest row. */
     val isFullyVisibleAtNaturalTail: Boolean
@@ -66,6 +75,8 @@ internal fun ConversationTimelineViewport.readingStartLayout(
         itemOffsetPx = row?.offset,
         viewportStartOffsetPx = layout.viewportStartOffset,
         isAtNaturalTail = isAtNaturalTail,
+        itemSpacingPx = layout.mainAxisItemSpacing,
+        hasOlderNeighbour = index + 1 < layout.totalItemsCount,
     )
 }
 
@@ -172,6 +183,7 @@ private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope
     val offset = probe.readLayout(index).readingStartOffset
     var placedIndex = index
     var placedOffset = offset
+    var viaOlderNeighbour = false
     val reached =
         if (approach is ConversationReadingStartApproach.Animated) {
             probe.traced(ConversationMentionJumpTrace.APPROACH) {
@@ -180,10 +192,23 @@ private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope
                     offset,
                     traceMentionJump = probe.traceSections,
                     resolveIndex = probe.resolveTargetIndex,
-                    resolveScrollOffset = { resolved ->
+                    resolveDestination = { resolved ->
                         placedIndex = resolved
-                        placedOffset = probe.readLayout(resolved).readingStartOffset
-                        placedOffset
+                        val layout = probe.readLayout(resolved)
+                        placedOffset = layout.readingStartOffset
+                        // Every laid-out row is older than a target below the viewport, so the travel
+                        // crosses its older neighbour first. That neighbour's newest edge is the target's
+                        // reading start, so the approach stops there even when the unseen target is much
+                        // taller than its estimate, instead of passing its beginning and snapping back.
+                        viaOlderNeighbour =
+                            firstVisibleItemIndex > resolved &&
+                            layout.hasOlderNeighbour &&
+                            layout.viewportEndOffsetPx > 0
+                        if (viaOlderNeighbour) {
+                            resolved + 1 to layout.olderNeighbourReadingStartOffset
+                        } else {
+                            resolved to placedOffset
+                        }
                     },
                 )
             }
@@ -191,6 +216,8 @@ private suspend fun ConversationScrollCoordinator.ConversationScrollCommandScope
             scrollToItem(index, offset)
             true
         }
+    // The target is laid out now, so record its measured reading start as the write it received.
+    if (reached && viaOlderNeighbour) placedOffset = probe.readLayout(placedIndex).readingStartOffset
     return ConversationReadingStartPlacement(placedIndex, placedOffset).takeIf { reached }
 }
 
