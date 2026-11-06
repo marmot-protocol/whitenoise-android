@@ -82,6 +82,12 @@ internal interface MediaDecodeTransport {
     fun retireDomain(domain: MediaTrustDomain) = Unit
 }
 
+/** A lane that starts domain-bound workers on demand, and can say which inputs need none started first. */
+internal interface MediaWorkerReadiness {
+    /** The [domains] whose next input needs no worker to start first. */
+    fun servableNow(domains: List<MediaTrustDomain>): Set<MediaTrustDomain>
+}
+
 /**
  * Still-image worker generations bound to data-access domains (#3373). Each request carries the
  * [MediaTrustDomain] set by its caller through [MediaTrustScope]. Requests of one domain are serialized
@@ -103,6 +109,7 @@ internal class IsolatedMediaTransport(
      */
     private val claimAllowanceMs: Long = MediaDecodePolicy.DEADLINE_MS - MediaDecodePolicy.WATCHDOG_MS,
 ) : MediaDecodeTransport,
+    MediaWorkerReadiness,
     java.io.Closeable {
     /** Admission for single-use requests, which share one serialized lane. */
     private val gate = Semaphore(1)
@@ -141,6 +148,16 @@ internal class IsolatedMediaTransport(
      */
     override fun retireDomain(domain: MediaTrustDomain) {
         if (domain != MediaTrustDomain.Unique) pool.retireDomain(domain)
+    }
+
+    /**
+     * The [domains] the pool could serve now without starting a generation. A [MediaTrustDomain.Unique] input is
+     * never reported: each one takes a fresh single-use generation only after the previous one has died.
+     */
+    override fun servableNow(domains: List<MediaTrustDomain>): Set<MediaTrustDomain> {
+        if (closed || session == null) return emptySet()
+        val reusable = domains.filter { it != MediaTrustDomain.Unique }.distinct()
+        return pool.servableNow(reusable).filterIsInstance<MediaTrustDomain>().toSet()
     }
 
     private fun replaceSession(active: Boolean) {
