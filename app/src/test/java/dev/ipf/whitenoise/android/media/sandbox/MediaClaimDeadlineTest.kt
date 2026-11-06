@@ -48,7 +48,10 @@ class MediaClaimDeadlineTest {
             // The only slot is busy, so B's request waits for a worker, here longer than the allowance on the clock
             // its deadline reads.
             late = startDecode(transport, 2, B, sized = true)
-            Thread.sleep(SETTLE_MS)
+            // Advance the clock only once B is parked in its timed worker claim, so its deadline already started.
+            val parked = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+            while (late.thread.state != Thread.State.TIMED_WAITING && System.nanoTime() < parked) Thread.yield()
+            assertEquals(Thread.State.TIMED_WAITING, late.thread.state)
             ShadowSystemClock.advanceBy(Duration.ofMillis(CLAIM_WAIT_MS))
             assertTrue(withWorkerIdentity { first.remote.deliverHeldReply(successfulPixelReply()) })
             busy.join()
@@ -88,6 +91,5 @@ class MediaClaimDeadlineTest {
         const val DEADLINE_MS = 1_200L
         const val CLAIM_ALLOWANCE_MS = 200L
         const val CLAIM_WAIT_MS = 500L
-        const val SETTLE_MS = 100L
     }
 }

@@ -29,6 +29,7 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.window.DialogProperties
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.whitenoise.android.appModuleSource
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.audio.VoicePlaybackSource
 import dev.ipf.whitenoise.android.audio.tts.FakeSessionEngine
@@ -66,7 +67,6 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadow.api.Shadow
 import org.robolectric.shadows.ShadowBiometricManager
-import java.io.File
 import java.util.Locale
 
 /** Exercises the real selector and account/lock revocation, rather than only a stateless strip fixture. */
@@ -410,7 +410,7 @@ class PlaybackTransportOwnershipTest {
 
     /** MainShell must retain ordinary outgoing chrome while preserving account and lock privacy gates. */
     @Test fun backDoesNotDeselectTheRetainedConversationPlayer() {
-        val source = File("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt").readText()
+        val source = appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt")
         val slot = source.substringAfter("playbackTransport = {").substringBefore("dictationControlsVisible =")
         assertTrue(slot.contains("navAccountStable && !appState.appLockScreenVisible"))
         assertFalse(slot.contains("selectedChat"))
@@ -418,7 +418,7 @@ class PlaybackTransportOwnershipTest {
 
     /** The real shell wiring must not hoist or collapse the outgoing list player's geometry on a tap. */
     @Test fun chatListPlaybackIsNotDeselectedByPendingOrSelectedConversation() {
-        val source = File("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt").readText()
+        val source = appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt")
         val placement = source.substringAfter("val playbackInChatList =").substringBefore("val playbackInShell =")
         assertTrue(placement.contains("section == MainSection.Chats"))
         assertFalse(placement.contains("selectedChat"))

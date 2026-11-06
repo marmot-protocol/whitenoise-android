@@ -144,6 +144,20 @@ class AmberActivityCoordinatorTest {
         return relayLaunch!!
     }
 
+    /** Drains main-thread work until a request thread publishes its outcome, instead of guessing a sleep. */
+    private fun awaitOutcome(
+        outcome: AtomicReference<AmberActivityCoordinator.Outcome>,
+        timeoutMs: Long = 2_000,
+    ): AmberActivityCoordinator.Outcome {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            shadowOf(Looper.getMainLooper()).idle()
+            outcome.get()?.let { return it }
+            Thread.sleep(5)
+        }
+        return requireNotNull(outcome.get()) { "No outcome within ${timeoutMs}ms" }
+    }
+
     /** Drains posted main-thread work until the selected launcher has observed [expected] intents. */
     private fun awaitLaunchCount(
         expected: Int,
@@ -1155,13 +1169,12 @@ class AmberActivityCoordinatorTest {
 
         awaitLaunchCount(Nip55.MAX_GROUPED_APPROVALS)
         startRequest(Nip55.MAX_GROUPED_APPROVALS, timeoutMs = 250)
-        Thread.sleep(350)
-        shadowOf(Looper.getMainLooper()).idle()
-        assertEquals(Nip55.MAX_GROUPED_APPROVALS, launches.size)
         assertEquals(
             AmberActivityCoordinator.Outcome.AdmissionUnavailable,
-            outcomes.last().get(),
+            awaitOutcome(outcomes.last()),
         )
+        shadowOf(Looper.getMainLooper()).idle()
+        assertEquals(Nip55.MAX_GROUPED_APPROVALS, launches.size)
 
         AmberActivityCoordinator.deliverResult(resultOk = false, data = null)
 
@@ -1368,11 +1381,10 @@ class AmberActivityCoordinatorTest {
             )
             done.countDown()
         }.start()
-        Thread.sleep(350)
-        shadowOf(Looper.getMainLooper()).idle()
 
+        assertEquals(AmberActivityCoordinator.Outcome.AdmissionUnavailable, awaitOutcome(second))
+        shadowOf(Looper.getMainLooper()).idle()
         assertEquals(1, launches.size)
-        assertEquals(AmberActivityCoordinator.Outcome.AdmissionUnavailable, second.get())
         AmberActivityCoordinator.deliverResult(resultOk = false, data = null)
         assertTrue(done.await(2, TimeUnit.SECONDS))
         assertFalse((first.get() as AmberActivityCoordinator.Outcome.Completed).resultOk)

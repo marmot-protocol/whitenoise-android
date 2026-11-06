@@ -238,7 +238,9 @@ they are not app/runtime configuration. An `IllegalAccessException` mentioning
 test-JVM flags, not a screenshot mismatch; do not re-record baselines for it.
 
 Baseline PNGs live under `app/src/test/snapshots/` and are committed to git. CI
-runs both complete dev-debug unit suites with `-Proborazzi.test.verify=true`.
+runs the complete dev-debug unit suite with `-Proborazzi.test.verify=true`:
+ordinary pull requests run Zapstore only, and the merge queue, master pushes and
+full-matrix runs also run Play.
 The committed-baseline owner registry in `config/screenshot-baseline-owners.txt`
 remains a static coverage contract and provides focused local regeneration filters.
 Tests named `*ScreenshotTest` are included automatically; a mixed-name test that
