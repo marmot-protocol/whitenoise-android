@@ -26,7 +26,8 @@ class CustomEmojiReactionWireCoverageTest {
     @get:Rule
     val folder = TemporaryFolder()
 
-    private val sent = SendSummaryFfi(1u, listOf("reaction"), SendAcceptDispositionFfi.PUBLISHED, SendMaintenanceDispositionFfi.READY)
+    private val sent =
+        SendSummaryFfi(1u, listOf("reaction"), SendAcceptDispositionFfi.PUBLISHED, SendMaintenanceDispositionFfi.READY)
     private val artwork = LocalEmojiArtwork(":party:", "party.png", "image/png", byteArrayOf(1, 2, 3))
 
     /** A native upload result with a stable original epoch and an opaque locator. */
@@ -123,8 +124,19 @@ class CustomEmojiReactionWireCoverageTest {
             val captured = readLocalEmojiArtwork(directory, listOf(":party:")).single()
             val calls = mutableListOf<Pair<String, List<Any?>>>()
             engine(calls, onUpload = { file.writeBytes(byteArrayOf(9, 9)) })
-                .sendCustomEmojiReaction("a", "g", "target", ":party:", captured, EmojiUploadCache(), currentEpoch = { 7uL })
-            assertArrayEquals(artwork.bytes, (calls.first().second[2] as MediaUploadRequestFfi).attachments.single().plaintext)
+                .sendCustomEmojiReaction(
+                    "a",
+                    "g",
+                    "target",
+                    ":party:",
+                    captured,
+                    EmojiUploadCache(),
+                    currentEpoch = { 7uL },
+                )
+            assertArrayEquals(
+                artwork.bytes,
+                (calls.first().second[2] as MediaUploadRequestFfi).attachments.single().plaintext,
+            )
         }
 
     /** A typed stale-epoch refusal permits exactly one fresh upload of the same captured bytes. */
@@ -134,20 +146,42 @@ class CustomEmojiReactionWireCoverageTest {
             var publishes = 0
             val calls = mutableListOf<Pair<String, List<Any?>>>()
             engine(calls, onPublish = { if (++publishes == 1) throw staleEpochRejection() else sent })
-                .sendCustomEmojiReaction("a", "g", "target", ":party:", artwork, EmojiUploadCache(), currentEpoch = { 7uL })
-            assertEquals(listOf("uploadMedia", "reactWithMedia", "uploadMedia", "reactWithMedia"), calls.map { it.first })
+                .sendCustomEmojiReaction(
+                    "a",
+                    "g",
+                    "target",
+                    ":party:",
+                    artwork,
+                    EmojiUploadCache(),
+                    currentEpoch = { 7uL },
+                )
+            assertEquals(
+                listOf("uploadMedia", "reactWithMedia", "uploadMedia", "reactWithMedia"),
+                calls.map { it.first },
+            )
         }
 
     /** Neither unknown acknowledgement nor a cancellation is retried as a new high-level reaction. */
     @Test
     fun uncertainPublicationAndCancellationAreNeverResent() =
         runTest {
-            for (failure in listOf(IllegalStateException("acknowledgement unknown"), CancellationException("cancelled"))) {
+            for (failure in listOf(
+                IllegalStateException("acknowledgement unknown"),
+                CancellationException("cancelled"),
+            )) {
                 val calls = mutableListOf<Pair<String, List<Any?>>>()
                 val result =
                     runCatching {
                         engine(calls, onPublish = { throw failure })
-                            .sendCustomEmojiReaction("a", "g", "target", ":party:", artwork, EmojiUploadCache(), currentEpoch = { 7uL })
+                            .sendCustomEmojiReaction(
+                                "a",
+                                "g",
+                                "target",
+                                ":party:",
+                                artwork,
+                                EmojiUploadCache(),
+                                currentEpoch = { 7uL },
+                            )
                     }
                 assertSame(failure, result.exceptionOrNull())
                 assertEquals(1, calls.count { it.first == "reactWithMedia" })

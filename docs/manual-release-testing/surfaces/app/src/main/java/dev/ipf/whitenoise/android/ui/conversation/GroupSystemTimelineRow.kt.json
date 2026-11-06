@@ -58,6 +58,15 @@
         "test_ids": [
           "MSG-041"
         ]
+      },
+      {
+        "surface": "GroupSystemReactionPills",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/GroupSystemTimelineRow.kt",
+        "anchor": "private fun GroupSystemReactionPills(",
+        "test_ids": [
+          "MSG-034",
+          "MSG-037"
+        ]
       }
     ],
     "source_coverage": [

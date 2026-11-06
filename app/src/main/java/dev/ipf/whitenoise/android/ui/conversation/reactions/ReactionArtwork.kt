@@ -52,30 +52,34 @@ internal fun rememberReactionArtwork(
         )
     return key(controller, account, group, generation, sources, allowNetwork, revision) {
         val artwork by produceState<Map<String, EmojiArt>>(emptyMap()) {
+            /** Every suspended native/decoder boundary must still belong to the mounted controller. */
+            fun ownsArtwork(): Boolean =
+                appState.runtimeGeneration == generation && controller.acceptsConversationActionOwner(account, group)
             for (source in sources) {
+                if (!ownsArtwork()) break
                 val image =
                     runCatchingCancellable {
                         val entry =
                             appState.marmotIo { reactionAttachment(account, group, source) }
                                 ?: return@runCatchingCancellable null
+                        if (!ownsArtwork()) return@runCatchingCancellable null
                         val bytes =
                             appState.reactionArtworkBytes(account, group, entry, allowNetwork)
                                 ?: return@runCatchingCancellable null
+                        if (!ownsArtwork()) return@runCatchingCancellable null
                         withContext(Dispatchers.Default) { decodeEmojiImage(bytes, controller.mediaTrustDomain) }
                     }.getOrNull()
-                if (image != null &&
-                    appState.runtimeGeneration == generation &&
-                    controller.acceptsConversationActionOwner(account, group)
-                ) {
-                    value = value + (source to EmojiArt.Decoded(image))
-                }
+                if (ownsArtwork() && image != null) value = value + (source to EmojiArt.Decoded(image))
             }
+            if (!ownsArtwork()) value = emptyMap()
         }
         artwork
     }
 }
 
-/** Native chips use only their exact image; an unavailable definition stays literal rather than borrowing a local one. */
+/**
+ * Native chips use only their exact image; unavailable definitions stay literal without borrowing local artwork.
+ */
 internal fun reactionInlineContent(
     shortcode: String?,
     artwork: EmojiArt?,

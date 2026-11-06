@@ -9088,11 +9088,11 @@ class ConversationController(
         return accountRef
     }
 
-    /** Commits an add and retains its exact event id for an immediate queued removal. */
-    private suspend fun commitReactionAdd(
+    /** Captures one pending add's image before busy retries; the returned publisher never rereads a definition. */
+    private suspend fun prepareReactionAdd(
         owner: ReactionMutationTarget,
         emoji: String,
-    ) {
+    ): suspend () -> Unit {
         val account = owner.account
         val target = owner.messageId
         val key = target.lowercase() to emoji
@@ -9101,11 +9101,25 @@ class ConversationController(
             withContext(Dispatchers.Main.immediate) {
                 owner.requireAvailable()
                 check(reactionIntentConflator.latest(key)?.desiredMine == true)
-                check(appState.runtimeGeneration == generation && acceptsConversationActionOwner(account, group.groupIdHex))
+                check(appState.runtimeGeneration == generation)
+                check(acceptsConversationActionOwner(account, group.groupIdHex))
             }
         }
         val sourceReactionId = reactions[target].orEmpty().firstOrNull { it.emoji == emoji }?.reactionMessageIdHex
         val artwork = appState.reactionArtworkForSend(emoji, account, group.groupIdHex, sourceReactionId, ensureCurrent)
+        return { commitReactionAdd(owner, emoji, artwork, ensureCurrent) }
+    }
+
+    /** Commits the captured add and retains its exact event id for an immediate queued removal. */
+    private suspend fun commitReactionAdd(
+        owner: ReactionMutationTarget,
+        emoji: String,
+        artwork: LocalEmojiArtwork?,
+        ensureCurrent: suspend () -> Unit,
+    ) {
+        val account = owner.account
+        val target = owner.messageId
+        val key = target.lowercase() to emoji
         val summary =
             appState.marmotIo(MarmotTraceSection.MESSAGE_REACT) {
                 sendCustomEmojiReaction(
@@ -9255,11 +9269,12 @@ class ConversationController(
             conflator = reactionIntentConflator,
             initialMine = emoji in ownEmojis,
         ) { commitMine ->
+            val publishAdd = if (commitMine) prepareReactionAdd(owner, emoji) else null
             retryBusyReactionMutation(
                 stillDesired = { reactionIntentConflator.latest(key)?.desiredMine == commitMine },
             ) {
                 if (commitMine) {
-                    commitReactionAdd(owner, emoji)
+                    requireNotNull(publishAdd).invoke()
                     ownEmojis += emoji
                     addedBeforeProjection = true
                 } else {

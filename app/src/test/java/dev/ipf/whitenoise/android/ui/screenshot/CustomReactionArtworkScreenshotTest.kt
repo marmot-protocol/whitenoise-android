@@ -68,9 +68,18 @@ class CustomReactionArtworkScreenshotTest {
     ) {
         val images =
             listOf(Color.RED, Color.BLUE).map { color ->
-                EmojiArt.Decoded(Bitmap.createBitmap(12, 12, Bitmap.Config.ARGB_8888).apply { eraseColor(color) }.asImageBitmap())
+                EmojiArt.Decoded(
+                    Bitmap.createBitmap(12, 12, Bitmap.Config.ARGB_8888).apply { eraseColor(color) }.asImageBitmap(),
+                )
             }
-        val localImage = Bitmap.createBitmap(12, 12, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.GREEN) }.asImageBitmap()
+        val localImage =
+            Bitmap
+                .createBitmap(
+                    12,
+                    12,
+                    Bitmap.Config.ARGB_8888,
+                ).apply { eraseColor(Color.GREEN) }
+                .asImageBitmap()
         val local = CustomEmojiSet(listOf(CustomEmoji(":same:", File("same.png"), localImage)))
         composeRule.setContent {
             val density = LocalDensity.current
@@ -81,11 +90,35 @@ class CustomReactionArtworkScreenshotTest {
                     LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
                 ) {
                     Surface(color = MaterialTheme.colorScheme.background) {
-                        Column(Modifier.width(320.dp).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            listOf("First definition", "Different image, same code", "Artwork unavailable").forEachIndexed { index, label ->
+                        Column(
+                            Modifier.width(320.dp).padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            listOf(
+                                "First definition",
+                                "Different image, same code",
+                                "Artwork unavailable",
+                            ).forEachIndexed {
+                                index,
+                                label,
+                                ->
                                 Text(label)
                                 ReactionPillRow(
-                                    tallies = listOf(ReactionTally(if (index == 2) ":marmot:" else ":same:", 2, false, "reaction-$index")),
+                                    tallies =
+                                        listOf(
+                                            ReactionTally(
+                                                if (index ==
+                                                    2
+                                                ) {
+                                                    ":marmot:"
+                                                } else {
+                                                    ":same:"
+                                                },
+                                                2,
+                                                false,
+                                                "reaction-$index",
+                                            ),
+                                        ),
                                     enabled = true,
                                     onOpenDetails = {},
                                     artworkByReaction = mapOf("reaction-0" to images[0], "reaction-1" to images[1]),

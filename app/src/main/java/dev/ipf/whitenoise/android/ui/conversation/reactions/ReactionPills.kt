@@ -65,8 +65,22 @@ internal fun reactionPills(
     tallies: List<ReactionTally>,
     maximumPills: Int = MAX_VISIBLE_REACTIONS,
 ): List<ReactionPill> {
-    if (tallies.size <= maximumPills) return tallies.map { ReactionPill(it.emoji, it.count, it.mine, reactionMessageIdHex = it.reactionMessageIdHex) }
-    val visible = tallies.take(maximumPills).map { ReactionPill(it.emoji, it.count, it.mine, reactionMessageIdHex = it.reactionMessageIdHex) }
+    if (tallies.size <=
+        maximumPills
+    ) {
+        return tallies.map {
+            ReactionPill(
+                it.emoji,
+                it.count,
+                it.mine,
+                reactionMessageIdHex = it.reactionMessageIdHex,
+            )
+        }
+    }
+    val visible =
+        tallies.take(maximumPills).map {
+            ReactionPill(it.emoji, it.count, it.mine, reactionMessageIdHex = it.reactionMessageIdHex)
+        }
     val omitted = tallies.drop(maximumPills)
     return visible +
         ReactionPill(
@@ -252,7 +266,14 @@ private fun ReactionPillSurface(
     // Keep the Text's own immutable layout for an already-present counted badge too.
     var emojiLayout by remember(emoji) { mutableStateOf<TextLayoutResult?>(null) }
     val nativeSource = pill.reactionMessageIdHex != null
-    val artwork = if (nativeSource) receivedArtwork else emoji?.let { EmojiShortcodes.art(it, LocalCustomEmoji.current, emptyMap()) }
+    val artwork =
+        if (nativeSource) {
+            receivedArtwork
+        } else {
+            emoji?.let {
+                EmojiShortcodes.art(it, LocalCustomEmoji.current, emptyMap())
+            }
+        }
     Row(
         modifier =
             Modifier

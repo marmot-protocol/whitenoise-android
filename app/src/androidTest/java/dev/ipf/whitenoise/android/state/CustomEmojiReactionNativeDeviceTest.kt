@@ -31,6 +31,8 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.net.Socket
+import java.net.URL
 import java.util.UUID
 
 /** Actual Android send entry points, independent MLS peers and bounded encrypted artwork acquisition. */
@@ -38,6 +40,24 @@ import java.util.UUID
 @RunWith(AndroidJUnit4::class)
 class CustomEmojiReactionNativeDeviceTest {
     private val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
+
+    /** Empty and truncated clients cannot stop later generated uploads on the same fixture. */
+    @Test
+    fun blobFixtureSurvivesAbortedClients() {
+        EmojiBlossomFixture().use { blobs ->
+            val port = URL(blobs.url).port
+            Socket("127.0.0.1", port).use { /* An accepted client closes before its request line. */ }
+            Socket("127.0.0.1", port).use { socket ->
+                socket.getOutputStream().write("PUT /upload HTTP/1.1\r\nContent-Length: 10\r\n\r\nshort".toByteArray())
+            }
+            Socket("127.0.0.1", port).use { socket ->
+                socket.soTimeout = 5_000
+                socket.getOutputStream().write("PUT /upload HTTP/1.1\r\nContent-Length: 3\r\n\r\nabc".toByteArray())
+                val response = socket.getInputStream().bufferedReader().use { it.readText() }
+                org.junit.Assert.assertTrue(response.startsWith("HTTP/1.1 200 OK"))
+            }
+        }
+    }
 
     /** Both send entry points carry real images, surviving an epoch advance, receiver restart and exact removal. */
     @Test(timeout = 240_000L)
@@ -61,7 +81,13 @@ class CustomEmojiReactionNativeDeviceTest {
                         withTimeout(210_000L) {
                             val sender = participant(File(root, "sender"), relay, natives)
                             var peer = participant(File(root, "peer"), relay, natives)
-                            val group = sender.native.createGroup(sender.account.label, "Emoji peers", listOf(peer.account.accountIdHex), null)
+                            val group =
+                                sender.native.createGroup(
+                                    sender.account.label,
+                                    "Emoji peers",
+                                    listOf(peer.account.accountIdHex),
+                                    null,
+                                )
                             await { runCatching { peer.native.acceptGroupInvite(peer.account.label, group) }.isSuccess }
                             val target =
                                 sender.native
@@ -71,11 +97,22 @@ class CustomEmojiReactionNativeDeviceTest {
                             val senderState = state(sender, blobs).also(states::add)
                             var peerState = state(peer, blobs).also(states::add)
                             val active =
-                                ConversationController(senderState, sender.native.groupDetails(sender.account.label, group).group, startOnConstruction = true)
+                                ConversationController(
+                                    senderState,
+                                    sender.native.groupDetails(sender.account.label, group).group,
+                                    startOnConstruction = true,
+                                )
                             controller = active
-                            await { active.membersVerified && active.isSelfMember && active.timeline.any { it.record.messageIdHex == target } }
+                            await {
+                                active.membersVerified &&
+                                    active.isSelfMember &&
+                                    active.timeline.any { it.record.messageIdHex == target }
+                            }
                             withContext(Dispatchers.Main.immediate) {
-                                active.toggleReaction(code, active.timeline.single { it.record.messageIdHex == target }.record)
+                                active.toggleReaction(
+                                    code,
+                                    active.timeline.single { it.record.messageIdHex == target }.record,
+                                )
                             }
                             val entry = awaitArtwork(peer, group, target, code)
                             assertArrayEquals(bytes, acquire(peerState, group, entry))
@@ -83,7 +120,10 @@ class CustomEmojiReactionNativeDeviceTest {
                             val oldEpoch = sender.native.groupMlsState(sender.account.label, group).epoch
                             sender.native.inviteMembers(sender.account.label, group, listOf(third.account.accountIdHex))
                             await { peer.native.groupMlsState(peer.account.label, group).epoch > oldEpoch }
-                            assertArrayEquals(bytes, peerState.reactionArtworkBytes(peer.account.label, group, entry, false))
+                            assertArrayEquals(
+                                bytes,
+                                peerState.reactionArtworkBytes(peer.account.label, group, entry, false),
+                            )
                             peerState.mutationsScope.cancel()
                             peer.native.shutdownAndClose()
                             natives -= peer.native
@@ -91,20 +131,37 @@ class CustomEmojiReactionNativeDeviceTest {
                             peerState = state(peer, blobs).also(states::add)
                             val restored = awaitArtwork(peer, group, target, code)
                             assertEquals(entry.sourceMessageIdHex, restored.sourceMessageIdHex)
-                            assertArrayEquals(bytes, peerState.reactionArtworkBytes(peer.account.label, group, restored, false))
+                            assertArrayEquals(
+                                bytes,
+                                peerState.reactionArtworkBytes(peer.account.label, group, restored, false),
+                            )
                             assertEquals(
                                 NotificationReactionSendOutcome.Sent,
                                 senderState.sendNotificationReaction(sender.account.label, group, target, ":wn:"),
                             )
                             val notificationArt = awaitArtwork(peer, group, target, ":wn:")
-                            val wn = context.resources.openRawResource(R.drawable.builtin_emoji_wn).use { it.readBytes() }
+                            val wn =
+                                context.resources
+                                    .openRawResource(
+                                        R.drawable.builtin_emoji_wn,
+                                    ).use { it.readBytes() }
                             assertArrayEquals(wn, acquire(peerState, group, notificationArt))
                             await { active.reactions[target].orEmpty().any { it.emoji == code && it.mine } }
                             withContext(Dispatchers.Main.immediate) {
-                                active.toggleReaction(code, active.timeline.single { it.record.messageIdHex == target }.record)
+                                active.toggleReaction(
+                                    code,
+                                    active.timeline.single { it.record.messageIdHex == target }.record,
+                                )
                             }
-                            await { peer.native.reactionAttachment(peer.account.label, group, restored.messageIdHex) == null }
-                            assertNull(peerState.openNativeAttachment(requireNotNull(restored.reactionRequest(peer.account.label, group))))
+                            await {
+                                peer.native.reactionAttachment(peer.account.label, group, restored.messageIdHex) ==
+                                    null
+                            }
+                            assertNull(
+                                peerState.openNativeAttachment(
+                                    requireNotNull(restored.reactionRequest(peer.account.label, group)),
+                                ),
+                            )
                         }
                     }
                 }
@@ -166,7 +223,8 @@ class CustomEmojiReactionNativeDeviceTest {
                     accountRef: String,
                     groupIdHex: String,
                     request: MediaUploadRequestFfi,
-                ): MediaUploadResultFfi = participant.native.uploadMedia(accountRef, groupIdHex, request.copy(blossomServer = blobs.url))
+                ): MediaUploadResultFfi =
+                    participant.native.uploadMedia(accountRef, groupIdHex, request.copy(blossomServer = blobs.url))
             }
         return WhiteNoiseAppState(
             context = context,
@@ -187,7 +245,11 @@ class CustomEmojiReactionNativeDeviceTest {
     ): AttachmentEntryFfi {
         var entry: AttachmentEntryFfi? = null
         await {
-            val reaction = peer.native.messageReactions(peer.account.label, group, target).firstOrNull { it.emoji == code }
+            val reaction =
+                peer.native.messageReactions(peer.account.label, group, target).firstOrNull {
+                    it.emoji ==
+                        code
+                }
             entry = reaction?.let { peer.native.reactionAttachment(peer.account.label, group, it.reactionMessageIdHex) }
             entry != null
         }
@@ -201,7 +263,10 @@ class CustomEmojiReactionNativeDeviceTest {
         entry: AttachmentEntryFfi,
     ): ByteArray {
         val account = requireNotNull(state.activeAccountRef)
-        state.acquireNativeAttachment(requireNotNull(entry.reactionRequest(account, group)), AttachmentDownloadPriority.Interactive)
+        state.acquireNativeAttachment(
+            requireNotNull(entry.reactionRequest(account, group)),
+            AttachmentDownloadPriority.Interactive,
+        )
         return requireNotNull(state.reactionArtworkBytes(account, group, entry, false))
     }
 

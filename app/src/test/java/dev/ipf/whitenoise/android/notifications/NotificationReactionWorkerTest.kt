@@ -73,7 +73,10 @@ class NotificationReactionWorkerTest {
                     uploads += request
                     val reference =
                         dev.ipf.marmotkit.MediaAttachmentReferenceFfi(
-                            locators = listOf(dev.ipf.marmotkit.MediaLocatorFfi("blossom", "https://fixture.invalid/image")),
+                            locators =
+                                listOf(
+                                    dev.ipf.marmotkit.MediaLocatorFfi("blossom", "https://fixture.invalid/image"),
+                                ),
                             ciphertextSha256 = "",
                             plaintextSha256 = "",
                             nonceHex = "",
@@ -84,7 +87,10 @@ class NotificationReactionWorkerTest {
                             dim = null,
                             thumbhash = null,
                         )
-                    dev.ipf.marmotkit.MediaUploadResultFfi(listOf(dev.ipf.marmotkit.MediaUploadAttachmentResultFfi(reference, 1uL)), null)
+                    dev.ipf.marmotkit.MediaUploadResultFfi(
+                        listOf(dev.ipf.marmotkit.MediaUploadAttachmentResultFfi(reference, 1uL)),
+                        null,
+                    )
                 },
                 onReactWithMedia = { arguments ->
                     mediaReactions += arguments

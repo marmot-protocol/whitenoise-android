@@ -96,7 +96,7 @@ internal data class ReactionDetailsReadState(
 
 /** Shows every reactor and always starts on the All filter. */
 @Composable
-@Suppress("LongParameterList") // One existing sheet owner coordinates readiness, artwork and actions.
+@Suppress("FunctionNaming", "LongParameterList") // One existing sheet owner coordinates readiness, artwork and actions.
 internal fun ReactionDetailsSheet(
     participants: List<ReactionParticipant>,
     appState: WhiteNoiseAppState,
@@ -164,11 +164,22 @@ internal fun ReactionDetailsContent(
                     emojiCounts = emojiCounts,
                     participantCount = participants.size,
                     onSelectedEmoji = { selectedEmoji = it },
-                    artworkByEmoji = participants.distinctBy { it.emoji }.associate { it.emoji to artworkByReaction[it.reactionMessageIdHex] },
+                    artworkByEmoji =
+                        participants.distinctBy { it.emoji }.associate {
+                            it.emoji to
+                                artworkByReaction[it.reactionMessageIdHex]
+                        },
                     nativeEmojis = participants.filter { it.reactionMessageIdHex != null }.map { it.emoji }.toSet(),
                 )
             }
-            ReactionParticipantList(visibleParticipants, appState, readState.viewerAccountId, onRemoveOwnReaction, artworkByReaction, controller)
+            ReactionParticipantList(
+                visibleParticipants,
+                appState,
+                readState.viewerAccountId,
+                onRemoveOwnReaction,
+                artworkByReaction,
+                controller,
+            )
         }
     }
 }
@@ -280,20 +291,7 @@ private fun ReactionParticipantRow(
     artwork: EmojiArt?,
     controller: ConversationController?,
 ) {
-    val resolvedArtwork =
-        if (controller != null && participant.reactionMessageIdHex != null) {
-            rememberReactionArtwork(
-                controller,
-                appState,
-                listOf(
-                    dev.ipf.whitenoise.android.core
-                        .ReactionTally(participant.emoji, 1, mine, participant.reactionMessageIdHex),
-                ),
-                revision = controller.window.frame?.revision,
-            )[participant.reactionMessageIdHex]
-        } else {
-            artwork
-        }
+    val resolvedArtwork = rememberParticipantArtwork(controller, appState, participant, mine, artwork)
     val shortIdentity =
         appState.shortNpub(participant.sender).ifBlank {
             IdentityFormatter.short(participant.sender, prefix = 10, suffix = 8)
@@ -321,18 +319,7 @@ private fun ReactionParticipantRow(
             pictureUrl = appState.contactAvatarSource(participant.sender),
         )
     }
-    val trailing: @Composable () -> Unit = {
-        Text(
-            text = EmojiShortcodes.annotate(AnnotatedString(participant.emoji)),
-            inlineContent =
-                if (participant.reactionMessageIdHex != null) {
-                    reactionInlineContent(participant.emoji, resolvedArtwork)
-                } else {
-                    EmojiShortcodes.content(dev.ipf.whitenoise.android.ui.ReceivedEmoji.None)
-                },
-            style = MaterialTheme.typography.headlineSmall,
-        )
-    }
+    val trailing: @Composable () -> Unit = { ReactionParticipantGlyph(participant, resolvedArtwork) }
     val colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     if (mine && onRemove != null) {
         ListItem(
@@ -357,6 +344,48 @@ private fun ReactionParticipantRow(
             content = headline,
         )
     }
+}
+
+/** Resolves one lazy reactor row; offscreen participants retain no decoded image or acquisition work. */
+@Composable
+private fun rememberParticipantArtwork(
+    controller: ConversationController?,
+    appState: WhiteNoiseAppState,
+    participant: ReactionParticipant,
+    mine: Boolean,
+    artwork: EmojiArt?,
+): EmojiArt? =
+    if (controller != null && participant.reactionMessageIdHex != null) {
+        rememberReactionArtwork(
+            controller,
+            appState,
+            listOf(
+                dev.ipf.whitenoise.android.core
+                    .ReactionTally(participant.emoji, 1, mine, participant.reactionMessageIdHex),
+            ),
+            revision = controller.window.frame?.revision,
+        )[participant.reactionMessageIdHex]
+    } else {
+        artwork
+    }
+
+/** Uses exact native artwork for a known source and the existing local rendering for optimistic rows. */
+@Composable
+@Suppress("FunctionNaming")
+private fun ReactionParticipantGlyph(
+    participant: ReactionParticipant,
+    artwork: EmojiArt?,
+) {
+    Text(
+        text = EmojiShortcodes.annotate(AnnotatedString(participant.emoji)),
+        inlineContent =
+            if (participant.reactionMessageIdHex != null) {
+                reactionInlineContent(participant.emoji, artwork)
+            } else {
+                EmojiShortcodes.content(dev.ipf.whitenoise.android.ui.ReceivedEmoji.None)
+            },
+        style = MaterialTheme.typography.headlineSmall,
+    )
 }
 
 /** Renders secondary reactor context without competing with the display name. */

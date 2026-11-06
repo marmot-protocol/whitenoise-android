@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import org.json.JSONObject
 import java.io.Closeable
 import java.io.DataInputStream
+import java.io.IOException
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.SocketException
@@ -25,8 +26,15 @@ internal class EmojiBlossomFixture : Closeable {
     /** Serves one bounded request per connection; closing this fixture interrupts its accept loop. */
     private fun serve() {
         while (!server.isClosed) {
+            val connection =
+                try {
+                    server.accept()
+                } catch (_: SocketException) {
+                    check(server.isClosed)
+                    break
+                }
             try {
-                server.accept().use { socket ->
+                connection.use { socket ->
                     socket.soTimeout = 10_000
                     val input = DataInputStream(socket.getInputStream())
                     val request = line(input).split(' ')
@@ -44,12 +52,16 @@ internal class EmojiBlossomFixture : Closeable {
                             blobs[request[1].substringAfterLast('/').substringBefore('?')]
                         }
                     val code = if (bytes == null) "404 Not Found" else "200 OK"
-                    output.write("HTTP/1.1 $code\r\nContent-Length: ${bytes?.size ?: 0}\r\nConnection: close\r\n\r\n".toByteArray())
+                    output.write(
+                        "HTTP/1.1 $code\r\nContent-Length: ${bytes?.size ?: 0}\r\nConnection: close\r\n\r\n"
+                            .toByteArray(),
+                    )
                     if (method != "HEAD" && bytes != null) output.write(bytes)
                     output.flush()
                 }
-            } catch (_: SocketException) {
-                check(server.isClosed)
+            } catch (_: IOException) {
+                // A reset or truncated request belongs to that connection.
+                // Keep serving the next generated client.
             }
         }
     }

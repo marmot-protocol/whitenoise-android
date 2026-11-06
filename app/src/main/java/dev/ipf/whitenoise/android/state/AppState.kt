@@ -10206,7 +10206,8 @@ class WhiteNoiseAppState private constructor(
             return NotificationReactionSendOutcome.NonRetryableFailure
         }
         return runCatchingCancellable {
-            notificationReactionOutcome(publishNotificationReaction(accountRef, groupIdHex, messageIdHex, emoji).acceptDisposition)
+            val summary = publishNotificationReaction(accountRef, groupIdHex, messageIdHex, emoji)
+            notificationReactionOutcome(summary.acceptDisposition)
         }.onFailure {
             appStateDebug(it) {
                 "notification reaction failed for group=${groupIdHex.take(8)}: ${it.readableMessage()}"

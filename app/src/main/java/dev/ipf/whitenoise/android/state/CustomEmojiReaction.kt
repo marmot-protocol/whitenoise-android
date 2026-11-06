@@ -45,9 +45,16 @@ internal suspend fun WhiteNoiseAppState.reactionArtworkBytes(
 
 /** Captures a local definition or bundled PNG before upload; unresolved codes remain ordinary text. */
 internal suspend fun WhiteNoiseAppState.localReactionArtwork(emoji: String): LocalEmojiArtwork? {
-    localEmojiArtworkIn(emoji).singleOrNull()?.let { return it }
-    val drawable = EmojiShortcodes.builtinDrawable(emoji) ?: return null
-    return withContext(Dispatchers.IO) {
+    val local = localEmojiArtworkIn(emoji).singleOrNull()
+    return local ?: EmojiShortcodes.builtinDrawable(emoji)?.let { bundledReactionArtwork(emoji, it) }
+}
+
+/** Encodes the bundled painter's cropped pixels so peers receive the same selected artwork. */
+private suspend fun WhiteNoiseAppState.bundledReactionArtwork(
+    emoji: String,
+    drawable: Int,
+): LocalEmojiArtwork =
+    withContext(Dispatchers.IO) {
         val region = EmojiShortcodes.builtinArtworkRegion(drawable)
         val bytes =
             appContext.resources.openRawResource(drawable).use { input ->
@@ -70,7 +77,6 @@ internal suspend fun WhiteNoiseAppState.localReactionArtwork(emoji: String): Loc
         check(bytes.size <= CustomEmojiStore.MAX_BYTES)
         LocalEmojiArtwork(emoji, "${emoji.trim(':')}.png", "image/png", bytes)
     }
-}
 
 /** Captures an exact received definition when no local image defines the chosen code. */
 internal suspend fun WhiteNoiseAppState.reactionArtworkForSend(
@@ -83,14 +89,26 @@ internal suspend fun WhiteNoiseAppState.reactionArtworkForSend(
     ensureCurrent()
     val local = localReactionArtwork(emoji)
     ensureCurrent()
-    if (local != null) return local
-    if (reactionId.isNullOrBlank()) return null
-    val entry = marmotIo { reactionAttachment(account, group, reactionId) } ?: return null
+    val entry =
+        if (local == null && EmojiShortcodes.isShortcode(emoji) && !reactionId.isNullOrBlank()) {
+            marmotIo { reactionAttachment(account, group, reactionId) }
+        } else {
+            null
+        }
     ensureCurrent()
-    val reference = (entry.attachment as? MediaAttachmentOutcomeFfi.Accepted)?.reference ?: return null
-    val bytes = requireNotNull(reactionArtworkBytes(account, group, entry, true, AttachmentDownloadPriority.Interactive))
-    ensureCurrent()
-    return LocalEmojiArtwork(emoji, reference.fileName, reference.mediaType, bytes)
+    val reference = (entry?.attachment as? MediaAttachmentOutcomeFfi.Accepted)?.reference
+    return when {
+        local != null -> local
+        entry == null || reference == null -> null
+        else -> {
+            val bytes =
+                requireNotNull(
+                    reactionArtworkBytes(account, group, entry, true, AttachmentDownloadPriority.Interactive),
+                )
+            ensureCurrent()
+            LocalEmojiArtwork(emoji, reference.fileName, reference.mediaType, bytes)
+        }
+    }
 }
 
 /**

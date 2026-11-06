@@ -78,9 +78,6 @@ internal fun GroupSystemTimelineRow(
                 motion.accept(emoji, added, origin)
             }
         }
-    val reactionArtwork =
-        dev.ipf.whitenoise.android.ui.conversation.reactions
-            .rememberReactionArtwork(controller, appState, actions.tallies)
     val react: (String) -> Unit = { emoji -> actions.react(emoji, motion.takeOrigin(emoji)) }
     val surface = remember(owner) { GroupSystemActionSurface() }
     GroupSystemActionLifetime(owner, actions, surface, onActionMenuOpenChange)
@@ -103,21 +100,41 @@ internal fun GroupSystemTimelineRow(
                     null
                 },
             reactionContent = {
-                if (actions.tallies.isNotEmpty()) {
-                    ReactionPillFlow(
-                        actions.tallies,
-                        react.takeIf { actions.canReact },
-                        { surface.detailsOpen = true },
-                        localMotion = motion,
-                        artworkByReaction = reactionArtwork,
-                    )
-                }
+                GroupSystemReactionPills(controller, appState, actions, motion, react) { surface.detailsOpen = true }
             },
         )
         if (isActionMenuOpen && (actions.canReact || actions.canDelete)) {
             GroupSystemFocusedActions(actions, surface, quickReactionEmojis, onActionMenuOpenChange, motion)
         }
         GroupSystemReactionSheets(actions, surface, recentEmojis, onEmojiUsed, react)
+    }
+}
+
+/** Loads only displayed activity pills through the same source-scoped image owner as chat messages. */
+@Composable
+@Suppress("LongParameterList")
+private fun GroupSystemReactionPills(
+    controller: ConversationController,
+    appState: WhiteNoiseAppState,
+    actions: GroupSystemRowActions,
+    motion: dev.ipf.whitenoise.android.ui.conversation.reactions.LocalReactionMotion,
+    react: (String) -> Unit,
+    onDetails: () -> Unit,
+) {
+    val artwork =
+        dev.ipf.whitenoise.android.ui.conversation.reactions.rememberReactionArtwork(
+            controller,
+            appState,
+            actions.tallies,
+        )
+    if (actions.tallies.isNotEmpty()) {
+        ReactionPillFlow(
+            actions.tallies,
+            react.takeIf { actions.canReact },
+            { onDetails() },
+            localMotion = motion,
+            artworkByReaction = artwork,
+        )
     }
 }
 
