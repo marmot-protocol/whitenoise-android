@@ -109,6 +109,8 @@ class ChatSvgBubbleViewerTest {
         fixture: MediaDownloadIntegrationFixture,
     ) {
         try {
+            // Let Compose dispose the viewer first so no new detail work can take the lane after the probe.
+            rule.waitForIdle()
             rule.awaitViewerImageWorkIdle()
         } finally {
             controller.onCleared()
