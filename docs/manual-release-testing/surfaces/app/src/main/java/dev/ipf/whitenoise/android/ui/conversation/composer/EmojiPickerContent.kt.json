@@ -59,14 +59,6 @@
         ]
       },
       {
-        "surface": "EmojiSearchRow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
-        "anchor": "fun EmojiSearchRow(",
-        "test_ids": [
-          "CON-010"
-        ]
-      },
-      {
         "surface": "EmojiSectionGrid",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
         "anchor": "fun EmojiSectionGrid(",
@@ -79,15 +71,6 @@
         "surface": "EmojiSectionHeader",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
         "anchor": "fun EmojiSectionHeader(",
-        "test_ids": [
-          "CON-010",
-          "MSG-005"
-        ]
-      },
-      {
-        "surface": "EmojiTapTarget",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
-        "anchor": "fun EmojiTapTarget(",
         "test_ids": [
           "CON-010",
           "MSG-005"

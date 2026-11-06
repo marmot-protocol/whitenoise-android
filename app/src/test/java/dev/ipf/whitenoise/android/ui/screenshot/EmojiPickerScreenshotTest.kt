@@ -411,8 +411,14 @@ class EmojiPickerScreenshotTest {
         val row = boundsOfTag(EMOJI_PICKER_SEARCH_ROW_TEST_TAG)
         val field = boundsOfTag(EMOJI_PICKER_SEARCH_TEST_TAG)
         assertEquals("Row height", EXPECTED_CELL_SIZE.value, row.height, CELL_SIZE_TOLERANCE_PX)
-        assertTrue("Row ${row.bottom}px sits above the field ${field.top}px", row.bottom <= field.top + GAP_TOLERANCE_PX)
-        val cells = (0 until EXPECTED_COLUMN_COUNT).map { boundsOfTag(emojiPickerItemTestTag(EmojiCategory.SmileysAndPeople, it)) }
+        assertTrue(
+            "Row ${row.bottom}px sits above the field ${field.top}px",
+            row.bottom <= field.top + GAP_TOLERANCE_PX,
+        )
+        val cells =
+            (0 until EXPECTED_COLUMN_COUNT).map {
+                boundsOfTag(emojiPickerItemTestTag(EmojiCategory.SmileysAndPeople, it))
+            }
         cells.forEach { cell ->
             assertEquals("Cell height", EXPECTED_CELL_SIZE.value, cell.height, CELL_SIZE_TOLERANCE_PX)
             assertEquals("Cell width", EXPECTED_CELL_SIZE.value, cell.width, CELL_SIZE_TOLERANCE_PX)
@@ -420,7 +426,7 @@ class EmojiPickerScreenshotTest {
         }
         cells.zipWithNext().forEach { (first, next) ->
             val step = if (rtl) first.left - next.left else next.left - first.left
-            assertEquals("Adjacent cells are one cell apart in reading order", EXPECTED_CELL_SIZE.value, step, CELL_SIZE_TOLERANCE_PX)
+            assertEquals("Adjacent cells are one cell apart", EXPECTED_CELL_SIZE.value, step, CELL_SIZE_TOLERANCE_PX)
         }
         val leadingInset = if (rtl) row.right - cells.first().right else cells.first().left - row.left
         assertEquals("Row starts at the screen margin", ROW_START_INSET.value, leadingInset, GAP_TOLERANCE_PX)

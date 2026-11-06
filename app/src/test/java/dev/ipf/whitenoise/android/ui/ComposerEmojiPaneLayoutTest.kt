@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui
 
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerFallbackHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerPaneRestoreStep
@@ -353,15 +354,28 @@ class ComposerEmojiPaneLayoutTest {
     /** The search row outlives its field's focus until the keyboard has fully hidden. */
     @Test
     fun searchRowStaysUntilTheKeyboardIsGone() {
-        assertTrue(composerEmojiSearchRowShown(searchRowShown = false, searchActive = true, currentImeHeight = 0.dp, targetImeHeight = 300.dp))
-        assertTrue(composerEmojiSearchRowShown(searchRowShown = true, searchActive = false, currentImeHeight = 80.dp, targetImeHeight = 0.dp))
-        assertFalse(composerEmojiSearchRowShown(searchRowShown = true, searchActive = false, currentImeHeight = 0.dp, targetImeHeight = 0.dp))
-        assertFalse(composerEmojiSearchRowShown(searchRowShown = false, searchActive = false, currentImeHeight = 300.dp, targetImeHeight = 300.dp))
+        assertTrue(searchRowShown(shown = false, active = true, current = 0.dp, target = 300.dp))
+        assertTrue(searchRowShown(shown = true, active = false, current = 80.dp, target = 0.dp))
+        assertFalse(searchRowShown(shown = true, active = false, current = 0.dp, target = 0.dp))
+        assertFalse(searchRowShown(shown = false, active = false, current = 300.dp, target = 300.dp))
     }
 
     /** Without an on-screen keyboard there is nothing for the row to sit on, so search stays in the browsing pane. */
     @Test
     fun hardwareKeyboardSearchKeepsTheBrowsingPane() {
-        assertFalse(composerEmojiSearchRowShown(searchRowShown = false, searchActive = true, currentImeHeight = 0.dp, targetImeHeight = 0.dp))
+        assertFalse(searchRowShown(shown = false, active = true, current = 0.dp, target = 0.dp))
     }
+
+    private fun searchRowShown(
+        shown: Boolean,
+        active: Boolean,
+        current: Dp,
+        target: Dp,
+    ): Boolean =
+        composerEmojiSearchRowShown(
+            searchRowShown = shown,
+            searchActive = active,
+            currentImeHeight = current,
+            targetImeHeight = target,
+        )
 }

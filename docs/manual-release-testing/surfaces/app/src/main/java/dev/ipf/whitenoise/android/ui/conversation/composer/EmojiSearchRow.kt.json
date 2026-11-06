@@ -1,0 +1,26 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiSearchRow.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "EmojiSearchRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiSearchRow.kt",
+        "anchor": "fun EmojiSearchRow(",
+        "test_ids": [
+          "CON-010"
+        ]
+      },
+      {
+        "surface": "EmojiTapTarget",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiSearchRow.kt",
+        "anchor": "fun EmojiTapTarget(",
+        "test_ids": [
+          "CON-010",
+          "MSG-005"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
