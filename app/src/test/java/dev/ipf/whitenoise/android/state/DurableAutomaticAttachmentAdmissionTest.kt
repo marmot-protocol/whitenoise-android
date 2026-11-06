@@ -372,10 +372,20 @@ class DurableAutomaticAttachmentAdmissionTest {
         assertTrue("the check holds the refresh lock", "synchronized(permissionRefreshLock)" in timeout)
         val refresh =
             source
-                .substringAfter("internal fun refreshNativeAttachmentPermissions(")
-                .substringBefore("return mutationsScope")
-        val lock = refresh.indexOf("synchronized(permissionRefreshLock)")
-        assertTrue("the refresh invalidates under the same lock", lock in 0 until refresh.indexOf(".invalidate("))
+                .substringAfter("private fun refreshNativeAttachmentPermissions(", missingDelimiterValue = "")
+                .substringBefore("\n    }\n", missingDelimiterValue = "")
+        val lock =
+            refresh
+                .substringAfter("synchronized(permissionRefreshLock) {", missingDelimiterValue = "")
+                .substringBefore("\n        }", missingDelimiterValue = "")
+        assertTrue(
+            "the refresh invalidates under the same lock",
+            "nativeAttachmentPermissions.invalidate(runtime)" in lock,
+        )
+        assertTrue(
+            "a network refresh begins under the same lock",
+            "nativeAttachmentPermissions.beginNetworkRefresh(" in lock,
+        )
     }
 
     /** A refusal from a revocation window is asked again once the host's approval has moved on. */
