@@ -6,6 +6,8 @@
     <string name="composer_layout">布局</string>
     <string name="composer_side_left">左侧</string>
     <string name="composer_side_right">右侧</string>
+    <string name="composer_voice_on_send">在发送按钮上</string>
+    <string name="composer_voice_off">关闭</string>
     <string name="composer_layout_automatic">自动</string>
     <string name="composer_layout_expanded">始终展开</string>
     <string name="composer_move_earlier">向前移动</string>

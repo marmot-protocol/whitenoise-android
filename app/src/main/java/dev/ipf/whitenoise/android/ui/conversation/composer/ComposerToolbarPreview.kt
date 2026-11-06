@@ -30,6 +30,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
+import dev.ipf.whitenoise.android.state.ComposerVoicePlacement
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 
 private val PreviewPrimaryEndInset = 4.dp
@@ -61,10 +62,11 @@ internal fun ComposerToolbarPreview(
         )
     val visibleShortcuts =
         displayedSettings.normalized().shortcuts.filter {
-            it != ComposerShortcut.More || (attachments - displayedSettings.shortcuts.toSet()).isNotEmpty()
+            it != ComposerShortcut.More ||
+                (attachments + composerMenuTextShortcuts - displayedSettings.shortcuts.toSet()).isNotEmpty()
         }
-    val voiceSelected = ComposerShortcut.VoiceNote in displayedSettings.shortcuts
-    val protectedWidth = if (voiceSelected) 0.dp else ComposerShortcutTarget
+    // Send always keeps its place; the voice launcher shares it only with Send placement.
+    val protectedWidth = ComposerShortcutTarget
     var editingProgress by remember { mutableStateOf<State<Float>?>(null) }
     val primaryAlignment = remember { ComposerActionRowAlignment(Alignment.End) { editingProgress?.value ?: 0f } }
     BoxWithConstraints(
@@ -112,16 +114,18 @@ internal fun ComposerToolbarPreview(
             toolbarPreview = true,
         )
         if (editState != null) ComposerToolbarLiftedIcon(editState)
-        if (!voiceSelected) {
-            Box(
-                Modifier
-                    .align(primaryAlignment)
-                    .testTag("composer.toolbar.preview.primary")
-                    .width(ComposerShortcutTarget + PreviewPrimaryEndInset)
-                    .height(ComposerShortcutTarget)
-                    .padding(end = PreviewPrimaryEndInset),
-                contentAlignment = Alignment.Center,
-            ) {
+        Box(
+            Modifier
+                .align(primaryAlignment)
+                .testTag("composer.toolbar.preview.primary")
+                .width(ComposerShortcutTarget + PreviewPrimaryEndInset)
+                .height(ComposerShortcutTarget)
+                .padding(end = PreviewPrimaryEndInset),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (displayedSettings.voicePlacement == ComposerVoicePlacement.Send) {
+                MiniWaveformGlyph(MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
                 Icon(
                     painterResource(dev.ipf.whitenoise.android.R.drawable.ic_arrow_upward),
                     null,

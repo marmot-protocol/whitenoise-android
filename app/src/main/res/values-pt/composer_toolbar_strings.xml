@@ -6,6 +6,8 @@
     <string name="composer_layout">Disposição</string>
     <string name="composer_side_left">Esquerda</string>
     <string name="composer_side_right">Direita</string>
+    <string name="composer_voice_on_send">No Enviar</string>
+    <string name="composer_voice_off">Desativado</string>
     <string name="composer_layout_automatic">Automática</string>
     <string name="composer_layout_expanded">Sempre expandido</string>
     <string name="composer_move_earlier">Mover para antes</string>

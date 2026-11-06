@@ -99,6 +99,7 @@ import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
 import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ComposerShortcutSide
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
+import dev.ipf.whitenoise.android.state.ComposerVoicePlacement
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
@@ -1499,8 +1500,8 @@ internal fun ComposerBar(
                             (dictationOwnedByComposer && dictationController?.completionControlsRequired == true)
                     val settings = toolbarPreference?.value ?: ComposerToolbarSettings()
                     val available =
-                        attachmentActions.keys + setOf(ComposerShortcut.Emoji, ComposerShortcut.Paste) +
-                            (if (attachmentActions.isNotEmpty()) setOf(ComposerShortcut.More) else emptySet()) +
+                        attachmentActions.keys +
+                            setOf(ComposerShortcut.Emoji, ComposerShortcut.Paste, ComposerShortcut.More) +
                             (
                                 if (appState != null &&
                                     composerSendingAccount(appState, draftAccountRef) != null
@@ -1520,8 +1521,11 @@ internal fun ComposerBar(
                             )
                     val selectedShortcuts = settings.normalized().shortcuts.filter { it in available }
                     val hiddenAttachments = attachmentActions.keys - selectedShortcuts.toSet()
+                    // Unpinned text actions stay reachable from the Plus menu.
+                    val hiddenMenuShortcuts =
+                        hiddenAttachments + (composerMenuTextShortcuts intersect available) - selectedShortcuts.toSet()
                     val liveShortcuts =
-                        selectedShortcuts.filter { it != ComposerShortcut.More || hiddenAttachments.isNotEmpty() }
+                        selectedShortcuts.filter { it != ComposerShortcut.More || hiddenMenuShortcuts.isNotEmpty() }
                     var idleToolbar by remember(draftKey, draftAccountRef, draftGroupIdHex) {
                         mutableStateOf(settings to liveShortcuts)
                     }
@@ -1529,9 +1533,12 @@ internal fun ComposerBar(
                     val renderedToolbar = if (transactionActive) idleToolbar else settings to liveShortcuts
                     val voiceSelected = configuredToolbar && ComposerShortcut.VoiceNote in renderedToolbar.second
                     val configuredVoiceVisible = voiceSelected && voiceSlotBounds != null
+                    // Send placement shares Send's slot while empty, matching the unconfigured composer.
+                    val voiceOnSend =
+                        !configuredToolbar || renderedToolbar.first.voicePlacement == ComposerVoicePlacement.Send
                     val showConfiguredMic =
                         showMicButton &&
-                            (!configuredToolbar || isRecordingVoice || configuredVoiceVisible) &&
+                            (voiceOnSend || isRecordingVoice || configuredVoiceVisible) &&
                             !customizationOpen
                     val configuredVoiceUsesSlot =
                         configuredToolbar && showMicButton && voiceSelected && voiceRecordingController?.locked != true
@@ -1732,11 +1739,12 @@ internal fun ComposerBar(
                                 }
                             },
                             attachmentSheetOpen = false,
-                            attachmentMenu = { bounds ->
+                            attachmentMenu = { bounds, textShortcuts ->
                                 ComposerAttachmentMenu(
                                     anchorBounds = bounds,
                                     expanded = attachmentSheetState.isOpen,
                                     onDismiss = attachmentSheetState::dismiss,
+                                    textShortcuts = textShortcuts.onlyHidden(hiddenMenuShortcuts),
                                     onCamera =
                                         onCaptureFromCamera
                                             ?.takeIf { ComposerShortcut.Camera in hiddenAttachments }
@@ -2034,6 +2042,28 @@ internal fun ComposerBar(
                                 }
                             } else if (showPrimaryTrailingAction &&
                                 !(configuredVoiceUsesSlot)
+                            ) {
+                                ComposerActionDisc(
+                                    onClick = { submitMessage() },
+                                    enabled = primaryActionEnabled,
+                                    width = actionTargetWidth,
+                                    containerColor = actionColors.container,
+                                    contentColor = actionColors.content,
+                                    description = stringResource(R.string.send),
+                                    icon = R.drawable.ic_arrow_upward,
+                                    modifier = Modifier.alpha(alpha = ordinarySendAlpha),
+                                )
+                            }
+                        }
+                        if (showPrimaryTrailingAction && configuredVoiceUsesSlot) {
+                            // The mic overlays its toolbar slot, so Send keeps its own place, disabled until content.
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier =
+                                    Modifier
+                                        .align(trailingActionAlignment)
+                                        .expandedComposerActionRow()
+                                        .composerFabContent(),
                             ) {
                                 ComposerActionDisc(
                                     onClick = { submitMessage() },

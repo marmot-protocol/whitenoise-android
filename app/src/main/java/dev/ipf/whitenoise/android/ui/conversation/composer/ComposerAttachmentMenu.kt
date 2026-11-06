@@ -18,6 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -26,8 +27,10 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.toRect
 import androidx.compose.ui.window.PopupPositionProvider
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicWidth
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
@@ -80,6 +83,25 @@ internal class ComposerAttachmentMenuPositionProvider(
     }
 }
 
+/** Text actions the Plus menu offers whenever they are not pinned to the toolbar. */
+internal val composerMenuTextShortcuts =
+    setOf(ComposerShortcut.Emoji, ComposerShortcut.Paste, ComposerShortcut.Dictation)
+
+/** Callbacks for unpinned text actions; Paste reports false when the system denies clipboard access. */
+internal data class ComposerMenuTextShortcuts(
+    val onEmoji: (() -> Unit)? = null,
+    val onPaste: (() -> Boolean)? = null,
+    val onDictation: (() -> Unit)? = null,
+) {
+    /** Drops actions already pinned to the toolbar or unavailable in this composer. */
+    fun onlyHidden(hidden: Set<ComposerShortcut>): ComposerMenuTextShortcuts =
+        ComposerMenuTextShortcuts(
+            onEmoji = onEmoji?.takeIf { ComposerShortcut.Emoji in hidden },
+            onPaste = onPaste?.takeIf { ComposerShortcut.Paste in hidden },
+            onDictation = onDictation?.takeIf { ComposerShortcut.Dictation in hidden },
+        )
+}
+
 /** Native acquisition callbacks in the prototype command surface; no picker or permission owner is replaced. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -95,6 +117,7 @@ internal fun ComposerAttachmentMenu(
     onUser: (() -> Unit)?,
     onContact: (() -> Unit)?,
     onPoll: (() -> Unit)? = null,
+    textShortcuts: ComposerMenuTextShortcuts = ComposerMenuTextShortcuts(),
 ) {
     val items =
         listOfNotNull(
@@ -111,7 +134,7 @@ internal fun ComposerAttachmentMenu(
                 WhiteNoiseMenuItem(stringResource(R.string.attachment_device_contact), it, R.drawable.ic_person)
             },
             onPoll?.let { WhiteNoiseMenuItem(stringResource(R.string.poll_create), it, R.drawable.ic_description) },
-        )
+        ) + composerMenuTextItems(textShortcuts, anchorBounds)
     val density = LocalDensity.current
     val position =
         remember(anchorBounds, density) {
@@ -153,6 +176,7 @@ internal fun ComposerAttachmentMenu(
                                 onDismiss()
                                 item.onClick()
                             },
+                            modifier = item.modifier,
                         )
                     }
                 }
@@ -160,3 +184,37 @@ internal fun ComposerAttachmentMenu(
         }
     }
 }
+
+@Composable
+private fun composerMenuTextItems(
+    textShortcuts: ComposerMenuTextShortcuts,
+    anchorBounds: IntRect,
+): List<WhiteNoiseMenuItem> {
+    val textToolbar = LocalTextToolbar.current
+    return listOfNotNull(
+        textShortcuts.onEmoji?.let { composerMenuShortcutItem(ComposerShortcut.Emoji, it) },
+        textShortcuts.onPaste?.let { paste ->
+            composerMenuShortcutItem(ComposerShortcut.Paste) {
+                // Denied clipboard reads fall back to the trusted system Paste menu at the Plus button.
+                if (!paste()) {
+                    textToolbar.showMenu(
+                        rect = anchorBounds.toRect(),
+                        onPasteRequested = { paste() },
+                    )
+                }
+            }
+        },
+        textShortcuts.onDictation?.let { composerMenuShortcutItem(ComposerShortcut.Dictation, it) },
+    )
+}
+
+@Composable
+private fun composerMenuShortcutItem(
+    shortcut: ComposerShortcut,
+    onClick: () -> Unit,
+) = WhiteNoiseMenuItem(
+    stringResource(shortcut.labelRes),
+    onClick,
+    shortcut.iconRes,
+    modifier = Modifier.testTag("conversation.attachment.menu.${shortcut.id}"),
+)

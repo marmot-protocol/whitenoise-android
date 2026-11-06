@@ -50,6 +50,15 @@
           "CON-041",
           "CON-042"
         ]
+      },
+      {
+        "surface": "ComposerVoicePlacementRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerToolbarEditor.kt",
+        "anchor": "fun ComposerVoicePlacementRow(",
+        "test_ids": [
+          "CON-043",
+          "CON-041"
+        ]
       }
     ],
     "source_coverage": [
@@ -142,7 +151,8 @@
         "anchor": "R.string.composer_side_left",
         "test_ids": [
           "CON-041",
-          "CON-042"
+          "CON-042",
+          "CON-043"
         ]
       },
       {
@@ -151,7 +161,8 @@
         "anchor": "R.string.composer_side_right",
         "test_ids": [
           "CON-041",
-          "CON-042"
+          "CON-042",
+          "CON-043"
         ]
       },
       {
@@ -161,6 +172,22 @@
         "test_ids": [
           "CON-041",
           "CON-042"
+        ]
+      },
+      {
+        "surface": "R.string.composer_voice_on_send",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerToolbarEditor.kt",
+        "anchor": "R.string.composer_voice_on_send",
+        "test_ids": [
+          "CON-043"
+        ]
+      },
+      {
+        "surface": "R.string.composer_voice_off",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerToolbarEditor.kt",
+        "anchor": "R.string.composer_voice_off",
+        "test_ids": [
+          "CON-043"
         ]
       }
     ]

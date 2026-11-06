@@ -352,7 +352,7 @@ internal fun ComposerPill(
     onEmojiPickerToggle: () -> Unit,
     onAttachmentsToggle: () -> Unit,
     attachmentSheetOpen: Boolean,
-    attachmentMenu: (@Composable (androidx.compose.ui.unit.IntRect) -> Unit)? = null,
+    attachmentMenu: (@Composable (androidx.compose.ui.unit.IntRect, ComposerMenuTextShortcuts) -> Unit)? = null,
     onPickFromGallery: (() -> Unit)?,
     onPickDocument: (() -> Unit)?,
     modifier: Modifier = Modifier,
@@ -1864,7 +1864,7 @@ internal fun ComposerPill(
                                                     )
                                                 }
                                             }
-                                            attachmentMenu?.invoke(attachmentAnchorBounds)
+                                            attachmentMenu?.invoke(attachmentAnchorBounds, ComposerMenuTextShortcuts())
                                         }
                                     }
                                     ComposerToolbarTargets {

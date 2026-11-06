@@ -62,6 +62,7 @@ import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ComposerShortcutSide
 import dev.ipf.whitenoise.android.state.ComposerToolbarLayout
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
+import dev.ipf.whitenoise.android.state.ComposerVoicePlacement
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 
 private val EditorContentInset = 12.dp
@@ -178,7 +179,11 @@ private fun ComposerToolbarPalette(
         Column {
             ComposerShortcut.entries.forEach { shortcut ->
                 key(shortcut) {
-                    ComposerShortcutPaletteRow(shortcut, state, saving, stackSideChoices)
+                    if (shortcut == ComposerShortcut.VoiceNote) {
+                        ComposerVoicePlacementRow(state, saving)
+                    } else {
+                        ComposerShortcutPaletteRow(shortcut, state, saving, stackSideChoices)
+                    }
                 }
             }
         }
@@ -243,6 +248,61 @@ private fun ComposerShortcutPaletteRow(
         }
     }
 }
+
+/** Voice notes choose one placement: Send's slot, either toolbar side, or hidden. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ComposerVoicePlacementRow(
+    state: ComposerToolbarEditState,
+    saving: Boolean,
+) {
+    val current = state.draft.voicePlacement
+    Column(Modifier.fillMaxWidth().testTag("composer.customize.label.${ComposerShortcut.VoiceNote.id}")) {
+        Row(Modifier.heightIn(min = ComposerShortcutTarget), verticalAlignment = Alignment.CenterVertically) {
+            MiniWaveformGlyph(MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                stringResource(ComposerShortcut.VoiceNote.labelRes),
+                Modifier
+                    .padding(horizontal = ComposerToolbarGutter)
+                    .testTag("composer.customize.name.${ComposerShortcut.VoiceNote.id}"),
+            )
+        }
+        FlowRow(
+            Modifier.fillMaxWidth().padding(start = ComposerShortcutIconSize).selectableGroup(),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            ComposerVoicePlacement.entries.forEach { placement ->
+                val chosen = current == placement
+                TextButton(
+                    onClick = { state.change(state.draft.withVoicePlacement(placement)) },
+                    enabled = !saving,
+                    modifier =
+                        Modifier
+                            .testTag("composer.customize.voice.${placement.name.lowercase()}")
+                            .semantics {
+                                role = Role.RadioButton
+                                selected = chosen
+                            },
+                ) {
+                    Text(
+                        stringResource(placement.labelRes),
+                        fontWeight = if (chosen) FontWeight.Bold else FontWeight.Normal,
+                        textDecoration = if (chosen) TextDecoration.Underline else TextDecoration.None,
+                    )
+                }
+            }
+        }
+    }
+}
+
+private val ComposerVoicePlacement.labelRes: Int
+    get() =
+        when (this) {
+            ComposerVoicePlacement.Send -> R.string.composer_voice_on_send
+            ComposerVoicePlacement.Left -> R.string.composer_side_left
+            ComposerVoicePlacement.Right -> R.string.composer_side_right
+            ComposerVoicePlacement.Off -> R.string.composer_voice_off
+        }
 
 /** Keeps side selection independent of the visibility checkbox, inline or beneath its label. */
 @Composable

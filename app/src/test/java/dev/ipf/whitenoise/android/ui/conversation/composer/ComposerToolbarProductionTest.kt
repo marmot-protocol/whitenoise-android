@@ -381,11 +381,30 @@ class ComposerToolbarProductionTest {
     @Test
     fun readerWithoutAttachmentCapabilitiesOmitsMoreWithoutChangingTheSavedConfiguration() {
         attachments = false
-        val settings = ComposerToolbarSettings(listOf(ComposerShortcut.More))
+        val settings =
+            ComposerToolbarSettings(
+                listOf(
+                    ComposerShortcut.More,
+                    ComposerShortcut.Emoji,
+                    ComposerShortcut.Paste,
+                    ComposerShortcut.Dictation,
+                ),
+            )
         render(settings)
         composeRule.onNodeWithTag("composer.shortcut.more").assertDoesNotExist()
         assertEquals(settings, appState.composerToolbarPreference.value)
         composeRule.onNode(hasSetTextAction()).performClick().assertIsFocused()
+    }
+
+    /** Unpinned text actions keep Plus available and appear in its menu even without attachment sources. */
+    @Test
+    fun unpinnedTextActionsKeepPlusAndAppearInItsMenu() {
+        attachments = false
+        render(ComposerToolbarSettings(listOf(ComposerShortcut.More)))
+        composeRule.onNodeWithTag("composer.shortcut.more").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("conversation.attachment.menu.emoji").assertIsDisplayed()
+        composeRule.onNodeWithTag("conversation.attachment.menu.paste").assertIsDisplayed()
     }
 
     @Test

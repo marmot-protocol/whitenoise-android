@@ -18,6 +18,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -44,6 +46,7 @@ import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ComposerShortcutSide
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
+import dev.ipf.whitenoise.android.state.ComposerVoicePlacement
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.share.testAccount
@@ -245,7 +248,12 @@ class ComposerToolbarSpacingScreenshotTest {
             } else {
                 ComposerToolbarSettings()
             }
-        val selected = case.voiceSide?.let { settings.withSide(ComposerShortcut.VoiceNote, it) } ?: settings
+        val selected =
+            case.voiceSide?.let { side ->
+                val placement =
+                    if (side == ComposerShortcutSide.Left) ComposerVoicePlacement.Left else ComposerVoicePlacement.Right
+                settings.withVoicePlacement(placement)
+            } ?: settings
         ApplicationProvider
             .getApplicationContext<Context>()
             .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
@@ -426,13 +434,19 @@ class ComposerToolbarSpacingScreenshotTest {
                 } else {
                     composeRule.onNodeWithContentDescription("Paste from clipboard").assertDoesNotExist()
                     composeRule.onNodeWithContentDescription("Dictate text").assertDoesNotExist()
-                    if (case.draft.isNotEmpty()) listOf(bounds("Hold to record voice message")) else emptyList()
+                    emptyList()
                 }
             assertTargets(left, sign)
             assertTargets(right, sign)
             val primary = bounds(if (case.draft.isEmpty()) "Hold to record voice message" else "Send")
             assertFootprints(listOf(primary))
             if (case.draft.isEmpty()) assertTargets(right + primary, sign)
+            if (case.crowded && case.draft.isEmpty()) {
+                // A pinned voice slot leaves Send visible in its own place, disabled until there is content.
+                composeRule.onNodeWithContentDescription("Send").assertIsDisplayed().assertIsNotEnabled()
+                assertFootprints(listOf(bounds("Send")))
+                assertDistinctFootprints(listOf(primary, bounds("Send")), listOf("Voice", "Send"))
+            }
             val editor = composeRule.onNode(hasSetTextAction()).fetchSemanticsNode().boundsInRoot
             assertTrue(
                 "editor retains a usable composing width",
@@ -451,11 +465,7 @@ class ComposerToolbarSpacingScreenshotTest {
             if (case.accounts > 1) add("Sending identity")
             add("Add attachment")
             add("Emoji")
-            if (case.crowded) {
-                addAll(listOf("Paste", "Dictation"))
-            } else if (case.draft.isNotEmpty()) {
-                add("Voice")
-            }
+            if (case.crowded) addAll(listOf("Paste", "Dictation"))
             add(if (case.draft.isEmpty()) "Voice" else "Send")
         }
 

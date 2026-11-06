@@ -40,7 +40,7 @@ internal fun ComposerConfiguredAction(
     onPaste: () -> Boolean,
     onMore: () -> Unit,
     onAnchor: (IntRect) -> Unit,
-    attachmentMenu: (@Composable (IntRect) -> Unit)?,
+    attachmentMenu: (@Composable (IntRect, ComposerMenuTextShortcuts) -> Unit)?,
     anchor: IntRect,
     emojiPickerOpen: Boolean,
     onEmoji: () -> Unit,
@@ -84,7 +84,10 @@ internal fun ComposerConfiguredAction(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                attachmentMenu?.invoke(anchor)
+                attachmentMenu?.invoke(
+                    anchor,
+                    bindings.menuTextShortcuts(onEmoji, onPaste, onDictation),
+                )
             }
         ComposerShortcut.Emoji ->
             TextEntryEmojiAction(
@@ -170,3 +173,14 @@ private fun ComposerOptionalShortcutAction(
         )
     }
 }
+
+/** Plus-menu text actions share the toolbar's activation guard. */
+private fun ComposerToolbarBindings.menuTextShortcuts(
+    onEmoji: () -> Unit,
+    onPaste: () -> Boolean,
+    onDictation: (() -> Unit)?,
+) = ComposerMenuTextShortcuts(
+    onEmoji = { if (canActivate()) onEmoji() },
+    onPaste = onPaste,
+    onDictation = onDictation?.let { dictate -> { if (canActivate()) dictate() } },
+)

@@ -58,6 +58,46 @@ class ComposerAttachmentMenuTest {
             .captureRoboImage("src/test/snapshots/composer_attachment_menu.png")
     }
 
+    /** Unpinned text actions follow the attachment sources and each dismisses the menu once. */
+    @Test
+    fun unpinnedTextActionsFollowSourcesAndDismissOnce() {
+        val calls = mutableListOf<String>()
+        var dismissals = 0
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                ComposerAttachmentMenu(
+                    IntRect(16, 700, 56, 748),
+                    true,
+                    { dismissals++ },
+                    onCamera = {},
+                    onGallery = {},
+                    onFiles = null,
+                    onLocation = null,
+                    onUser = null,
+                    onContact = null,
+                    textShortcuts =
+                        ComposerMenuTextShortcuts(
+                            onEmoji = { calls += "emoji" },
+                            onPaste = {
+                                calls += "paste"
+                                true
+                            },
+                            onDictation = { calls += "dictation" },
+                        ),
+                )
+            }
+        }
+        composeRule
+            .onNodeWithTag("conversation.attachment.menu")
+            .captureRoboImage("src/test/snapshots/composer_attachment_menu_text_actions_amoled.png")
+        listOf("emoji", "paste", "dictation").forEachIndexed { index, id ->
+            composeRule.onNodeWithTag("conversation.attachment.menu.$id").performTouchInput { click() }
+            composeRule.waitForIdle()
+            assertEquals(id, calls[index])
+            assertEquals(index + 1, dismissals)
+        }
+    }
+
     /** An open keyboard raises Add; every group action must remain above it and accept a finger scroll. */
     @Test
     fun raisedAttachmentButtonKeepsPollReachableByTouchScrolling() {

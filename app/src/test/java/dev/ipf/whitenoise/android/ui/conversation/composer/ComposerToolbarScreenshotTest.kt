@@ -8,8 +8,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
@@ -360,6 +362,39 @@ class ComposerToolbarScreenshotTest {
                 ),
         )
 
+    /** Send keeps its place in every placement, including a pinned voice slot. */
+    private fun assertPreviewSendOnShortcutRow(
+        settings: ComposerToolbarSettings,
+        previewAncestor: SemanticsMatcher,
+        firstBounds: Rect,
+        surface: Rect,
+    ) {
+        val primary =
+            composeRule
+                .onNodeWithTag("composer.toolbar.preview.primary")
+                .fetchSemanticsNode()
+                .boundsInRoot
+        // A wrapped toolbar keeps Send on one of its shortcut rows.
+        val rowCenters =
+            settings
+                .normalized()
+                .shortcuts
+                .mapNotNull { shortcut ->
+                    composeRule
+                        .onAllNodes(hasTestTag("composer.shortcut.${shortcut.id}") and previewAncestor)
+                        .fetchSemanticsNodes()
+                        .firstOrNull()
+                        ?.boundsInRoot
+                        ?.center
+                        ?.y
+                }
+        assertTrue(rowCenters.any { kotlin.math.abs(it - primary.center.y) <= 1f })
+        if (rowCenters.all { kotlin.math.abs(it - firstBounds.center.y) <= 1f }) {
+            assertEquals(firstBounds.center.y, primary.center.y, 1f)
+        }
+        assertTrue(primary.top >= surface.top && primary.bottom <= surface.bottom)
+    }
+
     /** Checks preview targets, scrolling and scaled labels against the rendered editor bounds. */
     private fun assertEditorPreview(
         settings: ComposerToolbarSettings,
@@ -393,15 +428,7 @@ class ComposerToolbarScreenshotTest {
                 .boundsInRoot
         val firstBounds = first.fetchSemanticsNode().boundsInRoot
         assertTrue(firstBounds.top >= surface.top && firstBounds.bottom <= surface.bottom)
-        if (ComposerShortcut.VoiceNote !in settings.shortcuts) {
-            val primary =
-                composeRule
-                    .onNodeWithTag("composer.toolbar.preview.primary")
-                    .fetchSemanticsNode()
-                    .boundsInRoot
-            assertEquals(firstBounds.center.y, primary.center.y, 1f)
-            assertTrue(primary.top >= surface.top && primary.bottom <= surface.bottom)
-        }
+        assertPreviewSendOnShortcutRow(settings, previewAncestor, firstBounds, surface)
         if (width == 240) {
             // The inert preview still lets the last configured row scroll into view.
             composeRule

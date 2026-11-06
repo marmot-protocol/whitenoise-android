@@ -19,7 +19,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [36])
 @OptIn(ExperimentalCoroutinesApi::class)
 class ComposerToolbarPreferencesTest {
-    /** Fresh preferences and Reset use the compact groups without replacing saved choices. */
+    /** Fresh preferences and Reset use the compact groups, with the voice launcher sharing Send's slot. */
     @Test
     fun freshDefaultsAndResetPersistCompactPhysicalGroups() =
         runTest {
@@ -31,11 +31,12 @@ class ComposerToolbarPreferencesTest {
                         ComposerShortcut.SendingIdentity,
                         ComposerShortcut.More,
                         ComposerShortcut.Emoji,
-                        ComposerShortcut.VoiceNote,
                     ),
                     rightShortcuts = setOf(ComposerShortcut.VoiceNote),
+                    voiceOnSend = true,
                 )
             assertEquals(expected, owner.value)
+            assertEquals(ComposerVoicePlacement.Send, owner.value.voicePlacement)
             val custom = ComposerToolbarSettings(listOf(ComposerShortcut.More, ComposerShortcut.Dictation))
             val saved = CompletableDeferred<Boolean>()
             owner.save(custom) { saved.complete(it) }
@@ -78,6 +79,42 @@ class ComposerToolbarPreferencesTest {
         assertEquals(saved, ComposerToolbarSettings.decode(saved.encode()))
     }
 
+    /** Each voice placement survives storage; Send and Off never leave a pinned voice slot behind. */
+    @Test
+    fun voicePlacementsRoundTripAndPinningLeavesSendSlot() {
+        val defaults = ComposerToolbarSettings()
+        ComposerVoicePlacement.entries.forEach { placement ->
+            val placed = defaults.withVoicePlacement(placement)
+            assertEquals(placement, placed.voicePlacement)
+            assertEquals(placed, ComposerToolbarSettings.decode(placed.encode()))
+            assertEquals(
+                placement == ComposerVoicePlacement.Left || placement == ComposerVoicePlacement.Right,
+                ComposerShortcut.VoiceNote in placed.normalized().shortcuts,
+            )
+        }
+        val left = defaults.withVoicePlacement(ComposerVoicePlacement.Left)
+        assertEquals(ComposerShortcut.VoiceNote, left.onSide(ComposerShortcutSide.Left).last())
+        assertEquals(ComposerVoicePlacement.Send, left.withVoicePlacement(ComposerVoicePlacement.Send).voicePlacement)
+        // Adding the voice shortcut from the palette pins it, leaving Send's slot to Send.
+        assertEquals(ComposerVoicePlacement.Right, defaults.insert(ComposerShortcut.VoiceNote, 9).voicePlacement)
+        assertEquals(ComposerVoicePlacement.Off, left.without(ComposerShortcut.VoiceNote).voicePlacement)
+    }
+
+    /** Older records had no Send placement, so they keep a pinned voice launcher or its absence. */
+    @Test
+    fun earlierVersionsKeepTheirVoiceChoice() {
+        val pinned =
+            ComposerToolbarSettings.decode(
+                """{"version":2,"shortcuts":["more","voice_note"],"layout":"automatic","rightShortcuts":[]}""",
+            )
+        assertEquals(ComposerVoicePlacement.Left, pinned.voicePlacement)
+        val hidden =
+            ComposerToolbarSettings.decode(
+                """{"version":2,"shortcuts":["more","emoji"],"layout":"automatic","rightShortcuts":[]}""",
+            )
+        assertEquals(ComposerVoicePlacement.Off, hidden.voicePlacement)
+    }
+
     @Test
     fun roundTripRetainsOrderAndIntentionalEmptyOptionalSelection() {
         val settings =
@@ -114,6 +151,8 @@ class ComposerToolbarPreferencesTest {
             """{"version":2,"shortcuts":[]}""",
             """{"version":1,"shortcuts":[false]}""",
             """{"version":1,"shortcuts":"camera"}""",
+            """{"version":3,"shortcuts":[],"rightShortcuts":[]}""",
+            """{"version":4,"shortcuts":[],"rightShortcuts":[],"voiceOnSend":true}""",
         ).forEach { encoded ->
             assertEquals(ComposerToolbarSettings(), ComposerToolbarSettings.decode(encoded))
         }
