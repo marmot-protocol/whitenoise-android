@@ -22,8 +22,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -36,10 +34,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -57,6 +58,7 @@ import dev.ipf.whitenoise.android.ui.EmojiEntry
 import dev.ipf.whitenoise.android.ui.EmojiSection
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
+import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyVerticalGrid
 import dev.ipf.whitenoise.android.ui.customEmojiSearchSection
 import dev.ipf.whitenoise.android.ui.emojiBrowseSections
@@ -168,8 +170,10 @@ private fun rememberEmojiPickerModel(
  * (while not searching) a divider plus the category bar. Shared by the reaction sheet, the
  * composer pane and the group image picker.
  *
- * [searchRow] replaces the grid and category bar with one row of matches above the search field,
- * so the composer pane stays small while its search has the keyboard. Only the composer sets it.
+ * [searchBehindIcon] hides the search field until the category bar's search action opens it; closing
+ * the field, or moving focus away from it, returns to plain browsing. [searchRow] replaces the grid
+ * and category bar with one row of matches above the search field, so the composer pane stays small
+ * while its search has the keyboard. Only the composer sets either.
  */
 @Composable
 internal fun EmojiPickerContent(
@@ -182,9 +186,17 @@ internal fun EmojiPickerContent(
     onConfigure: (() -> Unit)? = null,
     onSearchActiveChange: (Boolean) -> Unit = {},
     selectionEnabled: Boolean = true,
+    searchBehindIcon: Boolean = false,
     searchRow: Boolean = false,
 ) {
-    var query by rememberSaveable { mutableStateOf("") }
+    // The composer does not restore its pane, so a search behind the icon starts fresh on every open.
+    var query by if (searchBehindIcon) remember { mutableStateOf("") } else rememberSaveable { mutableStateOf("") }
+    var searchOpen by remember { mutableStateOf(!searchBehindIcon) }
+    var searchFocused by remember { mutableStateOf(false) }
+    var searchClosing by remember { mutableStateOf(false) }
+    val searchFocus = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
     val model = rememberEmojiPickerModel(query, recentEmojis, purpose)
     val gridState = rememberLazyGridState()
     val rowState = rememberLazyListState()
@@ -205,16 +217,60 @@ internal fun EmojiPickerContent(
         onEmojiPicked(emoji)
     }
 
+    fun closeSearch() {
+        if (searchFocused) {
+            searchFocused = false
+            onSearchActiveChange(false)
+        }
+        searchClosing = true
+    }
+
+    // Opening from the icon focuses the field and raises the keyboard.
+    LaunchedEffect(searchOpen) {
+        if (searchBehindIcon && searchOpen) {
+            searchFocus.requestFocus()
+            keyboard?.show()
+        }
+    }
+    // Leaving the search (close action, Back, keyboard hidden) keeps the field and matches in place
+    // until the composer leaves its one-row mode, then returns to plain browsing.
+    LaunchedEffect(searchClosing, searchRow) {
+        if (searchClosing && !searchRow) {
+            query = ""
+            searchOpen = false
+            searchClosing = false
+        }
+    }
+
     val noResults = model.searching && model.searchedQuery == query && model.sections.isEmpty()
     Column(modifier) {
         // The row is emitted ahead of the one search field call site, so switching modes keeps its focus.
         if (searchRow) EmojiSearchRow(model.sections, noResults, rowState, selectionEnabled, onPick = ::pick)
-        EmojiSearchField(
-            value = query,
-            onValueChange = { query = it },
-            onFocusChanged = onSearchActiveChange,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        if (searchOpen) {
+            EmojiSearchField(
+                value = query,
+                onValueChange = { query = it },
+                onFocusChanged = { focused ->
+                    if (searchBehindIcon && searchFocused && !focused) {
+                        closeSearch()
+                    } else {
+                        if (focused) searchClosing = false
+                        searchFocused = focused
+                        onSearchActiveChange(focused)
+                    }
+                },
+                onClose =
+                    if (searchBehindIcon) {
+                        {
+                            focusManager.clearFocus()
+                            closeSearch()
+                        }
+                    } else {
+                        null
+                    },
+                modifier = Modifier.fillMaxWidth().focusRequester(searchFocus),
+            )
+        }
         if (searchRow) {
             // The row above the field already shows matches; the grid and category bar stay out.
         } else if (noResults) {
@@ -239,6 +295,7 @@ internal fun EmojiPickerContent(
                 categories = model.sections.map { it.category },
                 selected = activeCategory,
                 state = categoryState,
+                onSearch = if (searchOpen) null else ({ searchOpen = true }),
                 onConfigure = onConfigure,
                 onBackspace = onBackspace,
                 onCategory = { category ->
@@ -276,18 +333,23 @@ private fun EmojiPickerScrollSync(
     }
 }
 
-/** Search field of the emoji picker. */
+/**
+ * Compact search field of the emoji picker. With [onClose] its trailing action closes the search
+ * instead of only clearing the query.
+ */
 @Composable
 private fun EmojiSearchField(
     value: String,
     onValueChange: (String) -> Unit,
     onFocusChanged: (Boolean) -> Unit,
+    onClose: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
-    val container = MaterialTheme.colorScheme.surfaceContainerHigh
-    TextField(
+    val closeDescription = stringResource(R.string.close)
+    WhiteNoiseCompactSearchField(
         value = value,
         onValueChange = onValueChange,
+        placeholder = stringResource(R.string.emoji_search_hint),
         modifier =
             modifier
                 .padding(
@@ -296,30 +358,17 @@ private fun EmojiSearchField(
                     bottom = WhiteNoiseSpacing.Related,
                 ).onFocusChanged { onFocusChanged(it.isFocused) }
                 .testTag(EMOJI_PICKER_SEARCH_TEST_TAG),
-        placeholder = { Text(stringResource(R.string.emoji_search_hint)) },
-        leadingIcon = { Icon(painterResource(R.drawable.ic_search), contentDescription = null) },
-        trailingIcon =
-            if (value.isNotEmpty()) {
+        outlined = true,
+        clearDescription = if (onClose != null) closeDescription else stringResource(R.string.emoji_search_clear),
+        onClear = onClose,
+        emptyTrailingIcon =
+            onClose?.let { close ->
                 {
-                    IconButton(onClick = { onValueChange("") }) {
-                        Icon(
-                            painterResource(R.drawable.ic_close),
-                            contentDescription = stringResource(R.string.emoji_search_clear),
-                        )
+                    IconButton(onClick = close) {
+                        Icon(painterResource(R.drawable.ic_close), contentDescription = closeDescription)
                     }
                 }
-            } else {
-                null
             },
-        singleLine = true,
-        shape = MaterialTheme.shapes.extraLarge,
-        colors =
-            TextFieldDefaults.colors(
-                focusedContainerColor = container,
-                unfocusedContainerColor = container,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-            ),
     )
 }
 

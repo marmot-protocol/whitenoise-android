@@ -38,6 +38,7 @@ import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerFallbackHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerPane
 import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_CELL_GLYPH_FILL_FRACTION
+import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_SEARCH_OPEN_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_SEARCH_ROW_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_SEARCH_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerContent
@@ -97,6 +98,21 @@ class EmojiPickerScreenshotTest {
         assertBrowseGridLayout()
     }
 
+    /** The composer pane opens on the grid alone; search waits behind the category bar icon. */
+    @Test
+    fun composerBrowseHidesSearchFieldUntilIconTap() {
+        renderBrowsePane(darkTheme = false, amoled = false)
+        waitForBrowseGrid()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertDoesNotExist()
+        val pane = boundsOfTag(PICKER_TAG)
+        val firstHeader = boundsOfTag(emojiPickerHeaderTestTag(EmojiCategory.Recent))
+        assertTrue(
+            "The grid starts at the top of the pane (${firstHeader.top}px, pane ${pane.top}px)",
+            firstHeader.top - pane.top <= (EXPECTED_HEADER_MIN_HEIGHT + EXPECTED_HEADER_TOP_GAP).value,
+        )
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_OPEN_TEST_TAG).assertIsDisplayed()
+    }
+
     /** The sheets' default picker content keeps the sectioned search grid and drops the Recent section. */
     @Test
     fun sheetSearchKeepsGrid() {
@@ -110,7 +126,7 @@ class EmojiPickerScreenshotTest {
             }
         }
         waitForBrowseGrid()
-        openSearchAndType("happy")
+        openSearchAndType("happy", fromIcon = false)
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_ROW_TEST_TAG).assertDoesNotExist()
         assertSearchGridLayout()
     }
@@ -129,7 +145,7 @@ class EmojiPickerScreenshotTest {
     fun composerSearchRowKeepsItsHeightWithoutMatches() {
         renderBrowsePane(darkTheme = false, amoled = false)
         waitForBrowseGrid()
-        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).performClick()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_OPEN_TEST_TAG).performClick()
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).performTextInput("zzzzqqqq")
         composeRule.waitUntil(5_000) {
             runCatching { composeRule.onNodeWithText(string(R.string.emoji_search_no_results)).assertIsDisplayed() }
@@ -346,9 +362,13 @@ class EmojiPickerScreenshotTest {
         error("Emoji browse grid did not load")
     }
 
-    /** Opens search and type. */
-    private fun openSearchAndType(query: String) {
-        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).performClick()
+    /** Opens search (the composer's category bar icon, or a sheet's field) and types [query]. */
+    private fun openSearchAndType(
+        query: String,
+        fromIcon: Boolean = true,
+    ) {
+        val opener = if (fromIcon) EMOJI_PICKER_SEARCH_OPEN_TEST_TAG else EMOJI_PICKER_SEARCH_TEST_TAG
+        composeRule.onNodeWithTag(opener).performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).performTextInput(query)
         repeat(100) {

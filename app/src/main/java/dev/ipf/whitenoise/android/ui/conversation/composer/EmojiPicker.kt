@@ -84,6 +84,7 @@ internal fun EmojiPickerSheet(
 
 /**
  * The composer's inline emoji pane: the same picker content in place of the keyboard, with a backspace action.
+ * Its search stays behind the category bar's search icon, so the pane opens with the full grid.
  *
  * Browsing fills [height]. With [searchRow] the pane wraps one row of matches and the search field so it fits
  * above the keyboard; [searchMinHeight] keeps it covering the space the keyboard has not yet taken or released.
@@ -119,6 +120,7 @@ internal fun ComposerEmojiPickerPane(
             onEmojiUsed = onEmojiUsed,
             onBackspace = onBackspace,
             onSearchActiveChange = onSearchActiveChange,
+            searchBehindIcon = true,
             searchRow = searchRow,
             modifier =
                 (if (searchRow) Modifier.fillMaxWidth() else Modifier.fillMaxSize())
