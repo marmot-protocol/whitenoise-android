@@ -37,7 +37,7 @@ class ReactionArtworkLifetimeTest {
 
     /** Releasing a suspended native lookup after teardown cannot request a second source or publish any artwork. */
     @Test
-    @Suppress("UNCHECKED_CAST", "LongMethod") // Keep the mounted lifecycle interleaving and binding continuation together.
+    @Suppress("UNCHECKED_CAST", "LongMethod") // Keep the mounted lifecycle and binding continuation together.
     fun clearedControllerStopsTheMountedArtworkLoop() {
         val requests = CopyOnWriteArrayList<String>()
         val pending = AtomicReference<Continuation<Any?>?>()
