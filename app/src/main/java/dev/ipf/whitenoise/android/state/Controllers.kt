@@ -9096,15 +9096,30 @@ class ConversationController(
         val account = owner.account
         val target = owner.messageId
         val key = target.lowercase() to emoji
-        val messageIdHex =
-            appState.withGroupCommitLock(account, group.groupIdHex) {
+        val generation = appState.runtimeGeneration
+        val ensureCurrent: suspend () -> Unit = {
+            withContext(Dispatchers.Main.immediate) {
                 owner.requireAvailable()
-                val summary =
-                    appState.marmotIo(MarmotTraceSection.MESSAGE_REACT) {
-                        reactToMessage(account, group.groupIdHex, target, emoji)
-                    }
-                summary.messageIds.firstOrNull()?.takeIf(String::isNotBlank)
+                check(reactionIntentConflator.latest(key)?.desiredMine == true)
+                check(appState.runtimeGeneration == generation && acceptsConversationActionOwner(account, group.groupIdHex))
             }
+        }
+        val sourceReactionId = reactions[target].orEmpty().firstOrNull { it.emoji == emoji }?.reactionMessageIdHex
+        val artwork = appState.reactionArtworkForSend(emoji, account, group.groupIdHex, sourceReactionId, ensureCurrent)
+        val summary =
+            appState.marmotIo(MarmotTraceSection.MESSAGE_REACT) {
+                sendCustomEmojiReaction(
+                    account,
+                    group.groupIdHex,
+                    target,
+                    emoji,
+                    artwork,
+                    appState.emojiUploads,
+                    ensureCurrent = ensureCurrent,
+                    publishLock = { publish -> appState.withGroupCommitLock(account, group.groupIdHex) { publish() } },
+                )
+            }
+        val messageIdHex = summary.messageIds.firstOrNull()?.takeIf(String::isNotBlank)
         // Presence records that the add committed even when older bindings return no event id.
         // A rapid later removal can then wait for local history instead of mistaking it for a no-op.
         unprojectedOwnReactionEventIds[key] = messageIdHex.orEmpty()
@@ -13808,7 +13823,14 @@ class ConversationController(
         val participants =
             appState.marmotIo {
                 messageReactions(account, group.groupIdHex, targetMessageId)
-                    .map { ReactionParticipant(sender = it.sender, emoji = it.emoji, reactedAt = it.reactedAt) }
+                    .map {
+                        ReactionParticipant(
+                            sender = it.sender,
+                            emoji = it.emoji,
+                            reactedAt = it.reactedAt,
+                            reactionMessageIdHex = it.reactionMessageIdHex,
+                        )
+                    }
             }
         check(acceptsConversationActionOwner(account, group.groupIdHex))
         return participants

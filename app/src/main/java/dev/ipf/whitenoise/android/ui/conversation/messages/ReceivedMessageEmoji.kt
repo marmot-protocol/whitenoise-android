@@ -103,7 +103,6 @@ private fun rememberReceivedEmojiInScope(
                 }
             }
     }
-    // Reaction chips stay literal `:code:` text until MDK can resolve a reaction's attachment (mdk#2151).
     return remember(defined, messageArt) {
         ReceivedEmoji(art = messageArt, attachmentIndexes = defined.keys)
     }
@@ -155,8 +154,7 @@ private fun rememberDefinedEmoji(
 
 /**
  * Whether a reaction's artwork may be fetched automatically. The reactor sent it, never the viewer's
- * own message, so the message's authorship must not widen the policy. Reaction artwork is gated off
- * until MDK can resolve a kind-7 attachment per message (mdk#2151), so nothing calls this yet.
+ * own message, so the message's authorship must not widen the policy.
  */
 internal fun reactionArtworkAutoDownloadAllowed(
     mediaAutoDownloadAllowed: Boolean,

@@ -8,6 +8,7 @@ import dev.ipf.marmotkit.AccountAttentionSubscription
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupMemberIdsFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.AppGroupMlsStateFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AttachmentDownloadPolicyFfi
@@ -38,6 +39,8 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarmotEventFfi
 import dev.ipf.marmotkit.MarmotInterface
+import dev.ipf.marmotkit.MediaUploadRequestFfi
+import dev.ipf.marmotkit.MediaUploadResultFfi
 import dev.ipf.marmotkit.NoPointer
 import dev.ipf.marmotkit.NotificationSettingsFfi
 import dev.ipf.marmotkit.NotificationTrafficClassFfi
@@ -148,6 +151,9 @@ internal class NotificationBootstrapTestFixture(
     private val onSetChatManuallyUnread: ((Boolean) -> ChatListRowFfi?)? = null,
     private val onSendText: ((accountRef: String, groupIdHex: String, text: String) -> SendSummaryFfi)? = null,
     private val onReactToMessage: (() -> SendSummaryFfi)? = null,
+    private val onReactWithMedia: ((List<Any?>) -> SendSummaryFfi)? = null,
+    private val onUploadMedia: ((MediaUploadRequestFfi) -> MediaUploadResultFfi)? = null,
+    private val onGroupMlsState: (() -> AppGroupMlsStateFfi)? = null,
     private val onCatchUpAccounts: (() -> Unit)? = null,
     private val emitStartupNotification: Boolean = true,
     private val onSetNativePushEnabled: ((accountRef: String, enabled: Boolean) -> NotificationSettingsFfi)? = null,
@@ -490,6 +496,9 @@ internal class NotificationBootstrapTestFixture(
                     val hook = onSendText ?: throw UnsupportedOperationException("Unexpected Marmot call: sendText")
                     hook(arguments?.get(0) as String, arguments[1] as String, arguments[2] as String)
                 }
+                "uploadMedia" -> requireNotNull(onUploadMedia).invoke(arguments!![2] as MediaUploadRequestFfi)
+                "groupMlsState" -> requireNotNull(onGroupMlsState).invoke()
+                "reactWithMedia" -> requireNotNull(onReactWithMedia).invoke(arguments!!.toList())
                 "reactToMessage" -> {
                     reactToMessageCalls.incrementAndGet()
                     val hook =

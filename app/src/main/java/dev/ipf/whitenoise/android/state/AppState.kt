@@ -10206,13 +10206,7 @@ class WhiteNoiseAppState private constructor(
             return NotificationReactionSendOutcome.NonRetryableFailure
         }
         return runCatchingCancellable {
-            withGroupCommitLock(accountRef, groupIdHex) {
-                val summary =
-                    marmotIo(MarmotTraceSection.MESSAGE_REACT) {
-                        reactToMessage(accountRef, groupIdHex, messageIdHex, emoji)
-                    }
-                notificationReactionOutcome(summary.acceptDisposition)
-            }
+            notificationReactionOutcome(publishNotificationReaction(accountRef, groupIdHex, messageIdHex, emoji).acceptDisposition)
         }.onFailure {
             appStateDebug(it) {
                 "notification reaction failed for group=${groupIdHex.take(8)}: ${it.readableMessage()}"

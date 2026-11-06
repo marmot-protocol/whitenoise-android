@@ -35,8 +35,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ReactionParticipant
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.EmojiArt
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.common.PersonAvatar
@@ -94,11 +96,14 @@ internal data class ReactionDetailsReadState(
 
 /** Shows every reactor and always starts on the All filter. */
 @Composable
+@Suppress("LongParameterList") // One existing sheet owner coordinates readiness, artwork and actions.
 internal fun ReactionDetailsSheet(
     participants: List<ReactionParticipant>,
     appState: WhiteNoiseAppState,
     onRemoveOwnReaction: ((String) -> Unit)?,
     onDismissRequest: () -> Unit,
+    artworkByReaction: Map<String, EmojiArt> = emptyMap(),
+    controller: ConversationController? = null,
     readState: ReactionDetailsReadState =
         ReactionDetailsReadState(viewerAccountId = appState.activeAccount?.accountIdHex),
 ) {
@@ -110,6 +115,8 @@ internal fun ReactionDetailsSheet(
         ReactionDetailsContent(
             participants = participants,
             appState = appState,
+            artworkByReaction = artworkByReaction,
+            controller = controller,
             onRemoveOwnReaction = onRemoveOwnReaction,
             readState = readState,
         )
@@ -118,11 +125,13 @@ internal fun ReactionDetailsSheet(
 
 /** Renders complete reactor snapshots, preserving filters during refresh and offering Retry after failed reads. */
 @Composable
-@Suppress("FunctionNaming")
+@Suppress("FunctionNaming", "LongParameterList")
 internal fun ReactionDetailsContent(
     participants: List<ReactionParticipant>,
     appState: WhiteNoiseAppState,
     onRemoveOwnReaction: ((String) -> Unit)?,
+    artworkByReaction: Map<String, EmojiArt> = emptyMap(),
+    controller: ConversationController? = null,
     readState: ReactionDetailsReadState =
         ReactionDetailsReadState(viewerAccountId = appState.activeAccount?.accountIdHex),
 ) {
@@ -155,9 +164,11 @@ internal fun ReactionDetailsContent(
                     emojiCounts = emojiCounts,
                     participantCount = participants.size,
                     onSelectedEmoji = { selectedEmoji = it },
+                    artworkByEmoji = participants.distinctBy { it.emoji }.associate { it.emoji to artworkByReaction[it.reactionMessageIdHex] },
+                    nativeEmojis = participants.filter { it.reactionMessageIdHex != null }.map { it.emoji }.toSet(),
                 )
             }
-            ReactionParticipantList(visibleParticipants, appState, readState.viewerAccountId, onRemoveOwnReaction)
+            ReactionParticipantList(visibleParticipants, appState, readState.viewerAccountId, onRemoveOwnReaction, artworkByReaction, controller)
         }
     }
 }
@@ -170,6 +181,8 @@ private fun ReactionParticipantList(
     appState: WhiteNoiseAppState,
     viewerAccountId: String?,
     onRemoveOwnReaction: ((String) -> Unit)?,
+    artworkByReaction: Map<String, EmojiArt>,
+    controller: ConversationController?,
 ) {
     WhiteNoiseLazyColumn(
         modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
@@ -182,6 +195,8 @@ private fun ReactionParticipantList(
             ReactionParticipantRow(
                 participant = participant,
                 appState = appState,
+                artwork = artworkByReaction[participant.reactionMessageIdHex],
+                controller = controller,
                 mine = isMine,
                 onRemove =
                     if (isMine && onRemoveOwnReaction != null) {
@@ -221,6 +236,8 @@ private fun ReactionFilterChips(
     emojiCounts: List<Pair<String, Int>>,
     participantCount: Int,
     onSelectedEmoji: (String?) -> Unit,
+    artworkByEmoji: Map<String, EmojiArt?>,
+    nativeEmojis: Set<String>,
 ) {
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -238,7 +255,12 @@ private fun ReactionFilterChips(
                 label = {
                     Text(
                         text = EmojiShortcodes.annotate(AnnotatedString("$emoji $count")),
-                        inlineContent = EmojiShortcodes.content(dev.ipf.whitenoise.android.ui.ReceivedEmoji.None),
+                        inlineContent =
+                            if (emoji in nativeEmojis) {
+                                reactionInlineContent(emoji, artworkByEmoji[emoji])
+                            } else {
+                                EmojiShortcodes.content(dev.ipf.whitenoise.android.ui.ReceivedEmoji.None)
+                            },
                     )
                 },
             )
@@ -255,7 +277,23 @@ private fun ReactionParticipantRow(
     appState: WhiteNoiseAppState,
     mine: Boolean,
     onRemove: (() -> Unit)?,
+    artwork: EmojiArt?,
+    controller: ConversationController?,
 ) {
+    val resolvedArtwork =
+        if (controller != null && participant.reactionMessageIdHex != null) {
+            rememberReactionArtwork(
+                controller,
+                appState,
+                listOf(
+                    dev.ipf.whitenoise.android.core
+                        .ReactionTally(participant.emoji, 1, mine, participant.reactionMessageIdHex),
+                ),
+                revision = controller.window.frame?.revision,
+            )[participant.reactionMessageIdHex]
+        } else {
+            artwork
+        }
     val shortIdentity =
         appState.shortNpub(participant.sender).ifBlank {
             IdentityFormatter.short(participant.sender, prefix = 10, suffix = 8)
@@ -286,7 +324,12 @@ private fun ReactionParticipantRow(
     val trailing: @Composable () -> Unit = {
         Text(
             text = EmojiShortcodes.annotate(AnnotatedString(participant.emoji)),
-            inlineContent = EmojiShortcodes.content(dev.ipf.whitenoise.android.ui.ReceivedEmoji.None),
+            inlineContent =
+                if (participant.reactionMessageIdHex != null) {
+                    reactionInlineContent(participant.emoji, resolvedArtwork)
+                } else {
+                    EmojiShortcodes.content(dev.ipf.whitenoise.android.ui.ReceivedEmoji.None)
+                },
             style = MaterialTheme.typography.headlineSmall,
         )
     }

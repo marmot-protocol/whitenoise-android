@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ReactionTally
+import dev.ipf.whitenoise.android.ui.EmojiArt
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
 import dev.ipf.whitenoise.android.ui.emojiPlainLabel
@@ -56,6 +57,7 @@ internal data class ReactionPill(
     val count: Int,
     val selected: Boolean,
     val omittedTypes: Int = 0,
+    val reactionMessageIdHex: String? = null,
 )
 
 /** The prototype's summary: up to [maximumPills] emoji pills, then one "+N" pill for the rest. */
@@ -63,8 +65,8 @@ internal fun reactionPills(
     tallies: List<ReactionTally>,
     maximumPills: Int = MAX_VISIBLE_REACTIONS,
 ): List<ReactionPill> {
-    if (tallies.size <= maximumPills) return tallies.map { ReactionPill(it.emoji, it.count, it.mine) }
-    val visible = tallies.take(maximumPills).map { ReactionPill(it.emoji, it.count, it.mine) }
+    if (tallies.size <= maximumPills) return tallies.map { ReactionPill(it.emoji, it.count, it.mine, reactionMessageIdHex = it.reactionMessageIdHex) }
+    val visible = tallies.take(maximumPills).map { ReactionPill(it.emoji, it.count, it.mine, reactionMessageIdHex = it.reactionMessageIdHex) }
     val omitted = tallies.drop(maximumPills)
     return visible +
         ReactionPill(
@@ -112,6 +114,7 @@ internal fun ReactionPillRow(
     modifier: Modifier = Modifier,
     localMotion: LocalReactionMotion? = null,
     allowHostClipping: Boolean = false,
+    artworkByReaction: Map<String, EmojiArt> = emptyMap(),
 ) {
     val pills = remember(tallies) { reactionPills(tallies) }
     Row(
@@ -128,6 +131,7 @@ internal fun ReactionPillRow(
                 localMotion = localMotion,
                 allowHostClipping = allowHostClipping,
                 motionEmoji = pill.motionEmoji(tallies, localMotion),
+                artwork = artworkByReaction[pill.reactionMessageIdHex],
             )
         }
     }
@@ -141,6 +145,7 @@ internal fun ReactionPillFlow(
     onToggleReaction: ((String) -> Unit)?,
     onOpenDetails: (String?) -> Unit,
     localMotion: LocalReactionMotion? = null,
+    artworkByReaction: Map<String, EmojiArt> = emptyMap(),
 ) {
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(ReactionPillSpacing, Alignment.CenterHorizontally),
@@ -155,6 +160,7 @@ internal fun ReactionPillFlow(
                 onToggleReaction,
                 localMotion,
                 motionEmoji = pill.motionEmoji(tallies, localMotion),
+                artwork = artworkByReaction[pill.reactionMessageIdHex],
             )
         }
     }
@@ -172,6 +178,7 @@ private fun ReactionPillItem(
     localMotion: LocalReactionMotion? = null,
     motionEmoji: String? = pill.emoji,
     allowHostClipping: Boolean = false,
+    artwork: EmojiArt? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val emoji = pill.emoji
@@ -226,7 +233,7 @@ private fun ReactionPillItem(
                 },
         contentAlignment = Alignment.Center,
     ) {
-        ReactionPillSurface(pill, single, interactionSource, localMotion, allowHostClipping)
+        ReactionPillSurface(pill, single, interactionSource, localMotion, allowHostClipping, artwork)
     }
 }
 
@@ -239,11 +246,13 @@ private fun ReactionPillSurface(
     interactionSource: MutableInteractionSource,
     localMotion: LocalReactionMotion?,
     allowHostClipping: Boolean,
+    receivedArtwork: EmojiArt?,
 ) {
     val emoji = pill.emoji
     // Keep the Text's own immutable layout for an already-present counted badge too.
     var emojiLayout by remember(emoji) { mutableStateOf<TextLayoutResult?>(null) }
-    val artwork = emoji?.let { EmojiShortcodes.art(it, LocalCustomEmoji.current, emptyMap()) }
+    val nativeSource = pill.reactionMessageIdHex != null
+    val artwork = if (nativeSource) receivedArtwork else emoji?.let { EmojiShortcodes.art(it, LocalCustomEmoji.current, emptyMap()) }
     Row(
         modifier =
             Modifier
@@ -271,7 +280,12 @@ private fun ReactionPillSurface(
                         emojiLayout?.takeIf { artwork == null || it.placeholderRects.singleOrNull() != null }
                     },
                 onTextLayout = { emojiLayout = it },
-                inlineContent = EmojiShortcodes.content(dev.ipf.whitenoise.android.ui.ReceivedEmoji.None),
+                inlineContent =
+                    if (nativeSource) {
+                        reactionInlineContent(emoji, artwork)
+                    } else {
+                        EmojiShortcodes.content(dev.ipf.whitenoise.android.ui.ReceivedEmoji.None)
+                    },
                 fontSize = with(LocalDensity.current) { ReactionEmojiSize.toSp() },
                 lineHeight = with(LocalDensity.current) { ReactionPillHeight.toSp() },
                 maxLines = 1,

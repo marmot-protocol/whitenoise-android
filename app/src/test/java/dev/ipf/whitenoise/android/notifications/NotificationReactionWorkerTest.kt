@@ -40,6 +40,8 @@ class NotificationReactionWorkerTest {
     @Volatile
     private var reactionDisposition = SendAcceptDispositionFfi.PUBLISHED
 
+    private val mediaReactions = mutableListOf<List<Any?>>()
+    private val uploads = mutableListOf<dev.ipf.marmotkit.MediaUploadRequestFfi>()
     private lateinit var fixture: NotificationBootstrapTestFixture
     private lateinit var workerContext: NotificationWorkerTestApplication
 
@@ -52,6 +54,43 @@ class NotificationReactionWorkerTest {
             NotificationBootstrapTestFixture(
                 context = realContext,
                 accounts = listOf(signingAccount()),
+                onGroupMlsState = {
+                    dev.ipf.marmotkit.AppGroupMlsStateFfi(
+                        "group",
+                        dev.ipf.marmotkit.AppProtocolProfileFfi.CURRENT,
+                        dev.ipf.marmotkit.GroupLifecycleStateFfi.STABLE,
+                        7uL,
+                        2u,
+                        false,
+                        emptyList(),
+                        false,
+                        false,
+                        emptyList(),
+                        null,
+                    )
+                },
+                onUploadMedia = { request ->
+                    uploads += request
+                    val reference =
+                        dev.ipf.marmotkit.MediaAttachmentReferenceFfi(
+                            locators = listOf(dev.ipf.marmotkit.MediaLocatorFfi("blossom", "https://fixture.invalid/image")),
+                            ciphertextSha256 = "",
+                            plaintextSha256 = "",
+                            nonceHex = "",
+                            fileName = "emoji.png",
+                            mediaType = "image/png",
+                            version = dev.ipf.marmotkit.EncryptedMediaVersionFfi.V1,
+                            sourceEpoch = 7uL,
+                            dim = null,
+                            thumbhash = null,
+                        )
+                    dev.ipf.marmotkit.MediaUploadResultFfi(listOf(dev.ipf.marmotkit.MediaUploadAttachmentResultFfi(reference, 1uL)), null)
+                },
+                onReactWithMedia = { arguments ->
+                    mediaReactions += arguments
+                    reactionFailure?.let { throw it }
+                    sentSummary()
+                },
                 onReactToMessage = {
                     reactionFailure?.let { throw it }
                     sentSummary()
@@ -59,6 +98,31 @@ class NotificationReactionWorkerTest {
             )
         workerContext = NotificationWorkerTestApplication(realContext, fixture.appState)
     }
+
+    /** Built-in quick reactions cross the real worker/AppState boundary with an encrypted image definition. */
+    @Test
+    fun builtInQuickReactionCarriesItsDefinition() =
+        runTest {
+            fixture.bootstrap()
+            val workId = UUID.randomUUID()
+            val result = pumpingMainLooper { buildWorker(reactionInput(workId, ":marmot:"), workId).doWork() }
+            assertEquals(Result.success(), result)
+            assertEquals(0, fixture.reactToMessageCalls.get())
+            assertEquals(1, uploads.size)
+            assertFalse(uploads.single().send)
+            assertTrue(
+                uploads
+                    .single()
+                    .attachments
+                    .single()
+                    .plaintext
+                    .isNotEmpty(),
+            )
+            val sent = mediaReactions.single()
+            assertEquals(reactAction().target.messageIdHex, sent[2])
+            assertEquals(":marmot:", sent[3])
+            assertEquals(listOf(listOf("emoji", "marmot", "https://fixture.invalid/image")), sent[4])
+        }
 
     @Test
     fun doWorkFailsMalformedInputWithoutSending() =

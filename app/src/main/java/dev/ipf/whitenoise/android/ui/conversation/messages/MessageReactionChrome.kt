@@ -33,6 +33,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.ReactionTally
+import dev.ipf.whitenoise.android.ui.EmojiArt
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.conversation.reactions.ReactionPillRow
 import kotlin.math.roundToInt
@@ -101,6 +102,7 @@ internal fun ColumnScope.MessageReactionSummary(
     enabled: Boolean = true,
     onClick: (String?) -> Unit,
     localMotion: dev.ipf.whitenoise.android.ui.conversation.reactions.LocalReactionMotion? = null,
+    artworkByReaction: Map<String, EmojiArt> = emptyMap(),
 ) {
     val reactionChipPadding = reactionChipPadding(mine)
     val targetVisible = tallies.isNotEmpty()
@@ -162,6 +164,7 @@ internal fun ColumnScope.MessageReactionSummary(
                 modifier = hostGraphicsModifier,
                 localMotion = localMotion,
                 allowHostClipping = hostAnimating,
+                artworkByReaction = artworkByReaction,
             )
         }
     }

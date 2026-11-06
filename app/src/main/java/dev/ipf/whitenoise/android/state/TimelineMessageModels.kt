@@ -96,4 +96,5 @@ data class ReactionParticipant(
     val sender: String,
     val emoji: String,
     val reactedAt: ULong,
+    val reactionMessageIdHex: String? = null,
 )

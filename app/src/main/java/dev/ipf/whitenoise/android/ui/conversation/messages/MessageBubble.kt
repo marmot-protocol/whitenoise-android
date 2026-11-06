@@ -928,6 +928,9 @@ internal fun MessageBubble(
         )
     val tallies = controller.reactions[record.messageIdHex].orEmpty()
     val reactionTallies = if (deleted) emptyList() else tallies
+    val reactionArtwork =
+        dev.ipf.whitenoise.android.ui.conversation.reactions
+            .rememberReactionArtwork(controller, appState, reactionTallies)
     val showReactionSummary = reactionTallies.isNotEmpty()
     val reactionVisibilityState =
         remember(record.messageIdHex) {
@@ -3366,6 +3369,7 @@ internal fun MessageBubble(
                 // Keep the host composed through its exit; deleted messages target an empty summary.
                 MessageReactionSummary(
                     tallies = reactionTallies,
+                    artworkByReaction = reactionArtwork,
                     mine = mine,
                     visibilityState = reactionVisibilityState,
                     localMotion = localReactionMotion,

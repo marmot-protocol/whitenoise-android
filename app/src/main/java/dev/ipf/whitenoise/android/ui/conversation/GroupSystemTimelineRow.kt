@@ -78,6 +78,9 @@ internal fun GroupSystemTimelineRow(
                 motion.accept(emoji, added, origin)
             }
         }
+    val reactionArtwork =
+        dev.ipf.whitenoise.android.ui.conversation.reactions
+            .rememberReactionArtwork(controller, appState, actions.tallies)
     val react: (String) -> Unit = { emoji -> actions.react(emoji, motion.takeOrigin(emoji)) }
     val surface = remember(owner) { GroupSystemActionSurface() }
     GroupSystemActionLifetime(owner, actions, surface, onActionMenuOpenChange)
@@ -106,6 +109,7 @@ internal fun GroupSystemTimelineRow(
                         react.takeIf { actions.canReact },
                         { surface.detailsOpen = true },
                         localMotion = motion,
+                        artworkByReaction = reactionArtwork,
                     )
                 }
             },
