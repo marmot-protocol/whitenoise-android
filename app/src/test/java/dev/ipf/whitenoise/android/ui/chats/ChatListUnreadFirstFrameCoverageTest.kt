@@ -55,8 +55,9 @@ class ChatListUnreadFirstFrameCoverageTest {
     /** The accessible action opens a complete result on its first frame with no filter loading state. */
     @Test fun accessibleActionShowsPreparedOffWindowUnreadOnTheFirstFrame() {
         val model = prepared()
+        val reads = model.snapshotReads
         openOnOneFrame()
-        assertFirstFrameResult(model, readsAtActivation = model.snapshotReads)
+        assertFirstFrameResult(model, readsAtActivation = reads)
     }
 
     /** Dismissing and re-entering keeps the prepared result, and repeated openings share one reconciling read. */
