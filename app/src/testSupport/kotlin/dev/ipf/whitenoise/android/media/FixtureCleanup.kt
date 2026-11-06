@@ -11,7 +11,11 @@ internal suspend fun <T> withFixtureCleanup(
     body: suspend () -> T,
 ): T {
     val result = runCatching { body() }
-    val cleanupFailure = runCatching { withContext(NonCancellable) { cleanup() } }.exceptionOrNull()
+    // Carry cleanup exceptions as values across the context boundary; stack-trace recovery must not copy them.
+    val cleanupFailure =
+        runCatching {
+            withContext(NonCancellable) { runCatching { cleanup() }.exceptionOrNull() }
+        }.getOrElse { it }
     val original = result.exceptionOrNull()
     if (cleanupFailure != null) {
         if (original == null) throw cleanupFailure
