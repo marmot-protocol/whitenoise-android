@@ -58,7 +58,7 @@ internal object RestartAttachmentRetentionProbe {
                 .put("received", received.toJson())
                 .put("sent", sent.toJson())
         File(root, "restart-fixture.json").writeText(manifest.toString())
-        report(JSONObject().put("phase", "fixture-stage").put("stage", "android-process-prepared"))
+        ControlledAttachmentProbe.checkpoint("android-process-prepared")
     }
 
     /** Verifies both directions through native leases in a new process with HTTP acquisition unavailable. */

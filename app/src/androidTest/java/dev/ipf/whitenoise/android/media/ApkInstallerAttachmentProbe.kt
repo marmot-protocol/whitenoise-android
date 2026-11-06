@@ -209,7 +209,7 @@ internal object ApkInstallerAttachmentProbe {
         HeldAttachmentCancellationProbe.control(session.blobPort, "/__acquisition-unavailable")
         val receipt = JSONObject().put("schema", 1).put("prepare_pid", Process.myPid()).put("cases", manifest)
         File(session.root, MANIFEST).writeText(receipt.toString())
-        ControlledAttachmentProbe.report(JSONObject().put("phase", "fixture-stage").put("stage", "apk-prepared"))
+        ControlledAttachmentProbe.checkpoint("apk-prepared")
     }
 
     /** Reopens the received artifacts without the network and dispatches the cases that belong to this stage. */

@@ -194,7 +194,7 @@ internal object ForwardAttachmentProbe {
         } finally {
             harness.close()
         }
-        ControlledAttachmentProbe.report(JSONObject().put("phase", "fixture-stage").put("stage", "forward-complete"))
+        ControlledAttachmentProbe.checkpoint("forward-complete")
     }
 
     /** Two disposable identities and three groups: the author's source, the forwarder's own source, the destination. */

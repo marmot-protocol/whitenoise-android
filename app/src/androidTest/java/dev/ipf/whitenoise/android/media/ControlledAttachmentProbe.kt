@@ -89,7 +89,13 @@ internal object ControlledAttachmentProbe {
             )
         val accounts = mutableListOf<String>()
         var fixtureState: WhiteNoiseAppState? = null
-        try {
+        withFixtureCleanup(
+            cleanup = {
+                checkpoint("fixture-cleanup-start")
+                fixtureState?.mutationsScope?.cancel()
+                cleanupFixture(marmot, accounts, root, preserveRestartFixture)
+            },
+        ) {
             withTimeout(options.deadlineMillis) {
                 marmot.start()
                 if (restartRole == "read") {
@@ -268,34 +274,35 @@ internal object ControlledAttachmentProbe {
                         .put("process_restart_offline_qualified", false),
                 )
             }
-        } finally {
-            checkpoint("fixture-cleanup-start")
-            fixtureState?.mutationsScope?.cancel()
-            cleanupFixture(marmot, accounts, root, preserveRestartFixture)
         }
     }
 
-    /** Removes generated data only outside restart preservation; completion markers follow successful actions. */
+    /** Attempts all cleanup stages; preserved restart data is kept and removal markers follow success. */
     private suspend fun cleanupFixture(
         marmot: Marmot,
         accounts: List<String>,
         root: File,
         preserveRestartFixture: Boolean,
     ) {
-        val cleanup =
-            if (preserveRestartFixture) {
-                emptyList()
-            } else {
-                accounts.map { runCatching { withTimeout(5_000L) { marmot.removeAccount(it) } } }
-            }
-        if (!preserveRestartFixture && cleanup.all { it.isSuccess }) checkpoint("fixture-accounts-removed")
-        try {
-            marmot.shutdownAndClose()
-            checkpoint("fixture-native-closed")
-        } finally {
-            if (!preserveRestartFixture && root.deleteRecursively()) checkpoint("fixture-files-removed")
-        }
-        check(cleanup.all { it.isSuccess }) { "fixture account cleanup failed" }
+        runFixtureCleanupSteps(
+            {
+                if (!preserveRestartFixture) {
+                    val cleanup = accounts.map { runCatching { withTimeout(5_000L) { marmot.removeAccount(it) } } }
+                    check(cleanup.all { it.isSuccess }) { "fixture account cleanup failed" }
+                    checkpoint("fixture-accounts-removed")
+                }
+            },
+            {
+                marmot.shutdownAndClose()
+                checkpoint("fixture-native-closed")
+            },
+            {
+                if (!preserveRestartFixture) {
+                    check(root.deleteRecursively()) { "fixture file cleanup failed" }
+                    checkpoint("fixture-files-removed")
+                }
+            },
+        )
     }
 
     /** Only the automatic scheduler case resolves its generated account for real per-account policy persistence. */
@@ -581,8 +588,10 @@ internal object ControlledAttachmentProbe {
 
     /** Best-effort boundary marker: a broken status channel must not mask failures or interrupt fixture cleanup. */
     internal fun checkpoint(stage: String) {
-        runCatching {
+        try {
             report(JSONObject().put("phase", "fixture-stage").put("stage", stage))
+        } catch (_: Exception) {
+            // Stage markers are optional; required result reporting still propagates failures.
         }
     }
 
