@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -81,7 +82,12 @@ internal fun EmojiPickerSheet(
     }
 }
 
-/** The composer's inline emoji pane: the same picker content in place of the keyboard, with a backspace action. */
+/**
+ * The composer's inline emoji pane: the same picker content in place of the keyboard, with a backspace action.
+ *
+ * Browsing fills [height]. With [searchRow] the pane wraps one row of matches and the search field so it fits
+ * above the keyboard; [searchMinHeight] keeps it covering the space the keyboard has not yet taken or released.
+ */
 @Composable
 internal fun ComposerEmojiPickerPane(
     height: Dp,
@@ -92,12 +98,14 @@ internal fun ComposerEmojiPickerPane(
     onBackspace: () -> Unit,
     onSearchActiveChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    searchRow: Boolean = false,
+    searchMinHeight: Dp = 0.dp,
 ) {
     Surface(
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(height)
+                .then(if (searchRow) Modifier.heightIn(min = searchMinHeight) else Modifier.height(height))
                 .clipToBounds()
                 .alpha(alpha),
         color = MaterialTheme.colorScheme.surface,
@@ -111,7 +119,10 @@ internal fun ComposerEmojiPickerPane(
             onEmojiUsed = onEmojiUsed,
             onBackspace = onBackspace,
             onSearchActiveChange = onSearchActiveChange,
-            modifier = Modifier.fillMaxSize().padding(top = ComposerEmojiPaneTopInset),
+            searchRow = searchRow,
+            modifier =
+                (if (searchRow) Modifier.fillMaxWidth() else Modifier.fillMaxSize())
+                    .padding(top = ComposerEmojiPaneTopInset),
         )
     }
 }
@@ -133,8 +144,6 @@ internal fun emojiPickerCellTextMetrics(
         minOf(maxGlyphDp.value, baseStyle.lineHeight.value * densityFontScale).sp / densityFontScale
     return fittedFontSize to fittedLineHeight
 }
-
-internal val ComposerEmojiPickerSearchExtraHeight = 112.dp
 
 internal fun composerEmojiPaneTargetHeight(
     currentImeHeight: Dp,

@@ -11,11 +11,13 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.HorizontalDivider
@@ -48,6 +50,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
@@ -71,6 +74,7 @@ import kotlinx.coroutines.withContext
 
 internal const val EMOJI_PICKER_SEARCH_TEST_TAG = "emoji.picker.search"
 internal const val EMOJI_PICKER_GRID_TEST_TAG = "emoji.picker.grid"
+internal const val EMOJI_PICKER_SEARCH_ROW_TEST_TAG = "emoji.picker.search_row"
 
 /** Stable test tag for an emoji section header. */
 internal fun emojiPickerHeaderTestTag(category: EmojiCategory): String = "emoji.picker.header.${category.id}"
@@ -169,6 +173,9 @@ private fun rememberEmojiPickerModel(
  * Prototype emoji picker: search field, adaptive grid of 48dp cells with section headers, and
  * (while not searching) a divider plus the category bar. Shared by the reaction sheet, the
  * composer pane and the group image picker.
+ *
+ * [searchRow] replaces the grid and category bar with one row of matches above the search field,
+ * so the composer pane stays small while its search has the keyboard. Only the composer sets it.
  */
 @Composable
 internal fun EmojiPickerContent(
@@ -181,10 +188,12 @@ internal fun EmojiPickerContent(
     onConfigure: (() -> Unit)? = null,
     onSearchActiveChange: (Boolean) -> Unit = {},
     selectionEnabled: Boolean = true,
+    searchRow: Boolean = false,
 ) {
     var query by rememberSaveable { mutableStateOf("") }
     val model = rememberEmojiPickerModel(query, recentEmojis, purpose)
     val gridState = rememberLazyGridState()
+    val rowState = rememberLazyListState()
     val categoryState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val activeCategory by remember(gridState, model) {
@@ -193,7 +202,7 @@ internal fun EmojiPickerContent(
                 ?: model.sections.firstOrNull()?.category
         }
     }
-    EmojiPickerScrollSync(model, activeCategory, gridState, categoryState)
+    EmojiPickerScrollSync(model, activeCategory, if (searchRow) rowState else null, gridState, categoryState)
 
     /** Delivers a picked emoji and records it as used when the picker serves the composer. */
     fun pick(emoji: String) {
@@ -202,14 +211,27 @@ internal fun EmojiPickerContent(
         onEmojiPicked(emoji)
     }
 
+    val noResults = model.searching && model.searchedQuery == query && model.sections.isEmpty()
     Column(modifier) {
+        // The row is emitted ahead of the one search field call site, so switching modes keeps its focus.
+        if (searchRow) {
+            EmojiSearchRow(
+                sections = model.sections,
+                noResults = noResults,
+                state = rowState,
+                selectionEnabled = selectionEnabled,
+                onPick = ::pick,
+            )
+        }
         EmojiSearchField(
             value = query,
             onValueChange = { query = it },
             onFocusChanged = onSearchActiveChange,
             modifier = Modifier.fillMaxWidth(),
         )
-        if (model.searching && model.searchedQuery == query && model.sections.isEmpty()) {
+        if (searchRow) {
+            // The row above the field already shows matches; the grid and category bar stay out.
+        } else if (noResults) {
             Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                 Text(
                     stringResource(R.string.emoji_search_no_results),
@@ -225,7 +247,7 @@ internal fun EmojiPickerContent(
                 modifier = Modifier.fillMaxWidth().weight(1f),
             )
         }
-        if (!model.searching) {
+        if (!searchRow && !model.searching) {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             EmojiCategoryBar(
                 categories = model.sections.map { it.category },
@@ -244,16 +266,21 @@ internal fun EmojiPickerContent(
     }
 }
 
-/** A new search result set starts at the top; in browse mode the category bar follows the visible section. */
+/**
+ * A new search result set starts at the top of the grid, or at the start of the search row when one
+ * is shown; in browse mode the category bar follows the visible section.
+ */
 @Composable
 private fun EmojiPickerScrollSync(
     model: EmojiPickerModel,
     activeCategory: EmojiCategory?,
+    rowState: LazyListState?,
     gridState: LazyGridState,
     categoryState: LazyListState,
 ) {
-    LaunchedEffect(model.searchedQuery) {
-        if (model.sections.isNotEmpty()) gridState.scrollToItem(0)
+    LaunchedEffect(model.searchedQuery, rowState) {
+        if (model.sections.isEmpty()) return@LaunchedEffect
+        if (rowState != null) rowState.scrollToItem(0) else gridState.scrollToItem(0)
     }
     LaunchedEffect(activeCategory, model.searching) {
         if (!model.searching) {
@@ -349,6 +376,55 @@ private fun EmojiSectionGrid(
     }
 }
 
+/**
+ * One row of 48dp cells holding every emoji of [sections] in order, scrolled horizontally. With no
+ * matches the same height holds the no-results text, so the pane does not change size while typing.
+ */
+@Composable
+private fun EmojiSearchRow(
+    sections: List<EmojiSection>,
+    noResults: Boolean,
+    state: LazyListState,
+    selectionEnabled: Boolean,
+    onPick: (String) -> Unit,
+) {
+    val modifier =
+        Modifier
+            .fillMaxWidth()
+            .height(EmojiPickerMinimumCellSize)
+            .testTag(EMOJI_PICKER_SEARCH_ROW_TEST_TAG)
+    if (noResults) {
+        Box(modifier.padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin), contentAlignment = Alignment.Center) {
+            Text(
+                stringResource(R.string.emoji_search_no_results),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        return
+    }
+    val cells =
+        remember(sections) {
+            sections.flatMap { section -> section.emoji.mapIndexed { index, emoji -> Triple(section.category, index, emoji) } }
+        }
+    LazyRow(
+        state = state,
+        modifier = modifier,
+        contentPadding = PaddingValues(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+    ) {
+        items(cells, key = { (category, index, emoji) -> "${category.id}:$index:$emoji" }) { (category, index, emoji) ->
+            EmojiTapTarget(
+                emoji = emoji,
+                enabled = selectionEnabled,
+                onClick = { onPick(emoji) },
+                modifier = Modifier.testTag(emojiPickerItemTestTag(category, index)),
+            )
+        }
+    }
+}
+
 /** Header text of one emoji section. */
 @Composable
 private fun EmojiSectionHeader(category: EmojiCategory) {
@@ -379,16 +455,29 @@ private fun EmojiCell(
         modifier = Modifier.fillMaxWidth().height(EmojiPickerMinimumCellSize),
         contentAlignment = Alignment.Center,
     ) {
-        Surface(
-            onClick = onClick,
-            enabled = enabled,
-            modifier = modifier.size(EmojiPickerMinimumCellSize),
-            shape = CircleShape,
-            color = Color.Transparent,
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                EmojiGlyph(emoji, fitPickerArtwork = true)
-            }
+        EmojiTapTarget(emoji = emoji, enabled = enabled, onClick = onClick, modifier = modifier)
+    }
+}
+
+/** The 48dp circular touch target around one emoji, shared by the grid, the search row and suggestions. */
+@Composable
+internal fun EmojiTapTarget(
+    emoji: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    glyphSize: Dp = EmojiPickerEmojiSize,
+    fitPickerArtwork: Boolean = true,
+) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.size(EmojiPickerMinimumCellSize),
+        shape = CircleShape,
+        color = Color.Transparent,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            EmojiGlyph(emoji, size = glyphSize, fitPickerArtwork = fitPickerArtwork)
         }
     }
 }

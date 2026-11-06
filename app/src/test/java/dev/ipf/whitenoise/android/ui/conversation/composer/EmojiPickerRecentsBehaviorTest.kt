@@ -6,12 +6,17 @@ import android.graphics.Color
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalCursorBlinkEnabled
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -123,6 +128,56 @@ class EmojiPickerRecentsBehaviorTest {
         composeRule.waitForIdle()
 
         assertEquals(listOf("😀", "👍", "😂"), owner.recents)
+    }
+
+    /**
+     * The composer's search row keeps the query and focus after a pick, so several emoji can be
+     * added in a row, and each one is recorded as used (#3613).
+     */
+    @Test
+    fun composerSearchRowPickKeepsQueryAndRecordsRecent() {
+        val owner =
+            RecentEmojiRecentsOwner(
+                scope = scope,
+                loadFromDisk = { listOf("👍") },
+                saveToDisk = {},
+            )
+        runBlocking { owner.hydrateFromDisk() }
+        val picked = mutableListOf<String>()
+        composeRule.setContent {
+            var searchRow by remember { mutableStateOf(false) }
+            WhiteNoiseTheme {
+                ComposerEmojiPickerPane(
+                    height = ComposerEmojiPickerFallbackHeight,
+                    alpha = 1f,
+                    recentEmojis = owner.recents,
+                    onEmojiUsed = owner::onEmojiUsed,
+                    onEmojiPicked = { picked += it },
+                    onBackspace = {},
+                    onSearchActiveChange = { if (it) searchRow = true },
+                    searchRow = searchRow,
+                    modifier = Modifier.width(360.dp),
+                )
+            }
+        }
+        waitForBrowseGrid()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).performTextInput("happy")
+        composeRule.waitUntil(5_000) { isDisplayed("😀") }
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_ROW_TEST_TAG).assertIsDisplayed()
+        composeRule
+            .onAllNodesWithTag(emojiPickerHeaderTestTag(EmojiCategory.SmileysAndPeople), useUnmergedTree = true)
+            .assertCountEquals(0)
+
+        composeRule.onNodeWithText("😀").performClick()
+        composeRule.onNodeWithText("😀").performClick()
+        composeRule.waitForIdle()
+
+        assertEquals(listOf("😀", "😀"), picked)
+        assertEquals(listOf("😀", "👍"), owner.recents)
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertIsFocused()
+        composeRule.onNodeWithText("happy").assertIsDisplayed()
     }
 
     /** Choosing an emoji while configuring quick reactions does not count as using it. */

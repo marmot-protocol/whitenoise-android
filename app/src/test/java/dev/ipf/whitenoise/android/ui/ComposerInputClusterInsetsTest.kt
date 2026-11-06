@@ -17,7 +17,7 @@ class ComposerInputClusterInsetsTest {
         assertTrue(
             composerBottomClusterAppliesImePadding(
                 showEmojiPane = false,
-                composerEmojiSearchActive = false,
+                composerEmojiSearchRow = false,
             ),
         )
     }
@@ -27,17 +27,17 @@ class ComposerInputClusterInsetsTest {
         assertFalse(
             composerBottomClusterAppliesImePadding(
                 showEmojiPane = true,
-                composerEmojiSearchActive = false,
+                composerEmojiSearchRow = false,
             ),
         )
     }
 
     @Test
-    fun emojiPaneSearchReappliesImePadding() {
+    fun emojiPaneSearchRowReappliesImePadding() {
         assertTrue(
             composerBottomClusterAppliesImePadding(
                 showEmojiPane = true,
-                composerEmojiSearchActive = true,
+                composerEmojiSearchRow = true,
             ),
         )
     }
