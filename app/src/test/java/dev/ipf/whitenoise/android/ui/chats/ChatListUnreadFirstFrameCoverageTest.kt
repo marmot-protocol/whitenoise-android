@@ -6,9 +6,12 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import dev.ipf.marmotkit.AppGroupMemberRecordFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.chatRow
 import dev.ipf.whitenoise.android.ui.common.FULL_SCREEN_LOADING_TEST_TAG
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -24,12 +27,14 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLooper
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
 
 /**
  * Invariant gate for #3586: the mounted chat list prepares its complete unread snapshot, so opening the
  * filter shows every folder-scoped unread chat, including one beyond the retained window, on the very
- * next frame. Every later native read is held, so a result that waited for activation could not appear.
+ * next frame. Every later native read is held, so a result that waited for activation could not appear. A
+ * failure from a read made while the filter was closed never reaches that frame either.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en")
@@ -158,16 +163,96 @@ class ChatListUnreadFirstFrameCoverageTest {
         assertNoProgress()
     }
 
+    /**
+     * A background read that failed while the filter was closed is retried by the read the opening starts. The
+     * failure never reaches the first frame, which shows the earlier complete result with no Retry or loading.
+     */
+    @Test fun aBackgroundReadFailureNeverReachesTheFirstFrame() {
+        val model = prepared()
+        model.beforeSnapshotRead = { error("Synthetic background read failure") }
+        rule.runOnIdle {
+            model.controller.applyChatListRow(chatRow(ARRIVED_CHAT).copy(manuallyMarkedUnread = true))
+        }
+        awaitReads { model.controller.items.any { it.id == ARRIVED_CHAT } && model.snapshotReads >= 2 }
+        model.beforeSnapshotRead = { holdReads.await() }
+        val reads = model.snapshotReads
+        openOnOneFrame()
+        assertNoFailure()
+        rule.onNodeWithTag("chat.row.$ARRIVED_CHAT").assertExists()
+        assertFirstFrameResult(model, reads)
+        holdReads.complete(Unit)
+        awaitReads { model.snapshotReads > reads }
+        assertNoFailure()
+        assertNoProgress()
+    }
+
+    /**
+     * A participant folder whose candidate rosters failed while the filter was closed opens pending, never on that
+     * old failure or on an unproven empty result. The failure of the opening's own read is then reported.
+     */
+    @Test fun aClosedRosterFailureOpensPendingRatherThanFailedOrEmpty() {
+        val requested = ConcurrentLinkedQueue<String>()
+        prepared(
+            memberLoader = { _, id -> emptyList<AppGroupMemberRecordFfi>().also { requested += id } },
+            folder = ChatFolderRule(includeMemberPubkeys = setOf("d6".repeat(32)), includeMuted = true),
+        )
+        // Only the closed preparation asks for the off-window candidate's roster, and it stays unresolved.
+        awaitReads { ACTION_TARGET in requested }
+        openOnOneFrame()
+        assertNoFailure()
+        rule.onNodeWithText(rule.activity.getString(R.string.chat_rows_no_unread_title)).assertDoesNotExist()
+        rule.onNodeWithTag(FULL_SCREEN_LOADING_TEST_TAG).assertExists()
+        rule.mainClock.autoAdvance = true
+        holdReads.complete(Unit)
+        awaitReads {
+            rule
+                .onAllNodesWithText(rule.activity.getString(R.string.pull_unread_load_failed))
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+    }
+
     /** Neither the filter's progress indicator nor its loading screen is shown. */
     private fun assertNoProgress() {
         rule.onNodeWithTag("chats.unread_refresh").assertDoesNotExist()
         rule.onNodeWithTag(FULL_SCREEN_LOADING_TEST_TAG).assertDoesNotExist()
     }
 
-    /** Mounts production ChatsScreen, waits for its background read, then holds every later read. */
-    private fun prepared(extras: List<dev.ipf.marmotkit.ChatListRowFfi> = emptyList()): OffWindowActionFixture {
-        val model = OffWindowActionFixture(scope).also { fixture = it }
+    /** Neither the filter's failure message nor its Retry action is shown. */
+    private fun assertNoFailure() {
+        rule.onNodeWithText(rule.activity.getString(R.string.pull_unread_load_failed)).assertDoesNotExist()
+        rule.onNodeWithText(rule.activity.getString(R.string.pull_unread_retry)).assertDoesNotExist()
+    }
+
+    /** Drives the native scope and main looper until [ready], then lets the screen settle. */
+    private fun awaitReads(ready: () -> Boolean) {
+        rule.waitUntil {
+            scope.testScheduler.runCurrent()
+            ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
+            ready()
+        }
+        scope.testScheduler.runCurrent()
+        rule.waitForIdle()
+    }
+
+    /**
+     * Mounts production ChatsScreen, on a participant [folder] when one is given, waits for its background read,
+     * then holds every later read.
+     */
+    private fun prepared(
+        extras: List<dev.ipf.marmotkit.ChatListRowFfi> = emptyList(),
+        memberLoader: suspend (String, String) -> List<AppGroupMemberRecordFfi> = { _, _ -> emptyList() },
+        folder: ChatFolderRule? = null,
+    ): OffWindowActionFixture {
+        val model = OffWindowActionFixture(scope, memberLoader = memberLoader).also { fixture = it }
         model.snapshotExtras = extras
+        val folderId =
+            folder?.let { folderRule ->
+                val preferences = model.state.chatFolderPreferences
+                requireNotNull(preferences.createFolder(ACTION_ACCOUNT, "Participants")).id.also {
+                    preferences.setFolderRule(ACTION_ACCOUNT, it, folderRule)
+                }
+            }
         rule.setContent {
             if (mounted.value) {
                 WhiteNoiseTheme {
@@ -176,6 +261,7 @@ class ChatListUnreadFirstFrameCoverageTest {
                         model.controller,
                         {},
                         { _, _, _, _ -> },
+                        selectedFolderId = folderId,
                         globalSearchState = search.value,
                         onGlobalSearchStateChange = { update -> search.value = update(search.value) },
                     )

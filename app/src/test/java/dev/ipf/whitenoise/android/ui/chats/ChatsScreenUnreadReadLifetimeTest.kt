@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -12,6 +13,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
+import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppText
 import dev.ipf.whitenoise.android.state.ChatFolderRule
@@ -102,7 +105,11 @@ class ChatsScreenUnreadReadLifetimeTest {
         rule.onNodeWithTag("chats.unread_refresh").assertDoesNotExist()
         assertEquals(2, model.snapshotReads)
         rule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(rule)
-        awaitProgress { true }
+        // Closed once the pill is gone and the off-window chat, which only the filter shows, has left the list.
+        awaitProgress {
+            rule.onAllNodesWithTag("chats.unread_filter").fetchSemanticsNodes().isEmpty() &&
+                rule.onAllNodesWithTag("chat.row.$ACTION_TARGET").fetchSemanticsNodes().isEmpty()
+        }
         rule.waitForIdle()
         val closedReads = model.snapshotReads
         repeat(3) { index ->
@@ -114,6 +121,37 @@ class ChatsScreenUnreadReadLifetimeTest {
         }
         scope.testScheduler.runCurrent()
         assertEquals("closed, row-level revisions start no account-wide read", closedReads, model.snapshotReads)
+    }
+
+    /**
+     * #3586: while the filter is closed, a membership change the prepared snapshot still serves starts no account-wide
+     * read, such as an off-window chat entering the window. A chat the read never saw, or a removal of unknown cause,
+     * starts exactly one.
+     */
+    @Test fun mountedClosedMembershipChangesReadOnlyWhenThePreparedSnapshotStopsServing() {
+        val model = OffWindowActionFixture(scope).also { fixture = it }
+        mount(model)
+        awaitProgress { model.snapshotReads == 1 }
+        settle()
+        rule.runOnIdle { model.controller.applyChatListRow(model.row.get()) }
+        settle()
+        assertTrue(model.controller.containsGroup(ACTION_TARGET))
+        assertEquals("a presented chat entering the window starts no read", 1, model.snapshotReads)
+
+        val created = "f8".repeat(16)
+        model.snapshotExtras = listOf(chatRow(created))
+        rule.runOnIdle { model.controller.applyChatListRow(chatRow(created)) }
+        awaitProgress { model.snapshotReads == 2 }
+        settle()
+        rule.runOnIdle {
+            model.controller.applyChatListSubscriptionUpdate(
+                ACTION_ACCOUNT,
+                ChatListSubscriptionUpdateFfi.RemoveRow(ChatListUpdateTriggerFfi.REMOVED, created),
+            )
+        }
+        awaitProgress { model.snapshotReads == 3 }
+        settle()
+        assertEquals("each stale membership change starts one read", 3, model.snapshotReads)
     }
 
     /**

@@ -371,16 +371,21 @@ internal fun ChatsScreen(
         remember(appState.activeAccountRef, appState.runtimeGeneration, selectedFolderId, searchOpen) {
             mutableStateOf(false)
         }
-    val unreadOnly = unreadOnlyFilter ?: localUnreadOnly
-    val setUnreadOnly: (Boolean) -> Unit = { enabled ->
-        if (onUnreadOnlyFilterChange != null) onUnreadOnlyFilterChange(enabled) else localUnreadOnly = enabled
-    }
     var unreadSnapshot by remember(controller, selectedFolderId) { mutableStateOf<AccountWideForwardTargets?>(null) }
     var unreadReadFailed by remember(controller, selectedFolderId) { mutableStateOf(false) }
+    // A participant folder cannot place a candidate whose roster stayed unresolved, so that snapshot is never a
+    // complete result, only a pending one, even after its failure is cleared.
+    var unreadSnapshotMissesRosters by remember(controller, selectedFolderId) { mutableStateOf(false) }
     var unreadRetry by remember(controller, selectedFolderId) { mutableIntStateOf(0) }
     var unreadLoadedFolderState by remember(controller, selectedFolderId) { mutableStateOf(folderStoreState) }
-    var unreadUnavailable by remember(controller, selectedFolderId) { mutableStateOf(false) }
     var unreadUnavailableWhileOpen by remember(controller, selectedFolderId) { mutableStateOf(false) }
+    val unreadOnly = unreadOnlyFilter ?: localUnreadOnly
+    val setUnreadOnly: (Boolean) -> Unit = { enabled ->
+        // Opening always starts a fresh read, which retries a failure from while the filter was closed, so
+        // that failure never reaches the first frame (#3586).
+        if (enabled && !unreadOnly) unreadReadFailed = false
+        if (onUnreadOnlyFilterChange != null) onUnreadOnlyFilterChange(enabled) else localUnreadOnly = enabled
+    }
     val currentUnreadOnly by rememberUpdatedState(unreadOnly)
     val unreadRevision = controller.forwardTargetsRevision
     val unreadAccountReady =
@@ -394,17 +399,18 @@ internal fun ChatsScreen(
             if (!unreadAccountReady) {
                 unreadSnapshot = null
                 unreadReadFailed = false
-                unreadUnavailable = false
+                unreadSnapshotMissesRosters = false
                 unreadUnavailableWhileOpen = false
             }
             return@LaunchedEffect
         }
-        // Membership and folder changes, including the store's first load, request one latest follow-up
-        // without cancelling the active native read. While the filter is closed, row-level revisions start
-        // none, since retained rows already override the snapshot. Opening the filter starts one, because an
-        // off-window row can change with no event here, such as a chat read on another device, and while it
-        // is open its rows' revisions, including committed commands on them, keep it current. The prepared
-        // result shows at once in both cases; closing starts no read.
+        // Folder changes, including the store's first load, request one latest follow-up without cancelling
+        // the active native read. While the filter is closed, row-level revisions start none, since retained
+        // rows already override the snapshot, and a membership change starts one only once the prepared result
+        // stops serving it. Paging, evictions and off-window chats entering the window leave it serving.
+        // Opening the filter starts one, because an off-window row can change with no event here, such as a
+        // chat read on another device, and while it is open its rows' revisions, including committed commands
+        // on them, keep it current. The prepared result shows at once in both cases; closing starts no read.
         var previousTrigger: UnreadSnapshotTrigger? = null
         snapshotFlow {
             UnreadSnapshotTrigger(
@@ -414,12 +420,19 @@ internal fun ChatsScreen(
             )
         }.conflate()
             .collect { trigger ->
-                val closedOnly = trigger.closesFilterAfter(previousTrigger)
+                val noReadNeeded =
+                    trigger.closesFilterAfter(previousTrigger) ||
+                        (
+                            trigger.changesClosedMembershipAfter(previousTrigger) &&
+                                !unreadReadFailed &&
+                                unreadLoadedFolderState == trigger.folders &&
+                                unreadSnapshot?.preparesCurrentWindow == true
+                        )
                 previousTrigger = trigger
-                if (closedOnly) return@collect
+                if (noReadNeeded) return@collect
                 val folders = trigger.folders
                 unreadReadFailed = false
-                val timing = UnreadSnapshotPreparationTiming()
+                val timing = UnreadSnapshotPreparationTiming(filterOpen = currentUnreadOnly)
                 when (val read = controller.readAccountWideForwardTargets()) {
                     is AccountWideRead.Loaded -> {
                         timing.readFinished()
@@ -448,21 +461,18 @@ internal fun ChatsScreen(
                             unreadSnapshot = read.snapshot
                             unreadLoadedFolderState = folders
                             unreadReadFailed = unresolved.isNotEmpty()
+                            unreadSnapshotMissesRosters = unresolved.isNotEmpty()
                         }
-                        unreadUnavailable = !read.snapshot.isCurrent
-                        unreadUnavailableWhileOpen = unreadUnavailable && currentUnreadOnly
+                        unreadUnavailableWhileOpen = !read.snapshot.isCurrent && currentUnreadOnly
                     }
                     AccountWideRead.Failed -> unreadReadFailed = true
-                    AccountWideRead.Unavailable -> {
-                        unreadUnavailable = true
-                        unreadUnavailableWhileOpen = currentUnreadOnly
-                    }
+                    AccountWideRead.Unavailable -> unreadUnavailableWhileOpen = currentUnreadOnly
                 }
             }
     }
     // A list with no complete reader cannot honor the filter, so opening it falls back to every chat, but
     // only once a read made while it is open says so. A background read that failed or found no reader
-    // before the filter opened gets one fresh attempt on opening instead.
+    // before the filter opened is retried by the read that opening starts instead.
     LaunchedEffect(unreadOnly, unreadUnavailableWhileOpen) {
         // An unavailable answer only applies to the opening it was read for, so a later opening waits for its own read.
         if (!unreadOnly) {
@@ -471,13 +481,12 @@ internal fun ChatsScreen(
             setUnreadOnly(false)
         }
     }
-    LaunchedEffect(unreadOnly) {
-        if (unreadOnly && (unreadReadFailed || unreadUnavailable)) unreadRetry++
-    }
     // Retained rows override the snapshot, so row revisions, new chats and local deletions keep it complete.
-    // Only a removal of unknown cause withholds its off-window rows until the next read completes it again.
+    // Only a removal of unknown cause withholds its off-window rows until the next read completes it again,
+    // and a participant folder's unresolved rosters keep the result pending until a read resolves them.
     val displayUnreadSnapshot = unreadSnapshot?.takeIf { unreadLoadedFolderState == folderStoreState && it.isCurrent }
-    val completeUnreadSnapshot = displayUnreadSnapshot?.takeIf { it.coversCurrentMembership }
+    val completeUnreadSnapshot =
+        displayUnreadSnapshot?.takeIf { it.coversCurrentMembership && !unreadSnapshotMissesRosters }
     val unreadItems =
         remember(
             unreadOnly,

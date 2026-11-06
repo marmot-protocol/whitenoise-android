@@ -3115,6 +3115,9 @@ class ChatsController private constructor(
     // projection.
     fun containsGroup(groupIdHex: String): Boolean = chatRowsByGroup.containsKey(chatRowKey(groupIdHex))
 
+    /** Lowercase IDs of every chat the bounded windows retain, as a read-only view of the raw rows. */
+    internal fun retainedGroupIds(): Set<String> = chatRowsByGroup.keys
+
     /**
      * Chats the active account can forward a message into, recent first.
      *
@@ -3359,7 +3362,7 @@ class ChatsController private constructor(
 
     /**
      * Replaces the chat-list window and refreshes mounted conversation metadata. [activeWindow], when known,
-     * classifies rows that left because they now rank past its retained tail as evictions rather than removals.
+     * classifies rows that left because they now rank outside its retained span as evictions rather than removals.
      */
     private fun replaceChatRows(
         incoming: List<ChatListRowFfi>,
@@ -3408,8 +3411,10 @@ class ChatsController private constructor(
         memberFetchRetryBackoffTierByGroup.keys.retainAll(liveGroupIds)
         failedMemberFetches.retainAll(liveGroupIds)
         if (previousKeys != chatRowsByGroup.keys.toSet()) {
-            // A bounded window evicts its tail whenever an off-window chat moves in. That chat still exists, so an
-            // earlier full read still covers it; only a row the window should still hold is an ambiguous removal.
+            // A bounded window evicts its tail whenever an off-window chat moves in, and a scrolled window also
+            // evicts past its first row. Those chats still exist, so an earlier full read still covers them; only a
+            // row the window's span should still hold is an ambiguous removal. A frame carries no new keys for a
+            // dropped row, so a mid-list chat that rose to the head on a new message counts as ambiguous too.
             val dropped =
                 previousRowsByGroup.any { (key, row) ->
                     key !in chatRowsByGroup && !row.evictedFrom(activeWindow)

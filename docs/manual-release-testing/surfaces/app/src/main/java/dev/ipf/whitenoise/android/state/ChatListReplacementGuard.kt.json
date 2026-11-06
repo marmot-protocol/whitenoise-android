@@ -10,6 +10,14 @@
         "test_ids": [
           "CHL-016"
         ]
+      },
+      {
+        "surface": "A scrolled window counts a dropped row as evicted only outside its retained span, so a chat deleted elsewhere leaves the prepared unread result",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ChatListReplacementGuard.kt",
+        "anchor": "internal fun ChatListRowFfi.evictedFrom(",
+        "test_ids": [
+          "CHL-031"
+        ]
       }
     ]
   },

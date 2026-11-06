@@ -15,22 +15,28 @@ import dev.ipf.whitenoise.android.state.ChatFolderAccountState
 import kotlinx.coroutines.flow.first
 
 /**
- * Times one background unread-snapshot preparation (#3586): the account-wide native read, then the
- * participant-folder roster resolution, each as its own WNPerf phase. Nothing is emitted, and no trace is
- * held, unless a local diagnostic session is active; both phases drop spans below the routine threshold.
+ * Times one unread-snapshot read (#3586): the account-wide native read, then the participant-folder roster
+ * resolution, each as its own WNPerf phase. A read started while [filterOpen] belongs to the open filter's
+ * `unread_filter` trace, and one started while it is closed to background `unread_prepare`, so preparation for
+ * a filter that never opens is not counted as filter work. Nothing is emitted, and no trace is held, unless a
+ * local diagnostic session is active; both phases drop spans below the routine threshold.
  */
 internal class UnreadSnapshotPreparationTiming(
+    filterOpen: Boolean,
     private val clock: () -> Long = SystemClock::elapsedRealtime,
 ) {
-    private val trace = PerformanceDiagnostics.begin(PerformanceOperation.UNREAD_FILTER)
+    private val trace =
+        PerformanceDiagnostics.begin(
+            if (filterOpen) PerformanceOperation.UNREAD_FILTER else PerformanceOperation.UNREAD_PREPARE,
+        )
     private val startedAt = clock()
     private var phaseStartedAt = startedAt
 
     /** Marks the end of the account-wide native read. */
-    fun readFinished() = record(PerformancePhase.UNREAD_FILTER_SNAPSHOT_READ, count = null)
+    fun readFinished() = record(PerformancePhase.UNREAD_SNAPSHOT_READ, count = null)
 
     /** Marks the end of roster resolution for the [groups] participant-folder candidates. */
-    fun rostersFinished(groups: Int) = record(PerformancePhase.UNREAD_FILTER_ROSTER_READY, groups)
+    fun rostersFinished(groups: Int) = record(PerformancePhase.UNREAD_ROSTER_READY, groups)
 
     /** Records [phase] with its own duration and the elapsed time since the preparation began. */
     private fun record(
@@ -82,8 +88,8 @@ internal fun RecordUnreadFilterFirstResultFrame(
 }
 
 /**
- * The changes that request a fresh unread snapshot. [openRowRevision] is the chat list's row revision while
- * the unread filter is open and null while it is closed, so opening the filter and row changes under it
+ * The changes that may request a fresh unread snapshot. [openRowRevision] is the chat list's row revision
+ * while the unread filter is open and null while it is closed, so opening the filter and row changes under it
  * each start one conflated read.
  */
 internal data class UnreadSnapshotTrigger(
@@ -94,4 +100,11 @@ internal data class UnreadSnapshotTrigger(
     /** Whether the only change since [previous] is the filter closing, which needs no fresh read. */
     fun closesFilterAfter(previous: UnreadSnapshotTrigger?): Boolean =
         previous != null && openRowRevision == null && this == previous.copy(openRowRevision = null)
+
+    /**
+     * Whether only window membership changed since [previous] while the filter stayed closed over the same
+     * folders, which needs a fresh read only once the prepared result stops serving the window.
+     */
+    fun changesClosedMembershipAfter(previous: UnreadSnapshotTrigger?): Boolean =
+        previous != null && previous.openRowRevision == null && openRowRevision == null && folders == previous.folders
 }

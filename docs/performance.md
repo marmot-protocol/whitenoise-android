@@ -194,17 +194,23 @@ chats had group photos spent that whole budget and still drew placeholders.
 
 ### Unread filter
 
-`op=unread_filter` covers the chat list's prepared unread snapshot and the filter that opens over it (#3586):
+The chat list prepares an unread snapshot in the background, and the unread filter opens over it (#3586).
+`op=unread_prepare` covers reads started while the filter is closed. `op=unread_filter` covers reads
+started while it is open and the opened filter's first result:
 
 | Phase | Stage |
 | --- | --- |
-| `unread_filter_snapshot_read` | One background account-wide presented-list read finished. `duration_ms` is the native read. Spans under 5 ms are dropped. |
-| `unread_filter_roster_ready` | Participant-folder rosters for the unread candidates resolved. `count=` is the candidates. It runs only for folders with participant rules, and spans under 5 ms are dropped. |
-| `unread_filter_first_result_frame` | The frame after the opened filter's complete result was composed. `elapsed_ms` is measured from activation. `result=success` means the snapshot was ready when the filter opened, `result=pending` that the filter waited for it. `count=` is the visible rows. |
+| `unread_snapshot_read` | One account-wide presented-list read finished. `duration_ms` is the native read. Spans under 5 ms are dropped. |
+| `unread_roster_ready` | Participant-folder rosters for the unread candidates resolved. `count=` is the candidates. It runs only for folders with participant rules, and spans under 5 ms are dropped. |
+| `unread_filter_first_result_frame` | `unread_filter` only. The frame after the opened filter's complete result was composed. `elapsed_ms` is measured from activation. `result=success` means the snapshot was ready when the filter opened, `result=pending` that the filter waited for it. `count=` is the visible rows. |
 
-Preparation reads start on chat-list membership and folder changes. Opening the filter starts one
-reconciling read behind the prepared result, and while it is open row-level revisions start more. Reads
-are conflated, so repeated changes never stack. Lines carry no account, chat or folder identity.
+The first preparation read starts when the list is mounted, and folder changes start another. While the
+filter is closed, a membership change starts one only when the prepared snapshot stops serving the window:
+no snapshot is loaded, the last read failed, a chat left the window for an unknown reason, or the window
+holds a chat the snapshot never presented. Paging, tail evictions and off-window chats entering the window
+start none. Opening the filter starts one reconciling read behind the prepared result, and while it is
+open row-level revisions start more. Reads are conflated, so repeated changes never stack. Lines carry no
+account, chat or folder identity.
 
 ### Send and attachment diagnosis
 

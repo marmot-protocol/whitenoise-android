@@ -329,6 +329,14 @@
         "test_ids": [
           "CHL-031"
         ]
+      },
+      {
+        "surface": "Opening the unread filter clears a failure from while it was closed, and a participant folder's unresolved rosters open pending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "val setUnreadOnly",
+        "test_ids": [
+          "CHL-031"
+        ]
       }
     ]
   },
