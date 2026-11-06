@@ -145,7 +145,11 @@ class AppSelfUpdatePackagePolicyTest {
         assertFalse(
             isTrustedSelfUpdatePackage(
                 installed = installed,
-                candidate = candidate(currentSignerSha256 = emptySet(), signerHistorySha256 = setOf("installed-signer")),
+                candidate =
+                    candidate(
+                        currentSignerSha256 = emptySet(),
+                        signerHistorySha256 = setOf("installed-signer"),
+                    ),
                 expectedVersion = "2026.9.4",
             ),
         )
