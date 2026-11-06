@@ -59,6 +59,7 @@ class DiagnosticIdentityPresentationTest {
                 groupIdHex = GROUP_HEX,
                 messageIdHex = "welcome-message",
                 recipientHex = RECIPIENT_HEX,
+                sizeClass = null,
             )
 
         val describedMessage = DiagnosticFormatter.describe(message, identity)
