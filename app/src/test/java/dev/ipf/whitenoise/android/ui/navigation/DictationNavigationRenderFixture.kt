@@ -44,6 +44,9 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
 import dev.ipf.whitenoise.android.core.MessageTextCopy
+import dev.ipf.whitenoise.android.state.ComposerShortcut
+import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.chats.ChatsNewMessageFabContent
 import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoff
 import dev.ipf.whitenoise.android.ui.conversation.ConversationJumpToNewestButton
@@ -54,11 +57,13 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_HANDLE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerOuterVerticalPadding
+import dev.ipf.whitenoise.android.ui.conversation.composer.composerDraftOwnerKey
 import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.ACCOUNT
 import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.COMPOSER_TAG
 import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.GROUP
 import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.JUMP_TO_NEWEST_TAG
 import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.origin
+import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -138,9 +143,11 @@ internal abstract class DictationNavigationRenderFixture {
         amoled: Boolean = false,
         compact: Boolean = false,
         withComposerMorph: Boolean = false,
+        configured: Boolean = false,
+        startImmediately: Boolean = true,
         jumpStack: Boolean = false,
     ): Fixture {
-        val (fixture, voice) = prepareFixture(withComposerMorph)
+        val (fixture, voice) = prepareFixture(withComposerMorph, configured, startImmediately)
         composeRule.setContent {
             observeImeInsets()
             val route = fixture.route
@@ -170,9 +177,11 @@ internal abstract class DictationNavigationRenderFixture {
                         ) { owner ->
                             val anchor = LocalFloatingDictationAnchor.current
                             val handoff = LocalComposerFabHandoff.current
+                            val dictationMotion = LocalDictationControlHandoff.current
                             SideEffect {
                                 fixture.anchor = anchor
                                 fixture.handoff = handoff
+                                fixture.dictationMotion = dictationMotion
                             }
                             if (!fixture.locked) {
                                 val transition =
@@ -193,6 +202,32 @@ internal abstract class DictationNavigationRenderFixture {
         }
         composeRule.waitForIdle()
         return fixture
+    }
+
+    /** Prepares the selected inactive toolbar before the existing dictation session starts. */
+    private fun configurePreviewToolbar(fixture: Fixture) {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val settings =
+            ComposerToolbarSettings(
+                listOf(
+                    ComposerShortcut.Emoji,
+                    ComposerShortcut.Dictation,
+                    ComposerShortcut.VoiceNote,
+                ),
+                rightShortcuts =
+                    setOf(
+                        ComposerShortcut.Emoji,
+                        ComposerShortcut.Paste,
+                        ComposerShortcut.Dictation,
+                        ComposerShortcut.VoiceNote,
+                    ),
+            )
+        context
+            .getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
+            .edit()
+            .putString("composer_toolbar_v1", settings.encode())
+            .commit()
+        fixture.toolbarState = emptyAppState()
     }
 
     /** Paints the actual route-specific FAB/composer inside its existing animation. */
@@ -219,6 +254,10 @@ internal abstract class DictationNavigationRenderFixture {
             if (chatId != null) {
                 val group = if (chatId == origin.selectedChatId) GROUP else "other-group"
                 ComposerBar(
+                    appState = fixture.toolbarState,
+                    draftKey = if (fixture.bindDraftOwner) composerDraftOwnerKey(ACCOUNT, group) else null,
+                    draftAccountRef = ACCOUNT.takeIf { fixture.bindDraftOwner },
+                    draftGroupIdHex = group.takeIf { fixture.bindDraftOwner },
                     replyingTo = null,
                     messageTextCopy = MessageTextCopy.Default,
                     onCancelReply = {},
@@ -233,6 +272,7 @@ internal abstract class DictationNavigationRenderFixture {
                     dictationController = fixture.controller,
                     dictationAccountRef = ACCOUNT,
                     dictationGroupIdHex = group,
+                    dictationOriginVisible = fixture.route.selectedChatId == chatId,
                     dictationControlsVisible =
                         owner == ConversationDictationControlOwner.Composer &&
                             fixture.route.selectedChatId == chatId,
@@ -274,12 +314,15 @@ internal abstract class DictationNavigationRenderFixture {
     }
 
     protected class Fixture {
+        var toolbarState: WhiteNoiseAppState? = null
+        var bindDraftOwner by mutableStateOf(false)
         var route by mutableStateOf(origin)
         var locked by mutableStateOf(false)
         var committedRoute = origin
         var committedLocked = false
         var anchor: FloatingDictationAnchor? = null
         var handoff: MeasuredControlHandoff? = null
+        var dictationMotion: MeasuredControlHandoff? = null
         var checkedArtworkFrames = 0
         var gripTopOffset = 0f
         var incomingCapsuleLeft = 0f
@@ -326,13 +369,20 @@ internal abstract class DictationNavigationRenderFixture {
     }
 
     /** Starts the same guarded dictation fixture before its production-shell composition. */
-    private fun prepareFixture(withComposerMorph: Boolean): Pair<Fixture, VoiceRecordingController?> {
+    private fun prepareFixture(
+        withComposerMorph: Boolean,
+        configured: Boolean,
+        startImmediately: Boolean,
+    ): Pair<Fixture, VoiceRecordingController?> {
         val fixture = Fixture()
+        if (configured) configurePreviewToolbar(fixture)
         renderedFixture = fixture
-        fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
-        fixture.platform.listener.onReady()
+        if (startImmediately) {
+            fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
+            fixture.platform.listener.onReady()
+        }
         val voice =
-            if (withComposerMorph) {
+            if (withComposerMorph || configured) {
                 createPreviewVoiceController(ApplicationProvider.getApplicationContext())
             } else {
                 null

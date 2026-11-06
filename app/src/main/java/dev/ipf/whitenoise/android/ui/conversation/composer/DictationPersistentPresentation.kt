@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.offset
 
 /** Measures the existing commands and retained recovery label in their original Layout scope. */
 internal fun MeasureScope.measurePersistentDictation(
@@ -27,12 +28,17 @@ internal fun MeasureScope.measurePersistentDictation(
     constraints: Constraints,
     embedded: Boolean,
 ): MeasureResult {
-    val actions = measurables.last().measure(constraints.copy(minWidth = 0, minHeight = 0))
+    // Measure floating breathing room into the same endpoint used by the control morph.
+    val horizontalInset = if (embedded) 0 else minOf(8.dp.roundToPx(), constraints.maxWidth / 2)
+    val actions =
+        measurables.last().measure(
+            constraints.copy(minWidth = 0, minHeight = 0).offset(horizontal = -horizontalInset * 2),
+        )
     // The former Row.widthIn(max = 288.dp) used Text.weight(1f, fill = true).
     // Preserve that finite constrained width rather than sizing to a short status string.
     val persistentWidth = minOf(constraints.maxWidth, 288.dp.roundToPx())
     val labelWidth =
-        ((if (embedded) 288.dp.roundToPx() else persistentWidth) - actions.width).coerceAtLeast(0)
+        ((if (embedded) 288.dp.roundToPx() else persistentWidth - horizontalInset * 2) - actions.width).coerceAtLeast(0)
     val label =
         measurables.takeIf { it.size > 1 }?.first()?.measure(
             constraints.copy(
@@ -45,13 +51,13 @@ internal fun MeasureScope.measurePersistentDictation(
         )
     val width =
         constraints.constrainWidth(
-            if (!embedded && label != null) persistentWidth else actions.width,
+            if (!embedded && label != null) persistentWidth else actions.width + horizontalInset * 2,
         )
     val height =
         constraints.constrainHeight(if (embedded) actions.height else maxOf(actions.height, label?.height ?: 0))
     return layout(width, height) {
-        actions.placeRelative(width - actions.width, (height - actions.height) / 2)
-        label?.placeRelative(width - actions.width - label.width, (height - label.height) / 2)
+        actions.placeRelative(width - horizontalInset - actions.width, (height - actions.height) / 2)
+        label?.placeRelative(width - horizontalInset - actions.width - label.width, (height - label.height) / 2)
     }
 }
 

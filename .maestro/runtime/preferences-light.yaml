@@ -10,6 +10,8 @@ name: preferences-light
       text: "Appearance"
     direction: DOWN
 - tapOn: "Appearance"
+- tapOn:
+    id: "appearance.theme.group"
 - tapOn: "Light"
 - back
 - tapOn: "Appearance"

@@ -42,4 +42,27 @@ class ConversationSurfaceStateTest {
             ).showDetails.value,
         )
     }
+
+    /** The chat's composer settings route survives recreation for the same conversation only. */
+    @Test
+    fun savedComposerSettingsRouteReturnsToItsOwnConversation() {
+        val original = ConversationSurfaceState().apply { showComposerSettings.value = true }
+        val saver = conversationSurfaceStateSaver(accountRef = "account-a", chatId = "chat-a", runtimeGeneration = 1)
+        val saved = with(saver) { requireNotNull(SaverScope { true }.save(original)) }
+
+        val restored = requireNotNull(saver.restore(saved))
+        assertTrue(restored.showComposerSettings.value)
+        assertFalse(restored.showDetails.value)
+        assertFalse(
+            requireNotNull(
+                conversationSurfaceStateSaver(
+                    accountRef = "account-a",
+                    chatId = "chat-b",
+                    runtimeGeneration = 1,
+                ).restore(saved),
+            ).showComposerSettings.value,
+        )
+        // Bundles written before the route existed restore to the conversation.
+        assertFalse(requireNotNull(saver.restore((saved as List<*>).take(7))).showComposerSettings.value)
+    }
 }

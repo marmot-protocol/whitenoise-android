@@ -231,7 +231,7 @@ internal abstract class DictationNavigationScenarioFixture : DictationNavigation
         }
         scheduler.runCurrent()
         composeRule.waitForIdle()
-        assertCommittedFailedFixture(fixture, persistent = false)
+        assertCommittedFailedFixture(fixture, persistent = true)
 
         fun commands(): androidx.compose.ui.geometry.Rect {
             val semanticsNode = composeRule.onNodeWithTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG).fetchSemanticsNode()
@@ -406,7 +406,7 @@ internal abstract class DictationNavigationScenarioFixture : DictationNavigation
         assertEquals(session, fixture.controller.state.sessionId)
     }
 
-    /** Starts with real inline controls, then changes the container twice before either morph settles. */
+    /** Keeps the same floating controls while the real container changes twice before settling. */
     protected fun verifyMixedOwnershipTrajectory(moveIme: Boolean) {
         val fixture = render(dark = true, largeRtl = true, withComposerMorph = true)
         val chats = origin.copy(selectedChatId = null, selectedGroupIdHex = null)
@@ -417,10 +417,12 @@ internal abstract class DictationNavigationScenarioFixture : DictationNavigation
         composeRule.mainClock.advanceTimeBy(64)
         assertTrue(requireNotNull(fixture.handoff).active)
         val departingActions = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).fetchSemanticsNode().boundsInWindow
-        val settledCapsuleBottom = requireNotNull(fixture.handoff?.targetBounds).top - 12f
-        assertTrue(
-            "The real inline command motion must still be in flight before opening another chat",
-            kotlin.math.abs(departingActions.bottom - settledCapsuleBottom) > 1f,
+        val movingBorder = requireNotNull(fixture.handoff?.presentationBounds ?: fixture.handoff?.targetBounds)
+        assertEquals(
+            "The persistent bubble follows the painted border",
+            12f,
+            movingBorder.top - departingActions.bottom,
+            1.6f,
         )
         val variant = if (moveIme) "mixed_keyboard" else "mixed_large_rtl_dark"
         firstNavigationFrame { fixture.route = other }
@@ -444,6 +446,7 @@ internal abstract class DictationNavigationScenarioFixture : DictationNavigation
         val source = requireNotNull(motion.renderedBounds)
         val capsule = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).fetchSemanticsNode().boundsInWindow
         val sourceGap = source.top - capsule.bottom
+        assertEquals("The persistent bubble begins at its native gap", 12f, sourceGap, 1.6f)
         capturePersistentFrame("${leg}_first", variant)
         repeat(frames) { index ->
             if (moveIme && index == 2) {
@@ -468,7 +471,7 @@ internal abstract class DictationNavigationScenarioFixture : DictationNavigation
             val current = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).fetchSemanticsNode().boundsInWindow
             val expectedGap = sourceGap + (12f - sourceGap) * fraction
             assertEquals(
-                "Older command motion must not finish before the restarted container",
+                "Persistent commands must follow the restarted container on the same frame",
                 expectedGap,
                 moving.top - current.bottom,
                 1.6f,
@@ -593,7 +596,7 @@ internal abstract class DictationNavigationScenarioFixture : DictationNavigation
             composeRule.waitForIdle()
             composeRule.runOnIdle { fixture.route = origin }
             composeRule.waitForIdle()
-            composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertDoesNotExist()
+            composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed()
         }
         assertSingleActionSet()
         val phase = if (returning) "returned_composer" else "departure_first_frame"

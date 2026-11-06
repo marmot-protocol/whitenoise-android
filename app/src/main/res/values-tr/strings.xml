@@ -2547,6 +2547,10 @@
     <string name="notification_tone_silent">Sessiz</string>
     <string name="notification_tone_off">Kapalı</string>
     <string name="notification_tone_default">Varsayılan</string>
+    <string name="appearance_colors_heading">Tema ve renkler</string>
+    <string name="appearance_text_heading">Metin ve dil</string>
+    <string name="appearance_conversation_heading">Sohbet</string>
+    <string name="appearance_preview_intro">Daha büyük metni ve sağdan sola düzeni deneyin.</string>
     <string name="media_viewer_fit_image">Görseli sığdır</string>
     <string name="media_viewer_zoom_image">Yakınlaştır</string>
     <string name="media_viewer_image_scale">%1$d%% yakınlaştırma</string>

@@ -39,6 +39,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsSpokenTextSpan
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.TtsTextRange
 import dev.ipf.whitenoise.android.audio.tts.TtsVisibleTextSpan
+import dev.ipf.whitenoise.android.kotlinBlockFrom
 import dev.ipf.whitenoise.android.state.ConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -411,7 +412,14 @@ class PlaybackTransportOwnershipTest {
     /** MainShell must retain ordinary outgoing chrome while preserving account and lock privacy gates. */
     @Test fun backDoesNotDeselectTheRetainedConversationPlayer() {
         val source = appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt")
-        val slot = source.substringAfter("playbackTransport = {").substringBefore("dictationControlsVisible =")
+        val callback = source.indexOf("playbackTransport = {")
+        assertTrue("Missing conversation playback callback", callback >= 0)
+        val slot =
+            source.kotlinBlockFrom(
+                openDelimiter = source.indexOf('{', callback),
+                description = "conversation playbackTransport callback",
+            )
+        assertTrue(slot.contains("PlaybackTransportBar("))
         assertTrue(slot.contains("navAccountStable && !appState.appLockScreenVisible"))
         assertFalse(slot.contains("selectedChat"))
     }

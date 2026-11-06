@@ -12,7 +12,7 @@ class NewMessageEntryRouteCoverageTest {
         val source = sourceFile().readText()
 
         assertTrue("the shared transition must open NewChatFlowHost", "if (showNewChatFlow)" in source)
-        assertEquals(1, occurrences(source, "ChatsNewMessageFab(appState, openNewMessageFlow)"))
+        assertEquals(1, occurrences(source, "ChatsNewMessageFab(appState, openNewMessageFlow,"))
         assertEquals(1, occurrences(source, "EmptyChats(onCreate = openNewMessageFlow)"))
     }
 

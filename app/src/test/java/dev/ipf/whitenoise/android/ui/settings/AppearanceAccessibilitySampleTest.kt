@@ -59,6 +59,10 @@ class AppearanceAccessibilitySampleTest {
                 }
             }
         }
+        composeRule
+            .onNodeWithText(context.getString(R.string.appearance_accessibility_preview))
+            .performScrollTo()
+            .performClick()
         val rtl = context.getString(R.string.appearance_preview_rtl)
         val large = context.getString(R.string.appearance_preview_large_text)
         assertEquals(1.5f, sampleLayout().layoutInput.density.fontScale)
@@ -88,6 +92,10 @@ class AppearanceAccessibilitySampleTest {
                 }
             }
         }
+        composeRule
+            .onNodeWithText(context.getString(R.string.appearance_accessibility_preview))
+            .performScrollTo()
+            .performClick()
         val rtl = context.getString(R.string.appearance_preview_rtl)
         val large = context.getString(R.string.appearance_preview_large_text)
         composeRule
@@ -101,6 +109,10 @@ class AppearanceAccessibilitySampleTest {
             .performClick()
             .assertIsOn()
         composeRule.runOnIdle { owner.value = "second-runtime" }
+        composeRule
+            .onNodeWithText(context.getString(R.string.appearance_accessibility_preview))
+            .performScrollTo()
+            .performClick()
         composeRule.onNodeWithText(rtl).performScrollTo().assertIsOff()
         composeRule.onNodeWithText(large).performScrollTo().assertIsOff()
     }

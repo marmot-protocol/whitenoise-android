@@ -3,13 +3,18 @@ package dev.ipf.whitenoise.android.ui.conversation.composer
 import android.content.Context
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
@@ -20,7 +25,9 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performImeAction
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -63,6 +70,8 @@ class ComposerDictationControlTest {
 
     @get:Rule
     val composeRule = createComposeRule()
+
+    private var voicePermissionRequests = 0
 
     /** A real controller tail failure leaves a normal composer, with audio recovery only in its own chat. */
     @Test
@@ -323,6 +332,316 @@ class ComposerDictationControlTest {
         assertTrue(controller.state is ConversationDictationState.Idle)
     }
 
+    /** A failed session still owns completion even though it no longer blocks a fresh Dictate request. */
+    @Test
+    fun floatingFailedSessionCannotExposeANewVoiceMicrophone() {
+        val controller = idleDictationController(TextFieldValue())
+        val voice = previewVoiceRecordingController()
+        try {
+            render(suppliedController = controller, voiceRecordingController = voice, floatingOrigin = true)
+            val retainedClick =
+                composeRule
+                    .onNodeWithTag("composer.voice.launcher")
+                    .fetchSemanticsNode()
+                    .config[SemanticsActions.OnClick]
+            composeRule.runOnIdle {
+                assertTrue(controller.requestStart(ACCOUNT, GROUP, TextFieldValue()))
+                FakeDictationPlatform.listener.onError(ConversationDictationFailure.ProviderUnavailable)
+                assertTrue(controller.state is ConversationDictationState.Failed)
+                assertFalse(controller.blocksNewRequest)
+                assertTrue(controller.completionControlsRequired)
+                // Invoke while the real clickable is still attached, before the next composition.
+                checkNotNull(retainedClick.action).invoke()
+                assertEquals(0, voicePermissionRequests)
+                assertFalse(voice.isRecording)
+            }
+            composeRule.onNodeWithTag("composer.voice.launcher").assertDoesNotExist()
+        } finally {
+            voice.release()
+        }
+    }
+
+    /** A retained Send callback must recheck live ownership before the next composition. */
+    @Test
+    fun retainedOriginSendCannotClearTypedTextAfterDictationStarts() {
+        val draft = TextFieldValue("Original")
+        val controller = idleDictationController(draft)
+        val input = ComposerTextState(draft)
+        var sends = 0
+        render(
+            draft = draft,
+            suppliedController = controller,
+            floatingOrigin = true,
+            suppliedText = input,
+            onSend = { _, accepted ->
+                sends++
+                accepted()
+            },
+        )
+        val send = composeRule.onNodeWithContentDescription("Send")
+        val before = send.fetchSemanticsNode().boundsInRoot
+        val retained = send.fetchSemanticsNode().config[SemanticsActions.OnClick]
+        composeRule.runOnIdle {
+            assertTrue(controller.requestStart(ACCOUNT, GROUP, draft))
+            checkNotNull(retained.action).invoke()
+            assertEquals(0, sends)
+            assertEquals(draft, input.valueState.value)
+        }
+        send.assertIsNotEnabled().assertIsDisplayed().performClick()
+        composeRule.onNode(hasSetTextAction()).performImeAction()
+        assertEquals(before, send.fetchSemanticsNode().boundsInRoot)
+        assertEquals(0, sends)
+        assertEquals(draft, input.valueState.value)
+    }
+
+    @Test
+    fun originTypedSendCannotPrecedeAutomaticFatalRecovery() = blockedSendThenCompletion("fatal")
+
+    @Test
+    fun originTypedSendCannotPrecedeAutomaticSilencePaste() = blockedSendThenCompletion("silence")
+
+    @Test
+    fun originTypedSendCannotPrecedeAutomaticWatchdogRecovery() = blockedSendThenCompletion("watchdog")
+
+    /** Uses the real Bar and listener; neither completion path presses Paste. */
+    private fun blockedSendThenCompletion(mode: String) {
+        val fixture = SendGuardFixture()
+        val origin = ACCOUNT to GROUP
+        val drafts = fixture.drafts
+        val revisions = fixture.revisions
+        val sent = fixture.sent
+        val writes = fixture.writes
+        val controller = automaticCompletionController(fixture, mode)
+        renderAcceptedSendComposer(controller, mutableStateOf(origin), drafts, revisions, sent)
+        composeRule.runOnIdle {
+            assertTrue(controller.requestStart(ACCOUNT, GROUP, drafts.getValue(origin)))
+            FakeDictationPlatform.listener.onReady()
+        }
+        composeRule.onNodeWithContentDescription("Send").assertIsNotEnabled().performClick()
+        composeRule.onNode(hasSetTextAction()).performImeAction()
+        composeRule.runOnIdle {
+            assertTrue(sent.isEmpty())
+            assertEquals("Typed message", drafts.getValue(origin).text)
+            val firstListener = FakeDictationPlatform.listener
+            firstListener.onResult("dictated words")
+            if (mode == "silence") {
+                runDeadline(fixture, 3_000L, 3_000L)
+            } else {
+                runDeadline(fixture, 500L, 500L)
+                assertTrue(firstListener !== FakeDictationPlatform.listener)
+                if (mode == "watchdog") {
+                    runDeadline(fixture, 10_000L, 10_500L)
+                } else {
+                    FakeDictationPlatform.listener.onError(ConversationDictationFailure.Unknown)
+                }
+            }
+            assertEquals("Typed message dictated words", drafts.getValue(origin).text)
+            assertEquals(listOf(origin), writes)
+            assertTrue(sent.isEmpty())
+            assertEquals(ConversationDictationState.Idle, controller.state)
+        }
+        composeRule.onNode(hasSetTextAction()).assertTextContains("Typed message dictated words")
+        composeRule.onNodeWithContentDescription("Send").performClick()
+        composeRule.runOnIdle {
+            assertEquals(listOf(origin to "Typed message dictated words"), sent)
+            assertEquals("", drafts.getValue(origin).text)
+            assertEquals(listOf(origin), writes)
+        }
+    }
+
+    /** Advances monotonic time and consumes a live deadline exactly once before its callback. */
+    private fun runDeadline(
+        fixture: SendGuardFixture,
+        delay: Long,
+        now: Long,
+    ) {
+        fixture.now = now
+        val timer = fixture.timers.first { it.first == delay }
+        fixture.timers.remove(timer)
+        timer.second.invoke()
+    }
+
+    private class SendGuardFixture {
+        val origin = ACCOUNT to GROUP
+        val drafts = mutableMapOf(origin to TextFieldValue("Typed message", TextRange("Typed message".length)))
+        val revisions = mutableMapOf(origin to 0L)
+        val sent = mutableListOf<Pair<Pair<String, String>, String>>()
+        val writes = mutableListOf<Pair<String, String>>()
+        val timers = mutableListOf<Pair<Long, () -> Unit>>()
+        var now = 0L
+    }
+
+    /** Retains cancellable real-controller deadlines and an authoritative draft revision. */
+    private fun automaticCompletionController(
+        fixture: SendGuardFixture,
+        mode: String,
+    ): ConversationDictationController =
+        ConversationDictationController(
+            platform = FakeDictationPlatform,
+            readDraft = { _, _ ->
+                ConversationDictationDraftSnapshot(
+                    fixture.drafts.getValue(fixture.origin),
+                    fixture.revisions.getValue(fixture.origin),
+                )
+            },
+            writeDraft = { account, group, expected, value ->
+                if (expected != fixture.revisions.getValue(fixture.origin)) {
+                    null
+                } else {
+                    fixture.writes += account to group
+                    fixture.drafts[fixture.origin] = value
+                    fixture.revisions[fixture.origin] = expected + 1L
+                    expected + 1L
+                }
+            },
+            disclosureAccepted = { true },
+            markDisclosureAccepted = {},
+            elapsedRealtime = { fixture.now },
+            finishAfterSilenceMillis = { if (mode == "silence") 3_000L else null },
+            scheduleTimeout = { delay, callback ->
+                val timer = delay to callback
+                fixture.timers += timer
+                ConversationDictationTimeoutHandle { fixture.timers.remove(timer) }
+            },
+        )
+
+    /** Another conversation keeps ordinary Send while origin Paste remains a single targeted append. */
+    @Test
+    fun foreignSendKeepsActivePasteAtOriginAfterAccountAndChatSwitch() {
+        val origin = ACCOUNT to GROUP
+        val other = "other-account" to "other-group"
+        val visible = mutableStateOf(origin)
+        val drafts =
+            mutableMapOf(
+                origin to TextFieldValue("Original", TextRange("Original".length)),
+                other to TextFieldValue("Other draft"),
+            )
+        val revisions = mutableMapOf(origin to 0L, other to 0L)
+        val writes = mutableListOf<Pair<String, String>>()
+        val sent = mutableListOf<Pair<Pair<String, String>, String>>()
+        val controller =
+            ConversationDictationController(
+                platform = FakeDictationPlatform,
+                readDraft = { account, group ->
+                    val key = account to group
+                    ConversationDictationDraftSnapshot(drafts.getValue(key), revisions.getValue(key))
+                },
+                writeDraft = { account, group, expected, value ->
+                    val key = account to group
+                    if (expected != revisions.getValue(key)) {
+                        null
+                    } else {
+                        writes += key
+                        drafts[key] = value
+                        revisions[key] = expected + 1L
+                        expected + 1L
+                    }
+                },
+                disclosureAccepted = { true },
+                markDisclosureAccepted = {},
+            )
+        assertTrue(controller.requestStart(ACCOUNT, GROUP, drafts.getValue(origin)))
+        val activeListener = FakeDictationPlatform.listener
+        renderAcceptedSendComposer(controller, visible, drafts, revisions, sent)
+        composeRule.onNodeWithContentDescription("Send").assertIsNotEnabled()
+        composeRule.runOnIdle { visible.value = other }
+        composeRule.onNodeWithContentDescription("Send").performClick()
+        composeRule.runOnIdle {
+            assertEquals(listOf(other to "Other draft"), sent)
+            activeListener.onResult("dictated words")
+            controller.paste()
+            controller.paste()
+            assertEquals("Original dictated words", drafts.getValue(origin).text)
+            assertEquals("", drafts.getValue(other).text)
+            assertEquals(listOf(origin), writes)
+        }
+    }
+
+    /** Cancellation retires the real generation, unlike an ordinary typed Send. */
+    @Test
+    fun cancelledFloatingSessionIgnoresItsRetiredRecognitionListener() {
+        val kept = TextFieldValue("Kept draft")
+        var writes = 0
+        var sends = 0
+        val controller =
+            ConversationDictationController(
+                platform = FakeDictationPlatform,
+                readDraft = { _, _ -> ConversationDictationDraftSnapshot(kept, 0L) },
+                writeDraft = { _, _, _, _ ->
+                    writes++
+                    1L
+                },
+                disclosureAccepted = { true },
+                markDisclosureAccepted = {},
+            )
+        assertTrue(controller.requestStart(ACCOUNT, GROUP, kept))
+        val retiredListener = FakeDictationPlatform.listener
+        val input = ComposerTextState(kept)
+        render(
+            draft = kept,
+            suppliedController = controller,
+            floatingOrigin = true,
+            suppliedText = input,
+            onSend = { _, _ -> sends++ },
+        )
+        composeRule.runOnIdle {
+            controller.cancel()
+            retiredListener.onResult("must be ignored")
+            controller.paste()
+            assertTrue(controller.state is ConversationDictationState.Idle)
+            assertEquals(0, writes)
+            assertEquals(0, sends)
+            assertEquals(kept, input.valueState.value)
+        }
+    }
+
+    /** Composes each visible owner against the existing draft, revision and acceptance callback references. */
+    private fun renderAcceptedSendComposer(
+        controller: ConversationDictationController,
+        visible: State<Pair<String, String>>,
+        drafts: MutableMap<Pair<String, String>, TextFieldValue>,
+        revisions: MutableMap<Pair<String, String>, Long>,
+        sent: MutableList<Pair<Pair<String, String>, String>>,
+    ) {
+        composeRule.setContent {
+            val key = visible.value
+            val editor =
+                rememberComposerTextState(
+                    key,
+                    drafts.getValue(key),
+                    controller.completionRevision(key.first, key.second),
+                )
+            WhiteNoiseTheme {
+                ComposerBar(
+                    replyingTo = null,
+                    messageTextCopy = MessageTextCopy.Default,
+                    onCancelReply = {},
+                    textState = editor,
+                    draftKey = key,
+                    draftAccountRef = key.first,
+                    draftGroupIdHex = key.second,
+                    onDraftChange = { value, changed ->
+                        drafts[key] = value
+                        if (changed) revisions[key] = revisions.getValue(key) + 1L
+                    },
+                    onSend = { text, accepted ->
+                        sent += key to text
+                        drafts[key] = TextFieldValue()
+                        revisions[key] = revisions.getValue(key) + 1L
+                        accepted()
+                    },
+                    dictationController = controller,
+                    dictationAccountRef = key.first,
+                    dictationGroupIdHex = key.second,
+                    dictationControlsVisible = false,
+                    dictationOriginVisible = key == (ACCOUNT to GROUP),
+                    modifier = Modifier.width(320.dp),
+                )
+            }
+        }
+    }
+
+    /** Renders the actual composer against the supplied draft and dictation ownership state. */
     private fun render(
         fontScale: Float = 1f,
         rtl: Boolean = false,
@@ -331,6 +650,10 @@ class ComposerDictationControlTest {
         voiceRecordingController: VoiceRecordingController? = null,
         replyingTo: dev.ipf.marmotkit.AppMessageRecordFfi? = null,
         suppliedController: ConversationDictationController? = null,
+        floatingOrigin: Boolean = false,
+        suppliedText: ComposerTextState? = null,
+        onDraftChange: (TextFieldValue, Boolean) -> Unit = { _, _ -> },
+        onSend: (String, () -> Unit) -> Unit = { _, _ -> },
     ): ConversationDictationController {
         val dictationController = suppliedController ?: idleDictationController(draft)
         composeRule.setContent {
@@ -344,7 +667,11 @@ class ComposerDictationControlTest {
                         replyingTo = replyingTo,
                         messageTextCopy = MessageTextCopy.Default,
                         onCancelReply = {},
-                        onSend = { _, _ -> },
+                        onSend = onSend,
+                        onDraftChange = onDraftChange,
+                        textState = suppliedText ?: rememberComposerTextState(null, draft),
+                        dictationControlsVisible = !floatingOrigin,
+                        dictationOriginVisible = true,
                         onPickFromGallery = if (withAttachments) ({}) else null,
                         initialDraft = draft,
                         dictationController = dictationController,
@@ -366,7 +693,10 @@ class ComposerDictationControlTest {
             context = context,
             outputDirectory = context.cacheDir,
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
-            onPermissionRequest = { true },
+            onPermissionRequest = {
+                voicePermissionRequests++
+                false
+            },
             onRecordingComplete = { _, _ -> },
             onError = {},
         )

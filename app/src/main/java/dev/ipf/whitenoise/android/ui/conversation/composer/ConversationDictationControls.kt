@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -78,9 +79,9 @@ private const val DICTATION_LISTENING_BAR_COUNT = 3
 private const val DICTATION_LISTENING_BAR_MIN_HEIGHT_DP = 6f
 private const val DICTATION_LISTENING_BAR_HEIGHT_RANGE_DP = 8f
 
-/** A compact 24dp listening pulse followed by three native 48dp commands. */
-internal val DICTATION_ACTIVE_ACTIONS_WIDTH = 168.dp
-private val DICTATION_PROCESSING_ACTIONS_WIDTH = 144.dp
+/** A compact 24dp listening pulse followed by three adjacent compact commands. */
+internal val DICTATION_ACTIVE_ACTIONS_WIDTH = 132.dp
+private val DICTATION_PROCESSING_ACTIONS_WIDTH = 108.dp
 
 /** Floating app-root control used while the immutable dictation origin is not visible. */
 @Composable
@@ -252,7 +253,7 @@ private fun ConversationDictationActiveActions(
     IconButton(
         onClick = settleControlMorph(controller::cancel),
         enabled = !controller.deliveryInProgress,
-        modifier = Modifier.size(48.dp),
+        modifier = Modifier.width(ComposerShortcutPitch).height(ComposerShortcutTarget),
     ) {
         Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel))
     }
@@ -262,7 +263,7 @@ private fun ConversationDictationActiveActions(
             onClick = settleControlMorph(controller::send),
             enabled = controller.completionActionsEnabled,
             modifier =
-                Modifier.size(48.dp).semantics {
+                Modifier.width(ComposerShortcutPitch).height(ComposerShortcutTarget).semantics {
                     contentDescription = sendLabel
                     selected = true
                     progressBarRangeInfo = ProgressBarRangeInfo.Indeterminate
@@ -288,14 +289,13 @@ private fun ConversationDictationActiveActions(
             icon = R.drawable.ic_arrow_upward,
             enabled = controller.completionActionsEnabled,
             modifier = Modifier.semantics { selected = false },
-            // The composer's disc is 40dp wide because it sits in a crowded row. These three
-            // commands are the whole control, and each keeps a 48dp target.
-            width = 48.dp,
+            // Keep commands adjacent while retaining Material minimum touch expansion.
+            width = ComposerShortcutPitch,
         )
     }
 }
 
-/** Retains the paste action while its selected outcome is still processing. */
+/** Pastes the owned transcript and shows progress while that completion action is processing. */
 @Composable
 private fun ConversationDictationPasteAction(controller: ConversationDictationController) {
     val pasteLabel = stringResource(R.string.paste_dictation_transcript)
@@ -303,7 +303,7 @@ private fun ConversationDictationPasteAction(controller: ConversationDictationCo
         onClick = settleControlMorph(controller::paste),
         enabled = controller.completionActionsEnabled,
         modifier =
-            Modifier.size(48.dp).semantics {
+            Modifier.width(ComposerShortcutPitch).height(ComposerShortcutTarget).semantics {
                 contentDescription = pasteLabel
                 selected = controller.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft
                 if (controller.processingDeliveryMode == ConversationDictationDeliveryMode.PasteIntoDraft) {
@@ -416,7 +416,10 @@ private fun ConversationDictationDismissAction(
             is ConversationDictationState.Failed -> R.string.dismiss
             else -> R.string.dictation_cancel
         }
-    IconButton(onClick = settleControlMorph(onClick), modifier = Modifier.size(48.dp)) {
+    IconButton(
+        onClick = settleControlMorph(onClick),
+        modifier = Modifier.width(ComposerShortcutPitch).height(ComposerShortcutTarget),
+    ) {
         Icon(
             Icons.Default.Close,
             contentDescription = stringResource(label),

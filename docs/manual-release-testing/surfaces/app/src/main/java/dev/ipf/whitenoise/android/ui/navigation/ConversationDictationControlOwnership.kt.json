@@ -8,7 +8,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/ConversationDictationControlOwnership.kt",
         "anchor": "recoveryHandedToComposer: Boolean = false",
         "test_ids": [
-          "DIC-002"
+          "DIC-002",
+          "CON-040"
         ]
       }
     ]

@@ -44,7 +44,8 @@ internal fun settingsSearchAdditionalControls(): List<SettingsSearchEntry> =
             R.string.appearance_theme,
             R.string.appearance,
             SettingsDetail.Appearance,
-            "search.Appearance.3",
+            "search.Appearance.2",
+            "theme",
         )
         control(
             "Dictation.result",
