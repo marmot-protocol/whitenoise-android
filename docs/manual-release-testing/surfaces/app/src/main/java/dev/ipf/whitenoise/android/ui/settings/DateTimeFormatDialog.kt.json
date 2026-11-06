@@ -12,6 +12,22 @@
         ]
       },
       {
+        "surface": "TimeFormatChoices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+        "anchor": "fun TimeFormatChoices(",
+        "test_ids": [
+          "SET-045"
+        ]
+      },
+      {
+        "surface": "DateFormatChoices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+        "anchor": "fun DateFormatChoices(",
+        "test_ids": [
+          "SET-045"
+        ]
+      },
+      {
         "surface": "DateTimeGroupLabel",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
         "anchor": "fun DateTimeGroupLabel(",
