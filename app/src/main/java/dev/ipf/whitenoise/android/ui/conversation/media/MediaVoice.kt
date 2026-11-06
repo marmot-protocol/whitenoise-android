@@ -744,25 +744,25 @@ private fun VoiceSeekTrack(
     var widthPx by remember { mutableFloatStateOf(0f) }
     val currentOnSeek by rememberUpdatedState(onSeek)
     val seekLabel = stringResource(R.string.voice_message_seek)
+    val seekSemantics =
+        if (onSeek == null) {
+            Modifier
+        } else {
+            Modifier.semantics(mergeDescendants = true) {
+                contentDescription = seekLabel
+                stateDescription = positionText
+                progressBarRangeInfo = ProgressBarRangeInfo(progressFraction, 0f..1f)
+                setProgress { target ->
+                    currentOnSeek?.invoke(target.coerceIn(0f, 1f))
+                    true
+                }
+            }
+        }
     Box(
         modifier =
             modifier
                 .height(VoiceSeekTargetHeight)
-                .then(
-                    if (onSeek == null) {
-                        Modifier
-                    } else {
-                        Modifier.semantics(mergeDescendants = true) {
-                            contentDescription = seekLabel
-                            stateDescription = positionText
-                            progressBarRangeInfo = ProgressBarRangeInfo(progressFraction, 0f..1f)
-                            setProgress { target ->
-                                currentOnSeek?.invoke(target.coerceIn(0f, 1f))
-                                true
-                            }
-                        }
-                    },
-                )
+                .then(seekSemantics)
                 .onSizeChanged { widthPx = it.width.toFloat() }
                 .voiceSeekGesture(enabled = onSeek != null, widthPx = { widthPx }) { fraction ->
                     currentOnSeek?.invoke(fraction)
