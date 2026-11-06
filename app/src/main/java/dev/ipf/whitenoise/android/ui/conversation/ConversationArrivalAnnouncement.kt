@@ -7,17 +7,21 @@ import dev.ipf.whitenoise.android.state.TimelineMessage
 /**
  * Chat messages someone else sent among the rows a live append added after [previousLatestId], oldest first. An
  * unknown [previousLatestId] means the timeline was replaced rather than appended to, so nothing counts as arrived.
+ * Rows in [previousRowIds] were already rendered, so one that a reorder moved past the anchor is not new.
  */
 internal fun conversationIncomingArrivals(
     renderedTimeline: List<TimelineMessage>,
     previousLatestId: String,
+    previousRowIds: Set<String>,
     isMine: (TimelineMessage) -> Boolean,
 ): List<TimelineMessage> {
     val previousIndex = renderedTimeline.indexOfFirst { it.presentationId == previousLatestId }
     if (previousIndex < 0) return emptyList()
     return renderedTimeline
         .drop(previousIndex + 1)
-        .filter { row -> row.record.kind == CHAT_MESSAGE_KIND && !isMine(row) }
+        .filter { row ->
+            row.record.kind == CHAT_MESSAGE_KIND && row.presentationId !in previousRowIds && !isMine(row)
+        }
 }
 
 /**

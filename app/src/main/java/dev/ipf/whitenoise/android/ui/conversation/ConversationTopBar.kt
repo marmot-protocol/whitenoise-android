@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -245,7 +246,8 @@ internal fun ConversationTopBar(
                                         enabled = performanceSelectorsEnabled,
                                     ).semantics(mergeDescendants = true) { heading() },
                         ) {
-                            Box(Modifier.testTag("conversation.header.avatar")) {
+                            // The fallback monogram stays visible but would read as initials before the chat name.
+                            Box(Modifier.testTag("conversation.header.avatar").clearAndSetSemantics {}) {
                                 GroupAvatar(
                                     appState = appState,
                                     group = avatarGroup,

@@ -38,6 +38,7 @@ import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
+import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -86,7 +87,12 @@ class ConversationTopBarSemanticsTest {
                     it.config[SemanticsActions.OnClick].label == OPEN_DETAILS_DESCRIPTION
                 },
             ).assertTextContains("Benchmark group")
-            .performClick()
+            .assert(
+                SemanticsMatcher("the fallback monogram is not read") { node ->
+                    val initials = IdentityFormatter.initials("Benchmark group")
+                    node.config.getOrElse(SemanticsProperties.Text) { emptyList() }.none { it.text == initials }
+                },
+            ).performClick()
         composeRule.runOnIdle { assertEquals(1, openDetailsCalls) }
         composeRule
             .onNodeWithTag("conversation.header.avatar", useUnmergedTree = true)

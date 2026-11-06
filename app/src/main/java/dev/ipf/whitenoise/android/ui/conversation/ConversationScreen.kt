@@ -3317,7 +3317,11 @@ internal fun ConversationScreen(
         val incomingAppendLanding = remember(controller) { ConversationIncomingAppendLandingQueue() }
         val arrivalView = LocalView.current
         val arrivalResources = LocalResources.current
+        // Rows the previous pass rendered, so a reorder that moves an older row to the end is not announced.
+        var rowIdsAtLastFollow by remember(controller) { mutableStateOf(emptySet<String>()) }
         LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored) {
+            val previousRowIds = rowIdsAtLastFollow
+            rowIdsAtLastFollow = renderedTimeline.mapTo(HashSet()) { it.presentationId }
             if (!initialTimelineAnchored || renderedTimeline.isEmpty()) {
                 // A restart that cannot be an append still interrupts the burst, so its rows never join a later one.
                 incomingAppendLanding.retire()
@@ -3334,15 +3338,16 @@ internal fun ConversationScreen(
                     renderedTimeline.any { it.presentationId == previousId }
             navigationState.lastFollowedLatestId = latestId ?: previousId
             if (isAppend && previousId != null) {
-                // Before any suspension, so a later append restarting this effect cannot drop the notice.
+                // Before any suspension, so a later append restarting this effect cannot drop the notice. Group details
+                // cover the transcript, so arrivals are not read over that screen.
                 conversationArrivalAnnouncement(
                     arrivals =
-                        conversationIncomingArrivals(renderedTimeline, previousId) { row ->
+                        conversationIncomingArrivals(renderedTimeline, previousId, previousRowIds) { row ->
                             controller.isMessageMine(row.record)
                         },
                     senderName = { row -> appState.displayName(row.record.sender) },
                     resources = arrivalResources,
-                )?.let { notice ->
+                )?.takeUnless { showDetails }?.let { notice ->
                     @Suppress("DEPRECATION")
                     arrivalView.announceForAccessibility(notice)
                 }

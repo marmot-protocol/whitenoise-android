@@ -17,9 +17,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Events a screen reader cannot see are spoken. A live append announces only messages someone else sent, naming a
- * single sender and counting a burst; a replaced timeline announces nothing. The voice recorder announces start, lock
- * and stop, and a tap that starts and locks in one step is heard once as a start.
+ * Events a screen reader cannot see are spoken. A live append announces only new messages someone else sent, naming a
+ * single sender and counting a burst; a replaced timeline or a reordered existing row announces nothing. The voice
+ * recorder announces start, lock and stop, and a tap that starts and locks in one step is heard once as a start.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -37,7 +37,7 @@ class ScreenReaderAnnouncementCoverageTest {
                 row("new", sender = "bob"),
             )
 
-        val arrivals = conversationIncomingArrivals(timeline, "msg:anchor") { it.record.sender == "me" }
+        val arrivals = conversationIncomingArrivals(timeline, "msg:anchor", emptySet()) { it.record.sender == "me" }
 
         assertEquals(listOf("new"), arrivals.map { it.record.messageIdHex })
         assertEquals(
@@ -49,15 +49,29 @@ class ScreenReaderAnnouncementCoverageTest {
     @Test
     fun burstIsCountedAndOwnOrReplacedTimelinesStaySilent() {
         val timeline = listOf(row("anchor"), row("a"), row("b"), row("c"))
-        val burst = conversationIncomingArrivals(timeline, "msg:anchor") { false }
+        val burst = conversationIncomingArrivals(timeline, "msg:anchor", emptySet()) { false }
 
         assertEquals(
             resources.getQuantityString(R.plurals.conversation_new_messages, 3, 3),
             conversationArrivalAnnouncement(burst, { error("a burst names no sender") }, resources),
         )
-        val ownOnly = conversationIncomingArrivals(timeline, "msg:anchor") { true }
+        val ownOnly = conversationIncomingArrivals(timeline, "msg:anchor", emptySet()) { true }
         assertNull(conversationArrivalAnnouncement(ownOnly, { "" }, resources))
-        assertEquals(emptyList<TimelineMessage>(), conversationIncomingArrivals(timeline, "msg:gone") { false })
+        assertEquals(
+            emptyList<TimelineMessage>(),
+            conversationIncomingArrivals(timeline, "msg:gone", emptySet()) { false },
+        )
+    }
+
+    @Test
+    fun rowsAlreadyRenderedBeforeTheAppendAreNotAnnouncedAfterAReorder() {
+        // A display-position change moved "earlier" past the anchor while "new" arrived.
+        val timeline = listOf(row("anchor"), row("earlier"), row("new"))
+
+        val rendered = setOf("msg:anchor", "msg:earlier")
+        val arrivals = conversationIncomingArrivals(timeline, "msg:anchor", rendered) { false }
+
+        assertEquals(listOf("new"), arrivals.map { it.record.messageIdHex })
     }
 
     @Test
