@@ -19,7 +19,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,12 +37,14 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ReactionTally
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
+import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
 import dev.ipf.whitenoise.android.ui.emojiPlainLabel
 
 // Distinct emojis shown as pills; the "+N" pill carries every reaction beyond them.
@@ -188,8 +193,13 @@ private fun ReactionPillItem(
             Modifier
                 .heightIn(min = ReactionTouchTargetHeight)
                 .testTag("$REACTION_PILL_TEST_TAG:$index")
-                .localReactionTarget(localMotion, motionEmoji, pill.selected, allowHostClipping)
-                .then(
+                .localReactionTarget(
+                    localMotion,
+                    motionEmoji,
+                    pill.selected,
+                    allowHostClipping,
+                    measureChip = emoji == null,
+                ).then(
                     if (enabled) {
                         Modifier.combinedClickable(
                             interactionSource = interactionSource,
@@ -216,7 +226,7 @@ private fun ReactionPillItem(
                 },
         contentAlignment = Alignment.Center,
     ) {
-        ReactionPillSurface(pill, single, interactionSource)
+        ReactionPillSurface(pill, single, interactionSource, localMotion, allowHostClipping)
     }
 }
 
@@ -227,8 +237,13 @@ private fun ReactionPillSurface(
     pill: ReactionPill,
     single: Boolean,
     interactionSource: MutableInteractionSource,
+    localMotion: LocalReactionMotion?,
+    allowHostClipping: Boolean,
 ) {
     val emoji = pill.emoji
+    // Keep the Text's own immutable layout for an already-present counted badge too.
+    var emojiLayout by remember(emoji) { mutableStateOf<TextLayoutResult?>(null) }
+    val artwork = emoji?.let { EmojiShortcodes.art(it, LocalCustomEmoji.current, emptyMap()) }
     Row(
         modifier =
             Modifier
@@ -239,7 +254,8 @@ private fun ReactionPillSurface(
                     } else {
                         Modifier.widthIn(min = ReactionPillMinimumWidth)
                     },
-                ).clip(CircleShape)
+                ).localReactionChrome(localMotion, emoji, single && pill.selected)
+                .clip(CircleShape)
                 .indication(interactionSource, ripple(color = MaterialTheme.colorScheme.onSurface))
                 .background(reactionPillContainerColor(pill.selected))
                 .border(1.dp, reactionPillBorderColor(pill.selected), CircleShape)
@@ -250,6 +266,11 @@ private fun ReactionPillSurface(
         if (emoji != null) {
             Text(
                 text = EmojiShortcodes.annotate(AnnotatedString(emoji)),
+                modifier =
+                    Modifier.localReactionGlyphTarget(localMotion, emoji, pill.selected, allowHostClipping) {
+                        emojiLayout?.takeIf { artwork == null || it.placeholderRects.singleOrNull() != null }
+                    },
+                onTextLayout = { emojiLayout = it },
                 inlineContent = EmojiShortcodes.content(dev.ipf.whitenoise.android.ui.ReceivedEmoji.None),
                 fontSize = with(LocalDensity.current) { ReactionEmojiSize.toSp() },
                 lineHeight = with(LocalDensity.current) { ReactionPillHeight.toSp() },
@@ -278,5 +299,5 @@ private val ReactionPillHeight = 23.dp
 private val ReactionPillMinimumWidth = 31.dp
 private val ReactionPillSpacing = 3.dp
 private val ReactionContentSpacing = 2.dp
-private val ReactionEmojiSize = 14.dp
+internal val ReactionEmojiSize = 14.dp
 private val ReactionTouchTargetHeight = 48.dp

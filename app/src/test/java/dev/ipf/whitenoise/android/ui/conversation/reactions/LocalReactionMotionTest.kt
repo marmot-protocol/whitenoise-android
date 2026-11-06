@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.reactions
 
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -53,11 +54,11 @@ class LocalReactionMotionTest {
         assertEquals(0, motion.targets.size)
     }
 
-    /** A custom emoji reaction carries no origin, so it never starts an extra decode or glyph flight. */
-    @Test fun customEmojiNeverStartsAnAdditionalDecodeOrGlyphFlight() {
+    /** Already-rendered custom artwork keeps the measured source for the same flight as a system emoji. */
+    @Test fun customEmojiKeepsItsMeasuredOrigin() {
         val motion = LocalReactionMotion()
         motion.accept(":party:", true, Rect(10f, 20f, 40f, 50f))
-        assertNull(motion.effect?.origin)
+        assertEquals(Rect(10f, 20f, 40f, 50f), motion.effect?.origin)
     }
 
     /**
@@ -71,6 +72,55 @@ class LocalReactionMotionTest {
         assertTrue(motion.canFly(Rect(30f, 90f, 58f, 118f), chip))
         motion.viewport = Rect.Zero
         assertFalse(motion.canFly(Rect(30f, 90f, 58f, 118f), chip))
+    }
+
+    /** Overlay, chip pulse and glyph handoff share one answer to whether this emoji is visibly in flight. */
+    @Test fun flightTargetRequiresTheCurrentVisibleFlight() {
+        val motion = LocalReactionMotion()
+        val target = ReactionMotionTarget(Rect(100f, 300f, 114f, 314f))
+        motion.targets["👍"] = target
+        motion.accept("👍", true)
+        assertNull(motion.flightTarget("👍"))
+        motion.accept("👍", true, Rect(10f, 200f, 40f, 230f))
+        assertEquals(target, motion.flightTarget("👍"))
+        assertNull(motion.flightTarget("🎉"))
+        motion.viewport = Rect(0f, 250f, 360f, 520f)
+        assertNull(motion.flightTarget("👍"))
+        motion.viewport = null
+        motion.enabled = false
+        assertNull(motion.flightTarget("👍"))
+    }
+
+    /** The target stays hidden until the final handoff, while the traveling glyph stays opaque. */
+    @Test fun glyphHandoffHappensOnlyAtTheDestination() {
+        assertEquals(0f, reactionGlyphHandoff(0f), 0f)
+        assertEquals(0f, reactionGlyphHandoff(0.79f), 0f)
+        assertEquals(0f, reactionGlyphHandoff(0.9f), 0f)
+        assertEquals(0f, reactionGlyphHandoff(0.999f), 0f)
+        assertEquals(1f, reactionGlyphHandoff(1f), 0f)
+        assertEquals(1f, reactionFlightProgress(0.8f), 0f)
+        assertEquals(1f, reactionFlightProgress(0.9f), 0f)
+        val enteringDelta = reactionFlightProgress(0.7f) - reactionFlightProgress(0.6f)
+        val arrivalDelta = reactionFlightProgress(0.8f) - reactionFlightProgress(0.7f)
+        assertTrue("travel must decelerate into the stationary handoff", arrivalDelta < enteringDelta)
+        assertTrue("arrival must approach zero velocity", 1f - reactionFlightProgress(0.799f) < 0.0001f)
+        val motion = LocalReactionMotion()
+        motion.accept("👍", true, Rect(10f, 20f, 40f, 50f))
+        assertEquals(0f, motion.progress.value, 0f)
+    }
+
+    /** A numeric overflow chip has no duplicate emoji, so its incoming glyph keeps the final fade. */
+    @Test fun overflowKeepsItsBoundedFade() {
+        assertEquals(1f, reactionOverflowAlpha(0.8f), 0f)
+        assertEquals(0.5f, reactionOverflowAlpha(0.9f), 0.0001f)
+        assertEquals(0f, reactionOverflowAlpha(1f), 0f)
+    }
+
+    /** A wide decoded image stays wide at both the source and destination instead of becoming square. */
+    @Test fun rectangularArtworkRetainsItsAspectRatio() {
+        assertEquals(Size(28f, 14f), reactionArtworkFit(Size(48f, 24f), Size(28f, 28f)))
+        assertEquals(Size(14f, 7f), reactionArtworkFit(Size(48f, 24f), Size(14f, 14f)))
+        assertEquals(Size(14f, 14f), reactionArtworkFit(Size.Unspecified, Size(14f, 14f)))
     }
 
     /** An accepted fifth reaction type targets the existing overflow chip, and its removal clears that target. */

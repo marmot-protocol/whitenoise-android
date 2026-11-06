@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.res.painterResource
@@ -214,21 +215,23 @@ internal fun EmojiArtImage(
     contentDescription: String?,
     modifier: Modifier = Modifier,
 ) {
+    Image(rememberEmojiArtPainter(art), contentDescription, modifier)
+}
+
+/** Reuses the same decoded artwork and bundled crop in an image or a decorative draw layer. */
+@Composable
+internal fun rememberEmojiArtPainter(art: EmojiArt): Painter =
     when (art) {
         is EmojiArt.Bundled -> {
-            // Crop padded bundled canvases at draw time; authored custom/received images keep their bounds.
             val region = EmojiShortcodes.builtinArtworkRegion(art.drawable)
-            val painter =
-                if (region != null) {
-                    val bitmap = ImageBitmap.imageResource(art.drawable)
-                    remember(bitmap, region) {
-                        BitmapPainter(bitmap, srcOffset = region.topLeft, srcSize = region.size)
-                    }
-                } else {
-                    painterResource(art.drawable)
+            if (region != null) {
+                val bitmap = ImageBitmap.imageResource(art.drawable)
+                remember(bitmap, region) {
+                    BitmapPainter(bitmap, srcOffset = region.topLeft, srcSize = region.size)
                 }
-            Image(painter, contentDescription, modifier)
+            } else {
+                painterResource(art.drawable)
+            }
         }
-        is EmojiArt.Decoded -> Image(art.image, contentDescription, modifier)
+        is EmojiArt.Decoded -> remember(art) { BitmapPainter(art.image) }
     }
-}
