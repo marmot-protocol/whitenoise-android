@@ -128,6 +128,7 @@ internal class MessageRowTextActions {
 internal val LocalMessageRowTextActions = staticCompositionLocalOf<MessageRowTextActions?> { null }
 
 /** Publishes a text leaf's actions to its row; writes only when the labels change. */
+@Suppress("FunctionNaming")
 @Composable
 internal fun ForwardTextActionsToMessageRow(actions: List<CustomAccessibilityAction>) {
     val registry = LocalMessageRowTextActions.current ?: return

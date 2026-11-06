@@ -49,10 +49,10 @@ internal fun RowScope.MessageSenderAvatarSlot(
     enabled: Boolean,
     alignToBubbleBottom: Boolean,
     onClick: () -> Unit,
-    // The merged message row offers Open profile instead of a separate avatar stop (#3603).
-    rowOwnsSemantics: Boolean = false,
     // Decoded bytes MarmotKit stores for the sender (0.10.1); when present the URL is not fetched.
     picture: ImageBitmap? = null,
+    // The merged message row offers Open profile instead of a separate avatar stop (#3603).
+    rowOwnsSemantics: Boolean = false,
 ) {
     val avatarAlignment =
         if (alignToBubbleBottom) {

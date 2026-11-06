@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -99,44 +100,7 @@ class MessageRowScreenReaderStopCoverageTest {
         val bodyShown = mutableStateOf(true)
         val registry = MessageRowTextActions()
 
-        composeRule.setContent {
-            CompositionLocalProvider(LocalMessageRowTextActions provides registry) {
-                Column(
-                    Modifier.testTag(ROW).semantics(mergeDescendants = true) {
-                        customActions =
-                            messageRowCustomActions(
-                                listOf(MessageRowAction("Open profile", true) { openedProfile = true }),
-                                registry.actions,
-                            )
-                    },
-                ) {
-                    Text(
-                        "Alice",
-                        Modifier
-                            .messageRowChrome(rowOwnsSemantics = true, description = "Alice")
-                            .clickable { openedProfile = true },
-                    )
-                    Box(
-                        Modifier
-                            .size(24.dp)
-                            .messageRowChrome(rowOwnsSemantics = true, description = "Replying to Bob: lunch?")
-                            .clickable {},
-                    )
-                    if (bodyShown.value) {
-                        ForwardTextActionsToMessageRow(
-                            listOf(
-                                CustomAccessibilityAction("Read aloud from here") {
-                                    spoke = true
-                                    true
-                                },
-                            ),
-                        )
-                        Text("Sure, noon works")
-                    }
-                    Text("Edited", Modifier.editedLabelTarget("Edited") {})
-                }
-            }
-        }
+        setMergedRow(registry, bodyShown, onSpeak = { spoke = true }, onOpenProfile = { openedProfile = true })
         composeRule.waitForIdle()
 
         // Nothing inside the row is its own focus stop any more.
@@ -200,6 +164,53 @@ class MessageRowScreenReaderStopCoverageTest {
         assertTrue(markdown.contains("ForwardTextActionsToMessageRow(leafActions)"))
         val plain = appModuleSource("$MESSAGES/BubbleContentBlocks.kt")
         assertTrue(plain.contains("ForwardTextActionsToMessageRow(sentenceActions)"))
+    }
+
+    /** A merged row shaped like a message bubble: sender, quote, body text and edited label. */
+    private fun setMergedRow(
+        registry: MessageRowTextActions,
+        bodyShown: MutableState<Boolean>,
+        onSpeak: () -> Unit,
+        onOpenProfile: () -> Unit,
+    ) {
+        composeRule.setContent {
+            CompositionLocalProvider(LocalMessageRowTextActions provides registry) {
+                Column(
+                    Modifier.testTag(ROW).semantics(mergeDescendants = true) {
+                        customActions =
+                            messageRowCustomActions(
+                                listOf(MessageRowAction("Open profile", true, onOpenProfile)),
+                                registry.actions,
+                            )
+                    },
+                ) {
+                    Text(
+                        "Alice",
+                        Modifier
+                            .messageRowChrome(rowOwnsSemantics = true, description = "Alice")
+                            .clickable(onClick = onOpenProfile),
+                    )
+                    Box(
+                        Modifier
+                            .size(24.dp)
+                            .messageRowChrome(rowOwnsSemantics = true, description = "Replying to Bob: lunch?")
+                            .clickable {},
+                    )
+                    if (bodyShown.value) {
+                        ForwardTextActionsToMessageRow(
+                            listOf(
+                                CustomAccessibilityAction("Read aloud from here") {
+                                    onSpeak()
+                                    true
+                                },
+                            ),
+                        )
+                        Text("Sure, noon works")
+                    }
+                    Text("Edited", Modifier.editedLabelTarget("Edited") {})
+                }
+            }
+        }
     }
 
     private companion object {
