@@ -2067,6 +2067,340 @@ class ConversationScrollCoordinatorTest {
         ).firstOrNull { it.exists() }
             ?: error("Missing conversation source file: $name")
 
+    /**
+     * An oversized incoming landing is a retained reading intent: later tail follows, reaction settles and appends
+     * leave its beginning in place instead of pulling the reader to the newest edge.
+     */
+    @Test
+    fun incomingReadingStartLandingSurvivesLaterTailCorrections() =
+        runTest {
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(900, 80, 80))
+            list.settle(index = 1)
+            val coordinator = ConversationScrollCoordinator(list)
+            val outcome =
+                coordinator.followAppendOrRevealIncomingStart(
+                    candidates = listOf(incoming("long")),
+                    probeFor = { list.probe { 0 } },
+                    resolveTailIndex = { 0 },
+                    awaitFrame = list::frame,
+                )
+            val revealed = outcome as ConversationIncomingAppendOutcome.RevealedReadingStart
+            assertEquals(ConversationReadingStartPlacement(0, 300), revealed.placement)
+            assertEquals(ConversationScrollMode.ReadingHistory("long", 300), coordinator.mode)
+            assertEquals(listOf(0 to 0, 0 to 300), list.writes)
+
+            assertFalse(coordinator.followTailIfAllowed({ 0 }, ConversationScrollReason.NewMessage, frameCount = 0))
+            assertFalse(
+                coordinator.settleTailAfterLayoutChange(
+                    resolveTailIndex = { 0 },
+                    captureLayout = { ConversationTailLayout(900, 0, 900, 600) },
+                    awaitFrame = list::frame,
+                ),
+            )
+            assertEquals(
+                ConversationIncomingAppendOutcome.NotFollowing,
+                coordinator.followAppendOrRevealIncomingStart(
+                    candidates = listOf(incoming("later")),
+                    probeFor = { list.probe { 0 } },
+                    resolveTailIndex = { 0 },
+                    awaitFrame = list::frame,
+                ),
+            )
+            assertEquals(listOf(0 to 0, 0 to 300), list.writes)
+            assertEquals(ConversationScrollMode.ReadingHistory("long", 300), coordinator.mode)
+        }
+
+    /**
+     * A passive tail correction, such as the membership-row follow, still in flight when a tall message arrives must
+     * not make the landing look like a history reader. The landing supersedes the correction and reaches the beginning.
+     */
+    @Test
+    fun anIncomingLandingDuringAPassiveTailCorrectionStillRevealsTheBeginning() =
+        runTest {
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(900, 80, 80))
+            list.settle(index = 1)
+            val coordinator = ConversationScrollCoordinator(list)
+            val correctionFrame = CompletableDeferred<Unit>()
+            val correction =
+                async {
+                    coordinator.followTailIfAllowed(
+                        resolveTailIndex = { 0 },
+                        reason = ConversationScrollReason.NewMessage,
+                        awaitFrame = { correctionFrame.await() },
+                    )
+                }
+            runCurrent()
+            assertEquals(
+                ConversationScrollMode.ProgrammaticJump(null, ConversationScrollReason.NewMessage),
+                coordinator.mode,
+            )
+            val outcome =
+                coordinator.followAppendOrRevealIncomingStart(
+                    candidates = listOf(incoming("long")),
+                    probeFor = { list.probe { 0 } },
+                    resolveTailIndex = { 0 },
+                    awaitFrame = list::frame,
+                )
+            val revealed = outcome as ConversationIncomingAppendOutcome.RevealedReadingStart
+            assertEquals(ConversationReadingStartPlacement(0, 300), revealed.placement)
+            assertFalse("the superseded correction reports no settle", correction.await())
+            assertEquals(ConversationScrollMode.ReadingHistory("long", 300), coordinator.mode)
+        }
+
+    /** An explicit jump in flight, such as a mention, keeps refusing an incoming landing that would override it. */
+    @Test
+    fun anIncomingLandingDuringExplicitNavigationIsNotTaken() =
+        runTest {
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(900, 80, 80))
+            list.settle(index = 1)
+            val coordinator = ConversationScrollCoordinator(list)
+            val jumpFrame = CompletableDeferred<Unit>()
+            val jump =
+                async {
+                    coordinator.programmaticJump(
+                        targetMessageId = "mention",
+                        reason = ConversationScrollReason.Mention,
+                    ) { jumpFrame.await() }
+                }
+            runCurrent()
+            assertEquals(
+                ConversationIncomingAppendOutcome.NotFollowing,
+                coordinator.followAppendOrRevealIncomingStart(
+                    candidates = listOf(incoming("long")),
+                    probeFor = { list.probe { 0 } },
+                    resolveTailIndex = { 0 },
+                    awaitFrame = list::frame,
+                ),
+            )
+            jumpFrame.complete(Unit)
+            assertTrue(jump.await())
+        }
+
+    /** A drag while the appended row is still being measured supersedes the landing before any reading-start write. */
+    @Test
+    fun dragDuringIncomingMeasurementSupersedesTheLanding() =
+        runTest {
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(900, 80))
+            list.settle(index = 1)
+            val coordinator = ConversationScrollCoordinator(list)
+            var frames = 0
+            val outcome =
+                coordinator.followAppendOrRevealIncomingStart(
+                    candidates = listOf(incoming("long")),
+                    probeFor = { list.probe { 0 } },
+                    resolveTailIndex = { 0 },
+                    awaitFrame = {
+                        frames++
+                        if (frames == 2) coordinator.onUserGestureStarted(anchor("older", listIndex = 1))
+                        list.frame()
+                    },
+                )
+            assertEquals(ConversationIncomingAppendOutcome.Superseded, outcome)
+            assertEquals(listOf(0 to 0), list.writes)
+            assertEquals(ConversationScrollMode.ReadingHistory("older", 0), coordinator.mode)
+        }
+
+    /** A reader above the newest edge is never moved by an incoming append, however tall it is. */
+    @Test
+    fun historyReaderIsNotMovedByAnOversizedIncomingAppend() =
+        runTest {
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(900, 80, 80))
+            val coordinator =
+                ConversationScrollCoordinator(list, ConversationScrollMode.ReadingHistory("older", 0))
+            val outcome =
+                coordinator.followAppendOrRevealIncomingStart(
+                    candidates = listOf(incoming("long")),
+                    probeFor = { list.probe { 0 } },
+                    resolveTailIndex = { 0 },
+                    awaitFrame = list::frame,
+                )
+            assertEquals(ConversationIncomingAppendOutcome.NotFollowing, outcome)
+            assertTrue(list.writes.isEmpty())
+        }
+
+    /** A burst lands on its first oversized incoming row, so newer rows below it stay readable downward. */
+    @Test
+    fun burstLandsOnItsFirstOversizedIncomingRow() =
+        runTest {
+            // Newest first: a short newer row at 0, the oversized older arrival at 1, earlier history above.
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(100, 700, 80))
+            list.settle(index = 2)
+            val coordinator = ConversationScrollCoordinator(list)
+            val ids = listOf("first", "second")
+            val outcome =
+                coordinator.followAppendOrRevealIncomingStart(
+                    candidates = ids.map(::incoming),
+                    probeFor = { candidate -> list.probe { if (candidate.messageId == "first") 1 else 0 } },
+                    resolveTailIndex = { 0 },
+                    awaitFrame = list::frame,
+                )
+            val revealed = outcome as ConversationIncomingAppendOutcome.RevealedReadingStart
+            assertEquals("first", revealed.anchor.messageId)
+            assertEquals(listOf(0 to 0, 1 to 100), list.writes)
+        }
+
+    /**
+     * When a later tall arrival pushes the burst's first tall row entirely above the viewport, the landing still
+     * reaches and measures that first row and starts at its beginning, not the later row's.
+     */
+    @Test
+    fun burstLandsOnItsFirstRowWhenALaterTallRowPushesItOffScreen() =
+        runTest {
+            assertBurstLandsOnFirstRow(
+                heightsPx = listOf(700, 900, 80),
+                expectedWrites = listOf(0 to 0, 1 to 0, 1 to 300),
+            )
+        }
+
+    /**
+     * Known limit: a tall first row hidden entirely behind a newer row that exactly fills the viewport is never laid
+     * out at the tail, so it cannot be seen to be oversized, and the burst keeps the single tail write.
+     */
+    @Test
+    fun oversizedRowHiddenBehindAFittingNewestRowKeepsTheTail() =
+        runTest {
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(600, 900, 80))
+            list.settle(index = 2)
+            val coordinator = ConversationScrollCoordinator(list)
+            val outcome = appendBurst(coordinator, list, listOf("first", "second"))
+            assertEquals(ConversationIncomingAppendOutcome.FollowedTail, outcome)
+            assertEquals(listOf(0 to 0), list.writes)
+            assertTrue(coordinator.isFollowingTail)
+        }
+
+    /** A burst of rows that each fit keeps the tail even when the first row's top is clipped. */
+    @Test
+    fun burstOfShortRowsKeepsFollowingTheTail() =
+        runTest {
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(400, 300, 80))
+            list.settle(index = 2)
+            val outcome = appendBurst(ConversationScrollCoordinator(list), list, listOf("first", "second"))
+            assertEquals(ConversationIncomingAppendOutcome.FollowedTail, outcome)
+            assertEquals(listOf(0 to 0), list.writes)
+        }
+
+    /**
+     * When a later oversized row pushes a short first row above the viewport, the burst lands on the short row's
+     * beginning, the first line the reader has not seen.
+     */
+    @Test
+    fun burstLandsOnAShortFirstRowPushedAboveByALaterOversizedRow() =
+        runTest {
+            assertBurstLandsOnFirstRow(
+                heightsPx = listOf(900, 300, 80),
+                expectedWrites = listOf(0 to 0, 1 to 0, 1 to -300),
+            )
+        }
+
+    /**
+     * A burst of short rows that overflows the viewport, leaving its first row not laid out, keeps the single tail
+     * write: no measuring scroll is made for rows the tail layout did not reach.
+     */
+    @Test
+    fun overflowingShortBurstMakesOnlyTheTailWrite() =
+        runTest {
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(300, 300, 300, 80))
+            list.settle(index = 3)
+            val coordinator = ConversationScrollCoordinator(list)
+            val outcome = appendBurst(coordinator, list, listOf("first", "second", "third"))
+            assertEquals(ConversationIncomingAppendOutcome.FollowedTail, outcome)
+            assertEquals(listOf(0 to 0), list.writes)
+            assertTrue(coordinator.isFollowingTail)
+        }
+
+    /** Appends [ids], oldest first, as a burst whose rows sit at list indices newest-first from zero. */
+    private suspend fun appendBurst(
+        coordinator: ConversationScrollCoordinator,
+        list: IncomingAppendTestList,
+        ids: List<String>,
+    ) = coordinator.followAppendOrRevealIncomingStart(
+        candidates = ids.map(::incoming),
+        probeFor = { candidate -> list.probe { ids.lastIndex - ids.indexOf(candidate.messageId) } },
+        resolveTailIndex = { 0 },
+        awaitFrame = list::frame,
+    )
+
+    /** A burst of short rows that fits together keeps the single physical-tail write. */
+    @Test
+    fun fittingBurstKeepsFollowingTheTail() =
+        runTest {
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(200, 200, 80))
+            list.settle(index = 2)
+            val coordinator = ConversationScrollCoordinator(list)
+            val outcome =
+                coordinator.followAppendOrRevealIncomingStart(
+                    candidates = listOf(incoming("first"), incoming("second")),
+                    probeFor = { candidate -> list.probe { if (candidate.messageId == "first") 1 else 0 } },
+                    resolveTailIndex = { 0 },
+                    awaitFrame = list::frame,
+                )
+            assertEquals(ConversationIncomingAppendOutcome.FollowedTail, outcome)
+            assertEquals(listOf(0 to 0), list.writes)
+        }
+
+    /** Appends a two-row burst (first at index 1, second at index 0) and asserts it lands on the first row. */
+    private suspend fun assertBurstLandsOnFirstRow(
+        heightsPx: List<Int>,
+        expectedWrites: List<Pair<Int, Int>>,
+    ) {
+        val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = heightsPx)
+        list.settle(index = 2)
+        val coordinator = ConversationScrollCoordinator(list)
+        val outcome =
+            coordinator.followAppendOrRevealIncomingStart(
+                candidates = listOf(incoming("first"), incoming("second")),
+                probeFor = { candidate -> list.probe { if (candidate.messageId == "first") 1 else 0 } },
+                resolveTailIndex = { 0 },
+                awaitFrame = list::frame,
+            )
+        val revealed = outcome as ConversationIncomingAppendOutcome.RevealedReadingStart
+        assertEquals("first", revealed.anchor.messageId)
+        assertEquals(expectedWrites, list.writes)
+        assertEquals(ConversationScrollMode.ReadingHistory("first", expectedWrites.last().second), coordinator.mode)
+    }
+
+    /** An append with no incoming rows, such as an accepted own send, keeps the single physical-tail write. */
+    @Test
+    fun appendWithoutIncomingRowsKeepsTheTailFollow() =
+        runTest {
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(900, 80))
+            list.settle(index = 1)
+            val coordinator = ConversationScrollCoordinator(list)
+            val outcome =
+                coordinator.followAppendOrRevealIncomingStart(
+                    candidates = emptyList(),
+                    probeFor = { list.probe { 0 } },
+                    resolveTailIndex = { 0 },
+                    awaitFrame = list::frame,
+                )
+            assertEquals(ConversationIncomingAppendOutcome.FollowedTail, outcome)
+            assertEquals(listOf(0 to 0), list.writes)
+            assertTrue(coordinator.isFollowingTail)
+        }
+
+    /** A row that is never measured within the bounded wait keeps ordinary tail following. */
+    @Test
+    fun unmeasuredIncomingRowFallsBackToTheTailWithinItsFrameBudget() =
+        runTest {
+            val list = IncomingAppendTestList(viewportEndPx = 600, heightsPx = listOf(900, 80))
+            val coordinator = ConversationScrollCoordinator(list)
+            var frames = 0
+            val outcome =
+                coordinator.followAppendOrRevealIncomingStart(
+                    candidates = listOf(incoming("long")),
+                    probeFor = { ConversationReadingStartProbe({ 0 }, { ConversationMentionJumpLayout(600, null) }) },
+                    resolveTailIndex = { 0 },
+                    maxMeasureFrames = 3,
+                    awaitFrame = { frames++ },
+                )
+            assertEquals(ConversationIncomingAppendOutcome.FollowedTail, outcome)
+            assertEquals(4, frames)
+            assertEquals(listOf(0 to 0), list.writes)
+        }
+
+    /** Builds an incoming landing candidate with its presentation identity. */
+    private fun incoming(messageId: String) = ConversationIncomingAppendCandidate(messageId, "msg:$messageId")
+
     private fun anchor(
         messageId: String?,
         itemId: String? = messageId?.let { "msg:$it" },

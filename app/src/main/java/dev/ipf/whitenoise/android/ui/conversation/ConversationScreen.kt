@@ -1163,8 +1163,13 @@ internal fun ConversationScreen(
             if (bounds != null) {
                 transcriptWindowTop = bounds.top
                 transcriptHeightPx = bounds.height
-                ttsFollowHandle.sentenceLayouts.updateViewportBounds(bounds)
             }
+        }
+    }
+    // Speech rests sentences below the painted top fade, unlike the drag and reaction consumers above.
+    LaunchedEffect(timelineViewport, ttsFollowHandle) {
+        snapshotFlow { timelineViewport.speechBoundsInWindow }.collect { bounds ->
+            if (bounds != null) ttsFollowHandle.sentenceLayouts.updateViewportBounds(bounds)
         }
     }
 
@@ -3261,8 +3266,14 @@ internal fun ConversationScreen(
                 )
             }
         }
+        // Survives the follow effect's restart within a burst, never a chat, account or runtime change.
+        val incomingAppendLanding = remember(controller) { ConversationIncomingAppendLandingQueue() }
         LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored) {
-            if (!initialTimelineAnchored || renderedTimeline.isEmpty()) return@LaunchedEffect
+            if (!initialTimelineAnchored || renderedTimeline.isEmpty()) {
+                // A restart that cannot be an append still interrupts the burst, so its rows never join a later one.
+                incomingAppendLanding.retire()
+                return@LaunchedEffect
+            }
             val latestId = renderedTimeline.lastOrNull()?.presentationId
             val previousId = navigationState.lastFollowedLatestId
             // A genuine append: the last id changed and the row we last followed is
@@ -3273,11 +3284,37 @@ internal fun ConversationScreen(
                     latestId != previousId &&
                     renderedTimeline.any { it.presentationId == previousId }
             navigationState.lastFollowedLatestId = latestId ?: previousId
-            if (isAppend) {
-                scrollCoordinator.followTailIfAllowed(
-                    resolveTailIndex = { currentTailIndex },
-                    reason = ConversationScrollReason.NewMessage,
-                )
+            if (isAppend && previousId != null) {
+                // #3558: an incoming row taller than the reading viewport lands at its beginning instead of its end.
+                val candidates =
+                    incomingAppendLanding.admit(
+                        appended =
+                            conversationAppendedRows(renderedTimeline, previousId) { row ->
+                                controller.isMessageMine(row.record)
+                            },
+                        intent = scrollCoordinator.intentToken,
+                    )
+                val outcome =
+                    scrollCoordinator.followAppendOrRevealIncomingStart(
+                        candidates = candidates,
+                        probeFor = { candidate ->
+                            ConversationReadingStartProbe(
+                                resolveTargetIndex = { currentTimelineListIndex(candidate.messageId) },
+                                readLayout = { index -> mentionJumpLayout(candidate.messageId, index) },
+                                traceSections = false,
+                            )
+                        },
+                        resolveTailIndex = { currentTailIndex },
+                        oversizedSeen = incomingAppendLanding.oversizedSeen,
+                        onOversized = incomingAppendLanding::markOversized,
+                    )
+                incomingAppendLanding.retire()
+                if (outcome is ConversationIncomingAppendOutcome.RevealedReadingStart) {
+                    viewportRestorationOwner.adoptIncomingReadingStart(outcome)
+                }
+            } else {
+                // A removal or trim restarted this effect without an append, so a burst it interrupted is over.
+                incomingAppendLanding.retire()
             }
         }
 
@@ -4437,6 +4474,7 @@ internal fun ConversationScreen(
                                             .transcriptEdgeFade(
                                                 listState = listState,
                                                 composerOverlap = overlayPadding,
+                                                geometry = timelineViewport.edgeFade,
                                             ),
                                     // Bottom-anchored like every established chat
                                     // client: the viewport shrinking under the keyboard

@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
 
 internal val SCROLL_EDGE_FADE_HEIGHT = 28.dp
 private const val EDGE_FADE_ANIMATION_MILLIS = 120
-private const val MAX_VIEWPORT_FADE_FRACTION = 0.25f
+internal const val MAX_VIEWPORT_FADE_FRACTION = 0.25f
 
 /** Physical viewport edges with more content beyond them; RTL does not invert vertical scrolling. */
 internal data class ScrollEdgeFadeState(

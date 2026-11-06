@@ -501,12 +501,31 @@ class ConversationTtsFollowComposeTest {
         assertMeasuredShapeFollowsSentence(FollowTargetShape.ReplyAndFooterAroundBody, reverseLayout = true)
     }
 
+    /** With the real transcript fade, a resumed multi-leaf sentence starts at the fade's opaque edge. */
+    @Test
+    fun reversedFadedTranscriptAlignsMultiLeafSentenceBelowTheOpaqueEdge() {
+        assertMeasuredShapeFollowsSentence(FollowTargetShape.SplitMarkdown, reverseLayout = true, edgeFade = true)
+    }
+
+    /** With the real transcript fade, a sentence after tall media lands below the band, not inside it. */
+    @Test
+    fun reversedFadedTranscriptAlignsTallMediaSentenceBelowTheOpaqueEdge() {
+        assertMeasuredShapeFollowsSentence(
+            FollowTargetShape.TallMediaBeforeSentence,
+            reverseLayout = true,
+            edgeFade = true,
+        )
+    }
+
+    /** Follows one target and asserts its sentence begins at the speech viewport top and fits inside it. */
     private fun assertMeasuredShapeFollowsSentence(
         shape: FollowTargetShape,
         reverseLayout: Boolean = false,
+        edgeFade: Boolean = false,
     ) {
         var request by mutableStateOf(0)
         lateinit var targetLayout: () -> Pair<Rect?, Rect?>
+        var readingTop: () -> Float? = { null }
         val messages = (0 until 30).map { "message-$it" }
         composeRule.setContent {
             WhiteNoiseTheme {
@@ -519,6 +538,8 @@ class ConversationTtsFollowComposeTest {
                     targetShape = shape,
                     onTargetLayout = { targetLayout = it },
                     reverseLayout = reverseLayout,
+                    edgeFade = edgeFade,
+                    onReadingTop = { readingTop = it },
                 )
             }
         }
@@ -529,6 +550,13 @@ class ConversationTtsFollowComposeTest {
             val (sentenceBounds, viewportBounds) = targetLayout()
             val sentence = requireNotNull(sentenceBounds)
             val viewport = requireNotNull(viewportBounds)
+            if (edgeFade) {
+                val fadePx = with(composeRule.density) { TRANSCRIPT_EDGE_FADE_HEIGHT.toPx() }
+                assertTrue(
+                    "speech must exclude the settled top fade: ${viewport.top} vs ${readingTop()} + $fadePx",
+                    kotlin.math.abs(viewport.top - (requireNotNull(readingTop()) + fadePx)) <= 1f,
+                )
+            }
             val topDelta = kotlin.math.abs(sentence.top - viewport.top)
             assertTrue(
                 "sentence top ${sentence.top} must use viewport top ${viewport.top} in $viewport",
@@ -538,6 +566,25 @@ class ConversationTtsFollowComposeTest {
         }
     }
 
+    /** Applies the production transcript fade, publishing to [viewport], only when [enabled]. */
+    @Composable
+    private fun Modifier.optionalTranscriptFade(
+        enabled: Boolean,
+        listState: LazyListState,
+        overlapPx: Int,
+        viewport: ConversationTimelineViewport,
+    ): Modifier =
+        if (enabled) {
+            transcriptEdgeFade(
+                listState = listState,
+                composerOverlap = with(LocalDensity.current) { overlapPx.toDp() },
+                geometry = viewport.edgeFade,
+            )
+        } else {
+            this
+        }
+
+    /** Mounts a follow target in a measured list, optionally reversed under the real transcript fade. */
     @Composable
     @Suppress("LongMethod")
     private fun FollowViewportHarness(
@@ -551,6 +598,8 @@ class ConversationTtsFollowComposeTest {
         onTargetLayout: ((() -> Pair<Rect?, Rect?>) -> Unit)? = null,
         estimatedItemHeightPx: Int? = null,
         reverseLayout: Boolean = false,
+        edgeFade: Boolean = false,
+        onReadingTop: ((() -> Float?) -> Unit)? = null,
     ) {
         val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialFirstVisibleItemIndex)
         val sentenceLayouts = remember { ConversationTtsSentenceLayoutRegistry() }
@@ -576,6 +625,15 @@ class ConversationTtsFollowComposeTest {
         onTargetLayout?.invoke {
             sentenceLayouts.completeSentenceBounds(followTarget(targetMessageId)) to
                 sentenceLayouts.viewportBoundsInWindow
+        }
+        onReadingTop?.invoke { timelineViewport.readingBoundsInWindow?.top }
+        if (edgeFade) {
+            // As the screen does: the painted fade changes without moving the list, so observe it.
+            LaunchedEffect(timelineViewport) {
+                snapshotFlow { timelineViewport.speechBoundsInWindow }.collect { bounds ->
+                    bounds?.let(sentenceLayouts::updateViewportBounds)
+                }
+            }
         }
         LaunchedEffect(request, targetMessageId) {
             if (request == 0) return@LaunchedEffect
@@ -633,10 +691,11 @@ class ConversationTtsFollowComposeTest {
                         .height(320.dp)
                         .onGloballyPositioned {
                             timelineViewport.onPaintViewportMeasured(it)
+                            if (edgeFade) return@onGloballyPositioned
                             val bounds =
                                 if (reverseLayout) timelineViewport.readingBoundsInWindow else it.boundsInWindow()
                             bounds?.let(sentenceLayouts::updateViewportBounds)
-                        },
+                        }.optionalTranscriptFade(edgeFade, listState, overlap, timelineViewport),
             ) {
                 items(messages, key = { it }) { messageId ->
                     if (messageId == targetMessageId) {

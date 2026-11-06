@@ -5,6 +5,7 @@ import androidx.compose.ui.geometry.Rect
 import dev.ipf.whitenoise.android.audio.tts.TtsPassage
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.TtsVisibleTextSpan
+import dev.ipf.whitenoise.android.ui.common.verticalEdgeFadeOpaqueRange
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsSentenceProjectionSegment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -408,6 +409,38 @@ class ConversationTtsFollowPolicyTest {
             ),
         )
         assertEquals(Rect(0f, 400f, 100f, 500f), registry.completeSentenceBounds(target))
+    }
+
+    /**
+     * The issue's geometry witness: paint-top 100 px under a settled 28 px fade leaves the opaque edge
+     * at 128 px, so a sentence aligned to the paint top is not yet revealed to speech.
+     */
+    @Test
+    fun aSentenceAtThePaintTopIsNotRevealedUnderASettledFade() {
+        val opaque = checkNotNull(verticalEdgeFadeOpaqueRange(heightPx = 900f, topFadePx = 28f, bottomFadePx = 60f))
+        val speech = Rect(0f, 100f + opaque.start, 100f, 100f + opaque.endInclusive)
+        val registry = ConversationTtsSentenceLayoutRegistry()
+        val target = speaking(sessionId = 1, sentenceIndex = 0).followTarget()
+        val row = Any()
+        val coverage = setOf(TtsSentenceProjectionSegment("plain", 0, 10))
+        registry.mountRow(target.messageIdHex, row)
+        registry.updateViewportBounds(speech)
+
+        listOf(100f to true, 128f to false).forEach { (top, needsReveal) ->
+            registry.report(
+                ConversationTtsSentenceLayoutReport(
+                    target = target,
+                    rowInstance = row,
+                    renderedLeafId = "plain",
+                    boundsInWindow = Rect(0f, top, 100f, top + 40f),
+                    coverage = coverage,
+                    expectedCoverage = coverage,
+                ),
+            )
+            assertEquals(128f, speech.top)
+            assertEquals("a sentence at $top px", needsReveal, registry.needsReveal(target))
+            assertEquals(!needsReveal, ttsSentenceWasRevealed(registry.completeSentenceBounds(target), speech))
+        }
     }
 
     @Test
