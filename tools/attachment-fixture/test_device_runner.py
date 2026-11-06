@@ -108,7 +108,15 @@ class RunnerContractTest(unittest.TestCase):
                 self.assertFalse(device_runner.wait_for_ledger_completion(ledger, 0, timeout=0)[1])
 
     def test_timeout_and_cleanup_failure_preserve_failed_report(self):
-        """An adb failure cannot discard the host evidence or become qualification."""
+        """A bytes-valued timeout retains closed checkpoints and host evidence without qualifying unfinished work."""
+        prefix = "INSTRUMENTATION_STATUS: controlled_attachment_json="
+        checkpoint = {"phase": "fixture-stage", "stage": "resume-work-succeeded"}
+        transcript = (prefix + json.dumps(checkpoint) + "\nPRIVATE-FIXTURE-CONTENT\n" +
+                      prefix + '{"phase":"fixture-stage","stage":"PRIVATE"}\n' +
+                      prefix + '{"phase":"fixture-stage","stage":"resume-work-succeeded","secret":"PRIVATE"}\n' +
+                      prefix + '{"phase":"automatic-platform-resume","success":true}\n' +
+                      prefix + '{"phase":"fixture-stage","stage":')
+
         def adb(_, serial, *args, **options):
             """Fail instrumentation and cleanup independently, after verified emulator setup."""
             self.assertEqual("emulator-5554", serial)
@@ -121,7 +129,7 @@ class RunnerContractTest(unittest.TestCase):
             if args[:2] == ("reverse", "--remove"):
                 raise subprocess.CalledProcessError(1, "adb")
             if args[:3] == ("shell", "am", "instrument"):
-                raise subprocess.TimeoutExpired("adb", 180)
+                raise subprocess.TimeoutExpired("adb", 180, output=transcript.encode(), stderr=b"PRIVATE device offline")
             return ""
 
         with tempfile.TemporaryDirectory() as root, patch.object(device_runner, "adb_command", side_effect=adb), \
@@ -134,6 +142,10 @@ class RunnerContractTest(unittest.TestCase):
             self.assertTrue(report["failure_diagnostics"]["timed_out"])
             self.assertEqual("instrumentation", report["failure_diagnostics"]["stage"])
             self.assertEqual("unavailable", report["failure_diagnostics"]["crash_capture"])
+            self.assertEqual("device-offline", report["failure_diagnostics"]["subprocess_status"])
+            self.assertEqual([checkpoint], report["metrics"])
+            self.assertNotIn("PRIVATE", output.read_text())
+            self.assertFalse(report.get("instrumentation_passed", False))
             self.assertIn("ledger", report)
             self.assertTrue(report["reverse_cleanup_failed"])
             self.assertFalse(report["qualified"])
