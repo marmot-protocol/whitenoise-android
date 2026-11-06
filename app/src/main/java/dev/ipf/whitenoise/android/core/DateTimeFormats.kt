@@ -31,9 +31,7 @@ enum class TimeFormatPreference(
         }
 
     companion object {
-        val DEFAULT = Automatic
-
-        fun fromPreference(value: String?): TimeFormatPreference = entries.firstOrNull { it.preferenceValue == value } ?: DEFAULT
+        fun fromPreference(value: String?) = entries.find { it.preferenceValue == value } ?: Automatic
     }
 }
 
@@ -55,9 +53,7 @@ enum class DateFormatPreference(
     ;
 
     companion object {
-        val DEFAULT = Automatic
-
-        fun fromPreference(value: String?): DateFormatPreference = entries.firstOrNull { it.preferenceValue == value } ?: DEFAULT
+        fun fromPreference(value: String?) = entries.find { it.preferenceValue == value } ?: Automatic
     }
 }
 
@@ -69,7 +65,7 @@ enum class DateFormatPreference(
 @Immutable
 data class DateTimeDisplay(
     val use24Hour: Boolean? = null,
-    val dateFormat: DateFormatPreference = DateFormatPreference.DEFAULT,
+    val dateFormat: DateFormatPreference = DateFormatPreference.Automatic,
     val region: String? = null,
 ) {
     companion object {
@@ -83,8 +79,8 @@ data class DateTimeDisplay(
  * state, so composition reading [display] recomposes on a change; plain text builders read it too.
  */
 object DateTimeFormatState {
-    var timeFormat by mutableStateOf(TimeFormatPreference.DEFAULT)
-    var dateFormat by mutableStateOf(DateFormatPreference.DEFAULT)
+    var timeFormat by mutableStateOf(TimeFormatPreference.Automatic)
+    var dateFormat by mutableStateOf(DateFormatPreference.Automatic)
 
     /** Android's explicit 12/24-hour switch; null when unset, so the regional default applies. */
     var system24Hour by mutableStateOf<Boolean?>(null)

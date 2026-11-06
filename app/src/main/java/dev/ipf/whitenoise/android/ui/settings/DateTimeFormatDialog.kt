@@ -43,7 +43,7 @@ internal fun dateTimeFormatSample(
     dateStyle: FormatStyle? = FormatStyle.SHORT,
     timeStyle: FormatStyle? = FormatStyle.SHORT,
     zone: ZoneId = ZoneId.systemDefault(),
-): String = IdentityFormatter.dateTime(SampleDateTime.atZone(zone).toInstant(), locale, zone, display, dateStyle, timeStyle)
+) = IdentityFormatter.dateTime(SampleDateTime.atZone(zone).toInstant(), locale, zone, display, dateStyle, timeStyle)
 
 /**
  * Time and date choices on one screen, each labelled with the example it produces. Choices apply
@@ -70,36 +70,8 @@ internal fun DateTimeFormatDialog(
                 Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                DateTimeGroupLabel(stringResource(R.string.date_time_format_time))
-                Column(Modifier.selectableGroup()) {
-                    TimeFormatPreference.entries.forEach { format ->
-                        val display = DateTimeDisplay(use24Hour = format.use24Hour(system24Hour))
-                        WhiteNoiseDialogChoiceRow(
-                            title = stringResource(format.labelRes),
-                            subtitle = dateTimeFormatSample(locale, display, dateStyle = null),
-                            selected = timeFormat == format,
-                            highlightSelected = false,
-                            onClick = { if (timeFormat != format) onSelectTime(format) },
-                            modifier = Modifier.testTag("date_time_format.time.${format.preferenceValue}"),
-                        )
-                    }
-                }
-                DateTimeGroupLabel(stringResource(R.string.date_time_format_date))
-                Column(Modifier.selectableGroup()) {
-                    DateFormatPreference.entries.forEach { format ->
-                        val sample = dateTimeFormatSample(locale, DateTimeDisplay(dateFormat = format), timeStyle = null)
-                        val isAutomatic = format == DateFormatPreference.Automatic
-                        WhiteNoiseDialogChoiceRow(
-                            // Explicit orders are named by their own example; only Automatic needs words.
-                            title = if (isAutomatic) stringResource(R.string.date_time_format_automatic) else sample,
-                            subtitle = sample.takeIf { isAutomatic },
-                            selected = dateFormat == format,
-                            highlightSelected = false,
-                            onClick = { if (dateFormat != format) onSelectDate(format) },
-                            modifier = Modifier.testTag("date_time_format.date.${format.preferenceValue}"),
-                        )
-                    }
-                }
+                TimeFormatChoices(locale, timeFormat, system24Hour, onSelectTime)
+                DateFormatChoices(locale, dateFormat, onSelectDate)
                 Text(
                     stringResource(R.string.date_time_format_help),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -121,6 +93,55 @@ internal fun DateTimeFormatDialog(
             }
         },
     )
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun TimeFormatChoices(
+    locale: Locale,
+    selected: TimeFormatPreference,
+    system24Hour: Boolean?,
+    onSelect: (TimeFormatPreference) -> Unit,
+) {
+    DateTimeGroupLabel(stringResource(R.string.date_time_format_time))
+    Column(Modifier.selectableGroup()) {
+        TimeFormatPreference.entries.forEach { format ->
+            val display = DateTimeDisplay(use24Hour = format.use24Hour(system24Hour))
+            WhiteNoiseDialogChoiceRow(
+                title = stringResource(format.labelRes),
+                subtitle = dateTimeFormatSample(locale, display, dateStyle = null),
+                selected = selected == format,
+                highlightSelected = false,
+                onClick = { if (selected != format) onSelect(format) },
+                modifier = Modifier.testTag("date_time_format.time.${format.preferenceValue}"),
+            )
+        }
+    }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun DateFormatChoices(
+    locale: Locale,
+    selected: DateFormatPreference,
+    onSelect: (DateFormatPreference) -> Unit,
+) {
+    DateTimeGroupLabel(stringResource(R.string.date_time_format_date))
+    Column(Modifier.selectableGroup()) {
+        DateFormatPreference.entries.forEach { format ->
+            val sample = dateTimeFormatSample(locale, DateTimeDisplay(dateFormat = format), timeStyle = null)
+            val isAutomatic = format == DateFormatPreference.Automatic
+            WhiteNoiseDialogChoiceRow(
+                // Explicit orders are named by their own example; only Automatic needs words.
+                title = if (isAutomatic) stringResource(R.string.date_time_format_automatic) else sample,
+                subtitle = sample.takeIf { isAutomatic },
+                selected = selected == format,
+                highlightSelected = false,
+                onClick = { if (selected != format) onSelect(format) },
+                modifier = Modifier.testTag("date_time_format.date.${format.preferenceValue}"),
+            )
+        }
+    }
 }
 
 @Composable

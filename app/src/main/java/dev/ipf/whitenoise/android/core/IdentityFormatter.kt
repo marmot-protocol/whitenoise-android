@@ -172,16 +172,25 @@ object IdentityFormatter {
                         days == 0L -> copy.hours((delta / 3_600).toInt())
                         days == 1L -> copy.yesterday
                         days < 7L -> messageDate.dayOfWeek.getDisplayName(TextStyle.SHORT, locale)
-                        days < 365L ->
-                            dateFormat.withoutYearPattern?.let { pattern ->
-                                numericDateFormatter(pattern).format(messageDate)
-                            } ?: localizedDateWithoutYearFormatter(formattingLocale).format(messageDate)
-                        else ->
-                            dateFormat.pattern?.let { pattern -> numericDateFormatter(pattern).format(messageDate) }
-                                ?: shortDateFormatter(formattingLocale).format(messageDate)
+                        else -> compactDate(messageDate, withoutYear = days < 365L, formattingLocale, dateFormat)
                     }
                 }.getOrDefault(copy.now)
             }
+        }
+    }
+
+    /** A chat-list date: the explicit numeric order when chosen, else the locale's compact date. */
+    private fun compactDate(
+        date: LocalDate,
+        withoutYear: Boolean,
+        locale: Locale,
+        dateFormat: DateFormatPreference,
+    ): String {
+        val numeric = if (withoutYear) dateFormat.withoutYearPattern else dateFormat.pattern
+        return when {
+            numeric != null -> numericDateFormatter(numeric).format(date)
+            withoutYear -> localizedDateWithoutYearFormatter(locale).format(date)
+            else -> shortDateFormatter(locale).format(date)
         }
     }
 
@@ -240,7 +249,7 @@ object IdentityFormatter {
     ): String =
         runCatching {
             dateFormat.pattern?.let { pattern -> numericDateFormatter(pattern).format(date) }
-                ?: displayFormatter(locale, DateTimeDisplay.LocaleDefault, style, null, withoutYear = false).format(date)
+                ?: displayFormatter(locale, DateTimeDisplay.LocaleDefault, style, null, false).format(date)
         }.getOrDefault("")
 
     /**
@@ -260,7 +269,8 @@ object IdentityFormatter {
     ): String {
         require(dateStyle != null || timeStyle != null) { "A date or time style is required" }
         return try {
-            displayFormatter(locale, display, dateStyle, timeStyle, withoutYear && dateStyle != null).format(instant.atZone(zone))
+            val formatter = displayFormatter(locale, display, dateStyle, timeStyle, withoutYear && dateStyle != null)
+            formatter.format(instant.atZone(zone))
         } catch (_: DateTimeException) {
             ""
         } catch (_: ArithmeticException) {
@@ -324,7 +334,13 @@ object IdentityFormatter {
                 }.withLocale(request.locale)
             } else {
                 val pattern =
-                    displayPattern(request.locale, request.display, request.dateStyle, request.timeStyle, request.withoutYear)
+                    displayPattern(
+                        request.locale,
+                        request.display,
+                        request.dateStyle,
+                        request.timeStyle,
+                        request.withoutYear,
+                    )
                 DateTimeFormatter.ofPattern(pattern, request.locale)
             }
         }
@@ -348,32 +364,55 @@ object IdentityFormatter {
             time: FormatStyle?,
         ) = DateTimeFormatterBuilder.getLocalizedDateTimePattern(date, time, IsoChronology.INSTANCE, locale)
 
-        val localizedDate = dateStyle?.let { localized(it, null) }
-        val localizedTime = timeStyle?.let { localized(null, it) }
-        val date =
-            localizedDate?.let { pattern ->
-                val numeric = if (withoutYear) display.dateFormat.withoutYearPattern else display.dateFormat.pattern
-                numeric ?: if (withoutYear) stripYearFromLocalizedDatePattern(pattern).ifBlank { pattern } else pattern
-            }
-        val time = localizedTime?.let { pattern -> display.use24Hour?.let { coerceClockPattern(pattern, it) } ?: pattern }
-        if (date == null || time == null) return requireNotNull(date ?: time)
-        val combined = localized(dateStyle, timeStyle)
-        val dateStart = combined.indexOf(localizedDate)
-        val timeStart = combined.indexOf(localizedTime)
-        val separate =
-            dateStart >= 0 &&
-                timeStart >= 0 &&
-                (dateStart + localizedDate.length <= timeStart || timeStart + localizedTime.length <= dateStart)
-        if (!separate) return "$date $time"
+        val date = dateStyle?.let { DatePart(localized(it, null), display.dateFormat, withoutYear) }
+        val time = timeStyle?.let { TimePart(localized(null, it), display.use24Hour) }
+        return when {
+            date == null -> requireNotNull(time).rewritten
+            time == null -> date.rewritten
+            else -> replaceParts(localized(dateStyle, timeStyle), date, time)
+        }
+    }
+
+    /** One localized part of a combined pattern and its rewrite. */
+    private sealed interface PatternPart {
+        val localized: String
+        val rewritten: String
+    }
+
+    private class DatePart(
+        override val localized: String,
+        dateFormat: DateFormatPreference,
+        withoutYear: Boolean,
+    ) : PatternPart {
+        override val rewritten: String =
+            (if (withoutYear) dateFormat.withoutYearPattern else dateFormat.pattern)
+                ?: if (withoutYear) stripYearFromLocalizedDatePattern(localized).ifBlank { localized } else localized
+    }
+
+    private class TimePart(
+        override val localized: String,
+        use24Hour: Boolean?,
+    ) : PatternPart {
+        override val rewritten: String = use24Hour?.let { coerceClockPattern(localized, it) } ?: localized
+    }
+
+    /** Puts the rewritten parts back into [combined], keeping the locale's own glue between them. */
+    private fun replaceParts(
+        combined: String,
+        date: PatternPart,
+        time: PatternPart,
+    ): String {
+        val placed = listOf(date, time).map { combined.indexOf(it.localized) to it }.sortedBy { it.first }
+        val (first, second) = placed
+        val separate = first.first >= 0 && first.first + first.second.localized.length <= second.first
+        if (!separate) return "${date.rewritten} ${time.rewritten}"
         return buildString {
             var index = 0
-            listOf(dateStart to (localizedDate.length to date), timeStart to (localizedTime.length to time))
-                .sortedBy { it.first }
-                .forEach { (start, part) ->
-                    append(combined, index, start)
-                    append(part.second)
-                    index = start + part.first
-                }
+            placed.forEach { (start, part) ->
+                append(combined, index, start)
+                append(part.rewritten)
+                index = start + part.localized.length
+            }
             append(combined, index, combined.length)
         }
     }
@@ -445,19 +484,7 @@ object IdentityFormatter {
                     out.append(if (use24Hour) "HH" else "h")
                     index = endOfPatternRun(pattern, index)
                 }
-                char in DAY_PERIOD_PATTERN_TOKENS && use24Hour -> {
-                    // Drop the day-period token with one separator run (a plain or
-                    // narrow no-break space): the one after it ("a h:mm"), else the
-                    // one before it at the end ("h:mm a"). Glued to a field
-                    // ("Bh:mm") it goes alone.
-                    index = endOfPatternRun(pattern, index)
-                    when {
-                        index < pattern.length && pattern[index].isWhitespace() ->
-                            while (index < pattern.length && pattern[index].isWhitespace()) index += 1
-                        index == pattern.length || !pattern[index].isLetter() ->
-                            while (out.isNotEmpty() && out.last().isWhitespace()) out.deleteCharAt(out.length - 1)
-                    }
-                }
+                char in DAY_PERIOD_PATTERN_TOKENS && use24Hour -> index = dropDayPeriod(pattern, index, out)
                 else -> {
                     out.append(char)
                     index += 1
@@ -465,6 +492,25 @@ object IdentityFormatter {
             }
         }
         return finishCoercedPattern(out, pattern, use24Hour)
+    }
+
+    /**
+     * Drops the day-period token at [start] with one separator run (a plain or narrow no-break
+     * space): the one after it ("a h:mm"), else the one before it at the end ("h:mm a"). Glued
+     * to a field ("Bh:mm") it goes alone. Returns the index after what was consumed.
+     */
+    private fun dropDayPeriod(
+        pattern: String,
+        start: Int,
+        out: StringBuilder,
+    ): Int {
+        var index = endOfPatternRun(pattern, start)
+        if (index < pattern.length && pattern[index].isWhitespace()) {
+            while (index < pattern.length && pattern[index].isWhitespace()) index += 1
+        } else if (index == pattern.length || !pattern[index].isLetter()) {
+            while (out.isNotEmpty() && out.last().isWhitespace()) out.deleteCharAt(out.length - 1)
+        }
+        return index
     }
 
     private fun patternMatchesClockSystem(

@@ -14,8 +14,12 @@ import java.util.Locale
 class DateTimeFormatsTest {
     @Test
     fun storedPreferencesRoundTripAndUnknownValuesFallBackToAutomatic() {
-        TimeFormatPreference.entries.forEach { assertEquals(it, TimeFormatPreference.fromPreference(it.preferenceValue)) }
-        DateFormatPreference.entries.forEach { assertEquals(it, DateFormatPreference.fromPreference(it.preferenceValue)) }
+        TimeFormatPreference.entries.forEach {
+            assertEquals(it, TimeFormatPreference.fromPreference(it.preferenceValue))
+        }
+        DateFormatPreference.entries.forEach {
+            assertEquals(it, DateFormatPreference.fromPreference(it.preferenceValue))
+        }
         assertEquals(TimeFormatPreference.Automatic, TimeFormatPreference.fromPreference(null))
         assertEquals(DateFormatPreference.Automatic, DateFormatPreference.fromPreference("bogus"))
     }
@@ -50,13 +54,14 @@ class DateTimeFormatsTest {
     @Test
     fun clockRewriteKeepsTheLocaleGlueBetweenDateAndTime() {
         // zh-Hant glues the day period to the hour; the date must not run into the time.
+        val clock24 = DateTimeDisplay(use24Hour = true)
         assertEquals(
             "y/M/d HH:mm",
-            IdentityFormatter.displayPattern(Locale.TAIWAN, DateTimeDisplay(use24Hour = true), FormatStyle.SHORT, FormatStyle.SHORT),
+            IdentityFormatter.displayPattern(Locale.TAIWAN, clock24, FormatStyle.SHORT, FormatStyle.SHORT),
         )
         assertEquals(
             "MMM d, y, HH:mm",
-            IdentityFormatter.displayPattern(Locale.US, DateTimeDisplay(use24Hour = true), FormatStyle.MEDIUM, FormatStyle.SHORT),
+            IdentityFormatter.displayPattern(Locale.US, clock24, FormatStyle.MEDIUM, FormatStyle.SHORT),
         )
     }
 
@@ -100,15 +105,24 @@ class DateTimeFormatsTest {
         val display = DateTimeDisplay(use24Hour = true, dateFormat = DateFormatPreference.YearMonthDay)
         assertEquals(
             "2026-12-31, 15:04",
-            IdentityFormatter.dateTime(instant, Locale.US, ZoneOffset.UTC, display, FormatStyle.SHORT, FormatStyle.SHORT),
+            IdentityFormatter.dateTime(
+                instant,
+                Locale.US,
+                ZoneOffset.UTC,
+                display,
+                FormatStyle.SHORT,
+                FormatStyle.SHORT,
+            ),
         )
     }
 
     @Test
     fun currentYearCheckRejectsUnrepresentableStamps() {
         val now = Instant.parse("2026-06-30T12:00:00Z")
-        assertTrue(IdentityFormatter.isCurrentYear(Instant.parse("2026-01-02T00:00:00Z").epochSecond.toULong(), ZoneOffset.UTC, now))
-        assertFalse(IdentityFormatter.isCurrentYear(Instant.parse("2025-12-31T00:00:00Z").epochSecond.toULong(), ZoneOffset.UTC, now))
+
+        fun stamp(text: String) = Instant.parse(text).epochSecond.toULong()
+        assertTrue(IdentityFormatter.isCurrentYear(stamp("2026-01-02T00:00:00Z"), ZoneOffset.UTC, now))
+        assertFalse(IdentityFormatter.isCurrentYear(stamp("2025-12-31T00:00:00Z"), ZoneOffset.UTC, now))
         assertFalse(IdentityFormatter.isCurrentYear(ULong.MAX_VALUE, ZoneOffset.UTC, now))
     }
 }

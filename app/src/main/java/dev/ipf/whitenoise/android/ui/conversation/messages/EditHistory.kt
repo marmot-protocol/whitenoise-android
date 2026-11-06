@@ -165,8 +165,14 @@ internal fun editHistoryRevisionTime(
 ): String {
     if (seconds > Instant.MAX.epochSecond.toULong()) return ""
     return IdentityFormatter
-        .dateTime(Instant.ofEpochSecond(seconds.toLong()), locale, zone, display, FormatStyle.MEDIUM, FormatStyle.MEDIUM)
-        .takeIf { it.isNotEmpty() }
+        .dateTime(
+            Instant.ofEpochSecond(seconds.toLong()),
+            locale,
+            zone,
+            display,
+            FormatStyle.MEDIUM,
+            FormatStyle.MEDIUM,
+        ).takeIf { it.isNotEmpty() }
         ?.let { "$it (${zone.id})" }
         .orEmpty()
 }

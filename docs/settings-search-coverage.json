@@ -61,6 +61,10 @@
           "represented_by": "Appearance.font_size"
         },
         {
+          "declaration": "\"date_time_format\"",
+          "represented_by": "Appearance.date_time_format"
+        },
+        {
           "declaration": "\"language\"",
           "represented_by": "Appearance.language"
         },

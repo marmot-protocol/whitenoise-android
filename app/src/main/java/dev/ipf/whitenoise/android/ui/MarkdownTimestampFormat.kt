@@ -113,10 +113,13 @@ internal fun markdownTimestampAbsolute(
             'S' -> FormatStyle.SHORT to FormatStyle.MEDIUM
             else -> FormatStyle.LONG to FormatStyle.SHORT
         }
-    val styleDisplay = if (dateStyle == FormatStyle.SHORT) display else display.copy(dateFormat = DateFormatPreference.Automatic)
+    // Numeric date orders only replace short dates; longer styles keep the language's wording.
+    val styleDisplay =
+        if (dateStyle == FormatStyle.SHORT) display else display.copy(dateFormat = DateFormatPreference.Automatic)
     // The parser accepts all i64 seconds; java.time has a smaller range, so Instant.ofEpochSecond
     // itself can throw before the formatter (which renders its own range failures empty) runs.
     val instant = runCatching { Instant.ofEpochSecond(seconds) }.getOrNull()
-    val label = instant?.let { IdentityFormatter.dateTime(it, locale, zone, styleDisplay, dateStyle, timeStyle) }.orEmpty()
+    val label =
+        instant?.let { IdentityFormatter.dateTime(it, locale, zone, styleDisplay, dateStyle, timeStyle) }.orEmpty()
     return label.ifEmpty { markdownTimestampToken(seconds, style) }
 }

@@ -5,11 +5,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.test.assertContentDescriptionContains
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -47,7 +48,8 @@ class QuickAccountSwitchingUiTest {
         composeRule.setContent {
             WhiteNoiseTheme { AppearanceScreen(app, {}, {}, {}, {}, {}) }
         }
-        composeRule.onNodeWithTag("appearance.quick_account_switching").performScrollTo().performClick()
+        composeRule.onNodeWithTag("settings.list").performScrollToNode(hasTestTag("appearance.quick_account_switching"))
+        composeRule.onNodeWithTag("appearance.quick_account_switching").performClick()
         composeRule.runOnIdle {
             assertFalse(app.quickAccountSwitching)
             assertEquals(A.label, app.activeAccountRef)

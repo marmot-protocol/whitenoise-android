@@ -2332,12 +2332,6 @@ class WhiteNoiseAppState private constructor(
     )
         private set
 
-    init {
-        // DateTimeFormatState owns the live values every formatter reads; this state persists them.
-        DateTimeFormatState.timeFormat = TimeFormatPreference.fromPreference(preferences.getString(TIME_FORMAT_KEY, null))
-        DateTimeFormatState.dateFormat = DateFormatPreference.fromPreference(preferences.getString(DATE_FORMAT_KEY, null))
-    }
-
     /** App-wide preference owner, retained across account changes and reset by erased app preferences. */
     internal val quickAccountSwitchingPreference = QuickAccountSwitchingPreference(preferences)
 
@@ -14426,6 +14420,11 @@ class WhiteNoiseAppState private constructor(
     // coroutines can execute immediately on another thread and must not observe
     // fields declared later in this class before their initializers have run.
     init {
+        // DateTimeFormatState owns the live values every formatter reads; this state persists them.
+        val storedTimeFormat = preferences.getString(TIME_FORMAT_KEY, null)
+        val storedDateFormat = preferences.getString(DATE_FORMAT_KEY, null)
+        DateTimeFormatState.timeFormat = TimeFormatPreference.fromPreference(storedTimeFormat)
+        DateTimeFormatState.dateFormat = DateFormatPreference.fromPreference(storedDateFormat)
         if (startPlatformServices) {
             mutationsScope.launch { notificationPreviewSettings.recover() }
             mutationsScope.launch {
