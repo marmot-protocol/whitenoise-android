@@ -157,6 +157,18 @@ class ChatListSelectionBarScreenshotTest {
             abandonLabel = R.string.chats_abandon_action,
         )
 
+    /** #2925: Select all beyond the loaded rows hides delete and folder actions, light theme. */
+    @Test fun beyondLoadedLight() = capture("selection_actions_beyond_loaded_light", beyondLoaded = true)
+
+    /** #2925: the complete selection on AMOLED keeps both directions for unknown unloaded rows. */
+    @Test
+    fun beyondLoadedAmoled() = capture("selection_actions_beyond_loaded_amoled", dark = true, amoled = true, beyondLoaded = true)
+
+    /** #2925: the complete selection at 200 percent text in right-to-left layout. */
+    @Test
+    @Config(sdk = [36], qualifiers = "ar-ldrtl-w360dp-h780dp-mdpi")
+    fun beyondLoadedRtlLarge() = capture("selection_actions_beyond_loaded_rtl_large", rtl = true, large = true, beyondLoaded = true)
+
     @Test fun partialBatchAmoled() {
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = true, amoled = true) {
@@ -284,7 +296,9 @@ class ChatListSelectionBarScreenshotTest {
         large: Boolean = false,
         departureLabel: Int? = null,
         abandonLabel: Int? = null,
+        beyondLoaded: Boolean = false,
     ) {
+        val both = bulk || beyondLoaded
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (large) 2f else 1f) {
                 CompositionLocalProvider(
@@ -292,13 +306,18 @@ class ChatListSelectionBarScreenshotTest {
                 ) {
                     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
                         ChatListSelectionControls(
-                            count = if (single) 1 else 4,
+                            count =
+                                when {
+                                    beyondLoaded -> BEYOND_LOADED_COUNT
+                                    single -> 1
+                                    else -> 4
+                                },
                             deleteLabel = stringResource(departureLabel ?: R.string.delete),
                             archiveAction = ChatListBulkArchiveAction.Archive,
                             actionsEnabled = true,
-                            allVisibleSelected = false,
-                            showMarkRead = single || bulk,
-                            showMarkUnread = bulk,
+                            allVisibleSelected = beyondLoaded,
+                            showMarkRead = single || both,
+                            showMarkUnread = both,
                             showMovePinnedUp = false,
                             showMovePinnedDown = false,
                             onArchive = {},
@@ -312,24 +331,36 @@ class ChatListSelectionBarScreenshotTest {
                             onSelectAll = {},
                             onDeselectAll = {},
                             abandonLabel = abandonLabel?.let { stringResource(it) },
-                            showMute = single || bulk,
-                            showUnmute = bulk,
-                            showPin = single || bulk,
-                            showUnpin = bulk,
+                            showMute = single || both,
+                            showUnmute = both,
+                            showPin = single || both,
+                            showUnpin = both,
                             onAlternateArchive = if (bulk) ({}) else null,
                             onExcludeFromFolder = if (bulk) ({}) else null,
                             onDeleteLocal = if (bulk) ({}) else null,
+                            showDelete = !beyondLoaded,
+                            showAddToFolder = !beyondLoaded,
                         )
                     }
                 }
             }
         }
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        val selectAllLabel = context.getString(R.string.chat_list_select_all)
+        val selectAllLabel =
+            context.getString(if (beyondLoaded) R.string.chat_list_deselect_all else R.string.chat_list_select_all)
         composeRule.onNodeWithText(selectAllLabel, useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithContentDescription(selectAllLabel).assertIsDisplayed()
+        if (beyondLoaded) {
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.chat_list_action_add_to_folder))
+                .assertDoesNotExist()
+        }
         departureLabel?.let { composeRule.onNodeWithContentDescription(context.getString(it)).assertIsDisplayed() }
         abandonLabel?.let { composeRule.onNodeWithContentDescription(context.getString(it)).assertIsDisplayed() }
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
+    }
+
+    private companion object {
+        const val BEYOND_LOADED_COUNT = 120
     }
 }
