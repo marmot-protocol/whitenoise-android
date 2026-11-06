@@ -31,6 +31,7 @@ internal fun resolveConversationDictationReplyTarget(
             controller.matchesConversation(accountRef, groupIdHex)
         } ?: return ConversationDictationReplyTargetResolution.Detached
     return if (
+        controller.editingMessageId == null &&
         controller.replyingTo
             ?.messageIdHex
             .equals(replyToMessageIdHex, ignoreCase = true)

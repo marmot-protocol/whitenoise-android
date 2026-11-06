@@ -22,22 +22,6 @@
     ],
     "source_coverage": [
       {
-        "surface": "Dictation fully-fed caller-audio settlement",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "fun callerAudioFullyFed(): Boolean = false",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
-        "surface": "Dictation completed-transcript Send validation and local-only Paste delivery",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
-        "anchor": "internal enum class ConversationDictationTargetValidation",
-        "test_ids": [
-          "DIC-002"
-        ]
-      },
-      {
         "surface": "Dictated pending-row publication revision for mounted tail reveal",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
         "anchor": "fun pendingSendRevision(",

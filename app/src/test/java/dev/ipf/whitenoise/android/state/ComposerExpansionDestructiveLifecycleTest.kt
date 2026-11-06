@@ -101,26 +101,136 @@ class ComposerExpansionDestructiveLifecycleTest {
         }
 
     @Test
-    fun detachedNonReplyEmptySummaryRetainsDraftAndGeometry() =
+    fun detachedPublishedSummaryWithoutIdsClearsOnlyItsSubmittedDraft() =
         runBlocking {
-            val fixture = fixture(sendResult = ::emptySendSummary, attachConversationController = false)
+            val fixture =
+                fixture(
+                    sendResult = { emptySendSummary().copy(acceptDisposition = SendAcceptDispositionFfi.PUBLISHED) },
+                    attachConversationController = false,
+                )
             fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
             var pendingCallbacks = 0
-            val request =
-                dictationRequest(fixture.appState, "typed").copy(
-                    onPendingShown = { pendingCallbacks += 1 },
-                )
-            val retained = retainExpansion(fixture.appState, draftGeneration = request.expectedDraftRevision)
+            val request = dictationRequest(fixture.appState, "typed").copy(onPendingShown = { pendingCallbacks += 1 })
+            retainExpansion(fixture.appState, draftGeneration = request.expectedDraftRevision)
 
-            assertFalse(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
+            assertTrue(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
 
             assertEquals(1, fixture.calls.send.get())
-            assertEquals(0, pendingCallbacks)
+            assertEquals(1, pendingCallbacks)
+            assertTrue(fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID).isNullOrEmpty())
+            assertNull(fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID))
+        }
+
+    @Test
+    fun detachedRetainedSummariesWithoutIdsKeepRecoveryAndDispatchOwnership() =
+        runBlocking {
+            for (disposition in SendAcceptDispositionFfi.entries.filter { it != SendAcceptDispositionFfi.PUBLISHED }) {
+                val fixture =
+                    fixture(
+                        sendResult = { emptySendSummary().copy(acceptDisposition = disposition) },
+                        attachConversationController = false,
+                    )
+                fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
+                var pending = 0
+                var rejected = 0
+                val request =
+                    dictationRequest(fixture.appState, "typed").copy(
+                        onPendingShown = { pending += 1 },
+                        onDispatchRejectedBeforeTransport = { rejected += 1 },
+                    )
+                val retained = retainExpansion(fixture.appState, draftGeneration = request.expectedDraftRevision)
+
+                assertFalse(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
+
+                assertEquals(1, fixture.calls.send.get())
+                assertEquals(0, pending)
+                assertEquals(0, rejected)
+                assertEquals("typed", fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID))
+                assertEquals(
+                    retained,
+                    fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
+                )
+            }
+        }
+
+    @Test
+    fun detachedNativeFailureStillRetainsDraftWithoutPendingCallback() =
+        runBlocking {
+            val fixture = fixture(sendResult = { error("native refusal") }, attachConversationController = false)
+            fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
+            var pending = 0
+            val request = dictationRequest(fixture.appState, "typed").copy(onPendingShown = { pending += 1 })
+            val retained = retainExpansion(fixture.appState, draftGeneration = request.expectedDraftRevision)
+
+            assertTrue(runCatching { fixture.appState.sendDictationTranscriptIfOriginUnchanged(request) }.isFailure)
+
+            assertEquals(1, fixture.calls.send.get())
+            assertEquals(0, pending)
             assertEquals("typed", fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID))
             assertEquals(
                 retained,
                 fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
             )
+        }
+
+    @Test
+    fun editOpenedBeforeOrDuringClaimRejectsDictationWithoutChangingTheEditor() =
+        runBlocking {
+            for (editBeforeClaim in listOf(true, false)) {
+                val fixture = fixture()
+                fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
+                var claims = 0
+                var rejections = 0
+                val request =
+                    dictationRequest(fixture.appState, "typed").copy(
+                        beginDispatch = {
+                            claims += 1
+                            fixture.conversationController.editingMessageId = REPLY_MESSAGE_ID
+                            true
+                        },
+                        onDispatchRejectedBeforeTransport = { rejections += 1 },
+                    )
+                if (editBeforeClaim) fixture.conversationController.editingMessageId = REPLY_MESSAGE_ID
+                val retained = retainExpansion(fixture.appState, draftGeneration = request.expectedDraftRevision)
+
+                assertFalse(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
+
+                assertEquals(if (editBeforeClaim) 0 else 1, claims)
+                assertEquals(if (editBeforeClaim) 0 else 1, rejections)
+                assertEquals(0, fixture.calls.send.get())
+                assertEquals(REPLY_MESSAGE_ID, fixture.conversationController.editingMessageId)
+                assertEquals("typed", fixture.appState.draftFor(ACCOUNT_REF, GROUP_ID))
+                assertEquals(
+                    retained,
+                    fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
+                )
+            }
+        }
+
+    @Test
+    fun mountedGuardRefusalReleasesClaimButPostPendingFailureDoesNot() =
+        runBlocking {
+            for (guardRefusal in listOf(true, false)) {
+                val fixture =
+                    fixture(
+                        groupRecord = group().copy(unrecoverable = guardRefusal),
+                        sendResult = { error("native refusal") },
+                    )
+                fixture.appState.setDraft(ACCOUNT_REF, GROUP_ID, TextFieldValue("typed"))
+                var rejections = 0
+                var pending = 0
+                val request =
+                    dictationRequest(fixture.appState, "typed").copy(
+                        onDispatchRejectedBeforeTransport = { rejections += 1 },
+                        onPendingShown = { pending += 1 },
+                    )
+
+                assertFalse(fixture.appState.sendDictationTranscriptIfOriginUnchanged(request))
+
+                assertEquals(if (guardRefusal) 1 else 0, rejections)
+                assertEquals(if (guardRefusal) 0 else 1, pending)
+                assertEquals(if (guardRefusal) 0 else 1, fixture.calls.send.get())
+            }
         }
 
     @Test
