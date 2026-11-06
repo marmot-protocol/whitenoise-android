@@ -9269,7 +9269,14 @@ class ConversationController(
             conflator = reactionIntentConflator,
             initialMine = emoji in ownEmojis,
         ) { commitMine ->
-            val publishAdd = if (commitMine) prepareReactionAdd(owner, emoji) else null
+            val publishAdd =
+                if (commitMine) {
+                    retryBusyReactionMutation(
+                        stillDesired = { reactionIntentConflator.latest(key)?.desiredMine == true },
+                    ) { prepareReactionAdd(owner, emoji) }
+                } else {
+                    null
+                }
             retryBusyReactionMutation(
                 stillDesired = { reactionIntentConflator.latest(key)?.desiredMine == commitMine },
             ) {
