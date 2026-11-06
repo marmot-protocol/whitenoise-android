@@ -133,8 +133,9 @@ active worker of the same source could already do.
 
 After a seek, the worker drops decoded video frames before the target without
 converting them to RGBA, because the parent would discard them. It stops
-dropping while half of the compressed lookahead is queued or after 500 ms of
-its 1.5-second call deadline, and then returns the frame for
+dropping while half of the compressed lookahead is queued, after 500 ms of
+its 1.5-second call deadline or after half of its read step budget, and then
+returns the frame for
 the parent's existing preroll handling.
 
 ## MDK boundary

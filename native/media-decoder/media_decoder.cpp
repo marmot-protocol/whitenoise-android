@@ -798,14 +798,15 @@ void queuePacket(Session& s) {
 /**
  * Decide whether a decoded video frame before the last seek target can be dropped without conversion.
  * The parent discards such frames anyway; skipping stops while the compressed lookahead is half full,
- * so the parent's preroll audio drain keeps the queue bounded, and before the conversion reserve.
+ * so the parent's preroll audio drain keeps the queue bounded, before the conversion reserve, and
+ * before half of the read step budget.
  */
-bool skipPrerollVideo(Session& s) {
+bool skipPrerollVideo(Session& s, int step) {
     if (timestamp(s, s.video, s.video.frame) >= s.videoSkipBeforeUs) {
         s.videoSkipBeforeUs = INT64_MIN;
         return false;
     }
-    return s.queuedPackets < 256 && s.queuedBytes < kMaxQueuedBytes / 2 &&
+    return step < kMaxReadSteps / 2 && s.queuedPackets < 256 && s.queuedBytes < kMaxQueuedBytes / 2 &&
         monotonicMs() + kPrerollReserveMs < s.deadline;
 }
 
@@ -828,7 +829,7 @@ jlongArray readPreferred(JNIEnv* env, Session& s, jobject videoOut, jobject audi
         check(!interrupted(&s), "media_read_deadline");
         pump(s, selected);
         if (selected.hasFrame) {
-            if (preferred == 1 && skipPrerollVideo(s)) {
+            if (preferred == 1 && skipPrerollVideo(s, step)) {
                 selected.hasFrame = false; av_frame_unref(selected.frame);
                 continue;
             }
