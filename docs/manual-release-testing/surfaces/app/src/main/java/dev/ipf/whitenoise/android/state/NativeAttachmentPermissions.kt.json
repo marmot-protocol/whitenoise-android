@@ -1,0 +1,29 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentPermissions.kt",
+  "legacy_sha256": "ac3dacb6571c83afe301b227d19af02f47efc2361fecfd96a57051e2c3d6a697",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Native host-managed permission fencing",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentPermissions.kt",
+        "anchor": "internal class NativeAttachmentPermissions",
+        "test_ids": [
+          "MED-019",
+          "MED-020"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "equivalent-network-callback-permission-retention",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/NativeAttachmentPermissions.kt",
+        "anchor": "fun beginNetworkRefresh(",
+        "test_ids": [
+          "MED-019",
+          "MED-036"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
