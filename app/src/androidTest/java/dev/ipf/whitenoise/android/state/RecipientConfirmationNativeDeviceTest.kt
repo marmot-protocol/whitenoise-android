@@ -59,15 +59,15 @@ class RecipientConfirmationNativeDeviceTest {
                     val group =
                         sender.native.createGroup(
                             sender.account.label,
-                            "Receipt fixture",
+                            "",
                             listOf(peer.account.accountIdHex),
                             null,
                         )
                     awaitInvite(peer, group)
-                    sender.native.sendText(sender.account.label, group, "ready")
-                    awaitRecord(peer, group, "ready") { true }
+                    assertTwoMemberRoster(sender, peer, group)
 
                     val failed = failPublication(sender, relay, group)
+                    assertChatListDelivery(sender, group, failed.messageIdHex, ChatListMessageDeliveryStateFfi.FAILED)
                     close(sender)
                     // Only the generated peer sees the rejected envelope. The sender will later get its reaction,
                     // never an own-message relay echo that could satisfy the source-event delivery condition.
@@ -93,7 +93,7 @@ class RecipientConfirmationNativeDeviceTest {
                     awaitTimeline(liveController, failed.messageIdHex, MessageStatus.Sent)
                     assertNull(warning(liveController, failed.messageIdHex))
                     assertEquals("+", liveController.reactions[failed.messageIdHex]?.single()?.emoji)
-                    assertChatListDelivered(onlineSender, group, failed.messageIdHex)
+                    assertChatListDelivery(onlineSender, group, failed.messageIdHex)
                     liveController.onCleared()
                     controllers -= liveController
                     close(onlineSender)
@@ -106,7 +106,7 @@ class RecipientConfirmationNativeDeviceTest {
                     val restored = controller(reopened, group)
                     awaitTimeline(restored, failed.messageIdHex, MessageStatus.Sent)
                     assertNull(warning(restored, failed.messageIdHex))
-                    assertChatListDelivered(reopened, group, failed.messageIdHex)
+                    assertChatListDelivery(reopened, group, failed.messageIdHex)
                 }
             }
         }
@@ -199,14 +199,29 @@ class RecipientConfirmationNativeDeviceTest {
     ) = TimelineProjector.invalidationWarning(controller.timelineRecords.getValue(message))
 
     /** The exact failed send's native preview must agree with the conversation's delivery status. */
-    private fun assertChatListDelivered(
+    private fun assertChatListDelivery(
         participant: Participant,
         group: String,
         message: String,
+        expected: ChatListMessageDeliveryStateFfi = ChatListMessageDeliveryStateFfi.DELIVERED,
     ) {
         val row = participant.native.chatList(participant.account.label, true).single { it.groupIdHex == group }
         assertEquals(message, row.lastMessage?.messageIdHex)
-        assertEquals(ChatListMessageDeliveryStateFfi.DELIVERED, row.lastMessage?.deliveryState)
+        assertEquals(expected, row.lastMessage?.deliveryState)
+    }
+
+    /** Confirms readiness through native membership without adding accepted history that outranks failed previews. */
+    private suspend fun assertTwoMemberRoster(
+        sender: Participant,
+        peer: Participant,
+        group: String,
+    ) {
+        val participants = listOf(sender, peer)
+        val expected = participants.map { requireNotNull(it.native.npub(it.account.accountIdHex)) }.toSet()
+        for (participant in participants) {
+            val details = participant.native.groupDetails(participant.account.label, group)
+            assertEquals(expected, details.members.map { it.npub }.toSet())
+        }
     }
 
     /** Accepts only this generated group's Welcome, with a finite bound. */
