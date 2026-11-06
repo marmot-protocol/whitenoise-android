@@ -69,6 +69,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowLooper
 
 /** Exercises the actual app-state-backed Bar, not the legacy isolated Pill fixture path. */
 @RunWith(RobolectricTestRunner::class)
@@ -324,6 +325,7 @@ class ComposerToolbarProductionTest {
         }
     }
 
+    /** A short, large-text editor still scrolls to every command, and accessibility add and reorder actions save. */
     @Test
     fun shortHeightEditorRetainsScrollableCommandsAndAccessibilityReorder() {
         val settings = ComposerToolbarSettings(listOf(ComposerShortcut.More, ComposerShortcut.Camera))
@@ -354,7 +356,7 @@ class ComposerToolbarProductionTest {
                 }
         composeRule.runOnIdle { assertTrue(move.action()) }
         composeRule.onNodeWithTag("composer.customize.done").assertDoesNotExist()
-        composeRule.waitUntil(5_000) { !appState.composerToolbarPreference.saving }
+        awaitToolbarSaveSettled()
         assertEquals(
             listOf(ComposerShortcut.More, ComposerShortcut.Gallery, ComposerShortcut.Camera),
             appState.composerToolbarPreference.value.shortcuts,
@@ -626,6 +628,19 @@ class ComposerToolbarProductionTest {
             }
         }
         composeRule.waitForIdle()
+    }
+
+    /**
+     * Waits for the host preference save to settle. Its disk commit runs on Dispatchers.IO, and `saving` clears only
+     * once the save resumes on the main looper, which Robolectric runs only when idled — `waitUntil` advances the
+     * Compose clock but never idles the looper. A commit that outlasts the preceding idle, as on a loaded CI fork,
+     * would otherwise never settle, so each poll idles the looper itself.
+     */
+    private fun awaitToolbarSaveSettled() {
+        composeRule.waitUntil(5_000) {
+            ShadowLooper.idleMainLooper()
+            !appState.composerToolbarPreference.saving
+        }
     }
 
     /** Counts invocations of one optional attachment action. */

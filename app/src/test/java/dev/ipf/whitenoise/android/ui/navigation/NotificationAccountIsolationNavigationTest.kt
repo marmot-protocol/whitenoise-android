@@ -125,7 +125,10 @@ class NotificationAccountIsolationNavigationTest {
     /**
      * The production seam at MainShell: a newer tap for the source account opens its conversation while the older
      * inactive-account tap's exact preload is still held. Releasing that retired read afterwards must leave the
-     * current selection, its open context, every handled request id and the first-frame gate owner unchanged.
+     * current selection, its open context, every handled request id, the first-frame gate owner and the active
+     * account unchanged. The older tap may already have activated the target account, and the newer tap's early
+     * open is handled before its own switch back lands, so the newer route counts as settled only once the source
+     * account is active again — still while the retired preload is held.
      */
     @Test
     fun heldInactivePreloadReleasedAfterANewerTapLeavesTheNewerRouteUnchanged() {
@@ -159,10 +162,16 @@ class NotificationAccountIsolationNavigationTest {
                 inbound.value = routing.notificationTarget
                 requestId.longValue = newerRequestId
             }
-            awaitCondition {
+            awaitCondition(
+                failureMessage = {
+                    "the newer route did not settle while the retired preload was held: " +
+                        HeldRouteSnapshot.of(holder, state, handled)
+                },
+            ) {
                 newerRequestId in handled &&
                     holder.selectedChatOpenContext.value.notificationRouteTraceRequestId == newerRequestId &&
-                    holder.notificationFirstFrame.gate == null
+                    holder.notificationFirstFrame.gate == null &&
+                    state.activeAccountRef == SOURCE_ACCOUNT
             }
             val before = HeldRouteSnapshot.of(holder, state, handled)
 
@@ -655,6 +664,7 @@ class NotificationAccountIsolationNavigationTest {
                 },
             ).build()
 
+    /** Idles Compose and the main looper between real-time polls until [condition] holds, else fails with a message. */
     private fun awaitCondition(
         failureMessage: (() -> String)? = null,
         condition: () -> Boolean,
