@@ -114,16 +114,8 @@ class SettingsSearchRankingTest {
         assertTrue(searchSettings(documents, "sonido de notificacion").any { it.entry.id == "Notifications.sound" })
     }
 
-    /** No wall-clock assertion: CI hosts are not representative production hardware. */
-    @Test fun boundedProductionCatalogBenchmarkFixture() {
-        val coldStart = System.nanoTime()
-        val documents = documents()
-        val coldNanos = System.nanoTime() - coldStart
-        val queries = listOf("f", "fo", "font", "font s", "font size", "font", "", "text size")
-        val warmStart = System.nanoTime()
-        repeat(100) { queries.forEach { searchSettings(documents, it) } }
-        val warmNanos = System.nanoTime() - warmStart
-        assertTrue(documents.size in 50..256)
-        assertTrue(coldNanos >= 0 && warmNanos >= 0)
+    /** Search ranks the whole catalog per keystroke, so its size stays bounded. */
+    @Test fun productionCatalogSizeIsBounded() {
+        assertTrue(documents().size in 50..256)
     }
 }

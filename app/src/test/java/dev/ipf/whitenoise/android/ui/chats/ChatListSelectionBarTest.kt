@@ -82,6 +82,45 @@ class ChatListSelectionBarTest {
         assertEquals(1, selectAll)
     }
 
+    /** #2925: a selection reaching unloaded chats never offers the destructive Delete action. */
+    @Test
+    fun selectionBeyondLoadedChatsHidesDeleteAndFolderActions() {
+        var deletes = 0
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ChatListSelectionControls(
+                    count = 120,
+                    archiveAction = ChatListBulkArchiveAction.Archive,
+                    actionsEnabled = true,
+                    allVisibleSelected = true,
+                    showMarkRead = false,
+                    showMarkUnread = false,
+                    showMovePinnedUp = false,
+                    showMovePinnedDown = false,
+                    onArchive = {},
+                    onDelete = { deletes++ },
+                    onAddToFolder = {},
+                    onMarkRead = {},
+                    onMarkUnread = {},
+                    onSetMuted = {},
+                    onSetPinned = {},
+                    onMovePinned = {},
+                    onSelectAll = {},
+                    onDeselectAll = {},
+                    showDelete = false,
+                    showAddToFolder = false,
+                )
+            }
+        }
+
+        composeRule.onAllNodesWithContentDescription(string(R.string.delete)).assertCountEquals(0)
+        composeRule
+            .onAllNodesWithContentDescription(string(R.string.chat_list_action_add_to_folder))
+            .assertCountEquals(0)
+        composeRule.onNodeWithContentDescription(string(R.string.archive)).assertIsDisplayed()
+        assertEquals(0, deletes)
+    }
+
     /**
      * #3310: bulk abandonment is its own destructive action beside Leave and delete, runs only while the selection is
      * still current, and is absent when the selection does not offer it.

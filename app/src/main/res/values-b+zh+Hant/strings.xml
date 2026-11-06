@@ -187,6 +187,7 @@
     <string name="toast_chat_deleted_local">已從此裝置刪除聊天</string>
     <string name="toast_couldnt_delete_chat">無法刪除聊天</string>
     <string name="chat_list_select_all">全選</string>
+    <string name="toast_chat_list_select_all_loaded_only">無法選取所有聊天。僅選取了已載入的聊天。</string>
     <string name="chat_list_deselect_all">取消全選</string>
     <plurals name="chat_list_selected_count">
         <item quantity="other">已選擇 %1$d 個聊天</item>

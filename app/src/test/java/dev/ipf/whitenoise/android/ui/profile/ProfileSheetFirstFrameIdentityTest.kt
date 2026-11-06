@@ -1,10 +1,10 @@
 package dev.ipf.whitenoise.android.ui.profile
 
+import dev.ipf.whitenoise.android.appModuleSource
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
 
 /**
  * The profile sheet must know its identity on its first composed frame (#1432).
@@ -22,13 +22,9 @@ import java.io.File
  * (`ChatsScreenSelectionActionsCoverageTest`, `TtsMarkdownCallSiteCoverageTest`).
  */
 class ProfileSheetFirstFrameIdentityTest {
-    private val source =
-        File("src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt")
-            .readText()
+    private val source = appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/profile/ProfileSheet.kt")
 
-    private val appState =
-        File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt")
-            .readText()
+    private val appState = appModuleSource("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt")
 
     /** The `hex` declaration, which is what decides the first frame. */
     private val hexDeclaration =
