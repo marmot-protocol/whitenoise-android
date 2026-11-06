@@ -22,6 +22,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.ui.common.SystemPasteIconButton
 import dev.ipf.whitenoise.android.ui.common.TextEntryEmojiAction
+import dev.ipf.whitenoise.android.ui.common.rememberSystemPasteGuard
 import dev.ipf.whitenoise.android.ui.navigation.dictationLauncherOrigin
 import kotlin.math.roundToInt
 
@@ -58,7 +59,8 @@ internal fun ComposerConfiguredAction(
     val voiceLabel = stringResource(R.string.voice_message_record)
     when (shortcut) {
         ComposerShortcut.SendingIdentity -> sendingIdentity?.invoke(modifier)
-        ComposerShortcut.More ->
+        ComposerShortcut.More -> {
+            val pasteAccepted = rememberSystemPasteGuard(enabled)
             Box(
                 Modifier.onGloballyPositioned { coordinates ->
                     val position = coordinates.positionInWindow()
@@ -86,9 +88,10 @@ internal fun ComposerConfiguredAction(
                 }
                 attachmentMenu?.invoke(
                     anchor,
-                    bindings.menuTextShortcuts(onEmoji, onPaste, onDictation),
+                    bindings.menuTextShortcuts(onEmoji, onPaste, onDictation, pasteAccepted),
                 )
             }
+        }
         ComposerShortcut.Emoji ->
             TextEntryEmojiAction(
                 pickerOpen = emojiPickerOpen,
@@ -179,8 +182,10 @@ private fun ComposerToolbarBindings.menuTextShortcuts(
     onEmoji: () -> Unit,
     onPaste: () -> Boolean,
     onDictation: (() -> Unit)?,
+    pasteAccepted: () -> Boolean,
 ) = ComposerMenuTextShortcuts(
     onEmoji = { if (canActivate()) onEmoji() },
     onPaste = onPaste,
     onDictation = onDictation?.let { dictate -> { if (canActivate()) dictate() } },
+    pasteAccepted = pasteAccepted,
 )

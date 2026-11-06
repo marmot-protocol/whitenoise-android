@@ -258,54 +258,83 @@ private fun ComposerShortcutPaletteRow(
     }
 }
 
-/** Voice notes choose one placement on a single line: Send's slot or either toolbar side. */
+/** Voice notes switch on or off like other rows, then choose Send's slot or either toolbar side. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ComposerVoicePlacementRow(
     state: ComposerToolbarEditState,
     saving: Boolean,
 ) {
+    val enabled = state.draft.voiceEnabled
     val current = state.draft.voicePlacement
     Row(
         Modifier
             .fillMaxWidth()
             .heightIn(min = ComposerShortcutTarget)
             .testTag("composer.customize.label.${ComposerShortcut.VoiceNote.id}")
-            .selectableGroup(),
+            .toggleable(
+                value = enabled,
+                enabled = !saving,
+                role = Role.Checkbox,
+                onValueChange = { state.change(state.draft.copy(voiceEnabled = it)) },
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         MiniWaveformGlyph(MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(
-            stringResource(R.string.composer_voice_placement),
-            Modifier
-                .weight(1f)
-                .padding(horizontal = ComposerToolbarGutter)
-                .testTag("composer.customize.name.${ComposerShortcut.VoiceNote.id}"),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        ComposerVoicePlacement.entries.forEach { placement ->
-            val chosen = current == placement
-            TextButton(
-                onClick = { state.change(state.draft.withVoicePlacement(placement)) },
-                enabled = !saving,
-                contentPadding = ComposerChoicePadding,
-                modifier =
-                    Modifier
-                        .testTag("composer.customize.voice.${placement.name.lowercase()}")
-                        .semantics {
-                            role = Role.RadioButton
-                            selected = chosen
-                        },
-            ) {
-                Text(
-                    stringResource(placement.labelRes),
-                    maxLines = 1,
-                    softWrap = false,
-                    fontWeight = if (chosen) FontWeight.Bold else FontWeight.Normal,
-                    textDecoration = if (chosen) TextDecoration.Underline else TextDecoration.None,
-                )
+        // Choices move beneath the label only when both cannot share one line.
+        FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(
+                stringResource(R.string.composer_voice_placement),
+                Modifier
+                    .align(Alignment.CenterVertically)
+                    .padding(horizontal = ComposerToolbarGutter)
+                    .testTag("composer.customize.name.${ComposerShortcut.VoiceNote.id}"),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (enabled) {
+                Row(Modifier.selectableGroup()) {
+                    ComposerVoicePlacement.entries.forEach { placement ->
+                        ComposerVoicePlacementChoice(placement, current == placement, state, saving)
+                    }
+                }
             }
         }
+        Checkbox(
+            checked = enabled,
+            onCheckedChange = null,
+            enabled = !saving,
+            modifier = Modifier.clearAndSetSemantics {},
+        )
+    }
+}
+
+@Composable
+private fun ComposerVoicePlacementChoice(
+    placement: ComposerVoicePlacement,
+    chosen: Boolean,
+    state: ComposerToolbarEditState,
+    saving: Boolean,
+) {
+    TextButton(
+        onClick = { state.change(state.draft.withVoicePlacement(placement)) },
+        enabled = !saving,
+        contentPadding = ComposerChoicePadding,
+        modifier =
+            Modifier
+                .testTag("composer.customize.voice.${placement.name.lowercase()}")
+                .semantics {
+                    role = Role.RadioButton
+                    selected = chosen
+                },
+    ) {
+        Text(
+            stringResource(placement.labelRes),
+            maxLines = 1,
+            softWrap = false,
+            fontWeight = if (chosen) FontWeight.Bold else FontWeight.Normal,
+            textDecoration = if (chosen) TextDecoration.Underline else TextDecoration.None,
+        )
     }
 }
 

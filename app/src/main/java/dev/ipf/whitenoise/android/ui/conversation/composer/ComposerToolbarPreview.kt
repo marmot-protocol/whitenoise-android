@@ -30,7 +30,6 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
-import dev.ipf.whitenoise.android.state.ComposerVoicePlacement
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 
 private val PreviewPrimaryEndInset = 4.dp
@@ -61,7 +60,7 @@ internal fun ComposerToolbarPreview(
             ComposerShortcut.Poll,
         )
     val visibleShortcuts =
-        displayedSettings.normalized().shortcuts.filter {
+        displayedSettings.displayedShortcuts.filter {
             it != ComposerShortcut.More ||
                 (attachments + composerMenuTextShortcuts - displayedSettings.shortcuts.toSet()).isNotEmpty()
         }
@@ -123,7 +122,7 @@ internal fun ComposerToolbarPreview(
                 .padding(end = PreviewPrimaryEndInset),
             contentAlignment = Alignment.Center,
         ) {
-            if (displayedSettings.voicePlacement == ComposerVoicePlacement.Send) {
+            if (displayedSettings.voiceOnSend) {
                 MiniWaveformGlyph(MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 Icon(

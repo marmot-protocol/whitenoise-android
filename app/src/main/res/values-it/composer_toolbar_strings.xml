@@ -6,7 +6,7 @@
     <string name="composer_layout">Disposizione</string>
     <string name="composer_side_left">Sinistra</string>
     <string name="composer_side_right">Destra</string>
-    <string name="composer_voice_placement">Voce</string>
+    <string name="composer_voice_placement">Nota vocale</string>
     <string name="composer_voice_on_send">Invia</string>
     <string name="composer_layout_automatic">Automatica</string>
     <string name="composer_layout_expanded">Sempre espanso</string>

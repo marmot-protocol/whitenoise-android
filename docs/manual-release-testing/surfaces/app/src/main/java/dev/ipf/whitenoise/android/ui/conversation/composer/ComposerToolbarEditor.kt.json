@@ -59,6 +59,15 @@
           "CON-043",
           "CON-041"
         ]
+      },
+      {
+        "surface": "ComposerVoicePlacementChoice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerToolbarEditor.kt",
+        "anchor": "fun ComposerVoicePlacementChoice(",
+        "test_ids": [
+          "CON-043",
+          "CON-041"
+        ]
       }
     ],
     "source_coverage": [

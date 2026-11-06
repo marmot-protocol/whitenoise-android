@@ -3,6 +3,7 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -78,6 +79,21 @@ internal fun composerToolbarRowCount(
     ceil(
         actionCount.toFloat() / floor(width / COMPOSER_SHORTCUT_TARGET_DP).toInt().coerceAtLeast(1),
     ).toInt().coerceAtLeast(1)
+
+/** Wrapped rows share the compact horizontal pitch; their 48dp targets overlap like adjacent columns. */
+internal val ComposerToolbarRowOverlap = ComposerShortcutPitch - ComposerShortcutTarget
+
+/** Height of [rows] wrapped target rows at the compact vertical pitch. */
+internal fun composerToolbarStackHeight(rows: Int): Dp {
+    val extraRows = (rows - 1).coerceAtLeast(0)
+    return ComposerShortcutTarget + ComposerShortcutPitch * extraRows
+}
+
+/** Complete wrapped rows that fit within [limit], so a scrolled toolbar still ends on a whole row. */
+internal fun composerToolbarFittingRows(limit: Dp): Int {
+    val extraRows = ((limit - ComposerShortcutTarget) / ComposerShortcutPitch).coerceAtLeast(0f)
+    return 1 + floor(extraRows).toInt()
+}
 
 /** Live adapters are ephemeral. Only [settings] is a persisted preference. */
 internal data class ComposerToolbarBindings(
@@ -160,6 +176,7 @@ internal fun ComposerConfiguredToolbar(
                 viewport
                     .heightIn(max = heightLimit.coerceAtLeast(ComposerShortcutTarget))
                     .fadingVerticalScroll(scroll, enabled = scrollAllowed),
+            verticalArrangement = Arrangement.spacedBy(ComposerToolbarRowOverlap),
             maxItemsInEachRow = floor(width.value / COMPOSER_SHORTCUT_TARGET_DP).toInt().coerceAtLeast(1),
         ) { slots() }
     }

@@ -1105,7 +1105,7 @@ internal fun ComposerPill(
                 composerToolbarRowCount(trailingCount, rightConfiguredWidth.value),
             )
         }
-    val toolbarHeight = minOf(ComposerShortcutTarget * toolbarRows, toolbarHeightLimit.coerceAtLeast(48.dp))
+    val toolbarHeight = composerToolbarStackHeight(minOf(toolbarRows, composerToolbarFittingRows(toolbarHeightLimit)))
     val toolbarExtraHeight = if (toolbar != null) (toolbarHeight - 48.dp).coerceAtLeast(0.dp) else 0.dp
     val extraControlsHeight = (if (topOnSeparateRow) 48.dp else 0.dp) + toolbarExtraHeight
     val reservedTrailingWidth = primaryTrailingWidth + if (topOnSeparateRow) 0.dp else draftTopWidth

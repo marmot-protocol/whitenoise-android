@@ -111,8 +111,8 @@ internal class ComposerToolbarEditState(
             }
         insertionSide = nearest?.let { draft.side(it.key) } ?: draft.side(id)
         val physicalLeft = pointer.x < dragArea.center.x
-        val hasLeft = draft.onSide(ComposerShortcutSide.Left).any { it != id }
-        val hasRight = draft.onSide(ComposerShortcutSide.Right).any { it != id }
+        val hasLeft = draft.onSide(ComposerShortcutSide.Left).any { it != id && it in draft.displayedShortcuts }
+        val hasRight = draft.onSide(ComposerShortcutSide.Right).any { it != id && it in draft.displayedShortcuts }
         if (physicalLeft && !hasLeft) insertionSide = ComposerShortcutSide.Left
         if (!physicalLeft && !hasRight) insertionSide = ComposerShortcutSide.Right
         val remaining = draft.onSide(insertionSide).filterNot { it == id }

@@ -98,7 +98,6 @@ import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
 import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ComposerShortcutSide
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
-import dev.ipf.whitenoise.android.state.ComposerVoicePlacement
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
@@ -1507,7 +1506,7 @@ internal fun ComposerBar(
                                 emptySet()
                             }
                         )
-                val selectedShortcuts = settings.normalized().shortcuts.filter { it in available }
+                val selectedShortcuts = settings.displayedShortcuts.filter { it in available }
                 val hiddenAttachments = attachmentActions.keys - selectedShortcuts.toSet()
                 // Unpinned text actions stay reachable from the Plus menu.
                 val hiddenMenuShortcuts =
@@ -1523,7 +1522,7 @@ internal fun ComposerBar(
                 val configuredVoiceVisible = voiceSelected && voiceSlotBounds != null
                 // Send placement shares Send's slot while empty, matching the unconfigured composer.
                 val voiceOnSend =
-                    !configuredToolbar || renderedToolbar.first.voicePlacement == ComposerVoicePlacement.Send
+                    !configuredToolbar || renderedToolbar.first.voiceOnSend
                 val showConfiguredMic =
                     showMicButton &&
                         (voiceOnSend || isRecordingVoice || configuredVoiceVisible)

@@ -6,7 +6,7 @@
     <string name="composer_layout">版面配置</string>
     <string name="composer_side_left">左側</string>
     <string name="composer_side_right">右側</string>
-    <string name="composer_voice_placement">語音</string>
+    <string name="composer_voice_placement">語音訊息</string>
     <string name="composer_voice_on_send">傳送</string>
     <string name="composer_layout_automatic">自動</string>
     <string name="composer_layout_expanded">一律展開</string>

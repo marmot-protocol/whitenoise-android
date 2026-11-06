@@ -1,7 +1,12 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalTextToolbar
+import androidx.compose.ui.platform.TextToolbar
+import androidx.compose.ui.platform.TextToolbarStatus
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
@@ -95,6 +100,49 @@ class ComposerAttachmentMenuTest {
             composeRule.waitForIdle()
             assertEquals(id, calls[index])
             assertEquals(index + 1, dismissals)
+        }
+    }
+
+    /** A denied Paste opens the system menu at Plus, and that menu cannot paste once the composer rejects it. */
+    @Test
+    fun deniedMenuPasteFallsBackToSystemMenuAndHonoursTheComposerGuard() {
+        val toolbar = MenuTestToolbar()
+        val accepted = mutableStateOf(true)
+        var readable = false
+        var pastes = 0
+        composeRule.setContent {
+            CompositionLocalProvider(LocalTextToolbar provides toolbar) {
+                WhiteNoiseTheme(darkTheme = true, amoled = true) {
+                    ComposerAttachmentMenu(
+                        IntRect(16, 700, 56, 748),
+                        true,
+                        {},
+                        onCamera = {},
+                        onGallery = null,
+                        onFiles = null,
+                        onLocation = null,
+                        onUser = null,
+                        onContact = null,
+                        textShortcuts =
+                            ComposerMenuTextShortcuts(
+                                onPaste = {
+                                    if (readable) pastes++
+                                    readable
+                                },
+                                pasteAccepted = { accepted.value },
+                            ),
+                    )
+                }
+            }
+        }
+        composeRule.onNodeWithTag("conversation.attachment.menu.paste").performTouchInput { click() }
+        composeRule.waitForIdle()
+        composeRule.runOnIdle {
+            assertEquals(TextToolbarStatus.Shown, toolbar.status)
+            readable = true
+            accepted.value = false
+            toolbar.selectPaste()
+            assertEquals("a rejected late Paste must not reach the composer", 0, pastes)
         }
     }
 
@@ -210,5 +258,31 @@ class ComposerAttachmentMenuTest {
             IntOffset(16, 10),
             provider.calculatePosition(IntRect.Zero, IntSize(360, 400), LayoutDirection.Ltr, IntSize(220, height)),
         )
+    }
+
+    private class MenuTestToolbar : TextToolbar {
+        private var paste: (() -> Unit)? = null
+        override var status = TextToolbarStatus.Hidden
+
+        override fun showMenu(
+            rect: Rect,
+            onCopyRequested: (() -> Unit)?,
+            onPasteRequested: (() -> Unit)?,
+            onCutRequested: (() -> Unit)?,
+            onSelectAllRequested: (() -> Unit)?,
+        ) {
+            paste = onPasteRequested
+            status = TextToolbarStatus.Shown
+        }
+
+        override fun hide() {
+            paste = null
+            status = TextToolbarStatus.Hidden
+        }
+
+        fun selectPaste() {
+            paste?.invoke()
+            hide()
+        }
     }
 }

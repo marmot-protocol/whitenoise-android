@@ -101,6 +101,23 @@ class ComposerToolbarPreferencesTest {
 
     /** Older records keep a pinned voice launcher; an unpinned one moves to Send's slot. */
     @Test
+    fun switchedOffVoiceHidesEverywhereAndKeepsItsPlacement() {
+        val left = ComposerToolbarSettings().withVoicePlacement(ComposerVoicePlacement.Left)
+        val off = left.copy(voiceEnabled = false)
+        assertFalse(off.voiceOnSend)
+        assertFalse(ComposerShortcut.VoiceNote in off.displayedShortcuts)
+        assertFalse(ComposerToolbarSettings().copy(voiceEnabled = false).voiceOnSend)
+        val decoded = ComposerToolbarSettings.decode(off.encode())
+        assertEquals(off, decoded)
+        assertEquals(ComposerVoicePlacement.Left, decoded.copy(voiceEnabled = true).voicePlacement)
+        assertTrue(ComposerShortcut.VoiceNote in decoded.copy(voiceEnabled = true).displayedShortcuts)
+        assertEquals(
+            ComposerToolbarSettings(),
+            ComposerToolbarSettings.decode("""{"version":3,"shortcuts":[],"rightShortcuts":[],"voiceEnabled":"no"}"""),
+        )
+    }
+
+    @Test
     fun earlierVersionsKeepTheirPinnedVoiceChoice() {
         val pinned =
             ComposerToolbarSettings.decode(

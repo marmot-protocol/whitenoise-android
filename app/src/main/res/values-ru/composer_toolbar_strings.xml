@@ -6,7 +6,7 @@
     <string name="composer_layout">Компоновка</string>
     <string name="composer_side_left">Слева</string>
     <string name="composer_side_right">Справа</string>
-    <string name="composer_voice_placement">Голос</string>
+    <string name="composer_voice_placement">Голосовое</string>
     <string name="composer_voice_on_send">Отправка</string>
     <string name="composer_layout_automatic">Автоматически</string>
     <string name="composer_layout_expanded">Всегда развёрнуто</string>

@@ -11,8 +11,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
@@ -61,6 +64,7 @@ class ComposerToolbarScreenshotTest {
 
     @Test fun denseLeftVoiceSingleLineLive() = capture("dense_left_voice_single_line_live", denseLeftVoice)
 
+    /** A left voice launcher keeps its slot when a draft turns the trailing action into Send. */
     @Test
     fun denseLeftVoiceSingleLineDraft() {
         capture("dense_left_voice_single_line_draft", denseLeftVoice, draft = "A draft")
@@ -68,6 +72,7 @@ class ComposerToolbarScreenshotTest {
 
     @Test fun denseRightVoiceTyping() = capture("dense_right_voice_typing", rightVoice, probeVoice = true)
 
+    /** A right voice launcher keeps its physical side while typing in a right-to-left layout. */
     @Test
     fun denseRightVoiceTypingRtl() {
         capture("dense_right_voice_typing_rtl", rightVoice, rtl = true, probeVoice = true)
@@ -83,7 +88,7 @@ class ComposerToolbarScreenshotTest {
 
     @Test fun expandedAmoled() = capture("expanded_amoled", custom, dark = true, amoled = true)
 
-    @Test fun wrappedRtlLargeFont() =
+    @Test fun wrappedRtlLargeFont() {
         capture(
             "wrapped_rtl_large",
             ComposerToolbarSettings(
@@ -102,6 +107,8 @@ class ComposerToolbarScreenshotTest {
             rtl = true,
             large = true,
         )
+        assertWrappedRowsUseCompactPitch()
+    }
 
     @Test fun editorLight() = capture("editor_light", custom, editor = true)
 
@@ -130,6 +137,18 @@ class ComposerToolbarScreenshotTest {
             fontScale = 1.3f,
             scrollToReset = true,
         )
+
+    /** A switched-off voice row keeps its label and checkbox but hides its placement choices. */
+    @Test fun editorVoiceOff() {
+        capture("editor_voice_off", custom.copy(voiceEnabled = false), dark = true, amoled = true, editor = true)
+        composeRule
+            .onNodeWithTag("composer.customize.label.${ComposerShortcut.VoiceNote.id}")
+            .performScrollTo()
+            .assertIsOff()
+        ComposerVoicePlacement.entries.forEach { placement ->
+            composeRule.onNodeWithTag("composer.customize.voice.${placement.name.lowercase()}").assertDoesNotExist()
+        }
+    }
 
     @Test fun editorNarrowOverflowAtDoubleFont() =
         capture(
@@ -304,6 +323,7 @@ class ComposerToolbarScreenshotTest {
 
     @Test fun denseSixLeftVoiceLive() = capture("dense_six_left_voice_live", denseVoice(6))
 
+    /** Builds a dense left-side toolbar of [count] shortcuts that includes the voice launcher. */
     private fun denseVoice(count: Int) =
         ComposerToolbarSettings(
             listOf(
@@ -391,7 +411,24 @@ class ComposerToolbarScreenshotTest {
         assertTrue(primary.top >= surface.top && primary.bottom <= surface.bottom)
     }
 
-    /** Checks preview targets, scrolling and scaled labels against the rendered editor bounds. */
+    /** Wrapped icon rows advance by the compact 36dp pitch instead of a full 48dp target. */
+    private fun assertWrappedRowsUseCompactPitch() {
+        val tops =
+            composeRule
+                .onAllNodes(
+                    SemanticsMatcher("shortcut slot") {
+                        it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("composer.shortcut.") == true
+                    },
+                    useUnmergedTree = true,
+                ).fetchSemanticsNodes()
+                .map { it.boundsInRoot.top }
+                .distinctBy { Math.round(it) }
+                .sorted()
+        assertTrue("expected wrapped rows: $tops", tops.size >= 2)
+        val pitch = ComposerShortcutPitch.value * composeRule.density.density
+        tops.zipWithNext { upper, lower -> assertEquals(pitch, lower - upper, 1f) }
+    }
+
     private fun assertVoiceRowFitsAndResetVisible(width: Int) {
         val row =
             composeRule
@@ -413,6 +450,7 @@ class ComposerToolbarScreenshotTest {
         composeRule.onNodeWithTag("composer.customize.reset").performScrollTo().assertIsDisplayed()
     }
 
+    /** Checks preview targets, scrolling and scaled labels against the rendered editor bounds. */
     private fun assertEditorPreview(
         settings: ComposerToolbarSettings,
         height: Int,

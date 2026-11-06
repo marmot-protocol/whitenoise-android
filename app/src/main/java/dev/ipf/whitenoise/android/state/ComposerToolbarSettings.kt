@@ -43,6 +43,8 @@ internal data class ComposerToolbarSettings(
     val shortcuts: List<ComposerShortcut> = defaultComposerShortcuts,
     val layout: ComposerToolbarLayout = ComposerToolbarLayout.Automatic,
     val rightShortcuts: Set<ComposerShortcut> = defaultRightComposerShortcuts,
+    /** Off hides the voice launcher everywhere while remembering its placement. */
+    val voiceEnabled: Boolean = true,
 ) {
     /** Retains the saved overflow position; runtime hides More when its menu would be empty. */
     fun normalized(): ComposerToolbarSettings {
@@ -59,8 +61,12 @@ internal data class ComposerToolbarSettings(
                 else -> ComposerVoicePlacement.Left
             }
 
-    /** Shown only while the voice launcher shares Send's slot. */
-    val voiceOnSend: Boolean get() = voicePlacement == ComposerVoicePlacement.Send
+    /** Shown only while an enabled voice launcher shares Send's slot. */
+    val voiceOnSend: Boolean get() = voiceEnabled && voicePlacement == ComposerVoicePlacement.Send
+
+    /** Saved order without a switched-off voice launcher. */
+    val displayedShortcuts: List<ComposerShortcut>
+        get() = normalized().shortcuts.filter { voiceEnabled || it != ComposerShortcut.VoiceNote }
 
     /** Moves the voice launcher between Send's slot and either toolbar side. */
     fun withVoicePlacement(placement: ComposerVoicePlacement): ComposerToolbarSettings =
@@ -145,6 +151,7 @@ internal data class ComposerToolbarSettings(
             .put("layout", layout.id)
             .put("rightShortcuts", JSONArray(rightShortcuts.map { it.id }))
             .put("voiceOnSend", normalized().voiceOnSend)
+            .put("voiceEnabled", voiceEnabled)
             .toString()
 
     companion object {
@@ -182,7 +189,8 @@ internal data class ComposerToolbarSettings(
                             }.toSet()
                     }
                 // An unpinned voice launcher from any version now shares Send's slot.
-                ComposerToolbarSettings(shortcuts, layout, right).normalized()
+                val voiceEnabled = record.opt("voiceEnabled")?.let { it as Boolean } ?: true
+                ComposerToolbarSettings(shortcuts, layout, right, voiceEnabled).normalized()
             }.getOrElse { ComposerToolbarSettings() }
         }
     }

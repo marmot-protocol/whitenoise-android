@@ -102,6 +102,7 @@ internal data class ComposerMenuTextShortcuts(
     val onEmoji: (() -> Unit)? = null,
     val onPaste: (() -> Boolean)? = null,
     val onDictation: (() -> Unit)? = null,
+    val pasteAccepted: () -> Boolean = { true },
 ) {
     /** Drops actions already pinned to the toolbar or unavailable in this composer. */
     fun onlyHidden(hidden: Set<ComposerShortcut>): ComposerMenuTextShortcuts =
@@ -109,6 +110,7 @@ internal data class ComposerMenuTextShortcuts(
             onEmoji = onEmoji?.takeIf { ComposerShortcut.Emoji in hidden },
             onPaste = onPaste?.takeIf { ComposerShortcut.Paste in hidden },
             onDictation = onDictation?.takeIf { ComposerShortcut.Dictation in hidden },
+            pasteAccepted = pasteAccepted,
         )
 }
 
@@ -224,7 +226,7 @@ private fun composerMenuTextItems(
                 if (!paste()) {
                     textToolbar.showMenu(
                         rect = anchorBounds.toRect(),
-                        onPasteRequested = { paste() },
+                        onPasteRequested = { if (textShortcuts.pasteAccepted()) paste() },
                     )
                 }
             }

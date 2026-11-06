@@ -30,24 +30,15 @@ internal fun SystemPasteIconButton(
 ) {
     val toolbar = LocalTextToolbar.current
     val latestOnPaste by rememberUpdatedState(onPaste)
-    val latestEnabled by rememberUpdatedState(enabled)
+    val pasteAccepted = rememberSystemPasteGuard(enabled)
     var bounds by remember { mutableStateOf(Rect.Zero) }
-    var active by remember(toolbar) { mutableStateOf(true) }
-
-    DisposableEffect(toolbar) {
-        active = true
-        onDispose {
-            active = false
-            toolbar.hide()
-        }
-    }
 
     IconButton(
         onClick = {
             if (!latestOnPaste()) {
                 toolbar.showMenu(
                     rect = bounds,
-                    onPasteRequested = { if (active && latestEnabled) latestOnPaste() },
+                    onPasteRequested = { if (pasteAccepted()) latestOnPaste() },
                 )
             }
         },
@@ -55,4 +46,23 @@ internal fun SystemPasteIconButton(
         enabled = enabled,
         content = content,
     )
+}
+
+/**
+ * Owns a system Paste menu opened by its caller: hides the menu when the caller leaves composition and
+ * returns whether a late Paste from that menu may still run, i.e. the caller is present and [enabled].
+ */
+@Composable
+internal fun rememberSystemPasteGuard(enabled: Boolean): () -> Boolean {
+    val toolbar = LocalTextToolbar.current
+    val latestEnabled by rememberUpdatedState(enabled)
+    var active by remember(toolbar) { mutableStateOf(true) }
+    DisposableEffect(toolbar) {
+        active = true
+        onDispose {
+            active = false
+            toolbar.hide()
+        }
+    }
+    return { active && latestEnabled }
 }

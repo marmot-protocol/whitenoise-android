@@ -258,7 +258,8 @@ class ComposerToolbarProductionTest {
         val toolbars = composeRule.onAllNodesWithTag("composer.shortcuts").fetchSemanticsNodes().map { it.boundsInRoot }
         assertTrue("physical shortcut groups are present", toolbars.isNotEmpty())
         toolbars.forEach { toolbar -> assertTrue(field.bottom <= toolbar.top + 1f) }
-        assertTrue("the populated side wraps its actions", toolbars.any { it.height >= 96f })
+        val twoRows = with(composeRule.density) { composerToolbarStackHeight(2).toPx() }
+        assertTrue("the populated side wraps its actions", toolbars.any { it.height >= twoRows })
         val camera = composeRule.onNodeWithTag("composer.shortcut.camera").fetchSemanticsNode().boundsInRoot
         assertTrue(camera.width >= 36f && camera.height >= 48f)
     }

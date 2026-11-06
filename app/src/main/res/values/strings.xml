@@ -2729,7 +2729,7 @@
     <string name="composer_save_failed">Couldn’t save composer settings. Try again.</string>
     <string name="composer_side_left">Left</string>
     <string name="composer_side_right">Right</string>
-    <string name="composer_voice_placement">Voice</string>
+    <string name="composer_voice_placement">Voice note</string>
     <string name="composer_voice_on_send">Send</string>
     <string name="appearance_colors_heading">Theme &amp; colors</string>
     <string name="appearance_text_heading">Text &amp; language</string>
