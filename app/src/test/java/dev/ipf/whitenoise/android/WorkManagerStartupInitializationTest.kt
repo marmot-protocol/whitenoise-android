@@ -25,7 +25,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 
 @RunWith(RobolectricTestRunner::class)
@@ -35,7 +34,7 @@ class WorkManagerStartupInitializationTest {
     fun applicationProvidesOnDemandWorkManagerConfiguration() {
         assertTrue(Configuration.Provider::class.java.isAssignableFrom(WhiteNoiseApplication::class.java))
 
-        val manifest = projectFile("src/main/AndroidManifest.xml").readText()
+        val manifest = appModuleSource("src/main/AndroidManifest.xml")
         assertTrue(manifest.contains("androidx.startup.InitializationProvider"))
         assertTrue(manifest.contains("androidx.work.WorkManagerInitializer"))
         assertTrue(manifest.contains("tools:node=\"remove\""))
@@ -57,8 +56,8 @@ class WorkManagerStartupInitializationTest {
 
     @Test
     fun periodicWorkSchedulingStartsAtTheSplashHandoff() {
-        val application = projectFile("src/main/java/dev/ipf/whitenoise/android/WhiteNoiseApplication.kt").readText()
-        val activity = projectFile("src/main/java/dev/ipf/whitenoise/android/MainActivity.kt").readText()
+        val application = appModuleSource("src/main/java/dev/ipf/whitenoise/android/WhiteNoiseApplication.kt")
+        val activity = appModuleSource("src/main/java/dev/ipf/whitenoise/android/MainActivity.kt")
         val handoff = activity.substringAfter("private fun holdSplashThroughBootstrap(")
         val postFrame = activity.substringAfter("private fun schedulePeriodicWorkAfterFirstFrame()")
 
@@ -153,11 +152,6 @@ class WorkManagerStartupInitializationTest {
                     .size,
             )
         }
-
-    private fun projectFile(relativePath: String): File =
-        listOf(File(relativePath), File("app/$relativePath"))
-            .firstOrNull(File::isFile)
-            ?: error("Missing project file: $relativePath")
 
     private fun String.functionBody(name: String): String {
         val signatureStart = indexOf("fun $name(")

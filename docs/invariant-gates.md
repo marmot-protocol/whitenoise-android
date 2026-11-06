@@ -4,6 +4,11 @@ An invariant gate is a test that enforces a behavioral rule across every call
 site that could break it. Most gates are
 source-inspecting `*CoverageTest.kt` classes built on
 [`SourceBlockTestHelpers.kt`](../app/src/test/java/dev/ipf/whitenoise/android/SourceBlockTestHelpers.kt).
+Read production files with `appModuleSource("src/main/...")`, which works from
+the module and repository working directories and fails when the file is
+missing. Slice them with `functionBody` or `kotlinBlockFrom`, which fail when
+the declaration is gone; `substringAfter` returns the whole file when its
+marker disappears, so the gate keeps passing against the wrong text.
 This page is the checked-in registry: it names the invariant each gate owns and
 the production primitive or boundary it protects.
 

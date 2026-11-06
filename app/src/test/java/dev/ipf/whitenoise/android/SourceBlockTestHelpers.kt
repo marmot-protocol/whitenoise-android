@@ -1,5 +1,18 @@
 package dev.ipf.whitenoise.android
 
+import java.io.File
+
+/**
+ * Resolves an app-module path such as `src/main/...` from either the module or the repository
+ * test working directory, failing when it is missing so a source gate never reads nothing.
+ */
+internal fun appModuleFile(path: String): File =
+    File(invariantGateRepositoryRoot(), "app/$path").takeIf(File::exists)
+        ?: error("Missing app module file: $path")
+
+/** Reads an app-module text file through [appModuleFile]. */
+internal fun appModuleSource(path: String): String = appModuleFile(path).readText()
+
 internal fun String.functionBody(functionName: String): String {
     val start =
         Regex("""\bfun\s+${Regex.escape(functionName)}\s*\(""")

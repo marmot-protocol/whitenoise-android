@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.notifications
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
@@ -35,6 +36,22 @@ class NotificationChannelBadgePolicyTest {
                 "${spec.name} launcher badge policy",
                 spec.launcherBadgeByDefault,
                 manager.getNotificationChannel(spec.id).canShowBadge(),
+            )
+        }
+    }
+
+    /** Lockscreen previews must use the redacted public version on every framework channel. */
+    @Test
+    fun frameworkChannelsStayPrivateOnTheLockscreen() {
+        deleteOrdinaryChannels()
+
+        NotificationChannels.ensureChannels(context)
+
+        NotificationChannelSpec.entries.forEach { spec ->
+            assertEquals(
+                "${spec.name} lockscreen visibility",
+                Notification.VISIBILITY_PRIVATE,
+                manager.getNotificationChannel(spec.id).lockscreenVisibility,
             )
         }
     }
