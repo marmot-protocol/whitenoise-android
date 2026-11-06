@@ -52,11 +52,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -697,6 +701,7 @@ internal fun VoiceAttachmentContent(
                 color = if (tinted) bubbleContent else MaterialTheme.colorScheme.primary,
                 trackColor = content.copy(alpha = VOICE_TRACK_ALPHA),
                 onSeek = onSeek,
+                positionText = voiceTimeText(isPlaying, isPaused, activePositionMs, activeDurationMs, totalDurationMs),
                 modifier = Modifier.weight(1f),
             )
             // A transfer shows only in the ring; its step and bytes are the play target's description.
@@ -723,6 +728,8 @@ internal const val VOICE_SEEK_TRACK_TAG = "voice-seek-track"
 /**
  * The progress bar is the seek surface: the whole 48dp-tall strip accepts a tap or a horizontal drag
  * and reports the pointer's position as a 0..1 fraction. Without [onSeek] it is a plain indicator.
+ * While seekable it is also its own screen-reader stop that reads [positionText] and moves with the
+ * reader's adjust gestures, so a voice note can be rewound without touch.
  */
 @Suppress("FunctionNaming")
 @Composable
@@ -731,14 +738,31 @@ private fun VoiceSeekTrack(
     color: Color,
     trackColor: Color,
     onSeek: ((Float) -> Unit)?,
+    positionText: String,
     modifier: Modifier = Modifier,
 ) {
     var widthPx by remember { mutableFloatStateOf(0f) }
     val currentOnSeek by rememberUpdatedState(onSeek)
+    val seekLabel = stringResource(R.string.voice_message_seek)
     Box(
         modifier =
             modifier
                 .height(VoiceSeekTargetHeight)
+                .then(
+                    if (onSeek == null) {
+                        Modifier
+                    } else {
+                        Modifier.semantics(mergeDescendants = true) {
+                            contentDescription = seekLabel
+                            stateDescription = positionText
+                            progressBarRangeInfo = ProgressBarRangeInfo(progressFraction, 0f..1f)
+                            setProgress { target ->
+                                currentOnSeek?.invoke(target.coerceIn(0f, 1f))
+                                true
+                            }
+                        }
+                    },
+                )
                 .onSizeChanged { widthPx = it.width.toFloat() }
                 .voiceSeekGesture(enabled = onSeek != null, widthPx = { widthPx }) { fraction ->
                     currentOnSeek?.invoke(fraction)

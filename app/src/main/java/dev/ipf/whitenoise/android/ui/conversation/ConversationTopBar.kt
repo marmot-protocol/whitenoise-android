@@ -35,7 +35,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -235,13 +235,15 @@ internal fun ConversationTopBar(
                                     .fillMaxWidth()
                                     .heightIn(min = 48.dp)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .clickable(role = Role.Button, onClick = onOpenDetails)
-                                    .performanceTestTag(
+                                    // The reader speaks the chat name and member line, then offers Details.
+                                    .clickable(
+                                        onClickLabel = openDetailsDescription,
+                                        role = Role.Button,
+                                        onClick = onOpenDetails,
+                                    ).performanceTestTag(
                                         PerformanceTestTags.OPEN_GROUP_DETAILS,
                                         enabled = performanceSelectorsEnabled,
-                                    ).semantics(mergeDescendants = true) {
-                                        contentDescription = openDetailsDescription
-                                    },
+                                    ).semantics(mergeDescendants = true) { heading() },
                         ) {
                             Box(Modifier.testTag("conversation.header.avatar")) {
                                 GroupAvatar(

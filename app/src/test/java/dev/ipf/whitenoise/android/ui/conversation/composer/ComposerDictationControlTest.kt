@@ -225,11 +225,11 @@ class ComposerDictationControlTest {
         val voiceRecording = previewVoiceRecordingController()
         try {
             render(voiceRecordingController = voiceRecording)
-            composeRule.onNodeWithContentDescription("Hold to record voice message").assertExists()
+            composeRule.onNodeWithContentDescription("Record voice message").assertExists()
 
             composeRule.onNodeWithContentDescription("Dictate text").performClick()
 
-            composeRule.onNodeWithContentDescription("Hold to record voice message").assertDoesNotExist()
+            composeRule.onNodeWithContentDescription("Record voice message").assertDoesNotExist()
             composeRule
                 .onNode(
                     hasContentDescription(transcriptPasteLabel) and

@@ -1251,7 +1251,7 @@
     <string name="group_system_you_avatar_changed">你更換了群組頭像</string>
     <string name="media_attachment_add_more">新增更多</string>
     <string name="media_attachment_remove">移除附件</string>
-    <string name="voice_message_record">按住錄製</string>
+    <string name="voice_message_record">錄製語音訊息</string>
     <string name="voice_message_too_short">按住更久以錄製</string>
     <string name="voice_message_permission_denied">需要麥克風權限才能錄製</string>
     <string name="voice_message_recording_failed">無法錄製語音訊息</string>
@@ -2525,4 +2525,16 @@
     <string name="settings_search_alias_read_aloud">TTS|文字轉語音|朗讀</string>
     <string name="settings_search_alias_sound">通知音效|提示音|鈴聲</string>
     <string name="settings_search_revealed">%1$s。已醒目標示設定。</string>
+    <string name="voice_recording_started_announcement">正在錄製語音訊息</string>
+    <string name="voice_recording_locked_announcement">錄音已鎖定</string>
+    <string name="voice_recording_stopped_announcement">錄音已停止</string>
+    <string name="voice_message_seek">播放位置</string>
+    <string name="video_failed">影片載入失敗</string>
+    <string name="conversation_new_message_from">來自 %1$s 的新訊息</string>
+    <plurals name="conversation_new_messages">
+        <item quantity="other">%1$d 則新訊息</item>
+    </plurals>
+    <plurals name="unread_mentions_count">
+        <item quantity="other">%1$d 則未讀提及</item>
+    </plurals>
 </resources>

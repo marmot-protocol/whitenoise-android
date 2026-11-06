@@ -75,8 +75,13 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.onClick
@@ -3310,6 +3315,8 @@ internal fun ConversationScreen(
         }
         // Survives the follow effect's restart within a burst, never a chat, account or runtime change.
         val incomingAppendLanding = remember(controller) { ConversationIncomingAppendLandingQueue() }
+        val arrivalView = LocalView.current
+        val arrivalResources = LocalResources.current
         LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored) {
             if (!initialTimelineAnchored || renderedTimeline.isEmpty()) {
                 // A restart that cannot be an append still interrupts the burst, so its rows never join a later one.
@@ -3327,6 +3334,18 @@ internal fun ConversationScreen(
                     renderedTimeline.any { it.presentationId == previousId }
             navigationState.lastFollowedLatestId = latestId ?: previousId
             if (isAppend && previousId != null) {
+                // Before any suspension, so a later append restarting this effect cannot drop the notice.
+                conversationArrivalAnnouncement(
+                    arrivals =
+                        conversationIncomingArrivals(renderedTimeline, previousId) { row ->
+                            controller.isMessageMine(row.record)
+                        },
+                    senderName = { row -> appState.displayName(row.record.sender) },
+                    resources = arrivalResources,
+                )?.let { notice ->
+                    @Suppress("DEPRECATION")
+                    arrivalView.announceForAccessibility(notice)
+                }
                 // #3558: an incoming row taller than the reading viewport lands at its beginning instead of its end.
                 val candidates =
                     incomingAppendLanding.admit(
@@ -4893,8 +4912,14 @@ internal fun ConversationScreen(
                                         // mention and marks it read, so the count steps down.
                                         val mentionCount = unreadMentionMessageIds.size
                                         if (!selectionMode && mentionCount > 0) {
+                                            // The badge caps at 99+; the spoken label keeps the real count.
                                             val jumpToMentionLabel =
-                                                stringResource(R.string.conversation_jump_to_mention)
+                                                stringResource(R.string.conversation_jump_to_mention) + ", " +
+                                                    pluralStringResource(
+                                                        R.plurals.unread_mentions_count,
+                                                        mentionCount,
+                                                        mentionCount,
+                                                    )
                                             Surface(
                                                 shape = CircleShape,
                                                 color = MaterialTheme.colorScheme.tertiaryContainer,
@@ -4904,8 +4929,10 @@ internal fun ConversationScreen(
                                                     Modifier
                                                         .height(34.dp)
                                                         .performanceTestTag(PerformanceTestTags.JUMP_TO_MENTION)
-                                                        .semantics { contentDescription = jumpToMentionLabel }
-                                                        .clickable { jumpToNextUnreadMention() },
+                                                        .clickable(role = Role.Button) { jumpToNextUnreadMention() }
+                                                        .clearAndSetSemantics {
+                                                            contentDescription = jumpToMentionLabel
+                                                        },
                                             ) {
                                                 Row(
                                                     verticalAlignment = Alignment.CenterVertically,

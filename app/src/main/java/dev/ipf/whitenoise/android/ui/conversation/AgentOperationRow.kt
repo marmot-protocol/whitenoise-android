@@ -35,6 +35,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -199,7 +201,12 @@ internal fun AgentOperationRow(
                         if (onSenderClick != null) {
                             Modifier
                                 .clip(CircleShape)
-                                .clickable(onClick = onSenderClick)
+                                .semantics { contentDescription = sender.name }
+                                .clickable(
+                                    onClickLabel = stringResource(R.string.chat_list_search_open_profile),
+                                    role = Role.Button,
+                                    onClick = onSenderClick,
+                                )
                         } else {
                             Modifier
                         },

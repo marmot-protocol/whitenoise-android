@@ -145,7 +145,10 @@ internal fun replyQuoteAccessibilityText(
                     replyQuoteAttachmentPresentation(preview.mediaKind, preview.mediaFileName, preview.mediaType)
                 },
         )
-    if (preview.originalUnavailable) return mediaLabel.orEmpty()
+    if (preview.originalUnavailable) {
+        // The card still shows its Reply heading above the unavailable notice; read both.
+        return listOfNotNull(stringResource(R.string.reply), mediaLabel).joinToString(", ")
+    }
     val title =
         replyQuoteTitle(
             senderTitle = senderTitleForReply(preview.sender, appState),

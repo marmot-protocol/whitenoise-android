@@ -1637,7 +1637,7 @@
     <string name="relative_time_yesterday">Yesterday</string>
     <string name="media_attachment_add_more">Add more</string>
     <string name="media_attachment_remove">Remove attachment</string>
-    <string name="voice_message_record">Hold to record voice message</string>
+    <string name="voice_message_record">Record voice message</string>
     <string name="voice_message_too_short">Hold longer to record</string>
     <string name="voice_message_permission_denied">Microphone permission needed to record</string>
     <string name="voice_message_recording_failed">Couldn\'t record voice message</string>
@@ -2729,4 +2729,18 @@
     <string name="settings_search_alias_read_aloud">TTS|text to speech|read aloud</string>
     <string name="settings_search_alias_sound">notification sound|alert sound|ringtone</string>
     <string name="settings_search_revealed">%1$s. Setting highlighted.</string>
+    <string name="voice_recording_started_announcement">Recording voice message</string>
+    <string name="voice_recording_locked_announcement">Recording locked</string>
+    <string name="voice_recording_stopped_announcement">Recording stopped</string>
+    <string name="voice_message_seek">Playback position</string>
+    <string name="video_failed">Video couldn\'t load</string>
+    <string name="conversation_new_message_from">New message from %1$s</string>
+    <plurals name="conversation_new_messages">
+        <item quantity="one">%1$d new message</item>
+        <item quantity="other">%1$d new messages</item>
+    </plurals>
+    <plurals name="unread_mentions_count">
+        <item quantity="one">%1$d unread mention</item>
+        <item quantity="other">%1$d unread mentions</item>
+    </plurals>
 </resources>

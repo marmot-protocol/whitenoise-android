@@ -412,7 +412,7 @@
     <string name="message_reacted">Reagiert mit %1$s</string>
     <string name="message_reaction_fallback">auf eine Nachricht</string>
     <string name="message_actions">Nachrichtenaktionen</string>
-    <string name="message_reply_quote_description">Antwort auf %1$s: %2$s</string>
+    <string name="message_reply_quote_description">Antwort – %1$s: %2$s</string>
     <string name="message_deleted_preview">Nachricht geloescht</string>
     <string name="agent_stream_started">Agent-Stream gestartet</string>
     <string name="stream_finished">Stream beendet</string>
@@ -1270,7 +1270,7 @@
     <string name="group_system_you_avatar_changed">Du hast das Gruppenbild geändert</string>
     <string name="media_attachment_add_more">Mehr hinzufügen</string>
     <string name="media_attachment_remove">Anhang entfernen</string>
-    <string name="voice_message_record">Halten zum Aufnehmen</string>
+    <string name="voice_message_record">Sprachnachricht aufnehmen</string>
     <string name="voice_message_too_short">Länger halten zum Aufnehmen</string>
     <string name="voice_message_permission_denied">Mikrofonberechtigung erforderlich</string>
     <string name="voice_message_recording_failed">Sprachnachricht konnte nicht aufgenommen werden</string>
@@ -2579,4 +2579,18 @@
     <string name="settings_search_alias_read_aloud">TTS|Sprachausgabe|vorlesen</string>
     <string name="settings_search_alias_sound">Benachrichtigungston|Hinweiston|Klingelton</string>
     <string name="settings_search_revealed">%1$s. Einstellung hervorgehoben.</string>
+    <string name="voice_recording_started_announcement">Sprachnachricht wird aufgenommen</string>
+    <string name="voice_recording_locked_announcement">Aufnahme fixiert</string>
+    <string name="voice_recording_stopped_announcement">Aufnahme beendet</string>
+    <string name="voice_message_seek">Wiedergabeposition</string>
+    <string name="video_failed">Video konnte nicht geladen werden</string>
+    <string name="conversation_new_message_from">Neue Nachricht von %1$s</string>
+    <plurals name="conversation_new_messages">
+        <item quantity="one">%1$d neue Nachricht</item>
+        <item quantity="other">%1$d neue Nachrichten</item>
+    </plurals>
+    <plurals name="unread_mentions_count">
+        <item quantity="one">%1$d ungelesene Erwähnung</item>
+        <item quantity="other">%1$d ungelesene Erwähnungen</item>
+    </plurals>
 </resources>

@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.Lifecycle
@@ -45,10 +46,53 @@ internal fun VoiceRecordingLifecycleEffect(controller: VoiceRecordingController)
             view.announceForAccessibility(warning)
         }
     }
+    VoiceRecordingPhaseAnnouncements(controller)
     val haptics = LocalHapticFeedback.current
     val lastSeconds = recording && controller.remainingMs <= VoiceRecordingController.LIMIT_HAPTIC_MS
     LaunchedEffect(controller, lastSeconds) {
         if (lastSeconds) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+    }
+}
+
+/** What the recorder is doing, as far as the screen reader needs to hear about it. */
+internal enum class VoiceRecordingPhase { Idle, Holding, Locked }
+
+/**
+ * The spoken update for a recorder phase change, or null when nothing should be said. A tap starts and
+ * locks in one step, so going straight from idle to locked is announced as a start.
+ */
+internal fun voiceRecordingAnnouncementRes(
+    before: VoiceRecordingPhase,
+    after: VoiceRecordingPhase,
+): Int? =
+    when {
+        before == after -> null
+        before == VoiceRecordingPhase.Idle -> R.string.voice_recording_started_announcement
+        after == VoiceRecordingPhase.Locked -> R.string.voice_recording_locked_announcement
+        after == VoiceRecordingPhase.Idle -> R.string.voice_recording_stopped_announcement
+        else -> null
+    }
+
+/** Start, lock and stop give no visual cue a screen reader can follow, so each is announced. */
+@Composable
+@Suppress("FunctionNaming")
+private fun VoiceRecordingPhaseAnnouncements(controller: VoiceRecordingController) {
+    val view = LocalView.current
+    val resources = LocalResources.current
+    val phase =
+        when {
+            !controller.isRecording -> VoiceRecordingPhase.Idle
+            controller.locked -> VoiceRecordingPhase.Locked
+            else -> VoiceRecordingPhase.Holding
+        }
+    val previous = remember(controller) { mutableStateOf(phase) }
+    LaunchedEffect(controller, phase) {
+        val before = previous.value
+        previous.value = phase
+        voiceRecordingAnnouncementRes(before, phase)?.let { res ->
+            @Suppress("DEPRECATION")
+            view.announceForAccessibility(resources.getString(res))
+        }
     }
 }
 

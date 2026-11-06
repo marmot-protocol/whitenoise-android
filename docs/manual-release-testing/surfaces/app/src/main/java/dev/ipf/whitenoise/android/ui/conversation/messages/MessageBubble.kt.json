@@ -278,6 +278,22 @@
         "test_ids": [
           "AXY-013"
         ]
+      },
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "AXY-013"
+        ]
+      },
+      {
+        "surface": "R.string.discard_failed_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.discard_failed_message",
+        "test_ids": [
+          "AXY-013"
+        ]
       }
     ],
     "message_rendering_contracts": [

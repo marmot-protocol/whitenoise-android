@@ -115,10 +115,11 @@
     ],
     "settings_controls": [
       {
-        "surface": "string:voice_message_failed",
+        "surface": "string:video_failed",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
-        "anchor": "R.string.voice_message_failed",
+        "anchor": "R.string.video_failed",
         "test_ids": [
+          "AXY-015",
           "MED-001"
         ]
       }
@@ -156,6 +157,14 @@
         "anchor": "fun MediaVideoBubble(",
         "test_ids": [
           "MED-044"
+        ]
+      },
+      {
+        "surface": "R.string.video_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt",
+        "anchor": "R.string.video_failed",
+        "test_ids": [
+          "AXY-015"
         ]
       }
     ]

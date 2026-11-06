@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationArrivalAnnouncement.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "R.string.conversation_new_message_from",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationArrivalAnnouncement.kt",
+        "anchor": "R.string.conversation_new_message_from",
+        "test_ids": [
+          "AXY-014"
+        ]
+      },
+      {
+        "surface": "R.plurals.conversation_new_messages",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationArrivalAnnouncement.kt",
+        "anchor": "R.plurals.conversation_new_messages",
+        "test_ids": [
+          "AXY-014"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

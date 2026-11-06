@@ -42,6 +42,40 @@
         "test_ids": [
           "MED-008"
         ]
+      },
+      {
+        "surface": "VoiceRecordingPhaseAnnouncements",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingLifecycle.kt",
+        "anchor": "fun VoiceRecordingPhaseAnnouncements(",
+        "test_ids": [
+          "AXY-014"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.voice_recording_started_announcement",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingLifecycle.kt",
+        "anchor": "R.string.voice_recording_started_announcement",
+        "test_ids": [
+          "AXY-014"
+        ]
+      },
+      {
+        "surface": "R.string.voice_recording_locked_announcement",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingLifecycle.kt",
+        "anchor": "R.string.voice_recording_locked_announcement",
+        "test_ids": [
+          "AXY-014"
+        ]
+      },
+      {
+        "surface": "R.string.voice_recording_stopped_announcement",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecordingLifecycle.kt",
+        "anchor": "R.string.voice_recording_stopped_announcement",
+        "test_ids": [
+          "AXY-014"
+        ]
       }
     ]
   },

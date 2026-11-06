@@ -1645,8 +1645,15 @@ internal fun MessageBubble(
         // (#3603): its nested controls read as text and their actions move here.
         val rowMerged = !selectionMode && !textSelectionMode
         val rowTextActions = LocalMessageRowTextActions.current
+        val failedOwnSend = mine && item.status == MessageStatus.Failed
         val rowActions =
             listOf(
+                MessageRowAction(stringResource(R.string.retry), failedOwnSend) {
+                    appState.launchMutation { controller.retryFailedSend(item) }
+                },
+                MessageRowAction(stringResource(R.string.discard_failed_message), failedOwnSend) {
+                    appState.launchMutation { controller.discardFailedSend(item) }
+                },
                 MessageRowAction(stringResource(R.string.reply), !deleted && !actionsReadOnly, ::beginReply),
                 MessageRowAction(stringResource(R.string.message_react), !deleted && !actionsReadOnly) {
                     onActionMenuOpenChange(false)

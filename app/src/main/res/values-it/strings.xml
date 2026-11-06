@@ -1272,7 +1272,7 @@
     <string name="group_system_you_avatar_changed">Hai cambiato l\'immagine del gruppo</string>
     <string name="media_attachment_add_more">Aggiungi altro</string>
     <string name="media_attachment_remove">Rimuovi allegato</string>
-    <string name="voice_message_record">Tieni premuto per registrare</string>
+    <string name="voice_message_record">Registra messaggio vocale</string>
     <string name="voice_message_too_short">Tieni premuto più a lungo</string>
     <string name="voice_message_permission_denied">Autorizzazione microfono necessaria</string>
     <string name="voice_message_recording_failed">Impossibile registrare il messaggio vocale</string>
@@ -2565,4 +2565,20 @@
     <string name="settings_search_alias_read_aloud">TTS|sintesi vocale|leggi ad alta voce</string>
     <string name="settings_search_alias_sound">suono delle notifiche|suono di avviso|suoneria</string>
     <string name="settings_search_revealed">%1$s. Impostazione evidenziata.</string>
+    <string name="voice_recording_started_announcement">Registrazione del messaggio vocale</string>
+    <string name="voice_recording_locked_announcement">Registrazione bloccata</string>
+    <string name="voice_recording_stopped_announcement">Registrazione interrotta</string>
+    <string name="voice_message_seek">Posizione di riproduzione</string>
+    <string name="video_failed">Impossibile caricare il video</string>
+    <string name="conversation_new_message_from">Nuovo messaggio da %1$s</string>
+    <plurals name="conversation_new_messages">
+        <item quantity="one">%1$d nuovo messaggio</item>
+        <item quantity="many">%1$d nuovi messaggi</item>
+        <item quantity="other">%1$d nuovi messaggi</item>
+    </plurals>
+    <plurals name="unread_mentions_count">
+        <item quantity="one">%1$d menzione non letta</item>
+        <item quantity="many">%1$d menzioni non lette</item>
+        <item quantity="other">%1$d menzioni non lette</item>
+    </plurals>
 </resources>
