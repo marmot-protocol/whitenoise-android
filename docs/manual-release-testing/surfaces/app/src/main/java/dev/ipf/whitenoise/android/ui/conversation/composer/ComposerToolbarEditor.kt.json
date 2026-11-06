@@ -175,6 +175,14 @@
         ]
       },
       {
+        "surface": "R.string.composer_voice_placement",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerToolbarEditor.kt",
+        "anchor": "R.string.composer_voice_placement",
+        "test_ids": [
+          "CON-043"
+        ]
+      },
+      {
         "surface": "R.string.composer_voice_on_send",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerToolbarEditor.kt",
         "anchor": "R.string.composer_voice_on_send",
