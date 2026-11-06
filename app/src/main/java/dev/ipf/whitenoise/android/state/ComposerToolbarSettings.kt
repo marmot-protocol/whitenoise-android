@@ -5,7 +5,7 @@ import org.json.JSONObject
 
 private const val MAX_STORED_COMPOSER_SHORTCUTS = 128
 
-// Version 3 adds voice placement on Send; earlier records decode with it off.
+// Version 3 marks records whose unpinned voice launcher shares Send's slot.
 private const val COMPOSER_TOOLBAR_RECORD_VERSION = 3
 
 /** Stable presentation IDs only: callbacks, accounts and current capability never enter storage. */
@@ -36,44 +36,36 @@ internal enum class ComposerToolbarLayout(
 
 internal enum class ComposerShortcutSide { Left, Right }
 
-/** Voice notes either share Send's slot while the composer is empty, sit in the toolbar, or stay hidden. */
-internal enum class ComposerVoicePlacement { Send, Left, Right, Off }
+/** Voice notes share Send's slot while the composer is empty unless pinned to a toolbar side. */
+internal enum class ComposerVoicePlacement { Send, Left, Right }
 
 internal data class ComposerToolbarSettings(
     val shortcuts: List<ComposerShortcut> = defaultComposerShortcuts,
     val layout: ComposerToolbarLayout = ComposerToolbarLayout.Automatic,
     val rightShortcuts: Set<ComposerShortcut> = defaultRightComposerShortcuts,
-    val voiceOnSend: Boolean = true,
 ) {
     /** Retains the saved overflow position; runtime hides More when its menu would be empty. */
     fun normalized(): ComposerToolbarSettings {
         val unique = shortcuts.distinct()
-        return copy(
-            shortcuts = if (ComposerShortcut.More in unique) unique else listOf(ComposerShortcut.More) + unique,
-            // A pinned voice shortcut always wins over Send placement.
-            voiceOnSend = voiceOnSend && ComposerShortcut.VoiceNote !in unique,
-        )
+        return copy(shortcuts = if (ComposerShortcut.More in unique) unique else listOf(ComposerShortcut.More) + unique)
     }
 
-    /** Where the voice launcher appears; a pinned voice shortcut always wins. */
+    /** Where the voice launcher appears; an unpinned launcher always shares Send's slot. */
     val voicePlacement: ComposerVoicePlacement
         get() =
             when {
-                ComposerShortcut.VoiceNote in shortcuts ->
-                    if (side(ComposerShortcut.VoiceNote) == ComposerShortcutSide.Right) {
-                        ComposerVoicePlacement.Right
-                    } else {
-                        ComposerVoicePlacement.Left
-                    }
-                voiceOnSend -> ComposerVoicePlacement.Send
-                else -> ComposerVoicePlacement.Off
+                ComposerShortcut.VoiceNote !in shortcuts -> ComposerVoicePlacement.Send
+                side(ComposerShortcut.VoiceNote) == ComposerShortcutSide.Right -> ComposerVoicePlacement.Right
+                else -> ComposerVoicePlacement.Left
             }
 
-    /** Moves the voice launcher between Send's slot, either toolbar side, or nowhere. */
+    /** Shown only while the voice launcher shares Send's slot. */
+    val voiceOnSend: Boolean get() = voicePlacement == ComposerVoicePlacement.Send
+
+    /** Moves the voice launcher between Send's slot and either toolbar side. */
     fun withVoicePlacement(placement: ComposerVoicePlacement): ComposerToolbarSettings =
         when (placement) {
-            ComposerVoicePlacement.Send -> copy(voiceOnSend = true, shortcuts = shortcuts - ComposerShortcut.VoiceNote)
-            ComposerVoicePlacement.Off -> copy(voiceOnSend = false, shortcuts = shortcuts - ComposerShortcut.VoiceNote)
+            ComposerVoicePlacement.Send -> copy(shortcuts = shortcuts - ComposerShortcut.VoiceNote)
             ComposerVoicePlacement.Left, ComposerVoicePlacement.Right -> {
                 val side =
                     if (placement == ComposerVoicePlacement.Left) {
@@ -189,9 +181,8 @@ internal data class ComposerToolbarSettings(
                                 ComposerShortcut.entries.firstOrNull { it.id == id }
                             }.toSet()
                     }
-                // Earlier versions had no Send placement; keep their pinned or hidden voice choice.
-                val voiceOnSend = version >= 3 && record.getBoolean("voiceOnSend")
-                ComposerToolbarSettings(shortcuts, layout, right, voiceOnSend).normalized()
+                // An unpinned voice launcher from any version now shares Send's slot.
+                ComposerToolbarSettings(shortcuts, layout, right).normalized()
             }.getOrElse { ComposerToolbarSettings() }
         }
     }

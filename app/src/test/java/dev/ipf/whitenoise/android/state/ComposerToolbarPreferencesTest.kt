@@ -33,7 +33,6 @@ class ComposerToolbarPreferencesTest {
                         ComposerShortcut.Emoji,
                     ),
                     rightShortcuts = setOf(ComposerShortcut.VoiceNote),
-                    voiceOnSend = true,
                 )
             assertEquals(expected, owner.value)
             assertEquals(ComposerVoicePlacement.Send, owner.value.voicePlacement)
@@ -97,22 +96,22 @@ class ComposerToolbarPreferencesTest {
         assertEquals(ComposerVoicePlacement.Send, left.withVoicePlacement(ComposerVoicePlacement.Send).voicePlacement)
         // Adding the voice shortcut from the palette pins it, leaving Send's slot to Send.
         assertEquals(ComposerVoicePlacement.Right, defaults.insert(ComposerShortcut.VoiceNote, 9).voicePlacement)
-        assertEquals(ComposerVoicePlacement.Off, left.without(ComposerShortcut.VoiceNote).voicePlacement)
+        assertEquals(ComposerVoicePlacement.Send, left.without(ComposerShortcut.VoiceNote).voicePlacement)
     }
 
-    /** Older records had no Send placement, so they keep a pinned voice launcher or its absence. */
+    /** Older records keep a pinned voice launcher; an unpinned one moves to Send's slot. */
     @Test
-    fun earlierVersionsKeepTheirVoiceChoice() {
+    fun earlierVersionsKeepTheirPinnedVoiceChoice() {
         val pinned =
             ComposerToolbarSettings.decode(
                 """{"version":2,"shortcuts":["more","voice_note"],"layout":"automatic","rightShortcuts":[]}""",
             )
         assertEquals(ComposerVoicePlacement.Left, pinned.voicePlacement)
-        val hidden =
+        val unpinned =
             ComposerToolbarSettings.decode(
                 """{"version":2,"shortcuts":["more","emoji"],"layout":"automatic","rightShortcuts":[]}""",
             )
-        assertEquals(ComposerVoicePlacement.Off, hidden.voicePlacement)
+        assertEquals(ComposerVoicePlacement.Send, unpinned.voicePlacement)
     }
 
     @Test
@@ -151,7 +150,6 @@ class ComposerToolbarPreferencesTest {
             """{"version":2,"shortcuts":[]}""",
             """{"version":1,"shortcuts":[false]}""",
             """{"version":1,"shortcuts":"camera"}""",
-            """{"version":3,"shortcuts":[],"rightShortcuts":[]}""",
             """{"version":4,"shortcuts":[],"rightShortcuts":[],"voiceOnSend":true}""",
         ).forEach { encoded ->
             assertEquals(ComposerToolbarSettings(), ComposerToolbarSettings.decode(encoded))

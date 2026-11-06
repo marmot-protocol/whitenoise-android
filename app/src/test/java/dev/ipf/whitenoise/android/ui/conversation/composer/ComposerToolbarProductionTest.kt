@@ -5,10 +5,14 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.window.OnBackInvokedCallback
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -50,6 +54,7 @@ import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ComposerToolbarLayout
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.settings.rememberComposerSettingsEditState
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.share.testAccount
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -85,6 +90,9 @@ class ComposerToolbarProductionTest {
     private var focused = false
     private var keyboardHides = 0
     private var back: OnBackInvokedCallback? = null
+
+    // Stands in for the conversation's full-screen route, which replaces the composer while open.
+    private var customizing by mutableStateOf(false)
     private val keyboard =
         object : SoftwareKeyboardController {
             override fun show() = Unit
@@ -408,6 +416,17 @@ class ComposerToolbarProductionTest {
     }
 
     @Test
+    fun longPressingAPlusMenuRowOpensCustomizationWithoutRunningTheRow() {
+        render(ComposerToolbarSettings(listOf(ComposerShortcut.More, ComposerShortcut.Camera)))
+        composeRule.onNodeWithTag("composer.shortcut.more").performTouchInput { click() }
+        val gallery = hasText(context.getString(R.string.attachment_photos_videos)) and hasAnyAncestor(isPopup())
+        composeRule.onNode(gallery).performTouchInput { longClick() }
+        composeRule.onNodeWithTag("composer.customize").assertIsDisplayed()
+        composeRule.onNodeWithTag("conversation.attachment.menu").assertDoesNotExist()
+        assertEquals(0, galleryCalls)
+    }
+
+    @Test
     fun locationPeopleContactAndPollShortcutsInvokeTheirProductionCallbacksOnce() {
         extraInventory = true
         render(
@@ -446,14 +465,6 @@ class ComposerToolbarProductionTest {
                 .fetchSemanticsNode()
                 .config[SemanticsActions.CustomActions]
                 .single { it.label == context.getString(R.string.composer_customize) }
-        val previousToolbarClick =
-            checkNotNull(
-                composeRule
-                    .onNodeWithContentDescription(context.getString(R.string.attachment_camera))
-                    .fetchSemanticsNode()
-                    .config[SemanticsActions.OnClick]
-                    .action,
-            )
         composeRule.onNodeWithTag("composer.shortcut.more").performTouchInput { click() }
         val visibleCameraInMenu =
             hasText(context.getString(R.string.attachment_camera)) and hasAnyAncestor(isPopup())
@@ -465,8 +476,7 @@ class ComposerToolbarProductionTest {
         composeRule.onNodeWithTag("composer.customize").assertIsDisplayed()
         composeRule.onNodeWithTag("composer.customize.label.camera").performScrollTo().assertIsDisplayed()
         composeRule.onNode(hiddenGallery).assertDoesNotExist()
-        // The toolbar callback stays attached; a detached Popup's framework clickable throws before app code.
-        composeRule.runOnIdle { previousToolbarClick() }
+        // The full-screen route replaces the composer; its preview glyphs never run acquisition.
         assertEquals(0, cameraCalls)
     }
 
@@ -558,6 +568,12 @@ class ComposerToolbarProductionTest {
                 emptyAppState()
             }
         text = ComposerTextState(value)
+        customizing = false
+        val registrar =
+            ComposerOverlayBackRegistrar { _, callback ->
+                back = callback
+                { if (back === callback) back = null }
+            }
         composeRule.setContent {
             CompositionLocalProvider(
                 LocalLayoutDirection provides direction,
@@ -566,8 +582,22 @@ class ComposerToolbarProductionTest {
                 WhiteNoiseTheme(fontScale = fontScale) {
                     Surface {
                         Box(Modifier.width(360.dp).height(height.dp), contentAlignment = Alignment.BottomCenter) {
+                            if (customizing) {
+                                val preference = appState.composerToolbarPreference
+                                ComposerToolbarEditor(
+                                    rememberComposerSettingsEditState(preference.requestedValue),
+                                    preference.saving,
+                                    preference::save,
+                                    { customizing = false },
+                                    Modifier.fillMaxSize(),
+                                    overlayBackRegistrar = registrar,
+                                    saveFailed = preference.failed,
+                                )
+                                return@Box
+                            }
                             ComposerBar(
                                 appState = appState,
+                                onCustomizeToolbar = { customizing = true },
                                 draftAccountRef = if (identity) "first" else null,
                                 replyingTo = null,
                                 messageTextCopy = MessageTextCopy.Default,
@@ -577,11 +607,7 @@ class ComposerToolbarProductionTest {
                                 onSendAttachments = attachmentSend,
                                 softwareKeyboardController = keyboard,
                                 onComposerFocusChanged = { focused = it },
-                                overlayBackRegistrar =
-                                    ComposerOverlayBackRegistrar { _, callback ->
-                                        back = callback
-                                        { if (back === callback) back = null }
-                                    },
+                                overlayBackRegistrar = registrar,
                                 onCaptureFromCamera = if (attachments) ({ cameraCalls++ }) else null,
                                 onPickFromGallery = if (attachments) ({ galleryCalls++ }) else null,
                                 onPickDocument = if (attachments) ({ fileCalls++ }) else null,

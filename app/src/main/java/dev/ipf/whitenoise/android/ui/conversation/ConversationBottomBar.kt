@@ -51,6 +51,8 @@ internal fun ConversationBottomBar(
     // Compact-height windows shrink the top bar, so the full-screen composer
     // reserves correspondingly less clearance below it.
     compactHeight: Boolean = false,
+    // Opens the full-screen composer settings route owned by the conversation screen.
+    onCustomizeComposer: (() -> Unit)? = null,
     dictationControlsVisible: Boolean = true,
     dictationOriginVisible: Boolean = dictationControlsVisible,
     selectionMode: Boolean,
@@ -284,6 +286,7 @@ internal fun ConversationBottomBar(
                             dictationControlsVisible = dictationControlsVisible,
                             dictationOriginVisible = dictationOriginVisible,
                             appState = appState,
+                            onCustomizeToolbar = onCustomizeComposer,
                             mentionCandidates = mentionCandidates,
                             mentionPickerEnabled = mentionPickerEnabled,
                             autoFocusOnEnter = autoFocusOnEnter,

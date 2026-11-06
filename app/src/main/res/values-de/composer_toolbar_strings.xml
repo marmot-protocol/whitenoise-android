@@ -6,8 +6,8 @@
     <string name="composer_layout">Anordnung</string>
     <string name="composer_side_left">Links</string>
     <string name="composer_side_right">Rechts</string>
-    <string name="composer_voice_on_send">Auf Senden</string>
-    <string name="composer_voice_off">Aus</string>
+    <string name="composer_voice_placement">Sprache</string>
+    <string name="composer_voice_on_send">Senden</string>
     <string name="composer_layout_automatic">Automatisch</string>
     <string name="composer_layout_expanded">Immer erweitert</string>
     <string name="composer_move_earlier">Nach vorn verschieben</string>

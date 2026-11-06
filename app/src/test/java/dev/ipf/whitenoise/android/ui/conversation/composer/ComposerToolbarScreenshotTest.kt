@@ -18,12 +18,10 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
-import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -34,6 +32,7 @@ import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.state.ComposerShortcut
 import dev.ipf.whitenoise.android.state.ComposerToolbarLayout
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
+import dev.ipf.whitenoise.android.state.ComposerVoicePlacement
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CoroutineScope
@@ -120,6 +119,18 @@ class ComposerToolbarScreenshotTest {
             fontScale = 2f,
         )
 
+    /** The voice placement row stays on one line at an enlarged font, ending at a visible Reset button. */
+    @Test fun editorVoiceRowAndResetAtLargeFont() =
+        capture(
+            "editor_voice_reset_large_font",
+            custom,
+            dark = true,
+            amoled = true,
+            editor = true,
+            fontScale = 1.3f,
+            scrollToReset = true,
+        )
+
     @Test fun editorNarrowOverflowAtDoubleFont() =
         capture(
             "editor_narrow_overflow_double_font",
@@ -129,19 +140,6 @@ class ComposerToolbarScreenshotTest {
             editor = true,
             fontScale = 2f,
             width = 240,
-        )
-
-    @Test fun inlineEditorAmoled() = capture("inline_editor_amoled", custom, dark = true, amoled = true, inline = true)
-
-    @Test fun inlineEditorShortLargeFont() =
-        capture(
-            "inline_editor_short_large",
-            custom,
-            dark = true,
-            amoled = true,
-            inline = true,
-            large = true,
-            height = 180,
         )
 
     @Test fun shortHeightWrappedActions() =
@@ -174,12 +172,12 @@ class ComposerToolbarScreenshotTest {
         rtl: Boolean = false,
         large: Boolean = false,
         editor: Boolean = false,
-        inline: Boolean = false,
         height: Int = if (editor) 700 else 360,
         fontScale: Float = if (large) 1.5f else 1f,
         width: Int = 360,
         draft: String = "",
         probeVoice: Boolean = false,
+        scrollToReset: Boolean = false,
     ) {
         val context = ApplicationProvider.getApplicationContext<Context>()
         context
@@ -198,7 +196,7 @@ class ComposerToolbarScreenshotTest {
                 onError = {},
             )
         val appState = emptyAppState()
-        val textState = ComposerTextState(TextFieldValue(if (inline) "A draft kept while editing shortcuts" else draft))
+        val textState = ComposerTextState(TextFieldValue(draft))
         val editState = ComposerToolbarEditState(settings)
         composeRule.setContent {
             CompositionLocalProvider(
@@ -258,10 +256,8 @@ class ComposerToolbarScreenshotTest {
             composeRule.waitForIdle()
             assertShortcutPositions("typed")
         }
-        if (inline) {
-            composeRule.onNodeWithTag("composer.shortcut.camera").performTouchInput { longClick() }
-        }
-        if (editor || inline) assertEditorPreview(settings, height, width, fontScale)
+        if (editor) assertEditorPreview(settings, height, width, fontScale)
+        if (scrollToReset) assertVoiceRowFitsAndResetVisible(width)
         assertDenseToolbarGeometry(name, settings, editor)
         composeRule.onNodeWithTag("toolbar.snapshot").captureRoboImage("src/test/snapshots/composer_toolbar_$name.png")
         if (probeVoice) {
@@ -396,6 +392,27 @@ class ComposerToolbarScreenshotTest {
     }
 
     /** Checks preview targets, scrolling and scaled labels against the rendered editor bounds. */
+    private fun assertVoiceRowFitsAndResetVisible(width: Int) {
+        val row =
+            composeRule
+                .onNodeWithTag("composer.customize.label.${ComposerShortcut.VoiceNote.id}")
+                .performScrollTo()
+                .fetchSemanticsNode()
+                .boundsInRoot
+        // Every placement sits beside the label on a single line, fully inside the row.
+        ComposerVoicePlacement.entries.forEach { placement ->
+            val choice =
+                composeRule
+                    .onNodeWithTag("composer.customize.voice.${placement.name.lowercase()}")
+                    .assertIsDisplayed()
+                    .fetchSemanticsNode()
+                    .boundsInRoot
+            assertTrue(choice.top >= row.top && choice.bottom <= row.bottom)
+            assertTrue(choice.right <= width * composeRule.density.density)
+        }
+        composeRule.onNodeWithTag("composer.customize.reset").performScrollTo().assertIsDisplayed()
+    }
+
     private fun assertEditorPreview(
         settings: ComposerToolbarSettings,
         height: Int,

@@ -20,6 +20,14 @@ internal class DictationLauncherOrigin {
     val boundsInWindow: Rect? get() = current?.second
     private var preparedSessionId: Long? = null
 
+    // A transient launcher, such as a Plus menu row, disappears before the session it starts.
+    private var pending: Rect? = null
+
+    /** Latches a transient launcher's last geometry for the next session entrance only. */
+    fun launchFrom(bounds: Rect) {
+        pending = bounds.takeIf { it.width > 0f && it.height > 0f && hasFiniteCoordinates(it) }
+    }
+
     /** Consumes a session's presentation entry once, even when policy or missing geometry blocks it. */
     fun takeEntrance(
         sessionId: Long?,
@@ -27,7 +35,9 @@ internal class DictationLauncherOrigin {
     ): Rect? {
         if (sessionId == null || preparedSessionId == sessionId) return null
         preparedSessionId = sessionId
-        return boundsInWindow.takeIf { eligible }
+        val origin = pending ?: boundsInWindow
+        pending = null
+        return origin?.takeIf { eligible }
     }
 
     /** Retains only finite, positive geometry from a currently placed launcher. */
@@ -36,6 +46,8 @@ internal class DictationLauncherOrigin {
         bounds: Rect,
     ) {
         if (bounds.width > 0f && bounds.height > 0f && hasFiniteCoordinates(bounds)) {
+            // A newly placed launcher supersedes an unused transient origin.
+            if (current?.first !== token) pending = null
             current = token to bounds
         } else {
             remove(token)

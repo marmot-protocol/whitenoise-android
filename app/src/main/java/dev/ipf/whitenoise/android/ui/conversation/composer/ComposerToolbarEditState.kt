@@ -32,6 +32,7 @@ internal class ComposerToolbarEditState(
     val previewSettings: ComposerToolbarSettings
         get() = dragging?.let { id -> insertion?.let { draft.insertOnSide(id, insertionSide, it) } } ?: draft
     private var dragBounds = emptyMap<ComposerShortcut, Rect>()
+    private var dragArea = Rect.Zero
     private var dragSource: ComposerToolbarSettings? = null
     private val selectedBounds = mutableMapOf<ComposerShortcut, Rect>()
     var previewRtl = false
@@ -80,6 +81,9 @@ internal class ComposerToolbarEditState(
         grabOffset = position - (selectedBounds[shortcut]?.center ?: position)
         dragSource = draft
         dragBounds = selectedBounds.toMap()
+        // Freeze the drop area too: a projected slot can reflow the preview, and a live area would
+        // flip the pointer in and out of bounds, snapping the glyph between sides.
+        dragArea = selectedArea.inflate((selectedBounds[shortcut]?.height ?: 0f) / 2)
         dragging = shortcut
         pointer = position
         updateInsertion()
@@ -95,7 +99,7 @@ internal class ComposerToolbarEditState(
     /** Finds the insertion index among the remaining rows inside the selected area. */
     private fun updateInsertion() {
         val id = dragging ?: return
-        if (!selectedArea.contains(pointer)) {
+        if (!dragArea.contains(pointer)) {
             insertion = null
             return
         }
@@ -106,7 +110,7 @@ internal class ComposerToolbarEditState(
                 delta.x * delta.x + delta.y * delta.y
             }
         insertionSide = nearest?.let { draft.side(it.key) } ?: draft.side(id)
-        val physicalLeft = pointer.x < selectedArea.center.x
+        val physicalLeft = pointer.x < dragArea.center.x
         val hasLeft = draft.onSide(ComposerShortcutSide.Left).any { it != id }
         val hasRight = draft.onSide(ComposerShortcutSide.Right).any { it != id }
         if (physicalLeft && !hasLeft) insertionSide = ComposerShortcutSide.Left
@@ -158,6 +162,7 @@ internal class ComposerToolbarEditState(
         insertion = null
         dragSource = null
         dragBounds = emptyMap()
+        dragArea = Rect.Zero
     }
 }
 

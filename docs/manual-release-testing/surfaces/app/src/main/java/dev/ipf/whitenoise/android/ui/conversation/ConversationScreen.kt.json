@@ -59,7 +59,7 @@
       {
         "surface": "Logical destination navigation motion",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScreen.kt",
-        "anchor": "val detailsRouteMotion =",
+        "anchor": "val transcriptRouteMotion =",
         "test_ids": [
           "CON-037"
         ]

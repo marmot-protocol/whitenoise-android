@@ -223,6 +223,22 @@ class ComposerToolbarEditTest {
     }
 
     @Test
+    fun previewReflowDuringDragKeepsTheFrozenDropAreaAndSide() {
+        val edit = editor()
+        edit.start(camera, Offset(54f, 24f))
+        edit.drag(Offset(200f, 60f))
+        val side = edit.insertionSide
+        val index = edit.insertion
+        assertEquals(ComposerShortcutSide.Right, side)
+        // The projected slot shrinks the live preview; the held target must not snap back.
+        edit.selectedArea = Rect(0f, 0f, 200f, 60f)
+        assertEquals(side, edit.insertionSide)
+        assertEquals(index, edit.insertion)
+        edit.selectedArea = Rect(0f, 0f, 300f, 100f)
+        assertEquals(index, edit.insertion)
+    }
+
+    @Test
     fun emptySpaceCannotStartDragAndClippedSlotsDoNotBecomeTargets() {
         val edit = editor()
         assertFalse(edit.startNearest(Offset(150f, 24f)))

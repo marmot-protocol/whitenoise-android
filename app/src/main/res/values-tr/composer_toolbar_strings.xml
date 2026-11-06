@@ -6,8 +6,8 @@
     <string name="composer_layout">Düzen</string>
     <string name="composer_side_left">Sol</string>
     <string name="composer_side_right">Sağ</string>
-    <string name="composer_voice_on_send">Gönder\'de</string>
-    <string name="composer_voice_off">Kapalı</string>
+    <string name="composer_voice_placement">Ses</string>
+    <string name="composer_voice_on_send">Gönder</string>
     <string name="composer_layout_automatic">Otomatik</string>
     <string name="composer_layout_expanded">Her zaman genişletilmiş</string>
     <string name="composer_move_earlier">Öne taşı</string>

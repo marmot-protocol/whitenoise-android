@@ -2,6 +2,7 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
+import android.view.View
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -17,8 +18,13 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalTextToolbar
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -28,13 +34,17 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toRect
+import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.window.PopupPositionProvider
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ComposerShortcut
+import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseMenuItem
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicWidth
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.design.KeyboardSafePopup
+import dev.ipf.whitenoise.android.ui.navigation.DictationLauncherOrigin
+import dev.ipf.whitenoise.android.ui.navigation.LocalDictationLauncherOrigin
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 /** Above-Add placement mirrors the pinned prototype, with its below-anchor fallback in short windows. */
@@ -118,6 +128,7 @@ internal fun ComposerAttachmentMenu(
     onContact: (() -> Unit)?,
     onPoll: (() -> Unit)? = null,
     textShortcuts: ComposerMenuTextShortcuts = ComposerMenuTextShortcuts(),
+    onCustomize: (() -> Unit)? = null,
 ) {
     val items =
         listOfNotNull(
@@ -163,7 +174,20 @@ internal fun ComposerAttachmentMenu(
                         .heightIn(max = menuMaxHeight)
                         .testTag("conversation.attachment.menu"),
             ) {
-                Column(Modifier.fadingVerticalScroll(rememberScrollState())) {
+                // Holding any row opens composer customization, matching a long press on the toolbar.
+                Column(
+                    Modifier
+                        .composerCustomizationEntry(
+                            enabled = onCustomize != null,
+                            onCustomize =
+                                onCustomize?.let { customize ->
+                                    {
+                                        onDismiss()
+                                        customize()
+                                    }
+                                },
+                        ).fadingVerticalScroll(rememberScrollState()),
+                ) {
                     items.forEachIndexed { index, item ->
                         DropdownMenuItem(
                             text = { Text(item.label) },
@@ -191,8 +215,9 @@ private fun composerMenuTextItems(
     anchorBounds: IntRect,
 ): List<WhiteNoiseMenuItem> {
     val textToolbar = LocalTextToolbar.current
+    val dictationOrigin = rememberMenuDictationOrigin()
     return listOfNotNull(
-        textShortcuts.onEmoji?.let { composerMenuShortcutItem(ComposerShortcut.Emoji, it) },
+        textShortcuts.onEmoji?.let { composerMenuShortcutItem(ComposerShortcut.Emoji, onClick = it) },
         textShortcuts.onPaste?.let { paste ->
             composerMenuShortcutItem(ComposerShortcut.Paste) {
                 // Denied clipboard reads fall back to the trusted system Paste menu at the Plus button.
@@ -204,17 +229,54 @@ private fun composerMenuTextItems(
                 }
             }
         },
-        textShortcuts.onDictation?.let { composerMenuShortcutItem(ComposerShortcut.Dictation, it) },
+        textShortcuts.onDictation?.let { dictate ->
+            composerMenuShortcutItem(ComposerShortcut.Dictation, dictationOrigin.modifier) {
+                dictationOrigin.latch()
+                dictate()
+            }
+        },
     )
+}
+
+/**
+ * The menu row lives in a popup window and is gone before dictation starts, so its bounds are
+ * converted into the host window and latched for the dictation bubble's entrance.
+ */
+private class MenuDictationOrigin(
+    private val hostView: View,
+    private val origin: DictationLauncherOrigin?,
+    private val enabled: Boolean,
+) {
+    private var screenBounds: Rect? = null
+    val modifier: Modifier =
+        Modifier.onGloballyPositioned { screenBounds = Rect(it.positionOnScreen(), it.size.toSize()) }
+
+    fun latch() {
+        val bounds = screenBounds ?: return
+        if (!enabled || origin == null) return
+        val onScreen = IntArray(2).also(hostView::getLocationOnScreen)
+        val inWindow = IntArray(2).also(hostView::getLocationInWindow)
+        val windowOrigin = Offset((onScreen[0] - inWindow[0]).toFloat(), (onScreen[1] - inWindow[1]).toFloat())
+        origin.launchFrom(bounds.translate(-windowOrigin))
+    }
+}
+
+@Composable
+private fun rememberMenuDictationOrigin(): MenuDictationOrigin {
+    val hostView = LocalView.current
+    val origin = LocalDictationLauncherOrigin.current
+    val enabled = LocalControlHandoffEndpointCurrent.current
+    return remember(hostView, origin, enabled) { MenuDictationOrigin(hostView, origin, enabled) }
 }
 
 @Composable
 private fun composerMenuShortcutItem(
     shortcut: ComposerShortcut,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) = WhiteNoiseMenuItem(
     stringResource(shortcut.labelRes),
     onClick,
     shortcut.iconRes,
-    modifier = Modifier.testTag("conversation.attachment.menu.${shortcut.id}"),
+    modifier = modifier.testTag("conversation.attachment.menu.${shortcut.id}"),
 )

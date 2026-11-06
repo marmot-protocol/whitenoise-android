@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -17,9 +18,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -56,6 +59,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ComposerShortcut
@@ -188,8 +192,13 @@ private fun ComposerToolbarPalette(
             }
         }
     }
-    TextButton(onClick = { state.change(ComposerToolbarSettings()) }, enabled = !saving) {
-        Text(stringResource(R.string.composer_reset))
+    OutlinedButton(
+        onClick = { state.change(ComposerToolbarSettings()) },
+        enabled = !saving,
+        modifier = Modifier.padding(vertical = ComposerToolbarGutter).testTag("composer.customize.reset"),
+    ) {
+        Icon(painterResource(R.drawable.ic_refresh), null, Modifier.size(ButtonDefaults.IconSize))
+        Text(stringResource(R.string.composer_reset), Modifier.padding(start = ButtonDefaults.IconSpacing))
     }
 }
 
@@ -249,51 +258,58 @@ private fun ComposerShortcutPaletteRow(
     }
 }
 
-/** Voice notes choose one placement: Send's slot, either toolbar side, or hidden. */
-@OptIn(ExperimentalLayoutApi::class)
+/** Voice notes choose one placement on a single line: Send's slot or either toolbar side. */
 @Composable
 private fun ComposerVoicePlacementRow(
     state: ComposerToolbarEditState,
     saving: Boolean,
 ) {
     val current = state.draft.voicePlacement
-    Column(Modifier.fillMaxWidth().testTag("composer.customize.label.${ComposerShortcut.VoiceNote.id}")) {
-        Row(Modifier.heightIn(min = ComposerShortcutTarget), verticalAlignment = Alignment.CenterVertically) {
-            MiniWaveformGlyph(MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(
-                stringResource(ComposerShortcut.VoiceNote.labelRes),
-                Modifier
-                    .padding(horizontal = ComposerToolbarGutter)
-                    .testTag("composer.customize.name.${ComposerShortcut.VoiceNote.id}"),
-            )
-        }
-        FlowRow(
-            Modifier.fillMaxWidth().padding(start = ComposerShortcutIconSize).selectableGroup(),
-            horizontalArrangement = Arrangement.End,
-        ) {
-            ComposerVoicePlacement.entries.forEach { placement ->
-                val chosen = current == placement
-                TextButton(
-                    onClick = { state.change(state.draft.withVoicePlacement(placement)) },
-                    enabled = !saving,
-                    modifier =
-                        Modifier
-                            .testTag("composer.customize.voice.${placement.name.lowercase()}")
-                            .semantics {
-                                role = Role.RadioButton
-                                selected = chosen
-                            },
-                ) {
-                    Text(
-                        stringResource(placement.labelRes),
-                        fontWeight = if (chosen) FontWeight.Bold else FontWeight.Normal,
-                        textDecoration = if (chosen) TextDecoration.Underline else TextDecoration.None,
-                    )
-                }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = ComposerShortcutTarget)
+            .testTag("composer.customize.label.${ComposerShortcut.VoiceNote.id}")
+            .selectableGroup(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        MiniWaveformGlyph(MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            stringResource(R.string.composer_voice_placement),
+            Modifier
+                .weight(1f)
+                .padding(horizontal = ComposerToolbarGutter)
+                .testTag("composer.customize.name.${ComposerShortcut.VoiceNote.id}"),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        ComposerVoicePlacement.entries.forEach { placement ->
+            val chosen = current == placement
+            TextButton(
+                onClick = { state.change(state.draft.withVoicePlacement(placement)) },
+                enabled = !saving,
+                contentPadding = ComposerChoicePadding,
+                modifier =
+                    Modifier
+                        .testTag("composer.customize.voice.${placement.name.lowercase()}")
+                        .semantics {
+                            role = Role.RadioButton
+                            selected = chosen
+                        },
+            ) {
+                Text(
+                    stringResource(placement.labelRes),
+                    maxLines = 1,
+                    softWrap = false,
+                    fontWeight = if (chosen) FontWeight.Bold else FontWeight.Normal,
+                    textDecoration = if (chosen) TextDecoration.Underline else TextDecoration.None,
+                )
             }
         }
     }
 }
+
+private val ComposerChoicePadding = PaddingValues(horizontal = 8.dp)
 
 private val ComposerVoicePlacement.labelRes: Int
     get() =
@@ -301,7 +317,6 @@ private val ComposerVoicePlacement.labelRes: Int
             ComposerVoicePlacement.Send -> R.string.composer_voice_on_send
             ComposerVoicePlacement.Left -> R.string.composer_side_left
             ComposerVoicePlacement.Right -> R.string.composer_side_right
-            ComposerVoicePlacement.Off -> R.string.composer_voice_off
         }
 
 /** Keeps side selection independent of the visibility checkbox, inline or beneath its label. */

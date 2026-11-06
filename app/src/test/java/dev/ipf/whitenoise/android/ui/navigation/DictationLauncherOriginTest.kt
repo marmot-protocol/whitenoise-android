@@ -58,4 +58,23 @@ class DictationLauncherOriginTest {
         assertNull(origin.takeEntrance(1L, eligible = true))
         assertEquals(launcher, origin.takeEntrance(2L, eligible = true))
     }
+
+    /** A Plus menu row closes before dictation starts, so its latched origin serves only the next entrance. */
+    @Test
+    fun transientMenuOriginWinsOnceAndANewLauncherSupersedesIt() {
+        val origin = DictationLauncherOrigin()
+        val toolbar = Rect(80f, 620f, 128f, 668f)
+        val menuRow = Rect(16f, 400f, 216f, 448f)
+        val token = Any()
+        origin.report(token, toolbar)
+        origin.launchFrom(menuRow)
+        origin.report(token, toolbar)
+        assertEquals(menuRow, origin.takeEntrance(1L, eligible = true))
+        assertEquals(toolbar, origin.takeEntrance(2L, eligible = true))
+        origin.launchFrom(menuRow)
+        origin.report(Any(), toolbar)
+        assertEquals(toolbar, origin.takeEntrance(3L, eligible = true))
+        origin.launchFrom(Rect.Zero)
+        assertEquals(toolbar, origin.takeEntrance(4L, eligible = true))
+    }
 }
