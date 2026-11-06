@@ -195,6 +195,9 @@ jobs:
       - name: Test analytics, invite-localization, media-latency and tooling-test wiring
         run: python3 -m unittest scripts.test_invite_failure_localization scripts.test_media_latency_report scripts.test_product_analytics_config scripts.test_tooling_tests_are_wired
 
+      - name: Test media A/V decoder, sandbox and report tooling
+        run: python3 -m unittest scripts.test_check_media_av_paced_report scripts.test_media_seccomp_filter scripts.test_media_video_geometry scripts.test_prepare_media_decoder scripts.test_summarize_media_av_capability
+
       - name: Test package-replacement startup reporter
         run: bash .github/scripts/test-package-replacement-startup-report.sh
 

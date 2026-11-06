@@ -128,8 +128,8 @@ contracts require current-source kernel and device qualification.
 
 The implementation now includes the native source build, isolated automatic
 poster/duration/waveform route, raw-output playback, attachment transcription and
-report validation. #3374 stays open until playback has a timing budget and a
-slow physical device has been timed against it.
+report validation. #3374 stays open until playback has a timing budget and the physical-device
+timing below has been compared against it.
 
 ## Measured playback timing
 
@@ -152,7 +152,34 @@ been agreed, so each row records
 not measure physical presentation, acoustic output or worker memory over a
 lifetime.
 
-A physical phone passed a manual check of the `c439df8` preview build. The check
-covered video start inline and fullscreen, voice and audio playback with pause,
-resume and seek, rotation, scrolling a long chat with videos, and data retained
-after the upgrade. Nothing was timed. No slow physical device has been timed.
+The API 36 run 42178845019 is marked failed because the Perfetto trace stop
+timed out after the instrumented tests had passed. Its timing rows are complete.
+
+### Physical device
+
+The same test ran once on a Pixel 6a (API 37, Android 17 `CP3A.261005.002.A1`)
+with the CI debug build of merge commit `c258423e` (PR head `5541df88` on master
+`ae53e478`). The playback, decoder and native sources are unchanged from that
+build to the current head. All 32 rows were observed with no failed rows.
+
+| Device | Play to first progress, median (max) | Resume to audio progress, median (max) | Seek to matching progress, median (max) |
+| --- | --- | --- | --- |
+| Pixel 6a | 1617 ms (1772 ms) | 1835 ms (4525 ms) | 166 ms (3168 ms) |
+
+The isolated worker accounts for most of the start time. Its median time from the
+play request to a ready worker was 1552 ms (1708 ms max), and first progress
+followed a median 59 ms later. The API 30 emulator needed 885 ms for the same
+step. Each resume starts a new worker activation, so resume costs about the same
+as a cold start: the start and ten resumes on each file ran in 11 separate
+worker processes.
+
+The long tails all come from `original-video.mp4`. Resume on that file took
+1.9–2.1 s six times and 3.9–4.5 s four times. Seeks to 600 ms took 2.6–3.2 s,
+and seeks to 100 ms took 246–505 ms. On `tone-pcm.wav`, resume took 1644–1805 ms
+and every seek finished within 86 ms.
+
+The Pixel 6a figures come from one run on one device. They are observations
+too, with the same pending `threshold_verdict`. A physical phone also passed a
+manual check of the `c439df8` preview build. The check covered video start inline and fullscreen,
+voice and audio playback with pause, resume and seek, rotation, scrolling a long
+chat with videos, and data retained after the upgrade.
