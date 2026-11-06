@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
 
 /** Explicit user actions must use their real Android boundary, not unrelated platform hints. */
 class ExplicitInteractionCoverageTest {
@@ -34,5 +33,5 @@ class ExplicitInteractionCoverageTest {
         assertTrue("onWebLinkActivated = onWebLinkActivated" in reader)
     }
 
-    private fun source(relative: String) = File("src/main/java/dev/ipf/whitenoise/android/$relative").readText()
+    private fun source(relative: String) = appModuleSource("src/main/java/dev/ipf/whitenoise/android/$relative")
 }

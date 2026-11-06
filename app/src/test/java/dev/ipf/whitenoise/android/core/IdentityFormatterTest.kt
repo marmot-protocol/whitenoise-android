@@ -5,9 +5,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import java.time.format.TextStyle
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 
@@ -45,17 +45,17 @@ class IdentityFormatterTest {
 
     @Test
     fun farFutureTimestampUsesExplicitLabel() {
-        val tomorrow = (Instant.now().epochSecond + 86_400L).toULong()
+        val tomorrow = (FIXED_NOW.epochSecond + 86_400L).toULong()
 
-        assertEquals("future", IdentityFormatter.relativeTime(tomorrow))
+        assertEquals("future", relativeTimeAtFixedNow(tomorrow))
     }
 
     @Test
     fun slightlyAheadTimestampReadsAsNowNotFuture() {
         // Clock skew shouldn't render the literal "future".
-        val skewedAhead = (Instant.now().epochSecond + 5L).toULong()
+        val skewedAhead = (FIXED_NOW.epochSecond + 5L).toULong()
 
-        assertEquals("now", IdentityFormatter.relativeTime(skewedAhead))
+        assertEquals("now", relativeTimeAtFixedNow(skewedAhead))
     }
 
     /** Initials take the leading letter only. */
@@ -112,24 +112,12 @@ class IdentityFormatterTest {
     fun relativeTimeDoesNotCrashOnOutOfRangeTimestamps() {
         // #468: untrusted epoch values must not throw DateTimeException into the
         // render path. ULong.MAX_VALUE wraps to -1L and a high-bit value wraps to
-        // Long.MIN_VALUE; both clamp to a safe instant instead of crashing.
-        val zone = ZoneId.systemDefault()
-        // Epoch 0 (1970) is well over a year ago, so the ladder renders the
-        // two-digit-year date with no time component.
-        val epochZeroFormatted =
-            DateTimeFormatter
-                .ofLocalizedDate(FormatStyle.SHORT)
-                .withLocale(Locale.US)
-                .format(Instant.ofEpochSecond(0).atZone(zone).toLocalDate())
-
-        assertEquals(epochZeroFormatted, IdentityFormatter.relativeTime(ULong.MAX_VALUE, RelativeTimeCopy.Default, Locale.US))
-        assertEquals(
-            epochZeroFormatted,
-            IdentityFormatter.relativeTime(0x8000000000000000uL, RelativeTimeCopy.Default, Locale.US),
-        )
+        // Long.MIN_VALUE; both clamp to epoch 0, which is well over a year before
+        // FIXED_NOW, so the ladder renders the two-digit-year date.
+        assertEquals("1/1/70", relativeTimeAtFixedNow(ULong.MAX_VALUE))
+        assertEquals("1/1/70", relativeTimeAtFixedNow(0x8000000000000000uL))
         // A positive value far past year 9999 clamps and still formats without throwing.
-        val farFuture = IdentityFormatter.relativeTime(999_999_999_999uL, RelativeTimeCopy.Default, Locale.US)
-        assertTrue(farFuture.isNotBlank())
+        assertTrue(relativeTimeAtFixedNow(999_999_999_999uL).isNotBlank())
     }
 
     /** Initials take two non bmp code points from one word. */
@@ -154,9 +142,9 @@ class IdentityFormatterTest {
     @Test
     fun relativeTimeShowsCompactHoursWithinTheFirstDay() {
         // Past an hour but inside 24h: compact "Nh", no clock time (#848).
-        val twoHoursAgo = (Instant.now().epochSecond - 2 * 3_600L).toULong()
+        val twoHoursAgo = (FIXED_NOW.epochSecond - 2 * 3_600L).toULong()
 
-        assertEquals("2h", IdentityFormatter.relativeTime(twoHoursAgo, RelativeTimeCopy.Default, Locale.US))
+        assertEquals("2h", relativeTimeAtFixedNow(twoHoursAgo))
     }
 
     @Test
@@ -199,7 +187,7 @@ class IdentityFormatterTest {
     fun relativeTimePassesCountToPluralCallback() {
         // The unit callbacks must receive the integer count so a real
         // getQuantityString-backed callback can pick the correct plural form.
-        val fortyFiveMinutesAgo = (Instant.now().epochSecond - (45 * 60L)).toULong()
+        val fortyFiveMinutesAgo = (FIXED_NOW.epochSecond - (45 * 60L)).toULong()
         val copy =
             RelativeTimeCopy(
                 future = "FUT",
@@ -209,7 +197,7 @@ class IdentityFormatterTest {
                 hours = { count -> "hr=$count" },
             )
 
-        assertEquals("min=45", IdentityFormatter.relativeTime(fortyFiveMinutesAgo, copy, Locale.US))
+        assertEquals("min=45", relativeTimeAtFixedNow(fortyFiveMinutesAgo, copy))
     }
 
     @Test
@@ -233,49 +221,24 @@ class IdentityFormatterTest {
 
     @Test
     fun relativeTimeShowsWeekdayWithinThePastWeek() {
-        val threeDaysAgo = Instant.now().minusSeconds(3 * 86_400L)
-        val zone = ZoneId.systemDefault()
-        val expected =
-            threeDaysAgo
-                .atZone(zone)
-                .toLocalDate()
-                .dayOfWeek
-                .getDisplayName(TextStyle.SHORT, Locale.US)
+        // Fixed "now" is Monday 30 June 2025, so three days earlier is a Friday.
+        val threeDaysAgo = FIXED_NOW.minusSeconds(3 * 86_400L)
 
-        assertEquals(expected, IdentityFormatter.relativeTime(threeDaysAgo.epochSecond.toULong(), RelativeTimeCopy.Default, Locale.US))
+        assertEquals("Fri", relativeTimeAtFixedNow(threeDaysAgo.epochSecond.toULong()))
     }
 
     @Test
     fun relativeTimeShowsYesterdayForThePreviousDay() {
-        // 26h ago is the previous calendar day for most wall-clock times; assert
-        // against the day-distance the formatter computes so the test is
-        // deterministic regardless of the hour it runs.
-        val now = Instant.now()
-        val zone = ZoneId.systemDefault()
-        val instant = now.minusSeconds(26 * 3_600L)
-        val messageDate = instant.atZone(zone).toLocalDate()
-        val days = ChronoUnit.DAYS.between(messageDate, now.atZone(zone).toLocalDate())
-        val expected =
-            if (days == 1L) {
-                "yesterday"
-            } else {
-                messageDate.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.US)
-            }
+        val twentySixHoursAgo = FIXED_NOW.minusSeconds(26 * 3_600L)
 
-        assertEquals(expected, IdentityFormatter.relativeTime(instant.epochSecond.toULong(), RelativeTimeCopy.Default, Locale.US))
+        assertEquals("yesterday", relativeTimeAtFixedNow(twentySixHoursAgo.epochSecond.toULong()))
     }
 
     @Test
     fun relativeTimeShowsTwoDigitYearPastAYear() {
-        val longAgo = Instant.now().minusSeconds(400 * 86_400L)
-        val zone = ZoneId.systemDefault()
-        val expected =
-            DateTimeFormatter
-                .ofLocalizedDate(FormatStyle.SHORT)
-                .withLocale(Locale.US)
-                .format(longAgo.atZone(zone).toLocalDate())
+        val fourHundredDaysAgo = FIXED_NOW.minusSeconds(400 * 86_400L)
 
-        assertEquals(expected, IdentityFormatter.relativeTime(longAgo.epochSecond.toULong(), RelativeTimeCopy.Default, Locale.US))
+        assertEquals("5/26/24", relativeTimeAtFixedNow(fourHundredDaysAgo.epochSecond.toULong()))
     }
 
     @Test
@@ -462,4 +425,14 @@ class IdentityFormatterTest {
             .ofLocalizedTime(FormatStyle.SHORT)
             .withLocale(Locale.US)
             .format(instant.atZone(zone))
+
+    /** Formats against a fixed UTC Monday noon so day-boundary expectations never depend on the runner clock. */
+    private fun relativeTimeAtFixedNow(
+        epochSeconds: ULong,
+        copy: RelativeTimeCopy = RelativeTimeCopy.Default,
+    ): String = IdentityFormatter.relativeTime(epochSeconds, copy, Locale.US, now = FIXED_NOW, zone = ZoneOffset.UTC)
+
+    private companion object {
+        val FIXED_NOW: Instant = Instant.parse("2025-06-30T12:00:00Z")
+    }
 }

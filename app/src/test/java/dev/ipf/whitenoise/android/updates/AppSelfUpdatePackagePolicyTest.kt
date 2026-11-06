@@ -123,6 +123,53 @@ class AppSelfUpdatePackagePolicyTest {
         )
     }
 
+    /** An empty signer set would make any history `containsAll` it, so unknown signers never pass. */
+    @Test
+    fun rejectsPackagesWithUnknownSigners() {
+        val unsignedInstalled = installed.copy(currentSignerSha256 = emptySet(), signerHistorySha256 = emptySet())
+
+        assertFalse(
+            isTrustedSelfUpdatePackage(
+                installed = unsignedInstalled,
+                candidate = candidate(currentSignerSha256 = emptySet()),
+                expectedVersion = "2026.9.4",
+            ),
+        )
+        assertFalse(
+            isTrustedSelfUpdatePackage(
+                installed = unsignedInstalled,
+                candidate = candidate(),
+                expectedVersion = "2026.9.4",
+            ),
+        )
+        assertFalse(
+            isTrustedSelfUpdatePackage(
+                installed = installed,
+                candidate =
+                    candidate(
+                        currentSignerSha256 = emptySet(),
+                        signerHistorySha256 = setOf("installed-signer"),
+                    ),
+                expectedVersion = "2026.9.4",
+            ),
+        )
+    }
+
+    @Test
+    fun singleSignerInstallRejectsMultipleSignerCandidate() {
+        assertFalse(
+            isTrustedSelfUpdatePackage(
+                installed = installed,
+                candidate =
+                    candidate(
+                        currentSignerSha256 = setOf("installed-signer", "other-signer"),
+                        hasMultipleSigners = true,
+                    ),
+                expectedVersion = "2026.9.4",
+            ),
+        )
+    }
+
     private fun candidate(
         packageName: String = installed.packageName,
         versionName: String = "2026.9.4",

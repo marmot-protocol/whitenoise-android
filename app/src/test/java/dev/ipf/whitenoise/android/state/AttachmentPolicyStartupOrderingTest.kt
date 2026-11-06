@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import dev.ipf.marmotkit.AttachmentDownloadPolicyFfi
+import dev.ipf.whitenoise.android.appModuleFile
 import dev.ipf.whitenoise.android.functionBody
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -168,5 +169,5 @@ class AttachmentPolicyStartupOrderingTest {
     }
 
     /** Returns one production state source file from the app module test working directory. */
-    private fun source(name: String): File = File("src/main/java/dev/ipf/whitenoise/android/state/$name")
+    private fun source(name: String): File = appModuleFile("src/main/java/dev/ipf/whitenoise/android/state/$name")
 }

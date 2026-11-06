@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.MessageDraftAttachmentFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.appModuleSource
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.media.AsfGuids
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
@@ -482,8 +483,9 @@ class VideoUploadMetadataCoverageTest {
     /** The staged visual probe reads the snapshot only after the scrub succeeded inside staging. */
     @Test
     fun fileBackedProbeRunsOnTheScrubbedSnapshot() {
-        val reader = File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt")
-        val fileBacked = reader.readText().functionBody("readFileBackedVideo")
+        val fileBacked =
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationMediaSender.kt")
+                .functionBody("readFileBackedVideo")
         val scrub = fileBacked.indexOf("scrubVideoMetadata()")
         assertTrue(scrub in 0 until fileBacked.indexOf("readVideoFileMetadata("))
         assertTrue(fileBacked.contains("metadataRemoved &&"))
