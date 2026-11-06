@@ -37,6 +37,9 @@ internal class LoopbackNostrRelay(
     /** Test-controlled visibility models an advertised outbox without a discovery-only package. */
     @Volatile var hiddenKinds: Set<Int> = emptySet()
 
+    /** Hides one retained envelope so a peer receipt can be tested without an own-publication echo. */
+    @Volatile var hiddenEventIds: Set<String> = emptySet()
+
     /** Models a relay requiring authentication instead of reporting package absence. */
     @Volatile var authRequiredKinds: Set<Int> = emptySet()
 
@@ -176,6 +179,7 @@ internal class LoopbackNostrRelay(
     /** Keeps query and live-delivery visibility identical for controlled negative fixtures. */
     private fun visible(event: JSONObject): Boolean =
         event.optInt("kind") !in hiddenKinds &&
+            event.optString("id") !in hiddenEventIds &&
             event.optString("pubkey") !in hiddenAuthorsByKind[event.optInt("kind")].orEmpty()
 
     /** Stops accepting and drops every open connection. */
