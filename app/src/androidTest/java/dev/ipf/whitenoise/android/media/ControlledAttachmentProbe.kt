@@ -570,9 +570,11 @@ internal object ControlledAttachmentProbe {
         assertTrue(success)
     }
 
-    /** Marks a fixed fixture boundary so a timed-out command can retain progress without raw instrumentation output. */
+    /** Best-effort boundary marker: a broken status channel must not mask failures or interrupt fixture cleanup. */
     internal fun checkpoint(stage: String) {
-        report(JSONObject().put("phase", "fixture-stage").put("stage", stage))
+        runCatching {
+            report(JSONObject().put("phase", "fixture-stage").put("stage", stage))
+        }
     }
 
     /** Sends closed metrics to the host runner; no synthetic identity or locator is exported. */
