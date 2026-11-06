@@ -39,6 +39,7 @@ class ChatListUnreadFirstFrameCoverageTest {
     private val scope = TestScope()
     private val mounted = mutableStateOf(true)
     private val holdReads = CompletableDeferred<Unit>()
+    private val search = mutableStateOf(GlobalSearchState())
     private var fixture: OffWindowActionFixture? = null
 
     /** Releases held reads and disposes the screen before the controller and native scope. */
@@ -68,6 +69,20 @@ class ChatListUnreadFirstFrameCoverageTest {
         rule.mainClock.autoAdvance = true
         rule.waitForIdle()
         rule.onNodeWithTag("chat.row.$ACTION_TARGET").assertDoesNotExist()
+        openOnOneFrame()
+        assertFirstFrameResult(model, reads)
+    }
+
+    /** A search round trip keeps the prepared result, so Unread still opens complete on its first frame. */
+    @Test fun aSearchRoundTripKeepsThePreparedResult() {
+        val model = prepared()
+        rule.runOnIdle { search.value = search.value.copy(isOpen = true) }
+        rule.waitForIdle()
+        rule.runOnIdle { search.value = search.value.copy(isOpen = false) }
+        rule.waitForIdle()
+        scope.testScheduler.runCurrent()
+        // Closing search restarts preparation with one held read. The filter must not wait for it.
+        val reads = model.snapshotReads
         openOnOneFrame()
         assertFirstFrameResult(model, reads)
     }
@@ -154,7 +169,16 @@ class ChatListUnreadFirstFrameCoverageTest {
         model.snapshotExtras = extras
         rule.setContent {
             if (mounted.value) {
-                WhiteNoiseTheme { ChatsScreen(model.state, model.controller, {}, { _, _, _, _ -> }) }
+                WhiteNoiseTheme {
+                    ChatsScreen(
+                        model.state,
+                        model.controller,
+                        {},
+                        { _, _, _, _ -> },
+                        globalSearchState = search.value,
+                        onGlobalSearchStateChange = { update -> search.value = update(search.value) },
+                    )
+                }
             }
         }
         rule.waitUntil {

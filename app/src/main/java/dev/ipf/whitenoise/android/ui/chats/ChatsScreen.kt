@@ -383,21 +383,20 @@ internal fun ChatsScreen(
     var unreadUnavailableWhileOpen by remember(controller, selectedFolderId) { mutableStateOf(false) }
     val currentUnreadOnly by rememberUpdatedState(unreadOnly)
     val unreadRevision = controller.forwardTargetsRevision
-    // Search replaces the list and resets the filter, so it is the one mounted state with nothing to prepare.
-    val unreadPrepared =
-        unreadOnly ||
-            (
-                !searchOpen &&
-                    appState.activeAccountRef != null &&
-                    !appState.signOutInProgress &&
-                    !appState.wipeInProgress
-            )
-    LaunchedEffect(controller, selectedFolderId, unreadPrepared, unreadRetry) {
+    val unreadAccountReady =
+        appState.activeAccountRef != null && !appState.signOutInProgress && !appState.wipeInProgress
+    // Search replaces the list and resets the filter, so it pauses preparation. It keeps a prepared result,
+    // which the snapshot's own currency and membership checks still govern, so closing search reopens the
+    // filter on its first frame.
+    val unreadPrepared = unreadOnly || (!searchOpen && unreadAccountReady)
+    LaunchedEffect(controller, selectedFolderId, unreadPrepared, unreadAccountReady, unreadRetry) {
         if (!unreadPrepared) {
-            unreadSnapshot = null
-            unreadReadFailed = false
-            unreadUnavailable = false
-            unreadUnavailableWhileOpen = false
+            if (!unreadAccountReady) {
+                unreadSnapshot = null
+                unreadReadFailed = false
+                unreadUnavailable = false
+                unreadUnavailableWhileOpen = false
+            }
             return@LaunchedEffect
         }
         // Membership and folder changes, including the store's first load, request one latest follow-up
