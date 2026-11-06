@@ -697,7 +697,7 @@ private fun FocusedReactionTarget(
 }
 
 /**
- * Bundled/custom artwork keeps existing feedback; only already-rendered system glyphs fly.
+ * Reports the rendered glyph square, including already-decoded custom artwork.
  * The target already announces the reaction's name, so the glyph adds no second one (#3292).
  */
 @Composable
@@ -706,12 +706,13 @@ private fun MeasuredReactionGlyph(
     size: Dp,
     onBounds: (androidx.compose.ui.geometry.Rect) -> Unit,
 ) {
-    val systemGlyph =
+    val artwork =
         dev.ipf.whitenoise.android.ui.EmojiShortcodes.art(
             emoji,
             dev.ipf.whitenoise.android.ui.LocalCustomEmoji.current,
             emptyMap(),
-        ) == null
+        )
+    val missingArtwork = emoji.startsWith(":") && emoji.endsWith(":") && artwork == null
     EmojiGlyph(
         emoji,
         size = size,
@@ -719,7 +720,7 @@ private fun MeasuredReactionGlyph(
             Modifier
                 .clearAndSetSemantics {}
                 .reactionSourceBounds { bounds ->
-                    onBounds(if (systemGlyph) bounds else androidx.compose.ui.geometry.Rect.Zero)
+                    onBounds(if (missingArtwork) androidx.compose.ui.geometry.Rect.Zero else bounds)
                 },
     )
 }

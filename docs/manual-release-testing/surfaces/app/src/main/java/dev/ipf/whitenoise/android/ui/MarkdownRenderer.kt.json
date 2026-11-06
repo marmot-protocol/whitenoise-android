@@ -113,14 +113,25 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
         "anchor": "fun MarkdownTableRowDivider(",
         "test_ids": [
+          "MSG-002",
           "RDR-001"
         ]
       },
       {
-        "surface": "MarkdownTableRowView",
+        "surface": "MarkdownTableRowCells",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
-        "anchor": "fun MarkdownTableRowView(",
+        "anchor": "fun MarkdownTableRowCells(",
         "test_ids": [
+          "MSG-002",
+          "RDR-001"
+        ]
+      },
+      {
+        "surface": "MarkdownTableCellElisionMarker",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
+        "anchor": "fun MarkdownTableCellElisionMarker(",
+        "test_ids": [
+          "MSG-002",
           "RDR-001"
         ]
       },
@@ -129,6 +140,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/MarkdownRenderer.kt",
         "anchor": "fun MarkdownTableView(",
         "test_ids": [
+          "MSG-002",
           "RDR-001"
         ]
       },

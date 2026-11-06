@@ -283,7 +283,16 @@ class FreshSweepCoverageTest {
         )
         assertTrue(
             "mark-read cleanup must preserve a newer conversation-card generation",
-            "cancelConversationCardIfSameGeneration(notificationTag, notificationId, actedMessageIdHex)" in presenter,
+            "cancelConversationCardIfSameGeneration(notificationTag, notificationId, actedMessageIdHex)" in
+                source("notifications/ConversationNotificationRetirement.kt"),
+        )
+        assertTrue(
+            "mark-read cleanup reaches the generation-checked retirement owner",
+            "retirement.dismissActionNotificationAndOlderSiblings(" in
+                presenter.section(
+                    "fun dismissActionNotificationAndOlderSiblings",
+                    "fun dismissConversationSiblingCardsNotNewerThan",
+                ),
         )
         val postPath = presenter.section("if (messaging != null)", "notificationDebug {")
         val firstPostAttempt = postPath.indexOf("postNotificationSafely(")

@@ -775,8 +775,11 @@ internal fun ConversationScreen(
     // composition state deliberately: serializing decrypted message snapshots into
     // Android saved state would extend their lifetime and privacy footprint.
     val selectedMessages = presentationState.selectedMessages
-    var batchForwardSheetOpen by
-        remember(chat.id, conversationAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
+    // Non-null while the batch picker is open: the payloads captured when it opened.
+    var batchForwardSnapshot by
+        remember(chat.id, conversationAccountRef, appState.runtimeGeneration) {
+            mutableStateOf<List<ForwardMessagePayload>?>(null)
+        }
     var batchAttachmentSaveInFlight by
         remember(chat.id, conversationAccountRef, appState.runtimeGeneration) { mutableStateOf(false) }
     var batchInfoSelection by
@@ -1051,7 +1054,12 @@ internal fun ConversationScreen(
                         !isBatchSelectableMessage(
                             messageId = messageId,
                             userVisibleMessage = MessageProjector.isChatKind(record.kind),
-                            committedMessage = item.status == MessageStatus.Received || item.status == MessageStatus.Sent,
+                            // A pending send joins a batch so its accepted text can be forwarded (#2794), while a
+                            // sent message with an edit in flight stays out of selection as before.
+                            committedMessage =
+                                item.status == MessageStatus.Received ||
+                                    item.status == MessageStatus.Sent ||
+                                    item.isPendingSend,
                             projectedDeleted = item.projected?.deleted == true,
                             deletedMessageIds = controller.deletedMessageIds,
                         )
@@ -1069,6 +1077,13 @@ internal fun ConversationScreen(
                     val forwardEligibility =
                         if (invalidated || persistedFailure) {
                             ForwardEligibility.Blocked(ForwardBlockedReason.Unsupported)
+                        } else if (item.isPendingSend) {
+                            MessageProjector.pendingForwardEligibility(
+                                message = record,
+                                mediaReferences = mediaReferences,
+                                editedText = editedText,
+                                nowSeconds = eligibilityNowSeconds,
+                            )
                         } else {
                             MessageProjector.forwardEligibility(
                                 message = record,
@@ -1110,6 +1125,7 @@ internal fun ConversationScreen(
                                 forwardPayload = (forwardEligibility as? ForwardEligibility.Eligible)?.payload,
                                 forwardBlockedReason =
                                     (forwardEligibility as? ForwardEligibility.Blocked)?.reason,
+                                pendingSend = item.isPendingSend,
                             ),
                         record = record,
                         status = item.status,
@@ -1163,8 +1179,13 @@ internal fun ConversationScreen(
             if (bounds != null) {
                 transcriptWindowTop = bounds.top
                 transcriptHeightPx = bounds.height
-                ttsFollowHandle.sentenceLayouts.updateViewportBounds(bounds)
             }
+        }
+    }
+    // Speech rests sentences below the painted top fade, unlike the drag and reaction consumers above.
+    LaunchedEffect(timelineViewport, ttsFollowHandle) {
+        snapshotFlow { timelineViewport.speechBoundsInWindow }.collect { bounds ->
+            if (bounds != null) ttsFollowHandle.sentenceLayouts.updateViewportBounds(bounds)
         }
     }
 
@@ -1336,7 +1357,7 @@ internal fun ConversationScreen(
         }
         controller.acknowledgeTimelineRemovals(pendingTimelineRemovals)
         if (selectedMessages.isEmpty()) {
-            batchForwardSheetOpen = false
+            batchForwardSnapshot = null
             showBatchDeleteConfirm = false
         }
     }
@@ -3261,8 +3282,14 @@ internal fun ConversationScreen(
                 )
             }
         }
+        // Survives the follow effect's restart within a burst, never a chat, account or runtime change.
+        val incomingAppendLanding = remember(controller) { ConversationIncomingAppendLandingQueue() }
         LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored) {
-            if (!initialTimelineAnchored || renderedTimeline.isEmpty()) return@LaunchedEffect
+            if (!initialTimelineAnchored || renderedTimeline.isEmpty()) {
+                // A restart that cannot be an append still interrupts the burst, so its rows never join a later one.
+                incomingAppendLanding.retire()
+                return@LaunchedEffect
+            }
             val latestId = renderedTimeline.lastOrNull()?.presentationId
             val previousId = navigationState.lastFollowedLatestId
             // A genuine append: the last id changed and the row we last followed is
@@ -3273,11 +3300,37 @@ internal fun ConversationScreen(
                     latestId != previousId &&
                     renderedTimeline.any { it.presentationId == previousId }
             navigationState.lastFollowedLatestId = latestId ?: previousId
-            if (isAppend) {
-                scrollCoordinator.followTailIfAllowed(
-                    resolveTailIndex = { currentTailIndex },
-                    reason = ConversationScrollReason.NewMessage,
-                )
+            if (isAppend && previousId != null) {
+                // #3558: an incoming row taller than the reading viewport lands at its beginning instead of its end.
+                val candidates =
+                    incomingAppendLanding.admit(
+                        appended =
+                            conversationAppendedRows(renderedTimeline, previousId) { row ->
+                                controller.isMessageMine(row.record)
+                            },
+                        intent = scrollCoordinator.intentToken,
+                    )
+                val outcome =
+                    scrollCoordinator.followAppendOrRevealIncomingStart(
+                        candidates = candidates,
+                        probeFor = { candidate ->
+                            ConversationReadingStartProbe(
+                                resolveTargetIndex = { currentTimelineListIndex(candidate.messageId) },
+                                readLayout = { index -> mentionJumpLayout(candidate.messageId, index) },
+                                traceSections = false,
+                            )
+                        },
+                        resolveTailIndex = { currentTailIndex },
+                        oversizedSeen = incomingAppendLanding.oversizedSeen,
+                        onOversized = incomingAppendLanding::markOversized,
+                    )
+                incomingAppendLanding.retire()
+                if (outcome is ConversationIncomingAppendOutcome.RevealedReadingStart) {
+                    viewportRestorationOwner.adoptIncomingReadingStart(outcome)
+                }
+            } else {
+                // A removal or trim restarted this effect without an append, so a burst it interrupted is over.
+                incomingAppendLanding.retire()
             }
         }
 
@@ -3852,11 +3905,7 @@ internal fun ConversationScreen(
 
     val openDetailsDescription = stringResource(R.string.details)
     LaunchedEffect(batchSelectionUi.forwardPayloads.isEmpty()) {
-        batchForwardSheetOpen =
-            batchForwardSheetOpenForPayloads(
-                currentlyOpen = batchForwardSheetOpen,
-                forwardPayloads = batchSelectionUi.forwardPayloads,
-            )
+        batchForwardSnapshot = batchForwardSnapshotFor(batchForwardSnapshot, batchSelectionUi.forwardPayloads)
     }
     ComposerSendMotionMediaGate(composerSendMotion, mediaViewerSessionState, sendMotionEnabled)
     ComposerSendMotionHost(composerSendMotion, surfaceMotionEnabled) {
@@ -3991,7 +4040,9 @@ internal fun ConversationScreen(
                         }
                     },
                     onForwardSelection = {
-                        if (batchSelectionUi.forwardPayloads.isNotEmpty()) batchForwardSheetOpen = true
+                        if (batchSelectionUi.forwardPayloads.isNotEmpty()) {
+                            batchForwardSnapshot = batchSelectionUi.forwardPayloads
+                        }
                     },
                     onSaveSelection = {
                         if (batchSelectionUi.actionAvailability.canSave && !batchAttachmentSaveInFlight) {
@@ -4437,6 +4488,7 @@ internal fun ConversationScreen(
                                             .transcriptEdgeFade(
                                                 listState = listState,
                                                 composerOverlap = overlayPadding,
+                                                geometry = timelineViewport.edgeFade,
                                             ),
                                     // Bottom-anchored like every established chat
                                     // client: the viewport shrinking under the keyboard
@@ -4958,14 +5010,14 @@ internal fun ConversationScreen(
     @Composable
     @Suppress("LongMethod", "CyclomaticComplexMethod")
     fun conversationOverlays() {
-        if (batchForwardSheetOpen && batchSelectionUi.forwardPayloads.isNotEmpty()) {
+        batchForwardSnapshot?.let { payloads ->
             ForwardMessageSheet(
                 appState = appState,
-                payloads = batchSelectionUi.forwardPayloads,
+                payloads = payloads,
                 sourceAccountRef = controller.boundAccountRef,
                 originGroupIdHex = controller.group.groupIdHex,
                 onDismiss = {
-                    batchForwardSheetOpen = false
+                    batchForwardSnapshot = null
                     selectedMessages.clear()
                 },
             )

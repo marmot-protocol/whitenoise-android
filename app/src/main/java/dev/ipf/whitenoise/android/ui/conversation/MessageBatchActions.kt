@@ -30,6 +30,11 @@ internal data class BatchMessageActionItem(
     val canDeleteForEveryone: Boolean,
     val forwardPayload: ForwardMessagePayload? = null,
     val forwardBlockedReason: ForwardBlockedReason? = null,
+    /**
+     * A locally authored send that is still pending. It can be copied and forwarded from its accepted content, but its
+     * temporary identity has no reply, info, save or delete path in a batch.
+     */
+    val pendingSend: Boolean = false,
 )
 
 /**
@@ -160,6 +165,7 @@ internal class BatchDeleteSubmissionGuard {
 
 private fun BatchDeleteOperationOutcome.retryKey() = attempt.selection.action.messageId to attempt.operation
 
+/** Whether a timeline row can join a batch selection: a visible, undeleted message that is committed or pending. */
 internal fun isBatchSelectableMessage(
     messageId: String,
     userVisibleMessage: Boolean,
@@ -178,10 +184,14 @@ internal fun batchForwardSheetOpenForBodies(
     forwardBodies: List<String>,
 ): Boolean = currentlyOpen && forwardBodies.isNotEmpty()
 
-internal fun batchForwardSheetOpenForPayloads(
-    currentlyOpen: Boolean,
+/**
+ * The payloads an open batch picker keeps forwarding. The picker holds the list captured when it opened, so a pending
+ * send that fails mid-pick doesn't silently drop out of a mixed batch, and it closes once nothing forwardable is left.
+ */
+internal fun batchForwardSnapshotFor(
+    snapshot: List<ForwardMessagePayload>?,
     forwardPayloads: List<ForwardMessagePayload>,
-): Boolean = currentlyOpen && forwardPayloads.isNotEmpty()
+): List<ForwardMessagePayload>? = snapshot?.takeIf { forwardPayloads.isNotEmpty() }
 
 internal fun reconcileBatchSelections(
     selected: Map<String, BatchMessageSelection>,
@@ -256,13 +266,15 @@ internal fun batchSelectionActionAvailability(
     }
     val forwardPayloads = batchForwardPayloads(items)
     val single = items.size == 1
+    // A pending send's temporary identity can be copied or forwarded, never replied to, inspected, saved or deleted.
+    val committedOnly = items.none(BatchMessageActionItem::pendingSend)
     return BatchSelectionActionAvailability(
         canCopy = items.all { !it.copyableText.isNullOrBlank() },
         canForward = forwardPayloads.isNotEmpty(),
-        canSave = items.all(BatchMessageActionItem::hasSaveableMedia),
-        canReply = single && composerGate == ComposerGate.COMPOSER,
-        canInfo = single,
-        canDelete = true,
+        canSave = committedOnly && items.all(BatchMessageActionItem::hasSaveableMedia),
+        canReply = committedOnly && single && composerGate == ComposerGate.COMPOSER,
+        canInfo = committedOnly && single,
+        canDelete = committedOnly,
     )
 }
 

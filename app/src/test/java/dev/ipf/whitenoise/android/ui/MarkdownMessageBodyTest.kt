@@ -4,6 +4,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithText
 import dev.ipf.marmotkit.MarkdownAlignmentFfi
 import dev.ipf.marmotkit.MarkdownBlockFfi
 import dev.ipf.marmotkit.MarkdownCodeBlockKindFfi
@@ -13,6 +14,8 @@ import dev.ipf.marmotkit.MarkdownListItemFfi
 import dev.ipf.marmotkit.MarkdownListKindFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -262,4 +265,57 @@ class MarkdownMessageBodyTest {
         composeRule.onAllNodesWithText("column-$MARKDOWN_MAX_TABLE_COLUMNS").assertCountEquals(0)
         composeRule.onAllNodesWithText("…").assertCountEquals(1)
     }
+
+    /** A short label column keeps its text width while the paragraph column takes the rest (#3562). */
+    @Test
+    fun shortTableColumnYieldsTheRemainingWidthToTheParagraphColumn() {
+        val paragraph = "A paragraph long enough to wrap inside the message body at any ordinary phone width."
+        render(
+            listOf(
+                MarkdownBlockFfi.Table(
+                    alignments = listOf(MarkdownAlignmentFfi.NONE, MarkdownAlignmentFfi.NONE),
+                    header = listOf(tableCell("ID"), tableCell("Description")),
+                    rows = listOf(listOf(tableCell("A"), tableCell(paragraph))),
+                ),
+            ),
+        )
+
+        val id = cellBounds("ID")
+        val description = cellBounds("Description")
+        assertTrue(id.width * 2 < description.width)
+        assertEquals(id.width, cellBounds("A").width, 1f)
+        assertEquals(description.left, cellBounds(paragraph).left, 1f)
+    }
+
+    /** A wider later body cell widens its column for the header and every earlier row. */
+    @Test
+    fun aWiderLaterBodyCellSetsTheSharedColumnWidth() {
+        render(
+            listOf(
+                MarkdownBlockFfi.Table(
+                    alignments = listOf(MarkdownAlignmentFfi.NONE, MarkdownAlignmentFfi.NONE),
+                    header = listOf(tableCell("K"), tableCell("V")),
+                    rows =
+                        listOf(
+                            listOf(tableCell("k1"), tableCell("v1")),
+                            listOf(tableCell("a wide key"), tableCell("v2")),
+                        ),
+                ),
+            ),
+        )
+
+        val wide = cellBounds("a wide key")
+        listOf("K", "k1").forEach { text ->
+            assertEquals(wide.left, cellBounds(text).left, 1f)
+            assertEquals(wide.width, cellBounds(text).width, 1f)
+        }
+        assertEquals(cellBounds("V").left, cellBounds("v2").left, 1f)
+        assertTrue(wide.width > cellBounds("V").width)
+    }
+
+    /** Root bounds of the table cell leaf showing exactly [text]. */
+    private fun cellBounds(text: String) = cellNode(text).boundsInRoot
+
+    /** The unmerged semantics node of the table cell leaf showing exactly [text]. */
+    private fun cellNode(text: String) = composeRule.onNodeWithText(text, useUnmergedTree = true).fetchSemanticsNode()
 }

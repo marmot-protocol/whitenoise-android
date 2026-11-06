@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TranscriptEdgeFade.kt",
+  "legacy_sha256": "5ffb074a117e892c5b55a41fd04d0aea45baffe028f5af155ac2192ae2a98792",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Modifier.transcriptEdgeFade",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TranscriptEdgeFade.kt",
+        "anchor": "fun Modifier.transcriptEdgeFade(",
+        "test_ids": [
+          "CON-002"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/TranscriptEdgeFade.kt",
+        "surface": "Read aloud keeps sentences in the opaque interval the transcript fade paints",
+        "anchor": "class TranscriptEdgeFadeGeometry",
+        "test_ids": [
+          "TTS-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

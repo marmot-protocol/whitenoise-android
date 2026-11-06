@@ -10,6 +10,14 @@
         "test_ids": [
           "CHL-002"
         ]
+      },
+      {
+        "surface": "Folder arrival first frame: chatFolderArrivalTranslation",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatFolderArrival.kt",
+        "anchor": "internal fun chatFolderArrivalTranslation(",
+        "test_ids": [
+          "CHL-002"
+        ]
       }
     ]
   },
