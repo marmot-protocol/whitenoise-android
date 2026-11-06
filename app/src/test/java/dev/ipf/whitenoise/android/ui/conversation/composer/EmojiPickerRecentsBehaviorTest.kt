@@ -277,6 +277,8 @@ class EmojiPickerRecentsBehaviorTest {
         }
     }
 
-    private fun isDisplayed(text: String): Boolean =
-        runCatching { composeRule.onNodeWithText(text).assertIsDisplayed() }.isSuccess
+    private fun isDisplayed(text: String): Boolean {
+        val node = composeRule.onNodeWithText(text)
+        return runCatching { node.assertIsDisplayed() }.isSuccess
+    }
 }
