@@ -347,7 +347,10 @@ class ConversationMediaViewerProductionPathTest {
         val fitLabel = context.getString(R.string.media_viewer_fit_image)
         repeat(2) { source ->
             assertSharedViewportZoomAndFit(zoomLabel, fitLabel)
-            if (source == 0) composeRule.runOnIdle { publicImage = true }
+            if (source == 0) {
+                composeRule.runOnIdle { publicImage = true }
+                awaitViewerSourceWorkCompletion()
+            }
         }
         composeRule.onNodeWithContentDescription(context.getString(R.string.close)).performClick()
         composeRule.runOnIdle { assertEquals(1, dismissed) }
@@ -382,6 +385,7 @@ class ConversationMediaViewerProductionPathTest {
         composeRule.runOnIdle { assertEquals(2, calls.get()) }
         composeRule.onNodeWithTag("media.viewer.retry").performClick()
         composeRule.waitUntil(10_000) { calls.get() == 3 }
+        awaitViewerSourceWorkCompletion()
     }
 
     /**
@@ -402,6 +406,7 @@ class ConversationMediaViewerProductionPathTest {
         composeRule.runOnIdle { assertEquals(1, calls.get()) }
         composeRule.onNodeWithTag("media.viewer.retry").performClick()
         composeRule.waitUntil(10_000) { calls.get() == 2 }
+        awaitViewerSourceWorkCompletion()
     }
 
     /**

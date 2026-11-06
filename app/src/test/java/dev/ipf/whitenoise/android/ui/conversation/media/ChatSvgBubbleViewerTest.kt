@@ -25,6 +25,10 @@ import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
 import dev.ipf.whitenoise.android.state.localTimelineMessage
 import dev.ipf.whitenoise.android.state.timelineAppMessage
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -98,10 +102,36 @@ class ChatSvgBubbleViewerTest {
             rule.onNodeWithContentDescription(context.getString(R.string.close)).performClick()
             rule.runOnIdle { assertEquals(null, opened) }
         } finally {
-            rule.runOnIdle { opened = null }
-            controller.onCleared()
-            fixture.close()
-            IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)
+            try {
+                rule.runOnIdle { opened = null }
+                awaitViewerImageWorkCompletion()
+            } finally {
+                controller.onCleared()
+                fixture.close()
+                IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)
+            }
+        }
+    }
+
+    /** Joins the removed viewer's source work before its Compose dispatcher and decoder fixture are retired. */
+    private fun awaitViewerImageWorkCompletion() {
+        rule.waitForIdle()
+        val completed =
+            java.util.concurrent.atomic
+                .AtomicBoolean()
+        val owner = Job()
+        val probe =
+            CoroutineScope(Dispatchers.Default + owner).launch {
+                withViewerImageWork { completed.set(true) }
+            }
+        try {
+            rule.waitUntil(10_000) {
+                rule.waitForIdle()
+                completed.get() && probe.isCompleted
+            }
+        } finally {
+            owner.cancel()
+            rule.waitUntil(10_000) { owner.isCompleted }
         }
     }
 

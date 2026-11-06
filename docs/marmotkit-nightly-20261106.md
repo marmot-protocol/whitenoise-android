@@ -131,6 +131,28 @@ requested.
 ## Validation status
 
 Archive SHA-256, embedded manifest/source/builder agreement, effective ABI feature
-inputs, static ELF inspection and generated API comparison are verified. Hosted
-consumer compilation, tests/style, packaging/runtime, reproduction and populated
-upgrade results remain pending. No APK was installed on a physical device.
+inputs, static ELF inspection and generated API comparison are verified. The first
+candidate, `f5bf3d270fcaecd3ec0a07003a772a0462046f3d`, passed
+[full two-distribution core CI](https://github.com/marmot-protocol/whitenoise-android/actions/runs/42189626546),
+[all six native adoption cases](https://github.com/marmot-protocol/whitenoise-android/actions/runs/42189799394)
+and [all 11 populated-upgrade phases](https://github.com/marmot-protocol/whitenoise-android/actions/runs/42189804798).
+The latter used November 5 on current master `c4b96a457b3ac612199ad253ff99e80a009bc666`
+as its baseline, preserved the original pending upload, and passed all seven
+replay cases under both comparison modes. It does not qualify a trusted signed
+preview. Pending-Welcome row preservation remains manual Android acceptance;
+the hosted fixture does not explicitly seed that row.
+
+The candidate's PR merge commit also passed
+[minified production API 36 and staging API 37 ART checks](https://github.com/marmot-protocol/whitenoise-android/actions/runs/42192570945),
+[unsigned reproducibility and both release-lint variants](https://github.com/marmot-protocol/whitenoise-android/actions/runs/42192571006),
+and all 219 general emulator cases. Its ready-event Play suite exposed five
+image-work timeouts after an SVG viewer fixture. That fixture counted decoder
+entry before completion, then could retire its Compose dispatcher while holding
+the shared image-work lane. Its teardown now removes the viewer and joins that
+lane before closing the fixture; the animation retries and public-image handoff
+also join source work before their assertions finish. This repairs the source-level isolation race;
+the failed run did not retain a lock-owner trace proving the exact interleaving.
+
+Use [PR #3609's validation record](https://github.com/marmot-protocol/whitenoise-android/pull/3609)
+for the final reviewed revision and current check results; earlier passing runs
+do not replace final-head validation. No APK was installed on a physical device.
