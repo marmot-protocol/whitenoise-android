@@ -139,8 +139,9 @@ and [all 11 populated-upgrade phases](https://github.com/marmot-protocol/whiteno
 The latter used November 5 on current master `c4b96a457b3ac612199ad253ff99e80a009bc666`
 as its baseline, preserved the original pending upload, and passed all seven
 replay cases under both comparison modes. It does not qualify a trusted signed
-preview. Pending-Welcome row preservation remains manual Android acceptance;
-the hosted fixture does not explicitly seed that row.
+preview. Pending-Welcome row preservation is untested on Android: the hosted
+fixture does not seed that row, and no seeded-row Android procedure or result
+is claimed.
 
 The candidate's PR merge commit also passed
 [minified production API 36 and staging API 37 ART checks](https://github.com/marmot-protocol/whitenoise-android/actions/runs/42192570945),

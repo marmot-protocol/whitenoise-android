@@ -102,14 +102,23 @@ class ChatSvgBubbleViewerTest {
             rule.onNodeWithContentDescription(context.getString(R.string.close)).performClick()
             rule.runOnIdle { assertEquals(null, opened) }
         } finally {
-            try {
-                rule.runOnIdle { opened = null }
-                awaitViewerImageWorkCompletion()
-            } finally {
-                controller.onCleared()
-                fixture.close()
-                IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)
-            }
+            closeViewerFixture(controller, fixture) { opened = null }
+        }
+    }
+
+    /** Removes the viewer and joins its source work before releasing the controller and decoder fixtures. */
+    private fun closeViewerFixture(
+        controller: ConversationController,
+        fixture: MediaDownloadIntegrationFixture,
+        removeViewer: () -> Unit,
+    ) {
+        try {
+            rule.runOnIdle { removeViewer() }
+            awaitViewerImageWorkCompletion()
+        } finally {
+            controller.onCleared()
+            fixture.close()
+            IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)
         }
     }
 

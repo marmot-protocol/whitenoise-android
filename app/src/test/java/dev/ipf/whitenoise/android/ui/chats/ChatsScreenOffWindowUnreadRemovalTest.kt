@@ -82,12 +82,12 @@ class ChatsScreenOffWindowUnreadRemovalTest {
         }
     }
 
-    /** Advances the native fixture scheduler at Compose's blocking test boundaries. */
+    /** Drives virtual native work while real journal IO finishes; this checks commit ordering, not disk latency. */
     private fun awaitNativeProgress(
         scope: TestScope,
         ready: () -> Boolean,
     ) {
-        composeRule.waitUntil {
+        composeRule.waitUntil(10_000) {
             scope.testScheduler.runCurrent()
             ready()
         }
