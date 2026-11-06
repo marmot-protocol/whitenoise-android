@@ -119,6 +119,63 @@ class ChatsScreenSelectionActionsCoverageTest {
         )
     }
 
+    /**
+     * #2925: Select all claims the complete native view, never only the loaded window. Late reads are fenced, every
+     * command revalidates natively first and destructive actions stay hidden while unloaded chats are selected.
+     */
+    @Test fun selectAllUsesCompleteNativeViewWithFencedRevalidation() {
+        val source = chatsScreenSource().readText()
+        val flat = source.replace(Regex("\\s+"), " ")
+        assertTrue(
+            "select all reads the complete view with not-ready retries",
+            "resolveCompleteChatListIds { controller.completeChatListIds(view, owner) }" in source,
+        )
+        assertTrue(
+            "a superseded select-all read is discarded",
+            "if (completeSelection !== pending) return@launch" in source,
+        )
+        assertTrue(
+            "the complete IDs extend the loaded selection",
+            "selectedChatIds.addAll(mergeCompleteChatListIds(ids, loadedIds))" in source,
+        )
+        assertTrue(
+            "commands revalidate the complete selection before running and start nothing without that answer",
+            "controller.revalidateCompleteChatListIds( view, request.ids, request.owner, )" in flat &&
+                "ids?.let { controller.runChatListBatch(it, request.command, request.owner) }" in source &&
+                "completeView = completeSelection?.takeIf { it.resolved }?.view," in source,
+        )
+        assertTrue(
+            "window movement prunes only chats native revalidation drops",
+            "controller.revalidateCompleteChatListIds(complete.view, sent.toList(), owner)" in source &&
+                "retainRevalidatedChatListIds(sent, kept)" in source,
+        )
+        assertTrue(
+            "changing scope cancels the complete claim",
+            "LaunchedEffect(completeSelectAllView) { completeSelection = null }" in source,
+        )
+        assertTrue("delete is hidden beyond loaded chats", "showDelete = !selectionBeyondLoaded," in source)
+        assertTrue(
+            "folder actions are hidden beyond loaded chats",
+            "showAddToFolder = !selectionBeyondLoaded," in source &&
+                "selectedFolder?.takeIf { !selectionBeyondLoaded }" in source,
+        )
+        assertTrue(
+            "a row toggle supersedes a pending Select all read",
+            "if (completeSelection?.resolved == false) completeSelection = null" in source,
+        )
+        assertTrue(
+            "abandonment is hidden beyond loaded chats",
+            "!selectionBeyondLoaded && controller.accountRef != null" in flat,
+        )
+        val controllers = File(chatsScreenSource().parentFile, "../../state/Controllers.kt").readText()
+        assertTrue(
+            "native complete reads are owner fenced",
+            "internal suspend fun completeChatListIds(" in controllers &&
+                "internal suspend fun revalidateCompleteChatListIds(" in controllers &&
+                "revalidate(owner.accountRef, ChatListViewFfi.LEFT, outside)" in controllers,
+        )
+    }
+
     /** Row/menu callbacks retain the existing captured presentation and session ownership boundaries. */
     @Test fun singleContextActionsKeepOwnershipAndAuthoritativeResolution() {
         val source = chatsScreenSource().readText()

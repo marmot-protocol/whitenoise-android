@@ -163,6 +163,12 @@ internal class ChatListLiveSubscriptions(
     val presentedRowByGroup: (suspend (account: String, groupIdHex: String) -> PresentedChatRowFfi?)? = null,
     /** Account-wide MDK read for pickers that must offer every chat, not only the retained window (#2618). */
     val presentedChatList: (suspend (account: String, includeArchived: Boolean) -> List<PresentedChatRowFfi>)? = null,
+    /** Every chat ID in a native view, in display order, for select all beyond the loaded window (#2925). */
+    val chatListIds: (suspend (account: String, view: ChatListViewFfi) -> List<String>)? = null,
+    /** Remove-only recheck of captured IDs against a native view before a bulk action (#2925). */
+    val revalidateChatListIds: (
+        suspend (account: String, view: ChatListViewFfi, groupIds: List<String>) -> List<String>
+    )? = null,
 ) {
     companion object {
         /** Binds the seam to the production MarmotKit runtime. */
@@ -194,6 +200,14 @@ internal class ChatListLiveSubscriptions(
                 presentedChatList = { account, includeArchived ->
                     appState.marmotIo(MarmotTraceSection.CHAT_LIST_READ) {
                         presentedChatList(account, includeArchived).rows
+                    }
+                },
+                chatListIds = { account, view ->
+                    appState.marmotIo(MarmotTraceSection.CHAT_LIST_READ) { chatListIds(account, view) }
+                },
+                revalidateChatListIds = { account, view, groupIds ->
+                    appState.marmotIo(MarmotTraceSection.CHAT_LIST_READ) {
+                        revalidateChatListIds(account, view, groupIds)
                     }
                 },
             )
