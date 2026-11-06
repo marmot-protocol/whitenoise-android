@@ -22,7 +22,7 @@
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationScrollCoordinator.kt",
         "surface": "Distance-bounded fresh target placement",
-        "anchor": "val resolvedScrollOffset = resolveScrollOffset(resolvedTargetIndex)",
+        "anchor": "val (destinationIndex, destinationOffset) = resolveDestination(resolvedTargetIndex)",
         "test_ids": [
           "CON-032"
         ]

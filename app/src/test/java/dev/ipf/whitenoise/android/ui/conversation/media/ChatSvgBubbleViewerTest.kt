@@ -99,6 +99,20 @@ class ChatSvgBubbleViewerTest {
             rule.runOnIdle { assertEquals(null, opened) }
         } finally {
             rule.runOnIdle { opened = null }
+            tearDown(controller, fixture)
+        }
+    }
+
+    /** Closing can leave the detail decode running; it must release the shared lane before teardown. */
+    private fun tearDown(
+        controller: ConversationController,
+        fixture: MediaDownloadIntegrationFixture,
+    ) {
+        try {
+            // Let Compose dispose the viewer first so no new detail work can take the lane after the probe.
+            rule.waitForIdle()
+            rule.awaitViewerImageWorkIdle()
+        } finally {
             controller.onCleared()
             fixture.close()
             IsolatedMediaDecoder.installTestTransport(TestMediaDecodeTransport)

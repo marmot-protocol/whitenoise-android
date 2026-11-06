@@ -1,0 +1,18 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationDictationReplyTargetResolution.kt",
+  "legacy_sha256": "90421d70fa9a8fb72509999fe5db895ae943a268a4dbe421083e35c9707cec1b",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Detached, mismatched, and mounted dictation reply-target resolution",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/ConversationDictationReplyTargetResolution.kt",
+        "anchor": "internal fun resolveConversationDictationReplyTarget(",
+        "test_ids": [
+          "DIC-002",
+          "DIC-010"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +15,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,6 +43,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.core.ReplyNavigation
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.filter
@@ -354,6 +357,52 @@ class ConversationMentionNavigationUiTest {
         assertMentionTop(suspendedFixture(SuspendedMentionAction.Drag))
     }
 
+    /**
+     * #3150: a tall mention the reader has never seen is approached from older history with the production
+     * estimate. It must stop at its beginning in one animated travel, not pass it and snap back.
+     */
+    @Test
+    fun tallUnseenMentionFromHistoryStopsAtItsBeginningInOneTravel() {
+        assertMentionTop(
+            MentionFixture(
+                target = Target(720),
+                viewportHeight = 420,
+                padding = 12,
+                initialIndex = 90,
+                productionGeometry = true,
+            ),
+        )
+    }
+
+    /** A few unread rows need no preposition, and the tall target still lands without a correction. */
+    @Test
+    fun tallUnseenMentionAFewRowsAwayStopsAtItsBeginningInOneTravel() {
+        assertMentionTop(
+            MentionFixture(
+                target = Target(720),
+                viewportHeight = 420,
+                padding = 12,
+                initialIndex = 13,
+                productionGeometry = true,
+            ),
+        )
+    }
+
+    /** Tall approach rows make the estimate too large for a short target; the travel still never reverses. */
+    @Test
+    fun shortUnseenMentionAcrossTallRowsStopsAtItsBeginningInOneTravel() {
+        assertMentionTop(
+            MentionFixture(
+                target = Target(80),
+                viewportHeight = 260,
+                padding = 32,
+                initialIndex = 90,
+                mixedRows = true,
+                productionGeometry = true,
+            ),
+        )
+    }
+
     /** More than fifty mixed rows separate the original reader from the true final mention. */
     private fun suspendedFixture(action: SuspendedMentionAction) =
         MentionFixture(
@@ -376,7 +425,7 @@ class ConversationMentionNavigationUiTest {
         val mixedRows = fixture.mixedRows
         val restoreTail = fixture.restoreTail
         val reopenAfterLanding = fixture.reopenAfterLanding
-        val state = MentionHarnessState(target.height)
+        val state = MentionHarnessState(target.height, fixture.productionGeometry)
         val targetIndex = target.index
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = fixture.dark) {
@@ -397,7 +446,7 @@ class ConversationMentionNavigationUiTest {
                     val coordinator =
                         remember(listState) {
                             ConversationScrollCoordinator(
-                                writer = LazyListConversationScrollWriter(listState),
+                                writer = LazyListConversationScrollWriter(listState, state.writeRecorder),
                                 initialMode =
                                     state.savedSnapshot?.let {
                                         ConversationScrollMode.ReadingHistory(
@@ -408,6 +457,7 @@ class ConversationMentionNavigationUiTest {
                             )
                         }
                     state.activeCoordinator = coordinator
+                    RecordTargetReadingEdges(listState, overlap, targetIndex, state)
 
                     fun anchor(): ConversationScrollAnchor {
                         val index = listState.firstVisibleItemIndex
@@ -477,6 +527,7 @@ class ConversationMentionNavigationUiTest {
                                     .background(MaterialTheme.colorScheme.background)
                                     .testTag("mention-list"),
                             reverseLayout = true,
+                            verticalArrangement = mentionFixtureArrangement(fixture.productionGeometry),
                             contentPadding = PaddingValues(bottom = padding.dp),
                         ) {
                             if (state.headerCount > 0) {
@@ -567,6 +618,7 @@ class ConversationMentionNavigationUiTest {
             composeRule.onNodeWithTag("message-$targetIndex").assertDoesNotExist()
             return
         }
+        assertSingleTravel(state)
         val messageTop = assertMentionLandingBounds(fixture, state)
         composeRule.runOnIdle {
             assertTrue(state.completed)
@@ -586,6 +638,48 @@ class ConversationMentionNavigationUiTest {
         composeRule.runOnIdle { state.captureOpacity = 1f }
         assertMentionFollowUps(fixture, state, messageTop)
     }
+
+    /**
+     * One animated travel, after at most one bounded snap near a far target, and no measured correction. The
+     * target's reading start only ever moves toward the top and never passes it, so nothing visibly snaps back.
+     */
+    private fun assertSingleTravel(state: MentionHarnessState) {
+        if (!state.productionGeometry) return
+        composeRule.runOnIdle {
+            val writes = state.writeRecorder.writes
+            assertEquals("one animated travel, last: $writes", true, writes.lastOrNull()?.animated)
+            assertEquals("at most one preposition before it: $writes", writes.size - 1, writes.count { !it.animated })
+            assertTrue("at most one preposition: $writes", writes.size <= 2)
+            val edges = state.readingEdges.filterNotNull()
+            assertTrue("the target was observed travelling: $edges", edges.isNotEmpty())
+            assertTrue("the reading start never passes the top: $edges", edges.all { it <= 1 })
+            assertEquals("the travel never reverses: $edges", edges.sorted(), edges)
+            assertEquals("it ends at the reading top: $edges", 0, edges.last())
+        }
+    }
+
+    /** Records every frame's reading edge of the target, so a passed-then-reversed landing is observable. */
+    @Composable
+    private fun RecordTargetReadingEdges(
+        listState: LazyListState,
+        overlap: Int,
+        targetIndex: Int,
+        state: MentionHarnessState,
+    ) {
+        LaunchedEffect(listState) {
+            snapshotFlow {
+                val layout = conversationReadingLayoutInfo(listState.layoutInfo, overlap)
+                val targetListIndex = targetIndex + state.incomingCount + state.headerCount
+                layout.visibleItemsInfo.firstOrNull { it.index == targetListIndex }?.let {
+                    it.offset + it.size - layout.viewportEndOffset
+                }
+            }.collect { edge -> if (state.writeRecorder.writes.isNotEmpty()) state.readingEdges.add(edge) }
+        }
+    }
+
+    /** Earlier fixtures and their baselines predate row spacing; production geometry opts in. */
+    private fun mentionFixtureArrangement(productionGeometry: Boolean): Arrangement.Vertical =
+        if (productionGeometry) CONVERSATION_TIMELINE_VERTICAL_ARRANGEMENT else Arrangement.Bottom
 
     /** Validates either the natural tail clamp or the reading top, against actual composed row bounds. */
     private fun assertMentionLandingBounds(
@@ -671,10 +765,18 @@ class ConversationMentionNavigationUiTest {
         return ConversationMentionJumpLayout(
             viewportEndOffsetPx = layout.viewportEndOffset,
             itemHeightPx = item?.size,
-            estimatedItemHeightPx = state.targetHeight,
+            // Production estimates an unseen row from the visible rows' median, never from the target itself.
+            estimatedItemHeightPx =
+                if (state.productionGeometry) {
+                    ReplyNavigation.estimateItemHeightPx(layoutInfo.visibleItemsInfo.map { it.size })
+                } else {
+                    state.targetHeight
+                },
             itemOffsetPx = item?.offset,
             viewportStartOffsetPx = layout.viewportStartOffset,
             isAtNaturalTail = state.atNaturalTail,
+            itemSpacingPx = layout.mainAxisItemSpacing,
+            hasOlderNeighbour = index + 1 < layoutInfo.totalItemsCount,
         )
     }
 
@@ -786,6 +888,7 @@ class ConversationMentionNavigationUiTest {
         val gestureAfterLanding: Boolean = false,
         val reopenAfterLanding: Boolean = false,
         val suspendedAction: SuspendedMentionAction? = null,
+        val productionGeometry: Boolean = false,
     ) {
         val layoutDirection: LayoutDirection
             get() = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
@@ -794,6 +897,7 @@ class ConversationMentionNavigationUiTest {
     /** Mutable controls belong to this one test's composition and never escape to the app. */
     private class MentionHarnessState(
         initialHeight: Int,
+        val productionGeometry: Boolean,
     ) {
         /** Holds exactly one layout continuation when a mutation or cancellation case requests it. */
         suspend fun awaitSuspendedLayout(action: SuspendedMentionAction?) {
@@ -818,6 +922,21 @@ class ConversationMentionNavigationUiTest {
         var routeGeneration by mutableIntStateOf(0)
         var savedSnapshot: ConversationScrollSnapshot? = null
         var activeCoordinator: ConversationScrollCoordinator? = null
+        val writeRecorder = WriteRecorder()
+
+        /** The target's reading edge minus the clear viewport end per observed frame; null while not laid out. */
+        val readingEdges = mutableListOf<Int?>()
+    }
+
+    /** Records the writes the production command sends through the sole list writer. */
+    private class WriteRecorder : ConversationScrollEvidenceSink {
+        val writes = mutableListOf<ConversationScrollWriteEvidence>()
+
+        override fun onViewport(snapshot: ConversationViewportEvidence) = Unit
+
+        override fun onWrite(write: ConversationScrollWriteEvidence) {
+            writes += write
+        }
     }
 
     private enum class SuspendedMentionAction { Height, Window, RepeatedTap, Drag }
