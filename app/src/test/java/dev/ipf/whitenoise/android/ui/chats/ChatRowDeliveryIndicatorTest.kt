@@ -78,6 +78,22 @@ class ChatRowDeliveryIndicatorTest {
         composeRule.onNodeWithContentDescription(context.getString(R.string.send_failed)).assertIsDisplayed()
     }
 
+    /** MDK's recipient-evidence update replaces the latest message's failure badge without reopening the list. */
+    @Test
+    fun aFailedLatestMessageSettledByNativeEvidenceShowsOnlySent() {
+        var item by mutableStateOf(ChatRowPortFixtures.item(delivery = ChatListMessageDeliveryStateFfi.FAILED))
+        renderState { item }
+        composeRule.onNodeWithContentDescription(context.getString(R.string.send_failed)).assertIsDisplayed()
+
+        composeRule.runOnIdle {
+            item = ChatRowPortFixtures.item(delivery = ChatListMessageDeliveryStateFfi.DELIVERED)
+        }
+
+        composeRule.onNodeWithContentDescription(context.getString(R.string.sent)).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.send_failed)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(context.getString(R.string.sending)).assertDoesNotExist()
+    }
+
     /**
      * A deleted last message has no delivery worth reporting: the row must not keep showing a tick, a
      * clock or a failure for something that is no longer there. Deletion is asserted against the failure
