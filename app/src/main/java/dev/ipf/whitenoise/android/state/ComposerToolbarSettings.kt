@@ -150,7 +150,6 @@ internal data class ComposerToolbarSettings(
             .put("shortcuts", JSONArray(normalized().shortcuts.map { it.id }))
             .put("layout", layout.id)
             .put("rightShortcuts", JSONArray(rightShortcuts.map { it.id }))
-            .put("voiceOnSend", normalized().voiceOnSend)
             .put("voiceEnabled", voiceEnabled)
             .toString()
 
