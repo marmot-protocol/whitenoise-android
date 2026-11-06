@@ -191,6 +191,7 @@
     <string name="toast_chat_deleted_local">Sohbet bu cihazdan silindi</string>
     <string name="toast_couldnt_delete_chat">Sohbet silinemedi</string>
     <string name="chat_list_select_all">Tümünü seç</string>
+    <string name="toast_chat_list_select_all_loaded_only">Tüm sohbetler seçilemedi. Yalnızca yüklenen sohbetler seçili.</string>
     <string name="chat_list_deselect_all">Seçimi kaldır</string>
     <plurals name="chat_list_selected_count">
         <item quantity="one">%1$d sohbet seçildi</item>

@@ -191,6 +191,7 @@
     <string name="toast_chat_deleted_local">Discussion supprimée de cet appareil</string>
     <string name="toast_couldnt_delete_chat">Impossible de supprimer la discussion</string>
     <string name="chat_list_select_all">Tout sélectionner</string>
+    <string name="toast_chat_list_select_all_loaded_only">Impossible de sélectionner toutes les discussions. Seules les discussions chargées sont sélectionnées.</string>
     <string name="chat_list_deselect_all">Tout désélectionner</string>
     <plurals name="chat_list_selected_count">
         <item quantity="one">%1$d discussion sélectionnée</item>

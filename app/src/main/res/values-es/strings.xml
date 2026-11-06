@@ -191,6 +191,7 @@
     <string name="toast_chat_deleted_local">Chat eliminado de este dispositivo</string>
     <string name="toast_couldnt_delete_chat">No se pudo eliminar el chat</string>
     <string name="chat_list_select_all">Seleccionar todo</string>
+    <string name="toast_chat_list_select_all_loaded_only">No se pudieron seleccionar todos los chats. Solo están seleccionados los chats cargados.</string>
     <string name="chat_list_deselect_all">Deseleccionar todo</string>
     <plurals name="chat_list_selected_count">
         <item quantity="one">%1$d chat seleccionado</item>

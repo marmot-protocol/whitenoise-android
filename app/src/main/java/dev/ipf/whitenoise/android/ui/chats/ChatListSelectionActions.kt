@@ -57,12 +57,6 @@ internal fun enterChatListSelection(chatId: String): Set<String> = setOf(chatId)
 /** Capture the current visible IDs, independent of later filtering. */
 internal fun selectAllVisibleChats(visibleIds: Collection<String>): Set<String> = visibleIds.toSet()
 
-/** Drop selections that fell off the current visible filtered list. */
-internal fun reconcileChatListSelection(
-    selected: Set<String>,
-    visibleIds: Set<String>,
-): Set<String> = selected.intersect(visibleIds)
-
 /** Install BackHandler only while selection mode or search is active (#1169). */
 internal fun chatListBackHandlerEnabled(
     selectionMode: Boolean,

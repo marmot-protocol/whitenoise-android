@@ -191,6 +191,7 @@
     <string name="toast_chat_deleted_local">Conversa excluída deste dispositivo</string>
     <string name="toast_couldnt_delete_chat">Não foi possível excluir a conversa</string>
     <string name="chat_list_select_all">Selecionar tudo</string>
+    <string name="toast_chat_list_select_all_loaded_only">Não foi possível selecionar todas as conversas. Apenas as conversas carregadas estão selecionadas.</string>
     <string name="chat_list_deselect_all">Desmarcar tudo</string>
     <plurals name="chat_list_selected_count">
         <item quantity="one">%1$d conversa selecionada</item>

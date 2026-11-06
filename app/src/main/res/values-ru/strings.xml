@@ -199,6 +199,7 @@
     <string name="toast_chat_deleted_local">Чат удалён с этого устройства</string>
     <string name="toast_couldnt_delete_chat">Не удалось удалить чат</string>
     <string name="chat_list_select_all">Выбрать все</string>
+    <string name="toast_chat_list_select_all_loaded_only">Не удалось выбрать все чаты. Выбраны только загруженные чаты.</string>
     <string name="chat_list_deselect_all">Снять выделение</string>
     <plurals name="chat_list_selected_count">
         <item quantity="one">%1$d чат выбран</item>
