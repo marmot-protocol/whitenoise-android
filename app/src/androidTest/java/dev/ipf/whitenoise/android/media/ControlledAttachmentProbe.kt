@@ -271,21 +271,31 @@ internal object ControlledAttachmentProbe {
         } finally {
             checkpoint("fixture-cleanup-start")
             fixtureState?.mutationsScope?.cancel()
-            val cleanup =
-                if (preserveRestartFixture) {
-                    emptyList()
-                } else {
-                    accounts.map { runCatching { withTimeout(5_000L) { marmot.removeAccount(it) } } }
-                }
-            if (!preserveRestartFixture && cleanup.all { it.isSuccess }) checkpoint("fixture-accounts-removed")
-            try {
-                marmot.shutdownAndClose()
-                checkpoint("fixture-native-closed")
-            } finally {
-                if (!preserveRestartFixture && root.deleteRecursively()) checkpoint("fixture-files-removed")
-            }
-            check(cleanup.all { it.isSuccess }) { "fixture account cleanup failed" }
+            cleanupFixture(marmot, accounts, root, preserveRestartFixture)
         }
+    }
+
+    /** Removes generated data only outside restart preservation; completion markers follow successful actions. */
+    private suspend fun cleanupFixture(
+        marmot: Marmot,
+        accounts: List<String>,
+        root: File,
+        preserveRestartFixture: Boolean,
+    ) {
+        val cleanup =
+            if (preserveRestartFixture) {
+                emptyList()
+            } else {
+                accounts.map { runCatching { withTimeout(5_000L) { marmot.removeAccount(it) } } }
+            }
+        if (!preserveRestartFixture && cleanup.all { it.isSuccess }) checkpoint("fixture-accounts-removed")
+        try {
+            marmot.shutdownAndClose()
+            checkpoint("fixture-native-closed")
+        } finally {
+            if (!preserveRestartFixture && root.deleteRecursively()) checkpoint("fixture-files-removed")
+        }
+        check(cleanup.all { it.isSuccess }) { "fixture account cleanup failed" }
     }
 
     /** Only the automatic scheduler case resolves its generated account for real per-account policy persistence. */
