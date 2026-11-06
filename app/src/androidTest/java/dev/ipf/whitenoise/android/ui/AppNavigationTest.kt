@@ -329,7 +329,9 @@ class AppNavigationTest {
             composeRule.onNodeWithContentDescription("Open settings", substring = true).performClick()
             composeRule.onNodeWithText(context.getString(R.string.appearance)).performScrollTo().performClick()
             // The preview starts collapsed; expand it so its switches and sample exist.
-            composeRule.onNodeWithTag("settings.list").performScrollToNode(hasTestTag("appearance.accessibility.preview"))
+            composeRule
+                .onNodeWithTag("settings.list")
+                .performScrollToNode(hasTestTag("appearance.accessibility.preview"))
             composeRule
                 .onNodeWithText(context.getString(R.string.appearance_accessibility_preview))
                 .performScrollTo()
