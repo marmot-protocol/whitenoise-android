@@ -93,7 +93,7 @@ class RecipientConfirmationNativeDeviceTest {
                     awaitTimeline(liveController, failed.messageIdHex, MessageStatus.Sent)
                     assertNull(warning(liveController, failed.messageIdHex))
                     assertEquals("+", liveController.reactions[failed.messageIdHex]?.single()?.emoji)
-                    assertChatListDelivered(onlineSender, group)
+                    assertChatListDelivered(onlineSender, group, failed.messageIdHex)
                     liveController.onCleared()
                     controllers -= liveController
                     close(onlineSender)
@@ -106,7 +106,7 @@ class RecipientConfirmationNativeDeviceTest {
                     val restored = controller(reopened, group)
                     awaitTimeline(restored, failed.messageIdHex, MessageStatus.Sent)
                     assertNull(warning(restored, failed.messageIdHex))
-                    assertChatListDelivered(reopened, group)
+                    assertChatListDelivered(reopened, group, failed.messageIdHex)
                 }
             }
         }
@@ -198,12 +198,14 @@ class RecipientConfirmationNativeDeviceTest {
         message: String,
     ) = TimelineProjector.invalidationWarning(controller.timelineRecords.getValue(message))
 
-    /** The native latest-message projection must agree with the conversation's delivery status. */
+    /** The exact failed send's native preview must agree with the conversation's delivery status. */
     private fun assertChatListDelivered(
         participant: Participant,
         group: String,
+        message: String,
     ) {
         val row = participant.native.chatList(participant.account.label, true).single { it.groupIdHex == group }
+        assertEquals(message, row.lastMessage?.messageIdHex)
         assertEquals(ChatListMessageDeliveryStateFfi.DELIVERED, row.lastMessage?.deliveryState)
     }
 
