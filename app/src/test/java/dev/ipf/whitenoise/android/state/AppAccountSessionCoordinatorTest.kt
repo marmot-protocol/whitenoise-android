@@ -253,6 +253,32 @@ class AppAccountSessionCoordinatorTest {
             assertEquals(listOf("publish:new-request"), host.events.filter { it.startsWith("publish:") })
         }
 
+    /** In a rapid A-to-B-to-C switch with B's local read stalled, only C publishes and only C reports ready. */
+    @Test
+    fun rapidSwitchPastAStalledTargetPublishesOnlyTheLatest() =
+        runTest {
+            val host = Activation()
+            val stalled = CompletableDeferred<Unit>()
+            host.beforePrepare = { if (it == "b") stalled.await() }
+            val owner = coordinator(backgroundScope, host)
+            val ready = mutableListOf<String>()
+            val toB =
+                async(UnconfinedTestDispatcher(testScheduler)) {
+                    owner.activate(AccountSessionActivationRequest("b"), onActivated = { ready += "b" })
+                }
+            val toC =
+                async(UnconfinedTestDispatcher(testScheduler)) {
+                    owner.activate(AccountSessionActivationRequest("c"), onActivated = { ready += "c" })
+                }
+            assertEquals("original", host.activeAccount)
+            stalled.complete(Unit)
+            assertNull(toB.await())
+            assertNotNull(toC.await())
+            assertEquals("c", host.activeAccount)
+            assertEquals(listOf("publish:c"), host.events.filter { it.startsWith("publish:") })
+            assertEquals(listOf("c"), ready)
+        }
+
     /** The last suspension before publication is shortcut removal, which must retain its own supersession check. */
     @Test
     fun supersededShortcutCleanupCannotPublishOldAccount() =

@@ -325,7 +325,7 @@
       {
         "surface": "Startup and account-switch snapshots carry MDK's stored per-row presentation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
-        "anchor": "prewarmFirstFrameDurableAvatars(accountRef, presentedRows)",
+        "anchor": "awaitColdWorkers = plan.awaitColdAvatarWorkers",
         "test_ids": [
           "CHL-023",
           "NAV-006"

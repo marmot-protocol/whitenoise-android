@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.navigation
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
@@ -8,11 +9,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -141,6 +145,38 @@ class QuickAccountSwitchTransitionTest {
         )
     }
 
+    /** The cue holds input back from an unready target, then lets the revealed target take it while it fades. */
+    @Test
+    fun revealedTargetAcceptsInputBeforeTheCueFinishesFading() {
+        var transition by mutableStateOf<QuickAccountSwitchTransition?>(animatedRequest(7L, ACCOUNT_B))
+        var targetClicks = 0
+        composeRule.mainClock.autoAdvance = false
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                Box(Modifier.fillMaxSize()) {
+                    Box(Modifier.fillMaxSize().clickable { targetClicks++ }.testTag(TARGET_CONTROL_TAG))
+                    QuickAccountSwitchTransitionOverlay(
+                        transition = transition,
+                        visible = transition?.phase == QuickAccountSwitchPhase.AwaitingTarget,
+                        onFinished = {},
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag(TARGET_CONTROL_TAG).performClick()
+        composeRule.runOnIdle { assertEquals("an unready target must not take input", 0, targetClicks) }
+
+        composeRule.runOnUiThread {
+            transition = transition?.copy(phase = QuickAccountSwitchPhase.RevealingTarget)
+        }
+        composeRule.waitForIdle()
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.onNodeWithTag(QUICK_ACCOUNT_SWITCH_CUE_TAG).assertExists()
+        composeRule.onNodeWithTag(TARGET_CONTROL_TAG).performClick()
+        composeRule.runOnIdle { assertEquals("the fade must not gate the target's input", 1, targetClicks) }
+    }
+
     /** A ready empty target renders its destination state without an account-switch interstitial. */
     @Test
     fun locallyReadyEmptyTargetSkipsTheDecorativeCue() {
@@ -224,5 +260,6 @@ class QuickAccountSwitchTransitionTest {
         const val TARGET_PRIVATE_CHAT = "Target work private chat"
         const val TARGET_EMPTY_STATE = "No target chats yet"
         const val TEST_FRAME_MILLIS = 16
+        const val TARGET_CONTROL_TAG = "target-control"
     }
 }
