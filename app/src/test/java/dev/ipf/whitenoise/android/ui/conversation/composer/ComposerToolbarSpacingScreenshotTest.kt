@@ -147,7 +147,14 @@ class ComposerToolbarSpacingScreenshotTest {
     /** The same row floor survives large RTL type; existing label truncation is separately reviewed. */
     @Test fun lockedNarrowRtlLargeKeepRows() {
         render(
-            ToolbarCase("narrow_rtl_large_transition", 320, rtl = true, fontScale = 2f, transition = true, crowded = true),
+            ToolbarCase(
+                "narrow_rtl_large_transition",
+                320,
+                rtl = true,
+                fontScale = 2f,
+                transition = true,
+                crowded = true,
+            ),
         )
     }
 
