@@ -94,9 +94,15 @@ class ScreenReaderAnnouncementCoverageTest {
         val middle = jumped + row("middle")
         val tail = middle + row("newest")
 
-        assertEquals(emptyList<TimelineMessage>(), baseline.follow(middle, "msg:old", reachesLiveTail = false) { false })
+        assertEquals(
+            emptyList<TimelineMessage>(),
+            baseline.follow(middle, "msg:old", reachesLiveTail = false) { false },
+        )
         // The page that reaches the tail is still history the reader scrolled to.
-        assertEquals(emptyList<TimelineMessage>(), baseline.follow(tail, "msg:middle", reachesLiveTail = true) { false })
+        assertEquals(
+            emptyList<TimelineMessage>(),
+            baseline.follow(tail, "msg:middle", reachesLiveTail = true) { false },
+        )
         // Only a message arriving after the window reached the tail is new.
         val arrivals = baseline.follow(tail + row("live"), "msg:newest", reachesLiveTail = true) { false }
         assertEquals(listOf("live"), arrivals.map { it.record.messageIdHex })
