@@ -159,7 +159,8 @@ internal fun ColumnScope.MessageReactionSummary(
                 sizeFraction = hostSizeFraction,
             ).messageRowChrome(
                 rowOwnsSemantics,
-                if (rowOwnsSemantics && targetVisible) messageReactionSummaryDescription(displayTallies) else null,
+                description =
+                    if (rowOwnsSemantics && targetVisible) messageReactionSummaryDescription(displayTallies) else null,
             ),
     ) {
         if (targetVisible || transition.currentState || transition.isRunning) {

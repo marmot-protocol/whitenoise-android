@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
 import dev.ipf.whitenoise.android.R
@@ -48,16 +49,19 @@ internal fun messageRowCustomActions(
         } + forwarded
 
 /**
- * Replaces a nested control's semantics while the merged row owns its action. [description]
- * stays as plain text, so the row reads it in place.
+ * Replaces a nested control's semantics while the merged row owns its action. [label] stays as plain
+ * text, so the row reads it in place; [description] labels a control that shows no words, such as
+ * the reaction pills.
  */
 internal fun Modifier.messageRowChrome(
     rowOwnsSemantics: Boolean,
+    label: String? = null,
     description: String? = null,
 ): Modifier =
     if (rowOwnsSemantics) {
         clearAndSetSemantics {
-            description?.takeIf(String::isNotBlank)?.let { text = AnnotatedString(it) }
+            label?.takeIf(String::isNotBlank)?.let { text = AnnotatedString(it) }
+            description?.takeIf(String::isNotBlank)?.let { contentDescription = it }
         }
     } else {
         this

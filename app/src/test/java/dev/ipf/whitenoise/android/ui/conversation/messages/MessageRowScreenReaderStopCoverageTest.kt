@@ -105,7 +105,13 @@ class MessageRowScreenReaderStopCoverageTest {
 
         // Nothing inside the row is its own focus stop any more.
         assertEquals(0, composeRule.onAllNodes(hasClickAction()).fetchSemanticsNodes().size)
-        assertTrue(composeRule.onNodeWithTag(ROW).fetchSemanticsNode().children.isEmpty())
+        assertTrue(
+            composeRule
+                .onNodeWithTag(ROW)
+                .fetchSemanticsNode()
+                .children
+                .isEmpty(),
+        )
 
         val row = composeRule.onNodeWithTag(ROW).fetchSemanticsNode().config
         // Chrome reads as text in place, so the row speaks in rendered order.
@@ -187,13 +193,13 @@ class MessageRowScreenReaderStopCoverageTest {
                     Text(
                         "Alice",
                         Modifier
-                            .messageRowChrome(rowOwnsSemantics = true, description = "Alice")
+                            .messageRowChrome(rowOwnsSemantics = true, label = "Alice")
                             .clickable(onClick = onOpenProfile),
                     )
                     Box(
                         Modifier
                             .size(24.dp)
-                            .messageRowChrome(rowOwnsSemantics = true, description = "Replying to Bob: lunch?")
+                            .messageRowChrome(rowOwnsSemantics = true, label = "Replying to Bob: lunch?")
                             .clickable {},
                     )
                     if (bodyShown.value) {
