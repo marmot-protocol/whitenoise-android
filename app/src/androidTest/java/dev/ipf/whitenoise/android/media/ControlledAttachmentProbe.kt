@@ -90,11 +90,7 @@ internal object ControlledAttachmentProbe {
         val accounts = mutableListOf<String>()
         var fixtureState: WhiteNoiseAppState? = null
         withFixtureCleanup(
-            cleanup = {
-                checkpoint("fixture-cleanup-start")
-                fixtureState?.mutationsScope?.cancel()
-                cleanupFixture(marmot, accounts, root, preserveRestartFixture)
-            },
+            cleanup = { cleanupFixture(marmot, accounts, root, preserveRestartFixture, fixtureState) },
         ) {
             withTimeout(options.deadlineMillis) {
                 marmot.start()
@@ -283,8 +279,11 @@ internal object ControlledAttachmentProbe {
         accounts: List<String>,
         root: File,
         preserveRestartFixture: Boolean,
+        fixtureState: WhiteNoiseAppState?,
     ) {
         runFixtureCleanupSteps(
+            { checkpoint("fixture-cleanup-start") },
+            { fixtureState?.mutationsScope?.cancel() },
             {
                 if (!preserveRestartFixture) {
                     val cleanup = accounts.map { runCatching { withTimeout(5_000L) { marmot.removeAccount(it) } } }
