@@ -196,9 +196,11 @@ class RecipientConfirmedMessagePresentationTest {
         )
 
     /** Reactions and status may arrive together under the delivery-state trigger. */
-    private fun upsert(record: TimelineMessageRecordFfi): TimelineMessageChangeFfi.Upsert {
-        return TimelineMessageChangeFfi.Upsert(TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED, record)
-    }
+    private fun upsert(record: TimelineMessageRecordFfi): TimelineMessageChangeFfi.Upsert =
+        TimelineMessageChangeFfi.Upsert(
+            TimelineUpdateTriggerFfi.DELIVERY_OR_SEND_STATE_CHANGED,
+            record,
+        )
 
     private enum class Shape { Text, File, Image }
 }
