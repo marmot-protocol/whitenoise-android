@@ -29,6 +29,7 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_DICTATION_CO
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_RESIZE_ACCESSIBILITY_TAG
 import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.COMPOSER_TAG
+import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.JUMP_TO_NEWEST_TAG
 import dev.ipf.whitenoise.android.ui.navigation.DictationNavigationFixtureValues.origin
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.Assert.assertEquals
@@ -55,6 +56,26 @@ internal abstract class DictationNavigationScenarioFixture : DictationNavigation
         assertSingleActionSet()
         val variant = if (largeRtl) "large_rtl_dark" else "light"
         captureGolden("src/test/snapshots/dictation_other_chat_painted_gap_$variant.png")
+    }
+
+    /** Captures another chat whose jump stack rests above the floating capsule, not under it (#3584). */
+    protected fun captureOtherChatJumpStack(
+        dark: Boolean,
+        amoled: Boolean,
+        largeRtl: Boolean,
+        variant: String,
+    ) {
+        val fixture = render(dark = dark, amoled = amoled, largeRtl = largeRtl, jumpStack = true)
+        composeRule.runOnIdle {
+            fixture.route = origin.copy(selectedChatId = "other-chat", selectedGroupIdHex = "other-group")
+        }
+        composeRule.waitForIdle()
+        assertSingleActionSet()
+        val capsule = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).fetchSemanticsNode().boundsInRoot
+        val newest = composeRule.onNodeWithTag(JUMP_TO_NEWEST_TAG).fetchSemanticsNode().boundsInRoot
+        val sharesColumn = newest.left < capsule.right && capsule.left < newest.right
+        assertTrue("Jump to newest $newest must clear capsule $capsule", !sharesColumn || newest.bottom <= capsule.top)
+        captureGolden("src/test/snapshots/dictation_other_chat_jump_stack_$variant.png")
     }
 
     /** Measures capsule clearance from the painted composer, excluding its outer padding. */

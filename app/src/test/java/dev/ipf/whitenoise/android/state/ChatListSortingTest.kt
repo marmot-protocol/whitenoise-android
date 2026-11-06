@@ -18,6 +18,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ChatListSortingTest {
+    /** Verifies pins lead in manual order, then invites, then recency. */
     @Test
     fun pinnedChatsRideAboveRecencyInEngineManualOrder() {
         val pinnedSecond = item("pinned-second", latestAt = 9_000uL, pinned = true, pinnedPosition = 1u)
@@ -27,14 +28,77 @@ class ChatListSortingTest {
 
         val sorted = sortChatListItems(listOf(recent, pinnedSecond, pinnedFirst, invited))
 
-        // Pending invites stay on top, the pinned block follows in the
-        // engine's manual order regardless of recency, unpinned rows keep
-        // the recency chain.
+        // The pinned block leads in the engine's manual order regardless of
+        // recency, pending invites head the unpinned rows, the rest keep the
+        // recency chain.
         assertEquals(
-            listOf("invited", "pinned-first", "pinned-second", "recent"),
+            listOf("pinned-first", "pinned-second", "invited", "recent"),
             sorted.map { it.id },
         )
     }
+
+    /** Verifies every input order of pins, several invites and ordinary rows keeps the pinned prefix intact. */
+    @Test
+    fun incomingInvitesNeverSplitThePinnedSectionInAnyInputOrder() {
+        val rows =
+            listOf(
+                item("pin0", latestAt = 1uL, pinned = true, pinnedPosition = 0u),
+                item("pin1", latestAt = 2uL, pinned = true, pinnedPosition = 1u),
+                item("invite-new", latestAt = 90uL, pending = true),
+                item("invite-old", latestAt = 80uL, pending = true),
+                item("ordinary", latestAt = 99uL),
+            )
+
+        permutations(rows).forEach { input ->
+            assertEquals(
+                "input ${input.map { it.id }}",
+                listOf("pin0", "pin1", "invite-new", "invite-old", "ordinary"),
+                sortChatListItems(input).map { it.id },
+            )
+        }
+    }
+
+    /** Verifies a pinned invite follows its saved pin position instead of jumping ahead of earlier pins. */
+    @Test
+    fun aPinnedInviteKeepsItsSavedPinPosition() {
+        val sorted =
+            sortChatListItems(
+                listOf(
+                    item("pinned-invite", latestAt = 90uL, pending = true, pinned = true, pinnedPosition = 1u),
+                    item("pin0", latestAt = 1uL, pinned = true, pinnedPosition = 0u),
+                    item("invite", latestAt = 5uL, pending = true),
+                ),
+            )
+
+        assertEquals(listOf("pin0", "pinned-invite", "invite"), sorted.map { it.id })
+    }
+
+    /** Verifies invites still lead an unpinned list and all-pinned lists keep manual order. */
+    @Test
+    fun invitesLeadWithoutPinsAndAllPinnedListsKeepManualOrder() {
+        val withoutPins =
+            sortChatListItems(listOf(item("ordinary", latestAt = 99uL), item("invite", latestAt = 1uL, pending = true)))
+        val allPinned =
+            sortChatListItems(
+                listOf(
+                    item("pin1", latestAt = 99uL, pinned = true, pinnedPosition = 1u),
+                    item("pin0", latestAt = 1uL, pinned = true, pinnedPosition = 0u),
+                ),
+            )
+
+        assertEquals(listOf("invite", "ordinary"), withoutPins.map { it.id })
+        assertEquals(listOf("pin0", "pin1"), allPinned.map { it.id })
+    }
+
+    /** Every ordering of [items], so a sort can be checked against all input orders. */
+    private fun <T> permutations(items: List<T>): List<List<T>> =
+        if (items.size <= 1) {
+            listOf(items)
+        } else {
+            items.flatMapIndexed { index, head ->
+                permutations(items.filterIndexed { other, _ -> other != index }).map { listOf(head) + it }
+            }
+        }
 
     @Test
     fun chatsWithoutMessagesSortAfterChatsWithMessages() {

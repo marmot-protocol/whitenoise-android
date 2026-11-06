@@ -34,9 +34,9 @@ internal fun sortChatListItems(
  */
 private class ChatListSortEntry(
     val item: ChatListItem,
-    val pendingConfirmation: Boolean,
     val pinned: Boolean,
     val pinnedPosition: Long,
+    val pendingConfirmation: Boolean,
     val recency: ULong,
     val sequence: ULong,
 )
@@ -49,9 +49,9 @@ private fun chatListSortEntry(
     val recencyTie = chatListItemRecencyTie(item, draftedAt)
     return ChatListSortEntry(
         item = item,
-        pendingConfirmation = item.group.pendingConfirmation,
         pinned = recencyTie.pinned,
         pinnedPosition = recencyTie.pinnedPosition?.toLong() ?: Long.MAX_VALUE,
+        pendingConfirmation = item.group.pendingConfirmation,
         recency = recencyTie.recency,
         // A draft-supplied or absent recency drops arrival order, so the whole
         // tie falls through to the stable title key instead of mixing
@@ -66,19 +66,21 @@ private fun chatListSortEntry(
 }
 
 /**
- * Pending confirmation first, then the pinned block in the engine's normalized
- * manual order, then draft-aware recency, then arrival order inside a
- * same-second tie, then the stable title key. Comparisons are on primitives,
+ * The pinned block first, in the engine's normalized manual order, then
+ * pending confirmation, then draft-aware recency, then arrival order inside a
+ * same-second tie, then the stable title key. Pins lead so an incoming invite
+ * can never split the pinned section — invites head the unpinned rows, and a
+ * pinned invite keeps its saved pin position. Comparisons are on primitives,
  * so nothing is boxed per comparison.
  */
 private val CHAT_LIST_SORT_ENTRY_COMPARATOR =
     Comparator<ChatListSortEntry> { left, right ->
-        val byPending = right.pendingConfirmation.compareTo(left.pendingConfirmation)
-        if (byPending != 0) return@Comparator byPending
         val byPinned = right.pinned.compareTo(left.pinned)
         if (byPinned != 0) return@Comparator byPinned
         val byPinnedPosition = left.pinnedPosition.compareTo(right.pinnedPosition)
         if (byPinnedPosition != 0) return@Comparator byPinnedPosition
+        val byPending = right.pendingConfirmation.compareTo(left.pendingConfirmation)
+        if (byPending != 0) return@Comparator byPending
         val byRecency = right.recency.compareTo(left.recency)
         if (byRecency != 0) return@Comparator byRecency
         val bySequence = right.sequence.compareTo(left.sequence)

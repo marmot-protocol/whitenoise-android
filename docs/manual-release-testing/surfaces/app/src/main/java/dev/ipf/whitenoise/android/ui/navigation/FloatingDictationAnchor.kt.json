@@ -29,6 +29,14 @@
           "DIC-002",
           "DIC-011"
         ]
+      },
+      {
+        "surface": "Modifier.floatingDictationCapsuleClearance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/FloatingDictationAnchor.kt",
+        "anchor": "fun Modifier.floatingDictationCapsuleClearance(",
+        "test_ids": [
+          "DIC-002"
+        ]
       }
     ],
     "source_coverage": [

@@ -37,6 +37,10 @@ class ChatsScreenOffWindowUnreadRemovalTest {
         composeRule.runOnIdle { controllers.forEach(ChatsController::onCleared) }
     }
 
+    /**
+     * A local delete drops its row from the open filter by id, so the result stays complete with no loading
+     * while the refresh read waits behind the native commit, and settles without the deleted row.
+     */
     @Test fun offWindowDeleteRefreshWaitsForNativeCommitAndSettlesWithoutDeletedRow() {
         val nativeScope = TestScope()
         val entered = CompletableDeferred<Unit>()
@@ -50,7 +54,8 @@ class ChatsScreenOffWindowUnreadRemovalTest {
                 WhiteNoiseTheme { ChatsScreen(fixture.state, fixture.controller, {}, { _, _, _, _ -> }) }
             }
             composeRule.onNodeWithTag("chats.unread_surface").performUnreadFilterAction(composeRule)
-            awaitNativeProgress(nativeScope) { reads == 1 }
+            // The prepared read, then the reconciling read the opening starts.
+            awaitNativeProgress(nativeScope) { reads == 2 }
             composeRule.waitForIdle()
             composeRule.onNodeWithTag("chat.row.$LOCAL_DELETE_GROUP").assertExists()
             val pending = nativeScope.async { fixture.controller.deleteGroupLocalFromChatList(LOCAL_DELETE_GROUP) }
@@ -61,12 +66,12 @@ class ChatsScreenOffWindowUnreadRemovalTest {
             composeRule.waitForIdle()
             composeRule.onNodeWithTag("chat.row.$LOCAL_DELETE_GROUP").assertDoesNotExist()
             composeRule.onNodeWithTag("chat.row.$SURVIVOR").assertExists()
-            composeRule.onNodeWithTag("chats.unread_refresh").assertExists()
+            composeRule.onNodeWithTag("chats.unread_refresh").assertDoesNotExist()
             release.complete(Unit)
             awaitNativeProgress(nativeScope) { pending.isCompleted }
             assertTrue(pending.getCompleted())
             ShadowLooper.idleMainLooper(20, TimeUnit.MILLISECONDS)
-            awaitNativeProgress(nativeScope) { reads >= 2 }
+            awaitNativeProgress(nativeScope) { reads >= 3 }
             composeRule.waitForIdle()
             composeRule.onNodeWithTag("chat.row.$LOCAL_DELETE_GROUP").assertDoesNotExist()
             composeRule.onNodeWithTag("chat.row.$SURVIVOR").assertExists()
@@ -82,12 +87,12 @@ class ChatsScreenOffWindowUnreadRemovalTest {
         }
     }
 
-    /** Advances the native fixture scheduler at Compose's blocking test boundaries. */
+    /** Drives virtual native work while real journal IO finishes; this checks commit ordering, not disk latency. */
     private fun awaitNativeProgress(
         scope: TestScope,
         ready: () -> Boolean,
     ) {
-        composeRule.waitUntil {
+        composeRule.waitUntil(10_000) {
             scope.testScheduler.runCurrent()
             ready()
         }

@@ -36,6 +36,7 @@ internal enum class PerformanceOperation(
     GROUP_MEMBERSHIP_PROJECTION("group_membership_projection"),
     MESSAGE_FORWARD("message_forward"),
     ACCOUNT_SWITCH("account_switch"),
+    UNREAD_FILTER("unread_filter"),
 }
 
 /** Source-confirmed triggers accepted by recovery diagnostics. */
@@ -100,6 +101,9 @@ internal enum class PerformancePhase(
     ACCOUNT_SWITCH_SEED_BOUND("account_switch_seed_bound"),
     UNREAD_AGGREGATE_REFRESH("unread_aggregate_refresh", ROUTINE_SPAN_THRESHOLD_MS),
     UNREAD_AGGREGATE_READY("unread_aggregate_ready"),
+    UNREAD_FILTER_SNAPSHOT_READ("unread_filter_snapshot_read", ROUTINE_SPAN_THRESHOLD_MS),
+    UNREAD_FILTER_ROSTER_READY("unread_filter_roster_ready", ROUTINE_SPAN_THRESHOLD_MS),
+    UNREAD_FILTER_FIRST_RESULT_FRAME("unread_filter_first_result_frame"),
     SYSTEM_SPLASH_HANDOFF("system_splash_handoff"),
     RELAY_CATCH_UP_READY("relay_catch_up_ready"),
     NETWORK_RESTORED("network_restored"),
