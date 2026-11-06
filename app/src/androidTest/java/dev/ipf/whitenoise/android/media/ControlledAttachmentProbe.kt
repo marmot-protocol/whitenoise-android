@@ -269,6 +269,7 @@ internal object ControlledAttachmentProbe {
                 )
             }
         } finally {
+            checkpoint("fixture-cleanup-start")
             fixtureState?.mutationsScope?.cancel()
             val cleanup =
                 if (preserveRestartFixture) {
@@ -276,10 +277,13 @@ internal object ControlledAttachmentProbe {
                 } else {
                     accounts.map { runCatching { withTimeout(5_000L) { marmot.removeAccount(it) } } }
                 }
+            checkpoint("fixture-accounts-removed")
             try {
                 marmot.shutdownAndClose()
+                checkpoint("fixture-native-closed")
             } finally {
                 if (!preserveRestartFixture) root.deleteRecursively()
+                checkpoint("fixture-files-removed")
             }
             check(cleanup.all { it.isSuccess }) { "fixture account cleanup failed" }
         }
@@ -564,6 +568,11 @@ internal object ControlledAttachmentProbe {
             }
         }
         assertTrue(success)
+    }
+
+    /** Marks a fixed fixture boundary so a timed-out command can retain progress without raw instrumentation output. */
+    internal fun checkpoint(stage: String) {
+        report(JSONObject().put("phase", "fixture-stage").put("stage", stage))
     }
 
     /** Sends closed metrics to the host runner; no synthetic identity or locator is exported. */
