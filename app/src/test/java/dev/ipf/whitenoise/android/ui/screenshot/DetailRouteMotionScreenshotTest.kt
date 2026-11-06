@@ -96,17 +96,17 @@ class DetailRouteMotionScreenshotTest {
     /** Conversation route motion under RTL at double font scale on the AMOLED theme. */
     @Test fun conversationLargeRtl() = capture("conversation_large_rtl", dark = true, amoled = true, rtl = true)
 
-    /**
-     * Drives the real route from its source to the notification destination and back, capturing the first, mid and
-     * settled frames of each transition. It ends by showing the app lock mid-flight and asserting the route goes away.
-     */
-    @Suppress("LongMethod") // One native fixture binds setup and first/middle/settled capture points.
     /** The conversation title, which offers Details as its click label. */
     private fun opensDetails() =
         SemanticsMatcher("opens details") {
             it.config.getOrNull(SemanticsActions.OnClick)?.label == app.getString(R.string.details)
         }
 
+    /**
+     * Drives the real route from its source to the notification destination and back, capturing the first, mid and
+     * settled frames of each transition. It ends by showing the app lock mid-flight and asserting the route goes away.
+     */
+    @Suppress("LongMethod") // One native fixture binds setup and first/middle/settled capture points.
     private fun capture(
         name: String,
         profile: Boolean = false,
