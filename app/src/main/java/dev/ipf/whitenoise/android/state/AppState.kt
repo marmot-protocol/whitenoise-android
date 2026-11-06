@@ -2332,6 +2332,10 @@ class WhiteNoiseAppState private constructor(
     /** App-wide preference owner, retained across account changes and reset by erased app preferences. */
     internal val quickAccountSwitchingPreference = QuickAccountSwitchingPreference(preferences)
 
+    internal val composerToolbarPreference by lazy {
+        ComposerToolbarPreference(preferences, mutationsScope, hostPreferenceCommitMutex)
+    }
+
     var languageTag by mutableStateOf(preferences.getString(APP_LANGUAGE_TAG_KEY, null).orEmpty())
         private set
 

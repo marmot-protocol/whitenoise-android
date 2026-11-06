@@ -2566,6 +2566,10 @@
     <string name="notification_tone_silent">Lautlos</string>
     <string name="notification_tone_off">Aus</string>
     <string name="notification_tone_default">Standard</string>
+    <string name="appearance_colors_heading">Design &amp; Farben</string>
+    <string name="appearance_text_heading">Text &amp; Sprache</string>
+    <string name="appearance_conversation_heading">Unterhaltung</string>
+    <string name="appearance_preview_intro">Größeren Text und Rechts-nach-links-Layout ausprobieren.</string>
     <string name="media_viewer_fit_image">Bild einpassen</string>
     <string name="media_viewer_zoom_image">Vergrößern</string>
     <string name="media_viewer_image_scale">%1$d%% Zoom</string>

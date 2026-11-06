@@ -9,6 +9,7 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -107,7 +108,7 @@ class AppearanceScreenBehaviorTest {
     @Test
     fun amoledKeepsBubbleColorsEnabledAndHidesOnlyActionColor() {
         composeRule.onNodeWithTag("appearance.colors.group").assertExists()
-        composeRule.onNodeWithText("AMOLED").performClick()
+        chooseTheme("AMOLED")
         composeRule.runOnIdle { assertEquals(AppThemeMode.Amoled, appState.themeMode) }
         composeRule.onNodeWithTag("appearance.colors.group").assertExists()
         composeRule.onNodeWithText("Action color").assertDoesNotExist()
@@ -119,21 +120,25 @@ class AppearanceScreenBehaviorTest {
             assertEquals(0, actionColorCount)
             assertEquals(1, bubbleColorsCount)
         }
-        composeRule.onNodeWithText("Light").performClick()
+        chooseTheme("Light")
         composeRule.onNodeWithText("Action color").assertIsEnabled()
         composeRule.onNodeWithText("Chat bubble colors").assertIsEnabled()
     }
 
-    /** Tapping a theme row selects it and writes the mode, including the AMOLED mode. */
+    /** The compact theme row opens every existing choice; selection applies immediately and dismissal is safe. */
     @Test
-    fun themeModeCardsWriteTheSelectedMode() {
+    fun compactThemePickerWritesEveryModeAndKeepsTheSelectedSummary() {
         assertEquals(AppThemeMode.System, appState.themeMode)
-        composeRule.onNode(themeRow("System default")).assertIsSelected()
-        composeRule.onNodeWithText("Dark").performClick()
-        composeRule.runOnIdle { assertEquals(AppThemeMode.Dark, appState.themeMode) }
-        composeRule.onNodeWithText("AMOLED").performClick()
-        composeRule.runOnIdle { assertEquals(AppThemeMode.Amoled, appState.themeMode) }
-        composeRule.onNodeWithText("AMOLED").assertIsSelected()
+        composeRule.onNodeWithTag("appearance.theme.group").performClick()
+        composeRule.onNode(hasText("System default") and hasAnyAncestor(isDialog())).assertIsSelected()
+        composeRule.onNodeWithText("Cancel").performClick()
+        assertEquals(AppThemeMode.System, appState.themeMode)
+        val modes = listOf("Light" to AppThemeMode.Light, "Dark" to AppThemeMode.Dark, "AMOLED" to AppThemeMode.Amoled)
+        modes.forEach { (label, mode) ->
+            chooseTheme(label)
+            composeRule.runOnIdle { assertEquals(mode, appState.themeMode) }
+            composeRule.onNode(hasTestTag("appearance.theme.group") and hasText(label, substring = true)).assertExists()
+        }
     }
 
     /** Each saved step updates the live sample and stays selected until the picker is dismissed. */
@@ -228,6 +233,8 @@ class AppearanceScreenBehaviorTest {
         val reset = context.getString(R.string.appearance_preview_reset)
         val preferences = context.getSharedPreferences("whitenoise", Context.MODE_PRIVATE)
         val before = preferences.all.toMap()
+        composeRule.onNodeWithTag("settings.list").performScrollToNode(hasText("Readability preview"))
+        composeRule.onNodeWithText("Readability preview").performScrollTo().performClick()
         composeRule.onNodeWithTag("settings.list").performScrollToNode(hasText(rtl))
         composeRule
             .onNodeWithText(rtl)
@@ -261,6 +268,7 @@ class AppearanceScreenBehaviorTest {
         val rtl = context.getString(R.string.appearance_preview_rtl)
         val large = context.getString(R.string.appearance_preview_large_text)
         composeRule.onNodeWithTag("settings.list").performScrollToNode(preview)
+        composeRule.onNodeWithText("Readability preview").performScrollTo().performClick()
         composeRule
             .onNodeWithText(rtl)
             .performScrollTo()
@@ -278,6 +286,9 @@ class AppearanceScreenBehaviorTest {
         composeRule.onNodeWithText(large).performScrollTo().assertIsOn()
     }
 
-    /** A theme row is the node with that label inside the theme group, not the language value. */
-    private fun themeRow(label: String) = hasText(label) and hasAnyAncestor(hasTestTag("appearance.theme.group"))
+    /** The selected value is a summary until the native choice dialog is opened. */
+    private fun chooseTheme(label: String) {
+        composeRule.onNodeWithTag("appearance.theme.group").performScrollTo().performClick()
+        composeRule.onNode(hasText(label) and hasAnyAncestor(isDialog())).performClick()
+    }
 }

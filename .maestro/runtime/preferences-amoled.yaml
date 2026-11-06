@@ -10,10 +10,12 @@ name: preferences-amoled
       text: "Appearance"
     direction: DOWN
 - tapOn: "Appearance"
+- tapOn:
+    id: "appearance.theme.group"
 - tapOn: "AMOLED"
 - back
 - tapOn: "Appearance"
 - assertVisible:
     id: "appearance.theme.group"
-- assertNotVisible:
-    id: "appearance.colors.group"
+- assertNotVisible: "Action color"
+- assertVisible: "Chat bubble colors"

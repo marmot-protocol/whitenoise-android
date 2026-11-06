@@ -14,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -24,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
@@ -56,11 +58,16 @@ internal fun composerSendingAccount(
  * route Back to the confirmation while the keyboard stays up.
  */
 @Composable
+@Suppress("LongParameterList") // Bound sender and presentation/gesture adapters remain separate inputs.
 internal fun ComposerSendingIdentity(
     appState: WhiteNoiseAppState,
     accountRef: String?,
     conversationKey: Any?,
     overlayBackRegistrar: ComposerOverlayBackRegistrar? = null,
+    enabled: Boolean = true,
+    slotWidth: Dp = ComposerToolbarSlotWidth,
+    canActivate: () -> Boolean = { true },
+    modifier: Modifier = Modifier,
     onOpenChange: (close: (() -> Unit)?) -> Unit = {},
 ) {
     val account = composerSendingAccount(appState, accountRef) ?: return
@@ -68,6 +75,7 @@ internal fun ComposerSendingIdentity(
     val picture = appState.avatarUrl(account.accountIdHex)
     key(accountRef, conversationKey, account.accountIdHex, title, picture) {
         var showing by remember { mutableStateOf(false) }
+        SideEffect { if (!enabled) showing = false }
         val currentOnOpenChange by rememberUpdatedState(onOpenChange)
         val open = showing
         DisposableEffect(open) {
@@ -88,10 +96,10 @@ internal fun ComposerSendingIdentity(
                     size = sendingIdentityAvatarSize,
                     touchTargetSize = composerSendingIdentityTargetSize,
                     actionDescription = sendingAs,
-                    onClick = { showing = !showing },
+                    onClick = { if (enabled && canActivate()) showing = !showing },
                     modifier =
-                        Modifier
-                            .width(ComposerToolbarSlotWidth)
+                        modifier
+                            .width(slotWidth)
                             .height(ComposerActionRowHeight)
                             .testTag("composer-sending-identity"),
                 )
