@@ -733,8 +733,11 @@ class ConversationComposerExpansionRetentionScreenshotTest {
             assertEquals("Controls do not acquire a traveling outline", 0f, captured.strokeWidth, 0f)
             assertEquals(0f, captured.topRadius, 0f)
             assertEquals(0f, captured.bottomRadius, 0f)
-            val pasteBounds = composeRule.onNodeWithTag("composer.paste").fetchSemanticsNode().boundsInWindow
-            assertTrue("Captured accepted text cannot include toolbar pixels", !captured.surface.overlaps(pasteBounds))
+            val toolbarBounds = composeRule.onNodeWithTag("composer.shortcut.emoji").fetchSemanticsNode().boundsInWindow
+            assertTrue(
+                "Captured accepted text cannot include toolbar pixels",
+                !captured.surface.overlaps(toolbarBounds),
+            )
             traceAcceptedGeometry(
                 checkNotNull(observedMotion),
                 acceptedPresentationId,
@@ -775,7 +778,7 @@ class ConversationComposerExpansionRetentionScreenshotTest {
                     diagnosticFrames,
                 )
                 val owner = checkNotNull(observedMotion)
-                composeRule.onNodeWithTag("composer.paste").assertIsDisplayed()
+                composeRule.onNodeWithTag("composer.shortcut.emoji").assertIsDisplayed()
                 if (!owner.presentation(acceptedPresentationId).coversNative) {
                     val canonical =
                         composeRule

@@ -9,6 +9,8 @@ appId: dev.ipf.whitenoise.android.maestrolab
       text: Appearance
     direction: DOWN
 - tapOn: Appearance
+- tapOn:
+    id: "appearance.theme.group"
 - tapOn: Light
 - back
 - assertVisible: Settings

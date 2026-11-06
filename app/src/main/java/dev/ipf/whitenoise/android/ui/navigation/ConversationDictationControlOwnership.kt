@@ -30,24 +30,31 @@ internal fun conversationDictationControlOwner(
     appLockScreenVisible: Boolean,
     recoveryHandedToComposer: Boolean = false,
 ): ConversationDictationControlOwner {
-    val target = state.target
-    if (appLockScreenVisible || target == null || !state.requiresCompletionControls(recoveryHandedToComposer)) {
+    if (appLockScreenVisible || state.target == null || !state.requiresCompletionControls(recoveryHandedToComposer)) {
         return ConversationDictationControlOwner.Hidden
     }
-    val originComposerVisible =
-        route.navigationAccountStable &&
-            route.composerVisible &&
-            route.selectedChatId != null &&
-            route.selectedChatId == route.renderedChatId &&
-            route.renderedAccountRef.equals(target.accountRef, ignoreCase = true) &&
-            route.selectedGroupIdHex.equals(target.groupIdHex, ignoreCase = true)
+    val originComposerVisible = conversationDictationOriginComposerVisible(state, route)
     return when {
-        originComposerVisible -> ConversationDictationControlOwner.Composer
         shouldShowConversationDictationPersistentControl(
             state = state,
             originVisible = false,
             appLockScreenVisible = false,
         ) -> ConversationDictationControlOwner.Persistent
+        originComposerVisible -> ConversationDictationControlOwner.Composer
         else -> ConversationDictationControlOwner.Hidden
     }
+}
+
+/** The measured launcher can seed entry only in the current session's exact rendered origin. */
+internal fun conversationDictationOriginComposerVisible(
+    state: ConversationDictationState,
+    route: ConversationDictationComposerRoute,
+): Boolean {
+    val target = state.target ?: return false
+    return route.navigationAccountStable &&
+        route.composerVisible &&
+        route.selectedChatId != null &&
+        route.selectedChatId == route.renderedChatId &&
+        route.renderedAccountRef.equals(target.accountRef, ignoreCase = true) &&
+        route.selectedGroupIdHex.equals(target.groupIdHex, ignoreCase = true)
 }

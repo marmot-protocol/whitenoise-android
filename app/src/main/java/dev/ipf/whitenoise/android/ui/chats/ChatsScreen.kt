@@ -67,6 +67,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -95,6 +96,7 @@ import dev.ipf.whitenoise.android.core.unreadMemberCandidateIds
 import dev.ipf.whitenoise.android.core.unreadNeedsMembers
 import dev.ipf.whitenoise.android.state.AccountWideForwardTargets
 import dev.ipf.whitenoise.android.state.AccountWideRead
+import dev.ipf.whitenoise.android.state.ChatFolderPreferences
 import dev.ipf.whitenoise.android.state.ChatListActionOwner
 import dev.ipf.whitenoise.android.state.ChatListBatchCommand
 import dev.ipf.whitenoise.android.state.ChatListBatchOutcome
@@ -104,6 +106,7 @@ import dev.ipf.whitenoise.android.state.ChatListPinMoveResult
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.LocalChatDeleteObserver
 import dev.ipf.whitenoise.android.state.SwipeAction
+import dev.ipf.whitenoise.android.state.SystemFolderKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.activeAccountMessageCount
 import dev.ipf.whitenoise.android.state.chatFolderSource
@@ -236,6 +239,10 @@ internal fun ChatsScreen(
         appState.recordProductObservation(dev.ipf.whitenoise.android.state.ProductObservation.INBOX)
     }
     val groupTitleCopy = rememberGroupTitleCopy()
+    val placementAccount = appState.activeAccountRef
+    val placementRuntime = appState.runtimeGeneration
+    val placementCurrent = dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent.current
+    val fabMinimumTopInWindow = remember(placementAccount, placementRuntime) { mutableStateOf<Float?>(null) }
     var showNewChatFlow by rememberSaveable { mutableStateOf(false) }
     // The list head when New Message opened, the row its keyed scroll anchor holds while the
     // flow replaces it. Not saved: after process death the open falls back to the current head.
@@ -260,6 +267,10 @@ internal fun ChatsScreen(
         if (appState.signOutInProgress || appState.wipeInProgress) folderManagerOpen = false
     }
     val selectedChatIds = remember { mutableStateSetOf<String>() }
+    // #2925: a Select all bound to MDK's complete view; null for loaded-window selections.
+    var completeSelection by remember(appState.activeAccountRef, appState.runtimeGeneration) {
+        mutableStateOf<ChatListCompleteSelection?>(null)
+    }
     var pendingLeaveAndDelete by remember(appState.activeAccountRef, appState.runtimeGeneration) {
         mutableStateOf<PendingChatDeparture?>(null)
     }
@@ -286,6 +297,7 @@ internal fun ChatsScreen(
     /** Capture the selected IDs and owner before any native action can change the visible filter. */
     fun startStateBatch(command: ChatListBatchCommand) {
         if (pendingStateBatch != null || controller.chatListBatchInProgress) return
+        if (completeSelection?.resolved == false) return
         val owner = controller.captureChatListActionOwner { batchScope.get() } ?: return
         if (!controller.chatListActionIsCurrent(owner)) return
         directBatchResult = null
@@ -298,6 +310,7 @@ internal fun ChatsScreen(
                 command,
                 owner,
                 followScope = pinFollow.currentScope.takeIf { command == ChatListBatchCommand.PIN },
+                completeView = completeSelection?.takeIf { it.resolved }?.view,
             )
     }
     pendingStateBatch?.let { request ->
@@ -313,11 +326,25 @@ internal fun ChatsScreen(
                         if (directBatchChecking && previous != null) {
                             controller.reconcileChatListBatch(previous, request.command, request.owner)
                         } else {
-                            controller.runChatListBatch(
-                                previous?.retryIds ?: request.ids,
-                                request.command,
-                                request.owner,
-                            )
+                            // A complete selection first drops chats that have since left its native view;
+                            // without that answer nothing starts, so stale unloaded IDs are never commanded.
+                            val view = request.completeView
+                            val ids =
+                                when {
+                                    previous != null -> previous.retryIds
+                                    view == null -> request.ids
+                                    else ->
+                                        runCatchingCancellable {
+                                            resolveCompleteChatListIds {
+                                                controller.revalidateCompleteChatListIds(
+                                                    view,
+                                                    request.ids,
+                                                    request.owner,
+                                                )
+                                            }
+                                        }.getOrNull()
+                                }
+                            ids?.let { controller.runChatListBatch(it, request.command, request.owner) }
                         }
                     if (controller.chatListActionSessionIsCurrent(request.owner)) {
                         val result =
@@ -544,6 +571,26 @@ internal fun ChatsScreen(
     val advancedFolder = selectedFolderRule?.smartFilter != null
     val showArchived = !advancedFolder && selectedFolderRule?.archivedOnly == true
     val unreadFolderSelected = unreadOnly || (!advancedFolder && selectedFolderRule?.unreadOnly == true)
+    // Archived matches MDK's ARCHIVED view only while its rule, members and exclusions are untouched.
+    val untouchedArchivedFolder =
+        remember(folderStoreState, appState.activeAccountRef, selectedFolder, selectedFolderRule) {
+            val account = appState.activeAccountRef
+            val folder = selectedFolder
+            account != null &&
+                folder?.systemKind == SystemFolderKind.ARCHIVED &&
+                selectedFolderRule == ChatFolderPreferences.defaultRuleFor(SystemFolderKind.ARCHIVED) &&
+                appState.chatFolderPreferences.membershipFor(account, folder.id).isEmpty() &&
+                appState.chatFolderPreferences.excludedChats(account, folder.id).isEmpty()
+        }
+    val completeSelectAllView =
+        chatListCompleteSelectAllView(
+            folderSelected = selectedFolder != null,
+            untouchedArchivedFolder = untouchedArchivedFolder,
+            unreadOnly = unreadOnly,
+            searchOpen = searchOpen,
+        )
+    // A scope change ends any complete selection; pending reads see the cleared holder and are discarded.
+    LaunchedEffect(completeSelectAllView) { completeSelection = null }
     // A confirmation still holding the previous account's or list variant's rows must not survive
     // into the next one, where those rows are not even addressable.
     var pendingBulkDelete by
@@ -561,6 +608,7 @@ internal fun ChatsScreen(
     val context = LocalContext.current
 
     fun clearSelection() {
+        completeSelection = null
         selectedChatIds.clear()
     }
 
@@ -1077,9 +1125,24 @@ internal fun ChatsScreen(
             if (showArchived || advancedFolder) null else chatListReturnHead(visibleItems)
         onPresentProfile(npub, visibleHead)
     }
-    LaunchedEffect(visibleChatIds, selectionMode) {
-        if (selectionMode) {
+    LaunchedEffect(visibleChatIds, selectionMode, completeSelection) {
+        if (!selectionMode) return@LaunchedEffect
+        if (selectedChatIds.isEmpty()) completeSelection = null
+        val complete = completeSelection
+        if (complete == null) {
             selectedChatIds.retainAll(reconcileChatListSelection(selectedChatIds, visibleChatIds))
+            return@LaunchedEffect
+        }
+        if (!complete.resolved) return@LaunchedEffect
+        // Unloaded IDs stay selected; only MDK can say a chat has left the complete view.
+        val owner = controller.captureChatListActionOwner { batchScope.get() } ?: return@LaunchedEffect
+        val sent = selectedChatIds.toSet()
+        val kept =
+            runCatchingCancellable {
+                controller.revalidateCompleteChatListIds(complete.view, sent.toList(), owner)
+            }.getOrNull() ?: return@LaunchedEffect
+        if (completeSelection === complete) {
+            selectedChatIds.removeAll(sent - retainRevalidatedChatListIds(sent, kept))
         }
     }
     LaunchedEffect(visibleChatIds, actionSheetChatId) {
@@ -1089,9 +1152,25 @@ internal fun ChatsScreen(
         remember(visibleItems, searchActive, selectedChatIds.size) {
             visibleItems.filter { visibleRowId(it) in selectedChatIds }
         }
+    val resolvedCompleteSelection = completeSelection?.takeIf { it.resolved }
+    val selectionResolving = completeSelection?.resolved == false
+    // Destructive and per-row flows need loaded rows; they stay hidden while unloaded chats are selected.
+    val selectionBeyondLoaded = resolvedCompleteSelection != null && selectedVisibleItems.size < selectedChatIds.size
     val selectionActions =
-        remember(selectedVisibleItems, appState.activeAccount?.accountIdHex) {
-            chatListSelectionActions(selectedVisibleItems, appState.activeAccount?.accountIdHex)
+        remember(
+            selectedVisibleItems,
+            selectedChatIds.size,
+            appState.activeAccount?.accountIdHex,
+            resolvedCompleteSelection,
+        ) {
+            val loaded = chatListSelectionActions(selectedVisibleItems, appState.activeAccount?.accountIdHex)
+            resolvedCompleteSelection?.let { complete ->
+                chatListCompleteSelectionActions(
+                    loaded,
+                    complete,
+                    allLoaded = selectedVisibleItems.size == selectedChatIds.size,
+                )
+            } ?: loaded
         }
     val bulkArchiveAction = selectionActions.archiveAction
     // Engine-normalized manual order of the pinned block, for the selection
@@ -1337,6 +1416,7 @@ internal fun ChatsScreen(
                 pointerY,
             ) ?: return false
         if (endpointId == anchorId && selectedChatIds.isEmpty()) return false
+        completeSelection = null
         val next =
             anchoredDragSelection(
                 orderedIds = orderedVisibleChatIds,
@@ -1352,7 +1432,10 @@ internal fun ChatsScreen(
     fun finishChatDrag(clearSelection: Boolean) {
         dragAnchorChatId = null
         dragPointerWindowY = null
-        if (clearSelection) selectedChatIds.clear()
+        if (clearSelection) {
+            completeSelection = null
+            selectedChatIds.clear()
+        }
     }
 
     LaunchedEffect(appState.activeAccountRef, appState.runtimeGeneration) {
@@ -1929,6 +2012,8 @@ internal fun ChatsScreen(
                         rangeDragActive = dragAnchorChatId == rowId,
                         onToggleSelection = {
                             if (menuActionsCurrent()) {
+                                // A row choice made while Select all resolves supersedes that pending read.
+                                if (completeSelection?.resolved == false) completeSelection = null
                                 val updated = toggleChatListSelection(selectedChatIds, rowId)
                                 selectedChatIds.clear()
                                 selectedChatIds.addAll(updated)
@@ -1971,7 +2056,7 @@ internal fun ChatsScreen(
                             onPinToggle = { toggleChatPin(item) },
                             onMovePinned = { delta -> movePinnedChat(item, delta) },
                             onSelect = {
-                                selectedChatIds.clear()
+                                clearSelection()
                                 selectedChatIds.addAll(enterChatListSelection(visibleRowId(item)))
                             },
                             onDelete = {
@@ -2128,8 +2213,9 @@ internal fun ChatsScreen(
                 // The review names the acting account, so a selection with no bound account offers nothing.
                 val abandonableSelection =
                     selectedVisibleItems
-                        .takeIf { controller.accountRef != null && it.offerLocalAbandonment() }
-                        ?.map { it.isDm() }
+                        .takeIf {
+                            !selectionBeyondLoaded && controller.accountRef != null && it.offerLocalAbandonment()
+                        }?.map { it.isDm() }
                 dev.ipf.whitenoise.android.ui.common.AdaptiveContent(
                     Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),
                 ) {
@@ -2145,11 +2231,16 @@ internal fun ChatsScreen(
                             ),
                         archiveAction = bulkArchiveAction,
                         actionsEnabled =
-                            pendingStateBatch == null &&
+                            !selectionResolving &&
+                                pendingStateBatch == null &&
                                 !controller.chatListBatchInProgress &&
-                                selectedVisibleItems.isNotEmpty() &&
+                                (selectedVisibleItems.isNotEmpty() || resolvedCompleteSelection != null) &&
                                 selectedVisibleItems.none { it.group.groupIdHex in leavingAndDeleting },
-                        allVisibleSelected = visibleChatIds.isNotEmpty() && selectedChatIds.containsAll(visibleChatIds),
+                        // Where MDK owns the complete view, Select all stays offered until that set is resolved.
+                        allVisibleSelected =
+                            visibleChatIds.isNotEmpty() &&
+                                selectedChatIds.containsAll(visibleChatIds) &&
+                                (completeSelectAllView == null || resolvedCompleteSelection != null),
                         showMarkRead = selectionActions.showMarkRead,
                         showMarkUnread = selectionActions.showMarkUnread,
                         showMute = selectionActions.showMute,
@@ -2182,7 +2273,7 @@ internal fun ChatsScreen(
                                 null
                             },
                         onExcludeFromFolder =
-                            selectedFolder?.let { folder ->
+                            selectedFolder?.takeIf { !selectionBeyondLoaded }?.let { folder ->
                                 {
                                     val owner = controller.captureChatListActionOwner { batchScope.get() }
                                     if (
@@ -2200,8 +2291,11 @@ internal fun ChatsScreen(
                                     }
                                 }
                             },
+                        showDelete = !selectionBeyondLoaded,
+                        showAddToFolder = !selectionBeyondLoaded,
                         onDeleteLocal =
                             if (
+                                !selectionBeyondLoaded &&
                                 selectedVisibleItems.any { !it.isDm() } &&
                                 selectedVisibleItems.any { it.actions?.canDeleteLocal == true }
                             ) {
@@ -2268,8 +2362,36 @@ internal fun ChatsScreen(
                                 }
                             }
                         },
-                        onSelectAll = { selectedChatIds.addAll(selectAllVisibleChats(visibleChatIds)) },
-                        onDeselectAll = { selectedChatIds.clear() },
+                        onSelectAll = {
+                            selectedChatIds.addAll(selectAllVisibleChats(visibleChatIds))
+                            // #2925: extend past the loaded window to MDK's complete view where it owns membership.
+                            val view = completeSelectAllView
+                            val owner = view?.let { controller.captureChatListActionOwner { actionScope.get() } }
+                            if (view != null && owner != null) {
+                                val pending = ChatListCompleteSelection(view, resolved = false)
+                                val loadedIds = visibleChatIds
+                                completeSelection = pending
+                                scope.launch {
+                                    val ids =
+                                        runCatchingCancellable {
+                                            resolveCompleteChatListIds { controller.completeChatListIds(view, owner) }
+                                        }.getOrNull()
+                                    if (completeSelection !== pending) return@launch
+                                    if (ids != null && controller.chatListActionIsCurrent(owner)) {
+                                        selectedChatIds.addAll(mergeCompleteChatListIds(ids, loadedIds))
+                                        completeSelection = pending.copy(resolved = true)
+                                    } else {
+                                        completeSelection = null
+                                        if (controller.chatListActionIsCurrent(owner)) {
+                                            appState.presentTransient(
+                                                resources.getString(R.string.toast_chat_list_select_all_loaded_only),
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        onDeselectAll = { clearSelection() },
                         isCurrent = {
                             val sameOwner =
                                 selectionAccount != null &&
@@ -2288,7 +2410,7 @@ internal fun ChatsScreen(
         },
         floatingActionButton = {
             if (!searchOpen && !selectionMode) {
-                ChatsNewMessageFab(appState, openNewMessageFlow)
+                ChatsNewMessageFab(appState, openNewMessageFlow, minimumTopInWindow = fabMinimumTopInWindow)
             }
         },
     ) { padding ->
@@ -2303,6 +2425,15 @@ internal fun ChatsScreen(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .onPlaced { coordinates ->
+                    if (
+                        placementCurrent &&
+                        appState.activeAccountRef == placementAccount &&
+                        appState.runtimeGeneration == placementRuntime
+                    ) {
+                        fabMinimumTopInWindow.value = coordinates.positionInWindow().y
+                    }
+                }
                 // The scaffold padding above already clears a side cutout or side navigation bar, so the
                 // body frame's banner slot must not pad for them again (#3312).
                 .consumeWindowInsets(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)),

@@ -1962,6 +1962,11 @@ internal fun MainShell(
                                         )
                                     }
                                 },
+                                dictationOriginVisible =
+                                    dictationComposerRoute.navigationAccountStable &&
+                                        dictationComposerRoute.composerVisible &&
+                                        content.controller === selectedOrPendingConversationController &&
+                                        selectedChat?.id == chat.id,
                                 dictationControlsVisible =
                                     dictationControlOwner == ConversationDictationControlOwner.Composer &&
                                         content.controller === selectedOrPendingConversationController &&

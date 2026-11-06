@@ -5,6 +5,7 @@ import androidx.compose.runtime.MutableIntState
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.ChatNotificationSettingsFfi
 import dev.ipf.marmotkit.ChatPinStateFfi
 import dev.ipf.marmotkit.MarmotInterface
@@ -735,6 +736,66 @@ class ChatsControllerBatchActionsTest {
             fixture.controller.onCleared()
         }
 
+    /** #2925: Select all reaches chats beyond the loaded window, and revalidation drops chats that left the view. */
+    @Test fun completeSelectionCommandsOffWindowChatsAfterNativeRevalidation() =
+        runTest {
+            val fixture = Fixture(this, retainedIds = setOf(A))
+            val owner = fixture.controller.captureChatListActionOwner()!!
+            val complete = fixture.controller.completeChatListIds(ChatListViewFfi.CHATS, owner)!!
+            assertEquals(listOf(A, B, C), complete)
+            assertEquals(listOf(ChatListViewFfi.CHATS), fixture.viewReads)
+            assertEquals(listOf(A), fixture.controller.chatRows.map { it.groupIdHex })
+            // C leaves the view (for example, archived elsewhere) before the bulk action starts.
+            fixture.completeIds = listOf(A, B)
+            val targets = fixture.controller.revalidateCompleteChatListIds(ChatListViewFfi.CHATS, complete, owner)!!
+            assertEquals(listOf(A, B), targets)
+            fixture.rejectB = false
+            val result = fixture.controller.runChatListBatch(targets, ChatListBatchCommand.READ, owner)!!
+            assertEquals(listOf(A to false, B to false), fixture.commands)
+            assertEquals(2, result.changed)
+            assertEquals(
+                emptyList<String>(),
+                fixture.controller.revalidateCompleteChatListIds(ChatListViewFfi.CHATS, emptyList(), owner),
+            )
+            fixture.controller.onCleared()
+        }
+
+    /** Departed groups render in Chats but MDK places them in LEFT, so a selected departed row stays selected. */
+    @Test fun completeSelectionKeepsSelectedDepartedGroups() =
+        runTest {
+            val fixture = Fixture(this, retainedIds = setOf(A))
+            val owner = fixture.controller.captureChatListActionOwner()!!
+            fixture.completeIds = listOf(A)
+            fixture.departedIds = listOf(B)
+            assertEquals(
+                listOf(A, B),
+                fixture.controller.revalidateCompleteChatListIds(ChatListViewFfi.CHATS, listOf(A, B, C), owner),
+            )
+            assertEquals(listOf(ChatListViewFfi.CHATS, ChatListViewFfi.LEFT), fixture.revalidatedViews)
+            fixture.revalidatedViews.clear()
+            assertEquals(
+                listOf(A),
+                fixture.controller.revalidateCompleteChatListIds(ChatListViewFfi.CHATS, listOf(A), owner),
+            )
+            assertEquals(
+                "no departed lookup when every ID is in view",
+                listOf(ChatListViewFfi.CHATS),
+                fixture.revalidatedViews,
+            )
+            fixture.controller.onCleared()
+        }
+
+    /** A complete read finishing after the account changes cannot become the new account's selection. */
+    @Test fun completeSelectionReadRejectsReplacedAccount() =
+        runTest {
+            val fixture = Fixture(this, retainedIds = setOf(A))
+            val owner = fixture.controller.captureChatListActionOwner()!!
+            fixture.beforeCompleteRead = { fixture.replaceAccount() }
+            assertNull(fixture.controller.completeChatListIds(ChatListViewFfi.CHATS, owner))
+            assertNull(fixture.controller.revalidateCompleteChatListIds(ChatListViewFfi.CHATS, listOf(A, B), owner))
+            fixture.controller.onCleared()
+        }
+
     private class Fixture(
         scope: TestScope,
         retainedIds: Set<String> = setOf(A, B, C),
@@ -765,6 +826,11 @@ class ChatsControllerBatchActionsTest {
         var archiveUpdater: (suspend (String, String, Boolean) -> AppGroupRecordFfi)? = null
         var beforeRead: (suspend () -> Unit)? = null
         var afterCommit: (() -> Unit)? = null
+        var completeIds = listOf(A, B, C)
+        var departedIds = emptyList<String>()
+        val revalidatedViews = mutableListOf<ChatListViewFfi>()
+        val viewReads = mutableListOf<ChatListViewFfi>()
+        var beforeCompleteRead: (() -> Unit)? = null
         val state: WhiteNoiseAppState
         val controller: ChatsController
 
@@ -881,6 +947,18 @@ class ChatsControllerBatchActionsTest {
                 ChatListLiveSubscriptions(
                     openChatListWindow = { _, _ -> error("unused") },
                     openChats = { _, _ -> error("unused") },
+                    chatListIds = { account, view ->
+                        check(account == ACCOUNT)
+                        beforeCompleteRead?.invoke()
+                        viewReads += view
+                        completeIds
+                    },
+                    revalidateChatListIds = { account, view, groupIds ->
+                        check(account == ACCOUNT)
+                        beforeCompleteRead?.invoke()
+                        revalidatedViews += view
+                        groupIds.filter { it in if (view == ChatListViewFfi.LEFT) departedIds else completeIds }
+                    },
                     presentedChatList = { account, _ ->
                         check(account == ACCOUNT)
                         wholeReads++

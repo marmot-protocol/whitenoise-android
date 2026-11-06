@@ -34,6 +34,15 @@ class SelectInstrumentedLanesTest(unittest.TestCase):
             with self.subTest(pattern=pattern):
                 self.assertTrue(pattern in TRIGGERS or ('*' not in pattern and matches(pattern, TRIGGERS)))
 
+    def test_every_pull_request_smoke_test_starts_the_workflow(self):
+        """A PR that edits only a smoke test still runs it, so the PR device lane cannot silently skip it."""
+        for path in sorted((ROOT / 'app/src/androidTest').rglob('*')):
+            if path.suffix in ('.kt', '.java') and '@PullRequestDeviceSmoke' in path.read_text():
+                relative = path.relative_to(ROOT).as_posix()
+                with self.subTest(path=relative):
+                    self.assertTrue(matches(relative, TRIGGERS))
+                    self.assertTrue(select('pull_request', [relative], TRIGGERS)['connected'])
+
     def test_fixture_only_inputs_are_not_pull_request_smoke_tests(self):
         """A fixture-only test input never carries the annotation the connected PR run selects."""
         for pattern in FIXTURE_ONLY + VIDEO_METADATA_FIXTURE_ONLY:

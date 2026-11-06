@@ -191,6 +191,7 @@
     <string name="toast_chat_deleted_local">Chat eliminado de este dispositivo</string>
     <string name="toast_couldnt_delete_chat">No se pudo eliminar el chat</string>
     <string name="chat_list_select_all">Seleccionar todo</string>
+    <string name="toast_chat_list_select_all_loaded_only">No se pudieron seleccionar todos los chats. Solo están seleccionados los chats cargados.</string>
     <string name="chat_list_deselect_all">Deseleccionar todo</string>
     <plurals name="chat_list_selected_count">
         <item quantity="one">%1$d chat seleccionado</item>
@@ -2551,6 +2552,10 @@
     <string name="notification_tone_silent">Silencio</string>
     <string name="notification_tone_off">Desactivado</string>
     <string name="notification_tone_default">Predeterminado</string>
+    <string name="appearance_colors_heading">Tema y colores</string>
+    <string name="appearance_text_heading">Texto e idioma</string>
+    <string name="appearance_conversation_heading">Conversación</string>
+    <string name="appearance_preview_intro">Prueba texto más grande y un diseño de derecha a izquierda.</string>
     <string name="media_viewer_fit_image">Ajustar imagen</string>
     <string name="media_viewer_zoom_image">Ampliar</string>
     <string name="media_viewer_image_scale">Zoom del %1$d%%</string>

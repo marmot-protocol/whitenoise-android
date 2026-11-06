@@ -45,7 +45,6 @@ class ChatListProjectionEqualityTest {
         val second = MarkdownDocumentFfi(truncated = false, blocks = emptyList(), blankLinesBefore = ByteArray(0))
 
         assertNotEquals(first, second)
-        assertEquals(EMPTY_MARKDOWN_DOCUMENT, EMPTY_MARKDOWN_DOCUMENT)
     }
 
     @Test

@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,12 +39,14 @@ import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -59,7 +62,14 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Lock
  * Compose doesn't fight us for the up event.
  */
 @Composable
-internal fun MicHoldButton(controller: dev.ipf.whitenoise.android.audio.VoiceRecordingController) {
+internal fun MicHoldButton(
+    controller: dev.ipf.whitenoise.android.audio.VoiceRecordingController,
+    slotWidth: Dp = ComposerToolbarSlotWidth,
+    canStart: () -> Boolean = { true },
+    onHoldStart: () -> Unit = {},
+) {
+    val latestHoldStart by rememberUpdatedState(onHoldStart)
+    val latestCanStart by rememberUpdatedState(canStart)
     val haptics = LocalHapticFeedback.current
     val cancelThresholdDp = 120.dp
     val lockThresholdDp = 80.dp
@@ -76,18 +86,22 @@ internal fun MicHoldButton(controller: dev.ipf.whitenoise.android.audio.VoiceRec
             onClick = {
                 if (controller.isRecording) {
                     controller.stop()
-                } else if (controller.start()) {
-                    controller.lock()
+                } else if (latestCanStart()) {
+                    latestHoldStart()
+                    if (controller.start()) controller.lock()
                 }
             },
             modifier =
                 Modifier
-                    .width(ComposerToolbarSlotWidth)
+                    .testTag("composer.voice.launcher")
+                    .width(slotWidth)
                     .height(48.dp)
                     .semantics { contentDescription = label }
                     .pointerInput(controller) {
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
+                            if (!latestCanStart()) return@awaitEachGesture
+                            latestHoldStart()
                             val started = controller.start()
                             if (!started) return@awaitEachGesture
                             // Consume the down so the FAB's internal clickable

@@ -29,6 +29,38 @@ DIAGNOSTIC_EXCEPTIONS = ("kotlin.UninitializedPropertyAccessException", "java.la
                          "java.lang.IllegalArgumentException", "android.os.DeadObjectException",
                          "android.os.RemoteException", "java.io.IOException")
 
+CHECKPOINT_STAGES = frozenset((
+    "upload-published", "received-projected", "automatic-policy-ready", "resume-body-released",
+    "resume-work-succeeded", "resume-plaintext-checked", "resume-sample-written", "resume-scenario-closed",
+    "resume-failure-entry", "resume-cleanup-start", "resume-work-observer-joined", "resume-native-observer-joined",
+    "resume-work-cancelled", "resume-listeners-stopped", "resume-application-restored",
+    "fixture-cleanup-start", "fixture-accounts-removed", "fixture-native-closed", "fixture-files-removed",
+))
+
+
+def subprocess_text(value):
+    """Normalize bounded captured output, including TimeoutExpired's bytes even in text mode; never export it."""
+    if isinstance(value, bytes):
+        return value[-1024 * 1024:].decode("utf-8", errors="replace")
+    return value[-1024 * 1024:] if isinstance(value, str) else ""
+
+
+def partial_checkpoints(error):
+    """Retain only complete closed stage rows from a failed instrument command, never success samples or raw text."""
+    prefix = "INSTRUMENTATION_STATUS: controlled_attachment_json="
+    checkpoints = []
+    for line in subprocess_text(getattr(error, "stdout", None)).splitlines():
+        if not line.startswith(prefix) or len(line) > 256:
+            continue
+        try:
+            row = json.loads(line[len(prefix):])
+        except ValueError:
+            continue
+        if (isinstance(row, dict) and set(row) == {"phase", "stage"} and row["phase"] == "fixture-stage"
+                and isinstance(row["stage"], str) and row["stage"] in CHECKPOINT_STAGES and row not in checkpoints):
+            checkpoints.append(row)
+    return checkpoints
+
 
 def adb_command(adb, serial, *args, timeout=180):
     """Use only the explicit verified device; never fall back to the default device."""
@@ -100,8 +132,8 @@ def failure_diagnostics(error, stage, adb, serial, physical):
     code = getattr(error, "returncode", None)
     if type(code) is int:
         details["adb_returncode"] = code
-    transcript = "\n".join(value for value in (getattr(error, "stdout", None), getattr(error, "stderr", None))
-                           if isinstance(value, str))
+    transcript = "\n".join(subprocess_text(value) for value in
+                           (getattr(error, "stdout", None), getattr(error, "stderr", None)))
     statuses = (("INSTRUMENTATION_RESULT: shortMsg=Process crashed.", "process-crashed"),
                 ("Unable to find instrumentation info", "missing-instrumentation"),
                 ("device offline", "device-offline"),
@@ -324,6 +356,8 @@ def run(adb, serial, root, output, private_debug=False, budget_profile="referenc
     except (subprocess.SubprocessError, OSError, ValueError) as error:
         failure = error
         report["failure_class"] = type(error).__name__
+        if stage in ("instrumentation", "restart-instrumentation"):
+            report["metrics"].extend(partial_checkpoints(error))
         if stage in ("instrumentation", "restart-instrumentation") and not physical:
             report["device_failure_diagnostics"] = device_failure_diagnostics(adb, serial)
         report["failure_diagnostics"] = failure_diagnostics(error, stage, adb, serial, physical)

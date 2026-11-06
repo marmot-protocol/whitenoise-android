@@ -41,6 +41,10 @@
           "represented_by": "Appearance.chat_bubble_colors"
         },
         {
+          "declaration": "\"composer\"",
+          "represented_by": "Appearance.composer"
+        },
+        {
           "declaration": "\"custom_emoji\"",
           "represented_by": "Appearance.custom_emoji"
         },
@@ -65,7 +69,7 @@
           "represented_by": "Appearance.quick_account_switching"
         },
         {
-          "declaration": "mode.preferenceValue",
+          "declaration": "\"theme\"",
           "represented_by": "Appearance.theme"
         }
       ]
@@ -742,6 +746,9 @@
     },
     "Developer": {
       "catalog_id": "home.DeveloperTools"
+    },
+    "Composer": {
+      "catalog_id": "Appearance.composer"
     }
   },
   "exclusions": {

@@ -20,9 +20,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
+// Material's disabled container and content emphasis, so an inactive Send reads grey rather than accented.
+private const val DISABLED_DISC_CONTAINER_ALPHA = 0.12f
+private const val DISABLED_DISC_CONTENT_ALPHA = 0.38f
+
 /**
  * The prototype's send disc: a flat 32dp circle centred in the 40dp trailing slot, with the account's action
- * colours (the AMOLED outline theme paints the surface with an outline instead).
+ * colours (the AMOLED outline theme paints the surface with an outline instead). A disabled disc is grey.
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -42,8 +46,18 @@ internal fun ComposerActionDisc(
             Surface(
                 modifier = Modifier.size(32.dp),
                 shape = CircleShape,
-                color = if (outline == null) containerColor else MaterialTheme.colorScheme.surface,
-                contentColor = if (outline == null) contentColor else MaterialTheme.colorScheme.onSurface,
+                color =
+                    when {
+                        outline != null -> MaterialTheme.colorScheme.surface
+                        enabled -> containerColor
+                        else -> MaterialTheme.colorScheme.onSurface.copy(alpha = DISABLED_DISC_CONTAINER_ALPHA)
+                    },
+                contentColor =
+                    when {
+                        !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = DISABLED_DISC_CONTENT_ALPHA)
+                        outline != null -> MaterialTheme.colorScheme.onSurface
+                        else -> contentColor
+                    },
                 border = outline,
             ) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

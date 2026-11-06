@@ -1,0 +1,37 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPreviewDrag.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "composerPreviewDragModifier",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPreviewDrag.kt",
+        "anchor": "fun composerPreviewDragModifier(",
+        "test_ids": [
+          "CON-041",
+          "CON-042"
+        ]
+      },
+      {
+        "surface": "Modifier.composerPreviewGestures",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPreviewDrag.kt",
+        "anchor": "fun Modifier.composerPreviewGestures(",
+        "test_ids": [
+          "CON-041",
+          "CON-042"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Stable parent preview drag coordinate conversion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerPreviewDrag.kt",
+        "anchor": "state.selectedArea.topLeft + position",
+        "test_ids": [
+          "CON-041"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

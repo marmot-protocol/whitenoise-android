@@ -29,6 +29,7 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.window.DialogProperties
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.whitenoise.android.appModuleSource
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.audio.VoicePlaybackSource
 import dev.ipf.whitenoise.android.audio.tts.FakeSessionEngine
@@ -38,6 +39,7 @@ import dev.ipf.whitenoise.android.audio.tts.TtsSpokenTextSpan
 import dev.ipf.whitenoise.android.audio.tts.TtsState
 import dev.ipf.whitenoise.android.audio.tts.TtsTextRange
 import dev.ipf.whitenoise.android.audio.tts.TtsVisibleTextSpan
+import dev.ipf.whitenoise.android.kotlinBlockFrom
 import dev.ipf.whitenoise.android.state.ConversationLiveSubscriptions
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -66,7 +68,6 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadow.api.Shadow
 import org.robolectric.shadows.ShadowBiometricManager
-import java.io.File
 import java.util.Locale
 
 /** Exercises the real selector and account/lock revocation, rather than only a stateless strip fixture. */
@@ -410,15 +411,22 @@ class PlaybackTransportOwnershipTest {
 
     /** MainShell must retain ordinary outgoing chrome while preserving account and lock privacy gates. */
     @Test fun backDoesNotDeselectTheRetainedConversationPlayer() {
-        val source = File("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt").readText()
-        val slot = source.substringAfter("playbackTransport = {").substringBefore("dictationControlsVisible =")
+        val source = appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt")
+        val callback = source.indexOf("playbackTransport = {")
+        assertTrue("Missing conversation playback callback", callback >= 0)
+        val slot =
+            source.kotlinBlockFrom(
+                openDelimiter = source.indexOf('{', callback),
+                description = "conversation playbackTransport callback",
+            )
+        assertTrue(slot.contains("PlaybackTransportBar("))
         assertTrue(slot.contains("navAccountStable && !appState.appLockScreenVisible"))
         assertFalse(slot.contains("selectedChat"))
     }
 
     /** The real shell wiring must not hoist or collapse the outgoing list player's geometry on a tap. */
     @Test fun chatListPlaybackIsNotDeselectedByPendingOrSelectedConversation() {
-        val source = File("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt").readText()
+        val source = appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/navigation/MainShell.kt")
         val placement = source.substringAfter("val playbackInChatList =").substringBefore("val playbackInShell =")
         assertTrue(placement.contains("section == MainSection.Chats"))
         assertFalse(placement.contains("selectedChat"))

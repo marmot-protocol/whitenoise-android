@@ -191,6 +191,7 @@
     <string name="toast_chat_deleted_local">Sohbet bu cihazdan silindi</string>
     <string name="toast_couldnt_delete_chat">Sohbet silinemedi</string>
     <string name="chat_list_select_all">Tümünü seç</string>
+    <string name="toast_chat_list_select_all_loaded_only">Tüm sohbetler seçilemedi. Yalnızca yüklenen sohbetler seçili.</string>
     <string name="chat_list_deselect_all">Seçimi kaldır</string>
     <plurals name="chat_list_selected_count">
         <item quantity="one">%1$d sohbet seçildi</item>
@@ -2546,6 +2547,10 @@
     <string name="notification_tone_silent">Sessiz</string>
     <string name="notification_tone_off">Kapalı</string>
     <string name="notification_tone_default">Varsayılan</string>
+    <string name="appearance_colors_heading">Tema ve renkler</string>
+    <string name="appearance_text_heading">Metin ve dil</string>
+    <string name="appearance_conversation_heading">Sohbet</string>
+    <string name="appearance_preview_intro">Daha büyük metni ve sağdan sola düzeni deneyin.</string>
     <string name="media_viewer_fit_image">Görseli sığdır</string>
     <string name="media_viewer_zoom_image">Yakınlaştır</string>
     <string name="media_viewer_image_scale">%1$d%% yakınlaştırma</string>

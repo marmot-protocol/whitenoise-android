@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
@@ -16,24 +17,32 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
+import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.ComposerShortcut
+import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -69,6 +78,59 @@ class ComposerCompactResizeTargetsTest {
         // Enter the group with a direction rather than relying on a synthetic spatial-search rectangle.
         composeRule.runOnIdle { composerEntryFocus.requestFocus(FocusDirection.Down) }
         composeRule.onNodeWithContentDescription(context.getString(R.string.open_emoji_picker)).assertIsFocused()
+        composeRule.onNode(hasSetTextAction()).performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        composeRule.onNode(hasSetTextAction()).assertIsFocused()
+    }
+
+    @Test
+    fun downwardEntryReachesAllTrailingActionsLtr() = verifyConfiguredDownEntry(LayoutDirection.Ltr, false)
+
+    @Test
+    fun downwardEntryReachesAllTrailingActionsRtl() = verifyConfiguredDownEntry(LayoutDirection.Rtl, false)
+
+    @Test
+    fun downwardEntrySkipsLeadingVoiceOnlyLtr() = verifyConfiguredDownEntry(LayoutDirection.Ltr, true)
+
+    @Test
+    fun downwardEntrySkipsLeadingVoiceOnlyRtl() = verifyConfiguredDownEntry(LayoutDirection.Rtl, true)
+
+    /** Enters the real configured group from its transcript when only the trailing group can take focus. */
+    private fun verifyConfiguredDownEntry(
+        direction: LayoutDirection,
+        leadingVoice: Boolean,
+    ) {
+        val trailingSideIsRight = direction == LayoutDirection.Ltr
+        val settings =
+            ComposerToolbarSettings(
+                shortcuts =
+                    if (leadingVoice) {
+                        listOf(ComposerShortcut.VoiceNote, ComposerShortcut.Camera)
+                    } else {
+                        listOf(ComposerShortcut.Camera)
+                    },
+                rightShortcuts =
+                    buildSet {
+                        if (trailingSideIsRight) add(ComposerShortcut.Camera)
+                        if (leadingVoice && !trailingSideIsRight) add(ComposerShortcut.VoiceNote)
+                    },
+            )
+        render(onAction = {}, onResize = {}, onDelta = {}, toolbar = settings, direction = direction)
+        if (leadingVoice) {
+            composeRule.onNodeWithTag("composer.shortcut.${ComposerShortcut.VoiceNote.id}").assertIsDisplayed()
+            composeRule
+                .onNodeWithContentDescription(context.getString(R.string.voice_message_record))
+                .assertIsDisplayed()
+                .assertIsNotEnabled()
+        }
+        composeRule.runOnIdle { assertTrue(inputModeManager.requestInputMode(InputMode.Keyboard)) }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag("synthetic-transcript").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        composeRule.onNodeWithTag("synthetic-transcript").assertIsFocused()
+        composeRule.runOnIdle { composerEntryFocus.requestFocus(FocusDirection.Down) }
+        composeRule.onNodeWithContentDescription(context.getString(R.string.attachment_camera)).assertIsFocused()
+        val group = if (leadingVoice) "voice_leading" else "trailing_only"
+        val name = "composer_toolbar_focus_${direction.name.lowercase()}_$group"
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
         composeRule.onNode(hasSetTextAction()).performSemanticsAction(SemanticsActions.RequestFocus) { it() }
         composeRule.onNode(hasSetTextAction()).assertIsFocused()
     }
@@ -120,6 +182,8 @@ class ComposerCompactResizeTargetsTest {
         onAction: () -> Unit,
         onResize: () -> Unit,
         onDelta: (Float) -> Unit,
+        toolbar: ComposerToolbarSettings? = null,
+        direction: LayoutDirection = LayoutDirection.Ltr,
     ) {
         val draft = (1..40).joinToString("\n") { "Synthetic compact line $it" }
         composeRule.setContent {
@@ -135,25 +199,37 @@ class ComposerCompactResizeTargetsTest {
                                 .focusable()
                                 .testTag("synthetic-transcript"),
                         )
-                        ComposerPill(
-                            actionColors = accountActionColors(appState = null),
-                            modifier = Modifier.height(48.dp).focusRequester(composerEntryFocus),
-                            textFieldValue = TextFieldValue(draft, TextRange(draft.length)),
-                            composerFocus = remember { FocusRequester() },
-                            emojiPickerOpen = false,
-                            onValueChange = {},
-                            onEmojiPickerToggle = onAction,
-                            onAttachmentsToggle = onAction,
-                            attachmentSheetOpen = false,
-                            onPickFromGallery = {},
-                            onPickDocument = {},
-                            onDictation = onAction,
-                            expansionMode = ComposerExpansionMode.Manual,
-                            compactMeasurementWidth = 360.dp,
-                            multilineControlsSuppressed = true,
-                            onHeightDragStarted = onResize,
-                            onHeightDrag = onDelta,
-                        )
+                        CompositionLocalProvider(LocalLayoutDirection provides direction) {
+                            ComposerPill(
+                                actionColors = accountActionColors(appState = null),
+                                modifier = Modifier.height(48.dp).focusRequester(composerEntryFocus),
+                                textFieldValue = TextFieldValue(draft, TextRange(draft.length)),
+                                composerFocus = remember { FocusRequester() },
+                                emojiPickerOpen = false,
+                                onValueChange = {},
+                                onEmojiPickerToggle = onAction,
+                                onAttachmentsToggle = onAction,
+                                attachmentSheetOpen = false,
+                                onPickFromGallery = {},
+                                onPickDocument = {},
+                                onDictation = onAction,
+                                expansionMode = ComposerExpansionMode.Manual,
+                                compactMeasurementWidth = 360.dp,
+                                multilineControlsSuppressed = true,
+                                toolbar =
+                                    toolbar?.let {
+                                        ComposerToolbarBindings(
+                                            it,
+                                            it.shortcuts,
+                                            mapOf(ComposerShortcut.Camera to onAction),
+                                            // Show the disabled voice glyph without a recorder overlay.
+                                            voiceLauncherVisible = false,
+                                        )
+                                    },
+                                onHeightDragStarted = onResize,
+                                onHeightDrag = onDelta,
+                            )
+                        }
                     }
                 }
             }

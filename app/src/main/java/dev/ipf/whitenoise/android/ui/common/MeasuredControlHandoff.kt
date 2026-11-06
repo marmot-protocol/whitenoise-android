@@ -58,6 +58,8 @@ internal class MeasuredControlHandoff(
     private var originDecorationAlpha = 0f
     private var boundsStartFraction by mutableStateOf(0f)
     private var request: Any? = null
+    private var prepared = false
+    private var enteringFromLauncher = false
     private var enabled by mutableStateOf(true)
     private var awaitingFrame by mutableStateOf(false)
     private var retirement: ControlMorphRetirement? by mutableStateOf(null)
@@ -97,6 +99,7 @@ internal class MeasuredControlHandoff(
     val destination: Any? get() = previous
     val targetBounds: Rect? get() = previous?.let { live[it]?.second }
     val active: Boolean get() = morphSurface && enabled && start != null
+    val entranceActive: Boolean get() = active && enteringFromLauncher
     val renderedSurface: ControlMorphSurface?
         get() = surfaces[previous] ?: originSurface
     val renderedRadius: Float
@@ -142,11 +145,18 @@ internal class MeasuredControlHandoff(
         destination: Any?,
         allowed: Boolean,
         continueActiveMotion: Boolean = false,
+        entranceOrigin: Rect? = null,
     ): Any {
         val continuesSameOwner = continueActiveMotion && active && previous == destination
         val token = Any()
-        val from = captureOrigin()
+        val continuingEntrance = continuesSameOwner && enteringFromLauncher
+        val measuredOrigin = captureOrigin()
+        val launcher = initialLauncherOrigin(entranceOrigin, measuredOrigin)
+        prepared = true
+        enteringFromLauncher = launcher != null || continuingEntrance
+        val from = measuredOrigin ?: launcher
         val source = previous
+        val canMove = canPrepareMovement(destination, allowed, from, continuesSameOwner, launcher != null)
         originRadius = if (active) renderedRadius else surfaces[source]?.radius ?: 0f
         originDecorationAlpha =
             if (active) renderedDecorationAlpha else surfaces[source]?.decorationAlpha ?: 0f
@@ -157,9 +167,7 @@ internal class MeasuredControlHandoff(
         enabled = allowed
         request = token
         awaitingFrame = true
-        val hasEndpoints = source != null && destination != null
-        val canMove = allowed && (source != destination || continuesSameOwner) && from != null
-        if (!hasEndpoints || !canMove) {
+        if (!canMove) {
             start = null
             end = null
         } else {
@@ -168,6 +176,36 @@ internal class MeasuredControlHandoff(
         }
         return token
     }
+
+    /** A first appearance accepts only a finite current launcher, never a late registration. */
+    private fun initialLauncherOrigin(
+        origin: Rect?,
+        measuredOrigin: Rect?,
+    ): Rect? =
+        origin?.takeIf {
+            !prepared &&
+                measuredOrigin == null &&
+                it.width > 0f &&
+                it.height > 0f &&
+                it.left.isFinite() &&
+                it.top.isFinite() &&
+                it.right.isFinite() &&
+                it.bottom.isFinite()
+        }
+
+    /** Reads the old endpoint before prepare replaces it; exclusions retain direct presentation. */
+    private fun canPrepareMovement(
+        destination: Any?,
+        allowed: Boolean,
+        from: Rect?,
+        continuesSameOwner: Boolean,
+        hasLauncher: Boolean,
+    ): Boolean =
+        destination != null &&
+            (previous != null || hasLauncher) &&
+            allowed &&
+            (previous != destination || continuesSameOwner || hasLauncher) &&
+            from != null
 
     /** New placement supplies the destination; a missing endpoint never waits or revives later. */
     suspend fun animatePrepared(token: Any) {

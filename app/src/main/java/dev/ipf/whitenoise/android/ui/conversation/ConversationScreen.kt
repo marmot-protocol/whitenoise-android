@@ -247,6 +247,7 @@ import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTilesState
 import dev.ipf.whitenoise.android.ui.medialibrary.toConversationViewerPages
 import dev.ipf.whitenoise.android.ui.navigation.conversationRouteBodyMotion
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
+import dev.ipf.whitenoise.android.ui.settings.ComposerSettingsScreen
 import dev.ipf.whitenoise.android.ui.settings.blockOutcomeMessage
 import dev.ipf.whitenoise.android.ui.settings.rememberRouteMotionModifier
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
@@ -559,6 +560,7 @@ internal fun ConversationScreen(
     onSaveScrollSnapshot: (ConversationScrollSnapshot?) -> Unit = {},
     surfaceState: ConversationSurfaceState? = null,
     dictationControlsVisible: Boolean = true,
+    dictationOriginVisible: Boolean = dictationControlsVisible,
     playbackTransport: @Composable () -> Unit = {},
     onStartGroupWithPeer: (RecipientSearch.Candidate) -> Unit = {},
     searchChatsController: ChatsController? = null,
@@ -645,6 +647,9 @@ internal fun ConversationScreen(
     // Keyed on the controller as well as chat.id so the same shared group under
     // another account cannot inherit this account's details route.
     var showDetails by presentationState.showDetails
+    var showComposerSettings by presentationState.showComposerSettings
+    // Either full-screen route replaces the transcript and stops it from owning visibility.
+    val transcriptRoutedAway = showDetails || showComposerSettings
     // Empty newly-created groups should route users into the existing member
     // invite flow instead of carrying a duplicate picker in the create sheet.
     var openAddMemberOnDetails by remember(chat.id) { mutableStateOf(false) }
@@ -742,7 +747,7 @@ internal fun ConversationScreen(
             conversationAccountRef,
             controller.group.groupIdHex,
             translationPreferences,
-            routeActive = !routeTransitionInProgress && !routePresentationFrozen && !showDetails,
+            routeActive = !routeTransitionInProgress && !routePresentationFrozen && !transcriptRoutedAway,
         )
     val freezeRoutePresentation =
         conversationRoutePresentationShouldFreeze(
@@ -903,8 +908,8 @@ internal fun ConversationScreen(
         // account-owned roster or first authoritative page is still withheld; it
         // must keep future notifications eligible until that presentation commits.
         // Details and their nested routes remain non-owning after the reveal too.
-        LaunchedEffect(controller, notificationOpenRequestId, showDetails, transcriptReadyToReveal) {
-            onNotificationTimelineVisibilityChanged(!showDetails && transcriptReadyToReveal)
+        LaunchedEffect(controller, notificationOpenRequestId, transcriptRoutedAway, transcriptReadyToReveal) {
+            onNotificationTimelineVisibilityChanged(!transcriptRoutedAway && transcriptReadyToReveal)
         }
 
         // Timeline publication can precede route settlement and the first visible
@@ -914,7 +919,7 @@ internal fun ConversationScreen(
             controller.hasPublishedAuthoritativeTimeline,
             transcriptReadyToReveal,
             routeTransitionInProgress,
-            showDetails,
+            transcriptRoutedAway,
             renderedTimeline.lastOrNull()?.presentationId,
             controller.inboundVisibleHostGeneration,
         ) {
@@ -923,7 +928,7 @@ internal fun ConversationScreen(
                     timelinePublished = controller.hasPublishedAuthoritativeTimeline,
                     transcriptReadyToReveal = transcriptReadyToReveal,
                     routeTransitionInProgress = routeTransitionInProgress,
-                    showingDetails = showDetails,
+                    showingDetails = transcriptRoutedAway,
                 )
             ) {
                 return@LaunchedEffect
@@ -3238,7 +3243,7 @@ internal fun ConversationScreen(
     composerSendMotion.readViewport = { presentationId ->
         timelineViewport.composerSendProjection(timelinePublication, presentationId)
     }
-    val motionRouteAvailable = !showDetails && !routeTransitionInProgress
+    val motionRouteAvailable = !transcriptRoutedAway && !routeTransitionInProgress
     val motionOwnerCurrent = controller.isCurrentGroupMutationOwner(appState, sendMotionRuntime) && motionRouteAvailable
     val motionTranscriptVisible = !routePresentationFrozen && transcriptReadyToReveal
     val surfaceMotionEnabled = rememberConversationMotionEnabled()
@@ -3633,47 +3638,55 @@ internal fun ConversationScreen(
     key(controller, appState.runtimeGeneration) {
         RestoredForwardRequestHost(appState = appState, controller = controller)
     }
-    val detailsRouteMotion =
+    // One motion owner for the transcript and both full-screen routes, so Back animates the return.
+    val transcriptRouteMotion =
         rememberRouteMotionModifier(
-            target = showDetails,
-            depth = if (showDetails) 1 else 0,
+            target = showDetails to showComposerSettings,
+            depth = if (transcriptRoutedAway) 1 else 0,
             ownerKey = controller to appState.runtimeGeneration,
             animationsEnabled = surfaceMotionEnabled,
             suppressMotion = routeTransitionInProgress || routePresentationFrozen,
         )
-    if (showDetails) {
-        /** Shows group details in place of the transcript while they are open. */
-        @Composable
-        fun groupDetailsRoute() {
-            GroupDetailsScreen(
-                appState = appState,
-                controller = controller,
-                onBack = {
-                    showDetails = false
-                    openAddMemberOnDetails = false
-                },
-                onLeft = exitConversation,
-                onJumpToMessage = { messageId ->
-                    showDetails = false
-                    scrollToSearchMatch(messageId)
-                },
-                autoOpenAddMember = openAddMemberOnDetails,
-                onAutoOpenAddMemberConsumed = { openAddMemberOnDetails = false },
-                onOpenSearch = {
-                    showDetails = false
-                    presentationState.searchState.value =
-                        conversationSearchPreset(
-                            conversationAccountRef,
-                            appState.runtimeGeneration,
-                            chat.id,
-                            controller.title(groupTitleCopy),
-                        )
-                    navigationState.searchOpen = true
-                },
-                onStartGroupWithPeer = onStartGroupWithPeer,
-            )
+    if (transcriptRoutedAway) {
+        if (showDetails) {
+            /** Shows group details in place of the transcript while they are open. */
+            @Composable
+            fun groupDetailsRoute() {
+                GroupDetailsScreen(
+                    appState = appState,
+                    controller = controller,
+                    onBack = {
+                        showDetails = false
+                        openAddMemberOnDetails = false
+                    },
+                    onLeft = exitConversation,
+                    onJumpToMessage = { messageId ->
+                        showDetails = false
+                        scrollToSearchMatch(messageId)
+                    },
+                    autoOpenAddMember = openAddMemberOnDetails,
+                    onAutoOpenAddMemberConsumed = { openAddMemberOnDetails = false },
+                    onOpenSearch = {
+                        showDetails = false
+                        presentationState.searchState.value =
+                            conversationSearchPreset(
+                                conversationAccountRef,
+                                appState.runtimeGeneration,
+                                chat.id,
+                                controller.title(groupTitleCopy),
+                            )
+                        navigationState.searchOpen = true
+                    },
+                    onStartGroupWithPeer = onStartGroupWithPeer,
+                )
+            }
+            Box(Modifier.fillMaxSize().then(transcriptRouteMotion)) { groupDetailsRoute() }
+        } else {
+            // The same full-screen editor as Settings; Back returns to this conversation.
+            Box(Modifier.fillMaxSize().then(transcriptRouteMotion)) {
+                ComposerSettingsScreen(appState) { showComposerSettings = false }
+            }
         }
-        Box(Modifier.fillMaxSize().then(detailsRouteMotion)) { groupDetailsRoute() }
         return
     }
 
@@ -3913,7 +3926,7 @@ internal fun ConversationScreen(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .then(detailsRouteMotion)
+                    .then(transcriptRouteMotion)
                     .blur(if (openActionMenuId != null) 24.dp else 0.dp)
                     .dismissTextSelectionOnOutsideTap(
                         active = textSelectionMessageId != null,
@@ -4011,8 +4024,10 @@ internal fun ConversationScreen(
             },
             bottomBar = {
                 ConversationBottomBar(
+                    onCustomizeComposer = { showComposerSettings = true },
                     compactHeight = compactHeightConversation,
                     dictationControlsVisible = dictationControlsVisible,
+                    dictationOriginVisible = dictationOriginVisible,
                     selectionMode = selectionMode,
                     selectionActionAvailability =
                         batchSelectionUi.actionAvailability.let { availability ->

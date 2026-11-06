@@ -1,9 +1,10 @@
 package dev.ipf.whitenoise.android.ui.conversation
 
+import dev.ipf.whitenoise.android.appModuleSource
+import dev.ipf.whitenoise.android.functionBody
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
 
 class AgentOperationRowPolicyTest {
     @Test
@@ -52,17 +53,9 @@ class AgentOperationRowPolicyTest {
 
     @Test
     fun deleteDialogUsesOneGuardForBothMutationPaths() {
-        val sourceText =
-            listOf(
-                File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/AgentOperationRow.kt"),
-                File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AgentOperationRow.kt"),
-            ).firstOrNull { it.exists() }
-                ?.readText()
-                ?: error("Missing source: AgentOperationRow.kt")
         val source =
-            sourceText
-                .substringAfter("private fun AgentOperationDeleteDialog(")
-                .substringBefore("internal fun AgentOperationRow(")
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/conversation/AgentOperationRow.kt")
+                .functionBody("AgentOperationDeleteDialog")
 
         assertTrue(
             "dialog must expose one busy state",

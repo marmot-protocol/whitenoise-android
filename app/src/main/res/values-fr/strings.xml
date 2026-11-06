@@ -191,6 +191,7 @@
     <string name="toast_chat_deleted_local">Discussion supprimée de cet appareil</string>
     <string name="toast_couldnt_delete_chat">Impossible de supprimer la discussion</string>
     <string name="chat_list_select_all">Tout sélectionner</string>
+    <string name="toast_chat_list_select_all_loaded_only">Impossible de sélectionner toutes les discussions. Seules les discussions chargées sont sélectionnées.</string>
     <string name="chat_list_deselect_all">Tout désélectionner</string>
     <plurals name="chat_list_selected_count">
         <item quantity="one">%1$d discussion sélectionnée</item>
@@ -2551,6 +2552,10 @@
     <string name="notification_tone_silent">Silencieux</string>
     <string name="notification_tone_off">Désactivé</string>
     <string name="notification_tone_default">Par défaut</string>
+    <string name="appearance_colors_heading">Thème et couleurs</string>
+    <string name="appearance_text_heading">Texte et langue</string>
+    <string name="appearance_conversation_heading">Dans les conversations</string>
+    <string name="appearance_preview_intro">Essayez un texte plus grand et une disposition de droite à gauche.</string>
     <string name="media_viewer_fit_image">Adapter l’image à l’écran</string>
     <string name="media_viewer_zoom_image">Agrandir</string>
     <string name="media_viewer_image_scale">Zoom : %1$d%%</string>

@@ -10,6 +10,8 @@ name: preferences-dark
       text: "Appearance"
     direction: DOWN
 - tapOn: "Appearance"
+- tapOn:
+    id: "appearance.theme.group"
 - tapOn: "Dark"
 - back
 - tapOn: "Appearance"

@@ -13,6 +13,24 @@ name: settings-appearance
 - tapOn: "Appearance"
 - assertVisible:
     id: "appearance.theme.group"
+- scrollUntilVisible:
+    element:
+      text: "Composer"
+    direction: DOWN
+- tapOn: "Composer"
+- assertVisible:
+    id: "composer.customize"
+- assertNotVisible: "Done"
+- assertNotVisible: "Cancel"
+- back
+- assertNotVisible:
+    id: "composer.customize"
+- scrollUntilVisible:
+    element:
+      id: "appearance.theme.group"
+    direction: UP
+- assertVisible:
+    id: "appearance.theme.group"
 - tapOn: "Back"
 - assertVisible: "Settings"
 - tapOn: "Back"

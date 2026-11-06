@@ -4648,6 +4648,45 @@ class ChatsController private constructor(
         return eligibleOwner && eligibleSession
     }
 
+    /**
+     * The complete native membership of [view] for select all (#2925), or null when this owner is stale.
+     * MDK throws ChatPresentationNotReady rather than returning a partial list; callers retry.
+     */
+    internal suspend fun completeChatListIds(
+        view: ChatListViewFfi,
+        owner: ChatListActionOwner,
+    ): List<String>? {
+        val read = liveSubscriptions.chatListIds?.takeIf { chatListActionIsCurrent(owner) } ?: return null
+        val ids = read(owner.accountRef, view)
+        return ids.takeIf { chatListActionIsCurrent(owner) }
+    }
+
+    /**
+     * Drops captured IDs that left [view]; keeps caller order and never adds chats (#2925). Departed groups
+     * render inside Chats and Archived but MDK places them in LEFT, so a loaded departed row that was
+     * selected stays selected while it is still departed.
+     */
+    internal suspend fun revalidateCompleteChatListIds(
+        view: ChatListViewFfi,
+        groupIds: List<String>,
+        owner: ChatListActionOwner,
+    ): List<String>? {
+        val revalidate = liveSubscriptions.revalidateChatListIds?.takeIf { chatListActionSessionIsCurrent(owner) }
+        return when {
+            groupIds.isEmpty() -> emptyList()
+            revalidate == null -> null
+            else -> {
+                val kept = revalidate(owner.accountRef, view, groupIds).mapTo(hashSetOf()) { it.lowercase(Locale.ROOT) }
+                val outside = groupIds.filter { it.lowercase(Locale.ROOT) !in kept }
+                if (outside.isNotEmpty()) {
+                    revalidate(owner.accountRef, ChatListViewFfi.LEFT, outside)
+                        .mapTo(kept) { it.lowercase(Locale.ROOT) }
+                }
+                groupIds.filter { it.lowercase(Locale.ROOT) in kept }.takeIf { chatListActionSessionIsCurrent(owner) }
+            }
+        }
+    }
+
     /** Resolves a displayed full-list row without materializing it into the bounded controller window. */
     internal suspend fun resolveChatListActionItem(
         groupIdHex: String,

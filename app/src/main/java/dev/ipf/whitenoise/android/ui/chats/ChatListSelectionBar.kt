@@ -93,6 +93,8 @@ internal fun ChatListSelectionControls(
     onAlternateArchive: (() -> Unit)? = null,
     onExcludeFromFolder: (() -> Unit)? = null,
     onDeleteLocal: (() -> Unit)? = null,
+    showDelete: Boolean = true,
+    showAddToFolder: Boolean = true,
 ) {
     var active by remember { mutableStateOf(true) }
     DisposableEffect(Unit) { onDispose { active = false } }
@@ -147,12 +149,14 @@ internal fun ChatListSelectionControls(
             enabled = actionsEnabled,
             onClick = { perform(onArchive) },
         )
-        DirectSelectionAction(
-            label = stringResource(R.string.chat_list_action_add_to_folder),
-            icon = R.drawable.ic_folder_add,
-            enabled = actionsEnabled,
-            onClick = { perform(onAddToFolder) },
-        )
+        if (showAddToFolder) {
+            DirectSelectionAction(
+                label = stringResource(R.string.chat_list_action_add_to_folder),
+                icon = R.drawable.ic_folder_add,
+                enabled = actionsEnabled,
+                onClick = { perform(onAddToFolder) },
+            )
+        }
         if (showMarkRead) {
             DirectSelectionAction(
                 stringResource(R.string.chat_row_action_mark_read),
@@ -252,18 +256,20 @@ internal fun ChatListSelectionControls(
                 onClick = { perform(deleteLocal) },
             )
         }
-        DirectSelectionAction(
-            label = deleteLabel,
-            icon =
-                if (deleteLabel == stringResource(R.string.leave_and_delete)) {
-                    R.drawable.ic_logout
-                } else {
-                    R.drawable.ic_delete
-                },
-            enabled = actionsEnabled,
-            destructive = true,
-            onClick = { perform(onDelete) },
-        )
+        if (showDelete) {
+            DirectSelectionAction(
+                label = deleteLabel,
+                icon =
+                    if (deleteLabel == stringResource(R.string.leave_and_delete)) {
+                        R.drawable.ic_logout
+                    } else {
+                        R.drawable.ic_delete
+                    },
+                enabled = actionsEnabled,
+                destructive = true,
+                onClick = { perform(onDelete) },
+            )
+        }
         abandonLabel?.let { label ->
             DirectSelectionAction(
                 label = label,

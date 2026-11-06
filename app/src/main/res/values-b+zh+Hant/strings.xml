@@ -187,6 +187,7 @@
     <string name="toast_chat_deleted_local">已從此裝置刪除聊天</string>
     <string name="toast_couldnt_delete_chat">無法刪除聊天</string>
     <string name="chat_list_select_all">全選</string>
+    <string name="toast_chat_list_select_all_loaded_only">無法選取所有聊天。僅選取了已載入的聊天。</string>
     <string name="chat_list_deselect_all">取消全選</string>
     <plurals name="chat_list_selected_count">
         <item quantity="other">已選擇 %1$d 個聊天</item>
@@ -2511,6 +2512,10 @@
     <string name="notification_tone_silent">靜音</string>
     <string name="notification_tone_off">關閉</string>
     <string name="notification_tone_default">預設</string>
+    <string name="appearance_colors_heading">主題與顏色</string>
+    <string name="appearance_text_heading">文字與語言</string>
+    <string name="appearance_conversation_heading">聊天</string>
+    <string name="appearance_preview_intro">試用大字體和由右至左的版面。</string>
     <string name="media_viewer_toggle_controls">顯示或隱藏控制項</string>
     <string name="media_viewer_zoom_image">放大</string>
     <string name="media_viewer_zoom_out">縮小</string>

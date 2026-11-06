@@ -118,16 +118,7 @@ class EmojiPickerRecentsBehaviorTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).performTextInput("happy")
         composeRule.waitForIdle()
-        var found = false
-        repeat(100) {
-            if (found) return@repeat
-            composeRule.waitForIdle()
-            runCatching {
-                composeRule.onNodeWithText("😀").assertIsDisplayed()
-                found = true
-            }
-            if (!found) Thread.sleep(20)
-        }
+        composeRule.waitUntil(5_000) { isDisplayed("😀") }
         composeRule.onNodeWithText("😀").performClick()
         composeRule.waitForIdle()
 
@@ -281,14 +272,13 @@ class EmojiPickerRecentsBehaviorTest {
 
     /** Waits until the browse grid is composed. */
     private fun waitForBrowseGrid() {
-        repeat(100) {
-            composeRule.waitForIdle()
-            runCatching {
-                composeRule.onNodeWithText(string(R.string.emoji_category_smileys_people)).assertIsDisplayed()
-                composeRule.onNodeWithText("😀").assertIsDisplayed()
-            }.onSuccess { return }
-            Thread.sleep(20)
+        composeRule.waitUntil(5_000) {
+            isDisplayed(string(R.string.emoji_category_smileys_people)) && isDisplayed("😀")
         }
-        error("Emoji browse grid did not load")
+    }
+
+    private fun isDisplayed(text: String): Boolean {
+        val node = composeRule.onNodeWithText(text)
+        return runCatching { node.assertIsDisplayed() }.isSuccess
     }
 }

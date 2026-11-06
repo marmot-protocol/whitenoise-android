@@ -81,9 +81,13 @@ class ConversationDictationPersistentControlTest {
             listOf("Cancel", transcriptPasteLabel, "Send").map { label ->
                 composeRule.onNodeWithContentDescription(label).assertIsDisplayed()
             }
+        val centers = actions.map { it.getUnclippedBoundsInRoot().let { bounds -> (bounds.left + bounds.right) / 2 } }
+        centers.zipWithNext().forEach { (first, second) -> assertEquals(36.dp, second - first) }
         actions.forEach { action ->
+            val touch = action.fetchSemanticsNode().touchBoundsInRoot
+            assertTrue("nominal touch width", touch.width >= with(composeRule.density) { 48.dp.toPx() })
             val bounds = action.getUnclippedBoundsInRoot()
-            assertTrue(bounds.right - bounds.left >= 48.dp)
+            assertTrue(bounds.right - bounds.left >= 36.dp)
             assertTrue(bounds.bottom - bounds.top >= 48.dp)
         }
         composeRule.onNodeWithContentDescription("Record voice message").assertDoesNotExist()
@@ -147,6 +151,8 @@ class ConversationDictationPersistentControlTest {
         val fixture = fixture(TextFieldValue("Draft", TextRange(5)))
         fixture.controller.requestStart(ACCOUNT, GROUP, fixture.draft)
         render(fixture, darkTheme = true, amoled = true)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_listening_floating_spacing.png")
+        assertFloatingControlsHaveHorizontalInset()
         composeRule.onNodeWithContentDescription("Send").performClick()
         composeRule.onNodeWithContentDescription(transcriptPasteLabel).assertIsEnabled()
         composeRule
@@ -155,6 +161,7 @@ class ConversationDictationPersistentControlTest {
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
         assertProcessingActionsAccessible("Send")
         composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_processing_send_editable.png")
+        assertFloatingControlsHaveHorizontalInset()
         composeRule.onNodeWithContentDescription(transcriptPasteLabel).performClick()
         composeRule.onNodeWithContentDescription("Send").assertIsEnabled()
         composeRule
@@ -163,6 +170,7 @@ class ConversationDictationPersistentControlTest {
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
         assertProcessingActionsAccessible(transcriptPasteLabel)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_processing_paste_editable.png")
+        assertFloatingControlsHaveHorizontalInset()
     }
 
     /** Plain dark keeps the selected Send processing state and both choices readable. */
@@ -180,6 +188,7 @@ class ConversationDictationPersistentControlTest {
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, true))
         assertProcessingActionsAccessible("Send")
         composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_processing_send_editable_dark.png")
+        assertFloatingControlsHaveHorizontalInset()
     }
 
     /** Pending processing advertises its selected action while both choices stay usable. */
@@ -199,6 +208,7 @@ class ConversationDictationPersistentControlTest {
         composeRule
             .onRoot()
             .captureRoboImage("src/test/snapshots/dictation_processing_send_editable_light_large_rtl.png")
+        assertFloatingControlsHaveHorizontalInset()
         composeRule.onNodeWithContentDescription(transcriptPasteLabel).performClick()
         composeRule.onNodeWithContentDescription("Send").assertIsEnabled()
         composeRule
@@ -209,6 +219,7 @@ class ConversationDictationPersistentControlTest {
         composeRule
             .onRoot()
             .captureRoboImage("src/test/snapshots/dictation_processing_paste_editable_light_large_rtl.png")
+        assertFloatingControlsHaveHorizontalInset()
     }
 
     /** A draft conflict is resolved automatically and never exposes a second edit action. */
@@ -372,7 +383,7 @@ class ConversationDictationPersistentControlTest {
                 .assertIsDisplayed()
                 .getUnclippedBoundsInRoot()
         assertTrue(cancel.left >= root.left && cancel.right <= root.right)
-        assertTrue(cancel.right - cancel.left >= 48.dp)
+        assertTrue(cancel.right - cancel.left >= 36.dp)
     }
 
     /** Verifies the recovery and dismiss actions stay visible and touch-accessible in compact RTL. */
@@ -388,7 +399,7 @@ class ConversationDictationPersistentControlTest {
             val action = composeRule.onNodeWithContentDescription(label).assertIsDisplayed().getUnclippedBoundsInRoot()
             assertTrue(action.left >= root.left && action.right <= root.right)
             assertTrue(action.top >= root.top && action.bottom <= root.bottom)
-            assertTrue(action.right - action.left >= 48.dp)
+            assertTrue(action.right - action.left >= 36.dp)
             assertTrue(action.bottom - action.top >= 48.dp)
         }
     }
@@ -524,7 +535,7 @@ class ConversationDictationPersistentControlTest {
         )
         listOf("Retry", "Dismiss").forEach { label ->
             val bounds = composeRule.onNodeWithContentDescription(label).assertIsDisplayed().getUnclippedBoundsInRoot()
-            assertTrue(bounds.right - bounds.left >= 48.dp)
+            assertTrue(bounds.right - bounds.left >= 36.dp)
             assertTrue(bounds.bottom - bounds.top >= 48.dp)
         }
     }
@@ -687,7 +698,29 @@ class ConversationDictationPersistentControlTest {
     }
 }
 
-/** Each completion choice is one labelled 48dp action; progress belongs to that action. */
+/** Floating chrome reserves breathing room without shrinking expanded touch targets. */
+private fun ConversationDictationPersistentControlTest.assertFloatingControlsHaveHorizontalInset() {
+    val capsule = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).getUnclippedBoundsInRoot()
+    val compact = composeRule.onNodeWithTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG).getUnclippedBoundsInRoot()
+    val labels = listOf("Cancel", transcriptPasteLabel, "Send")
+    val controls = labels.associateWith { composeRule.onNodeWithContentDescription(it).getUnclippedBoundsInRoot() }
+    val touches =
+        labels.associateWith { composeRule.onNodeWithContentDescription(it).fetchSemanticsNode().touchBoundsInRoot }
+    val details = "capsule=$capsule compact=$compact controls=$controls touch=$touches"
+    assertTrue(details, compact.left >= capsule.left + 8.dp && compact.right <= capsule.right - 8.dp)
+    controls.values.forEach { bounds ->
+        assertTrue(details, bounds.left >= capsule.left && bounds.right <= capsule.right)
+        assertTrue(details, bounds.top >= capsule.top && bounds.bottom <= capsule.bottom)
+    }
+    touches.values.forEach { bounds ->
+        with(composeRule.density) {
+            assertTrue(details, bounds.width >= 48.dp.toPx() && bounds.height >= 48.dp.toPx())
+            assertTrue(details, bounds.left >= capsule.left.toPx() && bounds.right <= capsule.right.toPx())
+        }
+    }
+}
+
+/** Each completion choice is one compact labelled action; progress belongs to that action. */
 private fun ConversationDictationPersistentControlTest.assertProcessingActionsAccessible(selectedLabel: String) {
     listOf("Send", transcriptPasteLabel).forEach { label ->
         composeRule.onAllNodesWithContentDescription(label).assertCountEquals(1)
@@ -695,7 +728,7 @@ private fun ConversationDictationPersistentControlTest.assertProcessingActionsAc
         action.assertIsEnabled().assertHasClickAction()
         action.assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, label == selectedLabel))
         val bounds = action.getUnclippedBoundsInRoot()
-        assertTrue(bounds.right - bounds.left >= 48.dp)
+        assertTrue(bounds.right - bounds.left >= 36.dp)
         assertTrue(bounds.bottom - bounds.top >= 48.dp)
     }
     composeRule.onNodeWithContentDescription(selectedLabel).assert(

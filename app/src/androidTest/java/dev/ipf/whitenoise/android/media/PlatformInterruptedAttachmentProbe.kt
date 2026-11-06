@@ -172,14 +172,17 @@ internal object PlatformInterruptedAttachmentProbe {
                 step = "resumed-completion"
                 assertNull("resumed partial ciphertext cannot be published", state.openNativeAttachment(request))
                 HeldAttachmentCancellationProbe.control(port, "/__release-acquisition")
+                ControlledAttachmentProbe.checkpoint("resume-body-released")
                 withTimeout(20_000L) {
                     while (states.none { it.id == firstRun.id && it.state == WorkInfo.State.SUCCEEDED }) delay(25L)
                 }
+                ControlledAttachmentProbe.checkpoint("resume-work-succeeded")
                 assertFalse(store.isInteractive(request))
                 assertEquals(Lifecycle.State.CREATED, scenario.state)
                 state.openNativeAttachment(request).use { source ->
                     assertArrayEquals(bytes, requireNotNull(source).toByteArray())
                 }
+                ControlledAttachmentProbe.checkpoint("resume-plaintext-checked")
                 val events =
                     HeldAttachmentCancellationProbe.awaitLedger(port) { e ->
                         e.any { it.getString("kind") == "complete" }
@@ -207,19 +210,28 @@ internal object PlatformInterruptedAttachmentProbe {
                         .put("native_resume_states", nativeResumeDiagnostics(nativeStates))
                         .put("android_process_restart_qualified", false),
                 )
+                ControlledAttachmentProbe.checkpoint("resume-sample-written")
             }
+            ControlledAttachmentProbe.checkpoint("resume-scenario-closed")
         } catch (failure: Throwable) {
+            ControlledAttachmentProbe.checkpoint("resume-failure-entry")
             reportFailure(step, failure, observations, port, stoppedAt)
             throw failure
         } finally {
             withContext(NonCancellable) {
+                ControlledAttachmentProbe.checkpoint("resume-cleanup-start")
                 observer.cancelAndJoin()
+                ControlledAttachmentProbe.checkpoint("resume-work-observer-joined")
                 nativeObserver?.cancelAndJoin()
+                ControlledAttachmentProbe.checkpoint("resume-native-observer-joined")
                 try {
                     manager.cancelUniqueWork(workName).result.get()
+                    ControlledAttachmentProbe.checkpoint("resume-work-cancelled")
                     state.stopNotificationListenerForAccountTeardown()
+                    ControlledAttachmentProbe.checkpoint("resume-listeners-stopped")
                 } finally {
                     restoreApplication()
+                    ControlledAttachmentProbe.checkpoint("resume-application-restored")
                 }
             }
         }

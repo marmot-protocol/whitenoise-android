@@ -2,7 +2,6 @@ package dev.ipf.whitenoise.android.ui.settings
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -74,16 +73,33 @@ internal fun AppearanceScreen(
     onOpenChatBubbleColors: () -> Unit,
     onOpenLanguage: () -> Unit,
     onOpenCustomEmoji: () -> Unit,
+    onOpenComposer: () -> Unit = {},
 ) {
+    var themeOpen by rememberSaveable { mutableStateOf(false) }
     var fontFamilyOpen by rememberSaveable { mutableStateOf(false) }
     var fontSizeOpen by rememberSaveable { mutableStateOf(false) }
     var enterOpen by rememberSaveable { mutableStateOf(false) }
     val previewState = remember(appState.activeAccountRef, appState.runtimeGeneration) { AppearancePreviewState() }
+    val familyThemeLabels = AppThemeMode.entries.associateWith { stringResource(it.labelRes) }
     val familyLabels = AppFont.entries.associateWith { it.pickerLabel() }
     val fontLabels = AppFontScale.entries.associateWith { stringResource(it.labelRes) }
     val enterLabels = EnterKeyBehavior.entries.associateWith { stringResource(it.labelRes) }
     val amoled = appState.themeMode == AppThemeMode.Amoled
     val language = languageOptions.firstOrNull { it.tag == appState.languageTag } ?: languageOptions.first()
+    if (themeOpen) {
+        ChoiceDialog(
+            title = stringResource(R.string.appearance_theme),
+            values = AppThemeMode.entries,
+            selected = appState.themeMode,
+            label = { mode -> familyThemeLabels.getValue(mode) },
+            supportingText = stringResource(R.string.appearance_theme_help),
+            onDismiss = { themeOpen = false },
+            onSelect = {
+                appState.updateThemeMode(it)
+                themeOpen = false
+            },
+        )
+    }
     if (fontFamilyOpen) {
         val sampleTheme = BubbleTheme.resolve(appState.themeMode, isSystemInDarkTheme())
         FontFamilyDialog(
@@ -127,45 +143,19 @@ internal fun AppearanceScreen(
     }
     SettingsScaffold(title = stringResource(R.string.appearance), onBack = onBack) {
         SettingsList {
-            item(key = "search.Appearance.1") {
-                SettingsGroup(modifier = Modifier.testTag("appearance.quick_account_switching")) {
-                    row("quick_account_switching") { context ->
-                        SettingsSwitch(
+            item(key = "search.Appearance.1") { SettingsSection(stringResource(R.string.appearance_colors_heading)) }
+            item(key = "search.Appearance.2") {
+                SettingsGroup(modifier = Modifier.testTag("appearance.colors.group")) {
+                    row("theme") { context ->
+                        SettingsLink(
                             context = context,
-                            title = stringResource(R.string.quick_account_switching),
-                            checked = appState.quickAccountSwitching,
-                            subtitle = stringResource(R.string.quick_account_switching_detail),
-                            onCheckedChange = appState::updateQuickAccountSwitching,
+                            title = stringResource(R.string.appearance_theme),
+                            value = familyThemeLabels.getValue(appState.themeMode),
+                            subtitle = if (amoled) stringResource(R.string.appearance_amoled_detail) else null,
+                            modifier = Modifier.testTag("appearance.theme.group"),
+                            onClick = { themeOpen = true },
                         )
                     }
-                }
-            }
-            item(key = "search.Appearance.2") { SettingsSection(stringResource(R.string.appearance_theme)) }
-            item(key = "search.Appearance.3") {
-                SettingsGroup(modifier = Modifier.selectableGroup().testTag("appearance.theme.group")) {
-                    AppThemeMode.entries.forEach { mode ->
-                        row(mode.preferenceValue) { context ->
-                            SettingsChoice(
-                                context = context,
-                                title = stringResource(mode.labelRes),
-                                selected = appState.themeMode == mode,
-                                subtitle =
-                                    if (mode == AppThemeMode.Amoled) {
-                                        stringResource(R.string.appearance_amoled_detail)
-                                    } else {
-                                        null
-                                    },
-                                highlightSelected = false,
-                                onClick = { appState.updateThemeMode(mode) },
-                            )
-                        }
-                    }
-                }
-            }
-            item(key = "search.Appearance.4") { SettingsExplainer(stringResource(R.string.appearance_theme_help)) }
-            item(key = "search.Appearance.5") {
-                SettingsGroup(modifier = Modifier.testTag("appearance.colors.group")) {
-                    // AMOLED keeps white action buttons, while bubble outlines remain customizable.
                     if (!amoled) {
                         row("action_color") { context ->
                             SettingsLink(
@@ -184,7 +174,8 @@ internal fun AppearanceScreen(
                     }
                 }
             }
-            item(key = "search.Appearance.6") {
+            item(key = "search.Appearance.3") { SettingsSection(stringResource(R.string.appearance_text_heading)) }
+            item(key = "search.Appearance.4") {
                 SettingsGroup {
                     row("font_family") { context ->
                         SettingsLink(
@@ -202,6 +193,30 @@ internal fun AppearanceScreen(
                             onClick = { fontSizeOpen = true },
                         )
                     }
+                    row("language") { context ->
+                        SettingsLink(
+                            context = context,
+                            title = stringResource(R.string.language),
+                            value = stringResource(language.labelRes),
+                            modifier = Modifier.testTag("appearance.language.group"),
+                            onClick = onOpenLanguage,
+                        )
+                    }
+                }
+            }
+            item(key = "search.Appearance.5") {
+                SettingsSection(stringResource(R.string.appearance_conversation_heading))
+            }
+            item(key = "search.Appearance.6") {
+                SettingsGroup {
+                    row("composer") { context ->
+                        SettingsLink(
+                            context = context,
+                            title = stringResource(R.string.composer_settings),
+                            subtitle = stringResource(R.string.composer_settings_detail),
+                            onClick = onOpenComposer,
+                        )
+                    }
                     row("enter_behavior") { context ->
                         SettingsLink(
                             context = context,
@@ -210,32 +225,27 @@ internal fun AppearanceScreen(
                             onClick = { enterOpen = true },
                         )
                     }
-                }
-            }
-            item(key = "search.Appearance.7") {
-                SettingsGroup(modifier = Modifier.testTag("appearance.custom_emoji.group")) {
                     row("custom_emoji") { context ->
                         SettingsLink(
                             context = context,
                             title = stringResource(R.string.custom_emoji),
+                            modifier = Modifier.testTag("appearance.custom_emoji.group"),
                             onClick = onOpenCustomEmoji,
                         )
                     }
-                }
-            }
-            item(key = "search.Appearance.8") {
-                SettingsGroup(modifier = Modifier.testTag("appearance.language.group")) {
-                    row("language") { context ->
-                        SettingsLink(
+                    row("quick_account_switching") { context ->
+                        SettingsSwitch(
                             context = context,
-                            title = stringResource(R.string.language),
-                            value = stringResource(language.labelRes),
-                            onClick = onOpenLanguage,
+                            title = stringResource(R.string.quick_account_switching),
+                            checked = appState.quickAccountSwitching,
+                            subtitle = stringResource(R.string.quick_account_switching_detail),
+                            modifier = Modifier.testTag("appearance.quick_account_switching"),
+                            onCheckedChange = appState::updateQuickAccountSwitching,
                         )
                     }
                 }
             }
-            item(key = "search.Appearance.9") {
+            item(key = "search.Appearance.7") {
                 val previewTheme = BubbleTheme.resolve(appState.themeMode, isSystemInDarkTheme())
                 AppearanceAccessibilitySample(
                     state = previewState,
