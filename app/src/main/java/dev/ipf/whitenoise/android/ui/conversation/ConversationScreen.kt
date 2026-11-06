@@ -4851,15 +4851,7 @@ internal fun ConversationScreen(
                                     )
                                 }
                                 if (transcriptReadyToReveal) {
-                                    Column(
-                                        modifier =
-                                            Modifier
-                                                .align(Alignment.BottomEnd)
-                                                .padding(bottom = overlayPadding)
-                                                .padding(12.dp),
-                                        horizontalAlignment = Alignment.End,
-                                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    ) {
+                                    ConversationNavigationStack(composerOverlap = overlayPadding) {
                                         // Selection hides these controls; paging progress never covers message rows.
                                         if (!selectionMode && ttsFollowHandle.showResumeAction) {
                                             TtsResumeFollowButton(

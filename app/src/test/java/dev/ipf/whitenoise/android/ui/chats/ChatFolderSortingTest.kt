@@ -19,26 +19,30 @@ class ChatFolderSortingTest {
         assertEquals(listOf("a", "z"), tied.map { it.id })
     }
 
-    @Test fun unreadSortPreservesPendingPinsAndRecencyWithinEachPartition() {
-        val invitation = item("invite", pending = true)
-        val pin0 = item("pin0", pinned = true)
-        val pin1 = item("pin1", pinned = true)
+    /** Verifies Unread and Name keep the pinned prefix, then invites, over the native base order. */
+    @Test fun unreadSortPreservesPinsPendingAndRecencyWithinEachPartition() {
+        // The folder sort receives the base chat-list order, so build the
+        // fixture through it — an invite arriving must not reach the top here.
         val rows =
-            listOf(
-                invitation,
-                pin0,
-                pin1,
-                item("read-draft"),
-                item("unread-new", unread = true),
-                item("read-old"),
-                item("unread-old", unread = true),
+            sortChatListItems(
+                listOf(
+                    item("invite", pending = true),
+                    item("read-draft"),
+                    item("pin1", pinned = true, pinnedPosition = 1u),
+                    item("unread-new", unread = true),
+                    item("pin0", pinned = true, pinnedPosition = 0u),
+                    item("read-old"),
+                    item("unread-old", unread = true),
+                ),
             )
         assertEquals(
-            listOf("invite", "pin0", "pin1", "unread-new", "unread-old", "read-draft", "read-old"),
+            listOf("pin0", "pin1", "invite", "unread-new", "unread-old", "read-draft", "read-old"),
             sortFolderChats(rows, ChatFolderSort.UNREAD, null) { it.id }.map { it.id },
         )
         val named = sortFolderChats(rows, ChatFolderSort.NAME, null) { it.id }
-        assertEquals(listOf("invite", "pin0", "pin1"), named.take(3).map { it.id })
+        assertEquals(listOf("pin0", "pin1", "invite"), named.take(3).map { it.id })
+        val recent = sortFolderChats(rows, ChatFolderSort.RECENT, null) { it.id }
+        assertEquals(listOf("pin0", "pin1", "invite"), recent.take(3).map { it.id })
     }
 
     @Test fun recentReturnsTheExistingDraftAwareOrderAndUnreadKeepsItWithinPartitions() {
@@ -47,11 +51,13 @@ class ChatFolderSortingTest {
         assertEquals(rows, sortFolderChats(rows, ChatFolderSort.UNREAD, null) { it.id })
     }
 
+    /** A chat row fixture with the unread, pinned, pending and manual pin position states the sort reads. */
     private fun item(
         id: String,
         unread: Boolean = false,
         pinned: Boolean = false,
         pending: Boolean = false,
+        pinnedPosition: UInt? = null,
     ): ChatListItem {
         val base = ChatRowPortFixtures.item()
         return base.copy(
@@ -62,6 +68,7 @@ class ChatFolderSortingTest {
                     hasUnread = unread,
                     unreadCount = if (unread) 1uL else 0uL,
                     pinned = pinned,
+                    pinnedPosition = pinnedPosition,
                     pendingConfirmation = pending,
                 ),
         )

@@ -28,6 +28,7 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.ChatListViewFfi
+import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
 import dev.ipf.marmotkit.ChatPinStateFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.DeletionSourceFfi
@@ -1198,6 +1199,24 @@ class ChatsController private constructor(
     var materializedGroupsRevision by mutableLongStateOf(0L)
         private set
 
+    /**
+     * Counts the membership removals whose cause Android cannot know — a window replacement or native
+     * removal that drops a row could be an eviction or a deletion. Additions and local deletions leave it
+     * alone, so a full-list read taken before them can still prove what the list holds (#3586).
+     * staleness-exempt: this observable membership version is consumed by Compose.
+     */
+    var ambiguousMembershipRemovalsRevision by mutableLongStateOf(0L)
+        private set
+
+    // Chats this controller deleted locally, in order, so an earlier full-list read can drop exactly those.
+    private val locallyDeletedGroupIds = mutableListOf<String>()
+
+    /** How many local deletions have been recorded, the mark a full-list read captures before it starts. */
+    internal val locallyDeletedGroupCount: Int get() = locallyDeletedGroupIds.size
+
+    /** Folded ids of the chats deleted locally after [mark] deletions had been recorded. */
+    internal fun locallyDeletedGroupIdsSince(mark: Int): Set<String> = locallyDeletedGroupIds.drop(mark).toSet()
+
     /** Complete observable forward-picker revision; staleness-exempt: it is a Compose version. */
     var forwardTargetsRevision by mutableLongStateOf(0L)
         private set
@@ -1976,7 +1995,7 @@ class ChatsController private constructor(
                     )
                     if (!isActiveBindEpoch(epoch)) break
                     chatListStream.publishIfCurrent(initialFrame) { rows ->
-                        replacePresentedChatRows(rows)
+                        replacePresentedChatRows(rows, chatListStream.installed(ChatListViewFfi.CHATS))
                         stagedChatListFrame = ChatListFrameMark(chatListStream, initialFrame.revision)
                     }
                     appState.schedulePendingLocalGroupDeleteCleanup()
@@ -3174,7 +3193,7 @@ class ChatsController private constructor(
             }
             else -> {
                 windows.publishIfCurrent(frame) { rows ->
-                    replacePresentedChatRows(rows)
+                    replacePresentedChatRows(rows, windows.installed(ChatListViewFfi.CHATS))
                     stagedChatListFrame = ChatListFrameMark(windows, frame.revision)
                     scheduleRecompute()
                 }
@@ -3215,8 +3234,14 @@ class ChatsController private constructor(
         return true
     }
 
-    /** Atomically replaces both base rows and their matching selected presentation. */
-    private fun replacePresentedChatRows(rows: List<PresentedChatRowFfi>) {
+    /**
+     * Atomically replaces both base rows and their matching selected presentation. [activeWindow] is the
+     * active-chats window this frame came from, which tells a row evicted past its tail from a removed one.
+     */
+    private fun replacePresentedChatRows(
+        rows: List<PresentedChatRowFfi>,
+        activeWindow: ChatListWindowSnapshotFfi? = null,
+    ) {
         selectedPresentationsByGroup =
             rows.associate { presented ->
                 chatRowKey(presented.row.groupIdHex) to
@@ -3234,7 +3259,7 @@ class ChatsController private constructor(
         selectedActionsByGroup =
             rows.associate { presented -> chatRowKey(presented.row.groupIdHex) to presented.actions }
         rows.forEach { requestChatRowProfiles(it.row) }
-        replaceChatRows(rows.map(PresentedChatRowFfi::row))
+        replaceChatRows(rows.map(PresentedChatRowFfi::row), activeWindow)
     }
 
     /** Folds one authoritative row and mirrors it into any mounted conversation. */
@@ -3285,7 +3310,7 @@ class ChatsController private constructor(
                 }
             }
         appState.publishConversationChatListRow(accountRef, effectivePublicationRow)
-        if (membershipChanged) noteMaterializedGroupMembershipChanged()
+        if (membershipChanged) noteMaterializedGroupMembershipChanged(removal = MembershipRemoval.None)
         scheduleRecompute()
     }
 
@@ -3332,8 +3357,14 @@ class ChatsController private constructor(
         foldChatRow(merged)
     }
 
-    /** Replaces the chat-list window and refreshes mounted conversation metadata. */
-    private fun replaceChatRows(incoming: List<ChatListRowFfi>) {
+    /**
+     * Replaces the chat-list window and refreshes mounted conversation metadata. [activeWindow], when known,
+     * classifies rows that left because they now rank past its retained tail as evictions rather than removals.
+     */
+    private fun replaceChatRows(
+        incoming: List<ChatListRowFfi>,
+        activeWindow: ChatListWindowSnapshotFfi? = null,
+    ) {
         val rows = incoming.map(localGroupNames::reconciled)
         rows.forEach {
             appState.acceptAuthoritativeMuteProjection(accountRef, it.groupIdHex, it.muted, it.mutedUntilMs)
@@ -3377,7 +3408,15 @@ class ChatsController private constructor(
         memberFetchRetryBackoffTierByGroup.keys.retainAll(liveGroupIds)
         failedMemberFetches.retainAll(liveGroupIds)
         if (previousKeys != chatRowsByGroup.keys.toSet()) {
-            noteMaterializedGroupMembershipChanged()
+            // A bounded window evicts its tail whenever an off-window chat moves in. That chat still exists, so an
+            // earlier full read still covers it; only a row the window should still hold is an ambiguous removal.
+            val dropped =
+                previousRowsByGroup.any { (key, row) ->
+                    key !in chatRowsByGroup && !row.evictedFrom(activeWindow)
+                }
+            noteMaterializedGroupMembershipChanged(
+                removal = if (dropped) MembershipRemoval.Ambiguous else MembershipRemoval.None,
+            )
         }
     }
 
@@ -3395,13 +3434,18 @@ class ChatsController private constructor(
     /** Captures rollback state and hides the row together at admitted local-removal time. */
     private fun removeChatRowOptimistically(groupIdHex: String): RemovedChatRowSnapshot? {
         val snapshot = snapshotChatRowForRemoval(groupIdHex)
-        removeChatRow(groupIdHex, optimistic = true)
+        removeChatRow(groupIdHex, optimistic = true, removal = MembershipRemoval.LocalDeletion)
         return snapshot
     }
 
+    /**
+     * Drops one row from the retained window. [removal] says whether the chat is known to be gone — a local
+     * deletion — or whether, as for a native removal, the row may only have left the bounded window.
+     */
     private fun removeChatRow(
         groupIdHex: String,
         optimistic: Boolean = false,
+        removal: MembershipRemoval = MembershipRemoval.Ambiguous,
     ) {
         val rowKey = chatRowKey(groupIdHex)
         val removedRow = chatRowsByGroup.remove(rowKey)
@@ -3410,9 +3454,9 @@ class ChatsController private constructor(
             optimisticChatListPreviewByGroup.remove(rowKey)
             if (!optimistic) finishRemovedChatRowClientState(removedRow.groupIdHex)
         }
-        // Off-window rows can still belong to a mounted full-list read. Every removal invalidates
-        // those extras and schedules its replacement, even when this bounded window held no row.
-        noteMaterializedGroupMembershipChanged()
+        // Off-window rows can still belong to a mounted full-list read. Every removal changes membership
+        // and schedules its replacement, even when this bounded window held no row.
+        noteMaterializedGroupMembershipChanged(removal = removal, groupIdHex = groupIdHex)
         scheduleRecompute()
     }
 
@@ -3438,7 +3482,7 @@ class ChatsController private constructor(
             optimisticChatListPreviewByGroup[rowKey] = state
             materializeOptimisticChatListPreview(rowKey, state)
         }
-        noteMaterializedGroupMembershipChanged()
+        noteMaterializedGroupMembershipChanged(removal = MembershipRemoval.None)
         scheduleRecompute()
     }
 
@@ -3455,8 +3499,18 @@ class ChatsController private constructor(
         return if (sameRuntime) read().takeIf { appState.runtimeGeneration == runtime } else null
     }
 
-    private fun noteMaterializedGroupMembershipChanged() {
+    /** Bumps the membership version, and records what a removal means for an earlier full-list read. */
+    private fun noteMaterializedGroupMembershipChanged(
+        removal: MembershipRemoval,
+        groupIdHex: String? = null,
+    ) {
         materializedGroupsRevision += 1L
+        when (removal) {
+            MembershipRemoval.None -> Unit
+            MembershipRemoval.Ambiguous -> ambiguousMembershipRemovalsRevision += 1L
+            MembershipRemoval.LocalDeletion ->
+                locallyDeletedGroupIds += requireNotNull(groupIdHex).lowercase(Locale.ROOT)
+        }
     }
 
     /**
@@ -4046,7 +4100,7 @@ class ChatsController private constructor(
                 appState.schedulePendingLocalGroupDeleteCleanup(retryTransport = true)
                 if (isCurrent()) {
                     if (nativeCommitted) {
-                        removeChatRow(groupIdHex)
+                        removeChatRow(groupIdHex, removal = MembershipRemoval.LocalDeletion)
                         finishRemovedChatRowClientState(groupIdHex)
                     } else {
                         removedSnapshot?.let(::restoreRemovedChatRow)
@@ -4110,7 +4164,7 @@ class ChatsController private constructor(
         observer: LocalChatDeleteObserver,
     ) {
         appState.dismissLocalDeleteFailure(account, groupIdHex)
-        removeChatRow(groupIdHex)
+        removeChatRow(groupIdHex, removal = MembershipRemoval.LocalDeletion)
         finishRemovedChatRowClientState(groupIdHex)
         if (!cleanupComplete) observer.onCleanupDeferred()
         if (success != null && cleanupComplete) appState.presentTransient(success)
@@ -14526,4 +14580,16 @@ class ConversationController(
         // calls that would otherwise throw InvalidHex.
         internal val HEX_MESSAGE_ID: Regex = Regex("^[0-9a-fA-F]{64}$")
     }
+}
+
+/** What a membership change means for a full-list read taken before it (#3586). */
+internal enum class MembershipRemoval {
+    /** Nothing left the window, or only rows evicted past its tail, so an earlier read still covers every chat. */
+    None,
+
+    /** A row the window should still hold left it, so an earlier read can no longer prove completeness. */
+    Ambiguous,
+
+    /** A chat this controller deleted locally, which an earlier read can drop by id. */
+    LocalDeletion,
 }

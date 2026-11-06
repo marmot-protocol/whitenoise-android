@@ -125,7 +125,7 @@ internal fun SettingsSwitch(
         modifier =
             modifier
                 .fillMaxWidth()
-                .settingsRowBorder(context, editable)
+                .settingsRowBorder(context)
                 .semantics { role = Role.Switch },
         enabled = editable,
         leadingContent = leading,
@@ -172,7 +172,7 @@ internal fun SettingsLink(
         modifier =
             modifier
                 .fillMaxWidth()
-                .settingsRowBorder(context, editable)
+                .settingsRowBorder(context)
                 .semantics { role = Role.Button },
         enabled = editable,
         leadingContent = leading,
@@ -214,7 +214,7 @@ internal fun SettingsAction(
         modifier =
             modifier
                 .fillMaxWidth()
-                .settingsRowBorder(context, enabled)
+                .settingsRowBorder(context)
                 .semantics { role = Role.Button },
         enabled = enabled,
         leadingContent = leading,
@@ -256,7 +256,7 @@ internal fun SettingsChoice(
         selected = selected,
         onClick = onClick,
         shapes = context.shapes,
-        modifier = modifier.fillMaxWidth().settingsRowBorder(context, enabled),
+        modifier = modifier.fillMaxWidth().settingsRowBorder(context),
         enabled = enabled,
         leadingContent = {
             RadioButton(

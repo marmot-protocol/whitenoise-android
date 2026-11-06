@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.screenshot
 import android.app.Application
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
@@ -153,6 +154,23 @@ class DetailsSurfacePolishScreenshotTest {
         composeRule.onNodeWithText(app.getString(R.string.group_reset_dialog_title)).assertIsDisplayed()
         composeRule.onNodeWithText(app.getString(R.string.abandon_identity_account, "Alice")).assertIsDisplayed()
         composeRule.onNode(isDialog()).captureRoboImage("src/test/snapshots/group_details_reset_dialog_light.png")
+    }
+
+    /** With every member already an admin, the disabled Transfer administration row keeps the AMOLED outline whole. */
+    @Test
+    fun allAdminTransferDisabledAmoled() {
+        val members = groupMembers()
+        renderGroupDetails(
+            group = group(admin = true).copy(admins = members.map { it.memberIdHex }),
+            members = members,
+            darkTheme = true,
+            amoled = true,
+        )
+        composeRule.onNodeWithTag("chat_info.transfer_admin").performScrollTo().assertIsNotEnabled()
+        composeRule
+            .onNodeWithTag("chat_info.lifecycle")
+            .performScrollTo()
+            .captureRoboImage("src/test/snapshots/group_details_all_admin_transfer_amoled.png")
     }
 
     /** Renders the details screen and records the full viewport once every asynchronous row settled. */

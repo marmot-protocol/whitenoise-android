@@ -84,10 +84,14 @@ class MessageActionMenuPlacementTest {
         )
     }
 
+    /** Columns take their widest one-line cell, and fall back to one column capped at the available width. */
     @Test
     fun columnAndHeightEstimatesTrackGridRowsWithIntegratedDelete() {
-        assertEquals(2, messageActionColumnCount(312.dp, 136.dp))
-        assertEquals(1, messageActionColumnCount(260.dp, 136.dp))
+        val cells = listOf(170.dp, 90.dp, 120.dp, 100.dp, 80.dp)
+        assertEquals(listOf(170.dp, 100.dp), messageActionColumnWidths(cells, 312.dp))
+        assertEquals(listOf(170.dp), messageActionColumnWidths(cells, 260.dp))
+        assertEquals(listOf(260.dp), messageActionColumnWidths(listOf(300.dp, 90.dp), 260.dp))
+        assertEquals(listOf(90.dp), messageActionColumnWidths(listOf(90.dp), 312.dp))
         assertEquals(379.dp, estimatedMessageActionMenuHeight(10, 2, canReact = true, canDelete = true))
         assertEquals(629.dp, estimatedMessageActionMenuHeight(10, 1, canReact = true, canDelete = true))
     }
