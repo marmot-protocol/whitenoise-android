@@ -21,7 +21,6 @@ import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -74,14 +73,14 @@ internal data class ViewerGeometry(
 
 /**
  * Hosts the production full-screen viewer — FullScreenMediaViewer, PlaybackDialog, MediaViewerFrame, the pager and
- * VideoViewerPage's own ExoPlayer and viewer PlayerView — over local edge-marked clips. It needs no account, network
+ * VideoViewerPage's own Player and viewer PlayerView — over local edge-marked clips. It needs no account, network
  * or MDK runtime: clips materialize into this test's own cache entries and app state uses private preferences.
  */
 internal class EdgeClipViewerFixture(
     private val rule: ComposeTestRule,
     private val context: Context,
     private val beforeMaterialize: suspend () -> Unit = {},
-    private val onPlayerCreated: (ExoPlayer) -> Unit = {},
+    private val onPlayerCreated: (Player) -> Unit = {},
 ) {
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
     private val viewerState = localAppState(accounts = emptyList())
@@ -361,7 +360,7 @@ internal class EdgeClipViewerFixture(
     }
 
     /** Records each page player's first rendered frame, observed from before it is prepared. */
-    private fun trackFirstFrame(player: ExoPlayer?) {
+    private fun trackFirstFrame(player: Player?) {
         player?.let(onPlayerCreated)
         player?.addListener(
             object : Player.Listener {

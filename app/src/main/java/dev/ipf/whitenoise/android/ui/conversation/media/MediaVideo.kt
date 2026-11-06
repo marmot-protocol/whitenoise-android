@@ -1505,7 +1505,7 @@ internal fun VideoViewerPage(
     reference: MediaAttachmentReferenceFfi,
     isCurrent: Boolean,
     mine: Boolean,
-    onPlayerChanged: (androidx.media3.exoplayer.ExoPlayer?) -> Unit = {},
+    onPlayerChanged: (androidx.media3.common.Player?) -> Unit = {},
     videoFileResolver: VideoViewerFileResolver = ::resolveVideoViewerFile,
     onControllerVisibilityChange: (Boolean) -> Unit = {},
 ) {
@@ -1634,9 +1634,7 @@ internal fun VideoViewerPage(
     val playerKey = videoViewerPlayerKey(file, messageIdHex, attachmentIndex, reference)
     val exo =
         remember(playerKey) {
-            androidx.media3.exoplayer.ExoPlayer
-                .Builder(context)
-                .build()
+            requireNotNull(localVideoPlayer(context, android.net.Uri.fromFile(file)))
                 .apply {
                     setAudioAttributes(videoPlaybackAudioAttributes, true)
                     setHandleAudioBecomingNoisy(true)
@@ -1669,7 +1667,6 @@ internal fun VideoViewerPage(
                             }
                         },
                     )
-                    setMediaSource(requireNotNull(localVideoSource(context, android.net.Uri.fromFile(file))))
                 }
         }
     DisposableEffect(exo) {
@@ -1713,9 +1710,10 @@ internal fun VideoViewerPage(
     LaunchedEffect(isCurrent, exo) {
         if (isCurrent) {
             VoicePlaybackController.pause()
-            exo.prepare()
             // Materialization may finish after STOP, before this player has observed any lifecycle event.
+            // Publish current autoplay intent before preparation so explicit video avoids an optional poster probe.
             exo.playWhenReady = autoplayAllowed.value && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+            exo.prepare()
         } else {
             exo.playWhenReady = false
             exo.stop()

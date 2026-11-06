@@ -8,10 +8,20 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PINS="${ROBOLECTRIC_ANDROID_ALL_PINS:-$REPO_DIR/scripts/robolectric-android-all.sha512}"
 CATALOG="${ROBOLECTRIC_VERSION_CATALOG:-$REPO_DIR/gradle/libs.versions.toml}"
-# Shared hosted-runner egress can be throttled by Central; this mirror serves the same checksum-pinned jars.
 REMOTE="${ROBOLECTRIC_ANDROID_ALL_REMOTE:-https://maven-central.storage-download.googleapis.com/maven2}"
+# Explicit repository overrides remain exclusive, including an explicit default URL.
+FALLBACK_REMOTE=""
+if [[ -z "${ROBOLECTRIC_ANDROID_ALL_REMOTE+x}" ]]; then
+  FALLBACK_REMOTE=https://repo.maven.apache.org/maven2
+fi
 LOCAL_REPO="${ROBOLECTRIC_LOCAL_REPOSITORY:-$HOME/.m2/repository}"
 ARTIFACT_PATH=org/robolectric/android-all-instrumented
+# One cumulative hard deadline includes every transfer and retry sleep.
+BUDGET_SECONDS="${ROBOLECTRIC_PREFETCH_BUDGET_SECONDS:-240}"
+if [[ ! "$BUDGET_SECONDS" =~ ^[1-9][0-9]{0,2}$ ]] || ((BUDGET_SECONDS < 2 || BUDGET_SECONDS > 240)); then
+  printf 'error: prefetch budget must be between 2 and 240 seconds\n' >&2
+  exit 1
+fi
 
 # Prints the SHA-512 of a file.
 sha512_of() {
@@ -30,22 +40,41 @@ check_robolectric_version() {
   fi
 }
 
+# Leave time for the fallback repository when the default repository rejects a download.
+download_jar() {
+  local retry_budget=0 status
+  if [[ -n "$FALLBACK_REMOTE" ]]; then
+    retry_budget=20
+  fi
+  status="$(curl --fail --silent --show-error --location --retry 5 --retry-all-errors --retry-delay 5 \
+    --retry-max-time "$retry_budget" \
+    --connect-timeout 20 --speed-limit 1048576 --speed-time 30 --max-time 300 \
+    --write-out '%{response_code}' --output "$2" "$1")" || return 1
+  # Some curl versions return zero when Retry-After exceeds retry-max-time.
+  # Check the final response as well, keeping explicit file:// repositories valid.
+  [[ "$status" == 2[0-9][0-9] || ( "$1" == file://* && "$status" == 000 ) ]]
+}
+
 # Downloads one jar unless a verified copy is already in the local repository.
 fetch_jar() {
   local version="$1" expected="$2"
   local name="android-all-instrumented-$version.jar"
   local dir="$LOCAL_REPO/$ARTIFACT_PATH/$version"
-  local partial="$dir/$name.part"
+  local partial="$DOWNLOAD_DIR/$name.part"
 
   if [[ -f "$dir/$name" && "$(sha512_of "$dir/$name")" == "$expected" ]]; then
     printf '%s: already present\n' "$name"
     return 0
   fi
   mkdir -p "$dir"
-  # A stalled transfer (under 1 MiB/s for 30 s) or a slow attempt fails so the next retry starts.
-  curl --fail --silent --show-error --location --retry 5 --retry-all-errors --retry-delay 5 \
-    --connect-timeout 20 --speed-limit 1048576 --speed-time 30 --max-time 300 \
-    --output "$partial" "$REMOTE/$ARTIFACT_PATH/$version/$name"
+  if ! download_jar "$REMOTE/$ARTIFACT_PATH/$version/$name" "$partial"; then
+    rm -f -- "$partial"
+    [[ -n "$FALLBACK_REMOTE" ]] || return 1
+    # Keep using the fallback repository for the rest of this batch after a transport failure.
+    REMOTE="$FALLBACK_REMOTE"
+    FALLBACK_REMOTE=""
+    download_jar "$REMOTE/$ARTIFACT_PATH/$version/$name" "$partial"
+  fi
   if [[ "$(sha512_of "$partial")" != "$expected" ]]; then
     rm -f -- "$partial"
     printf 'error: %s does not match its pinned SHA-512\n' "$name" >&2
@@ -70,4 +99,14 @@ main() {
   fi
 }
 
-main "$@"
+# The parent owns cleanup; the hard deadline kills the entire worker process group.
+mkdir -p "$LOCAL_REPO/$ARTIFACT_PATH"
+DOWNLOAD_DIR="$(mktemp -d "$LOCAL_REPO/$ARTIFACT_PATH/.prefetch.XXXXXX")"
+trap 'rm -rf -- "$DOWNLOAD_DIR"' EXIT
+export PINS CATALOG REMOTE FALLBACK_REMOTE LOCAL_REPO ARTIFACT_PATH DOWNLOAD_DIR
+export -f sha512_of check_robolectric_version download_jar fetch_jar main
+if ! timeout --signal=KILL "${BUDGET_SECONDS}s" \
+    bash -c 'set -euo pipefail; main'; then
+  printf 'error: Android jar prefetch failed within its cumulative budget\n' >&2
+  exit 1
+fi

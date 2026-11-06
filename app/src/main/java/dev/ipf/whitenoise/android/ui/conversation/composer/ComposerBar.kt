@@ -977,6 +977,7 @@ internal fun ComposerBar(
         if (active != null && active.inputGeneration != textState.contentGeneration) sendMotion.clear()
     }
     var attachmentSendInFlight by remember(draftKey) { mutableStateOf(false) }
+    val attachmentSendEnabled = !attachmentsPreparing && !attachmentSendInFlight && onSendAttachments != null
 
     /** Rechecks dictation ownership and pending completion before ordinary Send. */
     fun originDictationRequiresCompletion(): Boolean =
@@ -1605,7 +1606,8 @@ internal fun ComposerBar(
                 val ordinarySendAlpha = if (originDictationRequiresCompletion()) 0.38f else 1f
                 val primaryActionEnabled =
                     !originDictationRequiresCompletion() &&
-                        (!showMicButton || text.isNotBlank() || hasPendingAttachments)
+                        (!showMicButton || text.isNotBlank() || hasPendingAttachments) &&
+                        (!hasPendingAttachments || editingMessageId != null || attachmentSendEnabled)
                 val trailingControlsWidth = primaryTrailingActionWidth
                 BoxWithConstraints(
                     modifier =

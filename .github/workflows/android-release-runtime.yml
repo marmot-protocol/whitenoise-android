@@ -17,6 +17,8 @@ on:
       - 'app/proguard-rules.pro'
       - 'app/src/main/AndroidManifest.xml'
       - 'app/src/main/marmotkit/**'
+      - 'native/media-decoder/**'
+      - 'scripts/prepare_media_decoder.py'
       - 'scripts/prepare_marmotkit_artifact.py'
       - 'scripts/prepare-marmotkit-artifact.sh'
       - 'scripts/prepare-marmotkit-artifact.ps1'
@@ -40,6 +42,7 @@ on:
       - 'scripts/stabilize-android17-emulator.sh'
       - 'scripts/android17-adb-wrapper.sh'
       - 'scripts/test-android17-emulator-stabilization.sh'
+      - 'scripts/test_android17_disk_budget.py'
   merge_group:
     types: [checks_requested]
   push:
@@ -403,6 +406,38 @@ jobs:
           cmdline_tools_bin="${cmdline_tools_bins[${#cmdline_tools_bins[@]} - 1]}"
           "$cmdline_tools_bin/avdmanager" list device > /dev/null
           printf '%s\n' "$cmdline_tools_bin" >> "$GITHUB_PATH"
+
+      - name: Test Android 17 disk guard
+        run: python3 -m unittest scripts/test_android17_disk_budget.py
+
+      # No Gradle/native build runs after this point. Preserve all APKs, mapping,
+      # notices and verification reports; only the now-unused SDK NDKs go away.
+      - name: Reserve Android 17 emulator disk space
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:?}}"
+          avd_parent="$HOME/.android/avd"
+          mkdir -p "$avd_parent"
+          df -h "$avd_parent"
+          if [[ -d "$sdk_root/ndk" ]]; then
+            du -sh -- "$sdk_root/ndk"
+            rm -rf -- "$sdk_root/ndk"
+          fi
+          # Use the updated API-37 cmdline-tools already placed on PATH.
+          # Move this exact image install ahead of the space check; the pinned
+          # emulator action will find it installed and keeps its normal setup.
+          set +o pipefail
+          yes | sdkmanager --licenses > /dev/null
+          set -o pipefail
+          sdkmanager --install 'system-images;android-37.0;google_apis_ps16k;x86_64'
+          available_kib="$(df -Pk "$avd_parent" | awk 'NR == 2 { print $4 }')"
+          [[ "$available_kib" =~ ^[0-9]+$ ]] || { echo 'Cannot read AVD host disk budget' >&2; exit 1; }
+          df -h "$avd_parent"
+          if (( available_kib < 12 * 1024 * 1024 )); then
+            printf 'Android 17 AVD needs 12 GiB host headroom after image installation; available %s KiB\n' "$available_kib" >&2
+            exit 1
+          fi
 
       - name: Enable KVM
         run: |

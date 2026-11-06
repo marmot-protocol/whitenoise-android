@@ -69,8 +69,18 @@ class ConversationMediaCacheSelectionTest {
     fun cacheChangesWhileReadingDoNotRecomposeTheScreen() {
         val conversation = mountScreen(ConversationSurfaceState())
         composeRule.mainClock.autoAdvance = false
+        val neutralTraceCounts = mutableMapOf<String, Int>()
+        val cacheTraceCounts = mutableMapOf<String, Int>()
+        val neutralRuns =
+            countCompositions(SCREEN_SOURCE, neutralTraceCounts) {
+                repeat(3) {
+                    composeRule.runOnIdle { }
+                    composeRule.mainClock.advanceTimeByFrame()
+                    composeRule.waitForIdle()
+                }
+            }
         val screenRuns =
-            countCompositions(SCREEN_SOURCE) {
+            countCompositions(SCREEN_SOURCE, cacheTraceCounts) {
                 repeat(3) { index ->
                     composeRule.runOnIdle {
                         conversation.appState.cacheMediaPlaintext("other|chat|$index|0", byteArrayOf(index.toByte()))
@@ -79,7 +89,9 @@ class ConversationMediaCacheSelectionTest {
                     composeRule.waitForIdle()
                 }
             }
-        assertEquals("ConversationScreen.kt scopes re-ran for unrelated cache changes", 0, screenRuns)
+        val traceDetails = "neutral=$neutralTraceCounts; cache=$cacheTraceCounts"
+        assertEquals("ConversationScreen.kt scopes re-ran without cache changes: $traceDetails", 0, neutralRuns)
+        assertEquals("ConversationScreen.kt scopes re-ran for unrelated cache changes: $traceDetails", 0, screenRuns)
     }
 
     /** A selected media message without a locator becomes forwardable once its bytes reach the cache. */
@@ -214,6 +226,7 @@ class ConversationMediaCacheSelectionTest {
     @OptIn(InternalComposeTracingApi::class)
     private fun countCompositions(
         source: String,
+        traceCounts: MutableMap<String, Int>? = null,
         block: () -> Unit,
     ): Int {
         var runs = 0
@@ -229,7 +242,10 @@ class ConversationMediaCacheSelectionTest {
                     dirty2: Int,
                     info: String,
                 ) {
-                    if (source in info) runs++
+                    if (source in info) {
+                        runs++
+                        traceCounts?.let { it[info] = it.getOrDefault(info, 0) + 1 }
+                    }
                 }
 
                 /** Body ends need no bookkeeping for a count. */
