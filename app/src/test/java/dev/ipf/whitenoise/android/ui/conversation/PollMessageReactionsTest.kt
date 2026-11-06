@@ -76,7 +76,7 @@ class PollMessageReactionsTest : PollMessageTestFixtures() {
         }
         // Exercise the pill's action contract independently of the retiring menu and chip entry animation.
         composeRule
-            .onNodeWithTag("$REACTION_PILL_TEST_TAG:0")
+            .onNodeWithTag("$REACTION_PILL_TEST_TAG:0", useUnmergedTree = true)
             .performSemanticsAction(SemanticsActions.OnClick) { it() }
         // Canonical details now load on IO; settle its continuation as well as the Compose frame.
         awaitOwnReactionRow(item.record.messageIdHex)

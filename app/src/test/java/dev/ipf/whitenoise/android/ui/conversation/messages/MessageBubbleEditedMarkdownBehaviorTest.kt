@@ -142,7 +142,7 @@ class MessageBubbleEditedMarkdownBehaviorTest {
         composeRule.waitForIdle()
         assertEquals(7 until 12, highlightRange("value"))
         composeRule
-            .onNodeWithTag("tts-read-aloud-progress")
+            .onNodeWithTag("tts-read-aloud-progress", useUnmergedTree = true)
             .assert(
                 SemanticsMatcher.expectValue(
                     SemanticsProperties.ContentDescription,
@@ -153,14 +153,14 @@ class MessageBubbleEditedMarkdownBehaviorTest {
         textSelectionMode = true
         composeRule.waitForIdle()
         assertNull(highlightRange("value"))
-        composeRule.onNodeWithTag("tts-read-aloud-progress").assertDoesNotExist()
+        composeRule.onNodeWithTag("tts-read-aloud-progress", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithText("Edited value").assertExists()
 
         textSelectionMode = false
         appState.ttsController.stop()
         composeRule.waitForIdle()
         assertNull(highlightRange("value"))
-        composeRule.onNodeWithTag("tts-read-aloud-progress").assertDoesNotExist()
+        composeRule.onNodeWithTag("tts-read-aloud-progress", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithText("Edited value").assertExists()
     }
 
@@ -256,7 +256,7 @@ class MessageBubbleEditedMarkdownBehaviorTest {
         engine.range(index = 0, start = 14, end = 19)
         composeRule.waitForIdle()
         assertEquals(7 until 12, highlightRange("alpha"))
-        composeRule.onNodeWithTag("tts-read-aloud-progress").assertExists()
+        composeRule.onNodeWithTag("tts-read-aloud-progress", useUnmergedTree = true).assertExists()
 
         composeRule.runOnIdle {
             controller.editsByTarget = mapOf(MESSAGE_ID to editState(EDIT_B))
@@ -264,7 +264,7 @@ class MessageBubbleEditedMarkdownBehaviorTest {
         composeRule.onNodeWithText(EDIT_B).assertExists()
         composeRule.onNodeWithText("Edited alpha", substring = true).assertDoesNotExist()
         assertNull(highlightRange(EDIT_B))
-        composeRule.onNodeWithTag("tts-read-aloud-progress").assertDoesNotExist()
+        composeRule.onNodeWithTag("tts-read-aloud-progress", useUnmergedTree = true).assertDoesNotExist()
         composeRule.waitUntil(timeoutMillis = 5_000) { parseBStarted.isCompleted }
         composeRule.runOnIdle {
             controller.editsByTarget = mapOf(MESSAGE_ID to editState(EDIT_C))
@@ -274,7 +274,7 @@ class MessageBubbleEditedMarkdownBehaviorTest {
         composeRule.onNodeWithText("Edited alpha", substring = true).assertDoesNotExist()
         composeRule.onNodeWithText("Edited beta", substring = true).assertDoesNotExist()
         assertNull(highlightRange("gamma"))
-        composeRule.onNodeWithTag("tts-read-aloud-progress").assertDoesNotExist()
+        composeRule.onNodeWithTag("tts-read-aloud-progress", useUnmergedTree = true).assertDoesNotExist()
 
         parseBGate.complete(Unit)
         composeRule.waitForIdle()
@@ -282,7 +282,7 @@ class MessageBubbleEditedMarkdownBehaviorTest {
         composeRule.onNodeWithText("Edited alpha", substring = true).assertDoesNotExist()
         composeRule.onNodeWithText("Edited beta", substring = true).assertDoesNotExist()
         assertNull(highlightRange("gamma"))
-        composeRule.onNodeWithTag("tts-read-aloud-progress").assertDoesNotExist()
+        composeRule.onNodeWithTag("tts-read-aloud-progress", useUnmergedTree = true).assertDoesNotExist()
     }
 
     private fun highlightRange(text: String): IntRange? =

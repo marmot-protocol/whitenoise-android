@@ -196,7 +196,7 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             assertVoiceActionTarget(voiceId, R.string.media_downloading)
             assertVoiceBubbleFullyVisible(voiceId)
             composeRule
-                .onNodeWithTag(messageBubbleColumnTestTag(voiceId))
+                .onNodeWithTag(messageBubbleColumnTestTag(voiceId), useUnmergedTree = true)
                 .captureRoboImage("src/test/snapshots/voice_anchor_downloading_light.png")
 
             control.succeedMaterialization(0)
@@ -208,7 +208,7 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             assertVoiceActionTarget(voiceId, R.string.voice_message_pause)
             assertVoiceBubbleFullyVisible(voiceId)
             composeRule
-                .onNodeWithTag(messageBubbleColumnTestTag(voiceId))
+                .onNodeWithTag(messageBubbleColumnTestTag(voiceId), useUnmergedTree = true)
                 .captureRoboImage("src/test/snapshots/voice_anchor_playback_engaged_light.png")
             control.releaseHydration()
             control.awaitHydrationCompleted()
@@ -479,7 +479,7 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
             assertVoiceActionTarget(voiceId, R.string.voice_message_pause)
             assertVoiceBubbleFullyVisible(voiceId)
             composeRule
-                .onNodeWithTag(messageBubbleColumnTestTag(voiceId))
+                .onNodeWithTag(messageBubbleColumnTestTag(voiceId), useUnmergedTree = true)
                 .captureRoboImage("src/test/snapshots/voice_anchor_playback_large_font_rtl.png")
         } finally {
             closeFixture(fixture, runtime)
@@ -572,7 +572,7 @@ internal class ConversationVoiceDownloadAnchorScreenshotTest : ConversationVoice
                 .getUnclippedBoundsInRoot()
         val bubble =
             composeRule
-                .onNodeWithTag(messageBubbleColumnTestTag(messageId))
+                .onNodeWithTag(messageBubbleColumnTestTag(messageId), useUnmergedTree = true)
                 .getUnclippedBoundsInRoot()
         assertTrue("voice bubble top must be inside the transcript", bubble.top >= transcript.top)
         assertTrue("voice bubble bottom must be inside the transcript", bubble.bottom <= transcript.bottom)

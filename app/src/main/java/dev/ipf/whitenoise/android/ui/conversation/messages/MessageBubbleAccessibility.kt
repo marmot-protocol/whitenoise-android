@@ -13,7 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.text.AnnotatedString
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ReactionTally
 import dev.ipf.whitenoise.android.ui.emojiPlainLabel
@@ -48,7 +49,7 @@ internal fun messageRowCustomActions(
 
 /**
  * Replaces a nested control's semantics while the merged row owns its action. [description]
- * keeps what the control showed in the row's spoken summary.
+ * stays as plain text, so the row reads it in place.
  */
 internal fun Modifier.messageRowChrome(
     rowOwnsSemantics: Boolean,
@@ -56,7 +57,7 @@ internal fun Modifier.messageRowChrome(
 ): Modifier =
     if (rowOwnsSemantics) {
         clearAndSetSemantics {
-            description?.takeIf(String::isNotBlank)?.let { contentDescription = it }
+            description?.takeIf(String::isNotBlank)?.let { text = AnnotatedString(it) }
         }
     } else {
         this
@@ -73,7 +74,7 @@ internal fun Modifier.editedLabelTarget(
     if (onClick == null) {
         this
     } else {
-        clearAndSetSemantics { contentDescription = label }.clickable(onClick = onClick)
+        clearAndSetSemantics { text = AnnotatedString(label) }.clickable(onClick = onClick)
     }
 
 /** Spoken summary of a reaction row, one entry per emoji with its count. */
@@ -139,6 +140,11 @@ internal fun ForwardTextActionsToMessageRow(actions: List<CustomAccessibilityAct
         onDispose { registry.remove(owner) }
     }
     SideEffect {
-        registry.update(owner, labels) { index -> latest.value.getOrNull(index)?.action?.invoke() == true }
+        registry.update(owner, labels) { index ->
+            latest.value
+                .getOrNull(index)
+                ?.action
+                ?.invoke() == true
+        }
     }
 }

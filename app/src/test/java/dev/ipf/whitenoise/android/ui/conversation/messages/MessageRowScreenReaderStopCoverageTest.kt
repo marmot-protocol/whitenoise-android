@@ -108,10 +108,10 @@ class MessageRowScreenReaderStopCoverageTest {
         assertTrue(composeRule.onNodeWithTag(ROW).fetchSemanticsNode().children.isEmpty())
 
         val row = composeRule.onNodeWithTag(ROW).fetchSemanticsNode().config
-        val spoken =
-            row.getOrNull(SemanticsProperties.ContentDescription).orEmpty() +
-                row.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text }
-        assertEquals(listOf("Alice", "Replying to Bob: lunch?", "Edited", "Sure, noon works"), spoken)
+        // Chrome reads as text in place, so the row speaks in rendered order.
+        val spoken = row.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text }
+        assertEquals(listOf("Alice", "Replying to Bob: lunch?", "Sure, noon works", "Edited"), spoken)
+        assertFalse(row.contains(SemanticsProperties.ContentDescription))
         assertFalse(row.contains(SemanticsActions.OnClick))
 
         val labels = row[SemanticsActions.CustomActions].map { it.label }
