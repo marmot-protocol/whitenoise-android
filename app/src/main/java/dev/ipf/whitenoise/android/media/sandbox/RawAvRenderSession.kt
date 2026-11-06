@@ -174,10 +174,11 @@ internal class RawAvRenderSession(
         try {
             pause()
         } finally {
-            val retired = synchronized(clockLock) {
-                closed = true
-                parked.also { parked = null }
-            }
+            val retired =
+                synchronized(clockLock) {
+                    closed = true
+                    parked.also { parked = null }
+                }
             retired?.close()
             stream?.close()
         }
@@ -199,10 +200,10 @@ internal class RawAvRenderSession(
             synchronized(clockLock) {
                 startedRun = maxOf(startedRun, activation)
                 parked.also { parked = null }
-            } ?: return null
-        if (candidate.unpark()) return candidate
-        candidate.close()
-        return null
+            }
+        val claimed = candidate?.takeIf { it.unpark() }
+        if (claimed == null) candidate?.close()
+        return claimed
     }
 
     /** Parks one healthy stream, replacing none: run() is serial and takes the parked worker first. */
