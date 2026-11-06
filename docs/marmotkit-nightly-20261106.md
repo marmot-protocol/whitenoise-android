@@ -153,6 +153,8 @@ the shared image-work lane. Its teardown now removes the viewer and joins that
 lane before closing the fixture; the animation retries and public-image handoff
 also join source work before their assertions finish. This repairs the source-level isolation race;
 the failed run did not retain a lock-owner trace proving the exact interleaving.
+Fixture cleanup uses master's shared helper from
+[PR #3604](https://github.com/marmot-protocol/whitenoise-android/pull/3604).
 
 Use [PR #3609's validation record](https://github.com/marmot-protocol/whitenoise-android/pull/3609)
 for the final reviewed revision and current check results; earlier passing runs

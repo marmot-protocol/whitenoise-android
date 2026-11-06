@@ -44,10 +44,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.LocalSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.conversation.nostr.NostrEventImagePane
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -113,7 +109,7 @@ class ConversationMediaViewerProductionPathTest {
         composeRule.waitForIdle()
         composeRule.waitUntil(10_000) { acquisitions.get() > 0 }
         if (mediaType == "image/png") {
-            awaitViewerSourceWorkCompletion()
+            composeRule.awaitViewerImageWorkIdle()
             composeRule.onNodeWithTag(MEDIA_VIEWER_PAGE_GESTURE_TAG).assertExists()
         }
         // Revoking the binding removes the renderer instead of retaining its last decoded pixels/player.
@@ -349,7 +345,7 @@ class ConversationMediaViewerProductionPathTest {
             assertSharedViewportZoomAndFit(zoomLabel, fitLabel)
             if (source == 0) {
                 composeRule.runOnIdle { publicImage = true }
-                awaitViewerSourceWorkCompletion()
+                composeRule.awaitViewerImageWorkIdle()
             }
         }
         composeRule.onNodeWithContentDescription(context.getString(R.string.close)).performClick()
@@ -369,7 +365,7 @@ class ConversationMediaViewerProductionPathTest {
         var visible by mutableStateOf(true)
         renderAnimationFixture(drawables, calls) { visible }
         composeRule.waitUntil(10_000) { calls.get() == 1 }
-        awaitViewerSourceWorkCompletion()
+        composeRule.awaitViewerImageWorkIdle()
         val first = drawables[0]
         composeRule.runOnIdle { visible = false }
         composeRule.runOnIdle { visible = true }
@@ -379,13 +375,13 @@ class ConversationMediaViewerProductionPathTest {
             first.terminal.complete(AnimationTermination.WorkerLostUnknown)
         }
         composeRule.waitUntil(10_000) { calls.get() == 2 }
-        awaitViewerSourceWorkCompletion()
+        composeRule.awaitViewerImageWorkIdle()
         composeRule.runOnIdle { drawables[1].terminal.complete(AnimationTermination.WorkerLostUnknown) }
         composeRule.onNodeWithTag("media.viewer.retry").assertExists()
         composeRule.runOnIdle { assertEquals(2, calls.get()) }
         composeRule.onNodeWithTag("media.viewer.retry").performClick()
         composeRule.waitUntil(10_000) { calls.get() == 3 }
-        awaitViewerSourceWorkCompletion()
+        composeRule.awaitViewerImageWorkIdle()
     }
 
     /**
@@ -400,13 +396,13 @@ class ConversationMediaViewerProductionPathTest {
                 .AtomicInteger()
         renderAnimationFixture(drawables, calls) { true }
         composeRule.waitUntil(10_000) { calls.get() == 1 }
-        awaitViewerSourceWorkCompletion()
+        composeRule.awaitViewerImageWorkIdle()
         composeRule.runOnIdle { drawables[0].terminal.complete(AnimationTermination.ProtocolRejected) }
         composeRule.onNodeWithTag("media.viewer.retry").assertExists()
         composeRule.runOnIdle { assertEquals(1, calls.get()) }
         composeRule.onNodeWithTag("media.viewer.retry").performClick()
         composeRule.waitUntil(10_000) { calls.get() == 2 }
-        awaitViewerSourceWorkCompletion()
+        composeRule.awaitViewerImageWorkIdle()
     }
 
     /**
@@ -430,7 +426,7 @@ class ConversationMediaViewerProductionPathTest {
             lifecycle.lifecycle.currentState = Lifecycle.State.RESUMED
         }
         composeRule.waitUntil(10_000) { calls.get() == 1 }
-        awaitViewerSourceWorkCompletion()
+        composeRule.awaitViewerImageWorkIdle()
         composeRule.runOnIdle {
             assertEquals(1, reads.get())
             lifecycle.lifecycle.currentState = Lifecycle.State.CREATED
@@ -441,29 +437,10 @@ class ConversationMediaViewerProductionPathTest {
             lifecycle.lifecycle.currentState = Lifecycle.State.RESUMED
         }
         composeRule.waitUntil(10_000) { reads.get() == 2 }
-        awaitViewerSourceWorkCompletion()
+        composeRule.awaitViewerImageWorkIdle()
         composeRule.runOnIdle {
             assertEquals(1, calls.get())
             assertEquals(1, drawables.size)
-        }
-    }
-
-    /** Reacquires the serialized image-work lane to join source preparation before assertions or fixture teardown. */
-    private fun awaitViewerSourceWorkCompletion() {
-        val sourceWorkCompleted =
-            java.util.concurrent.atomic
-                .AtomicBoolean()
-        val probeOwner = Job()
-        val completionProbe =
-            CoroutineScope(Dispatchers.Default + probeOwner).launch {
-                // The byte read happens inside this lane; reacquiring it joins source preparation and publication.
-                withViewerImageWork { sourceWorkCompleted.set(true) }
-            }
-        try {
-            composeRule.waitUntil(10_000) { sourceWorkCompleted.get() && completionProbe.isCompleted }
-        } finally {
-            probeOwner.cancel()
-            composeRule.waitUntil(10_000) { probeOwner.isCompleted }
         }
     }
 

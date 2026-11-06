@@ -6590,7 +6590,12 @@ class WhiteNoiseAppState private constructor(
                     presentedChatList(accountRef, includeArchived = true)
                 }.rows
             val rows = presentedRows.map { it.row }
-            val firstFrameAvatars = prewarmFirstFrameDurableAvatars(accountRef, presentedRows)
+            val firstFrameAvatars =
+                prewarmFirstFrameDurableAvatars(
+                    accountRef,
+                    presentedRows,
+                    awaitColdWorkers = plan.awaitColdAvatarWorkers,
+                )
             ensureAccountSwitchRequestIsCurrent(generation)
             recordAccountSwitchPreloadStage(accountRef, "cached-chat-rows-ready", rows.size)
             val presentation =

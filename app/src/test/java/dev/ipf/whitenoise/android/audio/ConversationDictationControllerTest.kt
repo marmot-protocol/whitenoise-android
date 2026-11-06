@@ -8385,6 +8385,50 @@ class ConversationDictationControllerTest {
         fixture.controller.cancel()
     }
 
+    /** Repeated cancellation and duplicate native closure release the service and microphone exactly once. */
+    @Test
+    fun cancelledCaptureReleasesServiceAndMicrophoneOnceAfterNativeClosure() {
+        val platform =
+            FakePlatform(deferCaptureCompletion = true).apply {
+                tracksCallerAudioDisposal = true
+                discardCaptureActive = true
+                deferDiscardClosure = true
+            }
+        var stops = 0
+        var microphoneReleases = 0
+        val fixture =
+            fixture(
+                draft = TextFieldValue("Draft"),
+                platform = platform,
+                stopDurableSession = { stops++ },
+                releaseMicrophone = { microphoneReleases++ },
+            )
+        assertTrue(fixture.controller.requestStart(ACCOUNT, GROUP, fixture.drafts.getValue(key())))
+        assertTrue(fixture.controller.ownsMicrophone)
+
+        fixture.controller.cancel()
+        val nativeClosed = checkNotNull(platform.discardClosureCallback)
+        fixture.controller.cancel()
+
+        assertTrue(fixture.controller.hasDurableSession)
+        assertTrue(fixture.controller.ownsMicrophone)
+        assertEquals(
+            ConversationDictationComposerPhase.ClosingMicrophone,
+            fixture.controller.composerAccess(ACCOUNT, GROUP).phase,
+        )
+        assertEquals(0, stops)
+        assertEquals(0, microphoneReleases)
+        platform.discardCaptureActive = false
+        nativeClosed()
+        nativeClosed()
+
+        assertFalse(fixture.controller.hasDurableSession)
+        assertFalse(fixture.controller.ownsMicrophone)
+        assertEquals(1, stops)
+        assertEquals(1, microphoneReleases)
+        assertEquals("Draft", fixture.drafts.getValue(key()).text)
+    }
+
     /** An empty recorder failure keeps foreground protection until caller capture actually closes. */
     @Test
     fun emptyCaptureFailureKeepsForegroundLeaseUntilNativeClosure() {

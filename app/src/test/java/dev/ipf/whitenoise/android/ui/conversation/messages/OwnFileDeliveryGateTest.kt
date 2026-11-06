@@ -103,6 +103,36 @@ class OwnFileDeliveryGateTest : MessageBubbleFileAttachmentFixtures() {
         awaitOneFetch()
     }
 
+    /** A peer receipt releases an own file even though the relay source event is still absent. */
+    @Test
+    fun recipientConfirmationReleasesTheHeldOwnRow() {
+        val delivered = ownFileRow()
+        var row by mutableStateOf(undelivered(delivered))
+        composeRule.setContent { WhiteNoiseTheme { FileMessage(row) } }
+        composeRule.waitForIdle()
+        assertTrue(fixture.calls.isEmpty())
+
+        composeRule.runOnIdle {
+            row =
+                delivered.copy(
+                    projected = delivered.projected?.copy(sourceMessageIdHex = null, recipientConfirmed = true),
+                )
+        }
+
+        awaitOneFetch()
+    }
+
+    /** A retained stale row also observes confirmation held only in the controller's native record map. */
+    @Test
+    fun recipientConfirmationKnownOnlyToTheRecordMapIsNotHeld() {
+        val delivered = ownFileRow()
+        controller.timelineRecords[delivered.record.messageIdHex] =
+            requireNotNull(delivered.projected).copy(sourceMessageIdHex = null, recipientConfirmed = true)
+        composeRule.setContent { WhiteNoiseTheme { FileMessage(undelivered(delivered)) } }
+
+        awaitOneFetch()
+    }
+
     /** Waits until the card has asked the native boundary for its body, then checks that it asked only once. */
     private fun awaitOneFetch() {
         composeRule.waitUntil(WAIT_MILLIS) {

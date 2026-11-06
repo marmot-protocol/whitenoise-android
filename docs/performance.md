@@ -185,6 +185,13 @@ profile identity. Switching back to the current account, sign-in and first
 activation are not traced. Debug builds also log the same stages to Logcat as
 `account-switch <stage> +<ms>`, so release and debug runs can be compared.
 
+`cached_chat_rows_ready` includes the first-frame avatar decode. Every switch
+resets the isolated decoder workers, so on a quick switch it waits only for
+avatars already decoded or served by a running worker, never for a worker to
+start. On a GrapheneOS Pixel 9a a new worker took 0.4–0.6 s to start, longer
+than the 250 ms avatar budget. Before #3496, a switch to an account whose
+chats had group photos spent that whole budget and still drew placeholders.
+
 ### Send and attachment diagnosis
 
 `op=text_send` and `op=media_send` follow one process-local operation from the
