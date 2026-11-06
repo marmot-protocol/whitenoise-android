@@ -11,7 +11,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.toArgb
@@ -105,12 +104,13 @@ private fun BubbleDeliveryGlyph(
         }
         OutgoingMessageIndicator.Sent -> {
             val sent = stringResource(R.string.sent)
+            // The shaped fill draws the circle itself. A clip would draw a square fill and rely on a layer to
+            // cut its corners, and when that layer clip was not applied the disc showed as a square (#3610).
             Box(
                 modifier =
                     Modifier
                         .size(14.dp)
-                        .clip(CircleShape)
-                        .background(sentDeliveryDiscColor(tint, containerColor))
+                        .background(sentDeliveryDiscColor(tint, containerColor), CircleShape)
                         .semantics { contentDescription = sent },
                 contentAlignment = Alignment.Center,
             ) {

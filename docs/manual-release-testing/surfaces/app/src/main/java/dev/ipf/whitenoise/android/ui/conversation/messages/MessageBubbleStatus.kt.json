@@ -1,0 +1,63 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleStatus.kt",
+  "legacy_sha256": "6ff3676926515b98b0a38b2c9b0db89dabafedb7c73d60eca5184d482cd07030",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "BubbleDeliveryGlyph",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleStatus.kt",
+        "anchor": "fun BubbleDeliveryGlyph(",
+        "test_ids": [
+          "CON-005",
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "OutgoingIndicatorIcon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleStatus.kt",
+        "anchor": "fun OutgoingIndicatorIcon(",
+        "test_ids": [
+          "CON-005",
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "OutgoingMessageStatusIcon",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleStatus.kt",
+        "anchor": "fun OutgoingMessageStatusIcon(",
+        "test_ids": [
+          "CON-005",
+          "MSG-001"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:send_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleStatus.kt",
+        "anchor": "R.string.send_failed",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:sending",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleStatus.kt",
+        "anchor": "R.string.sending",
+        "test_ids": [
+          "MSG-001"
+        ]
+      },
+      {
+        "surface": "string:sent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubbleStatus.kt",
+        "anchor": "R.string.sent",
+        "test_ids": [
+          "CON-005",
+          "MSG-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
