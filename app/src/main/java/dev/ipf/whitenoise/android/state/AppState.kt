@@ -13384,13 +13384,18 @@ class WhiteNoiseAppState private constructor(
      * #3311: runs the post-write avatar prewarm and returns the late picture
      * refresh it enables for a card first drawn without its conversation or
      * sender picture, or null when no picture can still arrive. [content] is
-     * what the card shows.
+     * what the card shows. A missing conversation picture is read first from
+     * MDK's stored copy of the picture the chat list draws (#3635), so a
+     * picture already on the device needs no download. A missing sender
+     * picture gets a loader with the late refresh's longer bound. A reaction
+     * card draws only the person who reacted.
      */
     private suspend fun prepareLateNotificationIdentity(
         update: NotificationUpdateFfi,
         firstPost: NotificationFirstPost,
         content: LocalNotificationContent?,
     ): LateNotificationIdentity? {
+        val reaction = LocalNotificationFormatter.isReaction(update)
         val warmed = notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)
         val urlSources =
             firstPost.avatars.lateIdentitySources(
@@ -13400,14 +13405,67 @@ class WhiteNoiseAppState private constructor(
                     .notificationConversationDomain(update),
                 dev.ipf.whitenoise.android.notifications
                     .notificationSenderDomain(update),
+                isReaction = reaction,
             )
         val sources =
-            if (!update.isDm && urlSources.conversationBitmap == null && urlSources.conversationUrl.isNullOrBlank()) {
-                urlSources.copy(conversationLoader = encryptedGroupIdentityLoader(update))
-            } else {
+            if (reaction || urlSources.conversationBitmap != null) {
                 urlSources
+            } else {
+                val encryptedGroupPicture = !update.isDm && urlSources.conversationUrl.isNullOrBlank()
+                urlSources.copy(
+                    storedConversationLoader = storedConversationIdentityLoader(update),
+                    conversationLoader = if (encryptedGroupPicture) encryptedGroupIdentityLoader(update) else null,
+                )
             }
-        return if (content != null && sources.hasMissingPicture) LateNotificationIdentity(content, sources) else null
+        val pictures =
+            sources.senderUrl
+                ?.takeIf { sources.senderBitmap == null }
+                ?.let { url -> sources.copy(senderLoader = lateSenderPictureLoader(url, sources.senderDomain)) }
+                ?: sources
+        return if (content != null && pictures.hasMissingPicture) LateNotificationIdentity(content, pictures) else null
+    }
+
+    /**
+     * #3635: loads a sender's published picture for the late refresh through the same decoded cache and worker domain
+     * as the first post's fetch, without that fetch's short bound, so a cold download or a newly started decoder still
+     * reaches a group member's row or a reaction card. Nothing is fetched while the app lock shows, and a picture that
+     * finishes after the lock appears is dropped.
+     */
+    private fun lateSenderPictureLoader(
+        url: String,
+        domain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
+    ): suspend () -> Bitmap? =
+        {
+            if (appLockScreenVisible) {
+                null
+            } else {
+                AvatarImageLoader.loadBitmap(url, domain)?.takeUnless { appLockScreenVisible }
+            }
+        }
+
+    /**
+     * #3635: reads the picture the chat list draws for this conversation from MDK's stored copy of the row's
+     * selected avatar, for any account and with no network. The chat list's own adoption rule applies, so a named
+     * group never borrows a member's face while a direct chat shows its contact. A missing copy is never acquired
+     * here, so the URL and encrypted-download fallbacks still apply. Nothing is read while the app lock shows, and a
+     * picture that finishes after the lock appears is dropped. Null when the row selects no stored picture.
+     */
+    private suspend fun storedConversationIdentityLoader(update: NotificationUpdateFfi): (suspend () -> Bitmap?)? {
+        val account = update.accountRef
+        val stored =
+            runCatchingCancellable { marmotIo { presentedChatListRow(account, update.groupIdHex) } }
+                .getOrNull()
+                ?.storedNotificationAvatar(account)
+                ?: return null
+        return {
+            if (appLockScreenVisible) {
+                null
+            } else {
+                durableAvatar(stored.asset, account, acquireMissing = false, domain = stored.domain)
+                    ?.asAndroidBitmap()
+                    ?.takeUnless { appLockScreenVisible }
+            }
+        }
     }
 
     /**
@@ -13987,9 +14045,8 @@ class WhiteNoiseAppState private constructor(
         val result =
             if (shouldPost && !appLockScreenVisible) {
                 notificationFirstPostContentCoordinator.resolve(stage) {
-                    if (update.isDm || update.trigger != NotificationTriggerFfi.NEW_MESSAGE) {
-                        warmPrivateContactAvatar(update.accountRef, update.sender.accountIdHex)
-                    }
+                    // Every card draws its sender, in a group too (#3635), so their private picture is warmed.
+                    warmPrivateContactAvatar(update.accountRef, update.sender.accountIdHex)
                     notificationContentResolution.firstPost.resolve(update, localOnly = true)
                 }
             } else {
@@ -14019,27 +14076,29 @@ class WhiteNoiseAppState private constructor(
         )
     }
 
-    /** Snapshots decoded local imagery without hydration; the existing monogram covers misses. */
+    /**
+     * Snapshots decoded local imagery without hydration; the existing monogram covers misses. Every card's sender is
+     * drawn, in a group too (#3635). The conversation picture prefers the pixels the chat list already decoded for
+     * the row's stored selected avatar, the picture it shows, before the URL and encrypted-image caches.
+     */
     internal fun readyNotificationAvatars(update: NotificationUpdateFfi): PreWarmedNotificationAvatars {
         if (appLockScreenVisible) return PreWarmedNotificationAvatars(null, null)
         val senderUrl =
-            if (update.isDm || update.trigger != NotificationTriggerFfi.NEW_MESSAGE) {
-                synchronized(profilePresentationLock) {
-                    profilePresentations[update.sender.accountIdHex]?.avatarUrl
-                } ?: update.sender.pictureUrl
-            } else {
-                null
-            }
-        val group =
+            synchronized(profilePresentationLock) {
+                profilePresentations[update.sender.accountIdHex]?.avatarUrl
+            } ?: update.sender.pictureUrl
+        val item =
             chatsController
                 ?.takeIf { it.boundAccountRef == update.accountRef && update.accountRef == activeAccountRef }
                 ?.items
                 ?.firstOrNull { it.id.equals(update.groupIdHex, ignoreCase = true) }
-                ?.group
+        val group = item?.group
+        val stored = item?.readyStoredAvatarBitmap(update.accountRef)
         val ready = readyNotificationAvatarSnapshot(senderUrl, group?.avatarUrl)
         val encryptedKey = group?.let { encryptedGroupAvatarCacheKey(update.accountRef, it) }
         return ready.copy(
             groupAvatarBitmap = ready.groupAvatarBitmap ?: GroupAvatarImageLoader.peek(encryptedKey)?.asAndroidBitmap(),
+            storedConversationBitmap = stored,
         )
     }
 

@@ -4,9 +4,9 @@
   "categories": {
     "notification_content_contracts": [
       {
-        "surface": "native group sender-picture suppression after privacy and contact reconciliation",
+        "surface": "carried group rows from blank-picture builds get the sender monogram",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationGroupSenderImages.kt",
-        "anchor": "internal fun withoutGroupSenderPictures(",
+        "anchor": "internal fun withoutBlankGroupSenderPicture(",
         "test_ids": [
           "NTF-036",
           "NTF-042"

@@ -63,7 +63,31 @@ internal class NotificationCardContent(
         return builder.setConversationIdentityImage(identity).build()
     }
 
-    /** Copies an active MessagingStyle while replacing the matching sender's rich Person metadata. */
+    /**
+     * Rewrites a live reaction card with the reactor's late picture (#3635) as one silent write. The recovery builder
+     * drops custom views, so the card's reaction artwork views are copied across, and its text, extras and grouping
+     * are kept.
+     */
+    @Suppress("DEPRECATION") // Built custom views live only in these Notification fields.
+    fun reactorPictureNotification(
+        active: Notification,
+        reactor: NotificationIdentityImage,
+    ): Notification =
+        NotificationCompat
+            .Builder(context, active)
+            .setGroupAlertBehavior(active.groupAlertBehavior)
+            .setOnlyAlertOnce(true)
+            .apply {
+                active.contentView?.let(::setCustomContentView)
+                active.bigContentView?.let(::setCustomBigContentView)
+                active.headsUpContentView?.let(::setCustomHeadsUpContentView)
+            }.setConversationIdentityImage(reactor)
+            .build()
+
+    /**
+     * Copies an active MessagingStyle while replacing the matching sender's rich Person metadata, repainting that
+     * sender's lines so SystemUI draws a picture that arrived after the post (#3635).
+     */
     private fun enrichedMessagingStyle(
         notification: Notification,
         enrichedSender: Person,
@@ -71,7 +95,7 @@ internal class NotificationCardContent(
         val existing =
             NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
                 ?: return null
-        return copiedMessagingStyle(existing, enrichedSender)
+        return copiedMessagingStyle(existing, enrichedSender, repaint = true)
     }
 
     /** Rebuilds an active card only when a stable sender key can be relabeled safely. */
@@ -155,13 +179,8 @@ internal class NotificationCardContent(
         var style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
         if (style != null) {
             var changedAny = false
-            // Group cards draw no member's picture (withoutGroupSenderPictures), so their senders' choices go unread.
-            val people =
-                if (style.isGroupConversation) {
-                    emptyList()
-                } else {
-                    (style.messages + style.historicMessages).mapNotNull { it.person }.distinctBy { it.key }
-                }
+            // Group rows draw each member's picture (#3635), so every sender's private choice applies.
+            val people = (style.messages + style.historicMessages).mapNotNull { it.person }.distinctBy { it.key }
             people.forEach { person ->
                 val (changed, bitmap) = person.key?.let { contactAvatarOverride(account, it) } ?: (false to null)
                 if (changed) {
@@ -238,7 +257,9 @@ internal class NotificationCardContent(
                 style.addMessage(
                     copiedMessage(
                         message = message,
-                        replacement = sender.takeIf { replacement -> message.person?.key == replacement.key },
+                        replacement =
+                            sender.takeIf { replacement -> message.person?.key == replacement.key }
+                                ?: message.person?.let { withoutBlankGroupSenderPicture(context, it) },
                         boundedText = true,
                     ),
                 )

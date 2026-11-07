@@ -1,20 +1,17 @@
 package dev.ipf.whitenoise.android.notifications
 
-import android.app.Notification
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
-import android.graphics.drawable.Icon
-import android.os.Build
-import android.os.Bundle
-import androidx.core.app.NotificationCompat
+import android.graphics.drawable.BitmapDrawable
 import androidx.core.app.Person
 import androidx.core.graphics.drawable.IconCompat
 
 /**
- * A non-null transparent icon stops Android from generating sender initials while keeping genuine group
- * MessagingStyle and its native actions. SystemUI may still reserve its avatar gutter or draw a blank circle.
- * The immutable pixels remain alive for posted cards; the group picture is owned separately by the identity image.
+ * A non-null transparent icon stops Android from generating initials for a Person. A group's conversation shortcut
+ * stands for the group, never a member, so its sender carries this blank picture. Group message rows show each
+ * member's own picture (#3635); builds from #3515 drew this blank picture on every row instead, and
+ * [withoutBlankGroupSenderPicture] replaces it when such a card's history is carried into a new post.
  */
 private val transparentGroupSenderBitmap: Bitmap by lazy {
     Bitmap.createBitmap(intArrayOf(Color.TRANSPARENT), 1, 1, Bitmap.Config.ARGB_8888)
@@ -38,61 +35,29 @@ internal fun notificationShortcutSender(
     }
 
 /**
- * Final rich-group presentation fence after private overrides and privacy reconciliation. Normalize every retained
- * sender and the self Person, including history carried from older builds. Null message senders remain self rows.
+ * A carried row whose sender still has the blank picture an earlier build drew gets that sender's monogram, so it
+ * shows initials instead of an empty circle until a late picture or their next message brings their own picture.
+ * Any other Person is returned unchanged.
  */
-internal fun withoutGroupSenderPictures(
+internal fun withoutBlankGroupSenderPicture(
     context: Context,
-    notification: Notification,
-): Notification {
-    val existing =
-        if (notification.extras.getBoolean(EXTRA_CONTENT_REDACTED)) {
-            null
-        } else {
-            NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
-        }
-    if (existing == null || !existing.isGroupConversation) return notification
-    val style =
-        NotificationCompat
-            .MessagingStyle(groupNotificationPerson(existing.user))
-            .setGroupConversation(true)
-            .also { copy ->
-                existing.conversationTitle?.let { copy.setConversationTitle(it) }
-                existing.messages.forEach { message ->
-                    copy.addMessage(copiedMessage(message, message.person?.let(::groupNotificationPerson)))
-                }
-                existing.historicMessages.forEach {
-                    copy.addHistoricMessage(copiedMessage(it, it.person?.let(::groupNotificationPerson)))
-                }
-            }
-    val builder =
-        NotificationCompat
-            .Builder(context, notification)
-            .setStyle(style)
-            .setGroupAlertBehavior(notification.groupAlertBehavior)
-    // API 30 recovery cannot reconstruct legacy history once its unsafe structured duplicate was removed.
-    if (Build.VERSION.SDK_INT == Build.VERSION_CODES.R) {
-        notification.extras.getCharSequenceArray(Notification.EXTRA_REMOTE_INPUT_HISTORY)?.let {
-            builder.setRemoteInputHistory(it)
-        }
+    person: Person,
+): Person =
+    if (person.icon?.isBlankGroupSenderPicture(context) == true) {
+        person
+            .toBuilder()
+            .setIcon(
+                IconCompat.createWithBitmap(
+                    notificationMonogramBitmap(person.name?.toString().orEmpty(), person.key.orEmpty()),
+                ),
+            ).build()
+    } else {
+        person
     }
-    return builder
-        .build()
-        .apply {
-            flags = notification.flags
-            actions = notification.actions
-            extras = Bundle(extras)
-            groupNotificationPeople(notification)?.let { people ->
-                extras.putParcelableArrayList(Notification.EXTRA_PEOPLE_LIST, people)
-            }
-        }.withoutApi30RemoteInputHistoryItems()
-}
 
-/** Rich Person metadata follows the same policy; legacy URI people and unrelated extras are retained. */
-@Suppress("DEPRECATION") // The API 30-compatible typed-list overload is required on every supported Android version.
-private fun groupNotificationPeople(notification: Notification): ArrayList<android.app.Person>? =
-    notification.extras
-        .getParcelableArrayList<android.app.Person>(Notification.EXTRA_PEOPLE_LIST)
-        ?.mapTo(arrayListOf()) {
-            it.toBuilder().setIcon(Icon.createWithBitmap(transparentGroupSenderBitmap)).build()
-        }
+/** True only for the 1×1 transparent picture; the app draws no other picture at that size. */
+private fun IconCompat.isBlankGroupSenderPicture(context: Context): Boolean =
+    type == IconCompat.TYPE_BITMAP &&
+        runCatching { (toIcon(context).loadDrawable(context) as? BitmapDrawable)?.bitmap }
+            .getOrNull()
+            ?.let { it.width == 1 && it.height == 1 && Color.alpha(it.getPixel(0, 0)) == 0 } == true

@@ -31,6 +31,18 @@ class NotificationAvatarPreWarmTriggerTest {
         assertNull("a group never borrows the sender's face", senderOnly.conversationBitmap(isDm = false))
     }
 
+    /** #3635: the picture the chat list shows for the row comes first, for a direct chat as for a group. */
+    @Test
+    fun storedChatListPictureComesBeforeTheSenderAndGroupPictures() {
+        val stored = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        val sender = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        val group = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        val warmed = PreWarmedNotificationAvatars(null, null, sender, group, storedConversationBitmap = stored)
+
+        assertSame(stored, warmed.conversationBitmap(isDm = true))
+        assertSame(stored, warmed.conversationBitmap(isDm = false))
+    }
+
     @Test
     fun dmPreWarmUsesTheNotificationPayloadBeforeProfileMaterialization() {
         val target =
@@ -45,23 +57,38 @@ class NotificationAvatarPreWarmTriggerTest {
         assertEquals(true, target.preWarmRemoteImages)
     }
 
+    /** #3635: a group message warms its member's picture as well as the group's. */
     @Test
-    fun groupPreWarmSkipsMemberPayloadAndProfilePicturesButRequestsTheGroupAvatar() {
+    fun groupPreWarmWarmsTheMemberAndTheGroupAvatar() {
         val target =
             notificationAvatarPreWarmTarget(
-                update = update(isDm = false, pictureUrl = "http://127.0.0.1/alice.png"),
+                update = update(isDm = false, pictureUrl = "https://example.com/alice.png"),
                 appLockScreenVisible = true,
             )
 
-        assertNull(target.senderAccountIdHex)
-        assertNull(target.senderAvatarUrl)
+        assertEquals("alice", target.senderAccountIdHex)
+        assertEquals("https://example.com/alice.png", target.senderAvatarUrl)
         assertEquals(true, target.resolveGroupAvatar)
         assertEquals(false, target.preWarmRemoteImages)
     }
 
-    /** Group post-write warmup calls only the group owner, never the sender profile callback. */
+    /** #3635: a reaction card draws only the person who reacted, so its warmup skips the group picture. */
     @Test
-    fun groupCoordinatorNeverResolvesTheHiddenSenderProfile() =
+    fun reactionPreWarmWarmsOnlyThePersonWhoReacted() {
+        val target =
+            notificationAvatarPreWarmTarget(
+                update = update(isDm = false, pictureUrl = "https://example.com/alice.png", reactionEmoji = "👍"),
+                appLockScreenVisible = false,
+            )
+
+        assertEquals("alice", target.senderAccountIdHex)
+        assertEquals("https://example.com/alice.png", target.senderAvatarUrl)
+        assertEquals(false, target.resolveGroupAvatar)
+    }
+
+    /** Group post-write warmup resolves both the member's profile picture and the group's. */
+    @Test
+    fun groupCoordinatorResolvesTheMemberAndTheGroup() =
         runBlocking {
             var senderReads = 0
             var groupReads = 0
@@ -80,21 +107,32 @@ class NotificationAvatarPreWarmTriggerTest {
                     },
                 )
             val groupMessage = update(isDm = false, pictureUrl = "https://example.com/payload.png")
-            coordinator.preWarm(groupMessage, engineMuted = false)
-            assertEquals(0, senderReads)
+            val warmed = coordinator.preWarm(groupMessage, engineMuted = false)
+            assertEquals(1, senderReads)
             assertEquals(1, groupReads)
+            assertEquals("https://example.com/member.png", warmed.senderAvatarUrl)
+            val reaction = update(isDm = false, pictureUrl = "https://example.com/payload.png", reactionEmoji = "👍")
+            coordinator.preWarm(reaction, engineMuted = false)
+            assertEquals("a reaction resolves its reactor", 2, senderReads)
+            assertEquals("and never the group", 1, groupReads)
         }
 
-    /** Even callers carrying a ready member bitmap cannot feed it into a group's late picture work. */
+    /** #3635: every card's late work keeps its sender picture, and a reaction card has no conversation slot. */
     @Test
-    fun lateSourcesKeepSenderPicturesOnlyForDirectMessages() {
+    fun lateSourcesKeepSenderPicturesForEveryConversation() {
         val picture = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
         val ready = PreWarmedNotificationAvatars(null, null, senderAvatarBitmap = picture)
         val warmed = PreWarmedNotificationAvatars("https://example.com/member.png", "https://example.com/group.png")
         val group = ready.lateIdentitySources(warmed, isDm = false)
-        assertNull(group.senderBitmap)
-        assertNull(group.senderUrl)
+        assertSame(picture, group.senderBitmap)
+        assertEquals(warmed.senderAvatarUrl, group.senderUrl)
+        assertNull("a group never borrows the sender's face", group.conversationBitmap)
         assertEquals(warmed.groupAvatarUrl, group.conversationUrl)
+        val reaction = ready.lateIdentitySources(warmed, isDm = false, isReaction = true)
+        assertSame(picture, reaction.senderBitmap)
+        assertEquals(warmed.senderAvatarUrl, reaction.senderUrl)
+        assertNull(reaction.conversationBitmap)
+        assertNull(reaction.conversationUrl)
         val dm = ready.lateIdentitySources(warmed, isDm = true)
         assertSame(picture, dm.senderBitmap)
         assertSame(picture, dm.conversationBitmap)
@@ -102,6 +140,7 @@ class NotificationAvatarPreWarmTriggerTest {
         assertEquals(warmed.senderAvatarUrl, dm.conversationUrl)
     }
 
+    /** Only another person's postable message or reaction warms pictures; self, invites and blocked posts never do. */
     @Test
     fun preWarmEligibilityRequiresAPostableMessagingNotification() {
         val message = update(isDm = true, pictureUrl = null)
@@ -116,7 +155,8 @@ class NotificationAvatarPreWarmTriggerTest {
                 canPost = true,
             ),
         )
-        assertFalse(
+        assertTrue(
+            "a reaction card warms the person who reacted (#3635)",
             shouldPreWarmNotificationAvatars(
                 update(isDm = true, pictureUrl = null, reactionEmoji = "👍"),
                 shouldPost = true,
