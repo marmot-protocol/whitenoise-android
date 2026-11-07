@@ -2534,6 +2534,6 @@
     <string name="date_time_format_automatic">自動</string>
     <string name="time_format_12_hour">12 小時制</string>
     <string name="time_format_24_hour">24 小時制</string>
-    <string name="date_time_format_help">自動模式使用應用程式語言和手機所在地區。</string>
+    <string name="date_time_format_help">自動模式使用應用程式語言和手機系統設定中的地區。</string>
     <string name="settings_search_alias_date_time_format">時間格式|日期格式|時鐘|12 小時制|24 小時制|上午/下午</string>
 </resources>
