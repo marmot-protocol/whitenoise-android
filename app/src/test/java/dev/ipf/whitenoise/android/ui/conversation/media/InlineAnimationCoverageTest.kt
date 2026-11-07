@@ -15,10 +15,15 @@ class InlineAnimationCoverageTest {
         for (name in listOf("MediaImageBubble", "MediaImageGridTile")) {
             val body = bubbles.functionBody(name)
             assertTrue("$name must share inline admission", "InlineAttachmentImage(" in body)
-            assertTrue("$name must bind account/runtime", "rememberInlineAnimationSource(" in body)
-            assertTrue("$name promotion must only read local bytes", "localAttachmentBytes(" in body)
-            assertTrue("$name must not lose animation intent in the still cache", "!decoded.animationDeferred" in body)
+            assertTrue("$name must share the image load holder", "rememberImageLoadState(" in body)
         }
+        val holder = bubbles.functionBody("rememberImageLoadState")
+        assertTrue("The image load holder must bind account/runtime", "rememberInlineAnimationSource(" in holder)
+        assertTrue("The image load holder promotion must only read local bytes", "localAttachmentBytes(" in holder)
+        assertTrue(
+            "The image load holder must not lose animation intent in the still cache",
+            "!decoded.animationDeferred" in holder,
+        )
         val giphy = source("RemoteGiphyMediaBubble.kt")
         assertTrue("InlineAttachmentImage(" in giphy.functionBody("RemoteGiphyMediaCard"))
         assertTrue("rememberInlineAnimationSource(" in giphy.functionBody("RemoteGiphyMediaBubble"))

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import dev.ipf.whitenoise.android.functionBody
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -68,17 +69,31 @@ class AttachmentDownloadProductionWiringTest {
         val video = source("MediaVideo.kt").normalized()
         val voice = source("MediaVoice.kt").normalized()
 
-        assertEquals(2, occurrences(image, "afterInteractiveRequest()"))
+        // The image surfaces share one holder, so each wiring call appears once there and both composables call it.
+        assertEquals(1, occurrences(image, "afterInteractiveRequest()"))
+        val imageSource = source("MediaImageBubbles.kt")
+        val bubble = imageSource.functionBody("MediaImageBubble")
+        val tile = imageSource.functionBody("MediaImageGridTile")
+        assertTrue("rememberImageLoadState(" in bubble)
+        assertTrue("rememberImageLoadState(" in tile)
+        // Each surface keeps its own failure log line and an intent identity that a sourceEpoch upgrade cannot reset.
+        assertTrue("failureLogTag = \"MediaImageBubble\"" in bubble)
+        assertTrue("failureLogMessage = \"image_auto_download_failed\"" in bubble)
+        assertTrue("intentIdentity = \"\$key#\$attachmentIndex\"" in bubble)
+        assertTrue("decodeKeys = listOf(controller, key, attachmentIndex, reference.sourceEpoch)" in bubble)
+        assertTrue("failureLogTag = \"MediaImageGridTile\"" in tile)
+        assertTrue("failureLogMessage = \"image_tile_auto_download_failed\"" in tile)
+        assertTrue("intentIdentity = \"\$messageIdHex#\$attachmentIndex\"" in tile)
         assertEquals(4, occurrences(video, "afterInteractiveRequest()"))
         assertEquals(1, occurrences(voice, "afterInteractiveRequest()"))
-        assertEquals(2, occurrences(image, "persistedAttachmentDownloadEffect("))
+        assertEquals(1, occurrences(image, "persistedAttachmentDownloadEffect("))
         // Reopening a chat restores a download MDK still holds parked for storage, once per surface.
-        assertEquals(2, occurrences(image, "restoreParkedDownloadOnEntry("))
+        assertEquals(1, occurrences(image, "restoreParkedDownloadOnEntry("))
         assertEquals(2, occurrences(video, "restoreParkedDownloadOnEntry("))
         assertEquals(1, occurrences(voice, "restoreParkedDownloadOnEntry("))
         // Only the reader's own download is restored, so an automatic one never becomes an explicit request.
         val readerPark = "parkedByReader = failed && storageFailed && materializationIntent.readerRequested,"
-        assertEquals(2, occurrences(image, readerPark))
+        assertEquals(1, occurrences(image, readerPark))
         assertEquals(2, occurrences(video, readerPark))
         assertEquals(1, occurrences(voice, readerPark))
         assertEquals(2, occurrences(video, "persistedAttachmentDownloadEffect("))
@@ -94,10 +109,10 @@ class AttachmentDownloadProductionWiringTest {
         val video = source("MediaVideo.kt").normalized()
         val voice = source("MediaVoice.kt").normalized()
 
-        assertEquals(2, occurrences(image, "rememberAttachmentMaterializationIntent("))
+        assertEquals(1, occurrences(image, "rememberAttachmentMaterializationIntent("))
         assertEquals(2, occurrences(video, "rememberAttachmentMaterializationIntent("))
         assertEquals(1, occurrences(voice, "rememberAttachmentMaterializationIntent("))
-        assertEquals(2, occurrences(image, "afterProducerCancellation("))
+        assertEquals(1, occurrences(image, "afterProducerCancellation("))
         assertEquals(2, occurrences(video, "afterProducerCancellation("))
         assertEquals(1, occurrences(voice, "afterProducerCancellation("))
     }
@@ -111,7 +126,7 @@ class AttachmentDownloadProductionWiringTest {
         val image = source("MediaImageBubbles.kt").normalized()
 
         assertTrue(
-            "if (cachedPlaintextOnEntry || retainedPlaintextOnEntry) { Modifier " +
+            "if (load.cachedPlaintextOnEntry || load.retainedPlaintextOnEntry) { Modifier " +
                 ".semantics { contentDescription = openingLabel } " +
                 ".clickable(onClickLabel = openLabel, onClick = ::dispatchViewerOpen)" in image,
         )

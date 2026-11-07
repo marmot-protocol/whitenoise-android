@@ -14,12 +14,20 @@ class ThumbnailSizingCoverageTest {
         val source = mediaSource("MediaImageBubbles.kt")
         listOf("MediaImageBubble", "MediaImageGridTile").forEach { name ->
             val body = source.functionBody(name)
-            assertTrue("$name must observe physical bounds", ".onSizeChanged(decodeRequest::onSizeChanged)" in body)
-            assertTrue("$name must preserve request provenance", "presentationMaxEdgePx >= requestedMaxEdgePx" in body)
-            assertTrue("$name must admit the requested decode", "staticMaxEdgePx = requestedMaxEdgePx" in body)
-            assertTrue("$name must read compatible cache entries", "controller.thumbnailEntryFor(" in body)
-            assertFalse("$name must not force the old maximum", "MediaPipeline.THUMBNAIL_MAX_EDGE_PX" in body)
+            assertTrue(
+                "$name must observe physical bounds",
+                ".onSizeChanged(load.decodeRequest::onSizeChanged)" in body,
+            )
+            assertTrue("$name must share the image load holder", "rememberImageLoadState(" in body)
         }
+        val holder = source.functionBody("rememberImageLoadState")
+        assertTrue(
+            "The holder must preserve request provenance",
+            "presentationMaxEdgePx >= requestedMaxEdgePx" in holder,
+        )
+        assertTrue("The holder must admit the requested decode", "staticMaxEdgePx = requestedMaxEdgePx" in holder)
+        assertTrue("The holder must read compatible cache entries", "controller.thumbnailEntryFor(" in holder)
+        assertFalse("The holder must not force the old maximum", "MediaPipeline.THUMBNAIL_MAX_EDGE_PX" in holder)
     }
 
     /** The viewer still decodes original bytes with its own limit; thumbnail cache hits are only placeholders. */
