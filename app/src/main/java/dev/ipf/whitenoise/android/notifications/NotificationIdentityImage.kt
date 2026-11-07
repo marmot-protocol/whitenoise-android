@@ -47,10 +47,26 @@ internal fun LocalNotificationContent.identityImage(
 }
 
 /**
+ * A reaction card's picture is the person who reacted (#3635): their picture when one is in hand, else their
+ * monogram. It names no contact, because the final write's contact refresh would rebuild the card without its
+ * reaction artwork views.
+ */
+internal fun LocalNotificationContent.reactorImage(senderAvatar: Bitmap?): NotificationIdentityImage {
+    val seed = senderKey.ifBlank { notificationTag }
+    return NotificationIdentityImage(
+        bitmap = senderAvatar ?: notificationMonogramBitmap(senderName, seed),
+        title = senderName,
+        seed = seed,
+        contactKey = null,
+    )
+}
+
+/**
  * Where a card's two picture slots may still come from after its first post (#3311): the bitmap the first post drew,
  * authoritative when present, and the URL a missing one may resolve from. A present bitmap's URL is never fetched.
+ * [storedConversationLoader] reads MDK's stored copy of the picture the chat list draws (#3635) and is tried first.
  * [conversationLoader] supplies a group picture that has no URL, such as a Marmot encrypted group image, and is
- * consulted only when neither the bitmap nor the URL gives one.
+ * consulted only when neither the bitmap, the stored copy nor the URL gives one.
  */
 internal data class NotificationIdentityPictureSources(
     val conversationBitmap: Bitmap?,
@@ -58,6 +74,7 @@ internal data class NotificationIdentityPictureSources(
     val senderBitmap: Bitmap?,
     val senderUrl: String?,
     val conversationLoader: (suspend () -> Bitmap?)? = null,
+    val storedConversationLoader: (suspend () -> Bitmap?)? = null,
     /** The worker domain for [conversationUrl]: the public profiles for a direct chat, single-use for a group. */
     val conversationDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
@@ -65,11 +82,15 @@ internal data class NotificationIdentityPictureSources(
     val senderDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
 ) {
-    /** True when the card was drawn without a picture that a URL or the conversation loader may still supply. */
+    /** True when the card was drawn without a picture that a URL or a conversation loader may still supply. */
     val hasMissingPicture: Boolean
         get() =
-            (conversationBitmap == null && (!conversationUrl.isNullOrBlank() || conversationLoader != null)) ||
+            (conversationBitmap == null && (!conversationUrl.isNullOrBlank() || hasConversationLoader)) ||
                 (senderBitmap == null && !senderUrl.isNullOrBlank())
+
+    /** True when the stored copy or the encrypted download may still supply the conversation picture. */
+    private val hasConversationLoader: Boolean
+        get() = conversationLoader != null || storedConversationLoader != null
 }
 
 /**
