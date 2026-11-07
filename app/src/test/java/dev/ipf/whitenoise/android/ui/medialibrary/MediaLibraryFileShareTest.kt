@@ -15,6 +15,8 @@ import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.state.ATTACHMENT_PRESENTATION_MAX_BYTES
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -48,7 +50,7 @@ class MediaLibraryFileShareTest {
             registerShareTarget(PDF)
             val source = PatternedPlaintext(ATTACHMENT_PRESENTATION_MAX_BYTES + CHUNK_BYTES + 7)
 
-            shareLibraryFile(context, row("report.pdf", PDF), "Share", isCurrent = { true }) { source }
+            shareLibraryFile(context, row("report.pdf", PDF), "Share", currentRow = ::currentRow) { source }
 
             val uri = sharedStream(PDF)
             assertEquals("report.pdf", displayName(uri))
@@ -65,7 +67,7 @@ class MediaLibraryFileShareTest {
             registerShareTarget(PDF)
             val bytes = "retained upload bytes".encodeToByteArray()
 
-            shareLibraryFile(context, row("draft.pdf", PDF, mine = true), "Share", isCurrent = { true }) {
+            shareLibraryFile(context, row("draft.pdf", PDF, mine = true), "Share", currentRow = ::currentRow) {
                 AttachmentPlaintext.Bytes(bytes)
             }
 
@@ -74,23 +76,51 @@ class MediaLibraryFileShareTest {
             assertArrayEquals(bytes, context.contentResolver.openInputStream(uri)!!.use { it.readBytes() })
         }
 
-    /** A row that leaves the screen while its file is staged opens no share sheet and leaves no copy behind. */
+    /** A row rebound to another attachment while its file is staged opens no share sheet and leaves no copy behind. */
     @Test
-    fun rowLeavingDuringStagingSharesNothingAndDeletesTheStagedFile() =
+    fun rowReboundDuringStagingSharesNothingAndDeletesTheStagedFile() =
         runTest {
             clearSharedFiles()
             registerShareTarget(PDF)
+            val sharedRow = row("report.pdf", PDF)
+            var mounted = sharedRow
+            val staging = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
 
-            val failure =
-                runCatching {
-                    shareLibraryFile(context, row("report.pdf", PDF), "Share", isCurrent = { false }) {
-                        AttachmentPlaintext.Bytes("secret".encodeToByteArray())
-                    }
-                }.exceptionOrNull()
+            val sharing =
+                async {
+                    runCatching {
+                        shareLibraryFile(context, sharedRow, "Share", currentRow = { mounted }) {
+                            staging.complete(Unit)
+                            release.await()
+                            AttachmentPlaintext.Bytes("secret".encodeToByteArray())
+                        }
+                    }.exceptionOrNull()
+                }
+            staging.await()
+            mounted = row("other.pdf", PDF, attachmentIndex = 1)
+            release.complete(Unit)
+            val failure = sharing.await()
 
             assertTrue("$failure", failure is CancellationException)
             assertNull(shadowOf(RuntimeEnvironment.getApplication()).nextStartedActivity)
             assertTrue(sharedFiles().isEmpty())
+        }
+
+    /** A row recomposed with fresh data for the same attachment still shares it. */
+    @Test
+    fun rowRecomposedForTheSameAttachmentStillShares() =
+        runTest {
+            clearSharedFiles()
+            registerShareTarget(PDF)
+            val sharedRow = row("report.pdf", PDF)
+            val recomposed = sharedRow.copy(recordedAt = 2uL)
+
+            shareLibraryFile(context, sharedRow, "Share", currentRow = { recomposed }) {
+                AttachmentPlaintext.Bytes("bytes".encodeToByteArray())
+            }
+
+            assertEquals("report.pdf", displayName(sharedStream(PDF)))
         }
 
     /** The row's Share reads the streamed attachment source, never the budgeted whole-file byte transfer. */
@@ -180,9 +210,10 @@ class MediaLibraryFileShareTest {
         fileName: String,
         mediaType: String,
         mine: Boolean = false,
+        attachmentIndex: Int = 0,
     ) = SharedMediaRow(
         messageIdHex = "message",
-        attachmentIndex = 0,
+        attachmentIndex = attachmentIndex,
         reference =
             MediaAttachmentReferenceFfi(
                 locators = listOf(MediaLocatorFfi(kind = "blossom-v1", value = "https://cdn.example.test/blob")),
@@ -200,6 +231,9 @@ class MediaLibraryFileShareTest {
         recordedAt = 1uL,
         sender = "sender",
     )
+
+    /** The row as still mounted when the share finishes staging. */
+    private fun currentRow(): SharedMediaRow = row("report.pdf", PDF)
 
     private fun displayName(uri: Uri): String =
         context.contentResolver

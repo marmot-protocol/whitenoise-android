@@ -1266,7 +1266,7 @@ internal fun FileLibraryRow(
                                         context = context,
                                         row = sharedRow,
                                         chooserTitle = shareChooserTitle,
-                                        isCurrent = { currentRow.attachmentKey() == sharedRow.attachmentKey() },
+                                        currentRow = { currentRow },
                                     ) {
                                         attachmentSource(
                                             controller,
@@ -1297,19 +1297,20 @@ private fun SharedMediaRow.attachmentKey() = messageIdHex to attachmentIndex
 /**
  * Shares a Files-tab row's whole verified file through the outbound share sheet under its own name. The file is
  * staged from [source], so a file of any size is streamed rather than read into memory under the preview budget.
+ * The share is dropped once [currentRow] shows another attachment than [row].
  */
 internal suspend fun shareLibraryFile(
     context: Context,
     row: SharedMediaRow,
     chooserTitle: String,
-    isCurrent: () -> Boolean,
+    currentRow: () -> SharedMediaRow,
     source: suspend () -> AttachmentPlaintext,
 ) = shareAttachmentExternally(
     context = context,
     attachmentIndex = row.attachmentIndex,
     reference = row.reference,
     chooserTitle = chooserTitle,
-    isCurrent = isCurrent,
+    isCurrent = { currentRow().attachmentKey() == row.attachmentKey() },
     plaintext = source,
 )
 
