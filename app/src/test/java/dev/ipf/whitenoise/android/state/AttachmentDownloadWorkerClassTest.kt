@@ -13,6 +13,7 @@ import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
+import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.whitenoise.android.WhiteNoiseApplication
 import kotlinx.coroutines.CancellationException
@@ -296,6 +297,33 @@ class AttachmentDownloadWorkerClassTest {
                 listOf(request.accountRef, request.groupIdHex, request.messageIdHex, "fixture://private-stop-context")
             privateValues.forEach { value ->
                 assertFalse("stop diagnostics exposed private context", stopped.single().msg.contains(value))
+            }
+        }
+
+    /** A failed download logs MDK's terminal transfer state, even when wrapped, and no text from the failure. */
+    @Test
+    fun failedDownloadLogsTheNativeTerminalState() =
+        runTest {
+            val cases =
+                listOf(
+                    NativeAttachmentTerminalException(AttachmentTransferStateFfi.STORAGE_BLOCKED) to
+                        "type=NativeAttachmentTerminalException state=STORAGE_BLOCKED",
+                    IllegalStateException(
+                        "fixture://private-wrap",
+                        NativeAttachmentTerminalException(AttachmentTransferStateFfi.RETRY_EXHAUSTED),
+                    ) to "type=IllegalStateException state=RETRY_EXHAUSTED",
+                    IllegalStateException("fixture://private-plain") to "type=IllegalStateException",
+                )
+            for ((failure, expected) in cases) {
+                ShadowLog.clear()
+                buildWorkerWithDownloadOverride(downloadOverride = { _, _, _ -> throw failure }).doWork()
+
+                val failed =
+                    ShadowLog
+                        .getLogsForTag("DMAttachmentWorker")
+                        .filter { it.msg.startsWith("durable_attachment_download_failed") }
+                assertEquals("durable_attachment_download_failed $expected", failed.single().msg)
+                assertFalse("failure diagnostics exposed private text", failed.single().msg.contains("fixture://"))
             }
         }
 

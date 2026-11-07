@@ -12,6 +12,14 @@
         ]
       },
       {
+        "surface": "Failed attachment worker logs MarmotKit's terminal transfer state without identity",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
+        "anchor": "durable_attachment_download_failed type=",
+        "test_ids": [
+          "MED-017"
+        ]
+      },
+      {
         "surface": "Cancelled shared attachment fetch finishes its active worker and notification",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AttachmentDownloadWorker.kt",
         "anchor": "attachment_fetch_cancelled",
