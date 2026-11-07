@@ -956,7 +956,7 @@ internal fun MediaImageGridTile(
                 interactionSource = null,
                 indication =
                     rememberMediaViewerPressIndication(
-                        ready = presentation != null && !failed && !transfer.cancelling,
+                        ready = presentation != null && !transfer.cancelling,
                     ),
                 onLongClick = onLongPress,
                 // Two modes:
@@ -968,6 +968,8 @@ internal fun MediaImageGridTile(
                     when {
                         transfer.cancelling -> Unit
                         tooLargeToPreview -> onTap()
+                        // A shown image opens like the single bubble's, even if a sharper decode failed.
+                        presentation != null -> onTap()
                         failed ->
                             controller.retryAttachmentTransfer(
                                 messageIdHex,
@@ -975,7 +977,6 @@ internal fun MediaImageGridTile(
                                 onAccepted = { controller.requestAttachmentDownload(messageIdHex, attachmentIndex) },
                                 onFailure = { markFailed(it) },
                             )
-                        presentation != null -> onTap()
                         // Bytes already on the device, cached or the reader's own still held for upload, are only
                         // being read, so the tap opens the viewer now rather than downloading.
                         cachedPlaintextOnEntry || retainedPlaintextOnEntry -> onTap()
