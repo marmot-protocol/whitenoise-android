@@ -1292,6 +1292,7 @@
     <string name="voice_message_speed">Oynatma hızı %1$s</string>
     <string name="voice_message_failed">Sesli mesaj yüklenemedi</string>
     <string name="voice_message_locked">Kilitli</string>
+    <string name="voice_recording_resume">Devam et</string>
     <string name="reply_you">Sen</string>
     <string name="reply_media_photo">Fotoğraf</string>
     <string name="media_album">Albüm</string>

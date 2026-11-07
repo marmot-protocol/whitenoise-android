@@ -7,6 +7,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
@@ -42,6 +43,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -208,6 +210,7 @@ internal fun RecordingStripLeading(
     val pulseScale by rememberInfiniteRecordingPulse()
     val canceling = controller.willCancel
     val locked = controller.locked
+    val paused = controller.isPaused
     val cancelTint = MaterialTheme.colorScheme.error
     val nearLimit = controller.isNearLimit
     val remainingForDisplay = ((controller.remainingMs + 999L) / 1000L) * 1000L
@@ -234,10 +237,13 @@ internal fun RecordingStripLeading(
                 Modifier
                     .size(10.dp)
                     .graphicsLayer {
-                        scaleX = pulseScale
-                        scaleY = pulseScale
+                        val scale = if (paused) 1f else pulseScale
+                        scaleX = scale
+                        scaleY = scale
                     }.clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.error),
+                    .background(
+                        if (paused) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                    ),
         )
         Text(
             timing,
@@ -246,7 +252,24 @@ internal fun RecordingStripLeading(
             modifier = if (nearLimit) Modifier.clearAndSetSemantics { contentDescription = timerLabel } else Modifier,
         )
         Spacer(Modifier.weight(1f))
-        if (locked && !nearLimit) {
+        if (paused) {
+            // Another in-app sound took the microphone's focus: the take is
+            // held in place and only continues when the user asks.
+            // Compose extends this compact target's hit area to the 48dp minimum.
+            Text(
+                stringResource(R.string.voice_recording_resume),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier =
+                    Modifier
+                        .testTag("composer.voice.resume")
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(role = Role.Button) { controller.resume() }
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+            )
+        } else if (locked && !nearLimit) {
             // Locked: the user has handed off control. The hint copy
             // collapses to a compact "Locked" indicator so the row stays
             // visually quiet while the trailing Stop+Trash do the work.
