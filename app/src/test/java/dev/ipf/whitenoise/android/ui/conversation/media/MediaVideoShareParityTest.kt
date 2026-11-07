@@ -1,8 +1,12 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.pm.ApplicationInfo
+import android.content.pm.ResolveInfo
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
@@ -35,6 +39,7 @@ import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.FileProviderStrategyCacheRule
+import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
@@ -49,6 +54,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowView
 import org.robolectric.util.ReflectionHelpers
@@ -356,6 +362,14 @@ class MediaVideoShareParityTest {
             IntentCompat.getParcelableExtra(shareIntent, Intent.EXTRA_STREAM, android.net.Uri::class.java)
                 ?: error("share intent did not contain a stream")
 
+        val excluded =
+            IntentCompat
+                .getParcelableArrayExtra(chooser, Intent.EXTRA_EXCLUDE_COMPONENTS, ComponentName::class.java)
+                .orEmpty()
+
+        assertEquals(Intent.ACTION_CHOOSER, chooser.action)
+        assertEquals(context.getString(R.string.shared_media_share), chooser.getCharSequenceExtra(Intent.EXTRA_TITLE))
+        assertTrue(ComponentName(context, MainActivity::class.java) in excluded)
         assertEquals(Intent.ACTION_SEND, shareIntent.action)
         assertEquals(TARGET_MEDIA_TYPE, shareIntent.type)
         assertEquals("content", stream.scheme)
@@ -367,6 +381,7 @@ class MediaVideoShareParityTest {
     }
 
     private fun fixture(): ShareFixture {
+        registerShareTarget(TARGET_MEDIA_TYPE)
         val appState =
             WhiteNoiseAppState(
                 context = context,
@@ -384,6 +399,22 @@ class MediaVideoShareParityTest {
             targetBytes = targetBytes,
             neighborBytes = neighborBytes,
             targetFile = File.createTempFile("selected-video", ".webm").apply { writeBytes(targetBytes) },
+        )
+    }
+
+    /** Registers an external app that accepts a shared file of [mediaType]. */
+    private fun registerShareTarget(mediaType: String) {
+        shadowOf(context.packageManager).addResolveInfoForIntent(
+            Intent(Intent.ACTION_SEND).setType(mediaType),
+            ResolveInfo().apply {
+                activityInfo =
+                    ActivityInfo().apply {
+                        packageName = SHARE_TARGET_PACKAGE
+                        name = "$SHARE_TARGET_PACKAGE.ShareActivity"
+                        exported = true
+                        applicationInfo = ApplicationInfo().apply { packageName = SHARE_TARGET_PACKAGE }
+                    }
+            },
         )
     }
 
@@ -477,8 +508,13 @@ class MediaVideoShareParityTest {
 
         suspend fun share(request: MediaViewerShareRequest): Result<Unit> {
             requests += request
-            return shareVideo(shareContext, targetFile, request.reference.fileName, request.reference.mediaType)
-                .also(outcomes::add)
+            return shareVideo(
+                shareContext,
+                targetFile,
+                request.reference.fileName,
+                request.reference.mediaType,
+                chooserTitle = shareContext.getString(R.string.shared_media_share),
+            ).also(outcomes::add)
         }
 
         fun clearCaptures() {
@@ -511,5 +547,6 @@ class MediaVideoShareParityTest {
         const val TARGET_MESSAGE_ID = "target-message"
         const val TARGET_ATTACHMENT_INDEX = 7
         const val TARGET_MEDIA_TYPE = "video/webm"
+        const val SHARE_TARGET_PACKAGE = "example.share.target"
     }
 }
