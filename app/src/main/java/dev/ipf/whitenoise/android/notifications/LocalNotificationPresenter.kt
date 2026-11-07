@@ -1272,7 +1272,8 @@ class LocalNotificationPresenter(
     /**
      * Resolves both picture slots concurrently off the main thread, keeping a present bitmap and never fetching it.
      * The conversation slot first reads MDK's stored copy of the picture the chat list draws (#3635), so a picture
-     * already on the device never depends on the network. A conversation picture with no URL, such as a group's
+     * already on the device never depends on the network, and it replaces a picture the first post drew from
+     * elsewhere, which stays when the store has none. A conversation picture with no URL, such as a group's
      * encrypted image, then comes from the sources' loader. The sender slot tries its loader before its URL (#3635).
      * Loaders run only in the late refresh, after the enrichment permit is released, so they get a longer bound than
      * a URL picture and a slow network or a newly started decoder still gets the picture. A loader that fails yields
@@ -1283,8 +1284,8 @@ class LocalNotificationPresenter(
             coroutineScope {
                 val conversationAvatar =
                     async {
-                        sources.conversationBitmap
-                            ?: sources.storedConversationLoader?.let { boundedIdentityLoad(it) }
+                        sources.storedConversationLoader?.let { boundedIdentityLoad(it) }
+                            ?: sources.conversationBitmap
                             ?: withContext(MediaTrustScope.element(sources.conversationDomain)) {
                                 avatarBitmapResolver(sources.conversationUrl)
                             }
@@ -1472,14 +1473,16 @@ class LocalNotificationPresenter(
 
     /**
      * The card's final pictures once at least one it was drawn without has arrived, or null when none has. Nothing is
-     * fetched while previews are hidden, and a picture the card already showed is never fetched again.
+     * fetched while previews are hidden, and a picture the card already showed is never fetched again. A stored
+     * conversation picture with the same pixels as the one the card shows changes nothing.
      */
     private suspend fun arrivedPictures(sources: NotificationIdentityPictureSources): Pair<Bitmap?, Bitmap?>? =
         if (!sources.hasMissingPicture || !NotificationPreviewPreferences.capture(context).allowed) {
             null
         } else {
             resolveAvatars(sources).takeIf { (conversation, sender) ->
-                conversation !== sources.conversationBitmap || sender !== sources.senderBitmap
+                val shown = sources.conversationBitmap
+                (conversation !== shown && conversation?.sameAs(shown) != true) || sender !== sources.senderBitmap
             }
         }
 

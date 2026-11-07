@@ -13340,11 +13340,13 @@ class WhiteNoiseAppState private constructor(
      * #3311: runs the post-write avatar prewarm and returns the late picture
      * refresh it enables for a card first drawn without its conversation or
      * sender picture, or null when no picture can still arrive. [content] is
-     * what the card shows. A missing conversation picture is read first from
-     * MDK's stored copy of the picture the chat list draws (#3635), so a
-     * picture already on the device needs no download. A missing sender
-     * picture gets a loader with the late refresh's longer bound. A reaction
-     * card draws only the person who reacted.
+     * what the card shows. Unless the card already shows it, the stored
+     * picture the chat list draws is read first from MDK's copy (#3635), so a
+     * picture already on the device needs no download and replaces one the
+     * first post drew from elsewhere, such as a direct chat's published
+     * sender picture on an account whose chat list was not loaded. A missing
+     * sender picture gets a loader with the late refresh's longer bound. A
+     * reaction card draws only the person who reacted.
      */
     private suspend fun prepareLateNotificationIdentity(
         update: NotificationUpdateFfi,
@@ -13364,10 +13366,11 @@ class WhiteNoiseAppState private constructor(
                 isReaction = reaction,
             )
         val sources =
-            if (reaction || urlSources.conversationBitmap != null) {
+            if (reaction || firstPost.avatars.storedConversationBitmap != null) {
                 urlSources
             } else {
-                val encryptedGroupPicture = !update.isDm && urlSources.conversationUrl.isNullOrBlank()
+                val encryptedGroupPicture =
+                    !update.isDm && urlSources.conversationBitmap == null && urlSources.conversationUrl.isNullOrBlank()
                 urlSources.copy(
                     storedConversationLoader = storedConversationIdentityLoader(update),
                     conversationLoader = if (encryptedGroupPicture) encryptedGroupIdentityLoader(update) else null,

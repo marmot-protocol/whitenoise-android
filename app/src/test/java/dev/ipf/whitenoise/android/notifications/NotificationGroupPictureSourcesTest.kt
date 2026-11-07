@@ -149,6 +149,49 @@ class NotificationGroupPictureSourcesTest {
         }
 
     /**
+     * #3635: a direct chat first drawn with the contact's published picture, as on an account whose chat list was not
+     * loaded, ends on the stored picture the chat list shows, such as a private contact picture.
+     */
+    @Test
+    fun lateIdentityRefreshReplacesAFallbackWithTheStoredPicture() =
+        runBlocking {
+            val presenter = presenter(resolver = { error("a shown picture is never fetched again") })
+            val published = solid(Color.BLUE)
+            show(presenter, dm(), conversation = published, sender = published)
+            val sources =
+                NotificationIdentityPictureSources(
+                    published,
+                    PICTURE_URL,
+                    published,
+                    PICTURE_URL,
+                    storedConversationLoader = { solid(Color.GREEN) },
+                )
+
+            assertTrue(refreshLateIdentity(presenter, dm(), sources))
+
+            assertEquals("the chat list's picture", Color.GREEN, identityPixel(liveCard()))
+        }
+
+    /** A stored picture that is missing or has the shown picture's pixels leaves the card as it was posted. */
+    @Test
+    fun lateIdentityRefreshKeepsTheShownPictureWithoutADifferentStoredOne() =
+        runBlocking {
+            val posts = mutableListOf<Notification>()
+            val presenter = presenter(posts, resolver = { error("a shown picture is never fetched again") })
+            val published = solid(Color.BLUE)
+            show(presenter, dm(), conversation = published, sender = published)
+            val shown = NotificationIdentityPictureSources(published, PICTURE_URL, published, PICTURE_URL)
+            val noneStored = shown.copy(storedConversationLoader = { null })
+            val samePixels = shown.copy(storedConversationLoader = { solid(Color.BLUE) })
+
+            assertFalse(refreshLateIdentity(presenter, dm(), noneStored))
+            assertFalse(refreshLateIdentity(presenter, dm(), samePixels))
+
+            assertEquals("no silent rewrite", 1, posts.size)
+            assertEquals(Color.BLUE, identityPixel(liveCard()))
+        }
+
+    /**
      * #3635: a member's picture that the short URL fetch misses, such as a cold download, still reaches their row
      * through the late refresh's sender loader, and the group picture stays.
      */
@@ -271,6 +314,9 @@ class NotificationGroupPictureSourcesTest {
 
     /** A group message for the fixture account and conversation. */
     private fun group() = notificationUpdate(isDm = false, notificationKey = KEY, conversationKey = CONVERSATION)
+
+    /** A direct-chat message for the fixture account and conversation. */
+    private fun dm() = notificationUpdate(isDm = true, notificationKey = KEY, conversationKey = CONVERSATION)
 
     /** A small single-color bitmap whose pixels identify which picture reached the card. */
     private fun solid(color: Int): Bitmap {

@@ -200,7 +200,9 @@ class NotificationIdentityImageCoverageTest {
     /**
      * #3635: a card's conversation picture is the one the chat list draws. The first post peeks the pixels the chat
      * list decoded for the row's stored selected avatar, and the late refresh reads MDK's stored copy first, through
-     * the chat list's own adoption rule, never acquiring a missing copy and never behind the app lock.
+     * the chat list's own adoption rule, never acquiring a missing copy and never behind the app lock. Only a card that
+     * already shows the stored picture skips it, so one first drawn from elsewhere, such as a direct chat's published
+     * sender picture on an account whose chat list was not loaded, still ends on the chat list's picture.
      */
     @Test
     fun conversationPictureComesFromTheChatListsStoredAvatarFirst() {
@@ -221,6 +223,11 @@ class NotificationIdentityImageCoverageTest {
             "the late refresh carries the stored copy",
             "storedConversationLoader = storedConversationIdentityLoader(update)" in prepare,
         )
+        assertTrue(
+            "unless the card already shows it",
+            "firstPost.avatars.storedConversationBitmap != null" in prepare,
+        )
+        assertFalse("not whenever it shows any picture", "urlSources.conversationBitmap != null" in prepare)
         val stored = appState.functionBody("storedConversationIdentityLoader")
         assertTrue("from the chat list's own row", "presentedChatListRow(" in stored)
         assertTrue("through its adoption rule", "storedNotificationAvatar(" in stored)
@@ -230,11 +237,17 @@ class NotificationIdentityImageCoverageTest {
         )
         assertTrue("never acquiring a missing copy", "acquireMissing = false" in stored)
         assertTrue("nothing is read behind the lock", stored.split("appLockScreenVisible").size - 1 >= 2)
-        val resolve = source("LocalNotificationPresenter.kt").declaration("private suspend fun resolveAvatars(")
+        val presenter = source("LocalNotificationPresenter.kt")
+        val resolve = presenter.declaration("private suspend fun resolveAvatars(")
         val storedAt = resolve.indexOf("sources.storedConversationLoader")
         val urlAt = resolve.indexOf("sources.conversationUrl")
         assertTrue("the stored copy comes before the URL", storedAt in 0 until urlAt)
         assertTrue("and before the encrypted download", storedAt < resolve.indexOf("sources.conversationLoader"))
+        assertTrue("and replaces the picture the card shows", storedAt < resolve.indexOf("sources.conversationBitmap"))
+        assertTrue(
+            "a stored copy with the shown pixels changes nothing",
+            "sameAs(" in presenter.declaration("private suspend fun arrivedPictures("),
+        )
     }
 
     /**

@@ -64,7 +64,9 @@ internal fun LocalNotificationContent.reactorImage(senderAvatar: Bitmap?): Notif
 /**
  * Where a card's two picture slots may still come from after its first post (#3311): the bitmap the first post drew,
  * authoritative when present, and the URL a missing one may resolve from. A present bitmap's URL is never fetched.
- * [storedConversationLoader] reads MDK's stored copy of the picture the chat list draws (#3635) and is tried first.
+ * [storedConversationLoader] reads MDK's stored copy of the picture the chat list draws (#3635) and is tried first,
+ * also over a [conversationBitmap] the first post drew from elsewhere, such as a direct chat's published sender
+ * picture on an account whose chat list was not loaded, so the card still ends on the picture the chat list shows.
  * [conversationLoader] supplies a group picture that has no URL, such as a Marmot encrypted group image, and is
  * consulted only when neither the bitmap, the stored copy nor the URL gives one. [senderLoader] fetches the sender's
  * picture with the late refresh's longer bound, before the bounded URL fetch, so a cold download still arrives.
@@ -84,15 +86,15 @@ internal data class NotificationIdentityPictureSources(
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
     val senderLoader: (suspend () -> Bitmap?)? = null,
 ) {
-    /** True when the card was drawn without a picture that a URL or a loader may still supply. */
+    /**
+     * True when the card was drawn without a picture that a URL or a loader may still supply, or without the stored
+     * picture the chat list shows.
+     */
     val hasMissingPicture: Boolean
         get() =
-            (conversationBitmap == null && (!conversationUrl.isNullOrBlank() || hasConversationLoader)) ||
+            storedConversationLoader != null ||
+                (conversationBitmap == null && (!conversationUrl.isNullOrBlank() || conversationLoader != null)) ||
                 (senderBitmap == null && (!senderUrl.isNullOrBlank() || senderLoader != null))
-
-    /** True when the stored copy or the encrypted download may still supply the conversation picture. */
-    private val hasConversationLoader: Boolean
-        get() = conversationLoader != null || storedConversationLoader != null
 }
 
 /**
