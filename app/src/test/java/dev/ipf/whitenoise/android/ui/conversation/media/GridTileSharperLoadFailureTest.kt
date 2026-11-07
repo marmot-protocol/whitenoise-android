@@ -1,0 +1,147 @@
+package dev.ipf.whitenoise.android.ui.conversation.media
+
+import android.content.Context
+import android.graphics.Bitmap
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
+import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.MediaAutoDownloadNetwork
+import dev.ipf.whitenoise.android.state.MediaAutoDownloadType
+import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture
+import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.reference
+import dev.ipf.whitenoise.android.state.MediaDownloadIntegrationFixture.Companion.request
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.conversationTimelineTestGroup
+import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import java.io.IOException
+
+/**
+ * An album tile showing a cached image opens the viewer on tap after its sharper load fails, as the single-image
+ * bubble does. A tile showing nothing keeps Retry.
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36], qualifiers = "en-rUS-w360dp-h800dp-mdpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+class GridTileSharperLoadFailureTest {
+    @get:Rule
+    val composeRule = createComposeRule()
+
+    private lateinit var fixture: MediaDownloadIntegrationFixture
+    private lateinit var controller: ConversationController
+    private var opens = 0
+
+    @Before
+    fun setUp() {
+        fixture = MediaDownloadIntegrationFixture()
+        controller =
+            ConversationController(
+                appState = fixture.state,
+                initialGroup = conversationTimelineTestGroup().copy(groupIdHex = MediaDownloadIntegrationFixture.GROUP),
+            )
+        enableAutomaticImages()
+    }
+
+    @After
+    fun tearDown() {
+        fixture.close()
+    }
+
+    @Test
+    fun aTileShowingACachedThumbnailOpensTheViewerAfterTheSharperLoadFails() {
+        val thumbnail = Bitmap.createBitmap(SMALL_EDGE, SMALL_EDGE, Bitmap.Config.ARGB_8888)
+        controller.cacheThumbnail(request(0).messageIdHex, 0, thumbnail, SMALL_EDGE)
+        composeRule.setContent { WhiteNoiseTheme { GridTile() } }
+        awaitTransfers(1)
+        composeRule.runOnIdle { fixture.calls.single().fail(IOException("download failed")) }
+        composeRule.waitForIdle()
+        composeRule.onAllNodesWithContentDescription(text(R.string.media_tap_to_retry)).assertCountEquals(0)
+
+        composeRule.onNodeWithTag(TILE_TAG).performClick()
+
+        composeRule.runOnIdle { assertEquals("a tap on the visible image did not open the viewer", 1, opens) }
+        assertEquals("a tap on the visible image retried the transfer", 0, fixture.retryDemands.get())
+        assertEquals("a tap on the visible image started a transfer", 1, fixture.calls.size)
+    }
+
+    @Test
+    fun aTileShowingNothingStillRetriesAfterAFailedLoad() {
+        composeRule.setContent { WhiteNoiseTheme { GridTile() } }
+        awaitTransfers(1)
+        composeRule.runOnIdle { fixture.calls.single().fail(IOException("download failed")) }
+        val retry = text(R.string.media_tap_to_retry)
+        composeRule.waitUntil(WAIT_MILLIS) {
+            composeRule.waitForIdle()
+            composeRule.onAllNodesWithContentDescription(retry).fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeRule.onNodeWithTag(TILE_TAG).performClick()
+
+        composeRule.waitUntil(WAIT_MILLIS) {
+            composeRule.waitForIdle()
+            fixture.retryDemands.get() > 0 || fixture.calls.size > 1
+        }
+        composeRule.runOnIdle { assertEquals("a tap on Retry opened the viewer", 0, opens) }
+    }
+
+    private fun awaitTransfers(count: Int) {
+        composeRule.waitUntil(WAIT_MILLIS) {
+            composeRule.waitForIdle()
+            fixture.calls.size == count
+        }
+    }
+
+    /** The production album tile, sized larger than the cached thumbnail so it asks for a sharper decode. */
+    @Composable
+    private fun GridTile() {
+        MediaImageGridTile(
+            messageIdHex = request(0).messageIdHex,
+            attachmentIndex = 0,
+            reference = reference(0),
+            controller = controller,
+            appState = fixture.state,
+            mine = false,
+            onTap = { opens++ },
+            overflowCount = 0,
+            modifier = Modifier.size(TILE_SIZE).testTag(TILE_TAG),
+        )
+    }
+
+    /** Selects Wi-Fi without broadcasting a real connectivity change, so the tile downloads automatically. */
+    private fun enableAutomaticImages() {
+        WhiteNoiseAppState::class.java
+            .getDeclaredField("activeNetworkTypesSnapshot")
+            .apply { isAccessible = true }
+            .set(fixture.state, setOf(MediaAutoDownloadNetwork.WiFi))
+        fixture.state.setMediaAutoDownload(MediaAutoDownloadType.Image, MediaAutoDownloadNetwork.WiFi, true)
+        assertTrue(fixture.state.shouldAutoDownloadMedia(MediaAutoDownloadType.Image))
+    }
+
+    private fun text(id: Int): String = ApplicationProvider.getApplicationContext<Context>().getString(id)
+
+    private companion object {
+        const val TILE_TAG = "sharper-load-tile"
+        const val WAIT_MILLIS = 20_000L
+        const val SMALL_EDGE = 16
+        val TILE_SIZE = 240.dp
+    }
+}
