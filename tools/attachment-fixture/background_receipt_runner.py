@@ -17,6 +17,7 @@ from fixture_relay import FixtureRelay
 from fixture_server import FixtureServer
 from media_lifecycle_runner import failure_kind, metrics_of, passed
 from background_receipt_checker import check_background_receipt
+from background_receipt_wifi import WifiAssociation, WifiSetupError
 
 TEST = ("dev.ipf.whitenoise.android.media.IncomingAttachmentBackgroundDownloadAndroidTest"
         "#receivedMediaDownloadsInTheBackgroundUnderItsOwnPolicy")
@@ -25,7 +26,7 @@ DISCONNECT_WAIT_SECONDS = 15
 STAGES = ("main", "resume")
 
 
-def instrument(adb, serial, ports, stage, session):
+def instrument(adb, serial, ports, stage, session, wifi_ssid_hex):
     """Run one fixture process for [stage] on the preserved [session]; the main stage ends in a crash by design."""
     if stage not in STAGES:
         raise ValueError("unknown fixture stage")
@@ -34,6 +35,7 @@ def instrument(adb, serial, ports, stage, session):
         "-e", "class", TEST, "-e", "allowControlledAttachmentProbe", "true",
         "-e", "fixtureBlobPort", str(ports[0]), "-e", "fixtureRelayPort", str(ports[1]),
         "-e", "fixtureBackgroundStage", stage, "-e", "fixtureRestartSession", session,
+        "-e", "fixtureWifiSsidHex", wifi_ssid_hex,
         APP + ".test/androidx.test.runner.AndroidJUnitRunner",
     ]
     return subprocess.run(command, check=False, capture_output=True, text=True,
@@ -108,7 +110,11 @@ def run(adb, serial, root, output, budget_profile="reference-api30-arm64"):
               "stages": []}
     start = len(server.ledger.snapshot())
     forwards, threads, started, failure = [], [], [], None
+    wifi = None
     try:
+        wifi = WifiAssociation(lambda *args, timeout: adb_command(adb, serial, "shell", *args, timeout=timeout))
+        wifi_ssid_hex = wifi.prepare()
+        report["wifi_setup"] = {"advertised_open_ap_selected": True, "radio_enabled": True}
         for service in (server, relay):
             thread = threading.Thread(target=service.serve_forever, daemon=True)
             thread.start()
@@ -119,7 +125,7 @@ def run(adb, serial, root, output, budget_profile="reference-api30-arm64"):
             adb_command(adb, serial, "reverse", "--no-rebind", f"tcp:{port}", f"tcp:{port}")
             forwards.append(port)
         session = str(uuid.uuid4())
-        main_output = instrument(adb, serial, ports, "main", session)
+        main_output = instrument(adb, serial, ports, "main", session, wifi_ssid_hex)
         report["metrics"] += metrics_of(main_output)
         report["process_ended_abruptly"] = ended_abruptly(main_output)
         report["stages"].append({"stage": "main", "passed": report["process_ended_abruptly"],
@@ -130,7 +136,7 @@ def run(adb, serial, root, output, budget_profile="reference-api30-arm64"):
             release_held_body(server)
             report["interrupted_acquisition_ended"] = await_held_disconnect(server, start)
             if report["interrupted_acquisition_ended"]:
-                resume_output = instrument(adb, serial, ports, "resume", session)
+                resume_output = instrument(adb, serial, ports, "resume", session, wifi_ssid_hex)
                 report["metrics"] += metrics_of(resume_output)
                 report["stages"].append({"stage": "resume", "passed": passed(resume_output),
                                          "instrumentation": result_lines(resume_output),
@@ -148,6 +154,10 @@ def run(adb, serial, root, output, budget_profile="reference-api30-arm64"):
     except (subprocess.SubprocessError, OSError, ValueError) as error:
         failure = error
         report["failure_class"] = type(error).__name__
+        if isinstance(error, WifiSetupError):
+            report["wifi_setup_failure"] = error.reason
+            if error.structure is not None:
+                report["wifi_setup_structure"] = error.structure
     finally:
         # Failed and partial attempts stay in the ledger and report; nothing is reset.
         time.sleep(0.5)
@@ -171,7 +181,16 @@ def run(adb, serial, root, output, budget_profile="reference-api30-arm64"):
             service.server_close()
         for thread in threads:
             thread.join(5)
-        report["qualified"] = report["qualified"] and not report["reverse_cleanup_failed"]
+        report["wifi_cleanup_failed"] = False
+        if wifi is not None:
+            try:
+                wifi.cleanup()
+            except (subprocess.SubprocessError, OSError, ValueError) as error:
+                report["wifi_cleanup_failed"] = True
+                report["wifi_cleanup_failure"] = (error.reason if isinstance(error, WifiSetupError)
+                                                  else "command_or_read_failure")
+        report["qualified"] = (report["qualified"] and not report["reverse_cleanup_failed"]
+                               and not report["wifi_cleanup_failed"])
         output.write_text(json.dumps(report, indent=2) + "\n")
     if failure is not None or not report["qualified"]:
         raise RuntimeError("background receipt fixture failed; see the redacted report, not a closure claim")

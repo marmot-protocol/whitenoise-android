@@ -1,0 +1,25 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentPreparationStatus.kt",
+  "legacy_sha256": "945e25deef0a5178ee3b4145c987412b607f827ffb9196b859a5cd6f24d54003",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "AttachmentPreparationStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentPreparationStatus.kt",
+        "anchor": "fun AttachmentPreparationStatus(",
+        "test_ids": [
+          "MED-001"
+        ]
+      },
+      {
+        "surface": "R.string.media_preparing_attachment",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentPreparationStatus.kt",
+        "anchor": "R.string.media_preparing_attachment",
+        "test_ids": [
+          "MED-001"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

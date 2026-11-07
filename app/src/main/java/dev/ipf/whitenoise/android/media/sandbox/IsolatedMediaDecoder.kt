@@ -16,22 +16,35 @@ internal object IsolatedMediaDecoder {
     @Volatile private var mediaTransport: MediaDecodeTransport? = null
     private var installedContext: Context? = null
     private var imageOwner: IsolatedMediaTransport? = null
+    private var mediaOwner: IsolatedAutomaticAvTransport? = null
 
     @Volatile internal var lastIsolation: WorkerIsolation? = null
         private set
 
-    internal fun recordIsolation(result: android.os.Bundle) {
-        lastIsolation =
-            WorkerIsolation(
-                result.getInt("uid"),
-                result.getBoolean("isolated"),
-                result.getBoolean("internetGranted"),
-                result.getBoolean("runtimeInitialized"),
-                result.getBoolean("privateCanaryDenied"),
-                result.getInt("privateCanaryErrno"),
-                result.getInt("inputWriteErrno", -1),
-            )
+    @Volatile internal var lastAvIsolation: WorkerIsolation? = null
+        private set
+
+    /** Stores the attested automatic A/V isolation receipt without treating it as device qualification. */
+    internal fun recordAvIsolation(result: android.os.Bundle) {
+        lastAvIsolation = isolationReceipt(result)
     }
+
+    /** Stores the latest accepted isolation receipt for diagnostics without granting a new source capability. */
+    internal fun recordIsolation(result: android.os.Bundle) {
+        lastIsolation = isolationReceipt(result)
+    }
+
+    /** Returns the retained diagnostic receipt rather than probing or parsing another source. */
+    private fun isolationReceipt(result: android.os.Bundle): WorkerIsolation =
+        WorkerIsolation(
+            result.getInt("uid"),
+            result.getBoolean("isolated"),
+            result.getBoolean("internetGranted"),
+            result.getBoolean("runtimeInitialized"),
+            result.getBoolean("privateCanaryDenied"),
+            result.getInt("privateCanaryErrno"),
+            result.getInt("inputWriteErrno", -1),
+        )
 
     /**
      * Installs domain-bound still-image worker generations (#3373), owned for the process's lifetime: a worker
@@ -51,7 +64,13 @@ internal object IsolatedMediaDecoder {
                 ).also { imageOwner = it }
             owner.activateSession()
             transport = owner
-            mediaTransport = PlatformMediaTransport(context.applicationContext)
+            val automaticOwner =
+                mediaOwner ?: IsolatedAutomaticAvTransport(
+                    context.applicationContext,
+                    "automatic_av",
+                ).also { mediaOwner = it }
+            automaticOwner.activateSession()
+            mediaTransport = automaticOwner
         }
     }
 
@@ -60,6 +79,7 @@ internal object IsolatedMediaDecoder {
     internal fun installTestTransport(next: MediaDecodeTransport?) {
         (transport as? ReusableMediaTransport)?.close()
         imageOwner?.invalidateSession()
+        mediaOwner?.invalidateSession()
         transport = next
         mediaTransport = next
     }
@@ -74,15 +94,21 @@ internal object IsolatedMediaDecoder {
         }
     }
 
+    /** Revokes the selected transport without inventing a worker-death observation. */
     @Synchronized
     fun clear() {
         IsolatedAnimationSession.retireActive()
+        RawAvPlaybackEngine.retireAll()
         if (transport === imageOwner) {
             imageOwner?.invalidateSession()
         } else {
             (transport as? java.io.Closeable)?.close()
         }
-        (mediaTransport as? java.io.Closeable)?.close()
+        if (mediaTransport === mediaOwner) {
+            mediaOwner?.invalidateSession()
+        } else {
+            (mediaTransport as? java.io.Closeable)?.close()
+        }
         transport = null
         mediaTransport = null
     }
@@ -126,6 +152,33 @@ internal object IsolatedMediaDecoder {
         uri: Uri,
         edge: Int,
     ): MediaProbe? = safely { mediaTransport?.probeUri(resolver, uri, edge) }
+
+    /** Blocking compressed-audio work has a separate bounded analysis lane. */
+    internal fun openAudioStream(file: java.io.File): IsolatedAvStream {
+        val context =
+            synchronized(this) { installedContext } ?: throw java.io.IOException("Media decoder is unavailable")
+        return IsolatedAvStream.openFile(
+            context,
+            file,
+            wantVideo = false,
+            wantAudio = true,
+            lane = AvStreamLane.Analysis,
+        )
+    }
+
+    fun probeUriAt(
+        resolver: ContentResolver,
+        uri: Uri,
+        positionMs: Long,
+        edge: Int = 1280,
+    ): MediaProbe? =
+        safely {
+            if (positionMs !in 0..MAX_MEDIA_DURATION_MS) {
+                null
+            } else {
+                mediaTransport?.probeUriAt(resolver, uri, positionMs, edge)
+            }
+        }
 
     internal fun exerciseWatchdogForTest() {
         check(dev.ipf.whitenoise.android.BuildConfig.DEBUG)

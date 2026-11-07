@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.media.sandbox
 
+import android.app.UiAutomation
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
 import android.os.Process
@@ -20,7 +21,10 @@ class AvCapabilityLogCaptureDeviceTest {
     /** Parent log traffic must not evict the retired worker's begin and terminal records. */
     @Test
     fun workerDiagnosticsSurviveUnrelatedProcessLogTraffic() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        // Initialize the shell connection before the worker and the timed noise capture.
+        val automation = instrumentation.uiAutomation
+        val context = instrumentation.targetContext
         val token = UUID.randomUUID().toString().replace("-", "")
         val fixture = File(context.cacheDir, "av-log-capture-$token.bin")
         val canary = File(context.filesDir, "media-containment-canary")
@@ -34,8 +38,11 @@ class AvCapabilityLogCaptureDeviceTest {
                 val evidence = observed.observation
                 val workerPid = evidence.getInt("kernel_ready_pid")
                 check(workerPid != Process.myPid()) { "Noise must originate outside the worker" }
-                repeat(512) { index -> Log.i("AvCaptureNoise", "$token|$index") }
-                awaitParentNoise(token)
+                repeat(512) { index ->
+                    Log.i("AvCaptureNoise", "$token|$index")
+                    if (index % 32 == 31) SystemClock.sleep(10)
+                }
+                awaitParentNoise(automation, token)
                 val rows =
                     AvCapabilityLogs.read(
                         AvProbeTuple(token, "log_capture_noise", 1),
@@ -51,20 +58,34 @@ class AvCapabilityLogCaptureDeviceTest {
         }
     }
 
-    /** Establish that logd consumed the final fresh marker before testing the worker's older tail. */
-    private fun awaitParentNoise(token: String) {
+    /** Prove enough distinct foreign records exist to evict the worker from an unfiltered 256-line tail. */
+    private fun awaitParentNoise(
+        automation: UiAutomation,
+        token: String,
+    ) {
         val deadline = SystemClock.elapsedRealtime() + 3000
         do {
-            if (parentNoise(deadline).lineSequence().any { it == "$token|511" }) return
+            val prefix = "$token|"
+            val observed =
+                parentNoise(automation, deadline)
+                    .lineSequence()
+                    .filter { it.startsWith(prefix) }
+                    .mapNotNull { it.removePrefix(prefix).toIntOrNull() }
+                    .filter { it in 0..511 }
+                    .toSet()
+            if (observed.size >= 256) return
             SystemClock.sleep(10)
         } while (SystemClock.elapsedRealtime() < deadline)
-        error("Parent noise was not observed by logd within its capture bound")
+        error("Fewer than 256 distinct parent noise records were observed within the capture bound")
     }
 
-    /** Read a finite parent-only tail under one shared deadline and a 32KiB output ceiling. */
-    private fun parentNoise(deadline: Long): String {
-        val command = "logcat --pid=${Process.myPid()} -d -t 256 -v raw -s AvCaptureNoise:I '*:S'"
-        val shell = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)
+    /** Read a finite parent-only tail with headroom for the 256-record proof and the same 32KiB ceiling. */
+    private fun parentNoise(
+        automation: UiAutomation,
+        deadline: Long,
+    ): String {
+        val command = "logcat --pid=${Process.myPid()} -d -t 512 -v raw -s AvCaptureNoise:I '*:S'"
+        val shell = automation.executeShellCommand(command)
         return ParcelFileDescriptor.AutoCloseInputStream(shell).use { input ->
             val output = ByteArrayOutputStream()
             val buffer = ByteArray(4096)

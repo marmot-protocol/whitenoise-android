@@ -16,6 +16,7 @@ object AudioFocusOwner {
         Voice,
         Tts,
         Dictation,
+        Video,
     }
 
     val ttsSpeechAttributes: AudioAttributes =

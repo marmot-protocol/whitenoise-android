@@ -13,6 +13,143 @@ import org.junit.Test
 import java.lang.reflect.Proxy
 
 class NativeAttachmentPermissionsTest {
+    /** Duplicate effective callbacks must not revoke the native lease; real identity/input changes still do. */
+    @Test
+    fun networkCallbacksReuseOnlyCurrentSuccessfulOrApplyingInputs() =
+        runTest {
+            val permissions = NativeAttachmentPermissions()
+            var begins = 0
+            var sets = 0
+            var accept = true
+            val engine =
+                nativeBoundary { method, _ ->
+                    when (method) {
+                        "beginAttachmentPermissionUpdate" -> "generation-${++begins}"
+                        "setAttachmentAutomaticPermission" -> {
+                            sets += 1
+                            accept
+                        }
+                        else -> error(method)
+                    }
+                }
+            val runtime = Any()
+            val snapshot =
+                AttachmentPermissionNetworkSnapshot(
+                    1L,
+                    setOf(2L),
+                    true,
+                    true,
+                    setOf(MediaAutoDownloadNetwork.WiFi),
+                )
+            val allow = AttachmentAutomaticPermissionFfi(true, true, true, true)
+
+            suspend fun apply(
+                input: AttachmentPermissionNetworkSnapshot = snapshot,
+                owner: Any = runtime,
+            ) {
+                val next = permissions.beginNetworkRefresh(input, setOf("a"), owner) ?: return
+                permissions.update(next, owner, engine, listOf("a")) { allow }
+                permissions.endRefresh(next)
+            }
+            val seed = requireNotNull(permissions.beginNetworkRefresh(snapshot, setOf("a"), runtime))
+            assertEquals(null, permissions.beginNetworkRefresh(snapshot, setOf("a"), runtime))
+            permissions.update(seed, runtime, engine, listOf("a")) { allow }
+            permissions.endRefresh(seed)
+            apply()
+            assertEquals(1, begins)
+            assertEquals(1, sets)
+            apply(snapshot.copy(defaultNetworkHandle = 3L))
+            apply(snapshot.copy(validatedNetworkHandles = setOf(4L)))
+            apply(snapshot.copy(hasValidatedInternet = false))
+            apply(snapshot.copy(hasActiveNetwork = false))
+            apply(snapshot.copy(networkTypes = setOf(MediaAutoDownloadNetwork.Metered)))
+            assertEquals(6, begins)
+
+            // Settings invalidation cannot reuse a previous network-only approval.
+            permissions.invalidate(runtime)
+            apply()
+            assertEquals(7, begins)
+            // Equal inputs under a different runtime still require native synchronization.
+            apply(owner = Any())
+            assertEquals(8, begins)
+            // A failed apply is not an equivalence cache hit on the next identical callback.
+            permissions.invalidate(runtime)
+            accept = false
+            apply()
+            accept = true
+            apply()
+            assertEquals(10, begins)
+            assertEquals(10, sets)
+            apply()
+            assertEquals(10, begins)
+            // A changed signed-in account set must revoke even with the same platform inputs.
+            val changed = requireNotNull(permissions.beginNetworkRefresh(snapshot, setOf("a", "b"), runtime))
+            permissions.update(changed, runtime, engine, listOf("a", "b")) { allow }
+            permissions.endRefresh(changed)
+            assertEquals(12, begins)
+            assertEquals(null, permissions.beginNetworkRefresh(snapshot, setOf("b", "a"), runtime))
+        }
+
+    /** A late stale success cannot make a previously equivalent snapshot reusable. */
+    @Test
+    fun staleNetworkApplyCannotSuppressTheNextCallback() =
+        runTest {
+            val permissions = NativeAttachmentPermissions()
+            val runtime = Any()
+            val snapshot = AttachmentPermissionNetworkSnapshot(1L, setOf(2L), true, true, emptySet())
+            var sets = 0
+            val engine =
+                nativeBoundary { method, _ ->
+                    when (method) {
+                        "beginAttachmentPermissionUpdate" -> "generation"
+                        "setAttachmentAutomaticPermission" -> {
+                            sets += 1
+                            true
+                        }
+                        else -> error(method)
+                    }
+                }
+            val first = requireNotNull(permissions.beginNetworkRefresh(snapshot, setOf("a"), runtime))
+            permissions.update(first, runtime, engine, listOf("a")) {
+                permissions.invalidate(runtime)
+                AttachmentAutomaticPermissionFfi(true, true, true, true)
+            }
+            permissions.endRefresh(first)
+            assertEquals(0, sets)
+            assertTrue(requireNotNull(permissions.beginNetworkRefresh(snapshot, setOf("a"), runtime)) > first)
+        }
+
+    /** One account's differing live tuple permanently invalidates reuse for the entire revision. */
+    @Test
+    fun evaluationMismatchCannotBeReboundByALaterAccount() =
+        runTest {
+            val owner = NativeAttachmentPermissions()
+            val runtime = Any()
+            val physical = mutableSetOf(2L)
+            val types = mutableSetOf(MediaAutoDownloadNetwork.WiFi)
+            val supplied = AttachmentPermissionNetworkSnapshot(1L, physical, true, true, types)
+            val original = supplied.copy(validatedNetworkHandles = setOf(2L), networkTypes = types.toSet())
+            val revision = requireNotNull(owner.beginNetworkRefresh(supplied, setOf("a", "b"), runtime))
+            physical += 3L
+            types.clear()
+            assertEquals(null, owner.beginNetworkRefresh(original, setOf("a", "b"), runtime))
+            owner.noteNetworkEvaluation(revision, runtime, original.copy(hasValidatedInternet = false))
+            owner.noteNetworkEvaluation(revision, runtime, original)
+            val engine =
+                nativeBoundary { method, _ ->
+                    when (method) {
+                        "beginAttachmentPermissionUpdate" -> "generation"
+                        "setAttachmentAutomaticPermission" -> true
+                        else -> error(method)
+                    }
+                }
+            owner.update(revision, runtime, engine, listOf("a", "b")) {
+                AttachmentAutomaticPermissionFfi(true, true, true, true)
+            }
+            owner.endRefresh(revision)
+            assertTrue(requireNotNull(owner.beginNetworkRefresh(original, setOf("a", "b"), runtime)) > revision)
+        }
+
     /** Every media type is denied before validated connectivity or during user pause. */
     @Test
     fun permissionRespectsValidationPauseAndMostRestrictiveNetwork() {

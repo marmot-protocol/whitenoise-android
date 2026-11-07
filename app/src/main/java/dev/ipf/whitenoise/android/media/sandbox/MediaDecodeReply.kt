@@ -12,18 +12,29 @@ internal fun sendMediaDecodeReply(
     callback: IBinder,
     id: Int,
     result: Bundle,
+    synchronous: Boolean = false,
 ) {
     val parcel = Parcel.obtain()
+    val response = if (synchronous) Parcel.obtain() else null
     try {
         parcel.writeInterfaceToken(MEDIA_REPLY_DESCRIPTOR)
         parcel.writeInt(id)
         writeMediaDecodePayload(parcel, result)
-        callback.transact(IBinder.FIRST_CALL_TRANSACTION, parcel, null, IBinder.FLAG_ONEWAY)
+        val flags = if (synchronous) 0 else IBinder.FLAG_ONEWAY
+        val accepted = callback.transact(IBinder.FIRST_CALL_TRANSACTION, parcel, response, flags)
+        if (synchronous) {
+            val acknowledgement = checkNotNull(response)
+            check(accepted && acknowledgement.dataAvail() == 0 && !acknowledgement.hasFileDescriptors())
+        }
     } finally {
         parcel.recycle()
+        response?.recycle()
     }
 }
 
+/**
+ * Writes the fixed primitive field order; no Bundle or arbitrary Parcelable crosses this wire.
+ */
 private fun writeMediaDecodePayload(
     parcel: Parcel,
     result: Bundle,
@@ -46,6 +57,10 @@ private fun writeMediaDecodePayload(
     parcel.writeFloatArray(result.getFloatArray("waveform"))
 }
 
+/**
+ * Reads and bounds primitive metadata and normalized waveform samples, rejecting trailing bytes.
+ * The caller validates transaction identity, descriptor presence and outer parcel size separately.
+ */
 internal fun readMediaDecodeReply(parcel: Parcel): Bundle {
     require(parcel.dataAvail() >= MIN_MEDIA_REPLY_BYTES)
     val result = Bundle()
@@ -85,6 +100,9 @@ internal fun readMediaDecodeReply(parcel: Parcel): Bundle {
     return result
 }
 
+/**
+ * Accepts only the wire integers zero and one; malformed boolean values throw.
+ */
 private fun readMediaBoolean(parcel: Parcel): Boolean = parcel.readInt().also { require(it in 0..1) } == 1
 
 /** Actual isolated-UID callback corruption for debug instrumentation, never a production command. */

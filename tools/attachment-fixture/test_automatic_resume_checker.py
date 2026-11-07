@@ -13,7 +13,9 @@ def evidence():
                 "diagnostics_private": True, "activity_stopped": True, "android_api": 30,
                 "worker_stop_reason": "unavailable", "worker_run_attempt": 0, "android_process_restart_qualified": False},
                {"phase": "automatic-platform-resume-overall", "success": True, "payload_bytes": PAYLOAD_BYTES,
-                "elapsed_ms": 35000, "java_peak_bytes": 100, "native_peak_bytes": 100}]
+                "elapsed_ms": 35000, "java_peak_bytes": 100, "native_peak_bytes": 100},
+               {"phase": "automatic-resume-work-query", "state": "SUCCEEDED", "same_work_id": True,
+                "initial_run_attempt": 1, "run_attempt": 2}]
     rows = [(None, "upload", 0), (1, "upload_bytes", PAYLOAD_BYTES+16), (1, "upload_complete", 0),
             (None, "get", 0), (4, "range_offset", 0), (4, "status", 200), (4, "body_bytes", PREFIX_BYTES),
             (4, "held", PREFIX_BYTES), (None, "platform_stop_marker", 0), (None, "interrupt_acquisition", 0),
@@ -54,10 +56,36 @@ class AutomaticResumeEvidenceTest(unittest.TestCase):
         self.assertFalse(any("secret" in v or "/data" in v for v in result["violations"]))
 
     def test_optional_resume_timing_fields_do_not_change_a_passing_verdict(self):
-        """The measured stop-to-running and running-to-request times are diagnostics, never a qualification input."""
+        """Native request and Android success times are independent diagnostics, never a qualification input."""
         metrics, events = evidence()
-        metrics[0].update({"resume_running_ms": 27000, "resume_request_ms": 7})
+        metrics[0].update({"resume_work_succeeded_ms": 35000, "resume_request_after_stop_ms": 15000})
         self.assertTrue(check_automatic_resume(metrics, events)["passed"])
+
+    def test_native_body_can_resume_while_android_work_is_still_queued(self):
+        """An earlier native observation cannot override the required eventual database proof."""
+        metrics, events = evidence()
+        metrics.append({"phase": "native-resume-observed", "state": "DOWNLOADING", "work_state": "ENQUEUED"})
+        self.assertTrue(check_automatic_resume(metrics, events)["passed"])
+
+    def test_final_database_proof_must_be_unique_and_present(self):
+        metrics, events = evidence()
+        self.assertFalse(check_automatic_resume(metrics[:2], events)["passed"])
+        self.assertFalse(check_automatic_resume(metrics + [deepcopy(metrics[2])], events)["passed"])
+
+    def test_wrong_work_or_non_successful_final_state_fails(self):
+        for state in ("ENQUEUED", "RUNNING", "FAILED", "CANCELLED"):
+            metrics, events = evidence()
+            metrics[2]["state"] = state
+            self.assertFalse(check_automatic_resume(metrics, events)["passed"], state)
+        metrics, events = evidence()
+        metrics[2]["same_work_id"] = False
+        self.assertFalse(check_automatic_resume(metrics, events)["passed"])
+
+    def test_attempt_count_must_advance_without_boolean_aliases(self):
+        for initial, current in ((1, 1), (1, 0), (-1, 2), (True, 2), (False, 2), (0, True), (0, False), (1, 2.0)):
+            metrics, events = evidence()
+            metrics[2].update(initial_run_attempt=initial, run_attempt=current)
+            self.assertFalse(check_automatic_resume(metrics, events)["passed"], (initial, current))
 
     def test_each_missing_event_fails(self):
         """No marker, byte, hold, range or terminal event can be dropped from provenance."""

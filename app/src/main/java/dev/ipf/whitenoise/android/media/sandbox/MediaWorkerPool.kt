@@ -293,7 +293,6 @@ internal class MediaWorkerPool(
         }
     }
 
-    /** Records the bind outcome and catches up retirement without shortening a served worker's grace. */
     @Suppress("ReturnCount") // Accepted, definitively refused and unknown bind outcomes own different lifetimes.
     private fun start(worker: MediaWorker): Boolean {
         val accepted =
@@ -312,9 +311,10 @@ internal class MediaWorkerPool(
                     worker.retiring = true
                 }
                 warnLifetimeHold(worker, "bind-outcome")
+                resumeRetirementAfterBinding(worker)
                 return false
             }
-        val (bound, retiring) =
+        val bound =
             synchronized(lock) {
                 worker.bindComplete = true
                 worker.bound = worker.bound || accepted
@@ -324,71 +324,41 @@ internal class MediaWorkerPool(
                     worker.dead.countDown()
                     worker.connected.countDown()
                 }
-                worker.bound to worker.retiring
+                worker.bound
             }
-        if (retiring) {
-            // A callback may already have served this worker: preserve its grace or catch up an expired stop.
-            val served = synchronized(lock) { worker.served }
-            retire(worker, escalate = !served)
-            if (served) escalateAfterGrace(worker)
-        }
+        resumeRetirementAfterBinding(worker)
         dispose(worker)
         return bound
     }
 
-    /** Enforces the original retirement deadline after bind completion without introducing an interruptible wait. */
-    private fun escalateAfterGrace(worker: MediaWorker) {
-        val remainingNanos =
-            synchronized(lock) {
-                if (!worker.retireSent || worker.dead.count == 0L) return
-                TimeUnit.MILLISECONDS.toNanos(RETIRE_ESCALATION_MS) - (System.nanoTime() - worker.retiredAtNanos)
-            }
-        if (remainingNanos <= 0L) {
-            escalate(worker)
-        } else {
-            handler.postDelayed(
-                { if (worker.dead.count != 0L) escalate(worker) },
-                TimeUnit.NANOSECONDS.toMillis(remainingNanos) + 1,
-            )
-        }
-    }
-
-    /** Registers Binder death before waking claims, capturing any retirement that preceded the connection. */
     private fun connection(worker: MediaWorker): ServiceConnection =
         object : ServiceConnection {
             override fun onServiceConnected(
                 name: ComponentName,
                 service: IBinder,
             ) {
-                val retiredBeforeConnection =
-                    synchronized(lock) {
-                        if (worker.disposed || worker.binder != null) return
-                        worker.binder = service
-                        worker.bound = true
-                        worker.remote = Messenger(service)
-                        try {
-                            service.linkToDeath(worker.deathRecipient, 0)
-                            worker.linked = true
-                        } catch (_: android.os.RemoteException) {
-                            // linkToDeath can report an already-dead remote, never infer death from send failure.
-                            if (!service.isBinderAlive) {
-                                worker.dead.countDown()
-                            } else {
-                                warnLifetimeHold(worker, "death-link")
-                            }
-                            worker.retiring = true
-                        } catch (_: RuntimeException) {
-                            worker.retiring = true
-                            warnLifetimeHold(worker, "death-link")
-                        }
-                        if (closed) worker.retiring = true
-                        val retiring = worker.retiring
-                        worker.connected.countDown()
-                        signalLocked()
-                        retiring
+                synchronized(lock) {
+                    if (worker.disposed || worker.binder != null) return
+                    worker.binder = service
+                    worker.bound = true
+                    worker.remote = Messenger(service)
+                    try {
+                        service.linkToDeath(worker.deathRecipient, 0)
+                        worker.linked = true
+                    } catch (_: android.os.RemoteException) {
+                        // linkToDeath can report an already-dead remote, never infer death from send failure.
+                        if (!service.isBinderAlive) worker.dead.countDown() else warnLifetimeHold(worker, "death-link")
+                        worker.retiring = true
+                    } catch (_: RuntimeException) {
+                        worker.retiring = true
+                        warnLifetimeHold(worker, "death-link")
                     }
-                // A generation retired before it connected never received input: stop it at once.
-                if (retiredBeforeConnection) retire(worker, escalate = true)
+                    if (closed) worker.retiring = true
+                    worker.connected.countDown()
+                    signalLocked()
+                }
+                // Resume the existing retirement reason without shortening a served request's grace.
+                resumeRetirementAfterBinding(worker)
                 dispose(worker)
             }
 
@@ -428,6 +398,20 @@ internal class MediaWorkerPool(
             signalLocked()
         }
         dispose(worker)
+    }
+
+    /** Resumes a pending retirement without treating a newly served request as a pre-connection failure. */
+    private fun resumeRetirementAfterBinding(worker: MediaWorker) {
+        val escalate =
+            synchronized(lock) {
+                if (!worker.retiring) return
+                val graceExpired =
+                    worker.retireSent &&
+                        System.nanoTime() - worker.retiredAtNanos >=
+                        TimeUnit.MILLISECONDS.toNanos(RETIRE_ESCALATION_MS)
+                worker.escalationRequested || (!worker.served && !worker.retireSent) || graceExpired
+            }
+        retire(worker, escalate = escalate)
     }
 
     /**
@@ -494,6 +478,7 @@ internal class MediaWorkerPool(
         val unbind =
             synchronized(lock) {
                 worker.retiring = true
+                worker.escalationRequested = true
                 (worker.binder != null && worker.bindComplete && worker.bound && !worker.unbound).also {
                     if (it) worker.unbound = true
                 }
@@ -533,9 +518,10 @@ internal class MediaWorkerPool(
         val live =
             synchronized(lock) {
                 closed = true
-                detachAll()
+                // Preserve a served worker's grace while its original bind outcome is unresolved.
+                detachAll().map { worker -> worker to (!worker.served || worker.bindComplete) }
             }
-        live.forEach { retire(it, escalate = true) }
+        live.forEach { (worker, escalate) -> retire(worker, escalate = escalate) }
         quitWhenIdle()
     }
 
@@ -626,6 +612,7 @@ internal class MediaWorker(
     var bindComplete = false
     var retiring = false
     var retireSent = false
+    var escalationRequested = false
     var unbound = false
     var disposed = false
     var holdReported = false

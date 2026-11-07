@@ -96,6 +96,18 @@
             android:useAppZygote="true" />
 
         <service
+            android:name=".media.sandbox.MediaAvDecodeService"
+            android:exported="false"
+            android:isolatedProcess="true"
+            android:process=":media_av_decoder" />
+
+        <service
+            android:name=".media.sandbox.MediaAvPlaybackService"
+            android:exported="false"
+            android:isolatedProcess="true"
+            android:process=":media_av_playback" />
+
+        <service
             android:name=".media.sandbox.MediaAnimationService"
             android:exported="false"
             android:isolatedProcess="true"
