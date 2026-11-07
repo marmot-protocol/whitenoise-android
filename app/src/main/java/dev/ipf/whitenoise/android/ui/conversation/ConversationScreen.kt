@@ -3351,8 +3351,10 @@ internal fun ConversationScreen(
                 // Before any suspension, so a later append restarting this effect cannot drop the notice. Group details
                 // and the media viewer cover the transcript, and an open microphone would record the speech.
                 val quiet =
-                    showDetails || mediaViewerCoversTranscript ||
-                        voiceRecordingController.isRecording || voiceRecordingController.isFinalizing
+                    showDetails ||
+                        mediaViewerCoversTranscript ||
+                        voiceRecordingController.isRecording ||
+                        voiceRecordingController.isFinalizing
                 conversationArrivalAnnouncement(
                     arrivals = arrivals,
                     senderName = { row -> appState.displayName(row.record.sender) },
