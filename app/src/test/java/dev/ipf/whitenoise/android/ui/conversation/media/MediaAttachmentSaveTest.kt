@@ -579,8 +579,10 @@ class MediaAttachmentSaveTest {
 
     private fun videoSource(): File = File.createTempFile("held-playback", ".mp4").apply { writeBytes(VIDEO_BYTES) }
 
-    private fun sharedMediaFiles(): List<File> =
-        File(context().cacheDir, MediaCacheDirs.SHARED).listFiles().orEmpty().toList()
+    private fun sharedMediaFiles(): List<File> {
+        val dir = File(context().cacheDir, MediaCacheDirs.SHARED)
+        return dir.listFiles().orEmpty().toList()
+    }
 
     /** Registers an external app that accepts a shared file of [mediaType]. */
     private fun registerVideoShareTarget(mediaType: String) {
