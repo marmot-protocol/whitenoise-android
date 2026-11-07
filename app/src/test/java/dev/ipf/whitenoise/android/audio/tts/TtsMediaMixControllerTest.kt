@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.audio.tts
 
 import android.speech.tts.TextToSpeech
+import dev.ipf.whitenoise.android.audio.FakeNoisyRoutes
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -54,6 +55,23 @@ class TtsMediaMixControllerTest {
         assertEquals(listOf(TtsAudioFocusMode.MediaMix), focus.modes)
         assertTrue(engine.spoken.isEmpty())
         assertEquals(TtsStartFailure.AudioFocusDenied, controller.lastStartFailure)
+    }
+
+    /** Mixed speech holds no platform focus request, yet unplugging headphones still pauses it. */
+    @Test
+    fun mixedSpeechPausesWhenHeadphonesDisconnect() {
+        val engine = RecordingEngine()
+        val routes = FakeNoisyRoutes()
+        val controller =
+            controller(RecordingFocus(), mixEnabled = { true }, mediaActive = { true }, noisyRoutes = routes)
+        controller.attachEngine(engine)
+        assertTrue(controller.speak("Mixed speech.", Locale.US))
+        assertEquals(1, routes.listeners)
+
+        routes.disconnect()
+
+        assertTrue(controller.state.value is TtsState.Paused)
+        assertEquals(0, routes.listeners)
     }
 
     /** Samples media activity once when selecting the session's latched focus mode. */
@@ -182,12 +200,14 @@ class TtsMediaMixControllerTest {
         mixEnabled: () -> Boolean,
         mediaActive: () -> Boolean,
         volume: () -> Float = { 0.6f },
+        noisyRoutes: FakeNoisyRoutes = FakeNoisyRoutes(),
     ) = TtsController(
         audioFocus = focus,
         maxChunkLength = 4_000,
         mediaMixEnabled = mixEnabled,
         mediaMixVolume = volume,
         isMediaPlaybackActive = mediaActive,
+        noisyRoutes = noisyRoutes,
     )
 
     private data class Spoken(

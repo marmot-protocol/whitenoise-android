@@ -101,6 +101,14 @@
           "SCR-003",
           "SCR-004"
         ]
+      },
+      {
+        "surface": "Referenced Nostr video pauses when headphones disconnect",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventViewers.kt",
+        "anchor": "setHandleAudioBecomingNoisy(true)",
+        "test_ids": [
+          "MED-047"
+        ]
       }
     ]
   },

@@ -27,6 +27,16 @@
           "TTS-005"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Headphone disconnect pauses a parked read-aloud queue",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/tts/TtsPlaybackQueue.kt",
+        "anchor": "fun pauseParked(",
+        "test_ids": [
+          "MED-047"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

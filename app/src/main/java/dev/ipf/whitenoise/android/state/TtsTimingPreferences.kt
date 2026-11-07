@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import android.content.Context
 import android.content.SharedPreferences
 import android.media.AudioManager
+import dev.ipf.whitenoise.android.audio.AndroidNoisyAudioRouteRegistrar
 import dev.ipf.whitenoise.android.audio.tts.TtsAudioFocusOwner
 import dev.ipf.whitenoise.android.audio.tts.TtsController
 import dev.ipf.whitenoise.android.audio.tts.TtsTimingStore
@@ -22,6 +23,7 @@ internal fun createAppTtsController(
             context.applicationContext.getSystemService(AudioManager::class.java)?.isMusicActive == true
         },
         timingStore = TtsTimingPreferences(context),
+        noisyRoutes = AndroidNoisyAudioRouteRegistrar(context),
     )
 
 /**

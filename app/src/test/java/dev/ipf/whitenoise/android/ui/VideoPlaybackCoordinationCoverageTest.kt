@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
+import dev.ipf.whitenoise.android.appModuleFile
+import dev.ipf.whitenoise.android.appModuleSource
 import dev.ipf.whitenoise.android.functionBody
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -96,10 +98,46 @@ class VideoPlaybackCoordinationCoverageTest {
         )
     }
 
+    /** Nostr event videos follow the attachment viewer's focus, voice and headphone contract. */
+    @Test
+    fun nostrEventVideoPausesWhenHeadphonesDisconnect() {
+        val body = mainSource("ui/conversation/nostr/NostrEventViewers.kt").functionBody("rememberNostrVideoPlayer")
+
+        assertTrue(
+            "the Nostr video player must delegate audio focus to Media3",
+            "setAudioAttributes(nostrVideoAudioAttributes, true)" in body,
+        )
+        assertTrue(
+            "the Nostr video player must stop voice-note audio before video playback",
+            "VoicePlaybackController.pause()" in body,
+        )
+        assertTrue(
+            "headphone disconnection must use Media3 noisy-route handling",
+            "setHandleAudioBecomingNoisy(true)" in body,
+        )
+    }
+
+    /** Voice notes and read-aloud register the platform headphone-disconnect source in the app graph. */
+    @Test
+    fun appAudioOwnersUseThePlatformNoisyRoute() {
+        assertTrue(
+            "voice playback must listen for headphone disconnection once attached",
+            "noisyRoutes = AndroidNoisyAudioRouteRegistrar(context)" in
+                mainSource("audio/VoicePlaybackController.kt").functionBody("attach"),
+        )
+        assertTrue(
+            "read-aloud must listen for headphone disconnection",
+            "noisyRoutes = AndroidNoisyAudioRouteRegistrar(context)" in
+                mainSource("state/TtsTimingPreferences.kt").functionBody("createAppTtsController"),
+        )
+    }
+
     /** Resolves the production source from module and repository test working directories. */
-    private fun mediaVideoSource(): File =
-        listOf(
-            File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt"),
-            File("app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVideo.kt"),
-        ).firstOrNull(File::exists) ?: error("Missing MediaVideo.kt")
+    private fun mediaVideoSource(): File = appModuleFile("$MAIN_SOURCE/ui/conversation/media/MediaVideo.kt")
+
+    private fun mainSource(path: String): String = appModuleSource("$MAIN_SOURCE/$path")
+
+    private companion object {
+        const val MAIN_SOURCE = "src/main/java/dev/ipf/whitenoise/android"
+    }
 }
