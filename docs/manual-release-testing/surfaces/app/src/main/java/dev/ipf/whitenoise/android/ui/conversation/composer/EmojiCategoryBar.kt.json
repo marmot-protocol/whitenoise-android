@@ -1,0 +1,65 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiCategoryBar.kt",
+  "legacy_sha256": "cc4cdf78ad270c531d0671c694d29dbd3d500660b74c046336d6fa11907d014e",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "EmojiCategoryBar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiCategoryBar.kt",
+        "anchor": "fun EmojiCategoryBar(",
+        "test_ids": [
+          "CON-010",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "EmojiCategoryBarLeadingActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiCategoryBar.kt",
+        "anchor": "fun EmojiCategoryBarLeadingActions(",
+        "test_ids": [
+          "CON-010",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "EmojiCategoryToggle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiCategoryBar.kt",
+        "anchor": "fun EmojiCategoryToggle(",
+        "test_ids": [
+          "CON-010",
+          "MSG-005"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:configure_reactions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiCategoryBar.kt",
+        "anchor": "R.string.configure_reactions",
+        "test_ids": [
+          "CON-010",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "string:emoji_backspace",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiCategoryBar.kt",
+        "anchor": "R.string.emoji_backspace",
+        "test_ids": [
+          "CON-010",
+          "MSG-005"
+        ]
+      },
+      {
+        "surface": "string:emoji_search_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiCategoryBar.kt",
+        "anchor": "R.string.emoji_search_hint",
+        "test_ids": [
+          "CON-010",
+          "MSG-005"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}
