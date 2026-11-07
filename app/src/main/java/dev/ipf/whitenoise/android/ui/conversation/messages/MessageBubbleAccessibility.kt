@@ -69,7 +69,8 @@ internal fun Modifier.messageRowChrome(
 
 /**
  * The tappable "edited" footer label. Touch opens the edit history; for the screen reader it stays
- * text in the row summary, and the row offers Edit history.
+ * text in the row summary, and the row offers Edit history. Batch selection covers the row with its
+ * own tap layer and text selection drops [onClick], so the label is never a separate action there either.
  */
 internal fun Modifier.editedLabelTarget(
     label: String,

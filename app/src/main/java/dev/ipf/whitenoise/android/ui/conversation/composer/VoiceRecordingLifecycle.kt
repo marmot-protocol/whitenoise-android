@@ -46,7 +46,7 @@ internal fun VoiceRecordingLifecycleEffect(controller: VoiceRecordingController)
             view.announceForAccessibility(warning)
         }
     }
-    VoiceRecordingPhaseAnnouncements(controller)
+    VoiceRecordingPhaseFeedback(controller)
     val haptics = LocalHapticFeedback.current
     val lastSeconds = recording && controller.remainingMs <= VoiceRecordingController.LIMIT_HAPTIC_MS
     LaunchedEffect(controller, lastSeconds) {
@@ -55,40 +55,45 @@ internal fun VoiceRecordingLifecycleEffect(controller: VoiceRecordingController)
 }
 
 /** What the recorder is doing, as far as the screen reader needs to hear about it. */
-internal enum class VoiceRecordingPhase { Idle, Holding, Locked }
+internal enum class VoiceRecordingPhase { Idle, Holding, Locked, Closing }
 
 /**
- * The spoken update for a recorder phase change, or null when nothing should be said. A tap starts and
- * locks in one step, so going straight from idle to locked is announced as a start.
+ * The spoken update for a recorder phase change, or null when nothing should be said. Speech while the
+ * microphone is open would land in the take, so only the stop is spoken; start and lock are felt as haptics.
  */
 internal fun voiceRecordingAnnouncementRes(
     before: VoiceRecordingPhase,
     after: VoiceRecordingPhase,
-): Int? =
-    when {
-        before == after -> null
-        before == VoiceRecordingPhase.Idle -> R.string.voice_recording_started_announcement
-        after == VoiceRecordingPhase.Locked -> R.string.voice_recording_locked_announcement
-        after == VoiceRecordingPhase.Idle -> R.string.voice_recording_stopped_announcement
-        else -> null
-    }
+): Int? = R.string.voice_recording_stopped_announcement.takeIf { before != after && after == VoiceRecordingPhase.Idle }
 
-/** Start, lock and stop give no visual cue a screen reader can follow, so each is announced. */
+/** A take that starts already locked: a tap on the microphone, or recording again from review. */
+internal fun voiceRecordingOpensLocked(
+    before: VoiceRecordingPhase,
+    after: VoiceRecordingPhase,
+): Boolean = after == VoiceRecordingPhase.Locked && before != VoiceRecordingPhase.Holding
+
+/**
+ * A stop gives no visual cue a screen reader can follow, so it is announced once the microphone is released. A tap
+ * that opens a locked take is felt instead: the microphone is already listening. Press-and-hold has its own haptic.
+ */
 @Composable
 @Suppress("FunctionNaming")
-private fun VoiceRecordingPhaseAnnouncements(controller: VoiceRecordingController) {
+private fun VoiceRecordingPhaseFeedback(controller: VoiceRecordingController) {
     val view = LocalView.current
     val resources = LocalResources.current
+    val haptics = LocalHapticFeedback.current
     val phase =
         when {
-            !controller.isRecording -> VoiceRecordingPhase.Idle
-            controller.locked -> VoiceRecordingPhase.Locked
-            else -> VoiceRecordingPhase.Holding
+            controller.locked && controller.isRecording -> VoiceRecordingPhase.Locked
+            controller.isRecording -> VoiceRecordingPhase.Holding
+            controller.isFinalizing -> VoiceRecordingPhase.Closing
+            else -> VoiceRecordingPhase.Idle
         }
     val previous = remember(controller) { mutableStateOf(phase) }
     LaunchedEffect(controller, phase) {
         val before = previous.value
         previous.value = phase
+        if (voiceRecordingOpensLocked(before, phase)) haptics.performHapticFeedback(HapticFeedbackType.LongPress)
         voiceRecordingAnnouncementRes(before, phase)?.let { res ->
             @Suppress("DEPRECATION")
             view.announceForAccessibility(resources.getString(res))

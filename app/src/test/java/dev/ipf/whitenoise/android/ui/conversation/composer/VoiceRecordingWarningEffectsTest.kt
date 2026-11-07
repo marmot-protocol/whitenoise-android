@@ -155,14 +155,9 @@ class VoiceRecordingWarningEffectsTest {
             hapticCount: Int,
         ) {
             val warning = context.getString(R.string.voice_recording_limit_warning)
-            // Start and stop announcements are covered by ScreenReaderAnnouncementCoverageTest.
-            val phases =
-                listOf(
-                    R.string.voice_recording_started_announcement,
-                    R.string.voice_recording_locked_announcement,
-                    R.string.voice_recording_stopped_announcement,
-                ).map(context::getString)
-            assertEquals(List(announcementCount) { warning }, announcements.filterNot(phases::contains))
+            // The stop announcement is covered by ScreenReaderAnnouncementCoverageTest.
+            val stopped = context.getString(R.string.voice_recording_stopped_announcement)
+            assertEquals(List(announcementCount) { warning }, announcements.filterNot(stopped::equals))
             assertEquals(List(hapticCount) { HapticFeedbackType.LongPress }, haptics)
         }
     }

@@ -2729,8 +2729,6 @@
     <string name="settings_search_alias_read_aloud">TTS|text to speech|read aloud</string>
     <string name="settings_search_alias_sound">notification sound|alert sound|ringtone</string>
     <string name="settings_search_revealed">%1$s. Setting highlighted.</string>
-    <string name="voice_recording_started_announcement">Recording voice message</string>
-    <string name="voice_recording_locked_announcement">Recording locked</string>
     <string name="voice_recording_stopped_announcement">Recording stopped</string>
     <string name="voice_message_seek">Playback position</string>
     <string name="video_failed">Video couldn\'t load</string>

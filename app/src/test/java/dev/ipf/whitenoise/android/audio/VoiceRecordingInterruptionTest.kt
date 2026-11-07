@@ -134,9 +134,12 @@ class VoiceRecordingInterruptionTest {
                 controller.stop()
                 runCurrent()
                 assertTrue(completed.isEmpty())
+                // Still capturing the tail: the screen reader must not speak into it yet.
+                assertTrue(controller.isFinalizing)
                 advanceTimeBy(VoiceRecordingController.RECORDING_TAIL_MS)
                 runCurrent()
                 assertEquals(1, completed.size)
+                assertFalse(controller.isFinalizing)
                 assertTrue(reasons.isEmpty())
                 controller.start()
                 runCurrent()

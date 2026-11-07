@@ -2640,8 +2640,6 @@
     <string name="settings_search_alias_read_aloud">TTS|синтез речи|читать вслух</string>
     <string name="settings_search_alias_sound">звук уведомлений|сигнал уведомления|мелодия</string>
     <string name="settings_search_revealed">%1$s. Настройка выделена.</string>
-    <string name="voice_recording_started_announcement">Идёт запись голосового сообщения</string>
-    <string name="voice_recording_locked_announcement">Запись закреплена</string>
     <string name="voice_recording_stopped_announcement">Запись остановлена</string>
     <string name="voice_message_seek">Позиция воспроизведения</string>
     <string name="video_failed">Не удалось загрузить видео</string>

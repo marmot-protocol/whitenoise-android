@@ -2560,8 +2560,6 @@
     <string name="settings_search_alias_read_aloud">TTS|metin okuma|sesli oku</string>
     <string name="settings_search_alias_sound">bildirim sesi|uyarı sesi|zil sesi</string>
     <string name="settings_search_revealed">%1$s. Ayar vurgulandı.</string>
-    <string name="voice_recording_started_announcement">Sesli mesaj kaydediliyor</string>
-    <string name="voice_recording_locked_announcement">Kayıt kilitlendi</string>
     <string name="voice_recording_stopped_announcement">Kayıt durduruldu</string>
     <string name="voice_message_seek">Oynatma konumu</string>
     <string name="video_failed">Video yüklenemedi</string>

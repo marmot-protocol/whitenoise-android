@@ -141,16 +141,9 @@ class ScreenReaderMessageRowStopCoverageTest {
     }
 
     @Test
-    fun messageBubbleMergesItsRowAndRoutesNestedControlsThroughIt() {
+    fun messageBubbleRoutesNestedControlsThroughItsRow() {
+        // The merged row and its actions are exercised on the production bubble by MessageRowScreenReaderActionsTest.
         val bubble = appModuleSource("$MESSAGES/MessageBubble.kt")
-        assertTrue(bubble.contains("val rowMerged = !selectionMode && !textSelectionMode"))
-        assertTrue(bubble.contains("Modifier.semantics(mergeDescendants = true)"))
-        assertTrue(
-            bubble.contains("customActions = messageRowCustomActions(rowActions, rowTextActions?.actions.orEmpty())"),
-        )
-        for (label in ROW_ACTION_LABELS) {
-            assertTrue("missing row action $label", bubble.contains("stringResource(R.string.$label)"))
-        }
         // Avatar and reaction pills, sender name and quote card all yield to the row.
         assertEquals(2, Regex("""rowOwnsSemantics = rowMerged""").findAll(bubble).count())
         assertTrue(bubble.contains(".messageRowChrome(rowMerged, appState.displayName(record.sender))"))
@@ -223,18 +216,5 @@ class ScreenReaderMessageRowStopCoverageTest {
         const val ROW = "row"
         const val CONVERSATION = "src/main/java/dev/ipf/whitenoise/android/ui/conversation"
         const val MESSAGES = "$CONVERSATION/messages"
-        val ROW_ACTION_LABELS =
-            listOf(
-                "reply",
-                "message_react",
-                "copy",
-                "forward",
-                "delete",
-                "info",
-                "go_to_message",
-                "chat_list_search_open_profile",
-                "view_reactors",
-                "edit_history",
-            )
     }
 }

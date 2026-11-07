@@ -2565,8 +2565,6 @@
     <string name="settings_search_alias_read_aloud">TTS|texto a voz|leer en voz alta</string>
     <string name="settings_search_alias_sound">sonido de notificación|tono de aviso</string>
     <string name="settings_search_revealed">%1$s. Ajuste resaltado.</string>
-    <string name="voice_recording_started_announcement">Grabando mensaje de voz</string>
-    <string name="voice_recording_locked_announcement">Grabación bloqueada</string>
     <string name="voice_recording_stopped_announcement">Grabación detenida</string>
     <string name="voice_message_seek">Posición de reproducción</string>
     <string name="video_failed">No se pudo cargar el vídeo</string>

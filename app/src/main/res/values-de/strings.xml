@@ -2579,8 +2579,6 @@
     <string name="settings_search_alias_read_aloud">TTS|Sprachausgabe|vorlesen</string>
     <string name="settings_search_alias_sound">Benachrichtigungston|Hinweiston|Klingelton</string>
     <string name="settings_search_revealed">%1$s. Einstellung hervorgehoben.</string>
-    <string name="voice_recording_started_announcement">Sprachnachricht wird aufgenommen</string>
-    <string name="voice_recording_locked_announcement">Aufnahme fixiert</string>
     <string name="voice_recording_stopped_announcement">Aufnahme beendet</string>
     <string name="voice_message_seek">Wiedergabeposition</string>
     <string name="video_failed">Video konnte nicht geladen werden</string>

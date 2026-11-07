@@ -2525,8 +2525,6 @@
     <string name="settings_search_alias_read_aloud">TTS|文字转语音|朗读</string>
     <string name="settings_search_alias_sound">通知声音|提示音|铃声</string>
     <string name="settings_search_revealed">%1$s。设置已突出显示。</string>
-    <string name="voice_recording_started_announcement">正在录制语音消息</string>
-    <string name="voice_recording_locked_announcement">录音已锁定</string>
     <string name="voice_recording_stopped_announcement">录音已停止</string>
     <string name="voice_message_seek">播放位置</string>
     <string name="video_failed">视频加载失败</string>

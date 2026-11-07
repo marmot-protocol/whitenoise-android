@@ -9,8 +9,11 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.ui.conversation.composer.VoiceRecordingPhase
 import dev.ipf.whitenoise.android.ui.conversation.composer.voiceRecordingAnnouncementRes
+import dev.ipf.whitenoise.android.ui.conversation.composer.voiceRecordingOpensLocked
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -19,7 +22,7 @@ import org.robolectric.annotation.Config
 /**
  * Events a screen reader cannot see are spoken. A live append announces only new messages someone else sent, naming a
  * single sender and counting a burst; a replaced timeline or a reordered existing row announces nothing. The voice
- * recorder announces start, lock and stop, and a tap that starts and locks in one step is heard once as a start.
+ * recorder speaks only after the microphone is released, so nothing spoken lands in the take.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -109,17 +112,28 @@ class ScreenReaderAnnouncementCoverageTest {
     }
 
     @Test
-    fun voiceRecordingAnnouncesStartLockAndStopOnce() {
+    fun voiceRecordingSpeaksOnlyOnceTheMicrophoneCloses() {
         val idle = VoiceRecordingPhase.Idle
         val holding = VoiceRecordingPhase.Holding
         val locked = VoiceRecordingPhase.Locked
+        val closing = VoiceRecordingPhase.Closing
 
-        assertEquals(R.string.voice_recording_started_announcement, voiceRecordingAnnouncementRes(idle, holding))
-        assertEquals(R.string.voice_recording_started_announcement, voiceRecordingAnnouncementRes(idle, locked))
-        assertEquals(R.string.voice_recording_locked_announcement, voiceRecordingAnnouncementRes(holding, locked))
+        // Anything spoken while the microphone is open is captured in the take.
+        assertNull(voiceRecordingAnnouncementRes(idle, holding))
+        assertNull(voiceRecordingAnnouncementRes(idle, locked))
+        assertNull(voiceRecordingAnnouncementRes(holding, locked))
+        // A released take keeps recording its tail until the microphone is let go.
+        assertNull(voiceRecordingAnnouncementRes(holding, closing))
+        assertNull(voiceRecordingAnnouncementRes(locked, closing))
+        assertEquals(R.string.voice_recording_stopped_announcement, voiceRecordingAnnouncementRes(closing, idle))
         assertEquals(R.string.voice_recording_stopped_announcement, voiceRecordingAnnouncementRes(holding, idle))
         assertEquals(R.string.voice_recording_stopped_announcement, voiceRecordingAnnouncementRes(locked, idle))
         VoiceRecordingPhase.entries.forEach { phase -> assertNull(voiceRecordingAnnouncementRes(phase, phase)) }
+        // A tap opens a locked take silently, so it is felt; a held take already buzzed when pressed.
+        assertTrue(voiceRecordingOpensLocked(idle, locked))
+        assertTrue(voiceRecordingOpensLocked(closing, locked))
+        assertFalse(voiceRecordingOpensLocked(holding, locked))
+        assertFalse(voiceRecordingOpensLocked(idle, holding))
     }
 
     private fun row(

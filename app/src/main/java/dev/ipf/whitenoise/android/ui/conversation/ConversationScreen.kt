@@ -3294,6 +3294,8 @@ internal fun ConversationScreen(
             tailReached = { listState.firstVisibleItemIndex <= currentTailIndex },
         )
     TailEntranceSendClaim(tailEntrance, claimedSendPresentation)
+    // The media viewer session is created further down; it reports here so arrivals stay quiet under the viewer.
+    var mediaViewerCoversTranscript by remember(controller) { mutableStateOf(false) }
 
     /**
      * Follows the tail for membership activity and new rows, keeps viewport structure current and lands route focus
@@ -3347,12 +3349,15 @@ internal fun ConversationScreen(
                 ) { row -> controller.isMessageMine(row.record) }
             if (isAppend && previousId != null) {
                 // Before any suspension, so a later append restarting this effect cannot drop the notice. Group details
-                // cover the transcript, so arrivals are not read over that screen.
+                // and the media viewer cover the transcript, and an open microphone would record the speech.
+                val quiet =
+                    showDetails || mediaViewerCoversTranscript ||
+                        voiceRecordingController.isRecording || voiceRecordingController.isFinalizing
                 conversationArrivalAnnouncement(
                     arrivals = arrivals,
                     senderName = { row -> appState.displayName(row.record.sender) },
                     resources = arrivalResources,
-                )?.takeUnless { showDetails }?.let { notice ->
+                )?.takeUnless { quiet }?.let { notice ->
                     @Suppress("DEPRECATION")
                     arrivalView.announceForAccessibility(notice)
                 }
@@ -3742,6 +3747,11 @@ internal fun ConversationScreen(
                     runtimeGeneration = appState.runtimeGeneration,
                 ),
         )
+    val mediaViewerOpen = mediaViewerSessionState.active != null
+    DisposableEffect(mediaViewerSessionState, mediaViewerOpen) {
+        mediaViewerCoversTranscript = mediaViewerOpen
+        onDispose { mediaViewerCoversTranscript = false }
+    }
 
     RecordDmConversationFirstFrame(
         accountRef = conversationAccountRef,
