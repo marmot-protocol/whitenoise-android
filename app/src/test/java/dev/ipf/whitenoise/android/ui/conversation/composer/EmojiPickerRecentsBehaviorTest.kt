@@ -206,7 +206,7 @@ class EmojiPickerRecentsBehaviorTest {
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertIsFocused()
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_OPEN_TEST_TAG).assertDoesNotExist()
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).performTextInput("happy")
-        composeRule.onNodeWithContentDescription(string(R.string.close)).performClick()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_CLOSE_TEST_TAG, useUnmergedTree = true).performClick()
         composeRule.waitForIdle()
 
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertDoesNotExist()
@@ -241,7 +241,7 @@ class EmojiPickerRecentsBehaviorTest {
         waitForBrowseGrid()
         openComposerSearch()
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).performTextInput("happy")
-        composeRule.onNodeWithContentDescription(string(R.string.close)).performClick()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_CLOSE_TEST_TAG, useUnmergedTree = true).performClick()
         composeRule.waitForIdle()
 
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertIsDisplayed()

@@ -27,6 +27,8 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
+internal const val EMOJI_PICKER_SEARCH_CLOSE_TEST_TAG = "emoji.picker.search_close"
+
 /**
  * Search field state. Behind the icon the field opens on demand, and leaving it (close action, Back,
  * keyboard hidden) keeps the field and matches in place until [finishClose] returns to browsing.
@@ -102,8 +104,8 @@ internal fun EmojiSearchEffects(
 }
 
 /**
- * Compact search field of the emoji picker. Behind the icon its trailing action closes the search
- * instead of only clearing the query.
+ * Compact search field of the emoji picker. Behind the icon a leading back action closes the search,
+ * and the trailing clear action only appears once there is text to clear.
  */
 @Composable
 internal fun EmojiSearchField(
@@ -112,39 +114,49 @@ internal fun EmojiSearchField(
     modifier: Modifier = Modifier,
 ) {
     val focusManager = LocalFocusManager.current
-    val closeDescription = stringResource(R.string.close)
-    val onClose: (() -> Unit)? =
-        if (search.behindIcon) {
-            {
-                focusManager.clearFocus()
-                search.close(onActiveChange)
-            }
-        } else {
-            null
-        }
+    val placeholder = stringResource(R.string.emoji_search_hint)
+    val fieldModifier =
+        modifier
+            .focusRequester(search.focusRequester)
+            .onFocusChanged { search.onFocusChanged(it.isFocused, onActiveChange) }
+            .testTag(EMOJI_PICKER_SEARCH_TEST_TAG)
+    if (!search.behindIcon) {
+        WhiteNoiseCompactSearchField(
+            value = search.query,
+            onValueChange = { search.query = it },
+            placeholder = placeholder,
+            modifier =
+                Modifier
+                    .padding(
+                        start = WhiteNoiseSpacing.CompactScreenMargin,
+                        end = WhiteNoiseSpacing.CompactScreenMargin,
+                        bottom = WhiteNoiseSpacing.Related,
+                    ).then(fieldModifier),
+            outlined = true,
+            clearDescription = stringResource(R.string.emoji_search_clear),
+        )
+        return
+    }
     WhiteNoiseCompactSearchField(
         value = search.query,
         onValueChange = { search.query = it },
-        placeholder = stringResource(R.string.emoji_search_hint),
+        placeholder = placeholder,
         modifier =
-            modifier
-                .padding(
-                    start = WhiteNoiseSpacing.CompactScreenMargin,
-                    end = WhiteNoiseSpacing.CompactScreenMargin,
-                    bottom = WhiteNoiseSpacing.Related,
-                ).focusRequester(search.focusRequester)
-                .onFocusChanged { search.onFocusChanged(it.isFocused, onActiveChange) }
-                .testTag(EMOJI_PICKER_SEARCH_TEST_TAG),
+            Modifier
+                .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin, vertical = WhiteNoiseSpacing.Related)
+                .then(fieldModifier),
         outlined = true,
-        clearDescription = if (onClose != null) closeDescription else stringResource(R.string.emoji_search_clear),
-        onClear = onClose,
-        emptyTrailingIcon =
-            onClose?.let { close ->
-                {
-                    IconButton(onClick = close) {
-                        Icon(painterResource(R.drawable.ic_close), contentDescription = closeDescription)
-                    }
-                }
-            },
+        clearDescription = stringResource(R.string.emoji_search_clear),
+        leadingIcon = {
+            IconButton(
+                onClick = {
+                    focusManager.clearFocus()
+                    search.close(onActiveChange)
+                },
+                modifier = Modifier.testTag(EMOJI_PICKER_SEARCH_CLOSE_TEST_TAG),
+            ) {
+                Icon(painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.back))
+            }
+        },
     )
 }

@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -37,18 +38,20 @@ import dev.ipf.whitenoise.android.ui.EmojiCategory
 import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerFallbackHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerPane
+import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_CATEGORIES_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_CELL_GLYPH_FILL_FRACTION
 import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_SEARCH_OPEN_TEST_TAG
+import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_SEARCH_PULL_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_SEARCH_ROW_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_SEARCH_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerContent
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerEmojiSize
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerMinimumCellSize
+import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiSearchRowHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.emojiPickerCellTextMetrics
 import dev.ipf.whitenoise.android.ui.conversation.composer.emojiPickerHeaderTestTag
 import dev.ipf.whitenoise.android.ui.conversation.composer.emojiPickerItemTestTag
 import dev.ipf.whitenoise.android.ui.theme.Typography
-import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import dev.ipf.whitenoise.android.ui.theme.scaledBy
 import org.junit.Assert.assertEquals
@@ -90,7 +93,7 @@ class EmojiPickerScreenshotTest {
             .apply()
     }
 
-    /** Browse mode packs six 48dp cells per row under a 36dp header at 360dp. */
+    /** Browse mode packs seven 48dp cells per row under a 36dp header at 360dp. */
     @Test
     fun browseGridUsesAdaptiveCellsWithSectionHeaders() {
         renderBrowsePane(darkTheme = false, amoled = false)
@@ -98,19 +101,25 @@ class EmojiPickerScreenshotTest {
         assertBrowseGridLayout()
     }
 
-    /** The composer pane opens on the grid alone; search waits behind the category bar icon. */
+    /**
+     * The composer pane opens under its search/backspace row with the first section at the top; the
+     * pull-down search field waits above it, and the category rail sits along the bottom.
+     */
     @Test
-    fun composerBrowseHidesSearchFieldUntilIconTap() {
+    fun composerBrowseOpensPastThePullDownSearchField() {
         renderBrowsePane(darkTheme = false, amoled = false)
         waitForBrowseGrid()
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_PULL_TEST_TAG).assertIsNotDisplayed()
         val pane = boundsOfTag(PICKER_TAG)
+        val searchIcon = boundsOfTag(EMOJI_PICKER_SEARCH_OPEN_TEST_TAG)
         val firstHeader = boundsOfTag(emojiPickerHeaderTestTag(EmojiCategory.Recent))
         assertTrue(
-            "The grid starts at the top of the pane (${firstHeader.top}px, pane ${pane.top}px)",
-            firstHeader.top - pane.top <= (EXPECTED_HEADER_MIN_HEIGHT + EXPECTED_HEADER_TOP_GAP).value,
+            "The first section starts right under the top row (${firstHeader.top}px, row ${searchIcon.bottom}px)",
+            firstHeader.top - searchIcon.bottom <= (EXPECTED_HEADER_MIN_HEIGHT + EXPECTED_HEADER_TOP_GAP).value,
         )
-        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_OPEN_TEST_TAG).assertIsDisplayed()
+        val rail = boundsOfTag(EMOJI_PICKER_CATEGORIES_TEST_TAG)
+        assertEquals("The rail sits on the pane's bottom edge", pane.bottom, rail.bottom, GAP_TOLERANCE_PX * 4)
     }
 
     /** The sheets' default picker content keeps the sectioned search grid and drops the Recent section. */
@@ -128,12 +137,12 @@ class EmojiPickerScreenshotTest {
         waitForBrowseGrid()
         openSearchAndType("happy", fromIcon = false)
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_ROW_TEST_TAG).assertDoesNotExist()
-        assertSearchGridLayout()
+        assertSearchGridLayout(columns = SHEET_COLUMN_COUNT)
     }
 
-    /** Composer search lays every match out on one row of 48dp cells above the search field. */
+    /** Composer search lays every match out on one row of 48dp cells below the search field. */
     @Test
-    fun composerSearchUsesOneRowAboveTheField() {
+    fun composerSearchUsesOneRowBelowTheField() {
         renderBrowsePane(darkTheme = false, amoled = false)
         waitForBrowseGrid()
         openSearchAndType("happy")
@@ -152,7 +161,7 @@ class EmojiPickerScreenshotTest {
                 .isSuccess
         }
         val row = boundsOfTag(EMOJI_PICKER_SEARCH_ROW_TEST_TAG)
-        assertEquals("No-results row height", EXPECTED_CELL_SIZE.value, row.height, CELL_SIZE_TOLERANCE_PX)
+        assertEquals("No-results row height", EmojiSearchRowHeight.value, row.height, CELL_SIZE_TOLERANCE_PX)
     }
 
     /** Extra-large fonts shrink the glyph to fit the 32dp square instead of overlapping neighbours. */
@@ -412,15 +421,15 @@ class EmojiPickerScreenshotTest {
     }
 
     /** Asserts search grid layout. */
-    private fun assertSearchGridLayout() {
+    private fun assertSearchGridLayout(columns: Int) {
         composeRule
             .onNodeWithTag(emojiPickerHeaderTestTag(EmojiCategory.Recent), useUnmergedTree = true)
             .assertDoesNotExist()
         composeRule.onNodeWithText(string(R.string.emoji_category_smileys_people)).assertIsDisplayed()
-        assertCellGrid(EmojiCategory.SmileysAndPeople)
+        assertCellGrid(EmojiCategory.SmileysAndPeople, columns)
     }
 
-    /** Matches sit on one row of 48dp cells above the field, in reading order, with no section headers. */
+    /** Matches sit on one row of 48dp cells below the field, in reading order, with no section headers. */
     private fun assertSearchRowLayout(rtl: Boolean) {
         composeRule
             .onNodeWithTag(emojiPickerHeaderTestTag(EmojiCategory.SmileysAndPeople), useUnmergedTree = true)
@@ -430,10 +439,10 @@ class EmojiPickerScreenshotTest {
             .assertDoesNotExist()
         val row = boundsOfTag(EMOJI_PICKER_SEARCH_ROW_TEST_TAG)
         val field = boundsOfTag(EMOJI_PICKER_SEARCH_TEST_TAG)
-        assertEquals("Row height", EXPECTED_CELL_SIZE.value, row.height, CELL_SIZE_TOLERANCE_PX)
+        assertEquals("Row height", EmojiSearchRowHeight.value, row.height, CELL_SIZE_TOLERANCE_PX)
         assertTrue(
-            "Row ${row.bottom}px sits above the field ${field.top}px",
-            row.bottom <= field.top + GAP_TOLERANCE_PX,
+            "Row ${row.top}px sits below the field ${field.bottom}px",
+            row.top >= field.bottom - GAP_TOLERANCE_PX,
         )
         val cells =
             (0 until EXPECTED_COLUMN_COUNT).map {
@@ -442,7 +451,7 @@ class EmojiPickerScreenshotTest {
         cells.forEach { cell ->
             assertEquals("Cell height", EXPECTED_CELL_SIZE.value, cell.height, CELL_SIZE_TOLERANCE_PX)
             assertEquals("Cell width", EXPECTED_CELL_SIZE.value, cell.width, CELL_SIZE_TOLERANCE_PX)
-            assertEquals("Cell shares the row's top edge", row.top, cell.top, ROW_ALIGNMENT_TOLERANCE_PX)
+            assertEquals("Cell is centred in the row", row.center.y, cell.center.y, ROW_ALIGNMENT_TOLERANCE_PX)
         }
         cells.zipWithNext().forEach { (first, next) ->
             val step = if (rtl) first.left - next.left else next.left - first.left
@@ -452,16 +461,19 @@ class EmojiPickerScreenshotTest {
         assertEquals("Row starts at the screen margin", ROW_START_INSET.value, leadingInset, GAP_TOLERANCE_PX)
     }
 
-    /** Cells are 48dp squares, [EXPECTED_COLUMN_COUNT] per row, with the next row flush below the first. */
-    private fun assertCellGrid(category: EmojiCategory) {
-        val cells = (0..EXPECTED_COLUMN_COUNT).map { boundsOfTag(emojiPickerItemTestTag(category, it)) }
+    /** Cells are 48dp squares, [columns] per row, with the next row flush below the first. */
+    private fun assertCellGrid(
+        category: EmojiCategory,
+        columns: Int = EXPECTED_COLUMN_COUNT,
+    ) {
+        val cells = (0..columns).map { boundsOfTag(emojiPickerItemTestTag(category, it)) }
         cells.forEach { cell ->
             assertEquals("Cell height", EXPECTED_CELL_SIZE.value, cell.height, CELL_SIZE_TOLERANCE_PX)
             assertEquals("Cell width", EXPECTED_CELL_SIZE.value, cell.width, CELL_SIZE_TOLERANCE_PX)
         }
-        val firstRow = cells.take(EXPECTED_COLUMN_COUNT)
+        val firstRow = cells.take(columns)
         assertTrue(
-            "Expected $EXPECTED_COLUMN_COUNT cells on the first row but tops were ${firstRow.map { it.top }}",
+            "Expected $columns cells on the first row but tops were ${firstRow.map { it.top }}",
             firstRow.all { abs(it.top - firstRow.first().top) <= ROW_ALIGNMENT_TOLERANCE_PX },
         )
         val nextRowFirst = cells.last()
@@ -571,21 +583,24 @@ class EmojiPickerScreenshotTest {
         const val REACTION_SHEET_OS_FONT_SCALE = 1.5f
         const val PICKER_TAG = "emoji-picker-pane"
 
-        // 360dp minus the 16dp grid insets leaves 328dp: six adaptive 48dp columns.
-        const val EXPECTED_COLUMN_COUNT = 6
+        // 360dp minus the composer grid's 8dp side insets leaves 344dp: seven adaptive 48dp columns.
+        const val EXPECTED_COLUMN_COUNT = 7
+
+        // The reaction sheet keeps its 16dp insets: 328dp holds six columns.
+        const val SHEET_COLUMN_COUNT = 6
         val EXPECTED_ROW_SPACING = 0.dp
         val EXPECTED_CELL_SIZE = EmojiPickerMinimumCellSize
         val EXPECTED_HEADER_MIN_HEIGHT = 36.dp
         val EXPECTED_HEADER_TOP_GAP = 8.dp
-        val ROW_START_INSET = WhiteNoiseSpacing.CompactScreenMargin
+        val ROW_START_INSET = 8.dp
         const val ROW_ALIGNMENT_TOLERANCE_PX = 2f
         const val GAP_TOLERANCE_PX = 2f
         const val OVERLAP_TOLERANCE_PX = 1f
         const val CELL_SIZE_TOLERANCE_PX = 1f
         const val EMOJI_GLYPH_FILL_FRACTION = EMOJI_PICKER_CELL_GLYPH_FILL_FRACTION
 
-        val FIRST_SMILEYS_ROW = listOf("😀", "😃", "😄", "😁", "😆", "😅")
-        val SECOND_SMILEYS_ROW = listOf("🤣", "😂", "🙂", "🙃", "🫠", "😉")
+        val FIRST_SMILEYS_ROW = listOf("😀", "😃", "😄", "😁", "😆", "😅", "🤣")
+        val SECOND_SMILEYS_ROW = listOf("😂", "🙂", "🙃", "🫠", "😉", "😊", "😇")
         const val FIRST_SEARCH_EMOJI = "😀"
     }
 }

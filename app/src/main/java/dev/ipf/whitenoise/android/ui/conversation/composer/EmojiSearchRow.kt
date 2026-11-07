@@ -24,15 +24,21 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.EmojiSection
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 internal const val EMOJI_PICKER_SEARCH_ROW_TEST_TAG = "emoji.picker.search_row"
 
+/** One 48dp cell plus a little air above and below it. */
+internal val EmojiSearchRowHeight = EmojiPickerMinimumCellSize + 8.dp
+private val EmojiSearchRowPadding = 8.dp
+
 /**
  * One row of 48dp cells holding every emoji of [sections] in order, scrolled horizontally. With no
- * matches the same height holds the no-results text, so the pane does not change size while typing.
+ * matches the same height holds the no-results text, so the pane does not change size while typing;
+ * with nothing typed yet the caller passes recents, and an empty row stays blank.
  */
 @Composable
 internal fun EmojiSearchRow(
@@ -45,7 +51,7 @@ internal fun EmojiSearchRow(
     val modifier =
         Modifier
             .fillMaxWidth()
-            .height(EmojiPickerMinimumCellSize)
+            .height(EmojiSearchRowHeight)
             .testTag(EMOJI_PICKER_SEARCH_ROW_TEST_TAG)
     if (noResults) {
         Box(
@@ -71,7 +77,8 @@ internal fun EmojiSearchRow(
     LazyRow(
         state = state,
         modifier = modifier,
-        contentPadding = PaddingValues(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+        contentPadding = PaddingValues(horizontal = EmojiSearchRowPadding),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         items(cells, key = { (category, index, emoji) -> "${category.id}:$index:$emoji" }) { (category, index, emoji) ->
             EmojiTapTarget(

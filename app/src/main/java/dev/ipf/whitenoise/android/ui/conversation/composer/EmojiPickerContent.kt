@@ -92,6 +92,8 @@ private class EmojiPickerModel(
     val sections: List<EmojiSection>,
     val searching: Boolean,
     val searchedQuery: String,
+    /** Whether the emoji catalogue has loaded; recents alone can show before it does. */
+    val loaded: Boolean,
 ) {
     val sectionRanges = emojiSectionRanges(sections)
 
@@ -147,7 +149,8 @@ private fun rememberEmojiPickerModel(
         searchedQuery = query
     }
     val searching = query.isNotBlank()
-    return remember(browseSections, searchSections, searching, searchedQuery, custom) {
+    val loaded = entries.isNotEmpty()
+    return remember(browseSections, searchSections, searching, searchedQuery, custom, loaded) {
         EmojiPickerModel(
             sections =
                 if (searching) {
@@ -157,6 +160,7 @@ private fun rememberEmojiPickerModel(
                 },
             searching = searching,
             searchedQuery = searchedQuery,
+            loaded = loaded,
         )
     }
 }
@@ -166,11 +170,12 @@ private fun rememberEmojiPickerModel(
  * (while not searching) a divider plus the category bar. Shared by the reaction sheet, the
  * composer pane and the group image picker.
  *
- * [searchBehindIcon] hides the search field until the category bar's search action opens it; closing
- * the field, or moving focus away from it, returns to plain browsing. [searchRow] replaces the grid
- * and category bar with one row of matches above the search field, so the composer pane stays small
- * while its search has the keyboard. Only the composer sets either.
+ * [searchBehindIcon] selects the composer layout ([ComposerEmojiKeyboard]): the search field stays hidden
+ * until its search action or pull-down field opens it, and closing the field or moving focus away
+ * returns to browsing. [searchRow] replaces the grid with one row of matches under the search field, so
+ * the composer pane stays small while its search has the keyboard. Only the composer sets either.
  */
+@Suppress("LongMethod") // Owns the picker state shared by the composer and sheet layouts.
 @Composable
 internal fun EmojiPickerContent(
     onEmojiPicked: (String) -> Unit,
@@ -192,13 +197,23 @@ internal fun EmojiPickerContent(
     val rowState = rememberLazyListState()
     val categoryState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    val activeCategory by remember(gridState, model) {
+    // The composer's grid opens with a pull-down search field above the first section.
+    val leadingItems = if (searchBehindIcon) 1 else 0
+    val activeCategory by remember(gridState, model, leadingItems) {
         derivedStateOf {
-            model.sectionRanges.lastOrNull { it.firstItemIndex <= gridState.firstVisibleItemIndex }?.category
+            val first = gridState.firstVisibleItemIndex - leadingItems
+            model.sectionRanges.lastOrNull { it.firstItemIndex <= first }?.category
                 ?: model.sections.firstOrNull()?.category
         }
     }
-    EmojiPickerScrollSync(model, activeCategory, if (searchRow) rowState else null, gridState, categoryState)
+    EmojiPickerScrollSync(
+        model,
+        activeCategory,
+        if (searchRow) rowState else null,
+        gridState,
+        categoryState,
+        browseStartIndex = leadingItems,
+    )
     EmojiSearchEffects(search, searchRow)
 
     // Delivers a picked emoji and records it as used when the picker serves the composer.
@@ -209,41 +224,58 @@ internal fun EmojiPickerContent(
         }
     }
     val noResults = model.searching && model.searchedQuery == query && model.sections.isEmpty()
+    val categories = model.sections.map { it.category }
+    val onCategory: (EmojiCategory) -> Unit = { category ->
+        model.firstItemIndex(category)?.let { scope.launch { gridState.animateScrollToItem(it + leadingItems) } }
+    }
+    if (searchBehindIcon) {
+        ComposerEmojiKeyboard(
+            search = search,
+            sections = model.sections,
+            searching = model.searching,
+            noResults = noResults,
+            searchRow = searchRow,
+            gridState = gridState,
+            rowState = rowState,
+            categoryState = categoryState,
+            activeCategory = activeCategory,
+            selectionEnabled = selectionEnabled,
+            onPick = pick,
+            onCategory = onCategory,
+            onBackspace = onBackspace,
+            onSearchActiveChange = onSearchActiveChange,
+            modifier = modifier,
+        )
+        return
+    }
     Column(modifier) {
-        // The row is emitted ahead of the one search field call site, so switching modes keeps its focus.
-        if (searchRow) EmojiSearchRow(model.sections, noResults, rowState, selectionEnabled, onPick = pick)
         if (search.isOpen) EmojiSearchField(search, onSearchActiveChange, Modifier.fillMaxWidth())
-        // In row mode the row above the field already shows matches; the grid and category bar stay out.
-        if (!searchRow) {
-            EmojiPickerResults(
-                sections = model.sections,
-                noResults = noResults,
-                gridState = gridState,
-                selectionEnabled = selectionEnabled,
-                onPick = pick,
-                modifier = Modifier.fillMaxWidth().weight(1f),
+        EmojiPickerResults(
+            sections = model.sections,
+            noResults = noResults,
+            gridState = gridState,
+            selectionEnabled = selectionEnabled,
+            onPick = pick,
+            modifier = Modifier.fillMaxWidth().weight(1f),
+        )
+        if (!model.searching) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            EmojiCategoryBar(
+                categories = categories,
+                selected = activeCategory,
+                state = categoryState,
+                onSearch = null,
+                onConfigure = onConfigure,
+                onBackspace = onBackspace,
+                onCategory = onCategory,
             )
-            if (!model.searching) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                EmojiCategoryBar(
-                    categories = model.sections.map { it.category },
-                    selected = activeCategory,
-                    state = categoryState,
-                    onSearch = if (search.isOpen) null else search::open,
-                    onConfigure = onConfigure,
-                    onBackspace = onBackspace,
-                    onCategory = { category ->
-                        model.firstItemIndex(category)?.let { scope.launch { gridState.animateScrollToItem(it) } }
-                    },
-                )
-            }
         }
     }
 }
 
 /** Grid of matches or browse sections, or a centred notice when a search finds nothing. */
 @Composable
-private fun EmojiPickerResults(
+internal fun EmojiPickerResults(
     sections: List<EmojiSection>,
     noResults: Boolean,
     gridState: LazyGridState,
@@ -280,10 +312,18 @@ private fun EmojiPickerScrollSync(
     rowState: LazyListState?,
     gridState: LazyGridState,
     categoryState: LazyListState,
+    browseStartIndex: Int,
 ) {
-    LaunchedEffect(model.searchedQuery, rowState) {
-        if (model.sections.isEmpty()) return@LaunchedEffect
-        if (rowState != null) rowState.scrollToItem(0) else gridState.scrollToItem(0)
+    // Browsing starts past any leading item (the composer's pull-down search), which scrolling up reveals.
+    // Waiting for the whole catalogue matters: a grid holding only recents is too short to scroll past it.
+    val loaded = model.loaded
+    LaunchedEffect(model.searchedQuery, rowState, loaded) {
+        if (!loaded) return@LaunchedEffect
+        when {
+            rowState != null -> rowState.scrollToItem(0)
+            model.searching -> gridState.scrollToItem(0)
+            else -> gridState.scrollToItem(browseStartIndex)
+        }
     }
     LaunchedEffect(activeCategory, model.searching) {
         if (!model.searching) {
@@ -295,24 +335,29 @@ private fun EmojiPickerScrollSync(
 
 /** Grid of emoji sections with sticky headers. */
 @Composable
-private fun EmojiSectionGrid(
+internal fun EmojiSectionGrid(
     sections: List<EmojiSection>,
     state: LazyGridState,
     selectionEnabled: Boolean,
     onPick: (String) -> Unit,
     modifier: Modifier = Modifier,
+    contentPadding: PaddingValues =
+        PaddingValues(
+            start = WhiteNoiseSpacing.CompactScreenMargin,
+            end = WhiteNoiseSpacing.CompactScreenMargin,
+            bottom = WhiteNoiseSpacing.Related,
+        ),
+    leadingItem: (@Composable () -> Unit)? = null,
 ) {
     WhiteNoiseLazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = EmojiPickerMinimumCellSize),
         state = state,
         modifier = modifier.testTag(EMOJI_PICKER_GRID_TEST_TAG),
-        contentPadding =
-            PaddingValues(
-                start = WhiteNoiseSpacing.CompactScreenMargin,
-                end = WhiteNoiseSpacing.CompactScreenMargin,
-                bottom = WhiteNoiseSpacing.Related,
-            ),
+        contentPadding = contentPadding,
     ) {
+        if (leadingItem != null) {
+            item(key = "leading", span = { GridItemSpan(maxLineSpan) }) { leadingItem() }
+        }
         sections.forEach { section ->
             item(key = "${section.category.id}:header", span = { GridItemSpan(maxLineSpan) }) {
                 EmojiSectionHeader(section.category)
