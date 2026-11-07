@@ -968,7 +968,7 @@ internal fun MediaImageGridTile(
                     when {
                         transfer.cancelling -> Unit
                         tooLargeToPreview -> onTap()
-                        // A shown image opens like the single bubble's, even if a sharper decode failed.
+                        // A visible image opens the viewer even if its sharper decode failed, as in the single bubble.
                         presentation != null -> onTap()
                         failed ->
                             controller.retryAttachmentTransfer(

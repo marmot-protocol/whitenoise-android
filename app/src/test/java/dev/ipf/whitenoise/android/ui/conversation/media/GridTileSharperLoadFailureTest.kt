@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -32,10 +33,11 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.IOException
 
 /**
- * An album tile that already shows a cached image opens the viewer on tap even when the sharper version it then
- * asked for failed to load, as the single-image bubble does. Only a tile that shows nothing keeps Retry.
+ * An album tile showing a cached image opens the viewer on tap after its sharper load fails, as the single-image
+ * bubble does. A tile showing nothing keeps Retry.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36], qualifiers = "en-rUS-w360dp-h800dp-mdpi")
@@ -48,7 +50,6 @@ class GridTileSharperLoadFailureTest {
     private lateinit var controller: ConversationController
     private var opens = 0
 
-    /** Uses the real controller with only its native download boundary replaced, and automatic images allowed. */
     @Before
     fun setUp() {
         fixture = MediaDownloadIntegrationFixture()
@@ -57,44 +58,36 @@ class GridTileSharperLoadFailureTest {
                 appState = fixture.state,
                 initialGroup = conversationTimelineTestGroup().copy(groupIdHex = MediaDownloadIntegrationFixture.GROUP),
             )
-        opens = 0
         enableAutomaticImages()
     }
 
-    /** Cancels fixture transfers and removes its private temporary cache. */
     @After
     fun tearDown() {
         fixture.close()
     }
 
-    /** A small cached thumbnail stays on screen after the larger read fails, and a tap on it opens the viewer. */
     @Test
     fun aTileShowingACachedThumbnailOpensTheViewerAfterTheSharperLoadFails() {
-        controller.cacheThumbnail(
-            request(0).messageIdHex,
-            0,
-            Bitmap.createBitmap(SMALL_EDGE, SMALL_EDGE, Bitmap.Config.ARGB_8888),
-            SMALL_EDGE,
-        )
+        val thumbnail = Bitmap.createBitmap(SMALL_EDGE, SMALL_EDGE, Bitmap.Config.ARGB_8888)
+        controller.cacheThumbnail(request(0).messageIdHex, 0, thumbnail, SMALL_EDGE)
         composeRule.setContent { WhiteNoiseTheme { GridTile() } }
         awaitTransfers(1)
-        composeRule.runOnIdle { fixture.calls.single().fail(java.io.IOException("download failed")) }
+        composeRule.runOnIdle { fixture.calls.single().fail(IOException("download failed")) }
         composeRule.waitForIdle()
         composeRule.onAllNodesWithContentDescription(text(R.string.media_tap_to_retry)).assertCountEquals(0)
 
         composeRule.onNodeWithTag(TILE_TAG).performClick()
 
-        composeRule.runOnIdle { assertEquals("a tap on the visible image must open the viewer", 1, opens) }
+        composeRule.runOnIdle { assertEquals("a tap on the visible image did not open the viewer", 1, opens) }
         assertEquals("a tap on the visible image retried the transfer", 0, fixture.retryDemands.get())
         assertEquals("a tap on the visible image started a transfer", 1, fixture.calls.size)
     }
 
-    /** A tile that failed with nothing displayed still shows Retry, and a tap retries instead of opening. */
     @Test
     fun aTileShowingNothingStillRetriesAfterAFailedLoad() {
         composeRule.setContent { WhiteNoiseTheme { GridTile() } }
         awaitTransfers(1)
-        composeRule.runOnIdle { fixture.calls.single().fail(java.io.IOException("download failed")) }
+        composeRule.runOnIdle { fixture.calls.single().fail(IOException("download failed")) }
         val retry = text(R.string.media_tap_to_retry)
         composeRule.waitUntil(WAIT_MILLIS) {
             composeRule.waitForIdle()
@@ -110,7 +103,6 @@ class GridTileSharperLoadFailureTest {
         composeRule.runOnIdle { assertEquals("a tap on Retry opened the viewer", 0, opens) }
     }
 
-    /** Waits until the production tile has asked the native boundary [count] times. */
     private fun awaitTransfers(count: Int) {
         composeRule.waitUntil(WAIT_MILLIS) {
             composeRule.waitForIdle()
@@ -118,7 +110,7 @@ class GridTileSharperLoadFailureTest {
         }
     }
 
-    /** The production album tile for the fixture's first attachment, larger than the cached thumbnail. */
+    /** The production album tile, sized larger than the cached thumbnail so it asks for a sharper decode. */
     @Composable
     private fun GridTile() {
         MediaImageGridTile(
@@ -134,7 +126,7 @@ class GridTileSharperLoadFailureTest {
         )
     }
 
-    /** Selects the existing Wi-Fi policy without broadcasting a real connectivity change. */
+    /** Selects Wi-Fi without broadcasting a real connectivity change, so the tile downloads automatically. */
     private fun enableAutomaticImages() {
         WhiteNoiseAppState::class.java
             .getDeclaredField("activeNetworkTypesSnapshot")
@@ -144,11 +136,7 @@ class GridTileSharperLoadFailureTest {
         assertTrue(fixture.state.shouldAutoDownloadMedia(MediaAutoDownloadType.Image))
     }
 
-    /** Localized text for a string resource. */
-    private fun text(id: Int): String {
-        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        return context.getString(id)
-    }
+    private fun text(id: Int): String = ApplicationProvider.getApplicationContext<Context>().getString(id)
 
     private companion object {
         const val TILE_TAG = "sharper-load-tile"
