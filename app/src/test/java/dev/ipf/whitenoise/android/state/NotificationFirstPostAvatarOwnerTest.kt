@@ -68,9 +68,9 @@ class NotificationFirstPostAvatarOwnerTest {
         }
     }
 
-    /** Hidden sender cache hits are skipped for group messages, while invite imagery keeps its existing source. */
+    /** #3635: a group message's snapshot carries its sender's ready picture for the row, as an invite's does. */
     @Test
-    fun groupMessageSnapshotDropsTheSenderButInviteSnapshotRetainsIt() {
+    fun groupMessageAndInviteSnapshotsBothCarryTheReadySenderPicture() {
         val context = RuntimeEnvironment.getApplication()
         val url = "https://profiles.example/group-member.png"
         val fixture = NotificationBootstrapTestFixture(context = context, senderPictureUrl = url, isDm = false)
@@ -85,7 +85,9 @@ class NotificationFirstPostAvatarOwnerTest {
         val image = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
         try {
             AvatarImageLoader.putCached(url, image.asImageBitmap())
-            assertNull(state.readyNotificationAvatars(fixture.update).senderAvatarBitmap)
+            val message = state.readyNotificationAvatars(fixture.update)
+            assertSame(image, message.senderAvatarBitmap)
+            assertNull("a group never borrows the sender's face", message.conversationBitmap(isDm = false))
             val invite = fixture.update.copy(trigger = NotificationTriggerFfi.GROUP_INVITE)
             assertSame(image, state.readyNotificationAvatars(invite).senderAvatarBitmap)
         } finally {

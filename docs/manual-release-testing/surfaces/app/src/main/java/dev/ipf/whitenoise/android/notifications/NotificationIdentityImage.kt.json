@@ -12,6 +12,14 @@
         ]
       },
       {
+        "surface": "reaction card picture of the person who reacted, with monogram fallback",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationIdentityImage.kt",
+        "anchor": "internal fun LocalNotificationContent.reactorImage(",
+        "test_ids": [
+          "NTF-042"
+        ]
+      },
+      {
         "surface": "final-write private contact picture refresh",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationIdentityImage.kt",
         "anchor": "internal fun withCurrentIdentityContact(",

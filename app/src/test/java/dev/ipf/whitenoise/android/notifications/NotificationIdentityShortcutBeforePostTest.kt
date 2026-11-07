@@ -82,7 +82,10 @@ class NotificationIdentityShortcutBeforePostTest {
         assertEquals(notificationMonogramBackgroundColor(seed), iconPixel(withoutPicture.shortcuts.single()))
     }
 
-    /** Private member pictures cannot reappear in a group's final shortcut Person or replace its group icon. */
+    /**
+     * A member's private picture never reaches the group's shortcut Person or replaces its group icon, while the card's
+     * row for that member shows it (#3635).
+     */
     @Test
     fun groupShortcutKeepsSenderNamesWithoutPrivateMemberPixels() {
         val recorder = Recorder()
@@ -103,13 +106,11 @@ class NotificationIdentityShortcutBeforePostTest {
             ).messages.single().person!!
         assertEquals(person.name.toString(), cardPerson.name.toString())
         assertEquals(
-            0,
-            Color.alpha(
-                cardPerson.icon!!
-                    .loadDrawable(context)!!
-                    .toBitmap()
-                    .getPixel(0, 0),
-            ),
+            Color.RED,
+            cardPerson.icon!!
+                .loadDrawable(context)!!
+                .toBitmap()
+                .getPixel(0, 0),
         )
     }
 

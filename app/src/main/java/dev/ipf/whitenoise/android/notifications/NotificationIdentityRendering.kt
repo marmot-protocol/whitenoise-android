@@ -74,6 +74,10 @@ private fun String.firstMonogramCodePoint(): Int? {
     return null
 }
 
+/**
+ * The sender Person a message row draws: their picture in a group and a direct chat alike (#3635), and no picture
+ * at all on a redacted or hidden-preview card.
+ */
 internal fun notificationSenderPerson(
     content: LocalNotificationContent,
     avatarBitmap: Bitmap?,
@@ -84,15 +88,7 @@ internal fun notificationSenderPerson(
         .setName(content.senderName)
         .setKey(content.senderKey)
         .apply {
-            if (!redacted) {
-                val icon =
-                    if (content.isGroupConversation && content.senderKey.isNotBlank()) {
-                        groupSenderIcon()
-                    } else {
-                        avatarBitmap?.let(IconCompat::createWithBitmap)
-                    }
-                icon?.let(::setIcon)
-            }
+            if (!redacted) avatarBitmap?.let { setIcon(IconCompat.createWithBitmap(it)) }
         }.build()
 
 private const val NOTIFICATION_MONOGRAM_SIZE_PX = 128

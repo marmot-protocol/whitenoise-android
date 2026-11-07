@@ -8,10 +8,12 @@ import org.junit.Test
 import java.io.File
 
 /**
- * Invariant gate for #3311 and #3505: every rich message card uses the native conversation template and
+ * Invariant gate for #3311, #3505 and #3635: every rich message card uses the native conversation template and
  * carries one shared conversation identity snapshot through first post, enrichment, private contact pictures and
  * every rewrite of a live card. Its identity shortcut is published before the single first post, so even a
- * brand-new conversation's first card is a conversation, while redacted and hidden-preview cards stay generic.
+ * brand-new conversation's first card is a conversation, while redacted and hidden-preview cards stay generic. The
+ * identity is the picture the chat list draws, each group row shows its member's own picture, and a reaction card
+ * shows who reacted.
  */
 class NotificationIdentityImageCoverageTest {
     /** The presenter sets the picture only through the shared snapshot, and never on a redacted card. */
@@ -176,19 +178,125 @@ class NotificationIdentityImageCoverageTest {
      */
     @Test
     fun lateGroupIdentityLoadsTheEncryptedGroupPicture() {
-        val appState = File(notificationsRoot().parentFile, "state/AppState.kt").readText()
+        val appState = stateSource("AppState.kt")
         val prepare = appState.functionBody("prepareLateNotificationIdentity")
         assertTrue("only a group card asks for the loader", "!update.isDm" in prepare)
-        assertTrue("the late sources carry it", "conversationLoader = encryptedGroupIdentityLoader(update)" in prepare)
+        assertTrue("the late sources carry it", "conversationLoader = if (encryptedGroupPicture)" in prepare)
+        assertTrue("from the encrypted-picture loader", "encryptedGroupIdentityLoader(update)" in prepare)
         val loader = appState.functionBody("encryptedGroupIdentityLoader")
         assertTrue("through the group avatar cache", "GroupAvatarImageLoader" in loader)
         assertTrue("and MDK's encrypted download", "downloadGroupBlossomImage(" in loader)
         assertTrue("nothing decrypts behind the lock", loader.split("appLockScreenVisible").size - 1 >= 2)
         val presenter = source("LocalNotificationPresenter.kt")
-        val start = presenter.indexOf("private suspend fun resolveAvatars(")
-        val resolve = presenter.substring(start, presenter.indexOf("\n\n", start))
-        assertTrue("the presenter falls back to the loader", "conversationLoader" in resolve)
-        assertTrue("within its own late-refresh bound", "GROUP_IDENTITY_LOAD_TIMEOUT_MS" in resolve)
+        val resolve = presenter.declaration("private suspend fun resolveAvatars(")
+        assertTrue(
+            "the presenter falls back to the loader",
+            "sources.conversationLoader?.let { boundedIdentityLoad(it) }" in resolve,
+        )
+        val bounded = presenter.declaration("private suspend fun boundedIdentityLoad(")
+        assertTrue("within its own late-refresh bound", "GROUP_IDENTITY_LOAD_TIMEOUT_MS" in bounded)
+    }
+
+    /**
+     * #3635: a card's conversation picture is the one the chat list draws. The first post peeks the pixels the chat
+     * list decoded for the row's stored selected avatar, and the late refresh reads MDK's stored copy first, through
+     * the chat list's own adoption rule, never acquiring a missing copy and never behind the app lock.
+     */
+    @Test
+    fun conversationPictureComesFromTheChatListsStoredAvatarFirst() {
+        val appState = stateSource("AppState.kt")
+        val ready = appState.functionBody("readyNotificationAvatars")
+        assertTrue("the first post reads the row's stored picture", "readyStoredAvatarBitmap(" in ready)
+        assertTrue("before the URL and encrypted caches", "stored ?: ready.groupAvatarBitmap" in ready)
+        val avatars = stateSource("PreWarmedNotificationAvatars.kt")
+        val peek = avatars.declaration("internal fun ChatListItem.readyStoredAvatarBitmap(")
+        assertTrue("of the row's selected asset", "selectedAvatarAsset" in peek)
+        assertTrue("from the pixels the chat list decoded", "AvatarImageLoader::cachedImage" in peek)
+        val prepare = appState.functionBody("prepareLateNotificationIdentity")
+        assertTrue(
+            "the late refresh carries the stored copy",
+            "storedConversationLoader = storedConversationIdentityLoader(update)" in prepare,
+        )
+        val stored = appState.functionBody("storedConversationIdentityLoader")
+        assertTrue("from the chat list's own row", "presentedChatListRow(" in stored)
+        assertTrue("through its adoption rule", "storedNotificationAvatar(" in stored)
+        assertTrue(
+            "which is the chat list's projection",
+            "chatListItemFromProjection(" in avatars.extensionBody("storedNotificationAvatar"),
+        )
+        assertTrue("never acquiring a missing copy", "acquireMissing = false" in stored)
+        assertTrue("nothing is read behind the lock", stored.split("appLockScreenVisible").size - 1 >= 2)
+        val resolve = source("LocalNotificationPresenter.kt").declaration("private suspend fun resolveAvatars(")
+        val storedAt = resolve.indexOf("sources.storedConversationLoader")
+        val urlAt = resolve.indexOf("sources.conversationUrl")
+        assertTrue("the stored copy comes before the URL", storedAt in 0 until urlAt)
+        assertTrue("and before the encrypted download", storedAt < resolve.indexOf("sources.conversationLoader"))
+    }
+
+    /**
+     * #3635: every group row draws its member's own picture. Sender pictures are resolved, warmed and refreshed late
+     * for a group as for a direct chat, no write blanks them, and rows an earlier build blanked get their monogram
+     * when carried into a new post. Only the group shortcut's sender stays blank, since it stands for the group.
+     */
+    @Test
+    fun groupRowsDrawEachMembersOwnPicture() {
+        val rendering = source("NotificationIdentityRendering.kt").declaration("internal fun notificationSenderPerson(")
+        assertFalse("no blank picture for a group row", "groupSenderIcon" in rendering)
+        val write = source("NotificationCardPublisher.kt").functionBody("postNotificationSafely")
+        assertFalse("the final write keeps member pictures", "GroupSenderPictures(" in write)
+        val presenter = source("LocalNotificationPresenter.kt")
+        val firstPost =
+            presenter
+                .substringAfter("NotificationStyleChoice.Messaging -> {")
+                .substringBefore("messagingPost =")
+        assertFalse("a group keeps its sender's picture", "isGroupConversation" in firstPost)
+        val late = presenter.functionBody("refreshLateIdentityImage")
+        assertFalse("the late refresh keeps the sender slot", "senderUrl = null" in late)
+        val carried = source("NotificationCardContent.kt").functionBody("messagingStyle")
+        assertTrue("carried blank rows get their monogram", "withoutBlankGroupSenderPicture(" in carried)
+        val ready = stateSource("AppState.kt").functionBody("readyNotificationAvatars")
+        assertFalse("the first post resolves every sender", "NotificationTriggerFfi.NEW_MESSAGE" in ready)
+        val target =
+            stateSource("AppStatePresentation.kt").declaration("internal fun notificationAvatarPreWarmTarget(")
+        assertFalse("every sender is warmed", "takeIf { update.isDm" in target)
+        assertFalse("with their picture URL", "if (update.isDm) ProfileSanitizer" in target)
+        val sources =
+            stateSource("PreWarmedNotificationAvatars.kt").declaration(
+                "internal fun PreWarmedNotificationAvatars.lateIdentitySources(",
+            )
+        assertTrue("every sender has a late source", "senderUrl = warmed.senderAvatarUrl," in sources)
+        val shortcut =
+            source("NotificationGroupSenderImages.kt").declaration("internal fun notificationShortcutSender(")
+        assertTrue("the group shortcut's sender stays blank", "groupNotificationPerson(sender)" in shortcut)
+    }
+
+    /**
+     * #3635: a reaction card shows who reacted through the shared identity snapshot, never on a redacted or
+     * hidden-preview card. A late picture rewrites only that picture and keeps the reaction artwork views.
+     */
+    @Test
+    fun reactionCardsShowWhoReacted() {
+        val presenter = source("LocalNotificationPresenter.kt")
+        val plain =
+            presenter
+                .substringAfter("NotificationStyleChoice.Plain -> {")
+                .substringBefore("NotificationStyleChoice.Messaging -> {")
+        val reactor = plain.indexOf("reactorImage(")
+        assertTrue("the reaction card draws who reacted", reactor >= 0)
+        val guard = plain.substring(plain.lastIndexOf("if (", reactor), reactor)
+        assertTrue("never on a redacted or hidden-preview card", "!redactContent && previewToken.allowed" in guard)
+        assertTrue("through the shared snapshot", "setConversationIdentityImage(" in plain)
+        val route = presenter.functionBody("refreshLateIdentityImage")
+        assertTrue("a late picture takes the reaction path", "rewriteWithLateReactorPicture(" in route)
+        val rewrite = source("NotificationCardContent.kt").declaration("fun reactorPictureNotification(")
+        listOf("setCustomContentView", "setCustomBigContentView", "setCustomHeadsUpContentView").forEach {
+            assertTrue("the artwork view survives: $it", it in rewrite)
+        }
+        assertTrue("one silent rewrite", "setOnlyAlertOnce(true)" in rewrite)
+        val image = source("NotificationIdentityImage.kt").extensionBody("reactorImage")
+        assertTrue("no contact refresh rebuilds the card without its artwork", "contactKey = null" in image)
+        val warm = stateSource("AppStatePresentation.kt").declaration("internal fun shouldPreWarmNotificationAvatars(")
+        assertFalse("a reaction's picture is warmed", "isReaction" in warm)
     }
 
     /** An unchanged snapshot is re-read under the publication lock before only reporting use of the shortcut. */
@@ -207,20 +315,16 @@ class NotificationIdentityImageCoverageTest {
         assertTrue("the use report re-reads the snapshot inside the lock", lock in 0 until reRead)
     }
 
-    /** Every rich-group rewrite normalizes sender pixels after private overrides while retaining native style. */
-    @Test
-    fun groupSenderPicturesAreSuppressedAtTheFinalWriteBoundary() {
-        val write = source("NotificationCardPublisher.kt").functionBody("postNotificationSafely")
-        val normalize = write.indexOf("withoutGroupSenderPictures(")
-        assertTrue("normalization is in the final write", normalize >= 0)
-        assertTrue("after private picture reconciliation", write.indexOf("withCurrentContactPictures(") < normalize)
-        val policy = source("NotificationGroupSenderImages.kt")
-        assertTrue("real group conversation style retained", "setGroupConversation(true)" in policy)
-        assertTrue("all historic senders normalized", "existing.historicMessages.forEach" in policy)
-        assertTrue("self normalized too", "groupNotificationPerson(existing.user)" in policy)
-        assertTrue("native action objects retained", "actions = notification.actions" in policy)
-        assertFalse("no replacement custom card", "RemoteViews" in policy)
+    /** One declaration from its [header] to the blank line that ends it, for expression-bodied functions. */
+    private fun String.declaration(header: String): String {
+        val start = indexOf(header)
+        require(start >= 0) { "Missing $header" }
+        val end = indexOf("\n\n", start).takeIf { it >= 0 } ?: length
+        return substring(start, end)
     }
+
+    /** Reads one state source by file name. */
+    private fun stateSource(name: String): String = File(notificationsRoot().parentFile, "state/$name").readText()
 
     /** Body of an extension function such as `fun Receiver.name(...)`, which [functionBody] does not match. */
     private fun String.extensionBody(name: String): String {
