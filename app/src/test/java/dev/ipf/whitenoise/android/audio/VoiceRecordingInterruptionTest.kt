@@ -144,7 +144,10 @@ class VoiceRecordingInterruptionTest {
                 controller.start()
                 runCurrent()
                 controller.cancel()
+                // The discarded take keeps the microphone until its recorder is released.
+                assertTrue(controller.isFinalizing)
                 runCurrent()
+                assertFalse(controller.isFinalizing)
                 assertEquals(1, completed.size)
                 assertFalse(coordinator.isOwnedBy(controller))
             }

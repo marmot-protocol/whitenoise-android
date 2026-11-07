@@ -44,19 +44,20 @@ class VoiceRecordingWarningEffectsTest {
             withWarnings {
                 repeat(2) { take ->
                     start()
-                    assertWarnings(take, take)
+                    // While a take records, only earlier takes may have announced a stop.
+                    assertWarnings(take, take, stops = take)
                     advance(269_950L)
-                    assertWarnings(take, take)
+                    assertWarnings(take, take, stops = take)
                     advance(50L)
-                    assertWarnings(take + 1, take)
+                    assertWarnings(take + 1, take, stops = take)
                     advance(19_950L)
-                    assertWarnings(take + 1, take)
+                    assertWarnings(take + 1, take, stops = take)
                     advance(50L)
-                    assertWarnings(take + 1, take + 1)
+                    assertWarnings(take + 1, take + 1, stops = take)
                     advance(1_000L)
-                    assertWarnings(take + 1, take + 1)
+                    assertWarnings(take + 1, take + 1, stops = take)
                     cancel()
-                    assertWarnings(take + 1, take + 1)
+                    assertWarnings(take + 1, take + 1, stops = take + 1)
                 }
             }
         }
@@ -149,15 +150,16 @@ class VoiceRecordingWarningEffectsTest {
             advance(0L)
         }
 
-        /** Checks exact warning content and haptic type as well as their independent counts. */
+        /** Checks exact warning, stop-announcement and haptic counts independently. */
         fun assertWarnings(
             announcementCount: Int,
             hapticCount: Int,
+            stops: Int,
         ) {
             val warning = context.getString(R.string.voice_recording_limit_warning)
-            // The stop announcement is covered by ScreenReaderAnnouncementCoverageTest.
             val stopped = context.getString(R.string.voice_recording_stopped_announcement)
             assertEquals(List(announcementCount) { warning }, announcements.filterNot(stopped::equals))
+            assertEquals(stops, announcements.count(stopped::equals))
             assertEquals(List(hapticCount) { HapticFeedbackType.LongPress }, haptics)
         }
     }

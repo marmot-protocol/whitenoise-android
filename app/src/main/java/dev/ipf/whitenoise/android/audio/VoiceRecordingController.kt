@@ -443,9 +443,15 @@ class VoiceRecordingController internal constructor(
         // — the take was discarded. Released on the lifecycle-independent scope
         // so a teardown that races composition disposal still frees the mic.
         if (r != null) {
+            // A discarded take is still closing until the native recorder has released the microphone.
+            finalizingTakes++
             recorderScope.launch {
-                r.cancel()
-                releaseMicrophoneLease()
+                try {
+                    r.cancel()
+                } finally {
+                    releaseMicrophoneLease()
+                    withContext(NonCancellable + mainDispatcher) { finalizingTakes-- }
+                }
             }
         } else if (finalizeJob?.isActive == true) {
             // stop() already detached the recorder into its finalize job. End
