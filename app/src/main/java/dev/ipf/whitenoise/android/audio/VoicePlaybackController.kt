@@ -135,6 +135,13 @@ object VoicePlaybackController {
     private val playSerializer = VoicePlaybackRequestSerializer()
 
     private var resumeOnAudioFocusGain = false
+
+    /** Platform headphone-disconnect source; tests replace it before playback starts. */
+    internal var noisyRoutes: NoisyAudioRouteRegistrar = NoisyAudioRouteRegistrar.None
+
+    // Armed from a play request until focus is abandoned, so a disconnect
+    // during prepare or a transient-loss pause cannot leave speech on the speaker.
+    private val noisyListener = NoisyAudioRouteListener({ noisyRoutes }) { pause() }
     private var duckedForAudioFocusLoss = false
     private val speechAudioAttributes: AudioAttributes =
         AudioAttributes
@@ -146,6 +153,7 @@ object VoicePlaybackController {
     /** Call once from Application.onCreate so playback can request audio focus. */
     fun attach(context: Context) {
         applicationContext = context.applicationContext
+        noisyRoutes = AndroidNoisyAudioRouteRegistrar(context)
         AudioFocusOwner.attach(context)
     }
 
@@ -292,6 +300,8 @@ object VoicePlaybackController {
             return PlaybackStartResult.Resumed
         }
         releasePlayerInternal()
+        // A disconnect while this clip prepares supersedes it through pause().
+        noisyListener.arm()
         val sessionId = ++nextSessionId
         _state.value = PlaybackState(key = key, speed = currentSpeed, source = source, sessionId = sessionId)
         val mp =
@@ -311,10 +321,12 @@ object VoicePlaybackController {
                         if (!isActive) it.runCatching { release() }
                     }?.takeIf { isActive }
             } ?: run {
+                noisyListener.disarm()
                 _state.value = PlaybackState()
                 return PlaybackStartResult.PrepareFailed
             }
         if (!playbackRequests.isCurrent(playGeneration)) {
+            noisyListener.disarm()
             mp.runCatching { release() }
             return PlaybackStartResult.Superseded
         }
@@ -417,18 +429,26 @@ object VoicePlaybackController {
                 onFailure()
             }.isSuccess
 
-    private fun requestFocus(): Boolean =
-        AudioFocusOwner.acquireWithFocusChanges(
-            owner = AudioFocusOwner.Owner.Voice,
-            audioAttributes = speechAudioAttributes,
-            focusGain = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK,
-            onFocusChange = ::handleAudioFocusChange,
-            onOwnerSurrender = ::stopForAudioHandoff,
-        )
+    /** Requests focus with the headphone-disconnect listener armed for as long as it is held. */
+    private fun requestFocus(): Boolean {
+        noisyListener.arm()
+        return AudioFocusOwner
+            .acquireWithFocusChanges(
+                owner = AudioFocusOwner.Owner.Voice,
+                audioAttributes = speechAudioAttributes,
+                focusGain = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK,
+                onFocusChange = ::handleAudioFocusChange,
+                onOwnerSurrender = ::stopForAudioHandoff,
+            ).also { granted -> if (!granted) noisyListener.disarm() }
+    }
 
     private fun abandonFocus() {
+        noisyListener.disarm()
         AudioFocusOwner.release(AudioFocusOwner.Owner.Voice)
     }
+
+    /** True while the headphone-disconnect listener is registered. */
+    internal val listensForNoisyRoute: Boolean get() = noisyListener.armed
 
     private fun handleAudioFocusChange(change: Int) {
         when (change) {

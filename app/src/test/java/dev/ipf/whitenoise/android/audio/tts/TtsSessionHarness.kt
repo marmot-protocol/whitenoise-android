@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.audio.tts
 import android.speech.tts.TextToSpeech
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.whitenoise.android.audio.FakeNoisyRoutes
 import dev.ipf.whitenoise.android.state.canonicalTimelineRecords
 import dev.ipf.whitenoise.android.state.localTimelineMessage
 import dev.ipf.whitenoise.android.state.projectedTimelineMessage
@@ -28,11 +29,13 @@ internal class SessionHarness(
 ) {
     val engine = FakeSessionEngine()
     val focus = FakeSessionFocus()
+    val noisyRoutes = FakeNoisyRoutes()
     val controller =
         TtsController(
             audioFocus = focus,
             maxChunkLength = 4_000,
             preparationDispatcher = preparationDispatcher,
+            noisyRoutes = noisyRoutes,
         )
     val pager = FakeHistoryPager()
     var pagerAvailable = true

@@ -366,6 +366,8 @@ private fun rememberNostrVideoPlayer(
                 .build()
                 .apply {
                     setAudioAttributes(nostrVideoAudioAttributes, true)
+                    // Unplugging headphones pauses instead of moving the clip to the speaker.
+                    setHandleAudioBecomingNoisy(true)
                     addListener(
                         object : Player.Listener {
                             override fun onPlayerError(error: PlaybackException) = onPlaybackFailed()

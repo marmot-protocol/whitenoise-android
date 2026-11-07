@@ -296,6 +296,7 @@ class VoicePlaybackControllerFocusTest {
     @After
     fun tearDown() {
         VoicePlaybackController.stop()
+        VoicePlaybackController.noisyRoutes = NoisyAudioRouteRegistrar.None
         setControllerField("playerFactory", RawVoicePlaybackPlayer.Factory)
         setControllerField("currentSpeed", 1f)
         setAudioFocusOwnerField("audioManager", null)
@@ -573,6 +574,81 @@ class VoicePlaybackControllerFocusTest {
             assertEquals(VoicePlaybackController.PlaybackState(), VoicePlaybackController.state.value)
         }
     }
+
+    /** Unplugging headphones pauses the clip, keeps its player for resume and closes the listener. */
+    @Test
+    fun headphoneDisconnectPausesPlaybackAndClosesTheListener() {
+        val routes = attachWithNoisyRoutes()
+        assertTrue(requestFocus())
+        val mediaPlayer = TrackingVoicePlayer()
+        primeActivePlayer(mediaPlayer)
+        assertEquals(1, routes.listeners)
+
+        routes.disconnect()
+
+        assertFalse(mediaPlayer.playing)
+        assertFalse(VoicePlaybackController.state.value.isPlaying)
+        assertSame(mediaPlayer, controllerField("player"))
+        assertNull(audioFocusOwnerField("focusRequest"))
+        assertEquals(0, routes.listeners)
+        assertFalse(VoicePlaybackController.listensForNoisyRoute)
+    }
+
+    /** A disconnect while a new clip prepares supersedes it before the speaker can start. */
+    @Test
+    fun headphoneDisconnectDuringPrepareKeepsTheClipSilent() {
+        val routes = attachWithNoisyRoutes()
+        val mediaPlayer = TrackingVoicePlayer().apply { playing = false }
+        setControllerField(
+            "playerFactory",
+            VoicePlaybackPlayer.Factory { _, _ ->
+                routes.disconnect()
+                mediaPlayer
+            },
+        )
+
+        val result = runBlocking { VoicePlaybackController.play("new-source", File("voice.amr"), ownerKey = "owner") }
+
+        assertEquals(VoicePlaybackController.PlaybackStartResult.Superseded, result)
+        assertEquals(0, mediaPlayer.startCount)
+        assertTrue(mediaPlayer.released)
+        assertEquals(0, routes.listeners)
+    }
+
+    /** A transient focus loss keeps listening, so unplugging during a call cannot resume on the speaker. */
+    @Test
+    fun transientLossKeepsListeningForHeadphoneDisconnect() {
+        val routes = attachWithNoisyRoutes()
+        assertTrue(requestFocus())
+        val mediaPlayer = TrackingVoicePlayer()
+        primeActivePlayer(mediaPlayer)
+
+        handleAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS_TRANSIENT)
+        assertEquals(1, routes.listeners)
+        routes.disconnect()
+        handleAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN)
+
+        assertFalse(mediaPlayer.playing)
+        assertFalse(controllerField("resumeOnAudioFocusGain") as Boolean)
+        assertEquals(0, routes.listeners)
+    }
+
+    /** Stopping playback, or a denied focus request, leaves no headphone listener behind. */
+    @Test
+    fun stopAndDeniedFocusCloseTheHeadphoneListener() {
+        val context = RuntimeEnvironment.getApplication()
+        val routes = attachWithNoisyRoutes()
+        assertTrue(requestFocus())
+        primeActivePlayer(TrackingVoicePlayer())
+
+        VoicePlaybackController.stop()
+        assertEquals(0, routes.listeners)
+
+        shadowOf(context.getSystemService(AudioManager::class.java))
+            .setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_FAILED)
+        assertFalse(requestFocus())
+        assertEquals(0, routes.listeners)
+    }
 }
 
 /** A parser-free control seam; every failure-capable subclass preserves the production transition tests. */
@@ -743,6 +819,12 @@ private fun primeActivePlayer(mediaPlayer: TrackingVoicePlayer) {
             durationMs = mediaPlayer.durationMs,
         ),
     )
+}
+
+/** Attaches the controller with a test headphone route in place of the platform receiver. */
+private fun attachWithNoisyRoutes(): FakeNoisyRoutes {
+    VoicePlaybackController.attach(RuntimeEnvironment.getApplication())
+    return FakeNoisyRoutes().also { VoicePlaybackController.noisyRoutes = it }
 }
 
 /** Reads private controller ownership for assertions without replacing its transition logic. */
