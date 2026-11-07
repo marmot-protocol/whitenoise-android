@@ -68,13 +68,18 @@ internal class IsolatedAttachmentPlayer(
             .setAvailableCommands(commands)
             .setPlayWhenReady(current.playWhenReady, current.playWhenReadyChangeReason)
             .setPlaybackState(
-                when (current.status) {
-                    RawAvPlaybackEngine.Status.Idle -> Player.STATE_IDLE
-                    RawAvPlaybackEngine.Status.Buffering -> Player.STATE_BUFFERING
-                    RawAvPlaybackEngine.Status.Ready -> Player.STATE_READY
-                    RawAvPlaybackEngine.Status.Ended -> Player.STATE_ENDED
+                // Media3 accepts a player error only in STATE_IDLE: an engine that failed while buffering is idle.
+                if (current.error != null) {
+                    Player.STATE_IDLE
+                } else {
+                    when (current.status) {
+                        RawAvPlaybackEngine.Status.Idle -> Player.STATE_IDLE
+                        RawAvPlaybackEngine.Status.Buffering -> Player.STATE_BUFFERING
+                        RawAvPlaybackEngine.Status.Ready -> Player.STATE_READY
+                        RawAvPlaybackEngine.Status.Ended -> Player.STATE_ENDED
+                    }
                 },
-            ).setIsLoading(current.status == RawAvPlaybackEngine.Status.Buffering)
+            ).setIsLoading(current.error == null && current.status == RawAvPlaybackEngine.Status.Buffering)
             .setPlaylist(
                 listOf(
                     MediaItemData

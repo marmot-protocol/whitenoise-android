@@ -56,6 +56,9 @@ import java.io.ByteArrayOutputStream
 import java.util.concurrent.CopyOnWriteArrayList
 
 private const val AVATAR_FIXTURE_COUNT = 48
+private const val LOADER_SETTLE_POLL_MS = 250L
+private const val LOADER_SETTLE_QUIET_MS = 1_500L
+private const val LOADER_SETTLE_TIMEOUT_MS = 60_000L
 private const val AVATAR_BENCH_TAG = "WNAvatarBench"
 
 /** Bounded, synthetic list-scroll measurement of both real avatar loaders on Android. */
@@ -298,6 +301,30 @@ class AvatarCacheScrollDeviceTest {
         down: Boolean,
     ): Boolean = composeRule.runOnIdle { if (down) !state.canScrollForward else !state.canScrollBackward }
 
+    /**
+     * Waits until neither loader's counters move for [LOADER_SETTLE_QUIET_MS], so a pass's delta holds its own
+     * work. Every decode runs in an isolated worker generation, and work a pass started can still be finishing
+     * when its swipes end; without this it would be counted against the next pass.
+     */
+    private fun awaitLoaderSettled() {
+        val deadline = SystemClock.elapsedRealtime() + LOADER_SETTLE_TIMEOUT_MS
+        var last = AvatarCacheDiagnostics.snapshot()
+        var quietSince = SystemClock.elapsedRealtime()
+        while (SystemClock.elapsedRealtime() < deadline) {
+            SystemClock.sleep(LOADER_SETTLE_POLL_MS)
+            composeRule.waitForIdle()
+            val current = AvatarCacheDiagnostics.snapshot()
+            val now = SystemClock.elapsedRealtime()
+            if (current != last) {
+                last = current
+                quietSince = now
+            } else if (now - quietSince >= LOADER_SETTLE_QUIET_MS) {
+                return
+            }
+        }
+        throw AssertionError("avatar loaders did not settle within ${LOADER_SETTLE_TIMEOUT_MS}ms: $last")
+    }
+
     /** Scrolls one direction while recording cache deltas, rendered-frame time, and process memory. */
     private fun measurePass(
         name: String,
@@ -326,6 +353,7 @@ class AvatarCacheScrollDeviceTest {
         } finally {
             frames.close()
         }
+        awaitLoaderSettled()
         val terminalIndex = composeRule.runOnIdle { state.firstVisibleItemIndex }
         assertTrue(
             "fixture did not reach its scroll boundary: $terminalIndex",

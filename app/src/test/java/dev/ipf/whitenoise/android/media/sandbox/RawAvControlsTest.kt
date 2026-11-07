@@ -226,6 +226,25 @@ class RawAvControlsTest {
         }
     }
 
+    /** Media3 rejects an error outside STATE_IDLE, so an engine that failed while buffering must publish idle. */
+    @Test
+    fun failureWhileBufferingPublishesIdleStateInsteadOfThrowingFromPause() {
+        val player = IsolatedAttachmentPlayer(RuntimeEnvironment.getApplication(), Uri.parse("file:///fixture.mp4"))
+        val engine = field(player, "engine") as RawAvPlaybackEngine
+        engines += engine
+        try {
+            setField(engine, "status", RawAvPlaybackEngine.Status.Buffering)
+            setField(engine, "error", IOException("decoder failure"))
+            player.pause()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertEquals(Player.STATE_IDLE, player.playbackState)
+            assertNotNull(player.playerError)
+            assertFalse(player.isLoading)
+        } finally {
+            player.release()
+        }
+    }
+
     /** Unsupported Public Playback Parameters Leave Accepted Rate And Healthy Output Unchanged. */
     @Test
     fun unsupportedPublicPlaybackParametersLeaveAcceptedRateAndHealthyOutputUnchanged() {
