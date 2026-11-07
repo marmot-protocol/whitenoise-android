@@ -95,6 +95,7 @@ import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.onlyRepeatsRepresentedEvents
 import dev.ipf.whitenoise.android.core.withoutRepeatsOf
 import dev.ipf.whitenoise.android.ui.common.boundedIntrinsicHeight
+import dev.ipf.whitenoise.android.ui.conversation.messages.ForwardTextActionsToMessageRow
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageSearchHighlight
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudHighlightStyle
 import dev.ipf.whitenoise.android.ui.conversation.messages.messageSearchHighlight
@@ -433,20 +434,21 @@ private fun MarkdownBodyText(
 
     val speechActions = ttsSentenceAccessibilityActions(leafId, text.text, LocalTtsSentenceActions.current)
     LaunchedEffect(sentenceLayoutReporter) { reportIfReady() }
-    val accessibilityModifier =
-        Modifier.semantics {
-            customActions = speechActions +
-                if (onCopyLink == null) {
-                    emptyList()
-                } else {
-                    linkDestinations.map { destination ->
-                        CustomAccessibilityAction("$copyLabel: ${markdownSafeDisplayText(destination)}") {
-                            onCopyLink(destination)
-                            true
-                        }
+    val leafActions =
+        speechActions +
+            if (onCopyLink == null) {
+                emptyList()
+            } else {
+                linkDestinations.map { destination ->
+                    CustomAccessibilityAction("$copyLabel: ${markdownSafeDisplayText(destination)}") {
+                        onCopyLink(destination)
+                        true
                     }
                 }
-        }
+            }
+    // Inside a merged message row this leaf is not focusable; the row republishes its actions.
+    ForwardTextActionsToMessageRow(leafActions)
+    val accessibilityModifier = Modifier.semantics { customActions = leafActions }
 
     MarkdownTimestampText(
         text = text,

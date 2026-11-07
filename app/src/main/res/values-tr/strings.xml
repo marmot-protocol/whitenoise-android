@@ -1,5 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="voice_recording_stopped_announcement">Kayıt durduruldu</string>
+    <string name="voice_message_seek">Oynatma konumu</string>
+    <string name="video_failed">Video yüklenemedi</string>
+    <string name="conversation_new_message_from">%1$s kişisinden yeni mesaj</string>
+    <plurals name="conversation_new_messages">
+        <item quantity="one">%1$d yeni mesaj</item>
+        <item quantity="other">%1$d yeni mesaj</item>
+    </plurals>
+    <plurals name="unread_mentions_count">
+        <item quantity="one">%1$d okunmamış bahsetme</item>
+        <item quantity="other">%1$d okunmamış bahsetme</item>
+    </plurals>
     <string name="notification_channel_summary">Bildirim özeti</string>
     <string name="notification_channel_summary_description">Mesajların ve diğer olayların sessiz özeti</string>
     <plurals name="notification_group_count">
@@ -412,6 +424,7 @@
     <string name="message_reacted">%1$s ile tepki verildi</string>
     <string name="message_reaction_fallback">bir mesaja</string>
     <string name="message_actions">Mesaj eylemleri</string>
+    <string name="message_reply_quote_description">Yanıtlanan: %1$s, %2$s</string>
     <string name="message_deleted_preview">Mesaj silindi</string>
     <string name="agent_stream_started">Ajan akışı başlatıldı</string>
     <string name="stream_finished">Akış bitti</string>

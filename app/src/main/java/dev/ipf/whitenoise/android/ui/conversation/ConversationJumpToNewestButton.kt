@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -55,7 +56,7 @@ internal fun ConversationJumpToNewestButton(
                 .size(42.dp)
                 .semantics { contentDescription = jumpToNewestLabel }
                 .performanceTestTag(PerformanceTestTags.JUMP_TO_NEWEST)
-                .clickable(onClick = onClick),
+                .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Surface(

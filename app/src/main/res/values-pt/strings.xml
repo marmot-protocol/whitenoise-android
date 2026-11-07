@@ -1,5 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="voice_recording_stopped_announcement">Gravação parada</string>
+    <string name="voice_message_seek">Posição de reprodução</string>
+    <string name="video_failed">Não foi possível carregar o vídeo</string>
+    <string name="conversation_new_message_from">Nova mensagem de %1$s</string>
+    <plurals name="conversation_new_messages">
+        <item quantity="one">%1$d nova mensagem</item>
+        <item quantity="many">%1$d novas mensagens</item>
+        <item quantity="other">%1$d novas mensagens</item>
+    </plurals>
+    <plurals name="unread_mentions_count">
+        <item quantity="one">%1$d menção não lida</item>
+        <item quantity="many">%1$d menções não lidas</item>
+        <item quantity="other">%1$d menções não lidas</item>
+    </plurals>
     <string name="notification_channel_summary">Resumo de notificações</string>
     <string name="notification_channel_summary_description">Resumo silencioso de mensagens e outros eventos</string>
     <plurals name="notification_group_count">
@@ -412,6 +426,7 @@
     <string name="message_reacted">Reagiu com %1$s</string>
     <string name="message_reaction_fallback">a uma mensagem</string>
     <string name="message_actions">Ações da mensagem</string>
+    <string name="message_reply_quote_description">Em resposta a %1$s: %2$s</string>
     <string name="message_deleted_preview">Mensagem apagada</string>
     <string name="agent_stream_started">Fluxo do agente iniciado</string>
     <string name="stream_finished">Fluxo concluído</string>

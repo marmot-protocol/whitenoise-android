@@ -30,6 +30,10 @@ internal class TtsQuickTransportViewportLock(
     private var anchor: ViewportAnchor? = null
     private var holdJob: Job? = null
 
+    /** True while a two-finger hold owns the transcript, so its scroll lock is never read as the reader's. */
+    val holdsViewport: Boolean
+        get() = anchor != null
+
     /** Freezes the current viewport once for the active two-finger pointer sequence. */
     fun claim() {
         if (anchor != null) return

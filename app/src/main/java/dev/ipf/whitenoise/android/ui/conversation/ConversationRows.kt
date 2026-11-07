@@ -74,7 +74,8 @@ internal fun UnreadMessagesDivider(
                 Modifier
                     .fillMaxWidth()
                     .testTag(UNREAD_MESSAGES_DIVIDER_CONTENT_TAG)
-                    .semantics(mergeDescendants = true) {},
+                    // A heading, like the day separators, so heading navigation lands on the first unread.
+                    .semantics(mergeDescendants = true) { heading() },
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
         ) {

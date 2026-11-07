@@ -75,8 +75,13 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.onClick
@@ -1509,35 +1514,61 @@ internal fun ConversationScreen(
         )
     }
 
-    /** Lets user drags, never programmatic movement, cancel navigation and update reading intent. */
+    /** The reader moved the transcript: cancel navigation and take over reading intent and older paging. */
+    fun onReaderScrollStarted() {
+        navigationState.targetNavigation.cancel()
+        navigationState.targetHighlight.clear()
+        ttsFollowHandle.suspendForDirectDrag(
+            state = appState.ttsController.state.value,
+            ownsSession = appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
+        )
+        scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
+        controller.onOlderPagingGestureStarted()
+    }
+
+    fun onReaderScrollSettled() {
+        scrollCoordinator.onUserGestureSettled(currentScrollAnchor(), liveNearBottom())
+    }
+
+    /**
+     * Lets reader movement, never programmatic movement, cancel navigation and update reading intent.
+     *
+     * Touch drags report themselves through drag interactions. Every other scroll run, from a screen reader,
+     * keyboard or mouse wheel, is the reader's too unless a coordinator command, the read-aloud hold or
+     * drag-selection edge scrolling started it (#3603).
+     */
     @Composable
-    fun dragInteractionEffect() {
-        // Drag interactions are the authority for user intent. Programmatic list
-        // movement never emits these, so it cannot accidentally downgrade a tail
-        // follower or overwrite a history anchor.
+    fun readerScrollIntentEffects() {
+        var touchDragActive by remember(listState) { mutableStateOf(false) }
         LaunchedEffect(listState, scrollCoordinator) {
             listState.interactionSource.interactions.collectConversationDragInteractions(
                 onStarted = {
-                    navigationState.targetNavigation.cancel()
-                    navigationState.targetHighlight.clear()
-                    ttsFollowHandle.suspendForDirectDrag(
-                        state = appState.ttsController.state.value,
-                        ownsSession = appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
-                    )
-                    scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
-                    controller.onOlderPagingGestureStarted()
+                    touchDragActive = true
+                    onReaderScrollStarted()
                 },
                 awaitScrollSettled = {
                     snapshotFlow { listState.isScrollInProgress }.filter { !it }.first()
                 },
                 onSettled = {
-                    val liveHasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
-                    scrollCoordinator.onUserGestureSettled(currentScrollAnchor(), liveNearBottom())
+                    touchDragActive = false
+                    onReaderScrollSettled()
                 },
             )
         }
+        LaunchedEffect(listState, scrollCoordinator) {
+            snapshotFlow { listState.isScrollInProgress }.collectUnclaimedScrollRuns(
+                claimedByApp = {
+                    scrollCoordinator.mode.ownsListMovement ||
+                        ttsQuickTransportViewportLock.holdsViewport ||
+                        dragAnchorTimelineId != null
+                },
+                touchDragActive = { touchDragActive },
+                onStarted = { onReaderScrollStarted() },
+                onSettled = { onReaderScrollSettled() },
+            )
+        }
     }
-    dragInteractionEffect()
+    readerScrollIntentEffects()
     // The read anchor, badge and unread jump target are written from callbacks and reconciled by
     // ConversationUnreadTracking, never read while composing this screen: a send moves all three in turn, and
     // each read here recomposed the whole conversation once more.
@@ -3269,6 +3300,8 @@ internal fun ConversationScreen(
             tailReached = { listState.firstVisibleItemIndex <= currentTailIndex },
         )
     TailEntranceSendClaim(tailEntrance, claimedSendPresentation)
+    // The media viewer session is created further down; it reports here so arrivals stay quiet under the viewer.
+    var mediaViewerCoversTranscript by remember(controller) { mutableStateOf(false) }
 
     /**
      * Follows the tail for membership activity and new rows, keeps viewport structure current and lands route focus
@@ -3290,8 +3323,16 @@ internal fun ConversationScreen(
         }
         // Survives the follow effect's restart within a burst, never a chat, account or runtime change.
         val incomingAppendLanding = remember(controller) { ConversationIncomingAppendLandingQueue() }
+        val arrivalView = LocalView.current
+        val arrivalResources = LocalResources.current
+        val arrivalBaseline = remember(controller) { ConversationArrivalBaseline() }
+        // An older page changes the first row and size but not the latest id, so the follow pass would miss it.
+        LaunchedEffect(controller, renderedTimeline.firstOrNull()?.presentationId, renderedTimeline.size) {
+            arrivalBaseline.noteRendered(renderedTimeline, navigationState.lastFollowedLatestId)
+        }
         LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored) {
             if (!initialTimelineAnchored || renderedTimeline.isEmpty()) {
+                arrivalBaseline.markAllRendered(renderedTimeline, !controller.hasMoreAfterTimeline)
                 // A restart that cannot be an append still interrupts the burst, so its rows never join a later one.
                 incomingAppendLanding.retire()
                 return@LaunchedEffect
@@ -3306,7 +3347,28 @@ internal fun ConversationScreen(
                     latestId != previousId &&
                     renderedTimeline.any { it.presentationId == previousId }
             navigationState.lastFollowedLatestId = latestId ?: previousId
+            val arrivals =
+                arrivalBaseline.follow(
+                    timeline = renderedTimeline,
+                    previousLatestId = previousId.takeIf { isAppend },
+                    reachesLiveTail = !controller.hasMoreAfterTimeline,
+                ) { row -> controller.isMessageMine(row.record) }
             if (isAppend && previousId != null) {
+                // Before any suspension, so a later append restarting this effect cannot drop the notice. Group details
+                // and the media viewer cover the transcript, and an open microphone would record the speech.
+                val quiet =
+                    showDetails ||
+                        mediaViewerCoversTranscript ||
+                        voiceRecordingController.isRecording ||
+                        voiceRecordingController.isFinalizing
+                conversationArrivalAnnouncement(
+                    arrivals = arrivals,
+                    senderName = { row -> appState.displayName(row.record.sender) },
+                    resources = arrivalResources,
+                )?.takeUnless { quiet }?.let { notice ->
+                    @Suppress("DEPRECATION")
+                    arrivalView.announceForAccessibility(notice)
+                }
                 // #3558: an incoming row taller than the reading viewport lands at its beginning instead of its end.
                 val candidates =
                     incomingAppendLanding.admit(
@@ -3701,6 +3763,11 @@ internal fun ConversationScreen(
                     runtimeGeneration = appState.runtimeGeneration,
                 ),
         )
+    val mediaViewerOpen = mediaViewerSessionState.active != null
+    DisposableEffect(mediaViewerSessionState, mediaViewerOpen) {
+        mediaViewerCoversTranscript = mediaViewerOpen
+        onDispose { mediaViewerCoversTranscript = false }
+    }
 
     RecordDmConversationFirstFrame(
         accountRef = conversationAccountRef,
@@ -4884,8 +4951,14 @@ internal fun ConversationScreen(
                                         // mention and marks it read, so the count steps down.
                                         val mentionCount = unreadMentionMessageIds.size
                                         if (!selectionMode && mentionCount > 0) {
+                                            // The badge caps at 99+; the spoken label keeps the real count.
                                             val jumpToMentionLabel =
-                                                stringResource(R.string.conversation_jump_to_mention)
+                                                stringResource(R.string.conversation_jump_to_mention) + ", " +
+                                                    pluralStringResource(
+                                                        R.plurals.unread_mentions_count,
+                                                        mentionCount,
+                                                        mentionCount,
+                                                    )
                                             Surface(
                                                 shape = CircleShape,
                                                 color = MaterialTheme.colorScheme.tertiaryContainer,
@@ -4895,8 +4968,10 @@ internal fun ConversationScreen(
                                                     Modifier
                                                         .height(34.dp)
                                                         .performanceTestTag(PerformanceTestTags.JUMP_TO_MENTION)
-                                                        .semantics { contentDescription = jumpToMentionLabel }
-                                                        .clickable { jumpToNextUnreadMention() },
+                                                        .clickable(role = Role.Button) { jumpToNextUnreadMention() }
+                                                        .clearAndSetSemantics {
+                                                            contentDescription = jumpToMentionLabel
+                                                        },
                                             ) {
                                                 Row(
                                                     verticalAlignment = Alignment.CenterVertically,

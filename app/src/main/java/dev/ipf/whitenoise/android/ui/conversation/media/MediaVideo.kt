@@ -528,7 +528,7 @@ internal fun MediaVideoGridTile(
                         failed ->
                             Icon(
                                 Icons.Default.Refresh,
-                                contentDescription = stringResource(R.string.voice_message_failed),
+                                contentDescription = stringResource(R.string.video_failed),
                                 modifier = Modifier.size(24.dp),
                             )
                         !cacheProbeReady ->
@@ -587,7 +587,7 @@ internal fun MediaVideoGridTile(
                 if (!transferShown) {
                     Icon(
                         painter = painterResource(R.drawable.ic_warning),
-                        contentDescription = stringResource(R.string.voice_message_failed),
+                        contentDescription = stringResource(R.string.video_failed),
                         modifier = Modifier.size(VIDEO_UNAVAILABLE_GLYPH),
                         tint = MaterialTheme.colorScheme.inverseOnSurface,
                     )
@@ -1049,7 +1049,7 @@ internal fun MediaVideoBubble(
                             uploadFailed ->
                                 Icon(
                                     Icons.Default.Refresh,
-                                    contentDescription = stringResource(R.string.voice_message_failed),
+                                    contentDescription = stringResource(R.string.video_failed),
                                     modifier =
                                         Modifier
                                             .size(28.dp)
@@ -1072,7 +1072,7 @@ internal fun MediaVideoBubble(
                             failed ->
                                 Icon(
                                     Icons.Default.Refresh,
-                                    contentDescription = stringResource(R.string.voice_message_failed),
+                                    contentDescription = stringResource(R.string.video_failed),
                                     modifier =
                                         Modifier
                                             .size(28.dp)
@@ -1790,7 +1790,7 @@ private fun VideoViewerUnavailable(
             playbackInvalidated ->
                 Icon(
                     Icons.Default.Refresh,
-                    contentDescription = stringResource(R.string.voice_message_failed),
+                    contentDescription = stringResource(R.string.video_failed),
                     tint = Color.White,
                     modifier = Modifier.size(48.dp).clickable(onClick = onPlaybackRetry),
                 )

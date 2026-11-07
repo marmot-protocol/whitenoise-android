@@ -13,10 +13,10 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
-import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertHeightIsEqualTo
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -38,6 +38,7 @@ import dev.ipf.marmotkit.AppProtocolProfileFfi
 import dev.ipf.marmotkit.EncryptedMediaVersionFfi
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
+import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
@@ -63,7 +64,10 @@ class ConversationTopBarSemanticsTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
-    /** The full title is one accessible 48dp action and preserves its performance selector. */
+    /**
+     * The full title is one accessible 48dp heading action that reads the chat name, offers Details as its
+     * click label and preserves its performance selector.
+     */
     @Test
     fun performanceSelectorIsClickableWithoutReplacingAccessibilityDescription() {
         val appState = appState()
@@ -76,8 +80,19 @@ class ConversationTopBarSemanticsTest {
             .assertHasClickAction()
             .assertHeightIsAtLeast(48.dp)
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
-            .assertContentDescriptionEquals(OPEN_DETAILS_DESCRIPTION)
-            .performClick()
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.ContentDescription))
+            .assert(
+                SemanticsMatcher("click label is the details action") {
+                    it.config[SemanticsActions.OnClick].label == OPEN_DETAILS_DESCRIPTION
+                },
+            ).assertTextContains("Benchmark group")
+            .assert(
+                SemanticsMatcher("the fallback monogram is not read") { node ->
+                    val initials = IdentityFormatter.initials("Benchmark group")
+                    node.config.getOrElse(SemanticsProperties.Text) { emptyList() }.none { it.text == initials }
+                },
+            ).performClick()
         composeRule.runOnIdle { assertEquals(1, openDetailsCalls) }
         composeRule
             .onNodeWithTag("conversation.header.avatar", useUnmergedTree = true)

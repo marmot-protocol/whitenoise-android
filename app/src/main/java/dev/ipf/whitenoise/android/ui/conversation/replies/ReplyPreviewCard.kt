@@ -75,6 +75,90 @@ internal fun isOwnReplySender(
     return senderPubkey.equals(active, ignoreCase = true)
 }
 
+/** The quote's heading: the original sender, "You", or the bare reply label when the original is gone. */
+@Composable
+internal fun replyQuoteTitle(
+    senderTitle: String,
+    isOwn: Boolean,
+    originalUnavailable: Boolean,
+): String =
+    when {
+        originalUnavailable -> stringResource(R.string.reply)
+        isOwn -> stringResource(R.string.reply_you)
+        else -> senderTitle
+    }
+
+/** A typed document presentation for the quoted attachment, when its name or type is known. */
+internal fun replyQuoteAttachmentPresentation(
+    mediaKind: dev.ipf.whitenoise.android.core.ReplyMediaKind,
+    mediaFileName: String?,
+    mediaType: String?,
+) = if (
+    mediaKind == dev.ipf.whitenoise.android.core.ReplyMediaKind.Document &&
+    (!mediaFileName.isNullOrBlank() || !mediaType.isNullOrBlank())
+) {
+    resolveAttachmentPresentation(mediaType.orEmpty(), mediaFileName.orEmpty())
+} else {
+    null
+}
+
+/** The label that replaces the quoted text for media or an unavailable original; null for a text quote. */
+@Composable
+internal fun replyQuoteMediaLabel(
+    mediaKind: dev.ipf.whitenoise.android.core.ReplyMediaKind,
+    mediaFileName: String?,
+    originalUnavailable: Boolean,
+    attachmentPresentation: AttachmentPresentation?,
+): String? =
+    when {
+        originalUnavailable -> stringResource(R.string.toast_original_message_unavailable)
+        attachmentPresentation != null ->
+            replyAttachmentPreviewText(mediaFileName.orEmpty(), attachmentPresentation)
+                ?: stringResource(R.string.reply_media_document)
+        mediaKind == dev.ipf.whitenoise.android.core.ReplyMediaKind.Photo ->
+            stringResource(R.string.reply_media_photo)
+        mediaKind == dev.ipf.whitenoise.android.core.ReplyMediaKind.Video ->
+            stringResource(R.string.reply_media_video)
+        mediaKind == dev.ipf.whitenoise.android.core.ReplyMediaKind.Voice ->
+            stringResource(R.string.reply_media_voice)
+        mediaKind == dev.ipf.whitenoise.android.core.ReplyMediaKind.Document ->
+            stringResource(R.string.reply_media_document)
+        else -> null
+    }
+
+/**
+ * The spoken form of an in-bubble quote, for a message row that reads as one screen-reader stop
+ * (#3603). It uses the same heading and media label as [ReplyPreviewCard].
+ */
+@Composable
+internal fun replyQuoteAccessibilityText(
+    preview: dev.ipf.whitenoise.android.core.TimelineReplyDisplay,
+    appState: WhiteNoiseAppState,
+): String {
+    val mediaLabel =
+        replyQuoteMediaLabel(
+            mediaKind = preview.mediaKind,
+            mediaFileName = preview.mediaFileName,
+            originalUnavailable = preview.originalUnavailable,
+            attachmentPresentation =
+                remember(preview) {
+                    replyQuoteAttachmentPresentation(preview.mediaKind, preview.mediaFileName, preview.mediaType)
+                },
+        )
+    if (preview.originalUnavailable) {
+        // The card still shows its Reply heading above the unavailable notice; read both.
+        return listOfNotNull(stringResource(R.string.reply), mediaLabel).joinToString(", ")
+    }
+    val title =
+        replyQuoteTitle(
+            senderTitle = senderTitleForReply(preview.sender, appState),
+            isOwn = isOwnReplySender(preview.sender, appState),
+            originalUnavailable = false,
+        )
+    val excerpt = mediaLabel ?: replyFallbackPreviewText(preview.body, appState::mentionDisplayName)
+    return stringResource(R.string.message_reply_quote_description, title, excerpt)
+}
+
 /** Renders a compact reply quote with truthful unavailable and typed-attachment states. */
 @Composable
 @Suppress("CyclomaticComplexMethod", "FunctionNaming", "LongMethod")
@@ -103,39 +187,12 @@ internal fun ReplyPreviewCard(
     receivedEmoji: ReceivedEmoji = ReceivedEmoji.None,
     appState: WhiteNoiseAppState? = null,
 ) {
-    val title =
-        when {
-            originalUnavailable -> stringResource(R.string.reply)
-            isOwn -> stringResource(R.string.reply_you)
-            else -> senderTitle
-        }
+    val title = replyQuoteTitle(senderTitle, isOwn, originalUnavailable)
     val attachmentPresentation =
         remember(mediaKind, mediaFileName, mediaType) {
-            if (
-                mediaKind == dev.ipf.whitenoise.android.core.ReplyMediaKind.Document &&
-                (!mediaFileName.isNullOrBlank() || !mediaType.isNullOrBlank())
-            ) {
-                resolveAttachmentPresentation(mediaType.orEmpty(), mediaFileName.orEmpty())
-            } else {
-                null
-            }
+            replyQuoteAttachmentPresentation(mediaKind, mediaFileName, mediaType)
         }
-    val mediaLabel =
-        when {
-            originalUnavailable -> stringResource(R.string.toast_original_message_unavailable)
-            attachmentPresentation != null ->
-                replyAttachmentPreviewText(mediaFileName.orEmpty(), attachmentPresentation)
-                    ?: stringResource(R.string.reply_media_document)
-            mediaKind == dev.ipf.whitenoise.android.core.ReplyMediaKind.Photo ->
-                stringResource(R.string.reply_media_photo)
-            mediaKind == dev.ipf.whitenoise.android.core.ReplyMediaKind.Video ->
-                stringResource(R.string.reply_media_video)
-            mediaKind == dev.ipf.whitenoise.android.core.ReplyMediaKind.Voice ->
-                stringResource(R.string.reply_media_voice)
-            mediaKind == dev.ipf.whitenoise.android.core.ReplyMediaKind.Document ->
-                stringResource(R.string.reply_media_document)
-            else -> null
-        }
+    val mediaLabel = replyQuoteMediaLabel(mediaKind, mediaFileName, originalUnavailable, attachmentPresentation)
     val mediaIcon =
         if (originalUnavailable) {
             null

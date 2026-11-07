@@ -8,6 +8,7 @@ import android.os.SystemClock
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -86,6 +87,12 @@ class VoiceRecordingController internal constructor(
         private set
     var locked: Boolean by mutableStateOf(false)
         private set
+
+    // Takes whose tail is still being captured or whose container is still being written.
+    private var finalizingTakes by mutableIntStateOf(0)
+
+    /** True until every stopped take has released the microphone. */
+    val isFinalizing: Boolean get() = finalizingTakes > 0
 
     private val _elapsedMs = mutableLongStateOf(0L)
     val elapsedMs: Long get() = _elapsedMs.longValue
@@ -358,6 +365,7 @@ class VoiceRecordingController internal constructor(
     ) {
         var finalized: VoiceRecordingResult? = null
         var delivered = false
+        finalizingTakes++
         try {
             if (reason == null) withTimeoutOrNull(RECORDING_TAIL_MS) { cut.await() }
             val result =
@@ -399,6 +407,7 @@ class VoiceRecordingController internal constructor(
                     abandonRecordingFocus()
                     releaseMicrophoneLease()
                 }
+                finalizingTakes--
             }
         }
     }
@@ -434,9 +443,15 @@ class VoiceRecordingController internal constructor(
         // — the take was discarded. Released on the lifecycle-independent scope
         // so a teardown that races composition disposal still frees the mic.
         if (r != null) {
+            // A discarded take is still closing until the native recorder has released the microphone.
+            finalizingTakes++
             recorderScope.launch {
-                r.cancel()
-                releaseMicrophoneLease()
+                try {
+                    r.cancel()
+                } finally {
+                    releaseMicrophoneLease()
+                    withContext(NonCancellable + mainDispatcher) { finalizingTakes-- }
+                }
             }
         } else if (finalizeJob?.isActive == true) {
             // stop() already detached the recorder into its finalize job. End

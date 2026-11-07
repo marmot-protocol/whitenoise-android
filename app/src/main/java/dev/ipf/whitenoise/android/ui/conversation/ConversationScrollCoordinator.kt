@@ -16,6 +16,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.supervisorScope
 import java.util.concurrent.CancellationException
@@ -55,6 +56,10 @@ internal sealed interface ConversationScrollMode {
         val reason: ConversationScrollReason,
     ) : ConversationScrollMode
 }
+
+/** True while a coordinator command, not the reader, is moving the list. */
+internal val ConversationScrollMode.ownsListMovement: Boolean
+    get() = this is ConversationScrollMode.Restoring || this is ConversationScrollMode.ProgrammaticJump
 
 internal enum class ConversationScrollReason {
     InitialAnchor,
@@ -1088,6 +1093,40 @@ internal suspend fun Flow<Interaction>.collectConversationDragInteractions(
                 awaitScrollSettled()
                 onSettled()
             }
+        }
+    }
+}
+
+/**
+ * Reports each scroll run that nothing in the app started as the reader's own movement.
+ *
+ * Screen-reader scroll actions, focus moving past the last visible row, keyboard paging and mouse wheels
+ * scroll the list without a [DragInteraction], so [collectConversationDragInteractions] never sees them
+ * and a tail follower would be pulled back to the newest message by the next append or remeasure (#3603).
+ * Collect [listState.isScrollInProgress][LazyListState.isScrollInProgress] here. A run is ignored when
+ * [claimedByApp] holds as it starts: a coordinator command, the read-aloud hold or drag-selection edge
+ * scrolling. A touch drag reports its own start and settle, but its interaction can reach the drag
+ * collector after the scroll is already visible, so [touchDragActive] is checked again one frame later.
+ * A drag that begins inside a claimed run takes that run over, so the drag alone settles it.
+ */
+internal suspend fun Flow<Boolean>.collectUnclaimedScrollRuns(
+    claimedByApp: () -> Boolean,
+    touchDragActive: () -> Boolean,
+    onStarted: () -> Unit,
+    onSettled: () -> Unit,
+    awaitFrame: suspend () -> Unit = { withFrameNanos { } },
+) {
+    var readerRun = false
+    distinctUntilChanged().collect { scrolling ->
+        if (scrolling) {
+            if (claimedByApp() || touchDragActive()) return@collect
+            awaitFrame()
+            if (claimedByApp() || touchDragActive()) return@collect
+            readerRun = true
+            onStarted()
+        } else if (readerRun) {
+            readerRun = false
+            if (!touchDragActive()) onSettled()
         }
     }
 }
