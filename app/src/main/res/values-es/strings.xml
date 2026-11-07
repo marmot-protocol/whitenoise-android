@@ -1,5 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="voice_recording_stopped_announcement">Grabación detenida</string>
+    <string name="voice_message_seek">Posición de reproducción</string>
+    <string name="video_failed">No se pudo cargar el vídeo</string>
+    <string name="conversation_new_message_from">Nuevo mensaje de %1$s</string>
+    <plurals name="conversation_new_messages">
+        <item quantity="one">%1$d mensaje nuevo</item>
+        <item quantity="many">%1$d mensajes nuevos</item>
+        <item quantity="other">%1$d mensajes nuevos</item>
+    </plurals>
+    <plurals name="unread_mentions_count">
+        <item quantity="one">%1$d mención sin leer</item>
+        <item quantity="many">%1$d menciones sin leer</item>
+        <item quantity="other">%1$d menciones sin leer</item>
+    </plurals>
     <string name="notification_channel_summary">Resumen de notificaciones</string>
     <string name="notification_channel_summary_description">Resumen silencioso de mensajes y otros eventos</string>
     <plurals name="notification_group_count">
@@ -2565,18 +2579,4 @@
     <string name="settings_search_alias_read_aloud">TTS|texto a voz|leer en voz alta</string>
     <string name="settings_search_alias_sound">sonido de notificación|tono de aviso</string>
     <string name="settings_search_revealed">%1$s. Ajuste resaltado.</string>
-    <string name="voice_recording_stopped_announcement">Grabación detenida</string>
-    <string name="voice_message_seek">Posición de reproducción</string>
-    <string name="video_failed">No se pudo cargar el vídeo</string>
-    <string name="conversation_new_message_from">Nuevo mensaje de %1$s</string>
-    <plurals name="conversation_new_messages">
-        <item quantity="one">%1$d mensaje nuevo</item>
-        <item quantity="many">%1$d mensajes nuevos</item>
-        <item quantity="other">%1$d mensajes nuevos</item>
-    </plurals>
-    <plurals name="unread_mentions_count">
-        <item quantity="one">%1$d mención sin leer</item>
-        <item quantity="many">%1$d menciones sin leer</item>
-        <item quantity="other">%1$d menciones sin leer</item>
-    </plurals>
 </resources>

@@ -1,5 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="voice_recording_stopped_announcement">Aufnahme beendet</string>
+    <string name="voice_message_seek">Wiedergabeposition</string>
+    <string name="video_failed">Video konnte nicht geladen werden</string>
+    <string name="conversation_new_message_from">Neue Nachricht von %1$s</string>
+    <plurals name="conversation_new_messages">
+        <item quantity="one">%1$d neue Nachricht</item>
+        <item quantity="other">%1$d neue Nachrichten</item>
+    </plurals>
+    <plurals name="unread_mentions_count">
+        <item quantity="one">%1$d ungelesene Erwähnung</item>
+        <item quantity="other">%1$d ungelesene Erwähnungen</item>
+    </plurals>
     <string name="notification_channel_summary">Benachrichtigungsübersicht</string>
     <string name="notification_channel_summary_description">Stille Übersicht der Nachrichten und anderer Ereignisse</string>
     <plurals name="notification_group_count">
@@ -2579,16 +2591,4 @@
     <string name="settings_search_alias_read_aloud">TTS|Sprachausgabe|vorlesen</string>
     <string name="settings_search_alias_sound">Benachrichtigungston|Hinweiston|Klingelton</string>
     <string name="settings_search_revealed">%1$s. Einstellung hervorgehoben.</string>
-    <string name="voice_recording_stopped_announcement">Aufnahme beendet</string>
-    <string name="voice_message_seek">Wiedergabeposition</string>
-    <string name="video_failed">Video konnte nicht geladen werden</string>
-    <string name="conversation_new_message_from">Neue Nachricht von %1$s</string>
-    <plurals name="conversation_new_messages">
-        <item quantity="one">%1$d neue Nachricht</item>
-        <item quantity="other">%1$d neue Nachrichten</item>
-    </plurals>
-    <plurals name="unread_mentions_count">
-        <item quantity="one">%1$d ungelesene Erwähnung</item>
-        <item quantity="other">%1$d ungelesene Erwähnungen</item>
-    </plurals>
 </resources>

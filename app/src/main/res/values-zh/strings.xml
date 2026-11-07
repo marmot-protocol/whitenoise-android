@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="voice_recording_stopped_announcement">录音已停止</string>
+    <string name="voice_message_seek">播放位置</string>
+    <string name="video_failed">视频加载失败</string>
+    <string name="conversation_new_message_from">来自 %1$s 的新消息</string>
+    <plurals name="conversation_new_messages">
+        <item quantity="other">%1$d 条新消息</item>
+    </plurals>
+    <plurals name="unread_mentions_count">
+        <item quantity="other">%1$d 条未读提及</item>
+    </plurals>
     <string name="notification_channel_summary">通知摘要</string>
     <string name="notification_channel_summary_description">消息和其他事件的静音摘要</string>
     <plurals name="notification_group_count">
@@ -2525,14 +2535,4 @@
     <string name="settings_search_alias_read_aloud">TTS|文字转语音|朗读</string>
     <string name="settings_search_alias_sound">通知声音|提示音|铃声</string>
     <string name="settings_search_revealed">%1$s。设置已突出显示。</string>
-    <string name="voice_recording_stopped_announcement">录音已停止</string>
-    <string name="voice_message_seek">播放位置</string>
-    <string name="video_failed">视频加载失败</string>
-    <string name="conversation_new_message_from">来自 %1$s 的新消息</string>
-    <plurals name="conversation_new_messages">
-        <item quantity="other">%1$d 条新消息</item>
-    </plurals>
-    <plurals name="unread_mentions_count">
-        <item quantity="other">%1$d 条未读提及</item>
-    </plurals>
 </resources>

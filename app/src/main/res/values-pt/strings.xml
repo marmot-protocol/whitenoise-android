@@ -1,5 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="voice_recording_stopped_announcement">Gravação parada</string>
+    <string name="voice_message_seek">Posição de reprodução</string>
+    <string name="video_failed">Não foi possível carregar o vídeo</string>
+    <string name="conversation_new_message_from">Nova mensagem de %1$s</string>
+    <plurals name="conversation_new_messages">
+        <item quantity="one">%1$d nova mensagem</item>
+        <item quantity="many">%1$d novas mensagens</item>
+        <item quantity="other">%1$d novas mensagens</item>
+    </plurals>
+    <plurals name="unread_mentions_count">
+        <item quantity="one">%1$d menção não lida</item>
+        <item quantity="many">%1$d menções não lidas</item>
+        <item quantity="other">%1$d menções não lidas</item>
+    </plurals>
     <string name="notification_channel_summary">Resumo de notificações</string>
     <string name="notification_channel_summary_description">Resumo silencioso de mensagens e outros eventos</string>
     <plurals name="notification_group_count">
@@ -2565,18 +2579,4 @@
     <string name="settings_search_alias_read_aloud">TTS|texto para fala|ler em voz alta</string>
     <string name="settings_search_alias_sound">som de notificação|som de alerta|toque</string>
     <string name="settings_search_revealed">%1$s. Configuração destacada.</string>
-    <string name="voice_recording_stopped_announcement">Gravação parada</string>
-    <string name="voice_message_seek">Posição de reprodução</string>
-    <string name="video_failed">Não foi possível carregar o vídeo</string>
-    <string name="conversation_new_message_from">Nova mensagem de %1$s</string>
-    <plurals name="conversation_new_messages">
-        <item quantity="one">%1$d nova mensagem</item>
-        <item quantity="many">%1$d novas mensagens</item>
-        <item quantity="other">%1$d novas mensagens</item>
-    </plurals>
-    <plurals name="unread_mentions_count">
-        <item quantity="one">%1$d menção não lida</item>
-        <item quantity="many">%1$d menções não lidas</item>
-        <item quantity="other">%1$d menções não lidas</item>
-    </plurals>
 </resources>

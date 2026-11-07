@@ -1,5 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="voice_recording_stopped_announcement">Запись остановлена</string>
+    <string name="voice_message_seek">Позиция воспроизведения</string>
+    <string name="video_failed">Не удалось загрузить видео</string>
+    <string name="conversation_new_message_from">Новое сообщение от %1$s</string>
+    <plurals name="conversation_new_messages">
+        <item quantity="one">%1$d новое сообщение</item>
+        <item quantity="few">%1$d новых сообщения</item>
+        <item quantity="many">%1$d новых сообщений</item>
+        <item quantity="other">%1$d новых сообщения</item>
+    </plurals>
+    <plurals name="unread_mentions_count">
+        <item quantity="one">%1$d непрочитанное упоминание</item>
+        <item quantity="few">%1$d непрочитанных упоминания</item>
+        <item quantity="many">%1$d непрочитанных упоминаний</item>
+        <item quantity="other">%1$d непрочитанных упоминания</item>
+    </plurals>
     <string name="notification_channel_summary">Сводка уведомлений</string>
     <string name="notification_channel_summary_description">Беззвучная сводка сообщений и других событий</string>
     <plurals name="notification_group_count">
@@ -2640,20 +2656,4 @@
     <string name="settings_search_alias_read_aloud">TTS|синтез речи|читать вслух</string>
     <string name="settings_search_alias_sound">звук уведомлений|сигнал уведомления|мелодия</string>
     <string name="settings_search_revealed">%1$s. Настройка выделена.</string>
-    <string name="voice_recording_stopped_announcement">Запись остановлена</string>
-    <string name="voice_message_seek">Позиция воспроизведения</string>
-    <string name="video_failed">Не удалось загрузить видео</string>
-    <string name="conversation_new_message_from">Новое сообщение от %1$s</string>
-    <plurals name="conversation_new_messages">
-        <item quantity="one">%1$d новое сообщение</item>
-        <item quantity="few">%1$d новых сообщения</item>
-        <item quantity="many">%1$d новых сообщений</item>
-        <item quantity="other">%1$d новых сообщения</item>
-    </plurals>
-    <plurals name="unread_mentions_count">
-        <item quantity="one">%1$d непрочитанное упоминание</item>
-        <item quantity="few">%1$d непрочитанных упоминания</item>
-        <item quantity="many">%1$d непрочитанных упоминаний</item>
-        <item quantity="other">%1$d непрочитанных упоминания</item>
-    </plurals>
 </resources>
