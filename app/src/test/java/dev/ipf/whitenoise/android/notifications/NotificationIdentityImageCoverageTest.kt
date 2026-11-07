@@ -207,8 +207,12 @@ class NotificationIdentityImageCoverageTest {
         val appState = stateSource("AppState.kt")
         val ready = appState.functionBody("readyNotificationAvatars")
         assertTrue("the first post reads the row's stored picture", "readyStoredAvatarBitmap(" in ready)
-        assertTrue("before the URL and encrypted caches", "stored ?: ready.groupAvatarBitmap" in ready)
+        assertTrue("kept apart from the group's own caches", "storedConversationBitmap = stored" in ready)
         val avatars = stateSource("PreWarmedNotificationAvatars.kt")
+        assertTrue(
+            "and drawn first, for a direct chat as for a group",
+            "return storedConversationBitmap ?: own" in avatars.declaration("fun conversationBitmap("),
+        )
         val peek = avatars.declaration("internal fun ChatListItem.readyStoredAvatarBitmap(")
         assertTrue("of the row's selected asset", "selectedAvatarAsset" in peek)
         assertTrue("from the pixels the chat list decoded", "AvatarImageLoader::cachedImage" in peek)
@@ -281,6 +285,13 @@ class NotificationIdentityImageCoverageTest {
                 "internal fun PreWarmedNotificationAvatars.lateIdentitySources(",
             )
         assertTrue("every sender has a late source", "senderUrl = warmed.senderAvatarUrl," in sources)
+        val prepare = stateSource("AppState.kt").functionBody("prepareLateNotificationIdentity")
+        assertTrue("a cold sender picture gets a loader", "senderLoader = lateSenderPictureLoader(" in prepare)
+        val resolve = presenter.declaration("private suspend fun resolveAvatars(")
+        val loaderAt = resolve.indexOf("sources.senderLoader?.let { boundedIdentityLoad(it) }")
+        assertTrue("with the late bound, before the short URL fetch", loaderAt in 0 until resolve.indexOf("senderUrl"))
+        val enriched = source("NotificationCardContent.kt").functionBody("enrichedMessagingStyle")
+        assertTrue("and SystemUI redraws the rows it reaches", "repaint = true" in enriched)
         val shortcut =
             source("NotificationGroupSenderImages.kt").declaration("internal fun notificationShortcutSender(")
         assertTrue("the group shortcut's sender stays blank", "groupNotificationPerson(sender)" in shortcut)

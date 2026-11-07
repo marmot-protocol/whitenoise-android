@@ -84,7 +84,10 @@ internal class NotificationCardContent(
             }.setConversationIdentityImage(reactor)
             .build()
 
-    /** Copies an active MessagingStyle while replacing the matching sender's rich Person metadata. */
+    /**
+     * Copies an active MessagingStyle while replacing the matching sender's rich Person metadata, repainting that
+     * sender's lines so SystemUI draws a picture that arrived after the post (#3635).
+     */
     private fun enrichedMessagingStyle(
         notification: Notification,
         enrichedSender: Person,
@@ -92,7 +95,7 @@ internal class NotificationCardContent(
         val existing =
             NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification)
                 ?: return null
-        return copiedMessagingStyle(existing, enrichedSender)
+        return copiedMessagingStyle(existing, enrichedSender, repaint = true)
     }
 
     /** Rebuilds an active card only when a stable sender key can be relabeled safely. */

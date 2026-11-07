@@ -1273,9 +1273,10 @@ class LocalNotificationPresenter(
      * Resolves both picture slots concurrently off the main thread, keeping a present bitmap and never fetching it.
      * The conversation slot first reads MDK's stored copy of the picture the chat list draws (#3635), so a picture
      * already on the device never depends on the network. A conversation picture with no URL, such as a group's
-     * encrypted image, then comes from the sources' loader. Both loaders run only in the late refresh, after the
-     * enrichment permit is released, so they get a longer bound than a URL picture and a slow network or busy device
-     * still gets the picture. A loader that fails yields no group picture without cancelling the sender slot.
+     * encrypted image, then comes from the sources' loader. The sender slot tries its loader before its URL (#3635).
+     * Loaders run only in the late refresh, after the enrichment permit is released, so they get a longer bound than
+     * a URL picture and a slow network or a newly started decoder still gets the picture. A loader that fails yields
+     * no picture for its slot without cancelling the other.
      */
     private suspend fun resolveAvatars(sources: NotificationIdentityPictureSources): Pair<Bitmap?, Bitmap?> =
         withContext(Dispatchers.Default) {
@@ -1292,6 +1293,7 @@ class LocalNotificationPresenter(
                 val senderAvatar =
                     async {
                         sources.senderBitmap
+                            ?: sources.senderLoader?.let { boundedIdentityLoad(it) }
                             ?: sources.senderUrl?.let { url ->
                                 withContext(MediaTrustScope.element(sources.senderDomain)) {
                                     avatarBitmapResolver(url)
@@ -1302,7 +1304,7 @@ class LocalNotificationPresenter(
             }
         }
 
-    /** Runs one late conversation-picture loader within its bound; a failure yields no picture, never a crash. */
+    /** Runs one late picture loader within its bound; a failure yields no picture, never a crash. */
     private suspend fun boundedIdentityLoad(load: suspend () -> Bitmap?): Bitmap? =
         withTimeoutOrNull(GROUP_IDENTITY_LOAD_TIMEOUT_MS) {
             runCatchingCancellable { load() }.getOrNull()
@@ -1814,7 +1816,7 @@ private data class LateIdentityRefresh(
 
 private const val AVATAR_NOTIFICATION_FETCH_TIMEOUT_MS = 2_500L
 
-/** Bound for a group's encrypted picture in the late refresh; it delays no other card, only this silent rewrite. */
+/** Bound for a late-refresh picture loader; it delays no other card, only this silent rewrite. */
 private const val GROUP_IDENTITY_LOAD_TIMEOUT_MS = 15_000L
 internal const val EXTRA_CONTENT_REDACTED = "dev.ipf.whitenoise.android.notify.content_redacted"
 

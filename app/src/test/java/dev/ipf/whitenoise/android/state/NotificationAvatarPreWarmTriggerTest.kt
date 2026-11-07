@@ -31,6 +31,18 @@ class NotificationAvatarPreWarmTriggerTest {
         assertNull("a group never borrows the sender's face", senderOnly.conversationBitmap(isDm = false))
     }
 
+    /** #3635: the picture the chat list shows for the row comes first, for a direct chat as for a group. */
+    @Test
+    fun storedChatListPictureComesBeforeTheSenderAndGroupPictures() {
+        val stored = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        val sender = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        val group = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        val warmed = PreWarmedNotificationAvatars(null, null, sender, group, storedConversationBitmap = stored)
+
+        assertSame(stored, warmed.conversationBitmap(isDm = true))
+        assertSame(stored, warmed.conversationBitmap(isDm = false))
+    }
+
     @Test
     fun dmPreWarmUsesTheNotificationPayloadBeforeProfileMaterialization() {
         val target =

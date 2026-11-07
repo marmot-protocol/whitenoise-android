@@ -35,15 +35,25 @@ internal fun ChatListItem.readyStoredAvatarBitmap(accountRef: String): Bitmap? =
         ?.let(AvatarImageLoader::cachedImage)
         ?.asAndroidBitmap()
 
-/** Avatar warmup metadata or exact ready-local bitmaps retained across first publication and correction. */
+/**
+ * Avatar warmup metadata or exact ready-local bitmaps retained across first publication and correction.
+ * [storedConversationBitmap] holds the pixels the chat list decoded for the row's stored selected avatar (#3635).
+ */
 internal data class PreWarmedNotificationAvatars(
     val senderAvatarUrl: String?,
     val groupAvatarUrl: String?,
     val senderAvatarBitmap: Bitmap? = null,
     val groupAvatarBitmap: Bitmap? = null,
+    val storedConversationBitmap: Bitmap? = null,
 ) {
-    /** Chooses the card image from the same immutable snapshot as the sender image. */
-    fun conversationBitmap(isDm: Boolean): Bitmap? = if (isDm) senderAvatarBitmap else groupAvatarBitmap
+    /**
+     * Chooses the card image from the same immutable snapshot as the sender image: the picture the chat list shows
+     * for the row first (#3635), then the sender's picture for a direct chat or the group's own picture for a group.
+     */
+    fun conversationBitmap(isDm: Boolean): Bitmap? {
+        val own = if (isDm) senderAvatarBitmap else groupAvatarBitmap
+        return storedConversationBitmap ?: own
+    }
 }
 
 /**
