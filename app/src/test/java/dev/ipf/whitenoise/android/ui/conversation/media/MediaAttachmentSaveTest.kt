@@ -1,17 +1,25 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
+import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import android.content.ContentProvider
 import android.content.ContentResolver
 import android.content.ContentValues
 import android.content.ContextWrapper
 import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.pm.ApplicationInfo
+import android.content.pm.ResolveInfo
 import android.database.Cursor
 import android.net.Uri
 import android.provider.MediaStore
 import android.provider.Settings
 import androidx.core.content.IntentCompat
+import dev.ipf.whitenoise.android.FileProviderStrategyCacheRule
+import dev.ipf.whitenoise.android.MainActivity
 import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.BoundedPlaintextSink
+import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.state.ATTACHMENT_PRESENTATION_MAX_BYTES
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -21,6 +29,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -36,6 +45,9 @@ import kotlin.coroutines.cancellation.CancellationException
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class MediaAttachmentSaveTest {
+    @get:Rule
+    val fileProviderStrategyCacheRule = FileProviderStrategyCacheRule()
+
     private lateinit var outputFile: File
     private lateinit var provider: RecordingMediaProvider
 
@@ -282,70 +294,119 @@ class MediaAttachmentSaveTest {
         }
 
     @Test
-    fun videoShareUsesAReadOnlyContentIntentWithTheOriginalMimeType() =
+    fun videoShareOpensOutboundChooserWithTitleExclusionAndBlankTypeFallback() =
         runTest {
-            var launchedChooser: Intent? = null
-            val capturingContext =
-                object : ContextWrapper(context()) {
-                    override fun startActivity(intent: Intent) {
-                        launchedChooser = intent
+            registerVideoShareTarget("video/mp4")
+            val capturing = CapturingLaunchContext(context())
+            val source = videoSource()
+            try {
+                val result = shareVideo(capturing, source, "clip.mp4", "", VIDEO_CHOOSER_TITLE)
+
+                assertTrue(result.exceptionOrNull()?.stackTraceToString(), result.isSuccess)
+                val chooser = capturing.launched.single()
+                val shareIntent =
+                    IntentCompat.getParcelableExtra(chooser, Intent.EXTRA_INTENT, Intent::class.java)
+                        ?: error("chooser did not contain a share intent")
+                val stream =
+                    IntentCompat.getParcelableExtra(shareIntent, Intent.EXTRA_STREAM, Uri::class.java)
+                        ?: error("share intent did not contain a stream")
+                val excluded =
+                    IntentCompat
+                        .getParcelableArrayExtra(chooser, Intent.EXTRA_EXCLUDE_COMPONENTS, ComponentName::class.java)
+                        .orEmpty()
+                assertEquals(Intent.ACTION_CHOOSER, chooser.action)
+                assertEquals(VIDEO_CHOOSER_TITLE, chooser.getCharSequenceExtra(Intent.EXTRA_TITLE))
+                assertTrue(ComponentName(context(), MainActivity::class.java) in excluded)
+                assertEquals(Intent.ACTION_SEND, shareIntent.action)
+                assertEquals("video/mp4", shareIntent.type)
+                assertEquals("content", stream.scheme)
+                assertEquals("${context().packageName}.fileprovider", stream.authority)
+                assertEquals(stream, shareIntent.clipData?.getItemAt(0)?.uri)
+                assertTrue(shareIntent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
+                assertArrayEquals(VIDEO_BYTES, context().contentResolver.openInputStream(stream)?.use { it.readBytes() })
+            } finally {
+                source.delete()
+            }
+        }
+
+    @Test
+    fun videoShareNormalizesNonBlankTypeThroughTheOutboundContract() =
+        runTest {
+            registerVideoShareTarget("video/webm")
+            registerVideoShareTarget("application/octet-stream")
+            val capturing = CapturingLaunchContext(context())
+            val source = videoSource()
+            try {
+                assertTrue(shareVideo(capturing, source, "clip.webm", " Video/WebM ", VIDEO_CHOOSER_TITLE).isSuccess)
+                assertTrue(shareVideo(capturing, source, "clip.bin", "not a mime", VIDEO_CHOOSER_TITLE).isSuccess)
+
+                val types =
+                    capturing.launched.map { chooser ->
+                        IntentCompat.getParcelableExtra(chooser, Intent.EXTRA_INTENT, Intent::class.java)?.type
                     }
-                }
-            val uri = Uri.parse("content://dev.ipf.whitenoise.android.dev.fileprovider/shared_media/clip.webm")
+                assertEquals(listOf("video/webm", "application/octet-stream"), types)
+            } finally {
+                source.delete()
+            }
+        }
 
-            val result = launchVideoShare(capturingContext, uri, "video/webm")
+    @Test
+    fun videoShareWithoutExternalTargetFailsAsActivityNotFoundAndDeletesStagedFile() =
+        runTest {
+            val capturing = CapturingLaunchContext(context())
+            val source = videoSource()
+            try {
+                val result = shareVideo(capturing, source, "clip.mp4", "video/mp4", VIDEO_CHOOSER_TITLE)
 
-            assertTrue(result.isSuccess)
-            val shareIntent =
-                IntentCompat.getParcelableExtra(
-                    checkNotNull(launchedChooser),
-                    Intent.EXTRA_INTENT,
-                    Intent::class.java,
-                ) ?: error("chooser did not contain a share intent")
-            assertEquals(Intent.ACTION_SEND, shareIntent.action)
-            assertEquals("video/webm", shareIntent.type)
-            assertEquals(uri, IntentCompat.getParcelableExtra(shareIntent, Intent.EXTRA_STREAM, Uri::class.java))
-            assertTrue(shareIntent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
+                assertTrue("${result.exceptionOrNull()}", result.exceptionOrNull() is ActivityNotFoundException)
+                assertTrue(capturing.launched.isEmpty())
+                assertTrue(sharedMediaFiles().isEmpty())
+            } finally {
+                source.delete()
+            }
         }
 
     @Test
     fun videoSharePreservesPlatformFailureForPresentation() =
         runTest {
+            registerVideoShareTarget("video/mp4")
             val failure = SecurityException("credential-bearing provider detail")
             val failingContext =
                 object : ContextWrapper(context()) {
                     override fun startActivity(intent: Intent): Unit = throw failure
                 }
+            val source = videoSource()
+            try {
+                val result = shareVideo(failingContext, source, "clip.mp4", "video/mp4", VIDEO_CHOOSER_TITLE)
 
-            val result =
-                launchVideoShare(
-                    failingContext,
-                    Uri.parse("content://dev.ipf.whitenoise.android.dev.fileprovider/shared_media/clip.mp4"),
-                    "video/mp4",
-                )
-
-            assertSame(failure, result.exceptionOrNull())
+                assertSame(failure, result.exceptionOrNull())
+                assertTrue(sharedMediaFiles().isEmpty())
+            } finally {
+                source.delete()
+            }
         }
 
     @Test
     fun videoShareRethrowsCancellation() =
         runTest {
+            registerVideoShareTarget("video/mp4")
             val cancellation = CancellationException("screen closed")
             val cancellingContext =
                 object : ContextWrapper(context()) {
                     override fun startActivity(intent: Intent): Unit = throw cancellation
                 }
+            val source = videoSource()
+            try {
+                val observed =
+                    runCatching {
+                        shareVideo(cancellingContext, source, "clip.mp4", "video/mp4", VIDEO_CHOOSER_TITLE)
+                    }.exceptionOrNull()
 
-            val observed =
-                runCatching {
-                    launchVideoShare(
-                        cancellingContext,
-                        Uri.parse("content://dev.ipf.whitenoise.android.dev.fileprovider/shared_media/clip.mp4"),
-                        "video/mp4",
-                    )
-                }.exceptionOrNull()
-
-            assertSame(cancellation, observed)
+                assertSame(cancellation, observed)
+                assertTrue(sharedMediaFiles().isEmpty())
+            } finally {
+                source.delete()
+            }
         }
 
     @Test
@@ -513,6 +574,36 @@ class MediaAttachmentSaveTest {
 
     private fun context() = RuntimeEnvironment.getApplication()
 
+    private fun videoSource(): File = File.createTempFile("held-playback", ".mp4").apply { writeBytes(VIDEO_BYTES) }
+
+    private fun sharedMediaFiles(): List<File> = File(context().cacheDir, MediaCacheDirs.SHARED).listFiles().orEmpty().toList()
+
+    /** Registers an external app that accepts a shared file of [mediaType]. */
+    private fun registerVideoShareTarget(mediaType: String) {
+        shadowOf(context().packageManager).addResolveInfoForIntent(
+            Intent(Intent.ACTION_SEND).setType(mediaType),
+            ResolveInfo().apply {
+                activityInfo =
+                    ActivityInfo().apply {
+                        packageName = "example.share.target"
+                        name = "example.share.target.ShareActivity"
+                        exported = true
+                        applicationInfo = ApplicationInfo().apply { packageName = "example.share.target" }
+                    }
+            },
+        )
+    }
+
+    private class CapturingLaunchContext(
+        base: android.content.Context,
+    ) : ContextWrapper(base) {
+        val launched = mutableListOf<Intent>()
+
+        override fun startActivity(intent: Intent) {
+            launched += intent
+        }
+    }
+
     /** Streams a repeating byte pattern of [size] in chunks and records whether a bounded array sink received it. */
     private class PatternPlaintext(
         override val size: Long,
@@ -622,6 +713,8 @@ class MediaAttachmentSaveTest {
     }
 
     private companion object {
+        const val VIDEO_CHOOSER_TITLE = "Share"
+        val VIDEO_BYTES = "held playback video".encodeToByteArray()
         val PAYLOAD = "attachment bytes".toByteArray()
         const val PATTERN_PERIOD = 251
     }

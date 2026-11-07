@@ -21,6 +21,9 @@ import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.share.OutboundShareStream
+import dev.ipf.whitenoise.android.share.launchOutboundShare
+import dev.ipf.whitenoise.android.share.outboundShareIntent
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.presentFailure
@@ -755,12 +758,19 @@ internal fun copyDocumentToDestination(
     }
 }
 
-/** Stream an already-materialized video into a share-safe FileProvider temp. */
+/**
+ * Stream an already-materialized video into a share-safe FileProvider temp and
+ * open the outbound chooser, which excludes White Noise and throws
+ * [ActivityNotFoundException] when no external target exists. A blank type
+ * keeps the `video/mp4` fallback; other types are normalized by the outbound
+ * contract.
+ */
 internal suspend fun shareVideo(
     context: android.content.Context,
     source: java.io.File,
     fileName: String,
     mediaType: String,
+    chooserTitle: String,
     beforeLaunch: () -> Unit = {},
 ): Result<Unit> =
     runCatchingCancellable {
@@ -775,30 +785,15 @@ internal suspend fun shareVideo(
                     fileProviderUri(context, file)
                 }
             beforeLaunch()
-            launchVideoShare(context, uri, mediaType).getOrThrow()
+            launchOutboundShare(
+                context,
+                outboundShareIntent(null, listOf(OutboundShareStream(uri, mediaType.ifBlank { "video/mp4" }))),
+                chooserTitle,
+            ).getOrThrow()
         } catch (failure: Throwable) {
             runCatching { stagedFile?.delete() }
             throw failure
         }
-    }
-
-internal fun launchVideoShare(
-    context: android.content.Context,
-    uri: Uri,
-    mediaType: String,
-): Result<Unit> =
-    runCatchingCancellable {
-        val intent =
-            android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                type = mediaType.ifBlank { "video/mp4" }
-                putExtra(android.content.Intent.EXTRA_STREAM, uri)
-                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-        context.startActivity(
-            android.content.Intent.createChooser(intent, null).apply {
-                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-            },
-        )
     }
 
 /**
