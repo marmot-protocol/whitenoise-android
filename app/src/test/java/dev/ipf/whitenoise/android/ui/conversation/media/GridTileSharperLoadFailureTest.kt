@@ -145,8 +145,10 @@ class GridTileSharperLoadFailureTest {
     }
 
     /** Localized text for a string resource. */
-    private fun text(id: Int): String =
-        ApplicationProvider.getApplicationContext<android.content.Context>().getString(id)
+    private fun text(id: Int): String {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        return context.getString(id)
+    }
 
     private companion object {
         const val TILE_TAG = "sharper-load-tile"
