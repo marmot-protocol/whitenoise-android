@@ -120,7 +120,7 @@ all seven native replay cases with relay comparison refused and ignored.
 
 ```sh
 gh workflow run android-instrumented.yml --repo marmot-protocol/whitenoise-android \
-  --ref chore/marmotkit-nightly-20261106 -f mdk_qualification=true
+  --ref '<candidate-branch>' -f mdk_qualification=true
 ```
 
 The permanent `INT-010` manual case records this upgrade pair and migration.
@@ -134,7 +134,7 @@ Archive SHA-256, embedded manifest/source/builder agreement, effective ABI featu
 inputs, static ELF inspection and generated API comparison are verified. The first
 candidate, `f5bf3d270fcaecd3ec0a07003a772a0462046f3d`, passed
 [full two-distribution core CI](https://github.com/marmot-protocol/whitenoise-android/actions/runs/42189626546),
-[all six native adoption cases](https://github.com/marmot-protocol/whitenoise-android/actions/runs/42189799394)
+[all six native adoption cases at that revision](https://github.com/marmot-protocol/whitenoise-android/actions/runs/42189799394)
 and [all 11 populated-upgrade phases](https://github.com/marmot-protocol/whitenoise-android/actions/runs/42189804798).
 The latter used November 5 on current master `c4b96a457b3ac612199ad253ff99e80a009bc666`
 as its baseline, preserved the original pending upload, and passed all seven
@@ -143,7 +143,16 @@ preview. Pending-Welcome row preservation is untested on Android: the hosted
 fixture does not seed that row, and no seeded-row Android procedure or result
 is claimed.
 
-The candidate's PR merge commit also passed
+The previous head from PR #3609, `52ce95f3763eb746cdb55998748c77c24f019de5`, passed
+[all seven native adoption cases](https://github.com/marmot-protocol/whitenoise-android/actions/runs/42209190799)
+with zero failures, errors or skipped cases. Its
+[populated-upgrade campaign](https://github.com/marmot-protocol/whitenoise-android/actions/runs/42209196047)
+passed all 11 phases, including seven replay cases under each comparison mode;
+[full core CI](https://github.com/marmot-protocol/whitenoise-android/actions/runs/42209053048)
+also passed. The six-case count above belongs to the first candidate. These runs
+qualify only the stated revisions; follow-up changes require their own head-specific validation.
+
+The first candidate's PR merge commit also passed
 [minified production API 36 and staging API 37 ART checks](https://github.com/marmot-protocol/whitenoise-android/actions/runs/42192570945),
 [unsigned reproducibility and both release-lint variants](https://github.com/marmot-protocol/whitenoise-android/actions/runs/42192571006),
 and all 219 general emulator cases. Its ready-event Play suite exposed five

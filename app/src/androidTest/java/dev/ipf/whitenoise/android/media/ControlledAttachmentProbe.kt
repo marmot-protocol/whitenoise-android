@@ -89,7 +89,9 @@ internal object ControlledAttachmentProbe {
             )
         val accounts = mutableListOf<String>()
         var fixtureState: WhiteNoiseAppState? = null
-        try {
+        withFixtureCleanup(
+            cleanup = { cleanupFixture(marmot, accounts, root, preserveRestartFixture, fixtureState) },
+        ) {
             withTimeout(options.deadlineMillis) {
                 marmot.start()
                 if (restartRole == "read") {
@@ -142,7 +144,7 @@ internal object ControlledAttachmentProbe {
                     }
                 val failing =
                     sendFailingFixture(bodyCase == PHASES_CASE, context, root, marmot, sender, group, blobPort)
-                report(JSONObject().put("phase", "fixture-stage").put("stage", "upload-published"))
+                checkpoint("upload-published")
                 marmot.catchUpAccounts()
                 val request = projectedRequest(marmot, receiver.label, group, reference)
                 // History lookup is native authority; no retained row or attachment state is seeded.
@@ -162,7 +164,7 @@ internal object ControlledAttachmentProbe {
                         )
                     }
                 fixtureState = state
-                report(JSONObject().put("phase", "fixture-stage").put("stage", "received-projected"))
+                checkpoint("received-projected")
                 if (bodyCase != null) {
                     val inputs =
                         BodyCaseInputs(bodyCase, onUnknownLengthProgress, failing) {
@@ -268,25 +270,38 @@ internal object ControlledAttachmentProbe {
                         .put("process_restart_offline_qualified", false),
                 )
             }
-        } finally {
-            checkpoint("fixture-cleanup-start")
-            fixtureState?.mutationsScope?.cancel()
-            val cleanup =
-                if (preserveRestartFixture) {
-                    emptyList()
-                } else {
-                    accounts.map { runCatching { withTimeout(5_000L) { marmot.removeAccount(it) } } }
+        }
+    }
+
+    /** Attempts all cleanup stages; preserved restart data is kept and removal markers follow success. */
+    private suspend fun cleanupFixture(
+        marmot: Marmot,
+        accounts: List<String>,
+        root: File,
+        preserveRestartFixture: Boolean,
+        fixtureState: WhiteNoiseAppState?,
+    ) {
+        runFixtureCleanupSteps(
+            { checkpoint("fixture-cleanup-start") },
+            { fixtureState?.mutationsScope?.cancel() },
+            {
+                if (!preserveRestartFixture) {
+                    val cleanup = accounts.map { runCatching { withTimeout(5_000L) { marmot.removeAccount(it) } } }
+                    check(cleanup.all { it.isSuccess }) { "fixture account cleanup failed" }
+                    checkpoint("fixture-accounts-removed")
                 }
-            checkpoint("fixture-accounts-removed")
-            try {
+            },
+            {
                 marmot.shutdownAndClose()
                 checkpoint("fixture-native-closed")
-            } finally {
-                if (!preserveRestartFixture) root.deleteRecursively()
-                checkpoint("fixture-files-removed")
-            }
-            check(cleanup.all { it.isSuccess }) { "fixture account cleanup failed" }
-        }
+            },
+            {
+                if (!preserveRestartFixture) {
+                    check(root.deleteRecursively()) { "fixture file cleanup failed" }
+                    checkpoint("fixture-files-removed")
+                }
+            },
+        )
     }
 
     /** Only the automatic scheduler case resolves its generated account for real per-account policy persistence. */
@@ -570,9 +585,13 @@ internal object ControlledAttachmentProbe {
         assertTrue(success)
     }
 
-    /** Marks a fixed fixture boundary so a timed-out command can retain progress without raw instrumentation output. */
+    /** Best-effort boundary marker: a broken status channel must not mask failures or interrupt fixture cleanup. */
     internal fun checkpoint(stage: String) {
-        report(JSONObject().put("phase", "fixture-stage").put("stage", stage))
+        try {
+            report(JSONObject().put("phase", "fixture-stage").put("stage", stage))
+        } catch (_: Exception) {
+            // Stage markers are optional; required result reporting still propagates failures.
+        }
     }
 
     /** Sends closed metrics to the host runner; no synthetic identity or locator is exported. */

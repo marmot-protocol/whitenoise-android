@@ -451,9 +451,7 @@ internal object PlatformInterruptedAttachmentProbe {
         val before = revision.intValue
         withContext(Dispatchers.Main.immediate) { state.refreshNativeAttachmentPermissions() }
         withTimeout(15_000L) { while (revision.intValue == before) delay(25L) }
-        ControlledAttachmentProbe.report(
-            JSONObject().put("phase", "fixture-stage").put("stage", "automatic-policy-ready"),
-        )
+        ControlledAttachmentProbe.checkpoint("automatic-policy-ready")
     }
 
     /**

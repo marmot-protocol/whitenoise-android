@@ -161,7 +161,7 @@ internal object MatrixAttachmentProbe {
         HeldAttachmentCancellationProbe.control(session.blobPort, "/__marker/${marker + 1}")
         val receipt = JSONObject().put("schema", 1).put("prepare_pid", Process.myPid()).put("items", kept)
         File(session.root, MANIFEST).writeText(receipt.toString())
-        ControlledAttachmentProbe.report(JSONObject().put("phase", "fixture-stage").put("stage", "matrix-prepared"))
+        ControlledAttachmentProbe.checkpoint("matrix-prepared")
     }
 
     /** One upload, one cold download and one warm retained read of a generated file; returns its restart receipt. */
