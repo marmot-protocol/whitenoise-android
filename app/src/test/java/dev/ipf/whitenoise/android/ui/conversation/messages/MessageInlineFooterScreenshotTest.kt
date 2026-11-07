@@ -19,10 +19,12 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -38,6 +40,7 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.WCAG_NON_TEXT_CONTRAST
 import dev.ipf.whitenoise.android.state.contrastRatio
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -48,6 +51,9 @@ import org.robolectric.annotation.GraphicsMode
 
 private const val ROOT_TAG = "footer.status.matrix"
 private const val OPAQUE_ARGB_MASK = 0xFFFFFFFFL
+private const val SENT_SAMPLE_TAG = "footer.sent.sample"
+private const val DISC_DP = 14f
+private const val CHANNEL_TOLERANCE = 2.5f / 255f
 
 /**
  * The bubble footer's delivery states. A settled Sent disc must read as metadata beside the
@@ -127,6 +133,43 @@ class MessageInlineFooterScreenshotTest {
         val disc = sentDeliveryDiscColor(Color.White, Color.Black)
         val ratio = contrastRatio(disc.compositeOver(Color.Black).opaqueArgb(), Color.Black.opaqueArgb())
         assertTrue("media chip disc contrast $ratio is below the non-text floor", ratio >= WCAG_NON_TEXT_CONTRAST)
+    }
+
+    /**
+     * The settled disc is a drawn circle, not a square fill that relies on a layer clip (#3610): the four
+     * corners of its 14 dp box show the bubble fill, and the disc colour shows above and below the check.
+     */
+    @Test
+    fun sentDiscCornersShowTheBubbleFill() {
+        val samples = mutableListOf<Triple<String, Color, Color>>()
+        composeRule.setContent {
+            Column {
+                WhiteNoiseTheme(darkTheme = false) { SentFooterSample("light-own", samples) }
+                WhiteNoiseTheme(darkTheme = true) { SentFooterSample("dark-own", samples) }
+                WhiteNoiseTheme(darkTheme = true, amoled = true) { SentFooterSample("amoled-own", samples) }
+            }
+        }
+        composeRule.waitForIdle()
+        val discs = composeRule.onAllNodesWithContentDescription("Sent", useUnmergedTree = true)
+        assertEquals("one disc per sample", samples.size, discs.fetchSemanticsNodes().size)
+        samples.forEachIndexed { index, (name, _, footer) ->
+            // The fill as rendered, read from the sample's padding, so a translucent fill is judged as drawn.
+            val fill = composeRule.onNodeWithTag("$SENT_SAMPLE_TAG.$name").captureToImage().toPixelMap()[1, 1]
+            val pixels = discs[index].captureToImage().toPixelMap()
+            val right = pixels.width - 1
+            val bottom = pixels.height - 1
+            listOf(0 to 0, right to 0, 0 to bottom, right to bottom).forEach { (x, y) ->
+                assertColorNear("$name corner ($x, $y)", fill, pixels[x, y])
+            }
+            val disc = sentDeliveryDiscColor(footer, fill).compositeOver(fill)
+            val scale = pixels.width / DISC_DP
+            // The 10 dp check spans about 4.7 to 9.3 dp down the disc, so these rows are disc colour alone.
+            listOf(2.5f, 11.5f).forEach { dy ->
+                val x = (DISC_DP / 2 * scale).toInt()
+                val y = (dy * scale).toInt()
+                assertColorNear("$name disc ($x, $y)", disc, pixels[x, y])
+            }
+        }
     }
 
     /** Each delivery state keeps a description, so the state never rests on colour alone. */
@@ -274,6 +317,43 @@ class MessageInlineFooterScreenshotTest {
         val fill = bubbleFill(mine)
         val footer = footerColor(mine)
         SideEffect { into += Triple(name, fill, footer) }
+    }
+
+    /** One own-bubble Sent footer on its production fill, tagged so the fill can be read back as rendered. */
+    @Composable
+    private fun SentFooterSample(
+        name: String,
+        into: MutableList<Triple<String, Color, Color>>,
+    ) {
+        val fill = bubbleFill(mine = true)
+        val footer = footerColor(mine = true)
+        SideEffect { into += Triple(name, fill, footer) }
+        Surface(color = fill) {
+            Box(Modifier.testTag("$SENT_SAMPLE_TAG.$name").padding(8.dp)) {
+                MessageInlineFooter(
+                    timeText = "12:45",
+                    color = footer,
+                    showStatus = true,
+                    status = MessageStatus.Sent,
+                    editedLabel = null,
+                    onEditedClick = null,
+                    statusContainerColor = fill,
+                )
+            }
+        }
+    }
+
+    /** Asserts that [actual] matches [expected] in every channel, allowing for 8-bit rounding. */
+    private fun assertColorNear(
+        message: String,
+        expected: Color,
+        actual: Color,
+    ) {
+        val near =
+            kotlin.math.abs(expected.red - actual.red) <= CHANNEL_TOLERANCE &&
+                kotlin.math.abs(expected.green - actual.green) <= CHANNEL_TOLERANCE &&
+                kotlin.math.abs(expected.blue - actual.blue) <= CHANNEL_TOLERANCE
+        assertTrue("$message: expected $expected, was $actual", near)
     }
 
     /** Mounts one footer row per delivery state on both bubble directions plus the media chip. */
