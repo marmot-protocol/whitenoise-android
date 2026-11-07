@@ -128,7 +128,9 @@ class VideoPlaybackCoordinationCoverageTest {
         assertTrue(
             "read-aloud must listen for headphone disconnection",
             "noisyRoutes = AndroidNoisyAudioRouteRegistrar(context)" in
-                mainSource("state/TtsTimingPreferences.kt").functionBody("createAppTtsController"),
+                mainSource("state/TtsTimingPreferences.kt")
+                    .substringAfter("fun createAppTtsController(")
+                    .substringBefore("class TtsTimingPreferences("),
         )
     }
 
