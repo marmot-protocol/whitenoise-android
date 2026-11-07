@@ -594,6 +594,36 @@ class VoicePlaybackControllerFocusTest {
         assertFalse(VoicePlaybackController.listensForNoisyRoute)
     }
 
+    /** Read-aloud or recording taking focus pauses the clip at its position and never resumes it. */
+    @Test
+    fun inAppHandoffPausesPlaybackAndKeepsItsPlace() {
+        val routes = attachWithNoisyRoutes()
+        assertTrue(requestFocus())
+        val mediaPlayer = TrackingVoicePlayer().apply { positionMs = 4_200 }
+        primeActivePlayer(mediaPlayer)
+
+        assertTrue(
+            AudioFocusOwner.acquire(
+                owner = AudioFocusOwner.Owner.Tts,
+                audioAttributes = AudioFocusOwner.ttsSpeechAttributes,
+                focusGain = AudioManager.AUDIOFOCUS_GAIN,
+                onFocusLoss = {},
+                onOwnerSurrender = {},
+            ),
+        )
+
+        assertFalse(mediaPlayer.playing)
+        assertFalse(mediaPlayer.released)
+        assertSame(mediaPlayer, controllerField("player"))
+        assertEquals("voice-key", VoicePlaybackController.state.value.key)
+        assertEquals(4_200, VoicePlaybackController.state.value.positionMs)
+        assertFalse(VoicePlaybackController.state.value.isPlaying)
+        assertFalse(controllerField("resumeOnAudioFocusGain") as Boolean)
+        assertEquals(0, routes.listeners)
+        assertEquals(AudioFocusOwner.Owner.Tts, audioFocusOwnerField("currentOwner"))
+        AudioFocusOwner.release(AudioFocusOwner.Owner.Tts)
+    }
+
     /** A disconnect while a new clip prepares supersedes it before the speaker can start. */
     @Test
     fun headphoneDisconnectDuringPrepareKeepsTheClipSilent() {

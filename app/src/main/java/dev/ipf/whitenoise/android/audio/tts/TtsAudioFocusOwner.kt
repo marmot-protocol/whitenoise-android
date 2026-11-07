@@ -1,25 +1,24 @@
 package dev.ipf.whitenoise.android.audio.tts
 
 import android.content.Context
-import android.media.AudioAttributes
-import android.media.AudioFocusRequest
 import android.media.AudioManager
+import dev.ipf.whitenoise.android.audio.AudioFocusOwner
 
 /**
- * Audio-focus ownership for read-aloud. Ordinary long-form speech keeps full
- * GAIN, while the explicit media-mix policy leaves platform focus untouched so
- * speech and external media can remain active together. Full-focus loss remains
- * survivable: transient and permanent loss pause the queue at its retained
- * position rather than destroying the session (#1484). The callbacks stay
- * separate so permanent loss can drop the spent request for resume().
+ * Audio-focus ownership for read-aloud, held through the process-wide
+ * [AudioFocusOwner] so read-aloud, voice messages and recording hand off to one
+ * another instead of competing for platform focus. Ordinary long-form speech
+ * keeps full GAIN, while the explicit media-mix policy leaves platform focus
+ * untouched so speech and external media can remain active together. Every loss
+ * pauses the queue at its retained position rather than destroying the session
+ * (#1484). Permanent loss releases the spent request so resume() asks again.
  */
 internal class TtsAudioFocusOwner(
     context: Context,
 ) : TtsAudioFocus {
-    private val audioManager = context.applicationContext.getSystemService(AudioManager::class.java)
-    private var focusRequest: AudioFocusRequest? = null
-    private var focusMode: TtsAudioFocusMode? = null
-    private var focusGeneration = 0L
+    init {
+        AudioFocusOwner.attach(context)
+    }
 
     /** Preserves the established full-gain behavior for ordinary read-aloud. */
     override fun acquire(
@@ -35,63 +34,31 @@ internal class TtsAudioFocusOwner(
     ): Boolean =
         when (mode) {
             TtsAudioFocusMode.MediaMix -> {
-                if (focusMode != null && focusMode != mode) release()
-                focusMode = mode
+                release()
                 true
             }
-            TtsAudioFocusMode.Full -> acquireFullFocus(onFocusLoss, onOwnerSurrender)
+            TtsAudioFocusMode.Full ->
+                AudioFocusOwner.acquireWithFocusChanges(
+                    owner = AudioFocusOwner.Owner.Tts,
+                    audioAttributes = AudioFocusOwner.ttsSpeechAttributes,
+                    focusGain = AudioManager.AUDIOFOCUS_GAIN,
+                    onFocusChange = { change ->
+                        when (change) {
+                            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
+                            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK,
+                            -> onFocusLoss()
+                            AudioManager.AUDIOFOCUS_LOSS -> {
+                                release()
+                                onOwnerSurrender()
+                            }
+                        }
+                    },
+                    onOwnerSurrender = onOwnerSurrender,
+                )
         }
 
-    /** Requests or retains the ordinary full-gain focus request. */
-    private fun acquireFullFocus(
-        onFocusLoss: () -> Unit,
-        onOwnerSurrender: () -> Unit,
-    ): Boolean =
-        audioManager?.let { manager ->
-            if (focusMode != null && focusMode != TtsAudioFocusMode.Full) release()
-            if (focusRequest == null) {
-                focusGeneration += 1L
-                val requestGeneration = focusGeneration
-                val attributes =
-                    AudioAttributes
-                        .Builder()
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .build()
-                val request =
-                    AudioFocusRequest
-                        .Builder(AudioManager.AUDIOFOCUS_GAIN)
-                        .setAudioAttributes(attributes)
-                        .setOnAudioFocusChangeListener focusChange@{ change ->
-                            if (requestGeneration != focusGeneration) return@focusChange
-                            when (change) {
-                                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
-                                AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK,
-                                -> onFocusLoss()
-                                AudioManager.AUDIOFOCUS_LOSS -> {
-                                    focusRequest = null
-                                    focusMode = null
-                                    focusGeneration += 1L
-                                    onOwnerSurrender()
-                                }
-                                else -> Unit
-                            }
-                        }.build()
-                if (manager.requestAudioFocus(request) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-                    focusRequest = request
-                    focusMode = TtsAudioFocusMode.Full
-                }
-            }
-            focusRequest != null
-        } ?: false
-
-    /** Abandons the exact request held by this owner. */
+    /** Abandons read-aloud focus if read-aloud still holds it. */
     override fun release() {
-        val request = focusRequest
-        focusRequest = null
-        focusMode = null
-        focusGeneration += 1L
-        val manager = audioManager ?: return
-        request?.let { manager.abandonAudioFocusRequest(it) }
+        AudioFocusOwner.release(AudioFocusOwner.Owner.Tts)
     }
 }

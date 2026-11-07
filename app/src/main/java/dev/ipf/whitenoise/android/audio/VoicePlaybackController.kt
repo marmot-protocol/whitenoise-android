@@ -157,11 +157,6 @@ object VoicePlaybackController {
         AudioFocusOwner.attach(context)
     }
 
-    /** Stops playback when another audio owner takes focus. */
-    internal fun stopForAudioHandoff() {
-        stop()
-    }
-
     private data class CompletionCallback(
         val ownerKey: String,
         val token: Any,
@@ -438,7 +433,8 @@ object VoicePlaybackController {
                 audioAttributes = speechAudioAttributes,
                 focusGain = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK,
                 onFocusChange = ::handleAudioFocusChange,
-                onOwnerSurrender = ::stopForAudioHandoff,
+                // Another in-app owner took focus: pause and keep the position.
+                onOwnerSurrender = ::pause,
             ).also { granted -> if (!granted) noisyListener.disarm() }
     }
 

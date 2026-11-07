@@ -32,13 +32,15 @@ class VoiceRecordingControllerTest {
     }
 
     @Test
-    fun recordingFocusRequestIsStoredOnlyAfterGrant() {
+    fun recordingFocusIsMarkedHeldOnlyAfterTheArbiterGrantsIt() {
         val body = voiceRecordingControllerSource().kotlinFunctionBody("requestRecordingFocus")
 
         assertTrue(
-            "requestRecordingFocus should only retain the focus request after AudioManager grants it",
-            "focusRequest = req" in body &&
-                body.indexOf("requestAudioFocus(req)") < body.indexOf("focusRequest = req"),
+            "requestRecordingFocus should acquire through AudioFocusOwner and mark focus held only after a grant",
+            "AudioFocusOwner.acquireWithFocusChanges(" in body &&
+                "if (granted) recordingFocusHeld = true" in body &&
+                body.indexOf("AudioFocusOwner.acquireWithFocusChanges(") <
+                body.indexOf("if (granted) recordingFocusHeld = true"),
         )
     }
 
