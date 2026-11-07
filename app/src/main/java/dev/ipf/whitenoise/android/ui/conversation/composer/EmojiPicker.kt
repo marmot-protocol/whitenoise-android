@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -130,8 +131,11 @@ internal fun ComposerEmojiPickerPane(
             searchRow = searchRow,
             modifier =
                 if (searchRow) {
+                    // Measure the row at its own height: Surface passes searchMinHeight down as a
+                    // minimum, and reporting that would feed the pane's own size back as its target.
                     Modifier
                         .fillMaxWidth()
+                        .wrapContentHeight(Alignment.Top)
                         .onSizeChanged { onSearchRowHeightChange(with(density) { it.height.toDp() }) }
                         .padding(top = ComposerEmojiPaneTopInset)
                 } else {

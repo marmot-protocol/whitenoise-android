@@ -179,6 +179,38 @@ class EmojiPickerRecentsBehaviorTest {
     }
 
     /**
+     * The search row reports its own height, not the pane's minimum, so the composer's
+     * keyboard-plus-row target cannot grow from its own size while it animates.
+     */
+    @Test
+    fun composerSearchRowReportsItsOwnHeightUnderATallMinimum() {
+        var reported = 0.dp
+        composeRule.setContent {
+            var searchRow by remember { mutableStateOf(false) }
+            WhiteNoiseTheme {
+                ComposerEmojiPickerPane(
+                    height = ComposerEmojiPickerFallbackHeight,
+                    alpha = 1f,
+                    recentEmojis = emptyList(),
+                    onEmojiUsed = {},
+                    onEmojiPicked = {},
+                    onBackspace = {},
+                    onSearchActiveChange = { if (it) searchRow = true },
+                    searchRow = searchRow,
+                    searchMinHeight = 600.dp,
+                    onSearchRowHeightChange = { reported = it },
+                    modifier = Modifier.width(360.dp),
+                )
+            }
+        }
+        waitForBrowseGrid()
+        openComposerSearch()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_ROW_TEST_TAG).assertIsDisplayed()
+
+        assertTrue("reported $reported", reported > 0.dp && reported < 200.dp)
+    }
+
+    /**
      * The composer pane opens on the full grid; its search icon opens a focused search field, and
      * closing that field returns to browsing with the query cleared (#3613).
      */
