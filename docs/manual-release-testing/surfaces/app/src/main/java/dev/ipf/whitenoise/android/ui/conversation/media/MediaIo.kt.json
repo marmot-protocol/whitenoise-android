@@ -18,6 +18,14 @@
         "test_ids": [
           "STB-001"
         ]
+      },
+      {
+        "surface": "Media viewer video share uses outbound share chooser",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaIo.kt",
+        "anchor": "OutboundShareStream(uri, mediaType.ifBlank { \"video/mp4\" })",
+        "test_ids": [
+          "MED-016"
+        ]
       }
     ]
   },
