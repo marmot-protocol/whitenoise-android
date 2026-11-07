@@ -206,6 +206,17 @@
         ]
       },
       {
+        "surface": "setting:date_time_format",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.date_time_format",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044",
+          "SET-045"
+        ]
+      },
+      {
         "surface": "setting:default_disappearing_messages",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
         "anchor": "R.string.default_disappearing_messages",
@@ -603,6 +614,17 @@
           "SET-042",
           "SET-043",
           "SET-044"
+        ]
+      },
+      {
+        "surface": "setting:settings_search_alias_date_time_format",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.settings_search_alias_date_time_format",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-044",
+          "SET-045"
         ]
       },
       {

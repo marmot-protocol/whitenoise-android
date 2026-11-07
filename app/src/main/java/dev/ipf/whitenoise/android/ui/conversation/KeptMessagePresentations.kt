@@ -3,16 +3,16 @@ package dev.ipf.whitenoise.android.ui.conversation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalConfiguration
 import dev.ipf.marmotkit.AppMessageRecordFfi
+import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
 import dev.ipf.whitenoise.android.ui.conversation.messages.KeptMessageEntry
 import dev.ipf.whitenoise.android.ui.conversation.messages.KeptMessageKey
 import dev.ipf.whitenoise.android.ui.conversation.messages.KeptMessagePresentation
-import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 
 /**
  * Presentation strings for every kept message currently on the stack, resolved once per
@@ -29,7 +29,8 @@ internal fun keptMessagePresentations(
     controller: ConversationController? = null,
     thumbnailRevision: Long = 0,
 ): Map<KeptMessageKey, KeptMessagePresentation> {
-    val formatter = remember { DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT) }
+    val locale = LocalConfiguration.current.locales[0]
+    val use24Hour = currentDateTimeDisplay().use24Hour
     val zone = remember { ZoneId.systemDefault() }
     return entries.associate { entry ->
         key(entry.key) {
@@ -44,20 +45,9 @@ internal fun keptMessagePresentations(
                             record.plaintext
                         },
                     chatTitle = chatTitle,
-                    timeLabel = keptMessageTimeLabel(record.recordedAt, formatter, zone),
+                    timeLabel = IdentityFormatter.clockTime(record.recordedAt, locale, zone, use24Hour),
                     attachments = keptAttachmentPresentations(entry.message, controller, thumbnailRevision),
                 )
         }
     }
 }
-
-/** Wall-clock time of a kept message in the viewer's locale and zone. */
-private fun keptMessageTimeLabel(
-    recordedAt: ULong,
-    formatter: DateTimeFormatter,
-    zone: ZoneId,
-): String =
-    Instant
-        .ofEpochSecond(recordedAt.toLong())
-        .atZone(zone)
-        .format(formatter)

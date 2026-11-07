@@ -7,15 +7,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import dev.ipf.marmotkit.AccountKeyPackageRelayEventFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
+import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
-import java.text.DateFormat
-import java.util.Date
 
 /** Current slot winners first, then superseded events newest first, so a stale relay copy is easy to spot. */
 internal fun relayHistoryRows(events: List<AccountKeyPackageRelayEventFfi>): List<AccountKeyPackageRelayEventFfi> {
@@ -39,7 +39,10 @@ internal fun KeyPackageRelayHistory(events: List<AccountKeyPackageRelayEventFfi>
 @Suppress("FunctionNaming")
 @Composable
 internal fun KeyPackageRelayEventRow(event: AccountKeyPackageRelayEventFfi) {
-    val publishedAt = DateFormat.getDateTimeInstance().format(Date(event.createdAt.toLong() * MILLIS_PER_SECOND))
+    val publishedAt =
+        IdentityFormatter
+            .dateTime(event.createdAt, LocalConfiguration.current.locales[0], display = currentDateTimeDisplay())
+            .ifEmpty { "—" }
     val relays = event.sourceRelays.joinToString().ifEmpty { "—" }
     ListItem(
         modifier =
@@ -66,5 +69,3 @@ internal fun KeyPackageRelayEventRow(event: AccountKeyPackageRelayEventFfi) {
         },
     )
 }
-
-private const val MILLIS_PER_SECOND = 1_000L

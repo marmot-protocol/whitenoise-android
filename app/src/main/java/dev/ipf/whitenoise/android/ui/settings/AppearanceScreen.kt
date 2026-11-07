@@ -9,9 +9,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.DateTimeFormatState
 import dev.ipf.whitenoise.android.state.AppFont
 import dev.ipf.whitenoise.android.state.AppFontScale
 import dev.ipf.whitenoise.android.state.AppThemeMode
@@ -79,6 +81,7 @@ internal fun AppearanceScreen(
     var fontFamilyOpen by rememberSaveable { mutableStateOf(false) }
     var fontSizeOpen by rememberSaveable { mutableStateOf(false) }
     var enterOpen by rememberSaveable { mutableStateOf(false) }
+    var dateTimeOpen by rememberSaveable { mutableStateOf(false) }
     val previewState = remember(appState.activeAccountRef, appState.runtimeGeneration) { AppearancePreviewState() }
     val familyThemeLabels = AppThemeMode.entries.associateWith { stringResource(it.labelRes) }
     val familyLabels = AppFont.entries.associateWith { it.pickerLabel() }
@@ -141,6 +144,18 @@ internal fun AppearanceScreen(
             },
         )
     }
+    if (dateTimeOpen) {
+        DateTimeFormatDialog(
+            timeFormat = DateTimeFormatState.timeFormat,
+            dateFormat = DateTimeFormatState.dateFormat,
+            system24Hour = DateTimeFormatState.system24Hour,
+            onSelectTime = appState::updateTimeFormat,
+            onSelectDate = appState::updateDateFormat,
+            onDismiss = { dateTimeOpen = false },
+        )
+    }
+    val locale = LocalConfiguration.current.locales[0]
+    val dateTimeSample = dateTimeFormatSample(locale, DateTimeFormatState.display)
     SettingsScaffold(title = stringResource(R.string.appearance), onBack = onBack) {
         SettingsList {
             item(key = "search.Appearance.1") { SettingsSection(stringResource(R.string.appearance_colors_heading)) }
@@ -191,6 +206,15 @@ internal fun AppearanceScreen(
                             title = stringResource(R.string.font_size),
                             value = fontLabels.getValue(appState.fontScale),
                             onClick = { fontSizeOpen = true },
+                        )
+                    }
+                    row("date_time_format") { context ->
+                        SettingsLink(
+                            context = context,
+                            title = stringResource(R.string.date_time_format),
+                            value = dateTimeSample,
+                            modifier = Modifier.testTag("appearance.date_time_format"),
+                            onClick = { dateTimeOpen = true },
                         )
                     }
                     row("language") { context ->

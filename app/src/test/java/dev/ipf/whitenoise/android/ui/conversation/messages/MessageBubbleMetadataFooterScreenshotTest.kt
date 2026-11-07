@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.core.DateTimeFormatState
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.state.TimelineMessage
@@ -78,6 +79,8 @@ class MessageBubbleMetadataFooterScreenshotTest : MessageBubbleFileAttachmentFix
         originalTimeFormat = Settings.System.getString(context.contentResolver, Settings.System.TIME_12_24)
         Settings.System.putString(context.contentResolver, Settings.System.TIME_12_24, "24")
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+        // The app reads the phone clock setting on start and resume; pick up the pinned value now.
+        DateTimeFormatState.refreshSystem(context)
     }
 
     @After
@@ -87,6 +90,7 @@ class MessageBubbleMetadataFooterScreenshotTest : MessageBubbleFileAttachmentFix
         } finally {
             Settings.System.putString(context.contentResolver, Settings.System.TIME_12_24, originalTimeFormat)
             TimeZone.setDefault(originalTimeZone)
+            DateTimeFormatState.refreshSystem(context)
         }
     }
 

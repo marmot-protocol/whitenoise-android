@@ -50,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -63,6 +64,8 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.core.DateTimeDisplay
+import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.IndexedAttachment
 import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.core.MessageProjector
@@ -79,6 +82,7 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyVerticalGrid
+import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.media.FullScreenMediaViewer
@@ -118,8 +122,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.URI
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.FormatStyle
 import java.util.Calendar
+import java.util.Locale
 import androidx.compose.foundation.lazy.grid.items as gridItems
 
 // A renderable image/video tile resolved from the conversation timeline. Unlike
@@ -1404,8 +1411,9 @@ private fun UrlLibraryRow(
 
 @Composable
 private fun rememberRelativeTimestamp(recordedAt: ULong): String {
-    val context = LocalContext.current
-    return remember(context, recordedAt) { relativeTimestamp(context, recordedAt) }
+    val locale = LocalConfiguration.current.locales[0]
+    val display = currentDateTimeDisplay()
+    return remember(recordedAt, locale, display) { relativeTimestamp(recordedAt, locale, display) }
 }
 
 /** Displays a media sender through the active viewer's local contact-picture choice. */
@@ -1430,23 +1438,24 @@ private fun hostOf(url: String): String = runCatching { URI(url).host }.getOrNul
 // Compact relative-ish timestamp for the media rows: today shows the clock,
 // older entries show the calendar date. `recordedAt` is epoch SECONDS.
 private fun relativeTimestamp(
-    context: android.content.Context,
     recordedAtSeconds: ULong,
+    locale: Locale,
+    display: DateTimeDisplay,
 ): String {
-    val millis = recordedAtSeconds.toLong() * 1000L
-    val now = Calendar.getInstance()
-    val then = Calendar.getInstance().apply { timeInMillis = millis }
+    val zone = ZoneId.systemDefault()
     val sameDay =
-        now.get(Calendar.YEAR) == then.get(Calendar.YEAR) &&
-            now.get(Calendar.DAY_OF_YEAR) == then.get(Calendar.DAY_OF_YEAR)
-    val flags =
-        if (sameDay) {
-            android.text.format.DateUtils.FORMAT_SHOW_TIME
-        } else {
-            android.text.format.DateUtils.FORMAT_SHOW_DATE or android.text.format.DateUtils.FORMAT_ABBREV_ALL
-        }
-    return android.text.format.DateUtils
-        .formatDateTime(context, millis, flags)
+        runCatching {
+            Instant.ofEpochSecond(recordedAtSeconds.toLong()).atZone(zone).toLocalDate() == LocalDate.now(zone)
+        }.getOrDefault(false)
+    return IdentityFormatter.dateTime(
+        recordedAtSeconds,
+        locale,
+        zone,
+        display,
+        dateStyle = if (sameDay) null else FormatStyle.MEDIUM,
+        timeStyle = if (sameDay) FormatStyle.SHORT else null,
+        withoutYear = IdentityFormatter.isCurrentYear(recordedAtSeconds, zone),
+    )
 }
 
 // Localized month/year header for a [monthKeyForMedia] key.

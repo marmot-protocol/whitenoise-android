@@ -61,6 +61,7 @@ import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.common.AdaptiveContent
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.TopNoticeSlot
+import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
@@ -234,6 +235,7 @@ private fun MessageFactsSection(
     val configuration = LocalConfiguration.current
     val locale = remember(configuration) { ConfigurationCompat.getLocales(configuration)[0] ?: Locale.ROOT }
     val zone = remember { ZoneId.systemDefault() }
+    val display = currentDateTimeDisplay()
     val statusText = labelFor(status, messageStatusLabels())
     val timeLabel =
         when (status) {
@@ -251,17 +253,17 @@ private fun MessageFactsSection(
     ) {
         Column {
             FactRow(stringResource(R.string.message_info_status), statusText)
-            FactRow(stringResource(timeLabel), editHistoryRevisionTime(primarySeconds, locale, zone))
+            FactRow(stringResource(timeLabel), editHistoryRevisionTime(primarySeconds, locale, zone, display))
             if (showSenderTime) {
                 FactRow(
                     stringResource(R.string.message_sender_time),
-                    editHistoryRevisionTime(record.recordedAt, locale, zone),
+                    editHistoryRevisionTime(record.recordedAt, locale, zone, display),
                 )
             }
             record.retentionExpiresAt?.takeIf { it > 0uL }?.let { expiresAt ->
                 FactRow(
                     stringResource(R.string.message_info_disappears_at),
-                    editHistoryRevisionTime(expiresAt, locale, zone),
+                    editHistoryRevisionTime(expiresAt, locale, zone, display),
                 )
             }
             if (record.messageIdHex.isNotBlank()) {
@@ -427,7 +429,11 @@ private fun MessageReportRow(
     canDismiss: Boolean,
     onDismiss: (ContentReportFfi) -> Unit,
 ) {
-    val filedAt = remember(report.reportedAt, locale, zone) { editHistoryRevisionTime(report.reportedAt, locale, zone) }
+    val display = currentDateTimeDisplay()
+    val filedAt =
+        remember(report.reportedAt, locale, zone, display) {
+            editHistoryRevisionTime(report.reportedAt, locale, zone, display)
+        }
     ListItem(
         modifier = Modifier.testTag("message.details.report.$index"),
         headlineContent = { Text(stringResource(reportReasonLabel(report.reason))) },

@@ -2528,4 +2528,12 @@
     <string name="settings_search_alias_read_aloud">TTS|文字转语音|朗读</string>
     <string name="settings_search_alias_sound">通知声音|提示音|铃声</string>
     <string name="settings_search_revealed">%1$s。设置已突出显示。</string>
+    <string name="date_time_format">日期和时间</string>
+    <string name="date_time_format_time">时间</string>
+    <string name="date_time_format_date">日期</string>
+    <string name="date_time_format_automatic">自动</string>
+    <string name="time_format_12_hour">12 小时制</string>
+    <string name="time_format_24_hour">24 小时制</string>
+    <string name="date_time_format_help">自动模式使用应用语言和手机系统设置中的地区。</string>
+    <string name="settings_search_alias_date_time_format">时间格式|日期格式|时钟|12 小时制|24 小时制|上午/下午</string>
 </resources>

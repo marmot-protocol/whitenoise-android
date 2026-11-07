@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.common
 
-import android.text.format.DateFormat
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -14,6 +13,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.DateTimeDisplay
+import dev.ipf.whitenoise.android.core.DateTimeFormatState
 import dev.ipf.whitenoise.android.core.GroupSystemCopy
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.core.IdentityFormatter
@@ -142,17 +143,25 @@ private fun rememberRelativeTimeCopy(): dev.ipf.whitenoise.android.core.Relative
     }
 }
 
+/**
+ * The user's date/time display choices (#3602) resolved against Android's 12/24-hour switch and
+ * phone region. Reading it subscribes the caller to changes; use it as a remember key.
+ */
+internal fun currentDateTimeDisplay(): DateTimeDisplay = DateTimeFormatState.display
+
 @Composable
 internal fun rememberedRelativeTime(epochSeconds: ULong): String {
     val copy = rememberRelativeTimeCopy()
     val locale = LocalConfiguration.current.locales[0]
     val currentTime = rememberRelativeTimeNow()
-    return remember(epochSeconds, copy, locale, currentTime) {
+    val display = currentDateTimeDisplay()
+    return remember(epochSeconds, copy, locale, currentTime, display) {
         IdentityFormatter.relativeTime(
             epochSeconds = epochSeconds,
             copy = copy,
             locale = locale,
             now = currentTime,
+            dateFormat = display.dateFormat,
         )
     }
 }
@@ -208,16 +217,16 @@ internal fun rememberedMessageBubbleTime(epochSeconds: ULong): String {
     val locale = LocalConfiguration.current.locales[0]
     val zone = ZoneId.systemDefault()
     val currentTime = rememberRelativeTimeNow()
-    // The clock must honor Android's explicit 12/24-hour setting, same as the standalone clock-time path.
-    val use24Hour = DateFormat.is24HourFormat(LocalContext.current)
-    return remember(epochSeconds, copy, locale, currentTime, use24Hour) {
+    // The clock honors the app's time format, which defaults to Android's 12/24-hour setting.
+    val display = currentDateTimeDisplay()
+    return remember(epochSeconds, copy, locale, currentTime, display) {
         IdentityFormatter.messageBubbleTime(
             epochSeconds = epochSeconds,
             copy = copy,
             locale = locale,
             now = currentTime,
             zone = zone,
-            force24Hour = use24Hour,
+            force24Hour = display.use24Hour,
         )
     }
 }
@@ -229,10 +238,10 @@ internal fun rememberedMessageBubbleTime(epochSeconds: ULong): String {
 @Composable
 internal fun rememberedClockTime(epochSeconds: ULong): String {
     val locale = LocalConfiguration.current.locales[0]
-    // Android's explicit 12/24-hour setting wins over the locale default; it
-    // keys the remember so a toggled preference reformats newly rendered rows.
-    val use24Hour = DateFormat.is24HourFormat(LocalContext.current)
-    return remember(epochSeconds, locale, use24Hour) {
-        IdentityFormatter.clockTime(epochSeconds, locale, force24Hour = use24Hour)
+    // The app's time format (default: Android's 12/24-hour setting) wins over the
+    // locale default; it keys the remember so a changed choice reformats rows.
+    val display = currentDateTimeDisplay()
+    return remember(epochSeconds, locale, display) {
+        IdentityFormatter.clockTime(epochSeconds, locale, force24Hour = display.use24Hour)
     }
 }

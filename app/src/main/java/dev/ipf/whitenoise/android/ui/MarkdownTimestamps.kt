@@ -60,6 +60,7 @@ import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.marmotkit.MarkdownInlineFfi
 import dev.ipf.marmotkit.MarkdownTimestampStyleFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.DateTimeFormatState
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.outlined.Schedule
 import dev.ipf.whitenoise.android.ui.testing.exposePerformanceTestTags
@@ -87,8 +88,8 @@ internal fun AnnotatedString.Builder.appendMarkdownTimestamp(inline: MarkdownInl
 }
 
 /**
- * Counts display invalidations for [timestamps]: clock, timezone and locale broadcasts, and
- * relative-label boundaries while the screen is started. [nowMillis] reads the wall clock.
+ * Counts display invalidations for [timestamps]: clock, timezone and locale broadcasts, date/time
+ * format choices, and relative-label boundaries while the screen is started. [nowMillis] reads the wall clock.
  * Never rewrite the owned MDK document.
  */
 @Composable
@@ -126,6 +127,15 @@ internal fun rememberTimestampRevision(
             ContextCompat.registerReceiver(context, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         }
         onDispose { if (enabled) context.unregisterReceiver(receiver) }
+    }
+    // A changed date/time format (#3602) re-renders the absolute labels.
+    val display = DateTimeFormatState.display
+    var renderedDisplay by remember { mutableStateOf(display) }
+    LaunchedEffect(display) {
+        if (display != renderedDisplay) {
+            renderedDisplay = display
+            revision++
+        }
     }
     // A clock change restarts the wait: the boundary it was sleeping towards may now be far off.
     LaunchedEffect(lifecycle, relativeSeconds, clockChanges) {

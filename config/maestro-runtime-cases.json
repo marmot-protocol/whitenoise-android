@@ -184,9 +184,10 @@
       "suite": "preferences",
       "manual_ids": [
         "SET-024",
-        "SET-007"
+        "SET-007",
+        "SET-045"
       ],
-      "assertions": "System Back dismisses the font-size picker and retains Default; the real app-font picker exposes its preview and fixed System/Done actions, then Done dismisses it without changing the font.",
+      "assertions": "System Back dismisses the font-size picker and retains Default; the real app-font picker exposes its preview and fixed System/Done actions, then Done dismisses it without changing the font; the date and time picker opens with Automatic time and date choices and Done dismisses it without changing either.",
       "postcondition": "none"
     },
     "preferences-language-cancel": {
