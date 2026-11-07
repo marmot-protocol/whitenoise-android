@@ -1266,7 +1266,7 @@ internal fun FileLibraryRow(
                                         context = context,
                                         row = sharedRow,
                                         chooserTitle = shareChooserTitle,
-                                        isCurrent = { currentRow.isSameAttachment(sharedRow) },
+                                        isCurrent = { currentRow.attachmentKey() == sharedRow.attachmentKey() },
                                     ) {
                                         attachmentSource(
                                             controller,
@@ -1292,7 +1292,7 @@ internal fun FileLibraryRow(
     }
 }
 
-private fun SharedMediaRow.isSameAttachment(other: SharedMediaRow): Boolean = messageIdHex == other.messageIdHex && attachmentIndex == other.attachmentIndex
+private fun SharedMediaRow.attachmentKey() = messageIdHex to attachmentIndex
 
 /**
  * Shares a Files-tab row's whole verified file through the outbound share sheet under its own name. The file is
