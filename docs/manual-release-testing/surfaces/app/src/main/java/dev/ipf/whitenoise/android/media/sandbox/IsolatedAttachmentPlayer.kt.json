@@ -10,6 +10,14 @@
         "test_ids": [
           "MED-046"
         ]
+      },
+      {
+        "surface": "A playback failure while buffering publishes an idle error state",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/media/sandbox/IsolatedAttachmentPlayer.kt",
+        "anchor": "override fun getState(): State",
+        "test_ids": [
+          "MED-046"
+        ]
       }
     ]
   },
