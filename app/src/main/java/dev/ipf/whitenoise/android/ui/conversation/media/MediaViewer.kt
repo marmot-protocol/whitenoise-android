@@ -801,6 +801,7 @@ internal fun FullScreenMediaViewer(
                                                 file,
                                                 request.reference.fileName,
                                                 request.reference.mediaType,
+                                                chooserTitle = shareChooserTitle,
                                                 beforeLaunch = { requireExportPageOwner(selected, controller) },
                                             ).getOrThrow()
                                         }
