@@ -1281,6 +1281,7 @@
     <string name="voice_message_speed">Velocidade de reprodução %1$s</string>
     <string name="voice_message_failed">Não foi possível carregar a mensagem de voz</string>
     <string name="voice_message_locked">Bloqueado</string>
+    <string name="voice_recording_resume">Retomar</string>
     <string name="reply_you">Você</string>
     <string name="reply_media_photo">Foto</string>
     <string name="media_album">Álbum</string>

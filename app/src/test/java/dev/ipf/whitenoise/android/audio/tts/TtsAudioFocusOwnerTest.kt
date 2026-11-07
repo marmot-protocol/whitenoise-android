@@ -1,6 +1,8 @@
 package dev.ipf.whitenoise.android.audio.tts
 
 import android.media.AudioManager
+import dev.ipf.whitenoise.android.audio.AudioFocusOwner
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -14,6 +16,12 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class TtsAudioFocusOwnerTest {
+    @After
+    fun tearDown() {
+        AudioFocusOwner.release(AudioFocusOwner.Owner.Tts)
+        AudioFocusOwner.release(AudioFocusOwner.Owner.Voice)
+    }
+
     /** Protects the historical full-focus behavior outside media-mix mode. */
     @Test
     fun ordinaryModeRequestsFullGain() {
@@ -66,5 +74,26 @@ class TtsAudioFocusOwnerTest {
 
         assertEquals(1, permanentLosses)
         assertEquals(0, transientLosses)
+    }
+
+    /** Another in-app owner taking focus pauses read-aloud through the shared arbiter. */
+    @Test
+    fun inAppHandoffSurrendersReadAloudFocus() {
+        val context = RuntimeEnvironment.getApplication()
+        val owner = TtsAudioFocusOwner(context)
+        var surrenders = 0
+        assertTrue(owner.acquire(TtsAudioFocusMode.Full, onFocusLoss = {}, onOwnerSurrender = { surrenders += 1 }))
+
+        assertTrue(
+            AudioFocusOwner.acquire(
+                owner = AudioFocusOwner.Owner.Voice,
+                audioAttributes = AudioFocusOwner.ttsSpeechAttributes,
+                focusGain = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK,
+                onFocusLoss = {},
+                onOwnerSurrender = {},
+            ),
+        )
+
+        assertEquals(1, surrenders)
     }
 }

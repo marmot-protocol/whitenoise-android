@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import android.media.AudioManager
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
@@ -30,6 +31,7 @@ import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.audio.AudioFocusOwner
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.audio.ConversationDictationDraftSnapshot
 import dev.ipf.whitenoise.android.audio.ConversationDictationPlatform
@@ -37,6 +39,8 @@ import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionListener
 import dev.ipf.whitenoise.android.audio.ConversationDictationRecognitionSession
 import dev.ipf.whitenoise.android.audio.ConversationDictationTimeoutHandle
 import dev.ipf.whitenoise.android.audio.VoiceRecordingController
+import dev.ipf.whitenoise.android.audio.VoiceRecordingResult
+import dev.ipf.whitenoise.android.audio.VoiceRecordingSession
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.core.TimelineReplyDisplay
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
@@ -293,6 +297,55 @@ class ComposerBarScreenshotTest {
                 .onNodeWithTag(RECORDING_STRIP_TAG)
                 .captureRoboImage("src/test/snapshots/composer_voice_recording_strip_unlocked_light.png")
         } finally {
+            voiceRecording.release()
+        }
+    }
+
+    /** Captures a take paused by an in-app handoff: steady dot, kept timer and the resume control. */
+    @Test
+    fun voiceRecordingStripPausedLight() {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val voiceRecording =
+            VoiceRecordingController(
+                context = context,
+                outputDirectory = context.cacheDir,
+                scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+                onPermissionRequest = { true },
+                onRecordingComplete = { _, _ -> },
+                onError = {},
+                recorderFactory = { _, file, _ -> PausableRecordingSession(file) },
+                mainDispatcher = Dispatchers.Unconfined,
+                recorderDispatcher = Dispatchers.Unconfined,
+                elapsedRealtime = { 0L },
+            )
+        try {
+            assertTrue(voiceRecording.start())
+            assertTrue(
+                AudioFocusOwner.acquire(
+                    owner = AudioFocusOwner.Owner.Tts,
+                    audioAttributes = AudioFocusOwner.ttsSpeechAttributes,
+                    focusGain = AudioManager.AUDIOFOCUS_GAIN,
+                    onFocusLoss = {},
+                    onOwnerSurrender = {},
+                ),
+            )
+            assertTrue(voiceRecording.isPaused)
+            composeRule.mainClock.autoAdvance = false
+            composeRule.setContent {
+                WhiteNoiseTheme(darkTheme = false) {
+                    Surface(modifier = Modifier.width(320.dp).testTag(RECORDING_STRIP_TAG)) {
+                        RecordingStripLeading(controller = voiceRecording)
+                    }
+                }
+            }
+            composeRule.mainClock.advanceTimeBy(350L)
+
+            composeRule.onNodeWithTag("composer.voice.resume").assertIsDisplayed()
+            composeRule
+                .onNodeWithTag(RECORDING_STRIP_TAG)
+                .captureRoboImage("src/test/snapshots/composer_voice_recording_strip_paused_light.png")
+        } finally {
+            AudioFocusOwner.release(AudioFocusOwner.Owner.Tts)
             voiceRecording.release()
         }
     }
@@ -693,6 +746,19 @@ class ComposerBarScreenshotTest {
             receivedAt = 1uL,
             sticker = null,
         )
+
+    /** Stands in for the platform encoder so the strip can be captured mid-take. */
+    private class PausableRecordingSession(
+        private val file: java.io.File,
+    ) : VoiceRecordingSession {
+        override fun start() = file.writeText("captured audio")
+
+        override fun stop(): VoiceRecordingResult? = VoiceRecordingResult(file, 0L)
+
+        override fun cancel() {
+            file.delete()
+        }
+    }
 
     private companion object {
         /** Sampled past the height animation's former 160ms clock, before the 220ms editing row lands. */

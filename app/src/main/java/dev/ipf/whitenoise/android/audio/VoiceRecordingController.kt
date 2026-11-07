@@ -1,8 +1,6 @@
 package dev.ipf.whitenoise.android.audio
 
 import android.content.Context
-import android.media.AudioAttributes
-import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.SystemClock
 import androidx.compose.runtime.Stable
@@ -87,6 +85,10 @@ class VoiceRecordingController internal constructor(
     var locked: Boolean by mutableStateOf(false)
         private set
 
+    /** True while another in-app sound holds focus; the take keeps its place until [resume]. */
+    var isPaused: Boolean by mutableStateOf(false)
+        private set
+
     private val _elapsedMs = mutableLongStateOf(0L)
     val elapsedMs: Long get() = _elapsedMs.longValue
     val remainingMs: Long get() = (MAX_RECORDING_MS - elapsedMs).coerceAtLeast(0L)
@@ -110,12 +112,14 @@ class VoiceRecordingController internal constructor(
     // output file descriptor. Releases are idempotent, so this never
     // double-frees a recorder that stop() already finalized.
     private val recorderScope = CoroutineScope(SupervisorJob() + recorderDispatcher)
-    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-    private var focusRequest: AudioFocusRequest? = null
+
+    @Volatile
+    private var recordingFocusHeld = false
     private val microphoneLeaseLock = Any()
     private var microphoneLeaseHeld = false
 
     init {
+        AudioFocusOwner.attach(context)
         // Best-effort startup cleanup: a filesystem hiccup (e.g. a
         // SecurityException from listFiles on a restricted directory) must not
         // reach the scope's default handler and crash controller construction.
@@ -228,20 +232,7 @@ class VoiceRecordingController internal constructor(
             isRecording = true
             // start() already resets the take. Preserve lock/drag intent accepted
             // while native prepare/start was suspended.
-            tickJob =
-                scope.launch(mainDispatcher) {
-                    val started = elapsedRealtime()
-                    while (isActive) {
-                        val elapsed = (elapsedRealtime() - started).coerceAtLeast(0L)
-                        _elapsedMs.longValue = elapsed.coerceAtMost(MAX_RECORDING_MS)
-                        when {
-                            r.captureInterrupted -> finish(VoiceRecordingStopReason.Interrupted)
-                            elapsed >= MAX_RECORDING_MS -> finish(VoiceRecordingStopReason.LimitReached)
-                        }
-                        if (!isRecording) break
-                        delay(50L)
-                    }
-                }
+            startTick(r, baseElapsedMs = 0L)
             true
         } catch (c: CancellationException) {
             releaseRecorderAfterStartFailure(r)
@@ -267,6 +258,67 @@ class VoiceRecordingController internal constructor(
         }
     }
 
+    /** Publishes captured time from [baseElapsedMs] and stops the take at its limit or interruption. */
+    private fun startTick(
+        r: VoiceRecordingSession,
+        baseElapsedMs: Long,
+    ) {
+        tickJob =
+            scope.launch(mainDispatcher) {
+                val started = elapsedRealtime() - baseElapsedMs
+                while (isActive) {
+                    val elapsed = (elapsedRealtime() - started).coerceAtLeast(0L)
+                    _elapsedMs.longValue = elapsed.coerceAtMost(MAX_RECORDING_MS)
+                    when {
+                        r.captureInterrupted -> finish(VoiceRecordingStopReason.Interrupted)
+                        elapsed >= MAX_RECORDING_MS -> finish(VoiceRecordingStopReason.LimitReached)
+                    }
+                    if (!isRecording) break
+                    delay(50L)
+                }
+            }
+    }
+
+    /** Another in-app sound took focus: pause the take and keep its place. */
+    private fun pauseCapture() {
+        val r = recorder
+        if (r == null) {
+            // Nothing captured yet (still preparing or restarting): end the pending start.
+            if (isRecording) interrupt()
+            return
+        }
+        if (isPaused) return
+        tickJob?.cancel()
+        tickJob = null
+        try {
+            r.pause()
+        } catch (_: Throwable) {
+            interrupt()
+            return
+        }
+        isPaused = true
+    }
+
+    /** Continues a paused take after the user asks for it; returns false when focus is unavailable. */
+    fun resume(): Boolean {
+        val r = recorder ?: return false
+        if (!isPaused) return true
+        if (!requestRecordingFocus()) {
+            onError(IllegalStateException("Couldn't resume recording — audio is in use"))
+            return false
+        }
+        VoicePlaybackController.pause()
+        try {
+            r.resume()
+        } catch (_: Throwable) {
+            interrupt()
+            return false
+        }
+        isPaused = false
+        startTick(r, baseElapsedMs = _elapsedMs.longValue)
+        return true
+    }
+
     /** Accepts a new recorder-start request and returns its token. */
     private fun nextStartGeneration(): Long = startRequests.advance()
 
@@ -283,6 +335,7 @@ class VoiceRecordingController internal constructor(
 
     private fun resetRecordingUiState() {
         locked = false
+        isPaused = false
         _elapsedMs.longValue = 0L
         dragOffsetPx = 0f
         verticalOffsetPx = 0f
@@ -333,6 +386,7 @@ class VoiceRecordingController internal constructor(
         tickJob = null
         isRecording = false
         locked = false
+        isPaused = false
         dragOffsetPx = 0f
         verticalOffsetPx = 0f
         willCancel = false
@@ -420,6 +474,7 @@ class VoiceRecordingController internal constructor(
         tickJob = null
         isRecording = false
         locked = false
+        isPaused = false
         dragOffsetPx = 0f
         verticalOffsetPx = 0f
         willCancel = false
@@ -449,35 +504,35 @@ class VoiceRecordingController internal constructor(
         }
     }
 
-    /** Acquires transient speech focus and interrupts only for losses belonging to its current request. */
+    /**
+     * Acquires transient speech focus through the shared arbiter. Another app's
+     * loss preserves the take for review; another in-app sound pauses it in place.
+     */
     private fun requestRecordingFocus(): Boolean {
-        val am = audioManager ?: return true
-        val attrs =
-            AudioAttributes
-                .Builder()
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                .setUsage(AudioAttributes.USAGE_MEDIA)
-                .build()
-        lateinit var req: AudioFocusRequest
-        req =
-            AudioFocusRequest
-                .Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
-                .setAudioAttributes(attrs)
-                .setOnAudioFocusChangeListener { change ->
+        val granted =
+            AudioFocusOwner.acquireWithFocusChanges(
+                owner = AudioFocusOwner.Owner.Recording,
+                audioAttributes = AudioFocusOwner.ttsSpeechAttributes,
+                focusGain = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT,
+                onFocusChange = { change ->
                     if (change == AudioManager.AUDIOFOCUS_LOSS || change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT) {
                         scope.launch(mainDispatcher) {
-                            if (focusRequest === req) interrupt()
+                            if (recordingFocusHeld) interrupt()
                         }
                     }
-                }.build()
-        return (am.requestAudioFocus(req) == AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
-            .also { granted -> if (granted) focusRequest = req }
+                },
+                onOwnerSurrender = {
+                    recordingFocusHeld = false
+                    scope.launch(mainDispatcher) { pauseCapture() }
+                },
+            )
+        if (granted) recordingFocusHeld = true
+        return granted
     }
 
     private fun abandonRecordingFocus() {
-        val am = audioManager ?: return
-        focusRequest?.let { am.abandonAudioFocusRequest(it) }
-        focusRequest = null
+        recordingFocusHeld = false
+        AudioFocusOwner.release(AudioFocusOwner.Owner.Recording)
     }
 
     private fun acquireMicrophoneLease(): Boolean {

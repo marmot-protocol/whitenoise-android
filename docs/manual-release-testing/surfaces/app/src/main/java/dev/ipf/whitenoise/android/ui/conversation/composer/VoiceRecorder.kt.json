@@ -32,7 +32,8 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/VoiceRecorder.kt",
         "anchor": "fun RecordingStripLeading(",
         "test_ids": [
-          "CON-001"
+          "CON-001",
+          "MED-048"
         ]
       },
       {

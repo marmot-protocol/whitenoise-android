@@ -1273,6 +1273,7 @@
     <string name="voice_message_speed">播放速度 %1$s</string>
     <string name="voice_message_failed">語音訊息載入失敗</string>
     <string name="voice_message_locked">已鎖定</string>
+    <string name="voice_recording_resume">繼續</string>
     <string name="reply_you">你</string>
     <string name="reply_media_photo">相片</string>
     <string name="media_album">相簿</string>

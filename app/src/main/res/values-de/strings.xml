@@ -1292,6 +1292,7 @@
     <string name="voice_message_speed">Wiedergabegeschwindigkeit %1$s</string>
     <string name="voice_message_failed">Sprachnachricht konnte nicht geladen werden</string>
     <string name="voice_message_locked">Gesperrt</string>
+    <string name="voice_recording_resume">Fortsetzen</string>
     <string name="reply_you">Du</string>
     <string name="reply_media_photo">Foto</string>
     <string name="media_album">Album</string>
