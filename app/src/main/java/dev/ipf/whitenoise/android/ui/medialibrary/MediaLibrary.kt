@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.medialibrary
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -44,6 +45,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -67,6 +69,7 @@ import dev.ipf.whitenoise.android.core.IndexedAttachment
 import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.Nip30Emoji
+import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.MediaInventory
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -86,6 +89,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.MediaImageGridTile
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVideoGridTile
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
 import dev.ipf.whitenoise.android.ui.conversation.media.OpenAttachmentResult
+import dev.ipf.whitenoise.android.ui.conversation.media.attachmentSource
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeDescription
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeLabel
 import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
@@ -99,7 +103,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerChrom
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerForwardActions
 import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresentation
 import dev.ipf.whitenoise.android.ui.conversation.media.saveDocumentWithFallback
-import dev.ipf.whitenoise.android.ui.conversation.media.shareImage
+import dev.ipf.whitenoise.android.ui.conversation.media.shareAttachmentExternally
 import dev.ipf.whitenoise.android.ui.conversation.media.validatedAttachmentCacheFile
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.rememberForwardEligibilityNowSeconds
@@ -1086,6 +1090,8 @@ internal fun FileLibraryRow(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val currentRow by rememberUpdatedState(row)
+    val shareChooserTitle = stringResource(R.string.shared_media_share)
     var inFlight by remember(row.messageIdHex, row.attachmentIndex) { mutableStateOf(false) }
     var menuOpen by remember(row.messageIdHex, row.attachmentIndex) { mutableStateOf(false) }
     val recordedAtLabel = rememberRelativeTimestamp(row.recordedAt)
@@ -1111,18 +1117,6 @@ internal fun FileLibraryRow(
         } else {
             null
         }
-
-    /** Loads the row's file bytes for Share from the retained or downloaded attachment, within the preview budget. */
-    suspend fun fetchBytes(): ByteArray {
-        val retained = retainedBytes()
-        return controller
-            .requestAttachmentTransfer(
-                messageIdHex = row.messageIdHex,
-                attachmentIndex = row.attachmentIndex,
-                reference = row.reference,
-                retainedPlaintext = retained,
-            ).await()
-    }
 
     /** Materializes the row's document for opening or saving by streaming it, whatever its size. */
     suspend fun fetchFile() =
@@ -1263,13 +1257,25 @@ internal fun FileLibraryRow(
                         onClick = {
                             menuOpen = false
                             scope.launch {
+                                val sharedRow = row
                                 runCatchingCancellable {
-                                    shareImage(
-                                        context,
-                                        fetchBytes(),
-                                        row.reference.fileName,
-                                        row.reference.mediaType,
-                                    ).getOrThrow()
+                                    // Streams the whole verified file to the share sheet, whatever its size, as
+                                    // Open and Save do. Leaving the screen cancels this scope, and a row rebound
+                                    // to another attachment opens no share sheet.
+                                    shareLibraryFile(
+                                        context = context,
+                                        row = sharedRow,
+                                        chooserTitle = shareChooserTitle,
+                                        isCurrent = { currentRow.isSameAttachment(sharedRow) },
+                                    ) {
+                                        attachmentSource(
+                                            controller,
+                                            sharedRow.messageIdHex,
+                                            sharedRow.attachmentIndex,
+                                            sharedRow.reference,
+                                            sharedRow.mine,
+                                        )
+                                    }
                                 }.onFailure { error ->
                                     appState.presentMediaLaunchFailure(
                                         R.string.media_couldnt_open,
@@ -1285,6 +1291,27 @@ internal fun FileLibraryRow(
         }
     }
 }
+
+private fun SharedMediaRow.isSameAttachment(other: SharedMediaRow): Boolean = messageIdHex == other.messageIdHex && attachmentIndex == other.attachmentIndex
+
+/**
+ * Shares a Files-tab row's whole verified file through the outbound share sheet under its own name. The file is
+ * staged from [source], so a file of any size is streamed rather than read into memory under the preview budget.
+ */
+internal suspend fun shareLibraryFile(
+    context: Context,
+    row: SharedMediaRow,
+    chooserTitle: String,
+    isCurrent: () -> Boolean,
+    source: suspend () -> AttachmentPlaintext,
+) = shareAttachmentExternally(
+    context = context,
+    attachmentIndex = row.attachmentIndex,
+    reference = row.reference,
+    chooserTitle = chooserTitle,
+    isCurrent = isCurrent,
+    plaintext = source,
+)
 
 /** Links tab of the library. */
 @OptIn(ExperimentalFoundationApi::class)
