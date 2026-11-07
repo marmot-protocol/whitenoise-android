@@ -186,7 +186,8 @@ internal fun EmojiPickerContent(
     searchRow: Boolean = false,
 ) {
     val search = rememberEmojiSearchState(searchBehindIcon)
-    val model = rememberEmojiPickerModel(search.query, recentEmojis, purpose)
+    val query = search.query
+    val model = rememberEmojiPickerModel(query, recentEmojis, purpose)
     val gridState = rememberLazyGridState()
     val rowState = rememberLazyListState()
     val categoryState = rememberLazyListState()
@@ -207,7 +208,7 @@ internal fun EmojiPickerContent(
             onEmojiPicked(emoji)
         }
     }
-    val noResults = model.searching && model.searchedQuery == search.query && model.sections.isEmpty()
+    val noResults = model.searching && model.searchedQuery == query && model.sections.isEmpty()
     Column(modifier) {
         // The row is emitted ahead of the one search field call site, so switching modes keeps its focus.
         if (searchRow) EmojiSearchRow(model.sections, noResults, rowState, selectionEnabled, onPick = pick)
