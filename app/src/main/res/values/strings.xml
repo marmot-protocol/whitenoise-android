@@ -1731,6 +1731,7 @@
     <string name="voice_recording_limit_reached">Five-minute recording limit reached. Review your voice note before sending.</string>
     <string name="voice_recording_interrupted">Recording interrupted. Review the captured audio before sending.</string>
     <string name="voice_message_locked">Locked</string>
+    <string name="voice_recording_resume">Resume</string>
     <string name="voice_message_cancel">Cancel voice message</string>
     <string name="reply_you">You</string>
     <string name="reply_media_photo">Photo</string>

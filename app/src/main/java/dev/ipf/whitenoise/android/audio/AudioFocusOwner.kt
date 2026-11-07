@@ -7,9 +7,12 @@ import android.media.AudioManager
 import dev.ipf.whitenoise.android.state.StalenessGuard
 
 /**
- * Process-wide audio-focus arbiter shared by voice-note playback (#1479) and
- * the future TTS controller (#1480). Only one owner holds focus at a time;
- * handoff occurs only after the new owner is granted focus.
+ * Process-wide audio-focus arbiter for every in-app sound: voice-note playback,
+ * read-aloud, dictation, video and voice recording. Only one owner holds focus at
+ * a time; handoff occurs only after the new owner is granted focus.
+ *
+ * Surrender policy: an owner that loses focus to another in-app owner pauses and
+ * keeps its place. It never resumes on its own; the user resumes it.
  */
 object AudioFocusOwner {
     enum class Owner {
@@ -17,6 +20,7 @@ object AudioFocusOwner {
         Tts,
         Dictation,
         Video,
+        Recording,
     }
 
     val ttsSpeechAttributes: AudioAttributes =
@@ -187,27 +191,11 @@ object AudioFocusOwner {
         }
     }
 
-    fun acquireForTts(
-        onFocusLoss: () -> Unit,
-        onOwnerSurrender: () -> Unit,
-    ): Boolean =
-        acquire(
-            owner = Owner.Tts,
-            audioAttributes = ttsSpeechAttributes,
-            focusGain = AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK,
-            onFocusLoss = onFocusLoss,
-            onOwnerSurrender = onOwnerSurrender,
-        )
-
     fun release(owner: Owner) {
         synchronized(focusLock) {
             if (currentOwner != owner) return
             abandonFocusInternal()
         }
-    }
-
-    fun releaseTts() {
-        release(Owner.Tts)
     }
 
     /** Releases platform focus and invalidates every callback from the former owner. */

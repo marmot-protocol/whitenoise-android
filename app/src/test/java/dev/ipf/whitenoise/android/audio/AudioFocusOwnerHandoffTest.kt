@@ -30,10 +30,23 @@ class AudioFocusOwnerHandoffTest {
             .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
             .build()
 
+    /** Mirrors read-aloud's full-gain request through the shared arbiter. */
+    private fun acquireTts(
+        onFocusLoss: () -> Unit,
+        onOwnerSurrender: () -> Unit,
+    ): Boolean =
+        AudioFocusOwner.acquire(
+            owner = AudioFocusOwner.Owner.Tts,
+            audioAttributes = AudioFocusOwner.ttsSpeechAttributes,
+            focusGain = AudioManager.AUDIOFOCUS_GAIN,
+            onFocusLoss = onFocusLoss,
+            onOwnerSurrender = onOwnerSurrender,
+        )
+
     @After
     fun tearDown() {
         AudioFocusOwner.release(AudioFocusOwner.Owner.Voice)
-        AudioFocusOwner.releaseTts()
+        AudioFocusOwner.release(AudioFocusOwner.Owner.Tts)
         AudioFocusOwner.release(AudioFocusOwner.Owner.Dictation)
         setField("audioManager", null)
         setField("focusRequest", null)
@@ -59,7 +72,7 @@ class AudioFocusOwnerHandoffTest {
         )
 
         assertTrue(
-            AudioFocusOwner.acquireForTts(
+            acquireTts(
                 onFocusLoss = {},
                 onOwnerSurrender = {},
             ),
@@ -98,7 +111,7 @@ class AudioFocusOwnerHandoffTest {
         var ttsSurrendered = false
 
         assertTrue(
-            AudioFocusOwner.acquireForTts(
+            acquireTts(
                 onFocusLoss = {},
                 onOwnerSurrender = { ttsSurrendered = true },
             ),
@@ -177,7 +190,7 @@ class AudioFocusOwnerHandoffTest {
             ),
         )
 
-        assertTrue(AudioFocusOwner.acquireForTts(onFocusLoss = {}, onOwnerSurrender = {}))
+        assertTrue(acquireTts(onFocusLoss = {}, onOwnerSurrender = {}))
 
         assertFalse(callbackHeldLock)
     }
@@ -203,7 +216,7 @@ class AudioFocusOwnerHandoffTest {
         )
         val handoffThread =
             Thread {
-                handoffResult.set(AudioFocusOwner.acquireForTts(onFocusLoss = {}, onOwnerSurrender = {}))
+                handoffResult.set(acquireTts(onFocusLoss = {}, onOwnerSurrender = {}))
             }.apply { start() }
         assertTrue(callbackStarted.await(2, TimeUnit.SECONDS))
 
@@ -238,7 +251,7 @@ class AudioFocusOwnerHandoffTest {
 
         var failure: IllegalStateException? = null
         try {
-            AudioFocusOwner.acquireForTts(
+            acquireTts(
                 onFocusLoss = {},
                 onOwnerSurrender = {},
             )
@@ -297,13 +310,13 @@ class AudioFocusOwnerHandoffTest {
         setField("audioManager", null)
 
         assertTrue(
-            AudioFocusOwner.acquireForTts(
+            acquireTts(
                 onFocusLoss = {},
                 onOwnerSurrender = {},
             ),
         )
 
-        AudioFocusOwner.releaseTts()
+        AudioFocusOwner.release(AudioFocusOwner.Owner.Tts)
 
         assertNull(field("currentOwner"))
         assertNull(field("onFocusChange"))
@@ -319,7 +332,7 @@ class AudioFocusOwnerHandoffTest {
         shadowAudioManager.setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_FAILED)
 
         assertFalse(
-            AudioFocusOwner.acquireForTts(
+            acquireTts(
                 onFocusLoss = {},
                 onOwnerSurrender = {},
             ),
@@ -350,7 +363,7 @@ class AudioFocusOwnerHandoffTest {
         shadowAudioManager.setNextFocusRequestResponse(AudioManager.AUDIOFOCUS_REQUEST_FAILED)
 
         assertFalse(
-            AudioFocusOwner.acquireForTts(
+            acquireTts(
                 onFocusLoss = {},
                 onOwnerSurrender = {},
             ),
@@ -382,7 +395,7 @@ class AudioFocusOwnerHandoffTest {
         val staleListener = focusListener()
 
         assertTrue(
-            AudioFocusOwner.acquireForTts(
+            acquireTts(
                 onFocusLoss = { ttsFocusLost = true },
                 onOwnerSurrender = {},
             ),
