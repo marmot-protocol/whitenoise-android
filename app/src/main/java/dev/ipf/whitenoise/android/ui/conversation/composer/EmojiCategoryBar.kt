@@ -76,23 +76,7 @@ internal fun EmojiCategoryBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val leadingActions = onSearch != null || onConfigure != null
-            if (leadingActions) Spacer(Modifier.width(WhiteNoiseSpacing.Related))
-            if (onSearch != null) {
-                IconButton(onClick = onSearch, modifier = Modifier.testTag(EMOJI_PICKER_SEARCH_OPEN_TEST_TAG)) {
-                    Icon(
-                        painterResource(R.drawable.ic_search),
-                        contentDescription = stringResource(R.string.emoji_search_hint),
-                    )
-                }
-            }
-            if (onConfigure != null) {
-                IconButton(onClick = onConfigure, modifier = Modifier.testTag(EMOJI_PICKER_CONFIGURE_TEST_TAG)) {
-                    Icon(
-                        painterResource(R.drawable.ic_emoji_settings),
-                        contentDescription = stringResource(R.string.configure_reactions),
-                    )
-                }
-            }
+            if (leadingActions) EmojiCategoryBarLeadingActions(onSearch, onConfigure)
             LazyRow(
                 state = state,
                 modifier = Modifier.weight(1f),
@@ -122,6 +106,31 @@ internal fun EmojiCategoryBar(
                     )
                 }
             }
+        }
+    }
+}
+
+/** Search and configure actions at the start of the category bar. */
+@Composable
+private fun EmojiCategoryBarLeadingActions(
+    onSearch: (() -> Unit)?,
+    onConfigure: (() -> Unit)?,
+) {
+    Spacer(Modifier.width(WhiteNoiseSpacing.Related))
+    if (onSearch != null) {
+        IconButton(onClick = onSearch, modifier = Modifier.testTag(EMOJI_PICKER_SEARCH_OPEN_TEST_TAG)) {
+            Icon(
+                painterResource(R.drawable.ic_search),
+                contentDescription = stringResource(R.string.emoji_search_hint),
+            )
+        }
+    }
+    if (onConfigure != null) {
+        IconButton(onClick = onConfigure, modifier = Modifier.testTag(EMOJI_PICKER_CONFIGURE_TEST_TAG)) {
+            Icon(
+                painterResource(R.drawable.ic_emoji_settings),
+                contentDescription = stringResource(R.string.configure_reactions),
+            )
         }
     }
 }

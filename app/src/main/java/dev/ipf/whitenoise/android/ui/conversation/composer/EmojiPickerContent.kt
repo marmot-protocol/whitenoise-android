@@ -18,8 +18,6 @@ import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,19 +28,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -58,7 +49,6 @@ import dev.ipf.whitenoise.android.ui.EmojiEntry
 import dev.ipf.whitenoise.android.ui.EmojiSection
 import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import dev.ipf.whitenoise.android.ui.LocalCustomEmoji
-import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyVerticalGrid
 import dev.ipf.whitenoise.android.ui.customEmojiSearchSection
 import dev.ipf.whitenoise.android.ui.emojiBrowseSections
@@ -104,6 +94,12 @@ private class EmojiPickerModel(
     val searchedQuery: String,
 ) {
     val sectionRanges = emojiSectionRanges(sections)
+
+    /** Grid index of [category]'s section header, or null when the category is not shown. */
+    fun firstItemIndex(category: EmojiCategory): Int? {
+        val range = sectionRanges.firstOrNull { it.category == category }
+        return range?.firstItemIndex
+    }
 }
 
 /** Filtered sections for the query with the user's emoji and then recents first. */
@@ -189,15 +185,8 @@ internal fun EmojiPickerContent(
     searchBehindIcon: Boolean = false,
     searchRow: Boolean = false,
 ) {
-    // The composer does not restore its pane, so a search behind the icon starts fresh on every open.
-    var query by if (searchBehindIcon) remember { mutableStateOf("") } else rememberSaveable { mutableStateOf("") }
-    var searchOpen by remember { mutableStateOf(!searchBehindIcon) }
-    var searchFocused by remember { mutableStateOf(false) }
-    var searchClosing by remember { mutableStateOf(false) }
-    val searchFocus = remember { FocusRequester() }
-    val focusManager = LocalFocusManager.current
-    val keyboard = LocalSoftwareKeyboardController.current
-    val model = rememberEmojiPickerModel(query, recentEmojis, purpose)
+    val search = rememberEmojiSearchState(searchBehindIcon)
+    val model = rememberEmojiPickerModel(search.query, recentEmojis, purpose)
     val gridState = rememberLazyGridState()
     val rowState = rememberLazyListState()
     val categoryState = rememberLazyListState()
@@ -209,103 +198,73 @@ internal fun EmojiPickerContent(
         }
     }
     EmojiPickerScrollSync(model, activeCategory, if (searchRow) rowState else null, gridState, categoryState)
+    EmojiSearchEffects(search, searchRow)
 
-    /** Delivers a picked emoji and records it as used when the picker serves the composer. */
-    fun pick(emoji: String) {
-        if (!selectionEnabled) return
-        if (purpose != EmojiPickerPurpose.CONFIGURE_QUICK_REACTION) onEmojiUsed(emoji)
-        onEmojiPicked(emoji)
-    }
-
-    fun closeSearch() {
-        if (searchFocused) {
-            searchFocused = false
-            onSearchActiveChange(false)
-        }
-        searchClosing = true
-    }
-
-    // Opening from the icon focuses the field and raises the keyboard.
-    LaunchedEffect(searchOpen) {
-        if (searchBehindIcon && searchOpen) {
-            searchFocus.requestFocus()
-            keyboard?.show()
+    // Delivers a picked emoji and records it as used when the picker serves the composer.
+    val pick: (String) -> Unit = { emoji ->
+        if (selectionEnabled) {
+            if (purpose != EmojiPickerPurpose.CONFIGURE_QUICK_REACTION) onEmojiUsed(emoji)
+            onEmojiPicked(emoji)
         }
     }
-    // Leaving the search (close action, Back, keyboard hidden) keeps the field and matches in place
-    // until the composer leaves its one-row mode, then returns to plain browsing.
-    LaunchedEffect(searchClosing, searchRow) {
-        if (searchClosing && !searchRow) {
-            query = ""
-            searchOpen = false
-            searchClosing = false
-        }
-    }
-
-    val noResults = model.searching && model.searchedQuery == query && model.sections.isEmpty()
+    val noResults = model.searching && model.searchedQuery == search.query && model.sections.isEmpty()
     Column(modifier) {
         // The row is emitted ahead of the one search field call site, so switching modes keeps its focus.
-        if (searchRow) EmojiSearchRow(model.sections, noResults, rowState, selectionEnabled, onPick = ::pick)
-        if (searchOpen) {
-            EmojiSearchField(
-                value = query,
-                onValueChange = { query = it },
-                onFocusChanged = { focused ->
-                    if (searchBehindIcon && searchFocused && !focused) {
-                        closeSearch()
-                    } else {
-                        if (focused) searchClosing = false
-                        searchFocused = focused
-                        onSearchActiveChange(focused)
-                    }
-                },
-                onClose =
-                    if (searchBehindIcon) {
-                        {
-                            focusManager.clearFocus()
-                            closeSearch()
-                        }
-                    } else {
-                        null
-                    },
-                modifier = Modifier.fillMaxWidth().focusRequester(searchFocus),
-            )
-        }
-        if (searchRow) {
-            // The row above the field already shows matches; the grid and category bar stay out.
-        } else if (noResults) {
-            Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                Text(
-                    stringResource(R.string.emoji_search_no_results),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        } else {
-            EmojiSectionGrid(
+        if (searchRow) EmojiSearchRow(model.sections, noResults, rowState, selectionEnabled, onPick = pick)
+        if (search.isOpen) EmojiSearchField(search, onSearchActiveChange, Modifier.fillMaxWidth())
+        // In row mode the row above the field already shows matches; the grid and category bar stay out.
+        if (!searchRow) {
+            EmojiPickerResults(
                 sections = model.sections,
-                state = gridState,
+                noResults = noResults,
+                gridState = gridState,
                 selectionEnabled = selectionEnabled,
-                onPick = ::pick,
+                onPick = pick,
                 modifier = Modifier.fillMaxWidth().weight(1f),
             )
+            if (!model.searching) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                EmojiCategoryBar(
+                    categories = model.sections.map { it.category },
+                    selected = activeCategory,
+                    state = categoryState,
+                    onSearch = if (search.isOpen) null else search::open,
+                    onConfigure = onConfigure,
+                    onBackspace = onBackspace,
+                    onCategory = { category ->
+                        model.firstItemIndex(category)?.let { scope.launch { gridState.animateScrollToItem(it) } }
+                    },
+                )
+            }
         }
-        if (!searchRow && !model.searching) {
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            EmojiCategoryBar(
-                categories = model.sections.map { it.category },
-                selected = activeCategory,
-                state = categoryState,
-                onSearch = if (searchOpen) null else ({ searchOpen = true }),
-                onConfigure = onConfigure,
-                onBackspace = onBackspace,
-                onCategory = { category ->
-                    val itemIndex =
-                        model.sectionRanges.firstOrNull { it.category == category }?.firstItemIndex
-                            ?: return@EmojiCategoryBar
-                    scope.launch { gridState.animateScrollToItem(itemIndex) }
-                },
+    }
+}
+
+/** Grid of matches or browse sections, or a centred notice when a search finds nothing. */
+@Composable
+private fun EmojiPickerResults(
+    sections: List<EmojiSection>,
+    noResults: Boolean,
+    gridState: LazyGridState,
+    selectionEnabled: Boolean,
+    onPick: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (noResults) {
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            Text(
+                stringResource(R.string.emoji_search_no_results),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    } else {
+        EmojiSectionGrid(
+            sections = sections,
+            state = gridState,
+            selectionEnabled = selectionEnabled,
+            onPick = onPick,
+            modifier = modifier,
+        )
     }
 }
 
@@ -331,45 +290,6 @@ private fun EmojiPickerScrollSync(
             if (index >= 0) categoryState.animateScrollToItem(index)
         }
     }
-}
-
-/**
- * Compact search field of the emoji picker. With [onClose] its trailing action closes the search
- * instead of only clearing the query.
- */
-@Composable
-private fun EmojiSearchField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    onFocusChanged: (Boolean) -> Unit,
-    onClose: (() -> Unit)?,
-    modifier: Modifier = Modifier,
-) {
-    val closeDescription = stringResource(R.string.close)
-    WhiteNoiseCompactSearchField(
-        value = value,
-        onValueChange = onValueChange,
-        placeholder = stringResource(R.string.emoji_search_hint),
-        modifier =
-            modifier
-                .padding(
-                    start = WhiteNoiseSpacing.CompactScreenMargin,
-                    end = WhiteNoiseSpacing.CompactScreenMargin,
-                    bottom = WhiteNoiseSpacing.Related,
-                ).onFocusChanged { onFocusChanged(it.isFocused) }
-                .testTag(EMOJI_PICKER_SEARCH_TEST_TAG),
-        outlined = true,
-        clearDescription = if (onClose != null) closeDescription else stringResource(R.string.emoji_search_clear),
-        onClear = onClose,
-        emptyTrailingIcon =
-            onClose?.let { close ->
-                {
-                    IconButton(onClick = close) {
-                        Icon(painterResource(R.drawable.ic_close), contentDescription = closeDescription)
-                    }
-                }
-            },
-    )
 }
 
 /** Grid of emoji sections with sticky headers. */

@@ -13,6 +13,15 @@
         ]
       },
       {
+        "surface": "EmojiCategoryBarLeadingActions",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiCategoryBar.kt",
+        "anchor": "fun EmojiCategoryBarLeadingActions(",
+        "test_ids": [
+          "CON-010",
+          "MSG-005"
+        ]
+      },
+      {
         "surface": "EmojiCategoryToggle",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiCategoryBar.kt",
         "anchor": "fun EmojiCategoryToggle(",

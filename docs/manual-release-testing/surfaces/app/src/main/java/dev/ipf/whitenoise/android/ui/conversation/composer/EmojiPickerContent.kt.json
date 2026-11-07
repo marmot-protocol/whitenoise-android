@@ -41,18 +41,18 @@
         ]
       },
       {
-        "surface": "EmojiPickerScrollSync",
+        "surface": "EmojiPickerResults",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
-        "anchor": "fun EmojiPickerScrollSync(",
+        "anchor": "fun EmojiPickerResults(",
         "test_ids": [
           "CON-010",
           "MSG-005"
         ]
       },
       {
-        "surface": "EmojiSearchField",
+        "surface": "EmojiPickerScrollSync",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
-        "anchor": "fun EmojiSearchField(",
+        "anchor": "fun EmojiPickerScrollSync(",
         "test_ids": [
           "CON-010",
           "MSG-005"
@@ -78,33 +78,6 @@
       }
     ],
     "settings_controls": [
-      {
-        "surface": "string:close",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
-        "anchor": "R.string.close",
-        "test_ids": [
-          "CON-010",
-          "MSG-005"
-        ]
-      },
-      {
-        "surface": "string:emoji_search_clear",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
-        "anchor": "R.string.emoji_search_clear",
-        "test_ids": [
-          "CON-010",
-          "MSG-005"
-        ]
-      },
-      {
-        "surface": "string:emoji_search_hint",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
-        "anchor": "R.string.emoji_search_hint",
-        "test_ids": [
-          "CON-010",
-          "MSG-005"
-        ]
-      },
       {
         "surface": "string:emoji_search_no_results",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
