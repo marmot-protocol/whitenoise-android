@@ -135,7 +135,7 @@ class ComposerEmojiPaneLayoutTest {
                             rememberedImeHeight = lockedHeight,
                         ),
                     windowHeight = 800.dp,
-                    searchRow = false,
+                    searchKeyboardWanted = false,
                 ),
             )
         }
@@ -144,7 +144,7 @@ class ComposerEmojiPaneLayoutTest {
     @Test
     fun browsingPaneIsMuchTallerThanTheKeyboard() {
         assertEquals(
-            480f,
+            400f,
             composerEmojiBrowseHeight(keyboardHeight = 300.dp, windowHeight = 800.dp).value,
             DP_TOLERANCE,
         )
@@ -158,26 +158,56 @@ class ComposerEmojiPaneLayoutTest {
     @Test
     fun unlockedBrowsingPaneTakesTheTallBrowseHeight() {
         assertEquals(
-            480f,
+            400f,
             composerEmojiPaneHeight(
                 lockedPaneHeight = 0.dp,
                 keyboardHeight = 300.dp,
                 windowHeight = 800.dp,
-                searchRow = false,
+                searchKeyboardWanted = false,
             ).value,
             DP_TOLERANCE,
         )
     }
 
     @Test
-    fun searchRowCollapsesThePaneToTheKeyboardHeight() {
+    fun searchKeyboardCollapsesThePaneToTheKeyboardPlusTheRow() {
         assertEquals(
-            300.dp,
+            360.dp,
             composerEmojiPaneHeight(
-                lockedPaneHeight = 480.dp,
+                lockedPaneHeight = 400.dp,
                 keyboardHeight = 300.dp,
                 windowHeight = 800.dp,
-                searchRow = true,
+                searchKeyboardWanted = true,
+                searchRowHeight = 60.dp,
+            ),
+        )
+    }
+
+    @Test
+    fun searchCollapseNeverDropsBelowTheRowWhileTheKeyboardRises() {
+        val target =
+            composerEmojiPaneHeight(
+                lockedPaneHeight = 400.dp,
+                keyboardHeight = 300.dp,
+                windowHeight = 800.dp,
+                searchKeyboardWanted = true,
+                searchRowHeight = 60.dp,
+            )
+        listOf(0.dp, 100.dp, 200.dp, 300.dp).forEach { risingIme ->
+            assertTrue(target - risingIme >= 60.dp)
+        }
+    }
+
+    @Test
+    fun hidingTheSearchKeyboardReturnsToTheBrowseHeightImmediately() {
+        assertEquals(
+            400.dp,
+            composerEmojiPaneHeight(
+                lockedPaneHeight = 400.dp,
+                keyboardHeight = 300.dp,
+                windowHeight = 800.dp,
+                searchKeyboardWanted = false,
+                searchRowHeight = 60.dp,
             ),
         )
     }
@@ -427,7 +457,7 @@ class ComposerEmojiPaneLayoutTest {
         )
 
     private companion object {
-        // Window fractions are float products, so 0.6 * 800dp lands a hair above 480dp.
+        // Window fractions are float products, so 0.5 * 800dp can land a hair off 400dp.
         const val DP_TOLERANCE = 0.01f
     }
 }

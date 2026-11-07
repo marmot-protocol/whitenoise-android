@@ -19,6 +19,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
@@ -88,6 +90,8 @@ internal fun EmojiPickerSheet(
  *
  * Browsing fills [height]. With [searchRow] the pane wraps one row of matches and the search field so it fits
  * above the keyboard; [searchMinHeight] keeps it covering the space the keyboard has not yet taken or released.
+ * [onSearchRowHeightChange] reports the wrapped search content height so the composer can glide to exactly
+ * keyboard plus row.
  */
 @Composable
 internal fun ComposerEmojiPickerPane(
@@ -101,7 +105,9 @@ internal fun ComposerEmojiPickerPane(
     modifier: Modifier = Modifier,
     searchRow: Boolean = false,
     searchMinHeight: Dp = 0.dp,
+    onSearchRowHeightChange: (Dp) -> Unit = {},
 ) {
+    val density = LocalDensity.current
     Surface(
         modifier =
             modifier
@@ -123,13 +129,22 @@ internal fun ComposerEmojiPickerPane(
             searchBehindIcon = true,
             searchRow = searchRow,
             modifier =
-                (if (searchRow) Modifier.fillMaxWidth() else Modifier.fillMaxSize())
-                    .padding(top = ComposerEmojiPaneTopInset),
+                if (searchRow) {
+                    Modifier
+                        .fillMaxWidth()
+                        .onSizeChanged { onSearchRowHeightChange(with(density) { it.height.toDp() }) }
+                        .padding(top = ComposerEmojiPaneTopInset)
+                } else {
+                    Modifier.fillMaxSize().padding(top = ComposerEmojiPaneTopInset)
+                },
         )
     }
 }
 
 internal val ComposerEmojiPickerFallbackHeight = 320.dp
+
+/** Search field, one row of matches and the top inset, until the pane has measured the real row. */
+internal val ComposerEmojiSearchRowFallbackHeight = 56.dp + EmojiSearchRowHeight
 
 internal const val EMOJI_PICKER_CELL_GLYPH_FILL_FRACTION = 0.85f
 
@@ -162,7 +177,7 @@ internal fun composerEmojiPaneTargetHeight(
 }
 
 /** Share of the window the composer's browsing emoji pane takes; never less than the keyboard. */
-internal const val COMPOSER_EMOJI_BROWSE_HEIGHT_FRACTION = 0.6f
+internal const val COMPOSER_EMOJI_BROWSE_HEIGHT_FRACTION = 0.5f
 
 internal fun composerEmojiBrowseHeight(
     keyboardHeight: Dp,
@@ -172,17 +187,21 @@ internal fun composerEmojiBrowseHeight(
 /**
  * Height the composer emoji pane animates toward. Browsing takes the tall
  * [composerEmojiBrowseHeight] (or the [lockedPaneHeight] set on open and on the
- * way back to the keyboard); the search row collapses to the keyboard's own
- * height so only the row sits above the keyboard.
+ * way back to the keyboard). While the search keyboard is wanted the target is
+ * the keyboard plus the [searchRowHeight] above it, the pane's final total, so
+ * the pane glides straight there while the keyboard rises instead of dipping
+ * below the row and growing back. It flips back to browsing as soon as the
+ * keyboard starts hiding, so the grid grows during the hide rather than after.
  */
 internal fun composerEmojiPaneHeight(
     lockedPaneHeight: Dp,
     keyboardHeight: Dp,
     windowHeight: Dp,
-    searchRow: Boolean,
+    searchKeyboardWanted: Boolean,
+    searchRowHeight: Dp = ComposerEmojiSearchRowFallbackHeight,
 ): Dp =
     when {
-        searchRow -> keyboardHeight
+        searchKeyboardWanted -> keyboardHeight + searchRowHeight
         lockedPaneHeight > 0.dp -> lockedPaneHeight
         else -> composerEmojiBrowseHeight(keyboardHeight, windowHeight)
     }

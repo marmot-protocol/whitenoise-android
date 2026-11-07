@@ -794,12 +794,14 @@ internal fun ComposerBar(
             rememberedImeHeight = rememberedImePaneHeight,
         )
     val composerWindowHeight = configuration.screenHeightDp.dp
+    var composerEmojiSearchRowHeight by remember { mutableStateOf(ComposerEmojiSearchRowFallbackHeight) }
     val emojiPaneHeight =
         composerEmojiPaneHeight(
             lockedPaneHeight = lockedComposerEmojiPaneHeight,
             keyboardHeight = composerKeyboardHeight,
             windowHeight = composerWindowHeight,
-            searchRow = composerEmojiSearchRow,
+            searchKeyboardWanted = composerEmojiSearchRow && targetImePaneHeight > 0.dp,
+            searchRowHeight = composerEmojiSearchRowHeight,
         )
     // Keep exactly one opaque owner of the bottom region during the IME swap.
     // Fading this pane while the IME animates underneath exposes both surfaces
@@ -851,7 +853,7 @@ internal fun ComposerBar(
         if (!showEmojiPane) return@LaunchedEffect
         snapshotFlow { latestEmojiPaneHeight }.collectLatest { target ->
             if (emojiPaneHeightAnim.value != target) {
-                emojiPaneHeightAnim.animateTo(target, tween(durationMillis = 250, easing = FastOutSlowInEasing))
+                emojiPaneHeightAnim.animateTo(target, tween(durationMillis = 300, easing = FastOutSlowInEasing))
             }
         }
     }
@@ -2104,6 +2106,9 @@ internal fun ComposerBar(
                                 paneHeight = emojiPaneHeightAnim.value,
                                 currentImeHeight = currentImePaneHeight,
                             ),
+                        onSearchRowHeightChange = { measured ->
+                            if (measured > 0.dp) composerEmojiSearchRowHeight = measured
+                        },
                     )
                 }
             }
