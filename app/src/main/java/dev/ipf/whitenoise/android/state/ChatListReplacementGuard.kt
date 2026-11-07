@@ -30,8 +30,9 @@ internal fun missingActiveTopChatRows(
 }
 
 /**
- * Whether this previously shown active row left [window] by ranking past its retained tail, rather than by a
- * removal. Unknown windows and rows the window should still hold are never treated as evicted.
+ * Whether this previously shown active row left [window] by ranking outside its retained rows — ahead of a
+ * shifted window's first row or past a bounded window's tail — rather than by a removal. Unknown windows and
+ * rows the window should still hold are never treated as evicted.
  */
 internal fun ChatListRowFfi.evictedFrom(window: ChatListWindowSnapshotFfi?): Boolean {
     val bounded = window ?: return false
@@ -47,16 +48,23 @@ internal fun ChatListRowFfi.belongsInActiveChats(): Boolean =
         !disbanding &&
         lifecycleState != GroupLifecycleStateFfi.DISBANDED
 
-/** Uses true-head containment and MDK's pin, activity, and group-ID order to check the retained tail. */
+/**
+ * Whether [row] ranks inside this window's retained span in MDK's order. A window holding the true head has no
+ * lower bound, and one holding the true tail has no upper bound. An empty window can only place a row when it
+ * holds the head.
+ */
 internal fun ChatListWindowSnapshotFfi.shouldContain(row: ChatListRowFfi): Boolean {
-    val last = rows.lastOrNull()?.row
-    return when {
-        hasMoreBefore -> false
-        !hasMoreAfter || last == null -> true
-        row.pinned != last.pinned -> row.pinned
-        row.pinned && last.pinned && row.pinnedPosition != last.pinnedPosition ->
-            (row.pinnedPosition ?: UInt.MAX_VALUE) < (last.pinnedPosition ?: UInt.MAX_VALUE)
-        row.activitySortAt != last.activitySortAt -> row.activitySortAt > last.activitySortAt
-        else -> row.groupIdHex.lowercase(Locale.ROOT) < last.groupIdHex.lowercase(Locale.ROOT)
-    }
+    val first = rows.firstOrNull()?.row ?: return !hasMoreBefore
+    val last = rows.last().row
+    return (!hasMoreBefore || !row.ranksBefore(first)) && (!hasMoreAfter || row.ranksBefore(last))
 }
+
+/** MDK's chat-list page order: pins by position first, then newer activity, then ascending group ID. */
+private fun ChatListRowFfi.ranksBefore(other: ChatListRowFfi): Boolean =
+    when {
+        pinned != other.pinned -> pinned
+        pinned && pinnedPosition != other.pinnedPosition ->
+            (pinnedPosition ?: UInt.MAX_VALUE) < (other.pinnedPosition ?: UInt.MAX_VALUE)
+        activitySortAt != other.activitySortAt -> activitySortAt > other.activitySortAt
+        else -> groupIdHex.lowercase(Locale.ROOT) < other.groupIdHex.lowercase(Locale.ROOT)
+    }

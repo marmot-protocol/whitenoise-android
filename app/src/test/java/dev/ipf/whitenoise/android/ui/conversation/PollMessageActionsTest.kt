@@ -243,7 +243,7 @@ class PollMessageActionsTest : PollMessageTestFixtures() {
         render(invalidation = "local_publish_failed")
         composeRule.onNodeWithText("Lunch?").assertExists()
         composeRule.onNodeWithText("Soup").assertIsNotEnabled()
-        composeRule.onNodeWithTag("poll-message-warning").assertExists()
+        composeRule.onNodeWithTag("poll-message-warning", useUnmergedTree = true).assertExists()
         composeRule.runOnIdle { assertTrue(recordedCalls().none { it.first == "castPollVote" }) }
     }
 

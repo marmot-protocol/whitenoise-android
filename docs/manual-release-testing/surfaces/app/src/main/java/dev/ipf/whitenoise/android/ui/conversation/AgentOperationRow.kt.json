@@ -1,0 +1,91 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AgentOperationRow.kt",
+  "legacy_sha256": "ed3583a55fc27b24840aebe5065ac5c2148dc6aced35540046758b1ac0b21c89",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Authored emoji label: AgentOperationRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AgentOperationRow.kt",
+        "anchor": "EmojiLabel(",
+        "test_ids": [
+          "MSG-037"
+        ]
+      },
+      {
+        "surface": "AgentOperationChip",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AgentOperationRow.kt",
+        "anchor": "fun AgentOperationChip(",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "AgentOperationDeleteDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AgentOperationRow.kt",
+        "anchor": "fun AgentOperationDeleteDialog(",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "AgentOperationDetail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AgentOperationRow.kt",
+        "anchor": "fun AgentOperationDetail(",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "AgentOperationExpandedDetails",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AgentOperationRow.kt",
+        "anchor": "fun AgentOperationExpandedDetails(",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "AgentOperationHeader",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AgentOperationRow.kt",
+        "anchor": "fun AgentOperationHeader(",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "AgentOperationRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AgentOperationRow.kt",
+        "anchor": "fun AgentOperationRow(",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "AgentOperationStatus",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AgentOperationRow.kt",
+        "anchor": "fun AgentOperationStatus(",
+        "test_ids": [
+          "CON-001"
+        ]
+      },
+      {
+        "surface": "AgentOperationTimelineRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AgentOperationRow.kt",
+        "anchor": "fun AgentOperationTimelineRow(",
+        "test_ids": [
+          "CON-001"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.chat_list_search_open_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/AgentOperationRow.kt",
+        "anchor": "R.string.chat_list_search_open_profile",
+        "test_ids": [
+          "AXY-016"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

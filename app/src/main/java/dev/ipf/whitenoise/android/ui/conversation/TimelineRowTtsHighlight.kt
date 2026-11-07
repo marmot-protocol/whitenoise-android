@@ -20,7 +20,9 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerGate
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerTextState
 import dev.ipf.whitenoise.android.ui.conversation.media.ConversationMediaViewerOpenRequest
 import dev.ipf.whitenoise.android.ui.conversation.media.DocumentSaveFallback
+import dev.ipf.whitenoise.android.ui.conversation.messages.LocalMessageRowTextActions
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageBubble
+import dev.ipf.whitenoise.android.ui.conversation.messages.MessageRowTextActions
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsQuickTransportViewportLock
 import dev.ipf.whitenoise.android.ui.conversation.messages.TtsReadAloudProgress
 import dev.ipf.whitenoise.android.ui.conversation.messages.rememberReceivedEmoji
@@ -127,7 +129,11 @@ internal fun TimelineRowMessageBubble(
         }
     }
     val receivedEmoji = rememberReceivedEmoji(item, controller, appState)
-    CompositionLocalProvider(LocalReceivedEmoji provides receivedEmoji) {
+    val rowTextActions = remember(messageIdHex) { MessageRowTextActions() }
+    CompositionLocalProvider(
+        LocalReceivedEmoji provides receivedEmoji,
+        LocalMessageRowTextActions provides rowTextActions,
+    ) {
         MessageBubble(
             item = item,
             controller = controller,

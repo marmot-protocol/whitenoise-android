@@ -801,6 +801,7 @@ internal fun ColumnScope.BubbleBodyFooterAndRetry(
                                             bodyCollapsePending
                                     },
                                 )
+                            ForwardTextActionsToMessageRow(sentenceActions)
                             Text(
                                 remember(bodyText) { EmojiShortcodes.annotate(AnnotatedString(bodyText)) },
                                 inlineContent = EmojiShortcodes.content(),

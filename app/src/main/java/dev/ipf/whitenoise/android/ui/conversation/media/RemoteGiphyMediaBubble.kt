@@ -55,6 +55,7 @@ import dev.ipf.whitenoise.android.state.MessageStatus
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationMessageMetrics
 import dev.ipf.whitenoise.android.ui.conversation.messages.ConversationRichContentShape
 import dev.ipf.whitenoise.android.ui.conversation.messages.MessageInlineFooter
+import dev.ipf.whitenoise.android.ui.conversation.messages.editedLabelTarget
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.ArrowDownward
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
@@ -391,7 +392,7 @@ private fun RowScope.GiphyMetadataRow(
                     Modifier
                         .weight(1f, fill = false)
                         .alignByBaseline()
-                        .then(footer.onEditedClick?.let { Modifier.clickable(onClick = it) } ?: Modifier),
+                        .editedLabelTarget(label, footer.onEditedClick),
             )
         }
         MessageInlineFooter(

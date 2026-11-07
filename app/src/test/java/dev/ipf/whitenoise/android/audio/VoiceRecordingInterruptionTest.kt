@@ -134,14 +134,20 @@ class VoiceRecordingInterruptionTest {
                 controller.stop()
                 runCurrent()
                 assertTrue(completed.isEmpty())
+                // Still capturing the tail: the screen reader must not speak into it yet.
+                assertTrue(controller.isFinalizing)
                 advanceTimeBy(VoiceRecordingController.RECORDING_TAIL_MS)
                 runCurrent()
                 assertEquals(1, completed.size)
+                assertFalse(controller.isFinalizing)
                 assertTrue(reasons.isEmpty())
                 controller.start()
                 runCurrent()
                 controller.cancel()
+                // The discarded take keeps the microphone until its recorder is released.
+                assertTrue(controller.isFinalizing)
                 runCurrent()
+                assertFalse(controller.isFinalizing)
                 assertEquals(1, completed.size)
                 assertFalse(coordinator.isOwnedBy(controller))
             }

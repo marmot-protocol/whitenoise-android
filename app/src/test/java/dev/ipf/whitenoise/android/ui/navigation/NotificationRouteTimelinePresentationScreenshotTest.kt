@@ -490,14 +490,20 @@ class NotificationRouteTimelinePresentationScreenshotTest : NotificationRouteTim
         routeGate: NotificationRouteGate,
         rtl: Boolean,
     ) {
-        val directBounds = composeRule.onNodeWithText(NOTIFIED_BODY).getUnclippedBoundsInRoot()
+        val directBounds =
+            composeRule
+                .onNodeWithText(NOTIFIED_BODY, useUnmergedTree = true)
+                .getUnclippedBoundsInRoot()
         routeGate.includeThirdMember.set(true)
         runBlocking { mountedController.retryMembers() }
         awaitCondition {
             mountedController.memberCount == 3 && !mountedController.usesDirectTranscriptChrome
         }
         composeRule.onNodeWithText(SENDER_NAME, useUnmergedTree = true).assertIsDisplayed()
-        val groupBounds = composeRule.onNodeWithText(NOTIFIED_BODY).getUnclippedBoundsInRoot()
+        val groupBounds =
+            composeRule
+                .onNodeWithText(NOTIFIED_BODY, useUnmergedTree = true)
+                .getUnclippedBoundsInRoot()
         assertTrue(
             "three-member transcript must reserve a logical-leading avatar gutter",
             if (rtl) groupBounds.right < directBounds.right else groupBounds.left > directBounds.left,
@@ -512,7 +518,10 @@ class NotificationRouteTimelinePresentationScreenshotTest : NotificationRouteTim
         composeRule
             .onNodeWithText(IdentityFormatter.initials(SENDER_NAME), useUnmergedTree = true)
             .assertDoesNotExist()
-        val restoredBounds = composeRule.onNodeWithText(NOTIFIED_BODY).getUnclippedBoundsInRoot()
+        val restoredBounds =
+            composeRule
+                .onNodeWithText(NOTIFIED_BODY, useUnmergedTree = true)
+                .getUnclippedBoundsInRoot()
         assertEquals(directBounds.left.value, restoredBounds.left.value, 0.5f)
         assertEquals(directBounds.right.value, restoredBounds.right.value, 0.5f)
         assertFalse(mountedController.isDm)

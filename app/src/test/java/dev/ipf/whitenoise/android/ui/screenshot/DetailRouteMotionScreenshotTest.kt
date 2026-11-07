@@ -7,6 +7,9 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.isDialog
@@ -93,6 +96,12 @@ class DetailRouteMotionScreenshotTest {
     /** Conversation route motion under RTL at double font scale on the AMOLED theme. */
     @Test fun conversationLargeRtl() = capture("conversation_large_rtl", dark = true, amoled = true, rtl = true)
 
+    /** The conversation title, which offers Details as its click label. */
+    private fun opensDetails() =
+        SemanticsMatcher("opens details") {
+            it.config.getOrNull(SemanticsActions.OnClick)?.label == app.getString(R.string.details)
+        }
+
     /**
      * Drives the real route from its source to the notification destination and back, capturing the first, mid and
      * settled frames of each transition. It ends by showing the app lock mid-flight and asserting the route goes away.
@@ -140,7 +149,7 @@ class DetailRouteMotionScreenshotTest {
         if (!profile) {
             captureSource("${name}_entry", profile)
             rule.mainClock.autoAdvance = false
-            rule.onNodeWithContentDescription(app.getString(R.string.details)).performClick()
+            rule.onNode(opensDetails()).performClick()
             rule.mainClock.advanceTimeByFrame()
             captureTransition("${name}_entry", profile)
             rule.mainClock.autoAdvance = true
@@ -174,8 +183,8 @@ class DetailRouteMotionScreenshotTest {
             rule.onNodeWithContentDescription(app.getString(R.string.back)).performClick()
             rule.mainClock.advanceTimeByFrame()
             captureTransition("${name}_entry_back", profile)
-            rule.onNodeWithContentDescription(app.getString(R.string.details)).assertExists()
-            rule.onNodeWithContentDescription(app.getString(R.string.details)).performClick()
+            rule.onNode(opensDetails()).assertExists()
+            rule.onNode(opensDetails()).performClick()
             rule.mainClock.advanceTimeBy(240)
             // Scrolling is setup; pause again before the next timed navigation/lock assertion.
             rule.mainClock.autoAdvance = true

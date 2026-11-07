@@ -121,6 +121,14 @@
         "test_ids": [
           "MED-035"
         ]
+      },
+      {
+        "surface": "R.string.voice_message_seek",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaVoice.kt",
+        "anchor": "R.string.voice_message_seek",
+        "test_ids": [
+          "AXY-015"
+        ]
       }
     ]
   },

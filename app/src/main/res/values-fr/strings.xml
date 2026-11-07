@@ -1,5 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="voice_recording_stopped_announcement">Enregistrement arrêté</string>
+    <string name="voice_message_seek">Position de lecture</string>
+    <string name="video_failed">La vidéo n\u0027a pas pu être chargée</string>
+    <string name="conversation_new_message_from">Nouveau message de %1$s</string>
+    <plurals name="conversation_new_messages">
+        <item quantity="one">%1$d nouveau message</item>
+        <item quantity="many">%1$d nouveaux messages</item>
+        <item quantity="other">%1$d nouveaux messages</item>
+    </plurals>
+    <plurals name="unread_mentions_count">
+        <item quantity="one">%1$d mention non lue</item>
+        <item quantity="many">%1$d mentions non lues</item>
+        <item quantity="other">%1$d mentions non lues</item>
+    </plurals>
     <string name="notification_channel_summary">Résumé des notifications</string>
     <string name="notification_channel_summary_description">Résumé silencieux des messages et autres événements</string>
     <plurals name="notification_group_count">
@@ -412,6 +426,7 @@
     <string name="message_reacted">A réagi avec %1$s</string>
     <string name="message_reaction_fallback">à un message</string>
     <string name="message_actions">Actions du message</string>
+    <string name="message_reply_quote_description">En réponse à %1$s : %2$s</string>
     <string name="message_deleted_preview">Message supprimé</string>
     <string name="agent_stream_started">Flux de l’agent démarré</string>
     <string name="stream_finished">Flux terminé</string>
