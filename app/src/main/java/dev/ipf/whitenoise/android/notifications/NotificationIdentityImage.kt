@@ -66,7 +66,8 @@ internal fun LocalNotificationContent.reactorImage(senderAvatar: Bitmap?): Notif
  * authoritative when present, and the URL a missing one may resolve from. A present bitmap's URL is never fetched.
  * [storedConversationLoader] reads MDK's stored copy of the picture the chat list draws (#3635) and is tried first.
  * [conversationLoader] supplies a group picture that has no URL, such as a Marmot encrypted group image, and is
- * consulted only when neither the bitmap, the stored copy nor the URL gives one.
+ * consulted only when neither the bitmap, the stored copy nor the URL gives one. [senderLoader] fetches the sender's
+ * picture with the late refresh's longer bound, before the bounded URL fetch, so a cold download still arrives.
  */
 internal data class NotificationIdentityPictureSources(
     val conversationBitmap: Bitmap?,
@@ -81,12 +82,13 @@ internal data class NotificationIdentityPictureSources(
     /** The worker domain for [senderUrl]: the receiving account's public profiles. */
     val senderDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
+    val senderLoader: (suspend () -> Bitmap?)? = null,
 ) {
-    /** True when the card was drawn without a picture that a URL or a conversation loader may still supply. */
+    /** True when the card was drawn without a picture that a URL or a loader may still supply. */
     val hasMissingPicture: Boolean
         get() =
             (conversationBitmap == null && (!conversationUrl.isNullOrBlank() || hasConversationLoader)) ||
-                (senderBitmap == null && !senderUrl.isNullOrBlank())
+                (senderBitmap == null && (!senderUrl.isNullOrBlank() || senderLoader != null))
 
     /** True when the stored copy or the encrypted download may still supply the conversation picture. */
     private val hasConversationLoader: Boolean

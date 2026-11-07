@@ -13386,8 +13386,9 @@ class WhiteNoiseAppState private constructor(
      * sender picture, or null when no picture can still arrive. [content] is
      * what the card shows. A missing conversation picture is read first from
      * MDK's stored copy of the picture the chat list draws (#3635), so a
-     * picture already on the device needs no download. A reaction card draws
-     * only the person who reacted.
+     * picture already on the device needs no download. A missing sender
+     * picture gets a loader with the late refresh's longer bound. A reaction
+     * card draws only the person who reacted.
      */
     private suspend fun prepareLateNotificationIdentity(
         update: NotificationUpdateFfi,
@@ -13416,8 +13417,31 @@ class WhiteNoiseAppState private constructor(
                     conversationLoader = if (encryptedGroupPicture) encryptedGroupIdentityLoader(update) else null,
                 )
             }
-        return if (content != null && sources.hasMissingPicture) LateNotificationIdentity(content, sources) else null
+        val pictures =
+            sources.senderUrl
+                ?.takeIf { sources.senderBitmap == null }
+                ?.let { url -> sources.copy(senderLoader = lateSenderPictureLoader(url, sources.senderDomain)) }
+                ?: sources
+        return if (content != null && pictures.hasMissingPicture) LateNotificationIdentity(content, pictures) else null
     }
+
+    /**
+     * #3635: loads a sender's published picture for the late refresh through the same decoded cache and worker domain
+     * as the first post's fetch, without that fetch's short bound, so a cold download or a newly started decoder still
+     * reaches a group member's row or a reaction card. Nothing is fetched while the app lock shows, and a picture that
+     * finishes after the lock appears is dropped.
+     */
+    private fun lateSenderPictureLoader(
+        url: String,
+        domain: dev.ipf.whitenoise.android.media.MediaTrustDomain,
+    ): suspend () -> Bitmap? =
+        {
+            if (appLockScreenVisible) {
+                null
+            } else {
+                AvatarImageLoader.loadBitmap(url, domain)?.takeUnless { appLockScreenVisible }
+            }
+        }
 
     /**
      * #3635: reads the picture the chat list draws for this conversation from MDK's stored copy of the row's
@@ -14073,8 +14097,8 @@ class WhiteNoiseAppState private constructor(
         val ready = readyNotificationAvatarSnapshot(senderUrl, group?.avatarUrl)
         val encryptedKey = group?.let { encryptedGroupAvatarCacheKey(update.accountRef, it) }
         return ready.copy(
-            groupAvatarBitmap =
-                stored ?: ready.groupAvatarBitmap ?: GroupAvatarImageLoader.peek(encryptedKey)?.asAndroidBitmap(),
+            groupAvatarBitmap = ready.groupAvatarBitmap ?: GroupAvatarImageLoader.peek(encryptedKey)?.asAndroidBitmap(),
+            storedConversationBitmap = stored,
         )
     }
 

@@ -34,6 +34,37 @@ class NotificationEmojiHistoryTest {
         assertEquals(pair.first().dataUri, copied.first().dataUri)
     }
 
+    /**
+     * #3635: a repaint moves only the replaced sender's lines, by one millisecond so SystemUI draws them again, and
+     * keeps an image and text pair together. A plain copy keeps every time.
+     */
+    @Test
+    fun repaintMovesOnlyTheReplacedSendersLinesAndKeepsPairs() {
+        val other =
+            Person
+                .Builder()
+                .setName("Cal")
+                .setKey("cal")
+                .build()
+        val me =
+            Person
+                .Builder()
+                .setName("Me")
+                .setKey("me")
+                .build()
+        val style = NotificationCompat.MessagingStyle(me)
+        style.isGroupConversation = true
+        style.addMessage(NotificationCompat.MessagingStyle.Message("from cal", 5L, other))
+        notificationEmojiMessages("hi :wn:", 10L, sender, Uri.parse("content://test/art.png"))
+            .forEach { style.addMessage(it) }
+
+        val repainted = copiedMessagingStyle(style, sender, repaint = true).messages
+
+        assertEquals(listOf(5L, 11L, 11L), repainted.map { it.timestamp })
+        assertEquals(2, notificationLogicalMessageGroups(repainted).size)
+        assertEquals(listOf(5L, 10L, 10L), copiedMessagingStyle(style, sender).messages.map { it.timestamp })
+    }
+
     @Test
     fun replacementRemovesTheWholePairAndPreservesEarlierMessages() {
         val earlier = NotificationCompat.MessagingStyle.Message("earlier", 1L, sender)

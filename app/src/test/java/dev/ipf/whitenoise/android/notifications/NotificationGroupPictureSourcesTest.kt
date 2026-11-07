@@ -148,6 +148,33 @@ class NotificationGroupPictureSourcesTest {
             assertEquals(Color.BLUE, identityPixel(liveCard()))
         }
 
+    /**
+     * #3635: a member's picture that the short URL fetch misses, such as a cold download, still reaches their row
+     * through the late refresh's sender loader, and the group picture stays.
+     */
+    @Test
+    fun lateIdentityRefreshLoadsAColdMemberPicture() =
+        runBlocking {
+            val presenter = presenter(resolver = { null })
+            val picture = solid(Color.BLUE)
+            show(presenter, group(), conversation = picture)
+            val postedAt = lastMessage(liveCard()).timestamp
+            val sources =
+                NotificationIdentityPictureSources(
+                    picture,
+                    null,
+                    null,
+                    PICTURE_URL,
+                    senderLoader = { solid(Color.GREEN) },
+                )
+
+            assertTrue(refreshLateIdentity(presenter, group(), sources))
+
+            assertEquals("the group picture stays", Color.BLUE, identityPixel(liveCard()))
+            assertEquals("the member's row gets their picture", Color.GREEN, pixel(lastMessagePerson(liveCard())))
+            assertEquals("and moves so SystemUI draws it again", postedAt + 1, lastMessage(liveCard()).timestamp)
+        }
+
     /** Runs one late identity refresh of the fixture group card with [sources]. */
     private suspend fun refreshLateIdentity(
         presenter: LocalNotificationPresenter,
@@ -228,13 +255,15 @@ class NotificationGroupPictureSourcesTest {
     }
 
     /** The newest message's sender. */
-    private fun lastMessagePerson(card: Notification): Person =
+    private fun lastMessagePerson(card: Notification): Person = checkNotNull(lastMessage(card).person)
+
+    /** The newest message in the card's conversation template. */
+    private fun lastMessage(card: Notification): NotificationCompat.MessagingStyle.Message =
         checkNotNull(
             NotificationCompat.MessagingStyle
                 .extractMessagingStyleFromNotification(card)
                 ?.messages
-                ?.last()
-                ?.person,
+                ?.last(),
         )
 
     /** The top-left pixel of a Person icon. */
