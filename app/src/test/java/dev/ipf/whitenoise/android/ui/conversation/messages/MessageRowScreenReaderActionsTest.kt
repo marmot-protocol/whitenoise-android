@@ -88,6 +88,5 @@ class MessageRowScreenReaderActionsTest {
             .fetchSemanticsNode()
             .config
 
-    private fun actionLabels(config: SemanticsConfiguration): List<String> =
-        config.getOrNull(SemanticsActions.CustomActions).orEmpty().map { it.label }
+    private fun actionLabels(config: SemanticsConfiguration): List<String> = config.getOrNull(SemanticsActions.CustomActions).orEmpty().map { it.label }
 }
