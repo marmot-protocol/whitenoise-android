@@ -234,6 +234,22 @@ class NotificationIdentityImageCoverageTest {
     }
 
     /**
+     * #3635: Android draws a conversation card's picture from its shortcut, so a Direct Share refresh that rebuilds a
+     * card's shortcut as a recent chat draws the stored picture the chat row shows. A refresh that still has none for
+     * a pictured publication has the card's next post publish the picture again.
+     */
+    @Test
+    fun shareRefreshKeepsTheCardsStoredPicture() {
+        val share = File(notificationsRoot().parentFile, "share/ShareShortcutPublisher.kt").readText()
+        val select = share.declaration("internal fun selectShareShortcutTargets(")
+        assertTrue("a target carries its row's stored picture", "readyStoredAvatarBitmap(accountRef)" in select)
+        val targets = share.declaration("private fun targetShortcuts(")
+        assertTrue("a bare rebuild is marked", "markIdentityLost(shortcutId, ifPictured = true)" in targets)
+        val shortcuts = source("NotificationConversationShortcuts.kt")
+        assertTrue("the presenter records its picture", "pictured = ownedConversationAvatar != null" in shortcuts)
+    }
+
+    /**
      * #3635: every group row draws its member's own picture. Sender pictures are resolved, warmed and refreshed late
      * for a group as for a direct chat, no write blanks them, and rows an earlier build blanked get their monogram
      * when carried into a new post. Only the group shortcut's sender stays blank, since it stands for the group.

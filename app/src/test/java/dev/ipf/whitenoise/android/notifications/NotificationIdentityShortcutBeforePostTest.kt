@@ -256,6 +256,24 @@ class NotificationIdentityShortcutBeforePostTest {
     }
 
     /**
+     * #3635: the presenter records whether its publication carried the conversation picture, so a share refresh that
+     * rebuilds it with the monogram has the next post publish the picture again, while a monogram publication stays.
+     */
+    @Test
+    fun shareRefreshThatDropsThePublishedPictureIsPublishedAgain() {
+        val presenter = presenter(Recorder())
+        post(presenter, update(isDm = false), picture = solid(Color.BLUE))
+        val pictured = checkNotNull(conversationShortcutId(ACCOUNT, GROUP))
+        InFlightConversationShortcuts.markIdentityLost(pictured, ifPictured = true)
+        assertTrue("the picture is published again", InFlightConversationShortcuts.consumeIdentityLost(pictured))
+
+        post(presenter, update(isDm = false, groupIdHex = OTHER_GROUP), sender = solid(Color.GREEN))
+        val monogram = checkNotNull(conversationShortcutId(ACCOUNT, OTHER_GROUP))
+        InFlightConversationShortcuts.markIdentityLost(monogram, ifPictured = true)
+        assertFalse("a monogram loses nothing", InFlightConversationShortcuts.consumeIdentityLost(monogram))
+    }
+
+    /**
      * Account A's card publishes a share-eligible shortcut, and account B becomes active before the card is written.
      * B's Direct Share refresh keeps A's held shortcut with its picture and Person but never as a share target, so
      * Android cannot suggest A's conversation while B is active.

@@ -204,7 +204,12 @@ internal class NotificationConversationShortcuts(
                     shortcutSnapshots[shortcutId] = snapshot
                     InFlightConversationShortcuts.consumeIdentityLost(shortcutId)
                     ShortcutManagerCompat.reportShortcutUsed(context, shortcutId)
-                    InFlightConversationShortcuts.rememberPublished(shortcutId, currentShortcut, retainedShortcut)
+                    InFlightConversationShortcuts.rememberPublished(
+                        shortcutId,
+                        currentShortcut,
+                        retainedShortcut,
+                        pictured = ownedConversationAvatar != null,
+                    )
                     if (holdForPost) InFlightConversationShortcuts.hold(shortcutId)
                     holdForPost
                 } else {
