@@ -115,6 +115,7 @@ import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlin.math.roundToInt
 
 // One measured editor line, dedicated grip, bottom tools, and outer padding.
@@ -146,21 +147,21 @@ internal fun rememberComposerEditorLineHeight(): Dp {
  * picker, input row, and inline emoji pane) should apply
  * [imePadding]. Suppressed while the emoji pane owns the bottom region so the
  * keyboard/emoji swap does not double-count insets (#808, #895, #1109), but
- * restored while the emoji search field is active so the IME cannot cover the
- * filtered results grid (#1222).
+ * restored while the pane shows its search row, which sits on top of the
+ * keyboard (#1222, #3613).
  */
 internal fun composerBottomClusterAppliesImePadding(
     showEmojiPane: Boolean,
-    composerEmojiSearchActive: Boolean,
-): Boolean = !showEmojiPane || composerEmojiSearchActive
+    composerEmojiSearchRow: Boolean,
+): Boolean = !showEmojiPane || composerEmojiSearchRow
 
 internal fun composerBottomClusterModifier(
     showEmojiPane: Boolean,
-    composerEmojiSearchActive: Boolean,
+    composerEmojiSearchRow: Boolean,
     base: Modifier = Modifier,
 ): Modifier {
     val withNav = base.navigationBarsPadding()
-    return if (composerBottomClusterAppliesImePadding(showEmojiPane, composerEmojiSearchActive)) {
+    return if (composerBottomClusterAppliesImePadding(showEmojiPane, composerEmojiSearchRow)) {
         withNav.imePadding()
     } else {
         withNav
@@ -560,6 +561,7 @@ internal fun ComposerBar(
     var closeSendingIdentity by remember { mutableStateOf<(() -> Unit)?>(null) }
     var composerEmojiPickerRequested by remember { mutableStateOf(false) }
     var composerEmojiSearchActive by remember { mutableStateOf(false) }
+    var composerEmojiSearchRow by remember { mutableStateOf(false) }
     var composerKeyboardRestorePending by remember { mutableStateOf(false) }
     // Standalone fixtures keep a local fallback. Production binds the explicit
     // account/conversation owner below, with manual dp converted back to live
@@ -792,22 +794,38 @@ internal fun ComposerBar(
             targetImeHeight = targetImePaneHeight,
             rememberedImeHeight = rememberedImePaneHeight,
         )
-    val emojiPaneHeight =
-        if (composerEmojiSearchActive) {
-            emojiPaneBaseHeight + ComposerEmojiPickerSearchExtraHeight
-        } else {
-            emojiPaneBaseHeight
-        }
+    val emojiPaneHeight = emojiPaneBaseHeight
     // Keep exactly one opaque owner of the bottom region during the IME swap.
     // Fading this pane while the IME animates underneath exposes both surfaces
     // for several frames and looks like a duplicated, blinking composer.
     val showEmojiPane = composerEmojiPickerOpen
     val latestImePaneHeight by rememberUpdatedState(currentImePaneHeight)
+    val latestImeTargetPaneHeight by rememberUpdatedState(targetImePaneHeight)
     LaunchedEffect(showEmojiPane) {
         if (!showEmojiPane) {
             lockedComposerEmojiPaneHeight = 0.dp
             composerEmojiSearchActive = false
+            composerEmojiSearchRow = false
         }
+    }
+    LaunchedEffect(Unit) {
+        snapshotFlow {
+            composerEmojiSearchRowShown(
+                searchRowShown = composerEmojiSearchRow,
+                searchActive = composerEmojiSearchActive,
+                currentImeHeight = latestImePaneHeight,
+                targetImeHeight = latestImeTargetPaneHeight,
+            )
+        }.collect { composerEmojiSearchRow = it }
+    }
+    // Hiding the keyboard (Back, or its own hide key) leaves the search field
+    // focused; release it so the pane returns to browsing once the keyboard is gone.
+    LaunchedEffect(composerEmojiSearchActive) {
+        if (!composerEmojiSearchActive) return@LaunchedEffect
+        val imeShown = snapshotFlow { latestImeTargetPaneHeight > 0.dp }
+        imeShown.first { it }
+        imeShown.first { !it }
+        focusManager.clearFocus()
     }
     // The pane's rendered height is seeded from the live bottom inset on the
     // open edge, then animates to the locked target. Opening over a fully
@@ -848,6 +866,7 @@ internal fun ComposerBar(
                 )
         }
         composerEmojiSearchActive = false
+        composerEmojiSearchRow = false
         composerEmojiPickerRequested = false
         composerKeyboardRestorePending = true
         onKeyboardRestoreFromCustomInput()
@@ -1066,6 +1085,7 @@ internal fun ComposerBar(
             onKeyboardRestoreFromCustomInputFailed()
         }
         composerEmojiSearchActive = false
+        composerEmojiSearchRow = false
         if (!composerEmojiPickerOpen || lockedComposerEmojiPaneHeight == 0.dp) {
             lockedComposerEmojiPaneHeight =
                 composerEmojiPaneTargetHeight(
@@ -1102,7 +1122,7 @@ internal fun ComposerBar(
         val appliesImePadding =
             composerBottomClusterAppliesImePadding(
                 showEmojiPane = showEmojiPane,
-                composerEmojiSearchActive = composerEmojiSearchActive,
+                composerEmojiSearchRow = composerEmojiSearchRow,
             )
         val bottomInset =
             with(density) {
@@ -1243,7 +1263,7 @@ internal fun ComposerBar(
         Box(
             composerBottomClusterModifier(
                 showEmojiPane = showEmojiPane,
-                composerEmojiSearchActive = composerEmojiSearchActive,
+                composerEmojiSearchRow = composerEmojiSearchRow,
                 base = Modifier.fillMaxWidth(),
             ),
         ) {
@@ -2085,6 +2105,12 @@ internal fun ComposerBar(
                             composerEmojiSearchActive = it
                             onBottomInputChanged()
                         },
+                        searchRow = composerEmojiSearchRow,
+                        searchMinHeight =
+                            composerEmojiSearchRowMinHeight(
+                                paneHeight = emojiPaneHeightAnim.value,
+                                currentImeHeight = currentImePaneHeight,
+                            ),
                     )
                 }
             }

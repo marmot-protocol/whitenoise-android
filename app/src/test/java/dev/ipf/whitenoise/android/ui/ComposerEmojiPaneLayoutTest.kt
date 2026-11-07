@@ -1,12 +1,14 @@
 package dev.ipf.whitenoise.android.ui
 
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerFallbackHeight
-import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerSearchExtraHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerPaneRestoreStep
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiPaneHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiPaneRestoreStep
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiPaneTargetHeight
+import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiSearchRowMinHeight
+import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiSearchRowShown
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerKeyboardRestoreTimeoutClearsFocus
 import dev.ipf.whitenoise.android.ui.conversation.composer.shouldStartComposerKeyboardRestore
 import dev.ipf.whitenoise.android.ui.conversation.composer.shouldSwapComposerEmojiPaneToIme
@@ -341,9 +343,39 @@ class ComposerEmojiPaneLayoutTest {
         assertFalse(composerKeyboardRestoreTimeoutClearsFocus(currentImeHeight = 264.dp))
     }
 
-    /** Search mode adds room for the search field and results. */
+    /** Search mode keeps the browsing pane's space until the keyboard covers it, then sits on the keyboard (#3613). */
     @Test
-    fun searchModeAddsRoomForTheSearchFieldAndResults() {
-        assertEquals(432.dp, ComposerEmojiPickerFallbackHeight + ComposerEmojiPickerSearchExtraHeight)
+    fun searchRowCoversOnlyWhatTheKeyboardHasNotTaken() {
+        assertEquals(320.dp, composerEmojiSearchRowMinHeight(paneHeight = 320.dp, currentImeHeight = 0.dp))
+        assertEquals(120.dp, composerEmojiSearchRowMinHeight(paneHeight = 320.dp, currentImeHeight = 200.dp))
+        assertEquals(0.dp, composerEmojiSearchRowMinHeight(paneHeight = 320.dp, currentImeHeight = 340.dp))
     }
+
+    /** The search row outlives its field's focus until the keyboard has fully hidden. */
+    @Test
+    fun searchRowStaysUntilTheKeyboardIsGone() {
+        assertTrue(searchRowShown(shown = false, active = true, current = 0.dp, target = 300.dp))
+        assertTrue(searchRowShown(shown = true, active = false, current = 80.dp, target = 0.dp))
+        assertFalse(searchRowShown(shown = true, active = false, current = 0.dp, target = 0.dp))
+        assertFalse(searchRowShown(shown = false, active = false, current = 300.dp, target = 300.dp))
+    }
+
+    /** Without an on-screen keyboard there is nothing for the row to sit on, so search stays in the browsing pane. */
+    @Test
+    fun hardwareKeyboardSearchKeepsTheBrowsingPane() {
+        assertFalse(searchRowShown(shown = false, active = true, current = 0.dp, target = 0.dp))
+    }
+
+    private fun searchRowShown(
+        shown: Boolean,
+        active: Boolean,
+        current: Dp,
+        target: Dp,
+    ): Boolean =
+        composerEmojiSearchRowShown(
+            searchRowShown = shown,
+            searchActive = active,
+            currentImeHeight = current,
+            targetImeHeight = target,
+        )
 }

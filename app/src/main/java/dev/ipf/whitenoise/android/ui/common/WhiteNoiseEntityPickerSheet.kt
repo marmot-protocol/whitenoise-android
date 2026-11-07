@@ -209,6 +209,7 @@ private fun PickerRow(
 /**
  * Shared compact search. Empty trailing actions, IME options and accessibility labels remain caller-owned;
  * existing entity pickers retain their defaults, while Chats supplies native voice entry and its clear label.
+ * The leading search glyph can be swapped, for example for a back action that leaves the search.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
@@ -225,6 +226,7 @@ fun WhiteNoiseCompactSearchField(
     outlined: Boolean = false,
     keyboardActions: KeyboardActions = KeyboardActions.Default,
     onClear: (() -> Unit)? = null,
+    leadingIcon: @Composable () -> Unit = { Icon(painterResource(R.drawable.ic_search), contentDescription = null) },
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val outline =
@@ -262,7 +264,7 @@ fun WhiteNoiseCompactSearchField(
                 visualTransformation = VisualTransformation.None,
                 interactionSource = interactionSource,
                 placeholder = { Text(text = placeholder, maxLines = 1) },
-                leadingIcon = { Icon(painterResource(R.drawable.ic_search), contentDescription = null) },
+                leadingIcon = leadingIcon,
                 trailingIcon =
                     if (value.isNotEmpty()) {
                         {
