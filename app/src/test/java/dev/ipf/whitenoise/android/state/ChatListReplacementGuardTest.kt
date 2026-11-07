@@ -90,6 +90,34 @@ class ChatListReplacementGuardTest {
         assertFalse("no window means no proof", evicted.evictedFrom(null))
     }
 
+    /**
+     * #3586: a window scrolled away from the head evicts only rows ranking ahead of its first row or past its tail,
+     * so a chat that vanishes from inside its span, such as one deleted on another device, is an ambiguous removal.
+     */
+    @Test
+    fun aShiftedWindowEvictsOnlyRowsOutsideItsRetainedSpan() {
+        val newer = chatRow("newer").copy(activitySortAt = 80uL)
+        val first = chatRow("first").copy(activitySortAt = 60uL)
+        val inside = chatRow("inside").copy(activitySortAt = 50uL)
+        val last = chatRow("last").copy(activitySortAt = 40uL)
+        val older = chatRow("older").copy(activitySortAt = 10uL)
+        val incoming = listOf(first, last).map { presentedRow(it.groupIdHex).copy(row = it) }
+        val middle = topWindow(incoming, hasMoreBefore = true, hasMoreAfter = true)
+
+        assertTrue("a newer row scrolled off the head", newer.evictedFrom(middle))
+        assertTrue("a pinned row scrolled off the head", pinnedDm.evictedFrom(middle))
+        assertTrue("an older row pushed past the tail", older.evictedFrom(middle))
+        assertFalse("a row the span should still hold left for another reason", inside.evictedFrom(middle))
+        assertTrue("tie ahead of the head", chatRow("a").copy(activitySortAt = 60uL).evictedFrom(middle))
+        assertFalse("tie inside the span", chatRow("a").copy(activitySortAt = 40uL).evictedFrom(middle))
+        assertTrue("tie past the tail", chatRow("z").copy(activitySortAt = 40uL).evictedFrom(middle))
+        assertFalse("an archived row is a real removal", newer.copy(archived = true).evictedFrom(middle))
+
+        val throughTail = middle.copy(hasMoreAfter = false)
+        assertTrue("the head side still evicts", newer.evictedFrom(throughTail))
+        assertFalse("a window holding the true tail holds every older row", older.evictedFrom(throughTail))
+    }
+
     /** A viewport anchor does not imply earlier rows were evicted from the retained window. */
     @Test
     fun anchoredCompleteWindowStillChecksMissingPinnedAndActiveChats() {
