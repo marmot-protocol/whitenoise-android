@@ -787,14 +787,20 @@ internal fun ComposerBar(
             composerImePaneHeightMemory[configuration.orientation] = rememberedImePaneHeight
         }
     }
-    val emojiPaneBaseHeight =
-        composerEmojiPaneHeight(
-            lockedPaneHeight = lockedComposerEmojiPaneHeight,
+    val composerKeyboardHeight =
+        composerEmojiPaneTargetHeight(
             currentImeHeight = currentImePaneHeight,
             targetImeHeight = targetImePaneHeight,
             rememberedImeHeight = rememberedImePaneHeight,
         )
-    val emojiPaneHeight = emojiPaneBaseHeight
+    val composerWindowHeight = configuration.screenHeightDp.dp
+    val emojiPaneHeight =
+        composerEmojiPaneHeight(
+            lockedPaneHeight = lockedComposerEmojiPaneHeight,
+            keyboardHeight = composerKeyboardHeight,
+            windowHeight = composerWindowHeight,
+            searchRow = composerEmojiSearchRow,
+        )
     // Keep exactly one opaque owner of the bottom region during the IME swap.
     // Fading this pane while the IME animates underneath exposes both surfaces
     // for several frames and looks like a duplicated, blinking composer.
@@ -857,14 +863,8 @@ internal fun ComposerBar(
 
     fun restoreKeyboardFromEmojiPane() {
         if (!shouldStartComposerKeyboardRestore(composerEmojiPickerOpen, composerKeyboardRestorePending)) return
-        if (lockedComposerEmojiPaneHeight == 0.dp) {
-            lockedComposerEmojiPaneHeight =
-                composerEmojiPaneTargetHeight(
-                    currentImeHeight = currentImePaneHeight,
-                    targetImeHeight = targetImePaneHeight,
-                    rememberedImeHeight = rememberedImePaneHeight,
-                )
-        }
+        // The tall browsing pane shrinks toward the keyboard while it rises.
+        lockedComposerEmojiPaneHeight = composerKeyboardHeight
         composerEmojiSearchActive = false
         composerEmojiSearchRow = false
         composerEmojiPickerRequested = false
@@ -1086,12 +1086,7 @@ internal fun ComposerBar(
         composerEmojiSearchActive = false
         composerEmojiSearchRow = false
         if (!composerEmojiPickerOpen || lockedComposerEmojiPaneHeight == 0.dp) {
-            lockedComposerEmojiPaneHeight =
-                composerEmojiPaneTargetHeight(
-                    currentImeHeight = currentImePaneHeight,
-                    targetImeHeight = targetImePaneHeight,
-                    rememberedImeHeight = rememberedImePaneHeight,
-                )
+            lockedComposerEmojiPaneHeight = composerEmojiBrowseHeight(composerKeyboardHeight, composerWindowHeight)
         }
         composerEmojiPickerRequested = true
         composerEmojiPickerOpen = true

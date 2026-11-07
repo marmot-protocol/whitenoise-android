@@ -41,7 +41,7 @@ internal const val EMOJI_PICKER_EXPANDED_HEIGHT_FRACTION = 0.88f
 
 internal val EmojiPickerMaximumWidth = 600.dp
 
-private val ComposerEmojiPaneTopInset = 8.dp
+private val ComposerEmojiPaneTopInset = 4.dp
 
 /**
  * Full-height emoji sheet: search field on top, adaptive grid, category bar along the bottom.
@@ -161,16 +161,30 @@ internal fun composerEmojiPaneTargetHeight(
     return if (knownHeight > 0.dp) knownHeight else ComposerEmojiPickerFallbackHeight
 }
 
+/** Share of the window the composer's browsing emoji pane takes; never less than the keyboard. */
+internal const val COMPOSER_EMOJI_BROWSE_HEIGHT_FRACTION = 0.6f
+
+internal fun composerEmojiBrowseHeight(
+    keyboardHeight: Dp,
+    windowHeight: Dp,
+): Dp = maxOf(keyboardHeight, windowHeight * COMPOSER_EMOJI_BROWSE_HEIGHT_FRACTION)
+
+/**
+ * Height the composer emoji pane animates toward. Browsing takes the tall
+ * [composerEmojiBrowseHeight] (or the [lockedPaneHeight] set on open and on the
+ * way back to the keyboard); the search row collapses to the keyboard's own
+ * height so only the row sits above the keyboard.
+ */
 internal fun composerEmojiPaneHeight(
     lockedPaneHeight: Dp,
-    currentImeHeight: Dp,
-    targetImeHeight: Dp,
-    rememberedImeHeight: Dp,
+    keyboardHeight: Dp,
+    windowHeight: Dp,
+    searchRow: Boolean,
 ): Dp =
-    if (lockedPaneHeight > 0.dp) {
-        lockedPaneHeight
-    } else {
-        composerEmojiPaneTargetHeight(currentImeHeight, targetImeHeight, rememberedImeHeight)
+    when {
+        searchRow -> keyboardHeight
+        lockedPaneHeight > 0.dp -> lockedPaneHeight
+        else -> composerEmojiBrowseHeight(keyboardHeight, windowHeight)
     }
 
 internal fun updatedComposerRememberedImeHeight(

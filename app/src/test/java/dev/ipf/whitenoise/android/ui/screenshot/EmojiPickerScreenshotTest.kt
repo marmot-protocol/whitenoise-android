@@ -17,7 +17,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
-import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -41,13 +40,14 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerPa
 import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_CATEGORIES_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_CELL_GLYPH_FILL_FRACTION
 import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_SEARCH_OPEN_TEST_TAG
-import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_SEARCH_PULL_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_SEARCH_ROW_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_SEARCH_TEST_TAG
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerContent
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerEmojiSize
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerMinimumCellSize
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiSearchRowHeight
+import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiBrowseHeight
+import dev.ipf.whitenoise.android.ui.conversation.composer.emojiPickerCategoryTestTag
 import dev.ipf.whitenoise.android.ui.conversation.composer.emojiPickerCellTextMetrics
 import dev.ipf.whitenoise.android.ui.conversation.composer.emojiPickerHeaderTestTag
 import dev.ipf.whitenoise.android.ui.conversation.composer.emojiPickerItemTestTag
@@ -102,24 +102,34 @@ class EmojiPickerScreenshotTest {
     }
 
     /**
-     * The composer pane opens under its search/backspace row with the first section at the top; the
-     * pull-down search field waits above it, and the category rail sits along the bottom.
+     * The composer pane opens with the first section at its top and no search bar; the rail along the
+     * bottom holds search in its start corner and spreads the category toggles evenly.
      */
     @Test
-    fun composerBrowseOpensPastThePullDownSearchField() {
+    fun composerBrowseKeepsSearchInTheBottomRail() {
         renderBrowsePane(darkTheme = false, amoled = false)
         waitForBrowseGrid()
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertDoesNotExist()
-        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_PULL_TEST_TAG).assertIsNotDisplayed()
         val pane = boundsOfTag(PICKER_TAG)
-        val searchIcon = boundsOfTag(EMOJI_PICKER_SEARCH_OPEN_TEST_TAG)
         val firstHeader = boundsOfTag(emojiPickerHeaderTestTag(EmojiCategory.Recent))
         assertTrue(
-            "The first section starts right under the top row (${firstHeader.top}px, row ${searchIcon.bottom}px)",
-            firstHeader.top - searchIcon.bottom <= (EXPECTED_HEADER_MIN_HEIGHT + EXPECTED_HEADER_TOP_GAP).value,
+            "The first section starts at the pane's top (${firstHeader.top}px, pane ${pane.top}px)",
+            firstHeader.top - pane.top <= (EXPECTED_HEADER_MIN_HEIGHT + EXPECTED_HEADER_TOP_GAP).value,
         )
         val rail = boundsOfTag(EMOJI_PICKER_CATEGORIES_TEST_TAG)
-        assertEquals("The rail sits on the pane's bottom edge", pane.bottom, rail.bottom, GAP_TOLERANCE_PX * 4)
+        val searchIcon = boundsOfTag(EMOJI_PICKER_SEARCH_OPEN_TEST_TAG)
+        assertTrue("Search sits in the bottom-start corner", searchIcon.left - pane.left <= GAP_TOLERANCE_PX * 4)
+        assertTrue("Search shares the rail's row", searchIcon.top < rail.bottom && searchIcon.bottom > rail.top)
+        assertTrue("The rail sits on the pane's bottom edge", pane.bottom - searchIcon.bottom <= GAP_TOLERANCE_PX * 8)
+        val toggles =
+            listOf(EmojiCategory.Recent, EmojiCategory.SmileysAndPeople, EmojiCategory.AnimalsAndNature)
+                .map { boundsOfTag(emojiPickerCategoryTestTag(it)) }
+        assertEquals(
+            "Category toggles are evenly spaced",
+            toggles[1].left - toggles[0].left,
+            toggles[2].left - toggles[1].left,
+            GAP_TOLERANCE_PX,
+        )
     }
 
     /** The sheets' default picker content keeps the sectioned search grid and drops the Recent section. */
@@ -326,7 +336,7 @@ class EmojiPickerScreenshotTest {
         darkTheme: Boolean,
         amoled: Boolean,
         width: Dp = PICKER_WIDTH,
-        height: Dp = ComposerEmojiPickerFallbackHeight,
+        height: Dp = COMPOSER_BROWSE_HEIGHT,
         appFontScale: Float = 1f,
         osFontScale: Float = 1f,
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
@@ -577,6 +587,9 @@ class EmojiPickerScreenshotTest {
 
     private companion object {
         val PICKER_WIDTH = 360.dp
+
+        // The composer's browsing pane on the 780dp test window, keyboard at the fallback height.
+        val COMPOSER_BROWSE_HEIGHT = composerEmojiBrowseHeight(ComposerEmojiPickerFallbackHeight, 780.dp)
 
         // The reaction sheet fills 0.88 of the screen; enough rows for the large-font wrap checks.
         val REACTION_SHEET_HEIGHT = 640.dp

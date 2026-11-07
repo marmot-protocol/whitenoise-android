@@ -92,8 +92,6 @@ private class EmojiPickerModel(
     val sections: List<EmojiSection>,
     val searching: Boolean,
     val searchedQuery: String,
-    /** Whether the emoji catalogue has loaded; recents alone can show before it does. */
-    val loaded: Boolean,
 ) {
     val sectionRanges = emojiSectionRanges(sections)
 
@@ -149,8 +147,7 @@ private fun rememberEmojiPickerModel(
         searchedQuery = query
     }
     val searching = query.isNotBlank()
-    val loaded = entries.isNotEmpty()
-    return remember(browseSections, searchSections, searching, searchedQuery, custom, loaded) {
+    return remember(browseSections, searchSections, searching, searchedQuery, custom) {
         EmojiPickerModel(
             sections =
                 if (searching) {
@@ -160,7 +157,6 @@ private fun rememberEmojiPickerModel(
                 },
             searching = searching,
             searchedQuery = searchedQuery,
-            loaded = loaded,
         )
     }
 }
@@ -171,7 +167,7 @@ private fun rememberEmojiPickerModel(
  * composer pane and the group image picker.
  *
  * [searchBehindIcon] selects the composer layout ([ComposerEmojiKeyboard]): the search field stays hidden
- * until its search action or pull-down field opens it, and closing the field or moving focus away
+ * until the rail's search action opens it, and closing the field or moving focus away
  * returns to browsing. [searchRow] replaces the grid with one row of matches under the search field, so
  * the composer pane stays small while its search has the keyboard. Only the composer sets either.
  */
@@ -197,12 +193,9 @@ internal fun EmojiPickerContent(
     val rowState = rememberLazyListState()
     val categoryState = rememberLazyListState()
     val scope = rememberCoroutineScope()
-    // The composer's grid opens with a pull-down search field above the first section.
-    val leadingItems = if (searchBehindIcon) 1 else 0
-    val activeCategory by remember(gridState, model, leadingItems) {
+    val activeCategory by remember(gridState, model) {
         derivedStateOf {
-            val first = gridState.firstVisibleItemIndex - leadingItems
-            model.sectionRanges.lastOrNull { it.firstItemIndex <= first }?.category
+            model.sectionRanges.lastOrNull { it.firstItemIndex <= gridState.firstVisibleItemIndex }?.category
                 ?: model.sections.firstOrNull()?.category
         }
     }
@@ -212,7 +205,6 @@ internal fun EmojiPickerContent(
         if (searchRow) rowState else null,
         gridState,
         categoryState,
-        browseStartIndex = leadingItems,
     )
     EmojiSearchEffects(search, searchRow)
 
@@ -226,7 +218,7 @@ internal fun EmojiPickerContent(
     val noResults = model.searching && model.searchedQuery == query && model.sections.isEmpty()
     val categories = model.sections.map { it.category }
     val onCategory: (EmojiCategory) -> Unit = { category ->
-        model.firstItemIndex(category)?.let { scope.launch { gridState.animateScrollToItem(it + leadingItems) } }
+        model.firstItemIndex(category)?.let { scope.launch { gridState.animateScrollToItem(it) } }
     }
     if (searchBehindIcon) {
         ComposerEmojiKeyboard(
@@ -312,17 +304,11 @@ private fun EmojiPickerScrollSync(
     rowState: LazyListState?,
     gridState: LazyGridState,
     categoryState: LazyListState,
-    browseStartIndex: Int,
 ) {
-    // Browsing starts past any leading item (the composer's pull-down search), which scrolling up reveals.
-    // Waiting for the whole catalogue matters: a grid holding only recents is too short to scroll past it.
-    val loaded = model.loaded
-    LaunchedEffect(model.searchedQuery, rowState, loaded) {
-        if (!loaded) return@LaunchedEffect
+    LaunchedEffect(model.searchedQuery, rowState) {
         when {
             rowState != null -> rowState.scrollToItem(0)
-            model.searching -> gridState.scrollToItem(0)
-            else -> gridState.scrollToItem(browseStartIndex)
+            model.sections.isNotEmpty() -> gridState.scrollToItem(0)
         }
     }
     LaunchedEffect(activeCategory, model.searching) {
@@ -347,7 +333,6 @@ internal fun EmojiSectionGrid(
             end = WhiteNoiseSpacing.CompactScreenMargin,
             bottom = WhiteNoiseSpacing.Related,
         ),
-    leadingItem: (@Composable () -> Unit)? = null,
 ) {
     WhiteNoiseLazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = EmojiPickerMinimumCellSize),
@@ -355,9 +340,6 @@ internal fun EmojiSectionGrid(
         modifier = modifier.testTag(EMOJI_PICKER_GRID_TEST_TAG),
         contentPadding = contentPadding,
     ) {
-        if (leadingItem != null) {
-            item(key = "leading", span = { GridItemSpan(maxLineSpan) }) { leadingItem() }
-        }
         sections.forEach { section ->
             item(key = "${section.category.id}:header", span = { GridItemSpan(maxLineSpan) }) {
                 EmojiSectionHeader(section.category)

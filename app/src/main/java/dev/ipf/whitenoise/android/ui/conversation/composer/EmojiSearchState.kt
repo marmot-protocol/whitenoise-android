@@ -23,11 +23,15 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 internal const val EMOJI_PICKER_SEARCH_CLOSE_TEST_TAG = "emoji.picker.search_close"
+
+/** Space above and below the composer's search field, kept tight so the matches sit close under it. */
+private val ComposerEmojiSearchFieldInset = 4.dp
 
 /**
  * Search field state. Behind the icon the field opens on demand, and leaving it (close action, Back,
@@ -143,7 +147,7 @@ internal fun EmojiSearchField(
         placeholder = placeholder,
         modifier =
             Modifier
-                .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin, vertical = WhiteNoiseSpacing.Related)
+                .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin, vertical = ComposerEmojiSearchFieldInset)
                 .then(fieldModifier),
         outlined = true,
         clearDescription = stringResource(R.string.emoji_search_clear),

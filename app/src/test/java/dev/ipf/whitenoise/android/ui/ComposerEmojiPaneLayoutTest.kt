@@ -4,6 +4,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerFallbackHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerPaneRestoreStep
+import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiBrowseHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiPaneHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiPaneRestoreStep
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiPaneTargetHeight
@@ -127,12 +128,58 @@ class ComposerEmojiPaneLayoutTest {
                 lockedHeight,
                 composerEmojiPaneHeight(
                     lockedPaneHeight = lockedHeight,
-                    currentImeHeight = animatedImeHeight,
-                    targetImeHeight = 0.dp,
-                    rememberedImeHeight = lockedHeight,
+                    keyboardHeight =
+                        composerEmojiPaneTargetHeight(
+                            currentImeHeight = animatedImeHeight,
+                            targetImeHeight = 0.dp,
+                            rememberedImeHeight = lockedHeight,
+                        ),
+                    windowHeight = 800.dp,
+                    searchRow = false,
                 ),
             )
         }
+    }
+
+    @Test
+    fun browsingPaneIsMuchTallerThanTheKeyboard() {
+        assertEquals(
+            480f,
+            composerEmojiBrowseHeight(keyboardHeight = 300.dp, windowHeight = 800.dp).value,
+            DP_TOLERANCE,
+        )
+    }
+
+    @Test
+    fun browsingPaneNeverDropsBelowTheKeyboardInShortWindows() {
+        assertEquals(300.dp, composerEmojiBrowseHeight(keyboardHeight = 300.dp, windowHeight = 400.dp))
+    }
+
+    @Test
+    fun unlockedBrowsingPaneTakesTheTallBrowseHeight() {
+        assertEquals(
+            480f,
+            composerEmojiPaneHeight(
+                lockedPaneHeight = 0.dp,
+                keyboardHeight = 300.dp,
+                windowHeight = 800.dp,
+                searchRow = false,
+            ).value,
+            DP_TOLERANCE,
+        )
+    }
+
+    @Test
+    fun searchRowCollapsesThePaneToTheKeyboardHeight() {
+        assertEquals(
+            300.dp,
+            composerEmojiPaneHeight(
+                lockedPaneHeight = 480.dp,
+                keyboardHeight = 300.dp,
+                windowHeight = 800.dp,
+                searchRow = true,
+            ),
+        )
     }
 
     @Test
@@ -378,4 +425,9 @@ class ComposerEmojiPaneLayoutTest {
             currentImeHeight = current,
             targetImeHeight = target,
         )
+
+    private companion object {
+        // Window fractions are float products, so 0.6 * 800dp lands a hair above 480dp.
+        const val DP_TOLERANCE = 0.01f
+    }
 }

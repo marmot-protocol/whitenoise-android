@@ -4,25 +4,9 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "ComposerEmojiTopRow",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerEmojiKeyboard.kt",
-        "anchor": "fun ComposerEmojiTopRow(",
-        "test_ids": [
-          "CON-010"
-        ]
-      },
-      {
         "surface": "ComposerEmojiKeyboard",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerEmojiKeyboard.kt",
         "anchor": "fun ComposerEmojiKeyboard(",
-        "test_ids": [
-          "CON-010"
-        ]
-      },
-      {
-        "surface": "ComposerEmojiPullDownSearchField",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerEmojiKeyboard.kt",
-        "anchor": "fun ComposerEmojiPullDownSearchField(",
         "test_ids": [
           "CON-010"
         ]
@@ -39,14 +23,6 @@
         "surface": "ComposerEmojiRailToggle",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerEmojiKeyboard.kt",
         "anchor": "fun ComposerEmojiRailToggle(",
-        "test_ids": [
-          "CON-010"
-        ]
-      },
-      {
-        "surface": "ComposerEmojiRailLayout",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/ComposerEmojiKeyboard.kt",
-        "anchor": "fun ComposerEmojiRailLayout(",
         "test_ids": [
           "CON-010"
         ]

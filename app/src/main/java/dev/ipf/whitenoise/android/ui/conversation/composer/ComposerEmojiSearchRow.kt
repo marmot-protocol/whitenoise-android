@@ -5,9 +5,9 @@ import androidx.compose.ui.unit.dp
 
 /**
  * Minimum height of the emoji pane in search-row mode: whatever part of the
- * browsing pane's [paneHeight] the keyboard does not cover yet. The bottom
- * region is then max(keyboard + row, browsing pane), so entering and leaving
- * search moves the composer only as far as the keyboard itself moves.
+ * rendered [paneHeight] the keyboard does not cover yet. The pane height
+ * glides from the tall browsing pane down to the keyboard's, so the bottom
+ * region collapses smoothly to the row plus the keyboard.
  */
 internal fun composerEmojiSearchRowMinHeight(
     paneHeight: Dp,
