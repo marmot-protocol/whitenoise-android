@@ -285,38 +285,35 @@ class VoiceRecordingController internal constructor(
         if (r == null) {
             // Nothing captured yet (still preparing or restarting): end the pending start.
             if (isRecording) interrupt()
-            return
+        } else if (!isPaused) {
+            tickJob?.cancel()
+            tickJob = null
+            if (runCatching { r.pause() }.isSuccess) isPaused = true else interrupt()
         }
-        if (isPaused) return
-        tickJob?.cancel()
-        tickJob = null
-        try {
-            r.pause()
-        } catch (_: Throwable) {
-            interrupt()
-            return
-        }
-        isPaused = true
     }
 
     /** Continues a paused take after the user asks for it; returns false when focus is unavailable. */
     fun resume(): Boolean {
-        val r = recorder ?: return false
-        if (!isPaused) return true
-        if (!requestRecordingFocus()) {
-            onError(IllegalStateException("Couldn't resume recording — audio is in use"))
-            return false
+        val r = recorder
+        return when {
+            r == null -> false
+            !isPaused -> true
+            !requestRecordingFocus() -> {
+                onError(IllegalStateException("Couldn't resume recording — audio is in use"))
+                false
+            }
+            else -> {
+                VoicePlaybackController.pause()
+                val resumed = runCatching { r.resume() }.isSuccess
+                if (resumed) {
+                    isPaused = false
+                    startTick(r, baseElapsedMs = _elapsedMs.longValue)
+                } else {
+                    interrupt()
+                }
+                resumed
+            }
         }
-        VoicePlaybackController.pause()
-        try {
-            r.resume()
-        } catch (_: Throwable) {
-            interrupt()
-            return false
-        }
-        isPaused = false
-        startTick(r, baseElapsedMs = _elapsedMs.longValue)
-        return true
     }
 
     /** Accepts a new recorder-start request and returns its token. */
