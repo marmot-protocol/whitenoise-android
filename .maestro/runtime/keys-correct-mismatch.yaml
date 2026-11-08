@@ -5,6 +5,9 @@ name: keys-correct-mismatch
 - assertVisible: "Maestro group"
 - runFlow: ../fixtures/open-settings.yaml
 - assertVisible: "Settings"
+- tapOn: "Account"
+- assertVisible:
+    id: "settings.account.group"
 - tapOn: "Profile Keys"
 - assertVisible: "Private key hidden"
 - runFlow: ../fixtures/open-encrypted-key-editor.yaml

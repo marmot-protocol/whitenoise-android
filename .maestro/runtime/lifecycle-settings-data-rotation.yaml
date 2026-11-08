@@ -4,7 +4,7 @@ name: lifecycle-settings-data-rotation
 - runFlow:
     file: ../fixtures/open-fixture-settings-destination.yaml
     env:
-      SETTINGS_DESTINATION: Data Usage
+      SETTINGS_DESTINATION: Data & storage
 - assertVisible:
     id: data_usage.downloads.group
 - setOrientation: LANDSCAPE_LEFT

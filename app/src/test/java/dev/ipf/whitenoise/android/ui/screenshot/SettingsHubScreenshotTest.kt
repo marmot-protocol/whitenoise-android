@@ -13,9 +13,11 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.notifications.NativePushCapability
 import dev.ipf.whitenoise.android.notifications.PushTokenKeyRule
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.nativePushCapabilityForContext
 import dev.ipf.whitenoise.android.ui.settings.AccountScreen
 import dev.ipf.whitenoise.android.ui.settings.ChatsScreen
 import dev.ipf.whitenoise.android.ui.settings.HelpSupportScreen
@@ -99,12 +101,27 @@ class SettingsHubScreenshotTest {
     @Test
     fun deliveryRtlLargeFont() = capture("notification_delivery_rtl_large_font", false, rtl = true) { NotificationDeliveryScreen(it, {}) }
 
+    /** Push is available, so the Firebase Cloud Messaging disclosure is visible in AMOLED. */
+    @Test
+    fun deliveryPushAvailableAmoled() =
+        capture("notification_delivery_push_available_amoled", true, amoled = true, pushAvailable = true) {
+            NotificationDeliveryScreen(it, {})
+        }
+
+    /** Push is available at 200 % in RTL, so the longer disclosure wraps. */
+    @Test
+    fun deliveryPushAvailableRtlLargeFont() =
+        capture("notification_delivery_push_available_rtl_large_font", false, rtl = true, pushAvailable = true) {
+            NotificationDeliveryScreen(it, {})
+        }
+
     /** Renders [content] for an account-less app state under the requested theme and records its baseline. */
     private fun capture(
         name: String,
         darkTheme: Boolean,
         amoled: Boolean = false,
         rtl: Boolean = false,
+        pushAvailable: Boolean = false,
         content: @Composable (WhiteNoiseAppState) -> Unit,
     ) {
         val appState =
@@ -114,6 +131,9 @@ class SettingsHubScreenshotTest {
                 accountIdHexResolver = { null },
                 accounts = emptyList(),
                 activeAccountRef = "missing-account",
+                nativePushCapabilityResolver = {
+                    if (pushAvailable) NativePushCapability.Available else nativePushCapabilityForContext(app, it)
+                },
             )
         composeRule.setContent {
             val density = LocalDensity.current

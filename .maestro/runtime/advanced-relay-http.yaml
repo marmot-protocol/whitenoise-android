@@ -7,6 +7,13 @@ name: advanced-relay-http
 - assertVisible: "Settings"
 - scrollUntilVisible:
     element:
+      text: "Account"
+    direction: DOWN
+- tapOn: "Account"
+- assertVisible:
+    id: "settings.account.group"
+- scrollUntilVisible:
+    element:
       text: "Relays"
     direction: DOWN
 - tapOn: "Relays"

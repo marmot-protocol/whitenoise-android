@@ -4,7 +4,7 @@ name: lifecycle-settings-data-warm-resume
 - runFlow:
     file: ../fixtures/open-fixture-settings-destination.yaml
     env:
-      SETTINGS_DESTINATION: Data Usage
+      SETTINGS_DESTINATION: Data & storage
 - assertVisible:
     id: data_usage.downloads.group
 - runFlow: ../fixtures/runtime-warm-resume.yaml

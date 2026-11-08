@@ -7,11 +7,21 @@ name: support-entry-back
 - assertVisible: "Settings"
 - scrollUntilVisible:
     element:
+      text: "Help & support"
+    direction: DOWN
+- tapOn: "Help & support"
+- assertVisible:
+    id: "settings.help_support.group"
+- scrollUntilVisible:
+    element:
       text: "Chat with support"
     direction: DOWN
 - tapOn: "Chat with support"
 - assertVisible: "White Noise Support"
 - assertVisible:
     id: "support.start"
+- back
+- assertVisible:
+    id: "settings.help_support.group"
 - back
 - assertVisible: "Settings"

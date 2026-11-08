@@ -8,11 +8,21 @@ name: settings-read-aloud
 - assertVisible: "Settings"
 - scrollUntilVisible:
     element:
+      text: "Voice & language"
+    direction: DOWN
+- tapOn: "Voice & language"
+- assertVisible:
+    id: "settings.voice_language.group"
+- scrollUntilVisible:
+    element:
       text: "Read Aloud"
     direction: DOWN
 - tapOn: "Read Aloud"
 - assertVisible:
     id: "speech.engine.group"
+- tapOn: "Back"
+- assertVisible:
+    id: "settings.voice_language.group"
 - tapOn: "Back"
 - assertVisible: "Settings"
 - tapOn: "Back"

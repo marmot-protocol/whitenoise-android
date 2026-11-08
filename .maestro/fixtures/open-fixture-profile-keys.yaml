@@ -1,6 +1,9 @@
 appId: dev.ipf.whitenoise.android.maestrolab
 ---
 - runFlow: open-settings.yaml
+- tapOn: "Account"
+- assertVisible:
+    id: "settings.account.group"
 - tapOn: Profile Keys
 - scrollUntilVisible:
     element:

@@ -1,0 +1,36 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-settings-notification-sounds-warm-resume
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+# The instrumentation host owns launch, reset and disposal.
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Notifications"
+    direction: DOWN
+- tapOn: "Notifications"
+- assertVisible:
+    id: "notifications.sounds"
+- tapOn:
+    id: "notifications.sounds"
+- scrollUntilVisible:
+    element:
+      id: "notification-quiet-spoken-audio"
+    direction: DOWN
+- runFlow: ../fixtures/runtime-warm-resume.yaml
+- scrollUntilVisible:
+    element:
+      id: "notification-quiet-spoken-audio"
+    direction: DOWN
+    timeout: 10000
+- assertVisible:
+    id: "notification-quiet-spoken-audio"
+- tapOn: "Back"
+- assertVisible:
+    id: "notifications.sounds"
+- tapOn: "Back"
+- assertVisible: "Settings"
+- tapOn: "Back"
+- assertVisible: "Maestro group"

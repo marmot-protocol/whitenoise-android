@@ -9,7 +9,7 @@
       "manual_ids": [
         "SET-001"
       ],
-      "assertions": "Appearance opens its theme content; Composer opens the shared immediately saving editor without Done or Cancel controls. Back returns to Appearance, then toolbar Back returns to Settings and Chats. Navigation assertions authored only; no saved preference, gesture or runtime execution proof.",
+      "assertions": "Appearance opens its theme content; toolbar Back returns to Settings and Chats. Navigation assertions authored only; no saved preference, gesture or runtime execution proof.",
       "postcondition": "none"
     },
     "settings-notifications": {
@@ -18,6 +18,54 @@
         "SET-001"
       ],
       "assertions": "Notifications opens its expected content; toolbar Back returns to Settings and Chats.",
+      "postcondition": "none"
+    },
+    "settings-account": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-001"
+      ],
+      "assertions": "Account hub opens its group; toolbar Back returns to Settings and Chats.",
+      "postcondition": "none"
+    },
+    "settings-chats": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-001"
+      ],
+      "assertions": "Chats hub opens its group; Composer opens the shared immediately saving editor without Done or Cancel controls. Back returns to the Chats hub, then to Settings and Chats.",
+      "postcondition": "none"
+    },
+    "settings-voice-language": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-001"
+      ],
+      "assertions": "Voice & language hub opens its group; toolbar Back returns to Settings and Chats.",
+      "postcondition": "none"
+    },
+    "settings-help-support": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-001"
+      ],
+      "assertions": "Help & support hub opens its group; toolbar Back returns to Settings and Chats.",
+      "postcondition": "none"
+    },
+    "settings-notification-sounds": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-001"
+      ],
+      "assertions": "Notifications sounds page opens its quiet spoken audio control; Back returns to Notifications, then Settings and Chats.",
+      "postcondition": "none"
+    },
+    "settings-notification-delivery": {
+      "suite": "settings",
+      "manual_ids": [
+        "SET-001"
+      ],
+      "assertions": "Notifications Delivery & battery page opens its delivery choices; Back returns to Notifications, then Settings and Chats.",
       "postcondition": "none"
     },
     "settings-read-aloud": {
@@ -1942,6 +1990,114 @@
         "NAV-010"
       ],
       "assertions": "settings-notifications actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-account-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-009"
+      ],
+      "assertions": "settings-account actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-account-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-010"
+      ],
+      "assertions": "settings-account actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-chats-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-009"
+      ],
+      "assertions": "settings-chats actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-chats-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-010"
+      ],
+      "assertions": "settings-chats actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-voice-language-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-009"
+      ],
+      "assertions": "settings-voice-language actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-voice-language-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-010"
+      ],
+      "assertions": "settings-voice-language actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-help-support-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-009"
+      ],
+      "assertions": "settings-help-support actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-help-support-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-010"
+      ],
+      "assertions": "settings-help-support actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-notification-sounds-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-009"
+      ],
+      "assertions": "settings-notification-sounds actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-notification-sounds-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-010"
+      ],
+      "assertions": "settings-notification-sounds actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-notification-delivery-rotation": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-009"
+      ],
+      "assertions": "settings-notification-delivery actual destination controls remain reachable through handled portrait/landscape orientation changes; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
+      "postcondition": "none"
+    },
+    "lifecycle-settings-notification-delivery-warm-resume": {
+      "suite": "settings-lifecycle",
+      "manual_ids": [
+        "SET-001",
+        "NAV-010"
+      ],
+      "assertions": "settings-notification-delivery actual destination controls remain reachable through Home and foreground return without stopping or clearing the fixture; Back returns to its original Settings destination. No Activity recreation or process-death proof is claimed.",
       "postcondition": "none"
     },
     "lifecycle-settings-read-aloud-rotation": {

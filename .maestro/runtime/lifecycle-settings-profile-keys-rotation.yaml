@@ -5,6 +5,9 @@ name: lifecycle-settings-profile-keys-rotation
 - assertVisible: Maestro group
 - runFlow: ../fixtures/open-settings.yaml
 - assertVisible: Settings
+- tapOn: "Account"
+- assertVisible:
+    id: "settings.account.group"
 - tapOn: Profile Keys
 - assertVisible: Show private key
 - assertVisible: Private key hidden
@@ -24,5 +27,8 @@ name: lifecycle-settings-profile-keys-rotation
     timeout: 10000
 - assertVisible: Show private key
 - assertVisible: Private key hidden
+- back
+- assertVisible:
+    id: "settings.account.group"
 - back
 - assertVisible: Settings

@@ -8,6 +8,13 @@ name: settings-translation
 - assertVisible: "Settings"
 - scrollUntilVisible:
     element:
+      text: "Voice & language"
+    direction: DOWN
+- tapOn: "Voice & language"
+- assertVisible:
+    id: "settings.voice_language.group"
+- scrollUntilVisible:
+    element:
       text: "Translate"
     direction: DOWN
 - tapOn: "Translate"
@@ -16,6 +23,9 @@ name: settings-translation
 - assertVisible: Arabic
 - back
 - assertNotVisible: Arabic
+- tapOn: "Back"
+- assertVisible:
+    id: "settings.voice_language.group"
 - tapOn: "Back"
 - assertVisible: "Settings"
 - tapOn: "Back"

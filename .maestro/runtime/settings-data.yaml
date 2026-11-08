@@ -8,9 +8,9 @@ name: settings-data
 - assertVisible: "Settings"
 - scrollUntilVisible:
     element:
-      text: "Data Usage"
+      text: "Data & storage"
     direction: DOWN
-- tapOn: "Data Usage"
+- tapOn: "Data & storage"
 - assertVisible:
     id: "data_usage.downloads.group"
 - tapOn: "Back"

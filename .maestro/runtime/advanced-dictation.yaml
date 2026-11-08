@@ -7,10 +7,20 @@ name: advanced-dictation
 - assertVisible: "Settings"
 - scrollUntilVisible:
     element:
+      text: "Voice & language"
+    direction: DOWN
+- tapOn: "Voice & language"
+- assertVisible:
+    id: "settings.voice_language.group"
+- scrollUntilVisible:
+    element:
       text: "Dictation"
     direction: DOWN
 - tapOn: "Dictation"
 - assertVisible:
     id: "dictation.ostt_recommendation.group"
+- back
+- assertVisible:
+    id: "settings.voice_language.group"
 - back
 - assertVisible: "Settings"

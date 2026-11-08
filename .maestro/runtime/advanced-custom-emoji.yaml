@@ -7,9 +7,11 @@ name: advanced-custom-emoji
 - assertVisible: "Settings"
 - scrollUntilVisible:
     element:
-      text: "Appearance"
+      text: "Chats"
     direction: DOWN
-- tapOn: "Appearance"
+- tapOn: "Chats"
+- assertVisible:
+    id: "settings.chats.group"
 - scrollUntilVisible:
     element:
       text: "Custom emoji"
@@ -20,7 +22,8 @@ name: advanced-custom-emoji
 - assertVisible:
     id: "custom_emoji.add"
 - back
-- assertVisible: "Appearance"
+- assertVisible:
+    id: "settings.chats.group"
 - scrollUntilVisible:
     element:
       id: "appearance.custom_emoji.group"

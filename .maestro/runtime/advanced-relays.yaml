@@ -7,10 +7,20 @@ name: advanced-relays
 - assertVisible: "Settings"
 - scrollUntilVisible:
     element:
+      text: "Account"
+    direction: DOWN
+- tapOn: "Account"
+- assertVisible:
+    id: "settings.account.group"
+- scrollUntilVisible:
+    element:
       text: "Relays"
     direction: DOWN
 - tapOn: "Relays"
 - assertVisible:
     id: "relays.group"
+- back
+- assertVisible:
+    id: "settings.account.group"
 - back
 - assertVisible: "Settings"
