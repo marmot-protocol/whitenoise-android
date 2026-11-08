@@ -173,18 +173,10 @@ internal fun composerEmojiPaneTargetHeight(
     return if (knownHeight > 0.dp) knownHeight else ComposerEmojiPickerFallbackHeight
 }
 
-/** Share of the window the composer's browsing emoji pane takes; never less than the keyboard. */
-internal const val COMPOSER_EMOJI_BROWSE_HEIGHT_FRACTION = 0.5f
-
-internal fun composerEmojiBrowseHeight(
-    keyboardHeight: Dp,
-    windowHeight: Dp,
-): Dp = maxOf(keyboardHeight, windowHeight * COMPOSER_EMOJI_BROWSE_HEIGHT_FRACTION)
-
 /**
- * Height the composer emoji pane animates toward. Browsing takes the tall
- * [composerEmojiBrowseHeight] (or the [lockedPaneHeight] set on open and on the
- * way back to the keyboard). While the search keyboard is wanted the target is
+ * Height the composer emoji pane animates toward. Browsing matches the
+ * [keyboardHeight] (or the [lockedPaneHeight] set on open and on the way back to
+ * the keyboard), so swapping between keyboard and emoji keeps the composer still. While the search keyboard is wanted the target is
  * the keyboard plus the [searchRowHeight] above it, the pane's final total, so
  * the pane glides straight there while the keyboard rises instead of dipping
  * below the row and growing back. It flips back to browsing as soon as the
@@ -193,14 +185,13 @@ internal fun composerEmojiBrowseHeight(
 internal fun composerEmojiPaneHeight(
     lockedPaneHeight: Dp,
     keyboardHeight: Dp,
-    windowHeight: Dp,
     searchKeyboardWanted: Boolean,
     searchRowHeight: Dp = ComposerEmojiSearchRowFallbackHeight,
 ): Dp =
     when {
         searchKeyboardWanted -> keyboardHeight + searchRowHeight
         lockedPaneHeight > 0.dp -> lockedPaneHeight
-        else -> composerEmojiBrowseHeight(keyboardHeight, windowHeight)
+        else -> keyboardHeight
     }
 
 internal fun updatedComposerRememberedImeHeight(

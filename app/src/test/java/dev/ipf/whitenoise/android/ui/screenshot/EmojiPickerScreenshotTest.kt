@@ -46,7 +46,6 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerContent
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerEmojiSize
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerMinimumCellSize
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiSearchRowHeight
-import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiBrowseHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.emojiPickerCategoryTestTag
 import dev.ipf.whitenoise.android.ui.conversation.composer.emojiPickerCellTextMetrics
 import dev.ipf.whitenoise.android.ui.conversation.composer.emojiPickerHeaderTestTag
@@ -589,7 +588,7 @@ class EmojiPickerScreenshotTest {
         val PICKER_WIDTH = 360.dp
 
         // The composer's browsing pane on the 780dp test window, keyboard at the fallback height.
-        val COMPOSER_BROWSE_HEIGHT = composerEmojiBrowseHeight(ComposerEmojiPickerFallbackHeight, 780.dp)
+        val COMPOSER_BROWSE_HEIGHT = ComposerEmojiPickerFallbackHeight
 
         // The reaction sheet fills 0.88 of the screen; enough rows for the large-font wrap checks.
         val REACTION_SHEET_HEIGHT = 640.dp

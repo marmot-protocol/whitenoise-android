@@ -783,13 +783,11 @@ internal fun ComposerBar(
             targetImeHeight = targetImePaneHeight,
             rememberedImeHeight = rememberedImePaneHeight,
         )
-    val composerWindowHeight = configuration.screenHeightDp.dp
     var composerEmojiSearchRowHeight by remember { mutableStateOf(ComposerEmojiSearchRowFallbackHeight) }
     val emojiPaneHeight =
         composerEmojiPaneHeight(
             lockedPaneHeight = lockedComposerEmojiPaneHeight,
             keyboardHeight = composerKeyboardHeight,
-            windowHeight = composerWindowHeight,
             searchKeyboardWanted = composerEmojiSearchRow && targetImePaneHeight > 0.dp,
             searchRowHeight = composerEmojiSearchRowHeight,
         )
@@ -1079,7 +1077,7 @@ internal fun ComposerBar(
         composerEmojiSearchActive = false
         composerEmojiSearchRow = false
         if (!composerEmojiPickerOpen || lockedComposerEmojiPaneHeight == 0.dp) {
-            lockedComposerEmojiPaneHeight = composerEmojiBrowseHeight(composerKeyboardHeight, composerWindowHeight)
+            lockedComposerEmojiPaneHeight = composerKeyboardHeight
         }
         composerEmojiPickerRequested = true
         composerEmojiPickerOpen = true
