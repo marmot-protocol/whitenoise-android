@@ -356,6 +356,7 @@ internal fun MeasuredControlHandoffHost(
     destination: Any?,
     modifier: Modifier = Modifier,
     allowed: Boolean = true,
+    outlineVisible: () -> Boolean = { true },
     content: @Composable () -> Unit,
 ) {
     val enabled = rememberSystemAnimationsEnabled() && allowed
@@ -376,7 +377,7 @@ internal fun MeasuredControlHandoffHost(
                 drawContent()
                 if (enabled && state.presentationActive) {
                     drawMorphBridge(state, origin)
-                } else if (enabled && !state.morphSurface) {
+                } else if (enabled && !state.morphSurface && outlineVisible()) {
                     state.renderedBounds?.let { windowBounds ->
                         val bounds = windowBounds.translate(-origin)
                         drawRoundRect(

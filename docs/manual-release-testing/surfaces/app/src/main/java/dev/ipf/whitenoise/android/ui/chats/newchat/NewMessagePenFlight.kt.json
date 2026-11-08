@@ -1,0 +1,33 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePenFlight.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Modifier.newMessagePenOrigin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePenFlight.kt",
+        "anchor": "fun Modifier.newMessagePenOrigin(",
+        "test_ids": [
+          "NAV-011"
+        ]
+      },
+      {
+        "surface": "Modifier.penFlightBubble",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePenFlight.kt",
+        "anchor": "fun Modifier.penFlightBubble(",
+        "test_ids": [
+          "NAV-011"
+        ]
+      },
+      {
+        "surface": "Modifier.penFlightLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/NewMessagePenFlight.kt",
+        "anchor": "fun Modifier.penFlightLabel(",
+        "test_ids": [
+          "NAV-011"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

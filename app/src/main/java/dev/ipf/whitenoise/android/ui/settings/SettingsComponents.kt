@@ -73,7 +73,7 @@ internal fun SettingsGroup(
     val group = SettingsGroupScope().apply(content)
     val gap = WhiteNoiseListItemDefaults.segmentedGap
     Column(
-        modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+        modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin).settingsCardMorph(),
         verticalArrangement = Arrangement.spacedBy(gap),
     ) {
         group.rows.forEachIndexed { index, entry ->
