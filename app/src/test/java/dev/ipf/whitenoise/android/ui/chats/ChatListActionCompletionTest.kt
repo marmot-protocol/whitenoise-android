@@ -236,8 +236,7 @@ class ChatListActionCompletionTest {
         assertTrue("all original-account pending commands must clean up", pendingMuteCommands(fixture).isEmpty())
     }
 
-    private fun pendingMuteCommands(fixture: OffWindowActionFixture): Set<String> =
-        fixture.state.chatMuteOwner.pendingKeys
+    private fun pendingMuteCommands(fixture: OffWindowActionFixture) = fixture.state.chatMuteOwner.pendingKeys
 
     private fun muteOverrides(fixture: OffWindowActionFixture): Set<String> = fixture.state.chatMuteOwner.committedKeys
 

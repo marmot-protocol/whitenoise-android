@@ -18,8 +18,9 @@ class OptimisticSendDiscardTest {
         val diagnostic: DiscardedSendDiagnostic,
     )
 
-    private fun OptimisticSendDiscard.row() =
-        Row(releasesEditsAndFailureNotice, removesPhase, rollsBackPreview, diagnostic)
+    private fun OptimisticSendDiscard.row(): Row {
+        return Row(releasesEditsAndFailureNotice, removesPhase, rollsBackPreview, diagnostic)
+    }
 
     @Test
     fun eachDiscardPathKeepsItsIntendedDifferences() {

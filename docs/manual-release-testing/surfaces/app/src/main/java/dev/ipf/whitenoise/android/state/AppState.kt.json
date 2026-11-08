@@ -491,6 +491,14 @@
         "test_ids": [
           "DIC-011"
         ]
+      },
+      {
+        "surface": "Mute and unmute from chat-list actions and group details share one command path and one presentation owner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt",
+        "anchor": "private fun submitMuteCommand(",
+        "test_ids": [
+          "GRP-015"
+        ]
       }
     ]
   },
