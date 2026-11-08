@@ -261,7 +261,3 @@ internal class NativeAttachmentPausedException : IOException("native attachment 
 internal class NativeAttachmentTerminalException(
     val state: AttachmentTransferStateFfi,
 ) : IllegalStateException("native attachment transfer ended as $state")
-
-/** The state a terminal native acquisition ended in, found even when another step wrapped the refusal. */
-internal fun Throwable.nativeTerminalState(): AttachmentTransferStateFfi? =
-    generateSequence(this) { it.cause }.firstNotNullOfOrNull { (it as? NativeAttachmentTerminalException)?.state }

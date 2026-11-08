@@ -397,7 +397,7 @@ class AttachmentDownloadWorker : CoroutineWorker {
         } catch (expectedFailure: Throwable) {
             // Exception class and MDK's terminal transfer state are safe to log, while attachment
             // identity, URLs and decrypted metadata are deliberately excluded from logcat.
-            val state = expectedFailure.nativeTerminalState()?.let { " state=$it" }.orEmpty()
+            val state = expectedFailure.terminalStateLogSuffix()
             Log.w(TAG, "durable_attachment_download_failed type=${expectedFailure.javaClass.simpleName}$state")
             if (shouldRetryAttachmentDownloadWork(intentStore.hasSpentTransientRetry(request), expectedFailure)) {
                 intentStore.spendTransientRetry(request)

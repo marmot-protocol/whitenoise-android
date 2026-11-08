@@ -503,13 +503,19 @@ private fun refreshedState(
  * A transfer MDK parked for lack of free space presents as such, even when a publication step wrapped the native
  * refusal; every other failure is an ordinary failure.
  */
-internal fun Throwable.failedTransferState(): AttachmentTransferState {
-    val parked =
-        generateSequence(this) { it.cause }.any {
-            (it as? NativeAttachmentTerminalException)?.state == AttachmentTransferStateFfi.STORAGE_BLOCKED
-        }
-    return if (parked) AttachmentTransferState.StorageBlocked else AttachmentTransferState.Failed
-}
+internal fun Throwable.failedTransferState(): AttachmentTransferState =
+    if (nativeTerminalState() == AttachmentTransferStateFfi.STORAGE_BLOCKED) {
+        AttachmentTransferState.StorageBlocked
+    } else {
+        AttachmentTransferState.Failed
+    }
+
+/** The state a terminal native acquisition ended in, found even when another step wrapped the refusal. */
+internal fun Throwable.nativeTerminalState(): AttachmentTransferStateFfi? =
+    generateSequence(this) { it.cause }.firstNotNullOfOrNull { (it as? NativeAttachmentTerminalException)?.state }
+
+/** A failure log suffix naming MDK's terminal state, a fixed enum name that carries no attachment identity. */
+internal fun Throwable.terminalStateLogSuffix(): String = nativeTerminalState()?.let { " state=$it" }.orEmpty()
 
 private fun attachmentStateAfterRetention(retained: Boolean): AttachmentTransferState =
     if (retained) AttachmentTransferState.Available else AttachmentTransferState.NotRetained
