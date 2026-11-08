@@ -297,7 +297,7 @@ class PublicJpegPreviewsTest {
             preferences.retainAccounts(present)
             assertFalse(preferences.setEnabled("alice", true))
             assertFalse(preferences.enabled("alice"))
-            assertFalse(PublicJpegPreviewPreferences(context).enabled("alice"))
+            assertFalse(PublicJpegPreviewPreferences(context) { true }.enabled("alice"))
             assertEquals(emptySet<String>(), preferences.retainAccounts(present))
             // Re-importing the key publishes the account again; consent starts off and can be granted.
             present += "alice"
@@ -320,7 +320,7 @@ class PublicJpegPreviewsTest {
             preferences.retainAccounts(present)
             present += "carol"
             assertTrue(preferences.setEnabled("carol", true))
-            assertTrue(PublicJpegPreviewPreferences(context).enabled("carol"))
+            assertTrue(PublicJpegPreviewPreferences(context) { true }.enabled("carol"))
         }
 
     @Test
@@ -364,7 +364,7 @@ class PublicJpegPreviewsTest {
                 assertFalse(pending.first.await())
                 pending.second?.let { assertTrue(it.await()) }
                 assertFalse(preferences.enabled("alice"))
-                assertFalse(PublicJpegPreviewPreferences(context).enabled("alice"))
+                assertFalse(PublicJpegPreviewPreferences(context) { true }.enabled("alice"))
             }
         }
 
@@ -383,7 +383,7 @@ class PublicJpegPreviewsTest {
             preferences.revoke("alice")
             // No setEnabled(false): leaving the screen may cancel that coroutine before it starts.
             assertFalse(preferences.enabled("alice"))
-            assertFalse(PublicJpegPreviewPreferences(context).enabled("alice"))
+            assertFalse(PublicJpegPreviewPreferences(context) { true }.enabled("alice"))
             present.clear()
             preferences.retainAccounts(present)
             preferences.revoke("alice")
@@ -401,12 +401,12 @@ class PublicJpegPreviewsTest {
                 .edit()
                 .clear()
                 .commit()
-            val preferences = PublicJpegPreviewPreferences(context)
+            val preferences = PublicJpegPreviewPreferences(context) { true }
             assertFalse(preferences.enabled("alice"))
             assertTrue(preferences.setEnabled("alice", true))
-            assertTrue(PublicJpegPreviewPreferences(context).enabled("alice"))
+            assertTrue(PublicJpegPreviewPreferences(context) { true }.enabled("alice"))
             assertFalse(preferences.enabled("bob"))
             assertTrue(preferences.setEnabled("alice", false))
-            assertFalse(PublicJpegPreviewPreferences(context).enabled("alice"))
+            assertFalse(PublicJpegPreviewPreferences(context) { true }.enabled("alice"))
         }
 }

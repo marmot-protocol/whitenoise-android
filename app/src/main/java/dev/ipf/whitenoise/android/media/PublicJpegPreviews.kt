@@ -111,7 +111,7 @@ private fun isStaticJpegEnvelope(bytes: ByteArray): Boolean {
  */
 internal class PublicJpegPreviewPreferences(
     context: Context,
-    private val accountPresent: (String) -> Boolean = { true },
+    private val accountPresent: (String) -> Boolean,
 ) {
     private val preferences = context.getSharedPreferences("whitenoise.public_jpeg_previews", Context.MODE_PRIVATE)
     private val choices =
