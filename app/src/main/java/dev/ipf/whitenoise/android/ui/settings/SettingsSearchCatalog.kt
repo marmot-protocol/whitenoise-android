@@ -538,7 +538,13 @@ private fun settingsHubDestinationEntries(): List<SettingsSearchEntry> =
         ),
         hubEntry("home.Relays", R.string.relays, R.string.account, SettingsDetail.Relays, account = true),
         hubEntry("home.ChatFolders", R.string.chat_folders_title, R.string.chats, SettingsDetail.ChatFolders),
-        hubEntry("home.Gestures", R.string.gestures_title, R.string.chats, SettingsDetail.Gestures),
+        hubEntry(
+            "home.Gestures",
+            R.string.gestures_title,
+            R.string.chats,
+            SettingsDetail.Gestures,
+            alias = R.string.settings_search_alias_gestures,
+        ),
         hubEntry(
             "Chats.composer",
             R.string.composer_settings,

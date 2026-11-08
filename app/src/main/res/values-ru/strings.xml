@@ -977,7 +977,7 @@
     <string name="settings_profile_keys">Ключи профиля</string>
     <string name="settings_read_aloud">Читать вслух</string>
     <string name="settings_privacy_security">Конфиденциальность и безопасность</string>
-    <string name="settings_data_usage">Использование данных</string>
+    <string name="settings_data_usage">Данные и хранилище</string>
     <string name="settings_developer_tools">Инструменты разработчика</string>
     <string name="settings_donate">Пожертвовать</string>
     <string name="settings_add_profile">Добавить профиль</string>
@@ -1244,7 +1244,7 @@
     <string name="network_mobile">Мобильные данные</string>
     <string name="network_roaming">Роуминг</string>
     <string name="network_metered">Измеренная сеть</string>
-    <string name="data_usage_title">Использование данных</string>
+    <string name="data_usage_title">Данные и хранилище</string>
     <string name="download_automatic">Автоматические загрузки</string>
     <string name="download_photos">Фото</string>
     <string name="download_videos">Видео</string>
@@ -2658,6 +2658,7 @@
     <string name="settings_search_no_results">Настройки не найдены. Попробуйте другое слово.</string>
     <string name="settings_search_alias_font_size">размер текста|масштаб шрифта|крупный текст|мелкий текст</string>
     <string name="settings_search_alias_read_aloud">TTS|синтез речи|читать вслух</string>
+    <string name="settings_search_alias_gestures">жесты|свайп|жесты смахивания</string>
     <string name="settings_search_alias_sound">звук уведомлений|сигнал уведомления|мелодия</string>
     <string name="settings_search_revealed">%1$s. Настройка выделена.</string>
     <string name="date_time_format">Дата и время</string>

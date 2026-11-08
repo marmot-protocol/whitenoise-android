@@ -939,7 +939,7 @@
     <string name="settings_profile_keys">Chiavi del profilo</string>
     <string name="settings_read_aloud">Leggi ad alta voce</string>
     <string name="settings_privacy_security">Privacy e sicurezza</string>
-    <string name="settings_data_usage">Utilizzo dati</string>
+    <string name="settings_data_usage">Dati e archiviazione</string>
     <string name="settings_developer_tools">Strumenti per sviluppatori</string>
     <string name="settings_donate">Dona</string>
     <string name="settings_add_profile">Aggiungi profilo</string>
@@ -1198,7 +1198,7 @@
     <string name="network_mobile">Dati mobili</string>
     <string name="network_roaming">Roaming</string>
     <string name="network_metered">Rete a consumo</string>
-    <string name="data_usage_title">Utilizzo dei dati</string>
+    <string name="data_usage_title">Dati e archiviazione</string>
     <string name="download_automatic">Download automatici</string>
     <string name="download_photos">Foto</string>
     <string name="download_videos">Video</string>
@@ -2581,6 +2581,7 @@
     <string name="settings_search_no_results">Nessuna impostazione trovata. Prova un’altra parola.</string>
     <string name="settings_search_alias_font_size">dimensione del testo|scala del carattere|testo più grande|testo più piccolo</string>
     <string name="settings_search_alias_read_aloud">TTS|sintesi vocale|leggi ad alta voce</string>
+    <string name="settings_search_alias_gestures">gesti|scorrere|gesti di scorrimento</string>
     <string name="settings_search_alias_sound">suono delle notifiche|suono di avviso|suoneria</string>
     <string name="settings_search_revealed">%1$s. Impostazione evidenziata.</string>
     <string name="date_time_format">Data e ora</string>

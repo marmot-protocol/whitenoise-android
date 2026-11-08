@@ -922,7 +922,7 @@
     <string name="settings_profile_keys">个人资料密钥</string>
     <string name="settings_read_aloud">朗读</string>
     <string name="settings_privacy_security">隐私与安全</string>
-    <string name="settings_data_usage">数据用量</string>
+    <string name="settings_data_usage">数据与存储</string>
     <string name="settings_developer_tools">开发者工具</string>
     <string name="settings_donate">捐赠</string>
     <string name="settings_add_profile">添加个人资料</string>
@@ -1177,7 +1177,7 @@
     <string name="network_mobile">移动数据</string>
     <string name="network_roaming">漫游</string>
     <string name="network_metered">按流量计费网络</string>
-    <string name="data_usage_title">数据使用</string>
+    <string name="data_usage_title">数据与存储</string>
     <string name="download_automatic">自动下载</string>
     <string name="download_photos">照片</string>
     <string name="download_videos">视频</string>
@@ -2537,6 +2537,7 @@
     <string name="settings_search_no_results">未找到设置，请尝试其他关键词。</string>
     <string name="settings_search_alias_font_size">文字大小|字体缩放|放大文字|缩小文字</string>
     <string name="settings_search_alias_read_aloud">TTS|文字转语音|朗读</string>
+    <string name="settings_search_alias_gestures">手势|滑动|滑动手势</string>
     <string name="settings_search_alias_sound">通知声音|提示音|铃声</string>
     <string name="settings_search_revealed">%1$s。设置已突出显示。</string>
     <string name="date_time_format">日期和时间</string>

@@ -937,7 +937,7 @@
     <string name="settings_profile_keys">Profilschlüssel</string>
     <string name="settings_read_aloud">Vorlesen</string>
     <string name="settings_privacy_security">Datenschutz &amp; Sicherheit</string>
-    <string name="settings_data_usage">Datennutzung</string>
+    <string name="settings_data_usage">Daten &amp; Speicher</string>
     <string name="settings_developer_tools">Entwicklertools</string>
     <string name="settings_donate">Spenden</string>
     <string name="settings_add_profile">Profil hinzufügen</string>
@@ -1196,7 +1196,7 @@
     <string name="network_mobile">Mobile Daten</string>
     <string name="network_roaming">Roaming</string>
     <string name="network_metered">Getaktetes Netzwerk</string>
-    <string name="data_usage_title">Datennutzung</string>
+    <string name="data_usage_title">Daten &amp; Speicher</string>
     <string name="download_automatic">Automatische Downloads</string>
     <string name="download_photos">Fotos</string>
     <string name="download_videos">Videos</string>
@@ -2593,6 +2593,7 @@
     <string name="settings_search_no_results">Keine Einstellungen gefunden. Versuche ein anderes Wort.</string>
     <string name="settings_search_alias_font_size">Textgröße|Schriftgröße|größerer Text|kleinerer Text</string>
     <string name="settings_search_alias_read_aloud">TTS|Sprachausgabe|vorlesen</string>
+    <string name="settings_search_alias_gestures">Gesten|wischen|Wischgesten</string>
     <string name="settings_search_alias_sound">Benachrichtigungston|Hinweiston|Klingelton</string>
     <string name="settings_search_revealed">%1$s. Einstellung hervorgehoben.</string>
     <string name="date_time_format">Datum und Uhrzeit</string>

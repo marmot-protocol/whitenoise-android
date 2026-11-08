@@ -922,7 +922,7 @@
     <string name="settings_profile_keys">個人資料金鑰</string>
     <string name="settings_read_aloud">朗讀</string>
     <string name="settings_privacy_security">隱私與安全</string>
-    <string name="settings_data_usage">數據用量</string>
+    <string name="settings_data_usage">資料與儲存空間</string>
     <string name="settings_developer_tools">開發者工具</string>
     <string name="settings_donate">捐贈</string>
     <string name="settings_add_profile">新增個人資料</string>
@@ -1177,7 +1177,7 @@
     <string name="network_mobile">行動數據</string>
     <string name="network_roaming">漫遊</string>
     <string name="network_metered">按流量計費網路</string>
-    <string name="data_usage_title">資料使用</string>
+    <string name="data_usage_title">資料與儲存空間</string>
     <string name="download_automatic">自動下載</string>
     <string name="download_photos">照片</string>
     <string name="download_videos">影片</string>
@@ -2537,6 +2537,7 @@
     <string name="settings_search_no_results">找不到設定。請試試其他字詞。</string>
     <string name="settings_search_alias_font_size">文字大小|字型縮放|放大文字|縮小文字</string>
     <string name="settings_search_alias_read_aloud">TTS|文字轉語音|朗讀</string>
+    <string name="settings_search_alias_gestures">手勢|滑動|滑動手勢</string>
     <string name="settings_search_alias_sound">通知音效|提示音|鈴聲</string>
     <string name="settings_search_revealed">%1$s。已醒目標示設定。</string>
     <string name="date_time_format">日期和時間</string>

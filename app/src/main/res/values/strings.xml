@@ -1602,7 +1602,7 @@
     <string name="network_mobile">Mobile data</string>
     <string name="network_roaming">Roaming</string>
     <string name="network_metered">Metered network</string>
-    <string name="data_usage_title">Data Usage</string>
+    <string name="data_usage_title">Data &amp; storage</string>
     <string name="download_automatic">Automatic downloads</string>
     <string name="download_photos">Photos</string>
     <string name="download_videos">Videos</string>
@@ -2767,6 +2767,7 @@
     <string name="settings_search_no_results">No settings found. Try another word.</string>
     <string name="settings_search_alias_font_size">text size|font scale|larger text|smaller text</string>
     <string name="settings_search_alias_read_aloud">TTS|text to speech|read aloud</string>
+    <string name="settings_search_alias_gestures">gestures|swipe|swipe gestures</string>
     <string name="settings_search_alias_sound">notification sound|alert sound|ringtone</string>
     <string name="settings_search_revealed">%1$s. Setting highlighted.</string>
     <string name="date_time_format">Date and time</string>
