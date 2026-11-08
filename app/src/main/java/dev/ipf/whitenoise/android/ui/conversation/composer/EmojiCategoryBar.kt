@@ -49,6 +49,9 @@ private val EmojiCategoryToggleSize = 48.dp
 private val EmojiCategorySelectionSize = 36.dp
 private val EmojiCategoryIconSize = 22.dp
 
+/** Gap between the bar's outer buttons and the panel's rounded bottom corners. */
+private val EmojiCategoryBarEdgeInset = 12.dp
+
 /**
  * Bottom bar of the emoji picker: optional search and configure actions, one toggle per visible
  * category with a 36dp selection disc, and an optional backspace action for the composer pane.
@@ -98,7 +101,7 @@ internal fun EmojiCategoryBar(
             if (onBackspace != null) {
                 IconButton(
                     onClick = onBackspace,
-                    modifier = Modifier.padding(end = WhiteNoiseSpacing.Related),
+                    modifier = Modifier.padding(end = EmojiCategoryBarEdgeInset),
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.Backspace,
@@ -116,7 +119,7 @@ private fun EmojiCategoryBarLeadingActions(
     onSearch: (() -> Unit)?,
     onConfigure: (() -> Unit)?,
 ) {
-    Spacer(Modifier.width(WhiteNoiseSpacing.Related))
+    Spacer(Modifier.width(EmojiCategoryBarEdgeInset))
     if (onSearch != null) {
         IconButton(onClick = onSearch, modifier = Modifier.testTag(EMOJI_PICKER_SEARCH_OPEN_TEST_TAG)) {
             Icon(

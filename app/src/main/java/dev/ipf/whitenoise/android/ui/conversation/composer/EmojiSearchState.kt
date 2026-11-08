@@ -86,15 +86,9 @@ internal fun rememberEmojiSearchState(behindIcon: Boolean): EmojiSearchState {
     return remember(behindIcon, query) { EmojiSearchState(behindIcon, query) }
 }
 
-/**
- * Opening the search from the icon focuses the field and raises the keyboard; a pending close
- * finishes once the composer has left its one-row mode.
- */
+/** Opening the search from the icon focuses the field and raises the keyboard; closing returns to browsing. */
 @Composable
-internal fun EmojiSearchEffects(
-    search: EmojiSearchState,
-    searchRow: Boolean,
-) {
+internal fun EmojiSearchEffects(search: EmojiSearchState) {
     val keyboard = LocalSoftwareKeyboardController.current
     LaunchedEffect(search, search.isOpen) {
         if (search.behindIcon && search.isOpen) {
@@ -102,8 +96,8 @@ internal fun EmojiSearchEffects(
             keyboard?.show()
         }
     }
-    LaunchedEffect(search, search.closing, searchRow) {
-        if (search.closing && !searchRow) search.finishClose()
+    LaunchedEffect(search, search.closing) {
+        if (search.closing) search.finishClose()
     }
 }
 

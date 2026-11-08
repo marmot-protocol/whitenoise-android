@@ -168,8 +168,8 @@ private fun rememberEmojiPickerModel(
  *
  * [searchBehindIcon] selects the composer layout ([ComposerEmojiKeyboard]): the search field stays hidden
  * until the rail's search action opens it, and closing the field or moving focus away
- * returns to browsing. [searchRow] replaces the grid with one row of matches under the search field, so
- * the composer pane stays small while its search has the keyboard. Only the composer sets either.
+ * returns to browsing. Its search shows one row of matches under the field, and
+ * [onSearchContentHeightChange] reports their height so the composer can make room above the keyboard.
  */
 @Suppress("LongMethod") // Owns the picker state shared by the composer and sheet layouts.
 @Composable
@@ -184,7 +184,7 @@ internal fun EmojiPickerContent(
     onSearchActiveChange: (Boolean) -> Unit = {},
     selectionEnabled: Boolean = true,
     searchBehindIcon: Boolean = false,
-    searchRow: Boolean = false,
+    onSearchContentHeightChange: (Dp) -> Unit = {},
 ) {
     val search = rememberEmojiSearchState(searchBehindIcon)
     val query = search.query
@@ -202,11 +202,11 @@ internal fun EmojiPickerContent(
     EmojiPickerScrollSync(
         model,
         activeCategory,
-        if (searchRow) rowState else null,
+        if (searchBehindIcon) rowState else null,
         gridState,
         categoryState,
     )
-    EmojiSearchEffects(search, searchRow)
+    EmojiSearchEffects(search)
 
     // Delivers a picked emoji and records it as used when the picker serves the composer.
     val pick: (String) -> Unit = { emoji ->
@@ -226,7 +226,7 @@ internal fun EmojiPickerContent(
             sections = model.sections,
             searching = model.searching,
             noResults = noResults,
-            searchRow = searchRow,
+            onSearchContentHeightChange = onSearchContentHeightChange,
             gridState = gridState,
             rowState = rowState,
             categoryState = categoryState,

@@ -15,30 +15,14 @@ class ComposerInputClusterInsetsTest {
     @Test
     fun keyboardOpenClusterAppliesImePadding() {
         assertTrue(
-            composerBottomClusterAppliesImePadding(
-                showEmojiPane = false,
-                composerEmojiSearchRow = false,
-            ),
+            composerBottomClusterAppliesImePadding(showEmojiPane = false),
         )
     }
 
     @Test
     fun emojiPaneOpenClusterSkipsImePadding() {
         assertFalse(
-            composerBottomClusterAppliesImePadding(
-                showEmojiPane = true,
-                composerEmojiSearchRow = false,
-            ),
-        )
-    }
-
-    @Test
-    fun emojiPaneSearchRowReappliesImePadding() {
-        assertTrue(
-            composerBottomClusterAppliesImePadding(
-                showEmojiPane = true,
-                composerEmojiSearchRow = true,
-            ),
+            composerBottomClusterAppliesImePadding(showEmojiPane = true),
         )
     }
 

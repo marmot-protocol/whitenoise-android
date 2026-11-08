@@ -15,7 +15,6 @@ import androidx.compose.material3.IconButtonColors
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
@@ -33,6 +32,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ForwardBlockedReason
+import dev.ipf.whitenoise.android.ui.common.BottomPanelSurface
 import dev.ipf.whitenoise.android.ui.conversation.messages.forwardBlockedReasonLabel
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.Forward
@@ -41,7 +41,6 @@ import dev.ipf.whitenoise.android.ui.icons.filled.ContentCopy
 import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 import dev.ipf.whitenoise.android.ui.icons.filled.Download
 import dev.ipf.whitenoise.android.ui.icons.filled.Info
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,15 +61,7 @@ internal fun MessageSelectionBottomBar(
     val offered = remember(availability) { offeredMessageSelectionBarActions(availability) }
     val deleteLabel = stringResource(R.string.message_selection_action_delete)
 
-    Surface(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .navigationBarsPadding(),
-        color = MaterialTheme.colorScheme.surface,
-        border = amoledSurfaceBorderStroke(),
-        tonalElevation = 3.dp,
-    ) {
+    BottomPanelSurface(modifier = modifier.navigationBarsPadding()) {
         Column(modifier = Modifier.fillMaxWidth()) {
             if (!availability.canForward && forwardBlockedReason != null) {
                 Text(

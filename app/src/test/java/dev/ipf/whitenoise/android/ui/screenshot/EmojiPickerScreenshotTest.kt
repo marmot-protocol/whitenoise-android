@@ -4,10 +4,6 @@ import android.content.Context
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalCursorBlinkEnabled
@@ -35,6 +31,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.AppFontScale
 import dev.ipf.whitenoise.android.ui.EmojiCategory
 import dev.ipf.whitenoise.android.ui.RecentEmojiPreferences
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPaneHorizontalPadding
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerFallbackHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerPane
 import dev.ipf.whitenoise.android.ui.conversation.composer.EMOJI_PICKER_CATEGORIES_TEST_TAG
@@ -46,7 +43,6 @@ import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerContent
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerEmojiSize
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiPickerMinimumCellSize
 import dev.ipf.whitenoise.android.ui.conversation.composer.EmojiSearchRowHeight
-import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiBrowseHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.emojiPickerCategoryTestTag
 import dev.ipf.whitenoise.android.ui.conversation.composer.emojiPickerCellTextMetrics
 import dev.ipf.whitenoise.android.ui.conversation.composer.emojiPickerHeaderTestTag
@@ -73,7 +69,7 @@ import kotlin.math.abs
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [36], qualifiers = "w360dp-h780dp-mdpi")
+@Config(sdk = [36], qualifiers = "w392dp-h780dp-mdpi")
 class EmojiPickerScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -118,7 +114,10 @@ class EmojiPickerScreenshotTest {
         )
         val rail = boundsOfTag(EMOJI_PICKER_CATEGORIES_TEST_TAG)
         val searchIcon = boundsOfTag(EMOJI_PICKER_SEARCH_OPEN_TEST_TAG)
-        assertTrue("Search sits in the bottom-start corner", searchIcon.left - pane.left <= GAP_TOLERANCE_PX * 4)
+        assertTrue(
+            "Search sits in the bottom-start corner",
+            searchIcon.left - pane.left - ComposerEmojiPaneHorizontalPadding.value <= GAP_TOLERANCE_PX * 4,
+        )
         assertTrue("Search shares the rail's row", searchIcon.top < rail.bottom && searchIcon.bottom > rail.top)
         assertTrue("The rail sits on the pane's bottom edge", pane.bottom - searchIcon.bottom <= GAP_TOLERANCE_PX * 8)
         val toggles =
@@ -342,8 +341,6 @@ class EmojiPickerScreenshotTest {
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
     ) {
         composeRule.setContent {
-            // The composer switches to the row once search takes focus and keeps it while the keyboard is up.
-            var searchRow by remember { mutableStateOf(false) }
             WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled, fontScale = appFontScale) {
                 val base = LocalDensity.current
                 CompositionLocalProvider(
@@ -359,9 +356,9 @@ class EmojiPickerScreenshotTest {
                         onEmojiUsed = {},
                         onEmojiPicked = {},
                         onBackspace = {},
-                        onSearchActiveChange = { if (it) searchRow = true },
-                        searchRow = searchRow,
-                        modifier = Modifier.width(width).testTag(PICKER_TAG),
+                        onSearchActiveChange = {},
+                        // The pane pads itself to the composer's width; [width] is the visible surface.
+                        modifier = Modifier.width(width + ComposerEmojiPaneHorizontalPadding * 2).testTag(PICKER_TAG),
                     )
                 }
             }
@@ -589,7 +586,7 @@ class EmojiPickerScreenshotTest {
         val PICKER_WIDTH = 360.dp
 
         // The composer's browsing pane on the 780dp test window, keyboard at the fallback height.
-        val COMPOSER_BROWSE_HEIGHT = composerEmojiBrowseHeight(ComposerEmojiPickerFallbackHeight, 780.dp)
+        val COMPOSER_BROWSE_HEIGHT = ComposerEmojiPickerFallbackHeight
 
         // The reaction sheet fills 0.88 of the screen; enough rows for the large-font wrap checks.
         val REACTION_SHEET_HEIGHT = 640.dp

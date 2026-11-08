@@ -1,15 +1,11 @@
 package dev.ipf.whitenoise.android.ui
 
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerEmojiPickerFallbackHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerPaneRestoreStep
-import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiBrowseHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiPaneHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiPaneRestoreStep
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiPaneTargetHeight
-import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiSearchRowMinHeight
-import dev.ipf.whitenoise.android.ui.conversation.composer.composerEmojiSearchRowShown
 import dev.ipf.whitenoise.android.ui.conversation.composer.composerKeyboardRestoreTimeoutClearsFocus
 import dev.ipf.whitenoise.android.ui.conversation.composer.shouldStartComposerKeyboardRestore
 import dev.ipf.whitenoise.android.ui.conversation.composer.shouldSwapComposerEmojiPaneToIme
@@ -134,7 +130,6 @@ class ComposerEmojiPaneLayoutTest {
                             targetImeHeight = 0.dp,
                             rememberedImeHeight = lockedHeight,
                         ),
-                    windowHeight = 800.dp,
                     searchKeyboardWanted = false,
                 ),
             )
@@ -142,30 +137,14 @@ class ComposerEmojiPaneLayoutTest {
     }
 
     @Test
-    fun browsingPaneIsMuchTallerThanTheKeyboard() {
+    fun unlockedBrowsingPaneTakesExactlyTheKeyboardsSpace() {
         assertEquals(
-            400f,
-            composerEmojiBrowseHeight(keyboardHeight = 300.dp, windowHeight = 800.dp).value,
-            DP_TOLERANCE,
-        )
-    }
-
-    @Test
-    fun browsingPaneNeverDropsBelowTheKeyboardInShortWindows() {
-        assertEquals(300.dp, composerEmojiBrowseHeight(keyboardHeight = 300.dp, windowHeight = 400.dp))
-    }
-
-    @Test
-    fun unlockedBrowsingPaneTakesTheTallBrowseHeight() {
-        assertEquals(
-            400f,
+            300.dp,
             composerEmojiPaneHeight(
                 lockedPaneHeight = 0.dp,
                 keyboardHeight = 300.dp,
-                windowHeight = 800.dp,
                 searchKeyboardWanted = false,
-            ).value,
-            DP_TOLERANCE,
+            ),
         )
     }
 
@@ -176,7 +155,6 @@ class ComposerEmojiPaneLayoutTest {
             composerEmojiPaneHeight(
                 lockedPaneHeight = 400.dp,
                 keyboardHeight = 300.dp,
-                windowHeight = 800.dp,
                 searchKeyboardWanted = true,
                 searchRowHeight = 60.dp,
             ),
@@ -189,7 +167,6 @@ class ComposerEmojiPaneLayoutTest {
             composerEmojiPaneHeight(
                 lockedPaneHeight = 400.dp,
                 keyboardHeight = 300.dp,
-                windowHeight = 800.dp,
                 searchKeyboardWanted = true,
                 searchRowHeight = 60.dp,
             )
@@ -205,7 +182,6 @@ class ComposerEmojiPaneLayoutTest {
             composerEmojiPaneHeight(
                 lockedPaneHeight = 400.dp,
                 keyboardHeight = 300.dp,
-                windowHeight = 800.dp,
                 searchKeyboardWanted = false,
                 searchRowHeight = 60.dp,
             ),
@@ -418,46 +394,5 @@ class ComposerEmojiPaneLayoutTest {
     fun restoreTimeoutClearsFocusOnlyWhenNoKeyboardEverArrived() {
         assertTrue(composerKeyboardRestoreTimeoutClearsFocus(currentImeHeight = 0.dp))
         assertFalse(composerKeyboardRestoreTimeoutClearsFocus(currentImeHeight = 264.dp))
-    }
-
-    /** Search mode keeps the browsing pane's space until the keyboard covers it, then sits on the keyboard (#3613). */
-    @Test
-    fun searchRowCoversOnlyWhatTheKeyboardHasNotTaken() {
-        assertEquals(320.dp, composerEmojiSearchRowMinHeight(paneHeight = 320.dp, currentImeHeight = 0.dp))
-        assertEquals(120.dp, composerEmojiSearchRowMinHeight(paneHeight = 320.dp, currentImeHeight = 200.dp))
-        assertEquals(0.dp, composerEmojiSearchRowMinHeight(paneHeight = 320.dp, currentImeHeight = 340.dp))
-    }
-
-    /** The search row outlives its field's focus until the keyboard has fully hidden. */
-    @Test
-    fun searchRowStaysUntilTheKeyboardIsGone() {
-        assertTrue(searchRowShown(shown = false, active = true, current = 0.dp, target = 300.dp))
-        assertTrue(searchRowShown(shown = true, active = false, current = 80.dp, target = 0.dp))
-        assertFalse(searchRowShown(shown = true, active = false, current = 0.dp, target = 0.dp))
-        assertFalse(searchRowShown(shown = false, active = false, current = 300.dp, target = 300.dp))
-    }
-
-    /** Without an on-screen keyboard there is nothing for the row to sit on, so search stays in the browsing pane. */
-    @Test
-    fun hardwareKeyboardSearchKeepsTheBrowsingPane() {
-        assertFalse(searchRowShown(shown = false, active = true, current = 0.dp, target = 0.dp))
-    }
-
-    private fun searchRowShown(
-        shown: Boolean,
-        active: Boolean,
-        current: Dp,
-        target: Dp,
-    ): Boolean =
-        composerEmojiSearchRowShown(
-            searchRowShown = shown,
-            searchActive = active,
-            currentImeHeight = current,
-            targetImeHeight = target,
-        )
-
-    private companion object {
-        // Window fractions are float products, so 0.5 * 800dp can land a hair off 400dp.
-        const val DP_TOLERANCE = 0.01f
     }
 }

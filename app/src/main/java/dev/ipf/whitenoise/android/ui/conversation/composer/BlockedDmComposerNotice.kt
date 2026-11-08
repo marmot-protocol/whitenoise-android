@@ -3,12 +3,10 @@
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -22,7 +20,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+import dev.ipf.whitenoise.android.ui.common.BottomPanelSurface
 
 /** Read-only DM composer replacement with one account-scoped unblock action. */
 @Composable
@@ -31,15 +29,11 @@ internal fun BlockedDmComposerNotice(
     onUnblock: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
+    BottomPanelSurface(
         modifier =
             modifier
-                .fillMaxWidth()
                 .navigationBarsPadding()
                 .testTag("conversation.blocked_dm_notice"),
-        color = MaterialTheme.colorScheme.surface,
-        border = amoledSurfaceBorderStroke(),
-        tonalElevation = 3.dp,
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp),
