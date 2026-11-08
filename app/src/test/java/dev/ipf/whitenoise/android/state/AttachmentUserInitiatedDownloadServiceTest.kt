@@ -7,6 +7,9 @@ import android.content.Context
 import android.content.pm.ServiceInfo
 import android.os.PersistableBundle
 import androidx.test.core.app.ApplicationProvider
+import dev.ipf.marmotkit.AttachmentTransferStateFfi
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -16,6 +19,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowLog
 
 /** JobScheduler retains only the same validated native lookup identity as WorkManager. */
 @RunWith(RobolectricTestRunner::class)
@@ -177,4 +181,48 @@ class AttachmentUserInitiatedDownloadServiceTest {
         assertEquals("attachment_download_v2", notification.channelId)
         assertNull(manager.getNotificationChannel("attachment_download_v1"))
     }
+
+    /** A failed user job logs MDK's terminal transfer state, even when wrapped, and no text from the failure. */
+    @Test
+    fun failedUserJobLogsTheNativeTerminalState() =
+        runTest {
+            val cases =
+                listOf(
+                    NativeAttachmentTerminalException(AttachmentTransferStateFfi.UNAVAILABLE) to
+                        "type=NativeAttachmentTerminalException state=UNAVAILABLE",
+                    IllegalStateException(
+                        "fixture://private-wrap",
+                        NativeAttachmentTerminalException(AttachmentTransferStateFfi.STORAGE_BLOCKED),
+                    ) to "type=IllegalStateException state=STORAGE_BLOCKED",
+                    IllegalStateException("fixture://private-plain") to "type=IllegalStateException",
+                )
+            for ((failure, expected) in cases) {
+                ShadowLog.clear()
+                runUserInitiatedAttachmentDownload { throw failure }
+
+                val failed =
+                    ShadowLog
+                        .getLogsForTag("DMAttachmentJob")
+                        .filter { it.msg.startsWith("attachment_user_job_failed") }
+                assertEquals("attachment_user_job_failed $expected", failed.single().msg)
+                assertFalse("failure diagnostics exposed private text", failed.single().msg.contains("fixture://"))
+            }
+        }
+
+    /** A cancelled user-initiated job still rethrows its cancellation and logs no failure line. */
+    @Test
+    fun cancelledUserJobRethrowsWithoutAFailureLine() =
+        runTest {
+            ShadowLog.clear()
+
+            val thrown =
+                runCatching {
+                    runUserInitiatedAttachmentDownload { throw CancellationException("fixture://private-cancel") }
+                }.exceptionOrNull()
+
+            assertTrue("$thrown", thrown is CancellationException)
+            assertTrue(
+                ShadowLog.getLogsForTag("DMAttachmentJob").none { it.msg.startsWith("attachment_user_job_failed") },
+            )
+        }
 }

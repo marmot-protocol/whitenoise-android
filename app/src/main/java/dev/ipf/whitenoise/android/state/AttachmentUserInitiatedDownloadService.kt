@@ -185,6 +185,25 @@ internal fun attachmentDownloadNotification(context: Context): Notification =
             }
         }.build()
 
+/**
+ * Runs one user-initiated download so every native failure still finishes the job, logging only the exception
+ * type and MDK's terminal state. Cancellation is rethrown so the job's run can stop.
+ */
+@Suppress("TooGenericExceptionCaught") // This JobService boundary must finish jobs for all native failures.
+internal suspend fun runUserInitiatedAttachmentDownload(download: suspend () -> Unit) {
+    try {
+        download()
+    } catch (cancel: CancellationException) {
+        Log.w(TAG, "attachment_user_job_cancelled type=${cancel.javaClass.simpleName}")
+        throw cancel
+    } catch (failure: Throwable) {
+        // Exception class and MDK's terminal transfer state are safe to log, while attachment
+        // identity, URLs and decrypted metadata are deliberately excluded from logcat.
+        val state = failure.terminalStateLogSuffix()
+        Log.w(TAG, "attachment_user_job_failed type=${failure.javaClass.simpleName}$state")
+    }
+}
+
 /** Runs an explicit attachment fetch through Android's user-initiated transfer job. */
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 class AttachmentUserInitiatedDownloadService : JobService() {
@@ -220,12 +239,10 @@ class AttachmentUserInitiatedDownloadService : JobService() {
         return true
     }
 
-    @Suppress("TooGenericExceptionCaught") // This JobService boundary must finish jobs for all native failures.
-    private suspend fun runDownload(
-        request: AttachmentTransferRequest,
-    ) {
+    /** Downloads the request while the reader still wants it, through the same durable path as the worker. */
+    private suspend fun runDownload(request: AttachmentTransferRequest) {
         val store = attachmentIntentStore(applicationContext)
-        try {
+        runUserInitiatedAttachmentDownload {
             if (store.isInteractive(request)) {
                 val app = application as WhiteNoiseApplication
                 withContext(Dispatchers.Main.immediate) {
@@ -238,11 +255,6 @@ class AttachmentUserInitiatedDownloadService : JobService() {
                     )
                 if (!retained) Log.w(TAG, "attachment_user_job_not_retained")
             }
-        } catch (cancel: CancellationException) {
-            Log.w(TAG, "attachment_user_job_cancelled type=${cancel.javaClass.simpleName}")
-            throw cancel
-        } catch (failure: Throwable) {
-            Log.w(TAG, "attachment_user_job_failed type=${failure.javaClass.simpleName}")
         }
     }
 
