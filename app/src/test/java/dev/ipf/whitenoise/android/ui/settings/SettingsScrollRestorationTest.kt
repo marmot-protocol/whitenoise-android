@@ -216,7 +216,7 @@ class SettingsScrollRestorationTest {
             showSettings = true
         }
 
-        composeRule.onNodeWithText(context.getString(R.string.account)).fetchSemanticsNode()
+        composeRule.onNodeWithText(context.getString(SettingsHomeRow.Notifications.titleRes)).fetchSemanticsNode()
     }
 
     /** Keyed section wins when the section set changes. */
