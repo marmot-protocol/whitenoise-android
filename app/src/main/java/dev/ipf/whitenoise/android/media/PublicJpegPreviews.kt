@@ -104,15 +104,19 @@ private fun isStaticJpegEnvelope(bytes: ByteArray): Boolean {
     return false
 }
 
-/** Device-local rendering consent; defaults to no receive-side network requests. */
+/**
+ * Device-local rendering consent; defaults to no receive-side network requests.
+ * [accountPresent] reads the live local account list, so an account added after a wipe can change its
+ * setting while a removed account cannot (#3623).
+ */
 internal class PublicJpegPreviewPreferences(
     context: Context,
+    private val accountPresent: (String) -> Boolean,
 ) {
     private val preferences = context.getSharedPreferences("whitenoise.public_jpeg_previews", Context.MODE_PRIVATE)
     private val choices =
         MutableStateFlow(preferences.all.mapNotNull { (k, v) -> (v as? Boolean)?.let { k to it } }.toMap())
     val state = choices.asStateFlow()
-    private var retainedAccountIds: Set<String>? = null
     private val consentRevisions = mutableMapOf<String, Long>()
 
     fun enabled(accountRef: String): Boolean = choices.value[accountRef] == true
@@ -121,7 +125,6 @@ internal class PublicJpegPreviewPreferences(
     fun retainAccounts(accountIds: Collection<String>): Set<String> =
         synchronized(this) {
             val keep = accountIds.toSet()
-            retainedAccountIds = keep
             val removed = choices.value.keys - keep
             (choices.value.keys + consentRevisions.keys - keep).forEach { id ->
                 consentRevisions[id] = (consentRevisions[id] ?: 0L) + 1
@@ -134,7 +137,7 @@ internal class PublicJpegPreviewPreferences(
     /** Revoke immediately and schedule persistence independently of the settings screen lifetime. */
     fun revoke(accountId: String) {
         synchronized(this) {
-            if (retainedAccountIds?.contains(accountId) == false) return
+            if (!accountPresent(accountId)) return
             consentRevisions[accountId] = (consentRevisions[accountId] ?: 0L) + 1
             choices.value = choices.value + (accountId to false)
             preferences.edit().putBoolean(accountId, false).apply()
@@ -151,7 +154,7 @@ internal class PublicJpegPreviewPreferences(
             }
         return withContext(Dispatchers.IO) {
             synchronized(this@PublicJpegPreviewPreferences) {
-                if (retainedAccountIds?.contains(accountRef) == false || consentRevisions[accountRef] != revision) {
+                if (!accountPresent(accountRef) || consentRevisions[accountRef] != revision) {
                     return@synchronized false
                 }
                 val previous = this@PublicJpegPreviewPreferences.enabled(accountRef)

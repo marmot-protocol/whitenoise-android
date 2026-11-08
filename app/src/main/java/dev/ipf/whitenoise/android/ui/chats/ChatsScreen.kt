@@ -2532,13 +2532,14 @@ internal fun ChatsScreen(
                                 actionSheetChatId == null &&
                                 !actionMenuOwner.pointerHeld,
                         atTop = {
-                            (unreadOnly && (visibleItems.isEmpty() || displayUnreadSnapshot == null)) ||
-                                (
-                                    !hasEarlierChats &&
-                                        !chatListState.isScrollInProgress &&
-                                        chatListState.firstVisibleItemIndex == 0 &&
-                                        chatListState.firstVisibleItemScrollOffset == 0
-                                )
+                            chatListUnreadPullArmed(
+                                unreadOnly = unreadOnly,
+                                listEmpty = visibleItems.isEmpty(),
+                                hasEarlierChats = hasEarlierChats,
+                                scrollInProgress = chatListState.isScrollInProgress,
+                                firstVisibleItemIndex = chatListState.firstVisibleItemIndex,
+                                firstVisibleItemScrollOffset = chatListState.firstVisibleItemScrollOffset,
+                            )
                         },
                         onUnreadOnlyChange = { setUnreadOnly(it) },
                         status = {

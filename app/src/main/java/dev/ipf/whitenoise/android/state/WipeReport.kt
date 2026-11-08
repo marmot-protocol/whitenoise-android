@@ -120,15 +120,22 @@ enum class SignOutCompletion {
 
     /** Account cleanup failed or its native completion is unknown; this does not certify native liveness. */
     AccountCleanupIncomplete,
+
+    /**
+     * Native status confirms the account is signed out, so Android deactivated it, but the
+     * engine reported unfinished local cleanup for its data on this device (#3626).
+     */
+    SignedOutLocalCleanupIncomplete,
 }
 
 /**
  * Map the engine sign-out outcome to the completion the UI toasts about.
- * A null reply may reach this mapper only after native signed-out status is confirmed.
+ * Callers reach this mapper only after native signed-out status is confirmed, so a null
+ * reply or an unfinished local cleanup still describes a signed-out account.
  */
 internal fun signOutCompletion(engineOutcome: SignOutOutcomeFfi?): SignOutCompletion =
     when {
-        engineOutcome?.localCleanup?.completed == false -> SignOutCompletion.AccountCleanupIncomplete
+        engineOutcome?.localCleanup?.completed == false -> SignOutCompletion.SignedOutLocalCleanupIncomplete
         engineOutcome == null || engineOutcome.keyPackageFailures.isNotEmpty() ->
             SignOutCompletion.RelayCleanupIncomplete
         else -> SignOutCompletion.Complete

@@ -1417,6 +1417,7 @@
     <string name="sign_out_delete_key_packages_help">Verhindert neue Gruppeneinladungen für dieses Konto, solange du abgemeldet bist.</string>
     <string name="toast_signed_out_relay_cleanup_incomplete">Abgemeldet. Einige Einladungsschlüssel könnten noch auf Relays liegen.</string>
     <string name="toast_couldnt_sign_out">Abmelden nicht möglich. Das Konto ist auf diesem Gerät weiterhin aktiv.</string>
+    <string name="toast_signed_out_local_cleanup_incomplete">Abgemeldet. Einige Daten dieses Kontos konnten nicht von diesem Gerät entfernt werden.</string>
     <string name="wipe_progress_title">Abmelden &amp; Löschen…</string>
     <string name="wipe_stage_leaving_groups">Gruppen werden verlassen…</string>
     <string name="wipe_stage_deleting_key_packages">Einladungsschlüssel werden entfernt…</string>

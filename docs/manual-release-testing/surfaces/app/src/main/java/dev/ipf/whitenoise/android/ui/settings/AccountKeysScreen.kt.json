@@ -774,6 +774,14 @@
         ]
       },
       {
+        "surface": "string:toast_signed_out_local_cleanup_incomplete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
+        "anchor": "R.string.toast_signed_out_local_cleanup_incomplete",
+        "test_ids": [
+          "ONB-009"
+        ]
+      },
+      {
         "surface": "string:wipe",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AccountKeysScreen.kt",
         "anchor": "R.string.wipe",

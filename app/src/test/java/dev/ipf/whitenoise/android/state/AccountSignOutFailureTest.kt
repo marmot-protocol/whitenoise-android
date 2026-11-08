@@ -105,6 +105,29 @@ internal class AccountSignOutFailureTest : ExternalSignerSignOutFixture() {
             assertColdBootstrap(nativeAccounts(), null)
         }
 
+    /** Confirmed native sign-out with unfinished local cleanup reports signed out, not a failed sign-out (#3626). */
+    @Test
+    fun partialReplyAfterConfirmedSignOutReportsSignedOutWithLocalCleanupIncomplete() =
+        runBlocking {
+            signOutOutcome =
+                signOutOutcome.copy(
+                    localCleanup = dev.ipf.marmotkit.LocalCleanupReportFfi(false, "account worker still active"),
+                )
+            persistSignedOutBeforePartialFailure = true
+            val state = appState()
+            markReady(state)
+
+            dev.ipf.whitenoise.android.ui.settings
+                .signOutActiveAccount(state, deleteKeyPackages = true)
+            awaitUiSignOut(state)
+
+            assertEquals(AppText.Resource(R.string.toast_signed_out_local_cleanup_incomplete), state.toast?.title)
+            assertNull(state.activeAccountRef)
+            assertEquals(AppPhase.Onboarding, state.phase)
+            assertTrue(state.accounts.single().signedOut)
+            assertColdBootstrap(nativeAccounts(), null)
+        }
+
     /** Ordinary relay failures remain best-effort cleanup after a successful native local commit. */
     @Test
     fun typedRelayFailureStillCompletesLocalSignOut() =
