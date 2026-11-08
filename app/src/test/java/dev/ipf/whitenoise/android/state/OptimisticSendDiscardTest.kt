@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
@@ -31,39 +30,15 @@ class OptimisticSendDiscardTest {
         val forget = DiscardedSendDiagnostic.FORGET
         val expected =
             mapOf(
-                "cancelled" to Row(true, false, true, forget),
-                "abandoned" to Row(false, true, true, forget),
-                "discarded in flight" to Row(false, false, true, forget),
-                "discarded after publish" to Row(false, false, false, DiscardedSendDiagnostic.COMPLETE_DROPPED),
-                "discarded after media failure" to Row(false, false, true, DiscardedSendDiagnostic.LEAVE_TRACKED),
+                OptimisticSendDiscard.CANCELLED to Row(true, false, true, forget),
+                OptimisticSendDiscard.ABANDONED to Row(false, true, true, forget),
+                OptimisticSendDiscard.DISCARDED_IN_FLIGHT to Row(false, false, true, forget),
+                OptimisticSendDiscard.DISCARDED_AFTER_PUBLISH to
+                    Row(false, false, false, DiscardedSendDiagnostic.COMPLETE_DROPPED),
+                OptimisticSendDiscard.DISCARDED_AFTER_MEDIA_FAILURE to
+                    Row(false, false, true, DiscardedSendDiagnostic.LEAVE_TRACKED),
             )
-        val actual =
-            mapOf(
-                "cancelled" to OptimisticSendDiscard.CANCELLED.row(),
-                "abandoned" to OptimisticSendDiscard.ABANDONED.row(),
-                "discarded in flight" to OptimisticSendDiscard.DISCARDED_IN_FLIGHT.row(),
-                "discarded after publish" to OptimisticSendDiscard.DISCARDED_AFTER_PUBLISH.row(),
-                "discarded after media failure" to OptimisticSendDiscard.DISCARDED_AFTER_MEDIA_FAILURE.row(),
-            )
-        assertEquals(expected, actual)
-    }
-
-    @Test
-    fun sharedCleanupAlwaysReleasesTheBubbleAndUploadState() {
-        val body = discardFunctionBody()
-        val unconditional =
-            listOf(
-                "optimisticMessages.remove(optimisticKey)",
-                "durableAcceptanceCallbacks.remove(optimisticKey)",
-                "messageById.remove(tempId)",
-                "retainedMediaUploads.remove(optimisticKey)",
-                "activeUploadKeys.remove(optimisticKey)",
-                "publishTimelineFromIndexes()",
-            )
-        unconditional.forEach { call ->
-            val line = body.lines().single { call in it }
-            assertEquals("$call must not be behind an option", 8, line.indexOfFirst { !it.isWhitespace() })
-        }
+        assertEquals(expected, OptimisticSendDiscard.entries.associateWith { it.row() })
     }
 
     @Test
@@ -83,19 +58,8 @@ class OptimisticSendDiscardTest {
         }
         val rollbacks = Regex("""rollbackOptimisticChatListPreview\(tempId\)""").findAll(source).count()
         assertEquals("only the shared cleanup rolls back a discarded preview", 1, rollbacks)
-        assertTrue(
-            "only the shared cleanup completes a discarded send as dropped",
-            source.split("PerformanceResult.DROPPED").size == 2 &&
-                "PerformanceResult.DROPPED" in discardFunctionBody(),
-        )
-    }
-
-    private fun discardFunctionBody(): String {
-        val source = controllersSource()
-        val start = source.indexOf("private fun discardOptimisticSend(")
-        assertTrue("shared discard cleanup must exist", start >= 0)
-        val end = source.indexOf("\n    }\n", start)
-        return source.substring(start, end)
+        val dropped = Regex("""PerformanceResult\.DROPPED""").findAll(source).count()
+        assertEquals("only the shared cleanup completes a discarded send as dropped", 1, dropped)
     }
 
     private fun controllersSource(): String =

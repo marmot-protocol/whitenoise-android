@@ -57,32 +57,16 @@ internal class ChatMuteOwner {
             listMutedUntilMs()
         }
 
-    /**
-     * Group details: the command result, then the screen's latest chat-list
-     * row, then a direct MDK read made when that row is missing, then the
-     * loaded chat list.
-     */
-    @Suppress("LongParameterList") // Each fallback is a distinct source in the display order.
-    fun groupDetails(
-        key: String,
+    /** The command result when there is one, otherwise the caller's own reads. */
+    fun display(
+        key: String?,
         nowMillis: Long,
-        rowMuted: Boolean?,
-        rowMutedUntilMs: Long?,
-        targeted: ChatNotificationSettingsFfi?,
-        listMuted: () -> Boolean,
-        listMutedUntilMs: () -> Long?,
-    ): ChatMuteDisplay {
-        val committed = committedResult(key, nowMillis)
-        return ChatMuteDisplay(
-            muted = committed?.muted ?: rowMuted ?: targeted?.muted ?: listMuted(),
-            mutedUntilMs =
-                if (committed != null) {
-                    committed.mutedUntilMs
-                } else {
-                    rowMutedUntilMs ?: targeted?.mutedUntilMs ?: listMutedUntilMs()
-                },
-        )
-    }
+        fallback: () -> ChatMuteDisplay,
+    ): ChatMuteDisplay =
+        key
+            ?.let { committedResult(it, nowMillis) }
+            ?.let { ChatMuteDisplay(muted = it.muted, mutedUntilMs = it.mutedUntilMs) }
+            ?: fallback()
 
     /** Drops the command result once a projection supersedes it. */
     fun acceptProjection(

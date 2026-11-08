@@ -127,15 +127,11 @@ class AcceptedPendingMessageReconciliationTest {
         assertTrue("the canonical bridge must be stored after the discard check", bridgeStore > discardCheck)
         val discardBlock = source.substring(discardCheck, bridgeStore)
 
-        // The shared cleanup always clears the optimistic bubble and both upload
-        // maps; this option set also rolls back the chat-list preview.
+        // The shared cleanup clears the optimistic bubble, both upload maps and,
+        // for an in-flight discard, the chat-list preview.
         assertTrue(
             "discard must run the shared optimistic-send cleanup",
             "discardOptimisticSend(key, tempId, OptimisticSendDiscard.DISCARDED_IN_FLIGHT)" in discardBlock,
-        )
-        assertTrue(
-            "discard must restore the chat-list preview",
-            OptimisticSendDiscard.DISCARDED_IN_FLIGHT.rollsBackPreview,
         )
     }
 

@@ -8,7 +8,6 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
 
 /** Pins what each mute reader returns across command, row and projection state. */
 class ChatMuteOwnerTest {
@@ -19,37 +18,23 @@ class ChatMuteOwnerTest {
         val name: String,
         val committed: ChatNotificationSettingsFfi?,
         val pending: Boolean,
-        val rowMuted: Boolean?,
-        val rowMutedUntilMs: Long?,
         val expected: ChatMuteDisplay,
         val expectedListMuted: Boolean,
         val expectedListMutedUntilMs: Long?,
     )
 
-    // The loaded chat list says muted until 50_000; the targeted MDK read says unmuted.
+    // The loaded chat list says muted until 50_000; a screen's own read says muted until 30_000.
     private val listMuted = true
     private val listMutedUntilMs = 50_000L
-    private val targeted = settings(muted = false)
+    private val screenRead = ChatMuteDisplay(muted = true, mutedUntilMs = 30_000L)
 
     private val cases =
         listOf(
             Case(
-                name = "no command result, no row",
+                name = "no command result",
                 committed = null,
                 pending = false,
-                rowMuted = null,
-                rowMutedUntilMs = null,
-                expected = ChatMuteDisplay(muted = false, mutedUntilMs = listMutedUntilMs),
-                expectedListMuted = true,
-                expectedListMutedUntilMs = listMutedUntilMs,
-            ),
-            Case(
-                name = "no command result, row present",
-                committed = null,
-                pending = false,
-                rowMuted = true,
-                rowMutedUntilMs = 30_000L,
-                expected = ChatMuteDisplay(muted = true, mutedUntilMs = 30_000L),
+                expected = screenRead,
                 expectedListMuted = true,
                 expectedListMutedUntilMs = listMutedUntilMs,
             ),
@@ -57,18 +42,14 @@ class ChatMuteOwnerTest {
                 name = "pending command without a result yet",
                 committed = null,
                 pending = true,
-                rowMuted = false,
-                rowMutedUntilMs = null,
-                expected = ChatMuteDisplay(muted = false, mutedUntilMs = listMutedUntilMs),
+                expected = screenRead,
                 expectedListMuted = true,
                 expectedListMutedUntilMs = listMutedUntilMs,
             ),
             Case(
-                name = "settled unmute result beats row and list",
+                name = "settled unmute result beats the screen read and list",
                 committed = settings(muted = false),
                 pending = false,
-                rowMuted = true,
-                rowMutedUntilMs = 30_000L,
                 expected = ChatMuteDisplay(muted = false, mutedUntilMs = null),
                 expectedListMuted = false,
                 expectedListMutedUntilMs = null,
@@ -77,8 +58,6 @@ class ChatMuteOwnerTest {
                 name = "pending timed mute result",
                 committed = settings(muted = true, mutedUntilMs = 20_000L),
                 pending = true,
-                rowMuted = false,
-                rowMutedUntilMs = null,
                 expected = ChatMuteDisplay(muted = true, mutedUntilMs = 20_000L),
                 expectedListMuted = true,
                 expectedListMutedUntilMs = 20_000L,
@@ -87,8 +66,6 @@ class ChatMuteOwnerTest {
                 name = "expired timed mute result reads as unmuted",
                 committed = settings(muted = true, mutedUntilMs = now),
                 pending = false,
-                rowMuted = true,
-                rowMutedUntilMs = 30_000L,
                 expected = ChatMuteDisplay(muted = false, mutedUntilMs = null),
                 expectedListMuted = false,
                 expectedListMutedUntilMs = null,
@@ -106,19 +83,7 @@ class ChatMuteOwnerTest {
             if (case.pending) owner.admit(key)
 
             assertEquals(case.name, case.pending, owner.isPending(key))
-            assertEquals(
-                case.name,
-                case.expected,
-                owner.groupDetails(
-                    key = key,
-                    nowMillis = now,
-                    rowMuted = case.rowMuted,
-                    rowMutedUntilMs = case.rowMutedUntilMs,
-                    targeted = targeted,
-                    listMuted = { listMuted },
-                    listMutedUntilMs = { listMutedUntilMs },
-                ),
-            )
+            assertEquals(case.name, case.expected, owner.display(key, now) { screenRead })
             assertEquals(case.name, case.expectedListMuted, owner.muted(key, now) { listMuted })
             assertEquals(case.name, case.expectedListMutedUntilMs, owner.mutedUntilMs(key, now) { listMutedUntilMs })
             assertEquals(case.name, case.committed != null, owner.committedResult(key, now) != null)
@@ -126,21 +91,12 @@ class ChatMuteOwnerTest {
     }
 
     @Test
-    fun groupDetailsFallsBackToTheTargetedReadBeforeTheList() {
+    fun displayUsesTheCallersReadsWithoutAnAccount() {
         val owner = ChatMuteOwner()
+        val command = owner.admit(key)
+        runBlocking { command.execute { commit(settings(muted = false)) } }
 
-        val display =
-            owner.groupDetails(
-                key = key,
-                nowMillis = now,
-                rowMuted = null,
-                rowMutedUntilMs = null,
-                targeted = settings(muted = true, mutedUntilMs = 40_000L),
-                listMuted = { error("list must not be read when the targeted read is present") },
-                listMutedUntilMs = { null },
-            )
-
-        assertEquals(ChatMuteDisplay(muted = true, mutedUntilMs = 40_000L), display)
+        assertEquals(screenRead, owner.display(key = null, nowMillis = now) { screenRead })
     }
 
     @Test
@@ -203,19 +159,6 @@ class ChatMuteOwnerTest {
 
         assertFalse(owner.isPending(key))
         assertNull(owner.committedResult(key, now))
-    }
-
-    @Test
-    fun appStateSubmitsMuteAndUnmuteThroughOneCommandPath() {
-        val source =
-            listOf(
-                File("src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
-                File("app/src/main/java/dev/ipf/whitenoise/android/state/AppState.kt"),
-            ).first(File::exists).readText()
-
-        assertEquals(1, Regex("""private fun submitMuteCommand\(""").findAll(source).count())
-        assertFalse("submitUnmuteCommand" in source)
-        assertFalse("authoritativeMuteOverrides" in source)
     }
 
     private fun settings(

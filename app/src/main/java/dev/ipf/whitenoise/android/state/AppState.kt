@@ -8620,24 +8620,16 @@ class WhiteNoiseAppState private constructor(
         groupIdHex: String,
         row: ChatListRowFfi?,
         targeted: dev.ipf.marmotkit.ChatNotificationSettingsFfi?,
-    ): ChatMuteDisplay {
-        val listMuted = { row?.muted ?: engineConversationMuted(groupIdHex) }
-        val accountRef =
-            activeAccountRef
-                ?: return ChatMuteDisplay(
-                    muted = row?.muted ?: targeted?.muted ?: listMuted(),
-                    mutedUntilMs = row?.mutedUntilMs ?: targeted?.mutedUntilMs,
-                )
-        return chatMuteOwner.groupDetails(
-            key = ChatMutePreferences.compositeKey(accountRef, groupIdHex),
+    ): ChatMuteDisplay =
+        chatMuteOwner.display(
+            key = activeAccountRef?.let { ChatMutePreferences.compositeKey(it, groupIdHex) },
             nowMillis = System.currentTimeMillis(),
-            rowMuted = row?.muted,
-            rowMutedUntilMs = row?.mutedUntilMs,
-            targeted = targeted,
-            listMuted = listMuted,
-            listMutedUntilMs = { conversationMuteExpiryMillis(groupIdHex) },
-        )
-    }
+        ) {
+            ChatMuteDisplay(
+                muted = row?.muted ?: targeted?.muted ?: engineConversationMuted(groupIdHex),
+                mutedUntilMs = row?.mutedUntilMs ?: targeted?.mutedUntilMs ?: conversationMuteExpiryMillis(groupIdHex),
+            )
+        }
 
     fun conversationNotifyMode(groupIdHex: String): ChatNotifyMode {
         val accountRef = activeAccountRef ?: return ChatNotifyMode.ALL
