@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="manage_storage_title">Manage storage</string>
+    <string name="manage_storage_entry_subtitle">See what\'s stored on this device and free up space</string>
+    <string name="storage_calculating">Calculating…</string>
+    <string name="storage_used_by_profile">Used by this profile on this device</string>
+    <string name="storage_usage_description">Storage used: %1$s. %2$s</string>
+    <string name="storage_attachments">Attachments</string>
+    <plurals name="storage_attachment_count">
+        <item quantity="one">%d attachment</item>
+        <item quantity="other">%d attachments</item>
+    </plurals>
+    <string name="storage_chat_data">Messages and chat data</string>
+    <string name="storage_unused_space">Unused database space</string>
+    <string name="storage_pictures">Profile and group pictures</string>
+    <string name="storage_temporary">Temporary files</string>
+    <string name="storage_temporary_detail">Shared by all profiles on this device</string>
+    <string name="storage_load_failed">Couldn\'t load storage usage</string>
+    <string name="storage_retry">Try again</string>
+    <string name="storage_migration_moving_title">Updating attachment storage</string>
+    <string name="storage_migration_moving">%1$s left to move. Nothing is deleted.</string>
+    <string name="storage_migration_paused_title">Attachment storage update paused</string>
+    <string name="storage_migration_paused">Free up %1$s on this device, or remove attachments below, to continue. Nothing is deleted.</string>
+    <string name="storage_migration_compacting_title">Returning freed space</string>
+    <string name="storage_migration_compacting">Chats may pause for a moment.</string>
+    <string name="storage_free_up_space">Free up space</string>
+    <string name="storage_largest_attachments">Largest attachments</string>
+    <string name="storage_remove_older">Remove older attachments</string>
+    <string name="storage_clear_cache">Clear pictures and temporary files</string>
+    <string name="storage_clear_cache_subtitle">Pictures download again when you need them</string>
+    <string name="storage_removal_help">Removed attachments stay in their messages. You can download them again while the sender\'s copy is still available.</string>
+    <string name="storage_keep_media">Keep media</string>
+    <string name="storage_keep_media_help">Attachments older than this are removed from this device now and as they age. Downloading one again keeps it for the full period.</string>
+    <string name="storage_keep_media_failed">Couldn\'t load</string>
+    <string name="storage_keep_forever">Forever</string>
+    <string name="storage_keep_one_year">1 year</string>
+    <string name="storage_keep_six_months">6 months</string>
+    <string name="storage_keep_thirty_days">30 days</string>
+    <string name="storage_keep_confirm_title">Keep media for %1$s?</string>
+    <string name="storage_keep_confirm_message">Attachments older than %1$s are removed from this device now and as they age. Messages stay, and you can download attachments again while the sender\'s copy is still available.</string>
+    <string name="storage_older_one_week">Older than 1 week</string>
+    <string name="storage_older_one_month">Older than 1 month</string>
+    <string name="storage_older_three_months">Older than 3 months</string>
+    <string name="storage_older_six_months">Older than 6 months</string>
+    <string name="storage_older_one_year">Older than 1 year</string>
+    <string name="storage_remove_older_title">Remove older attachments?</string>
+    <string name="storage_remove_older_message">Attachments received before %1$s are removed from this device in every chat. Messages stay, and you can download attachments again while the sender\'s copy is still available.</string>
+    <string name="storage_remove_older_chat_message">Attachments in this chat received before %1$s are removed from this device. Messages stay, and you can download attachments again while the sender\'s copy is still available.</string>
+    <string name="storage_clear_cache_title">Clear pictures and temporary files?</string>
+    <string name="storage_clear_cache_message">This frees up to %1$s. Profile and group pictures download again when you need them.</string>
+    <string name="storage_clear">Clear</string>
+    <string name="storage_chats">Chats</string>
+    <string name="storage_chats_help">An attachment shared in more than one chat counts in each.</string>
+    <string name="storage_chat_unavailable">Chat unavailable</string>
+    <string name="storage_no_attachments">No attachments on this device</string>
+    <string name="storage_chats_failed">Couldn\'t load chats</string>
+    <string name="storage_attachments_failed">Couldn\'t load attachments</string>
+    <string name="storage_remove_all_in_chat">Remove all attachments</string>
+    <string name="storage_largest_first">Largest first</string>
+    <string name="storage_remove">Remove</string>
+    <string name="storage_removing">Removing</string>
+    <string name="storage_select_all">Select all</string>
+    <string name="storage_clear_selection">Clear selection</string>
+    <plurals name="storage_selected">
+        <item quantity="one">%1$d selected · %2$s</item>
+        <item quantity="other">%1$d selected · %2$s</item>
+    </plurals>
+    <plurals name="storage_remove_attachments_title">
+        <item quantity="one">Remove %d attachment?</item>
+        <item quantity="other">Remove %d attachments?</item>
+    </plurals>
+    <string name="storage_remove_attachments_message">This frees up to %1$s. Messages stay, and you can download attachments again while the sender\'s copy is still available.</string>
+    <string name="storage_attachment_photo">Photo</string>
+    <string name="storage_attachment_video">Video</string>
+    <string name="storage_attachment_audio">Audio</string>
+    <string name="storage_attachment_file">File</string>
+    <plurals name="storage_removed_freed">
+        <item quantity="one">Removed %1$d attachment · %2$s freed</item>
+        <item quantity="other">Removed %1$d attachments · %2$s freed</item>
+    </plurals>
+    <string name="storage_nothing_removed">No attachments matched, so nothing was removed</string>
+    <string name="storage_keep_media_saved">Keep media saved</string>
+    <string name="storage_cache_cleared">%1$s freed</string>
+    <string name="storage_action_failed">Couldn\'t free up space. Try again.</string>
+</resources>

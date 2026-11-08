@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="manage_storage_title">Administrar almacenamiento</string>
+    <string name="manage_storage_entry_subtitle">Consulta qué se guarda en este dispositivo y libera espacio</string>
+    <string name="storage_calculating">Calculando…</string>
+    <string name="storage_used_by_profile">Usado por este perfil en este dispositivo</string>
+    <string name="storage_usage_description">Almacenamiento usado: %1$s. %2$s</string>
+    <string name="storage_attachments">Adjuntos</string>
+    <plurals name="storage_attachment_count">
+        <item quantity="one">%d adjunto</item>
+        <item quantity="other">%d adjuntos</item>
+    </plurals>
+    <string name="storage_chat_data">Mensajes y datos de chat</string>
+    <string name="storage_unused_space">Espacio de base de datos sin usar</string>
+    <string name="storage_pictures">Fotos de perfil y de grupo</string>
+    <string name="storage_temporary">Archivos temporales</string>
+    <string name="storage_temporary_detail">Compartidos por todos los perfiles de este dispositivo</string>
+    <string name="storage_load_failed">No se pudo cargar el uso del almacenamiento</string>
+    <string name="storage_retry">Reintentar</string>
+    <string name="storage_migration_moving_title">Actualizando el almacenamiento de adjuntos</string>
+    <string name="storage_migration_moving">Quedan %1$s por mover. No se elimina nada.</string>
+    <string name="storage_migration_paused_title">Actualización del almacenamiento de adjuntos en pausa</string>
+    <string name="storage_migration_paused">Libera %1$s en este dispositivo o elimina adjuntos abajo para continuar. No se elimina nada.</string>
+    <string name="storage_migration_compacting_title">Recuperando el espacio liberado</string>
+    <string name="storage_migration_compacting">Los chats pueden detenerse un momento.</string>
+    <string name="storage_free_up_space">Liberar espacio</string>
+    <string name="storage_largest_attachments">Adjuntos más grandes</string>
+    <string name="storage_remove_older">Eliminar adjuntos antiguos</string>
+    <string name="storage_clear_cache">Borrar fotos y archivos temporales</string>
+    <string name="storage_clear_cache_subtitle">Las fotos se vuelven a descargar cuando las necesitas</string>
+    <string name="storage_removal_help">Los adjuntos eliminados permanecen en sus mensajes. Puedes volver a descargarlos mientras la copia del remitente siga disponible.</string>
+    <string name="storage_keep_media">Conservar multimedia</string>
+    <string name="storage_keep_media_help">Los adjuntos con más antigüedad que este periodo se eliminan de este dispositivo ahora y a medida que envejecen. Si vuelves a descargar uno, se conserva durante todo el periodo.</string>
+    <string name="storage_keep_media_failed">No se pudo cargar</string>
+    <string name="storage_keep_forever">Siempre</string>
+    <string name="storage_keep_one_year">1 año</string>
+    <string name="storage_keep_six_months">6 meses</string>
+    <string name="storage_keep_thirty_days">30 días</string>
+    <string name="storage_keep_confirm_title">¿Conservar multimedia: %1$s?</string>
+    <string name="storage_keep_confirm_message">Los adjuntos con más de %1$s se eliminan de este dispositivo ahora y a medida que envejecen. Los mensajes se conservan y puedes volver a descargar los adjuntos mientras la copia del remitente siga disponible.</string>
+    <string name="storage_older_one_week">Más de 1 semana</string>
+    <string name="storage_older_one_month">Más de 1 mes</string>
+    <string name="storage_older_three_months">Más de 3 meses</string>
+    <string name="storage_older_six_months">Más de 6 meses</string>
+    <string name="storage_older_one_year">Más de 1 año</string>
+    <string name="storage_remove_older_title">¿Eliminar adjuntos antiguos?</string>
+    <string name="storage_remove_older_message">Los adjuntos recibidos antes del %1$s se eliminan de este dispositivo en todos los chats. Los mensajes se conservan y puedes volver a descargar los adjuntos mientras la copia del remitente siga disponible.</string>
+    <string name="storage_remove_older_chat_message">Los adjuntos de este chat recibidos antes del %1$s se eliminan de este dispositivo. Los mensajes se conservan y puedes volver a descargar los adjuntos mientras la copia del remitente siga disponible.</string>
+    <string name="storage_clear_cache_title">¿Borrar fotos y archivos temporales?</string>
+    <string name="storage_clear_cache_message">Esto libera hasta %1$s. Las fotos de perfil y de grupo se vuelven a descargar cuando las necesitas.</string>
+    <string name="storage_clear">Borrar</string>
+    <string name="storage_chats">Conversaciones</string>
+    <string name="storage_chats_help">Un adjunto compartido en más de un chat cuenta en cada uno.</string>
+    <string name="storage_chat_unavailable">Chat no disponible</string>
+    <string name="storage_no_attachments">No hay adjuntos en este dispositivo</string>
+    <string name="storage_chats_failed">No se pudieron cargar los chats</string>
+    <string name="storage_attachments_failed">No se pudieron cargar los adjuntos</string>
+    <string name="storage_remove_all_in_chat">Eliminar todos los adjuntos</string>
+    <string name="storage_largest_first">Más grandes primero</string>
+    <string name="storage_remove">Eliminar</string>
+    <string name="storage_removing">Eliminando</string>
+    <string name="storage_select_all">Seleccionar todo</string>
+    <string name="storage_clear_selection">Borrar selección</string>
+    <plurals name="storage_selected">
+        <item quantity="one">%1$d seleccionado · %2$s</item>
+        <item quantity="other">%1$d seleccionados · %2$s</item>
+    </plurals>
+    <plurals name="storage_remove_attachments_title">
+        <item quantity="one">¿Eliminar %d adjunto?</item>
+        <item quantity="other">¿Eliminar %d adjuntos?</item>
+    </plurals>
+    <string name="storage_remove_attachments_message">Esto libera hasta %1$s. Los mensajes se conservan y puedes volver a descargar los adjuntos mientras la copia del remitente siga disponible.</string>
+    <string name="storage_attachment_photo">Foto</string>
+    <string name="storage_attachment_video">Vídeo</string>
+    <string name="storage_attachment_audio">Archivo de audio</string>
+    <string name="storage_attachment_file">Archivo</string>
+    <plurals name="storage_removed_freed">
+        <item quantity="one">%1$d adjunto eliminado · %2$s liberados</item>
+        <item quantity="other">%1$d adjuntos eliminados · %2$s liberados</item>
+    </plurals>
+    <string name="storage_nothing_removed">Ningún adjunto coincidía, así que no se eliminó nada</string>
+    <string name="storage_keep_media_saved">Se guardó Conservar multimedia</string>
+    <string name="storage_cache_cleared">%1$s liberados</string>
+    <string name="storage_action_failed">No se pudo liberar espacio. Inténtalo de nuevo.</string>
+</resources>

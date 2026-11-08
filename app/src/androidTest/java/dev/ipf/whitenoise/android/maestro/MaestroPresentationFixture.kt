@@ -151,6 +151,7 @@ internal class MaestroPresentationFixture(
         AvatarImageLoader.putCachedAnimated("https://fixture.example.invalid/animated", image, retained)
     }
 
+    /** Routes the scenario, by prefix, to the presentation that renders its production composables. */
     @Composable
     @Suppress("FunctionNaming")
     private fun Content() {
@@ -166,9 +167,16 @@ internal class MaestroPresentationFixture(
             scenario.startsWith("selection-") -> MaestroSelectionPresentation(this)
             scenario.startsWith("group-ui-") -> MaestroGroupPresentation(this)
             scenario.startsWith("surface-") -> MaestroSurfacePresentation(this)
-            scenario.startsWith("extra-") -> MaestroExtraPresentation(this)
+            scenario.substringBefore('-') in setOf("extra", "storage") -> SettingsExtraContent()
             else -> MaestroBoundaryPresentation(this)
         }
+    }
+
+    /** Extra and storage presentations share one route so the scenario switch stays within its complexity budget. */
+    @Composable
+    @Suppress("FunctionNaming")
+    private fun SettingsExtraContent() {
+        if (scenario.startsWith("storage-")) MaestroStoragePresentation(this) else MaestroExtraPresentation(this)
     }
 
     @Composable

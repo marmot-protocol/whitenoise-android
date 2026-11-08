@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="manage_storage_title">Gérer le stockage</string>
+    <string name="manage_storage_entry_subtitle">Voyez ce qui est stocké sur cet appareil et libérez de l\'espace</string>
+    <string name="storage_calculating">Calcul en cours…</string>
+    <string name="storage_used_by_profile">Utilisé par ce profil sur cet appareil</string>
+    <string name="storage_usage_description">Stockage utilisé : %1$s. %2$s</string>
+    <string name="storage_attachments">Pièces jointes</string>
+    <plurals name="storage_attachment_count">
+        <item quantity="one">%d pièce jointe</item>
+        <item quantity="other">%d pièces jointes</item>
+    </plurals>
+    <string name="storage_chat_data">Messages et données des discussions</string>
+    <string name="storage_unused_space">Espace inutilisé de la base de données</string>
+    <string name="storage_pictures">Photos de profil et de groupe</string>
+    <string name="storage_temporary">Fichiers temporaires</string>
+    <string name="storage_temporary_detail">Partagés par tous les profils de cet appareil</string>
+    <string name="storage_load_failed">Impossible de charger l\'utilisation du stockage</string>
+    <string name="storage_retry">Réessayer</string>
+    <string name="storage_migration_moving_title">Mise à jour du stockage des pièces jointes</string>
+    <string name="storage_migration_moving">Encore %1$s à déplacer. Rien n\'est supprimé.</string>
+    <string name="storage_migration_paused_title">Mise à jour du stockage des pièces jointes en pause</string>
+    <string name="storage_migration_paused">Libérez %1$s sur cet appareil ou supprimez des pièces jointes ci-dessous pour continuer. Rien n\'est supprimé.</string>
+    <string name="storage_migration_compacting_title">Restitution de l\'espace libéré</string>
+    <string name="storage_migration_compacting">Les discussions peuvent se figer un instant.</string>
+    <string name="storage_free_up_space">Libérer de l\'espace</string>
+    <string name="storage_largest_attachments">Pièces jointes les plus volumineuses</string>
+    <string name="storage_remove_older">Supprimer les anciennes pièces jointes</string>
+    <string name="storage_clear_cache">Effacer les photos et les fichiers temporaires</string>
+    <string name="storage_clear_cache_subtitle">Les photos sont à nouveau téléchargées quand vous en avez besoin</string>
+    <string name="storage_removal_help">Les pièces jointes supprimées restent dans leurs messages. Vous pouvez les télécharger à nouveau tant que la copie de l\'expéditeur est encore disponible.</string>
+    <string name="storage_keep_media">Conserver les médias</string>
+    <string name="storage_keep_media_help">Les pièces jointes plus anciennes que cette durée sont supprimées de cet appareil dès maintenant, puis au fil du temps. Une pièce jointe téléchargée à nouveau est conservée pendant toute la durée.</string>
+    <string name="storage_keep_media_failed">Impossible de charger</string>
+    <string name="storage_keep_forever">Toujours</string>
+    <string name="storage_keep_one_year">1 an</string>
+    <string name="storage_keep_six_months">6 mois</string>
+    <string name="storage_keep_thirty_days">30 jours</string>
+    <string name="storage_keep_confirm_title">Conserver les médias : %1$s ?</string>
+    <string name="storage_keep_confirm_message">Les pièces jointes de plus de %1$s sont supprimées de cet appareil dès maintenant, puis au fil du temps. Les messages restent, et vous pouvez télécharger à nouveau les pièces jointes tant que la copie de l\'expéditeur est encore disponible.</string>
+    <string name="storage_older_one_week">Plus d\'1 semaine</string>
+    <string name="storage_older_one_month">Plus d\'1 mois</string>
+    <string name="storage_older_three_months">Plus de 3 mois</string>
+    <string name="storage_older_six_months">Plus de 6 mois</string>
+    <string name="storage_older_one_year">Plus d\'1 an</string>
+    <string name="storage_remove_older_title">Supprimer les anciennes pièces jointes ?</string>
+    <string name="storage_remove_older_message">Les pièces jointes reçues avant le %1$s sont supprimées de cet appareil dans toutes les discussions. Les messages restent, et vous pouvez télécharger à nouveau les pièces jointes tant que la copie de l\'expéditeur est encore disponible.</string>
+    <string name="storage_remove_older_chat_message">Les pièces jointes de cette discussion reçues avant le %1$s sont supprimées de cet appareil. Les messages restent, et vous pouvez télécharger à nouveau les pièces jointes tant que la copie de l\'expéditeur est encore disponible.</string>
+    <string name="storage_clear_cache_title">Effacer les photos et les fichiers temporaires ?</string>
+    <string name="storage_clear_cache_message">Cela libère jusqu\'à %1$s. Les photos de profil et de groupe sont à nouveau téléchargées quand vous en avez besoin.</string>
+    <string name="storage_clear">Effacer</string>
+    <string name="storage_chats">Discussions</string>
+    <string name="storage_chats_help">Une pièce jointe partagée dans plusieurs discussions est comptée dans chacune.</string>
+    <string name="storage_chat_unavailable">Discussion indisponible</string>
+    <string name="storage_no_attachments">Aucune pièce jointe sur cet appareil</string>
+    <string name="storage_chats_failed">Impossible de charger les discussions</string>
+    <string name="storage_attachments_failed">Impossible de charger les pièces jointes</string>
+    <string name="storage_remove_all_in_chat">Supprimer toutes les pièces jointes</string>
+    <string name="storage_largest_first">Les plus volumineuses d\'abord</string>
+    <string name="storage_remove">Supprimer</string>
+    <string name="storage_removing">Suppression</string>
+    <string name="storage_select_all">Tout sélectionner</string>
+    <string name="storage_clear_selection">Effacer la sélection</string>
+    <plurals name="storage_selected">
+        <item quantity="one">%1$d sélectionnée · %2$s</item>
+        <item quantity="other">%1$d sélectionnées · %2$s</item>
+    </plurals>
+    <plurals name="storage_remove_attachments_title">
+        <item quantity="one">Supprimer %d pièce jointe ?</item>
+        <item quantity="other">Supprimer %d pièces jointes ?</item>
+    </plurals>
+    <string name="storage_remove_attachments_message">Cela libère jusqu\'à %1$s. Les messages restent, et vous pouvez télécharger à nouveau les pièces jointes tant que la copie de l\'expéditeur est encore disponible.</string>
+    <string name="storage_attachment_photo">Image</string>
+    <string name="storage_attachment_video">Vidéo</string>
+    <string name="storage_attachment_audio">Fichier audio</string>
+    <string name="storage_attachment_file">Fichier</string>
+    <plurals name="storage_removed_freed">
+        <item quantity="one">%1$d pièce jointe supprimée · %2$s libérés</item>
+        <item quantity="other">%1$d pièces jointes supprimées · %2$s libérés</item>
+    </plurals>
+    <string name="storage_nothing_removed">Aucune pièce jointe ne correspondait, rien n\'a été supprimé</string>
+    <string name="storage_keep_media_saved">Conserver les médias enregistré</string>
+    <string name="storage_cache_cleared">%1$s libérés</string>
+    <string name="storage_action_failed">Impossible de libérer de l\'espace. Réessayez.</string>
+</resources>

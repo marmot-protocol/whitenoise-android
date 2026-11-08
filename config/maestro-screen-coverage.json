@@ -32,6 +32,9 @@
     "Data": [
       "settings-data"
     ],
+    "ManageStorage": [
+      "settings-manage-storage"
+    ],
     "Profile": [
       "navigation-profile-edit-cancel"
     ],

@@ -1,0 +1,39 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageScreen.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ManageStorageContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageScreen.kt",
+        "anchor": "fun ManageStorageContent(",
+        "test_ids": [
+          "SET-047",
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "ManageStorageScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageScreen.kt",
+        "anchor": "fun ManageStorageScreen(",
+        "test_ids": [
+          "SET-047",
+          "SET-048",
+          "SET-049",
+          "SET-050"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:manage_storage_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ManageStorageScreen.kt",
+        "anchor": "R.string.manage_storage_title",
+        "test_ids": [
+          "SET-047"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

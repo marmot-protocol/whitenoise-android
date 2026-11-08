@@ -1,0 +1,165 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "KeepMediaDialogs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+        "anchor": "fun KeepMediaDialogs(",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "RemoveAttachmentsDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+        "anchor": "fun RemoveAttachmentsDialog(",
+        "test_ids": [
+          "SET-048",
+          "SET-049"
+        ]
+      },
+      {
+        "surface": "RemoveOlderDialogs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+        "anchor": "fun RemoveOlderDialogs(",
+        "test_ids": [
+          "SET-049",
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "StorageOverviewDialogs",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+        "anchor": "fun StorageOverviewDialogs(",
+        "test_ids": [
+          "SET-047",
+          "SET-050"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "plurals:storage_remove_attachments_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+        "anchor": "R.plurals.storage_remove_attachments_title",
+        "test_ids": [
+          "SET-048",
+          "SET-049"
+        ]
+      },
+      {
+        "surface": "string:storage_clear",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+        "anchor": "R.string.storage_clear",
+        "test_ids": [
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_clear_cache_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+        "anchor": "R.string.storage_clear_cache_message",
+        "test_ids": [
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_clear_cache_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+        "anchor": "R.string.storage_clear_cache_title",
+        "test_ids": [
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_keep_confirm_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+        "anchor": "R.string.storage_keep_confirm_message",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_keep_confirm_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+        "anchor": "R.string.storage_keep_confirm_title",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_keep_media",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+        "anchor": "R.string.storage_keep_media",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_keep_media_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+        "anchor": "R.string.storage_keep_media_help",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_remove",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+        "anchor": "R.string.storage_remove",
+        "test_ids": [
+          "SET-047",
+          "SET-048",
+          "SET-049",
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_remove_attachments_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+        "anchor": "R.string.storage_remove_attachments_message",
+        "test_ids": [
+          "SET-048",
+          "SET-049"
+        ]
+      },
+      {
+        "surface": "string:storage_remove_older",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+        "anchor": "R.string.storage_remove_older",
+        "test_ids": [
+          "SET-049",
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_remove_older_chat_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+        "anchor": "R.string.storage_remove_older_chat_message",
+        "test_ids": [
+          "SET-049"
+        ]
+      },
+      {
+        "surface": "string:storage_remove_older_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+        "anchor": "R.string.storage_remove_older_message",
+        "test_ids": [
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_remove_older_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+        "anchor": "R.string.storage_remove_older_title",
+        "test_ids": [
+          "SET-049",
+          "SET-050"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

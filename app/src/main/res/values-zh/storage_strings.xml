@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="manage_storage_title">管理存储空间</string>
+    <string name="manage_storage_entry_subtitle">查看此设备上存储的内容并释放空间</string>
+    <string name="storage_calculating">正在计算…</string>
+    <string name="storage_used_by_profile">此个人资料在此设备上占用的空间</string>
+    <string name="storage_usage_description">已用存储空间：%1$s。%2$s</string>
+    <string name="storage_attachments">附件</string>
+    <plurals name="storage_attachment_count">
+        <item quantity="other">%d 个附件</item>
+    </plurals>
+    <string name="storage_chat_data">消息和聊天数据</string>
+    <string name="storage_unused_space">未使用的数据库空间</string>
+    <string name="storage_pictures">个人资料和群组头像</string>
+    <string name="storage_temporary">临时文件</string>
+    <string name="storage_temporary_detail">此设备上的所有个人资料共用</string>
+    <string name="storage_load_failed">无法加载存储空间用量</string>
+    <string name="storage_retry">重试</string>
+    <string name="storage_migration_moving_title">正在更新附件存储</string>
+    <string name="storage_migration_moving">还剩 %1$s 待移动。不会删除任何内容。</string>
+    <string name="storage_migration_paused_title">附件存储更新已暂停</string>
+    <string name="storage_migration_paused">请在此设备上释放 %1$s，或移除下方的附件以继续。不会删除任何内容。</string>
+    <string name="storage_migration_compacting_title">正在回收已释放的空间</string>
+    <string name="storage_migration_compacting">聊天可能会短暂暂停。</string>
+    <string name="storage_free_up_space">释放空间</string>
+    <string name="storage_largest_attachments">最大的附件</string>
+    <string name="storage_remove_older">移除较早的附件</string>
+    <string name="storage_clear_cache">清除图片和临时文件</string>
+    <string name="storage_clear_cache_subtitle">需要时会重新下载图片</string>
+    <string name="storage_removal_help">已移除的附件仍保留在其消息中。只要发送者的副本仍然可用，你就可以重新下载。</string>
+    <string name="storage_keep_media">保留媒体</string>
+    <string name="storage_keep_media_help">早于此期限的附件会立即从此设备移除，之后到期的附件也会随之移除。重新下载的附件会保留完整期限。</string>
+    <string name="storage_keep_media_failed">无法加载</string>
+    <string name="storage_keep_forever">永久</string>
+    <string name="storage_keep_one_year">1 年</string>
+    <string name="storage_keep_six_months">6 个月</string>
+    <string name="storage_keep_thirty_days">30 天</string>
+    <string name="storage_keep_confirm_title">将媒体保留 %1$s？</string>
+    <string name="storage_keep_confirm_message">早于 %1$s 的附件会立即从此设备移除，之后到期的附件也会随之移除。消息会保留，只要发送者的副本仍然可用，你就可以重新下载附件。</string>
+    <string name="storage_older_one_week">早于 1 周</string>
+    <string name="storage_older_one_month">早于 1 个月</string>
+    <string name="storage_older_three_months">早于 3 个月</string>
+    <string name="storage_older_six_months">早于 6 个月</string>
+    <string name="storage_older_one_year">早于 1 年</string>
+    <string name="storage_remove_older_title">要移除较早的附件吗？</string>
+    <string name="storage_remove_older_message">所有聊天中在 %1$s 之前收到的附件都会从此设备移除。消息会保留，只要发送者的副本仍然可用，你就可以重新下载附件。</string>
+    <string name="storage_remove_older_chat_message">此聊天中在 %1$s 之前收到的附件会从此设备移除。消息会保留，只要发送者的副本仍然可用，你就可以重新下载附件。</string>
+    <string name="storage_clear_cache_title">要清除图片和临时文件吗？</string>
+    <string name="storage_clear_cache_message">这最多可释放 %1$s。个人资料和群组头像会在需要时重新下载。</string>
+    <string name="storage_clear">清除</string>
+    <string name="storage_chats">聊天</string>
+    <string name="storage_chats_help">在多个聊天中分享的附件会在每个聊天中分别计算。</string>
+    <string name="storage_chat_unavailable">聊天不可用</string>
+    <string name="storage_no_attachments">此设备上没有附件</string>
+    <string name="storage_chats_failed">无法加载聊天</string>
+    <string name="storage_attachments_failed">无法加载附件</string>
+    <string name="storage_remove_all_in_chat">移除所有附件</string>
+    <string name="storage_largest_first">最大的优先</string>
+    <string name="storage_remove">移除</string>
+    <string name="storage_removing">正在移除</string>
+    <string name="storage_select_all">全选</string>
+    <string name="storage_clear_selection">清除选择</string>
+    <plurals name="storage_selected">
+        <item quantity="other">已选择 %1$d 项 · %2$s</item>
+    </plurals>
+    <plurals name="storage_remove_attachments_title">
+        <item quantity="other">要移除 %d 个附件吗？</item>
+    </plurals>
+    <string name="storage_remove_attachments_message">这最多可释放 %1$s。消息会保留，只要发送者的副本仍然可用，你就可以重新下载附件。</string>
+    <string name="storage_attachment_photo">照片</string>
+    <string name="storage_attachment_video">视频</string>
+    <string name="storage_attachment_audio">音频</string>
+    <string name="storage_attachment_file">文件</string>
+    <plurals name="storage_removed_freed">
+        <item quantity="other">已移除 %1$d 个附件 · 已释放 %2$s</item>
+    </plurals>
+    <string name="storage_nothing_removed">没有匹配的附件，因此未移除任何内容</string>
+    <string name="storage_keep_media_saved">已保存“保留媒体”设置</string>
+    <string name="storage_cache_cleared">已释放 %1$s</string>
+    <string name="storage_action_failed">无法释放空间。请重试。</string>
+</resources>
