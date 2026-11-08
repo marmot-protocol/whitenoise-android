@@ -76,6 +76,7 @@ internal fun rememberBottomPanelShape(): Shape {
  * rounded, display-corner-safe outline and the AMOLED border.
  */
 @Composable
+@Suppress("FunctionNaming")
 internal fun BottomPanelSurface(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
