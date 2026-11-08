@@ -292,10 +292,15 @@ class SettingsScreenScreenshotTest {
                         opened++
                         true
                     },
+                    resolveProviderPackage = { _, _ -> null },
                 )
             }
         }
 
+        // The provider explainer resolves after the first frame and pushes the row down; tap only once it settled.
+        composeRule
+            .onNodeWithText("Your device’s speech service processes audio", substring = true)
+            .assertExists()
         composeRule.onNodeWithText("Get Offline Speech to Text").performClick()
         composeRule.runOnIdle { assertEquals(1, opened) }
     }
