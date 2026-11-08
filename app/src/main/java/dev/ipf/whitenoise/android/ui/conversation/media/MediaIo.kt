@@ -269,19 +269,29 @@ private fun documentAttachmentExtension(
         fromName
             ?: android.webkit.MimeTypeMap
                 .getSingleton()
-                .getExtensionFromMimeType(mediaType.lowercase())
+                .getExtensionFromMimeType(normalizeDocumentMime(mediaType))
                 ?.takeIf { it.length in 1..MAX_DOCUMENT_EXTENSION_LENGTH && it.all(Char::isLetterOrDigit) }
             ?: "bin"
-    return inertDocumentExtension(extension)
+    return inertDocumentExtension(extension, mediaType)
 }
 
 /**
- * FileProvider reports a cached document's type from its extension, so an active extension is cached as text
- * even when the sender labelled the attachment with a harmless type.
+ * FileProvider reports a cached document's type from its extension, so the cached copy must agree with the
+ * inert open type: an active extension or an active sender type is cached as text, whichever one is present.
  */
 @VisibleForTesting
-internal fun inertDocumentExtension(extension: String): String =
-    if (extension.lowercase(java.util.Locale.ROOT) in ACTIVE_CONTENT_EXTENSIONS) INERT_TEXT_EXTENSION else extension
+internal fun inertDocumentExtension(
+    extension: String,
+    mediaType: String,
+): String =
+    if (
+        extension.lowercase(java.util.Locale.ROOT) in ACTIVE_CONTENT_EXTENSIONS ||
+        isActiveContentMime(normalizeDocumentMime(mediaType))
+    ) {
+        INERT_TEXT_EXTENSION
+    } else {
+        extension
+    }
 
 @VisibleForTesting
 internal fun isActiveContentMime(normalizedMime: String): Boolean =
