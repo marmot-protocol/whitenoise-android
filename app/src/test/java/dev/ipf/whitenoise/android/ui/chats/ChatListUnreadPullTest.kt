@@ -25,6 +25,22 @@ import org.robolectric.annotation.Config
 class ChatListUnreadPullTest {
     @get:Rule val rule = createComposeRule()
 
+    @Test fun pendingUnreadSnapshotArmsThePullOnlyWhenEmptyOrAtTheTop() {
+        fun armed(
+            unreadOnly: Boolean = true,
+            listEmpty: Boolean = false,
+            index: Int = 0,
+            offset: Int = 0,
+        ) = chatListUnreadPullArmed(unreadOnly, listEmpty, false, false, index, offset)
+        assertEquals(false, armed(index = 4))
+        assertEquals(false, armed(offset = 12))
+        assertEquals(true, armed())
+        assertEquals(true, armed(listEmpty = true, index = 4))
+        assertEquals(false, armed(unreadOnly = false, index = 4))
+        assertEquals(false, chatListUnreadPullArmed(false, false, true, false, 0, 0))
+        assertEquals(false, chatListUnreadPullArmed(true, false, false, true, 0, 0))
+    }
+
     @Test fun secondPointerClearsClaimedMotionBeforeEitherPointerReleases() {
         var progress = 0f
         var distance = 0f

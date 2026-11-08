@@ -198,9 +198,9 @@ class SignOutCompletionTest {
     }
 
     @Test
-    fun unfinishedLocalTeardownKeepsTheAccountActive() {
+    fun unfinishedLocalTeardownAfterConfirmedSignOutReportsSignedOut() {
         val outcome = signOutOutcomeFfi(localCompleted = false)
 
-        assertEquals(SignOutCompletion.AccountCleanupIncomplete, signOutCompletion(outcome))
+        assertEquals(SignOutCompletion.SignedOutLocalCleanupIncomplete, signOutCompletion(outcome))
     }
 }

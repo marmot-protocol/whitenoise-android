@@ -983,6 +983,7 @@
     <string name="sign_out_delete_key_packages_help">Stops new group invitations for this account while you’re signed out.</string>
     <string name="toast_signed_out_relay_cleanup_incomplete">Signed out. Some invitation keys may still be on relays.</string>
     <string name="toast_couldnt_sign_out">Couldn\'t sign out. The account is still active on this device.</string>
+    <string name="toast_signed_out_local_cleanup_incomplete">Signed out. Some data for this account could not be removed from this device.</string>
     <!-- Staged progress + outcome UI for the destructive Sign Out & Wipe (#350). -->
     <string name="wipe_progress_title">Signing out &amp; wiping…</string>
     <string name="wipe_stage_leaving_groups">Leaving groups…</string>

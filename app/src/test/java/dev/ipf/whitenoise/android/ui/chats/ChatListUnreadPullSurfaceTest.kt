@@ -4,6 +4,8 @@ import android.os.Looper
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
@@ -18,6 +20,7 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -99,6 +102,37 @@ class ChatListUnreadPullSurfaceTest {
             assertEquals(direction + 1, haptics)
             assertEquals(direction == 0, unread.value)
         }
+    }
+
+    /** While the unread snapshot loads, a scrolled unread list scrolls instead of clearing the filter (#3622). */
+    @Test fun scrolledUnreadListPassesDownwardDragToTheList() {
+        var toggles = 0
+        lateinit var listState: LazyListState
+        rule.setContent {
+            WhiteNoiseTheme {
+                listState = rememberLazyListState(initialFirstVisibleItemIndex = 10)
+                Box(Modifier.size(300.dp, 500.dp)) {
+                    ChatListUnreadPullSurface(true, true, true, {
+                        chatListUnreadPullArmed(
+                            unreadOnly = true,
+                            listEmpty = false,
+                            hasEarlierChats = false,
+                            scrollInProgress = listState.isScrollInProgress,
+                            firstVisibleItemIndex = listState.firstVisibleItemIndex,
+                            firstVisibleItemScrollOffset = listState.firstVisibleItemScrollOffset,
+                        )
+                    }, { toggles++ }) {
+                        LazyColumn(Modifier.testTag("chats.list"), state = listState) {
+                            items(30) { Text("Chat $it", Modifier.size(48.dp).testTag("row.$it")) }
+                        }
+                    }
+                }
+            }
+        }
+        rule.onNodeWithTag("chats.list").performTouchInput { swipe(center, Offset(center.x, height - 1f)) }
+        rule.waitForIdle()
+        assertEquals(0, toggles)
+        assertTrue(listState.firstVisibleItemIndex < 10)
     }
 
     @Test fun accessibleActionAndWholePillClearAnEmptyBodyEvenWithGestureDisabled() {

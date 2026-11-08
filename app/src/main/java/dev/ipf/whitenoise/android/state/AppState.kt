@@ -1238,7 +1238,7 @@ class WhiteNoiseAppState private constructor(
     internal val appContext = context.applicationContext
     internal val publicJpegPreviewPreferences =
         dev.ipf.whitenoise.android.media
-            .PublicJpegPreviewPreferences(appContext)
+            .PublicJpegPreviewPreferences(appContext) { id -> isLocalContactAccount(accounts, id) }
     internal val publicJpegPreviewLoader =
         dev.ipf.whitenoise.android.media
             .PublicJpegPreviewLoader()
@@ -7649,7 +7649,7 @@ class WhiteNoiseAppState private constructor(
         localNotificationSettings = null
         if (!draftsSaved) present(R.string.toast_draft_save_failed)
         return OwnedSignOutCompletion(
-            if (partial) SignOutCompletion.AccountCleanupIncomplete else signOutCompletion(native),
+            signOutCompletion(native),
             next,
             selectionGeneration,
             attempt.cancellation,

@@ -50,6 +50,14 @@ class DataUsageScreenBehaviorTest {
         composeRule.waitUntil { !appState.publicJpegPreviewPreferences.enabled("ab".repeat(32)) }
     }
 
+    /** A wipe's retention pass that predates this account must not block its switch (#3623). */
+    @Test
+    fun accountPublishedAfterAWipeCanTurnOnPublicLinkPreviews() {
+        composeRule.runOnIdle { appState.publicJpegPreviewPreferences.retainAccounts(listOf("cd".repeat(32))) }
+        composeRule.onNodeWithTag("data_usage.public_jpeg_previews").performClick()
+        composeRule.waitUntil { appState.publicJpegPreviewPreferences.enabled("ab".repeat(32)) }
+    }
+
     /** Clears stored preferences and builds a fresh single-account app state. */
     @Before
     fun setUp() {

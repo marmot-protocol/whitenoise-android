@@ -13,6 +13,22 @@ import kotlin.math.abs
 
 private const val UNREAD_PULL_HAPTIC_REARM_RATIO = 0.9f
 
+/**
+ * The unread pull arms when an unread-only list has no rows or the list rests at its first row. A pending
+ * unread snapshot does not arm it, so a scrolled list keeps scrolling (#3622).
+ */
+@Suppress("LongParameterList")
+internal fun chatListUnreadPullArmed(
+    unreadOnly: Boolean,
+    listEmpty: Boolean,
+    hasEarlierChats: Boolean,
+    scrollInProgress: Boolean,
+    firstVisibleItemIndex: Int,
+    firstVisibleItemScrollOffset: Int,
+): Boolean =
+    (unreadOnly && listEmpty) ||
+        (!hasEarlierChats && !scrollInProgress && firstVisibleItemIndex == 0 && firstVisibleItemScrollOffset == 0)
+
 /** A pull must begin at the logical head; scrolling or flinging into it never arms the action. */
 @Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod", "NestedBlockDepth")
 internal fun Modifier.chatListUnreadPull(

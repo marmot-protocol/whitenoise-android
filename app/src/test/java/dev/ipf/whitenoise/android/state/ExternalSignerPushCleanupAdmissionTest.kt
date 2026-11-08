@@ -215,7 +215,7 @@ internal class ExternalSignerPushCleanupAdmissionTest : ExternalSignerSignOutFix
                 )
             persistSignedOutBeforePartialFailure = true
             val state = appState()
-            assertEquals(SignOutCompletion.AccountCleanupIncomplete, state.signOutActiveAccount())
+            assertEquals(SignOutCompletion.SignedOutLocalCleanupIncomplete, state.signOutActiveAccount())
             assertNull(state.activeAccountRef)
             assertTrue(state.accounts.single().signedOut)
             assertFalse(nativePushEnabled)

@@ -289,17 +289,38 @@ class PublicJpegPreviewsTest {
                 .edit()
                 .clear()
                 .commit()
-            val preferences = PublicJpegPreviewPreferences(context)
-            preferences.retainAccounts(listOf("alice", "bob"))
+            val present = mutableSetOf("alice", "bob")
+            val preferences = PublicJpegPreviewPreferences(context) { it in present }
+            preferences.retainAccounts(present)
             assertTrue(preferences.setEnabled("alice", true))
-            preferences.retainAccounts(listOf("bob"))
+            present -= "alice"
+            preferences.retainAccounts(present)
             assertFalse(preferences.setEnabled("alice", true))
             assertFalse(preferences.enabled("alice"))
             assertFalse(PublicJpegPreviewPreferences(context).enabled("alice"))
-            assertEquals(emptySet<String>(), preferences.retainAccounts(listOf("bob")))
-            preferences.retainAccounts(listOf("alice", "bob"))
+            assertEquals(emptySet<String>(), preferences.retainAccounts(present))
+            // Re-importing the key publishes the account again; consent starts off and can be granted.
+            present += "alice"
             assertFalse(preferences.enabled("alice"))
             assertTrue(preferences.setEnabled("alice", true))
+        }
+
+    /** Accounts published after a wipe's retention pass can change their setting (#3623). */
+    @Test
+    fun accountAddedAfterRetentionCanEnablePreviews() =
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            context
+                .getSharedPreferences("whitenoise.public_jpeg_previews", Context.MODE_PRIVATE)
+                .edit()
+                .clear()
+                .commit()
+            val present = mutableSetOf("bob")
+            val preferences = PublicJpegPreviewPreferences(context) { it in present }
+            preferences.retainAccounts(present)
+            present += "carol"
+            assertTrue(preferences.setEnabled("carol", true))
+            assertTrue(PublicJpegPreviewPreferences(context).enabled("carol"))
         }
 
     @Test
@@ -312,8 +333,8 @@ class PublicJpegPreviewsTest {
                     .edit()
                     .clear()
                     .commit()
-                val preferences = PublicJpegPreviewPreferences(context)
-                preferences.retainAccounts(listOf("alice", "bob"))
+                val present = mutableSetOf("alice", "bob")
+                val preferences = PublicJpegPreviewPreferences(context) { it in present }
                 val pending =
                     synchronized(preferences) {
                         val enable =
@@ -328,8 +349,9 @@ class PublicJpegPreviewsTest {
                                         preferences.setEnabled("alice", false)
                                     }
                                 "remove-and-readd" -> {
-                                    preferences.retainAccounts(listOf("bob"))
-                                    preferences.retainAccounts(listOf("alice", "bob"))
+                                    present -= "alice"
+                                    preferences.retainAccounts(present)
+                                    present += "alice"
                                     null
                                 }
                                 else -> {
@@ -355,13 +377,15 @@ class PublicJpegPreviewsTest {
                 .edit()
                 .clear()
                 .commit()
-            val preferences = PublicJpegPreviewPreferences(context)
+            val present = mutableSetOf("alice")
+            val preferences = PublicJpegPreviewPreferences(context) { it in present }
             assertTrue(preferences.setEnabled("alice", true))
             preferences.revoke("alice")
             // No setEnabled(false): leaving the screen may cancel that coroutine before it starts.
             assertFalse(preferences.enabled("alice"))
             assertFalse(PublicJpegPreviewPreferences(context).enabled("alice"))
-            preferences.retainAccounts(emptyList())
+            present.clear()
+            preferences.retainAccounts(present)
             preferences.revoke("alice")
             assertFalse(preferences.state.value.containsKey("alice"))
             val stored = context.getSharedPreferences("whitenoise.public_jpeg_previews", Context.MODE_PRIVATE)

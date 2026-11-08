@@ -1237,10 +1237,13 @@ internal fun signOutActiveAccount(
                 // does not retain a retry queue for the deletions.
                 SignOutCompletion.RelayCleanupIncomplete ->
                     appState.present(R.string.toast_signed_out_relay_cleanup_incomplete)
-                // Local cleanup is incomplete or unconfirmed. Retain the session unless
-                // durable native signed-out status already required local deactivation.
+                // Local cleanup is incomplete or unconfirmed and the session is retained.
                 SignOutCompletion.AccountCleanupIncomplete ->
                     appState.present(R.string.toast_couldnt_sign_out)
+                // Native status confirmed the sign-out and the account is inactive, but
+                // some of its local data could not be removed (#3626).
+                SignOutCompletion.SignedOutLocalCleanupIncomplete ->
+                    appState.present(R.string.toast_signed_out_local_cleanup_incomplete)
                 null -> Unit
             }
         } finally {
