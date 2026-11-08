@@ -10,6 +10,7 @@ import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.notifications.LocalNotificationContent
 import dev.ipf.whitenoise.android.notifications.NotificationIdentityPictureSources
+import kotlin.collections.MutableMap.MutableEntry
 
 /** MDK's stored avatar a notification shows for its conversation, and the worker domain that decodes it. */
 internal data class StoredNotificationAvatar(
@@ -62,6 +63,51 @@ internal fun List<ChatListItem>.readyContactRowPicture(
             .takeIf { it.privatePictureContact().equals(contact, ignoreCase = true) }
             ?.readyStoredAvatarBitmap(accountRef)
     }
+
+/**
+ * #3635: the stored picture a notification's late refresh last decoded for each contact's chat row, so a cleared
+ * private choice still shows what that row shows when no chat list holds the row, as for a push into a dead process
+ * or an account whose chat list is not open. It keeps only [AvatarImageLoader] cache keys, in memory and bounded by
+ * [capacity]: the pixels stay in the loader's own bounded cache, so a key whose pixels were evicted reads as nothing.
+ * Notification extras never carry the key, since it holds MDK's asset reference, which MDK keeps out of logs.
+ */
+internal class NotificationContactRowPictures(
+    private val capacity: Int = 64,
+) {
+    private val keys =
+        object : LinkedHashMap<ContactSlot, String>(16, 0.75f, true) {
+            /** Drops the least recently used contact once more than [capacity] are recorded. */
+            override fun removeEldestEntry(eldest: MutableEntry<ContactSlot, String>?): Boolean = size > capacity
+        }
+
+    /** Records [asset] as the stored picture [account]'s chat row shows for [contact]. */
+    fun record(
+        account: String,
+        contact: String,
+        asset: AvatarAssetFfi,
+    ) {
+        val key = asset.cacheKey(account) ?: return
+        synchronized(keys) { keys[slot(account, contact)] = key }
+    }
+
+    /** The decoded pixels last recorded for [contact] in [account], or null when none were or they were evicted. */
+    fun ready(
+        account: String,
+        contact: String,
+    ): Bitmap? =
+        synchronized(keys) { keys[slot(account, contact)] }
+            ?.let(AvatarImageLoader::cachedImage)
+            ?.asAndroidBitmap()
+
+    /** One record per account and contact, matching the contact in any case. */
+    private fun slot(
+        account: String,
+        contact: String,
+    ): ContactSlot = account to contact.lowercase(java.util.Locale.ROOT)
+}
+
+/** An account and a lowercase contact, the key of one [NotificationContactRowPictures] record. */
+private typealias ContactSlot = Pair<String, String>
 
 /**
  * Avatar warmup metadata or exact ready-local bitmaps retained across first publication and correction.

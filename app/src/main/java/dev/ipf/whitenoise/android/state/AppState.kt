@@ -1254,6 +1254,7 @@ class WhiteNoiseAppState private constructor(
                 dev.ipf.whitenoise.android.core.AvatarImageLoader
                     .attachActiveAccount { activeAccountRef }
             }
+    private val notificationContactRowPictures = NotificationContactRowPictures()
     internal val localGroupDeleteCleanupJournal =
         LocalGroupDeleteCleanupJournal(appContext.noBackupFilesDir.resolve("local-group-delete-cleanup"))
     internal val localGroupDeleteCleanupMutex = Mutex()
@@ -11858,15 +11859,20 @@ class WhiteNoiseAppState private constructor(
             )
     }
 
-    /** #3635: the stored picture [account]'s chat rows show for [contact], when the chat list already decoded it. */
+    /**
+     * #3635: the stored picture [account]'s chat rows show for [contact], archived ones included, when the chat list
+     * already decoded it, else the one a notification's late refresh last decoded for their row, such as for a push
+     * into a dead process or an account whose chat list is not open.
+     */
     private fun contactRowPicture(
         account: String,
         contact: String,
     ): android.graphics.Bitmap? =
         chatsController
             ?.takeIf { it.boundAccountRef == account }
-            ?.items
+            ?.let { it.items + it.archivedItems }
             ?.readyContactRowPicture(account, contact)
+            ?: notificationContactRowPictures.ready(account, contact)
 
     /** Bounded local file decode shares the first-post deadline; it can never acquire a public URL. */
     private suspend fun warmPrivateContactAvatar(
@@ -11941,8 +11947,13 @@ class WhiteNoiseAppState private constructor(
         if (saved) {
             // The editor's scope may already be cancelled by a configuration change while the record has landed.
             withContext(NonCancellable) {
-                // A nickname-only Save changes no pixels, so every cached avatar stays decoded.
-                if (picture !is ContactPictureChange.Keep) AvatarImageLoader.clearStoredAvatars()
+                // A nickname-only Save changes no pixels, so every cached avatar stays decoded. A picture change
+                // retires only this contact's private pixels, so the stored chat row picture a Clear falls back to
+                // stays decoded (#3635).
+                val retired = ContactPictureStore.cacheKeyPrefix(account, contact)
+                if (picture !is ContactPictureChange.Keep && retired != null) {
+                    AvatarImageLoader.clearStoredAvatarsWithPrefix(retired)
+                }
                 warmPrivateContactAvatar(account, contact)
                 contactNicknameRevision += 1
                 bumpProfileAccountRevision(contact)
@@ -13424,6 +13435,17 @@ class WhiteNoiseAppState private constructor(
                 .getOrNull()
                 ?.let { chatListItemFromProjection(it.row, it.presentation, it.avatarAsset) }
                 ?: return null
+        return lateRowIdentity(account, item)
+    }
+
+    /**
+     * #3635: [storedConversationIdentity] for a row already read. Once the loader decodes the row's stored picture, it
+     * records that picture for the row's peer, so a cleared private choice shows it while no chat list holds the row.
+     */
+    internal fun lateRowIdentity(
+        account: String,
+        item: ChatListItem,
+    ): LateRowIdentity {
         val contact = item.privatePictureContact()
         val stored = item.storedNotificationAvatar(account)
         val loader: (suspend () -> Bitmap?)? =
@@ -13432,11 +13454,15 @@ class WhiteNoiseAppState private constructor(
             } else {
                 {
                     if (!appLockScreenVisible) contact?.let { warmPrivateContactAvatar(account, it) }
-                    stored
-                        ?.takeUnless { appLockScreenVisible }
-                        ?.let { durableAvatar(it.asset, account, acquireMissing = false, domain = it.domain) }
-                        ?.asAndroidBitmap()
-                        ?.takeUnless { appLockScreenVisible }
+                    stored?.takeUnless { appLockScreenVisible }?.let { row ->
+                        val picture =
+                            durableAvatar(row.asset, account, acquireMissing = false, domain = row.domain)
+                                ?.takeUnless { appLockScreenVisible }
+                        if (picture != null && contact != null) {
+                            notificationContactRowPictures.record(account, contact, row.asset)
+                        }
+                        picture?.asAndroidBitmap()
+                    }
                 }
             }
         return LateRowIdentity(loader, contact)

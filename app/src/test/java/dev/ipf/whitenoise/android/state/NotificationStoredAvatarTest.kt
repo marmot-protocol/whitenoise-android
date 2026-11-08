@@ -130,6 +130,26 @@ class NotificationStoredAvatarTest {
         assertNull("another account's pixels", listOf(direct).readyContactRowPicture("another-account", PEER))
     }
 
+    /**
+     * A late refresh's record of a contact's row picture reads only this account's decoded pixels, matches the contact
+     * in any case, reads nothing before the pixels are decoded, and keeps only the most recently recorded contacts.
+     */
+    @Test
+    fun recordedRowPictureReadsOnlyThisAccountsDecodedPixels() {
+        val pictures = NotificationContactRowPictures(capacity = 1)
+        val asset = asset("peer-picture")
+        val stored = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+
+        pictures.record(ACCOUNT, PEER, asset)
+        assertNull("not decoded yet", pictures.ready(ACCOUNT, PEER))
+        AvatarImageLoader.putCached(checkNotNull(asset.cacheKey(ACCOUNT)), stored.asImageBitmap())
+
+        assertSame(stored, pictures.ready(ACCOUNT, PEER.uppercase()))
+        assertNull("another account", pictures.ready("another-account", PEER))
+        pictures.record(ACCOUNT, "c".repeat(64), asset("other-picture"))
+        assertNull("past capacity", pictures.ready(ACCOUNT, PEER))
+    }
+
     /** Without a loaded chat row, as on an account whose chat list is not open, the snapshot adds nothing. */
     @Test
     fun missingChatRowAddsNothingToTheSnapshot() {
