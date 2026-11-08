@@ -1840,19 +1840,17 @@
     <string name="notify_for">Уведомлять</string>
     <string name="ok">OK</string>
     <string name="ai_agents">ИИ-агенты</string>
-    <string name="ai_agents_about_title">Об ИИ-агентах</string>
-    <string name="ai_agents_intro">Общайтесь с ИИ-агентами со сквозным шифрованием, как в любом другом чате. Каждый агент работает на компьютере или сервере, который контролируете вы, и использует собственный аккаунт.</string>
-    <string name="ai_agents_clipboard_disclosure">Это запросы на установку. Выберите своего агента, скопируйте запрос и вставьте его в этого агента, чтобы подключить его к White Noise. Запрос содержит вашу публичную npub и никогда — закрытый ключ, а также просит агента объяснить работу коннектора, прежде чем запрашивать ваше одобрение на установку. Используйте только агента, которого вы запускаете сами и которому доверяете.</string>
+    <string name="ai_agents_clipboard_disclosure">Выберите агента, скопируйте его запрос и вставьте его туда. Передаётся только ваш открытый ключ.</string>
     <string name="ai_agents_connectors_title">Коннекторы</string>
     <string name="ai_agents_prompt_copied">Запрос скопирован — вставьте его в ваш агент.</string>
     <string name="ai_agents_public_key_unavailable">Ваш открытый ключ недоступен. Вернитесь в настройки и попробуйте другой профиль.</string>
     <string name="ai_agents_setup_title">Настройка %1$s</string>
-    <string name="ai_agents_setup_instruction">Вставьте этот запрос в %1$s. Он содержит вашу публичную npub и не содержит закрытый ключ. Агент обязан запросить ваше одобрение, прежде чем что-либо устанавливать. Используйте этот запрос только с агентом, которого вы запускаете сами и которому доверяете.</string>
+    <string name="ai_agents_setup_instruction">Вставьте это в %1$s. Передаётся только ваш открытый ключ, и агент спросит перед установкой.</string>
     <string name="ai_agents_copy_prompt">Копировать запрос</string>
     <string name="ai_agents_docs_opened">Открытие документации коннектора.</string>
     <string name="ai_agents_docs_failed">Не удалось открыть документацию коннектора.</string>
     <string name="ai_agents_manual_setup_title">Ручная настройка</string>
-    <string name="ai_agents_manual_setup_body">Когда агент сообщит свою npub, добавьте его в контакты из %1$s и начните чат. Остальное описано в документации коннектора.</string>
+    <string name="ai_agents_manual_setup_body">Затем добавьте агента в контакты из %1$s по его npub.</string>
     <string name="ai_agents_connector_docs_title">Документация коннектора агентов</string>
     <string name="ai_agents_connector_docs_subtitle">Скрипты установки, проверки состояния и устранение неполадок</string>
     <string name="agent_connector_hermes_name">Hermes</string>
@@ -2456,7 +2454,7 @@
     <string name="profile_readiness_field_optional">Необязательно</string>
     <string name="agent_connector_claude_subtitle">Агент для программирования Claude Code CLI</string>
     <string name="agent_connector_claude_prompt">Это запрос на установку для подключения этой конфигурации Claude Code к White Noise через Marmot. Вставьте это в Claude Code в терминале компьютера, на котором будет работать агент. Мобильное приложение Claude и его облачные сеансы не могут установить коннектор на этот компьютер. Прочитайте авторитетное руководство по harness Claude Code: https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md и постоянное руководство по коннектору: https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Объясните мне, как работает коннектор и что изменит установка. Подтвердите предварительные требования: CLI Claude Code установлена, аутентифицирована и доступна в PATH. Если чего-то не хватает, объясните по https://code.claude.com/docs/en/setup необходимые шаги установки, настройки PATH или входа и запросите моё одобрение до любых изменений на компьютере, включая установку Claude Code и изменение PATH или настроек входа. Попросите меня проверить на телефоне, что список публичных релеев содержит wss://relay.eu.whitenoise.chat и wss://relay.us.whitenoise.chat; не утверждайте, что проверили настройки телефона с компьютера. Затем предложите шаги установки для моей публичной npub: %1$s и запросите мое одобрение, прежде чем вносить какие-либо изменения. После моего одобрения используйте релизный поток install-claude-marmot.sh с проверкой контрольной суммы, выполните bootstrap wn-agent с этой npub как единственным разрешённым welcomer и проверьте wn-claude --version. Объясните, что скачанный установщик запускается командой bash install-claude-marmot.sh, а не двойным щелчком. Затем ответьте npub вашего агента и попросите меня пригласить его из White Noise. Моё первое сообщение в приглашённой группе должно выбрать существующую папку относительно домашнего каталога компьютера агента: /Claude означает $HOME/Claude, а не /Users/me/Claude. Затем попросите меня отправить тестовое сообщение с этой разрешенной npub через настроенные реле. Не сообщайте о завершении настройки, пока wn-claude не ответит через White Noise; если этот обмен нельзя проверить автоматически, явно укажите, что требуется проверка на устройстве.</string>
-    <string name="ai_agents_project_groups_tip">Используй отдельную группу для каждого проекта и начинай с его расположения и контекста. Команды сеанса зависят от коннектора; проверь руководство перед возобновлением сеанса или созданием ветки.</string>
+    <string name="ai_agents_project_groups_tip">Совет: используйте отдельную группу для каждого проекта.</string>
     <string name="nostr_event_view_image">Показать изображение</string>
     <string name="nostr_event_image_failed">Не удалось загрузить изображение. Попробуйте ещё раз.</string>
     <string name="nostr_event_type_image">Изображение</string>
@@ -2670,4 +2668,12 @@
     <string name="time_format_24_hour">24-часовой</string>
     <string name="date_time_format_help">Автоматически: язык приложения и регион телефона.</string>
     <string name="settings_search_alias_date_time_format">формат времени|формат даты|часы|12 часов|24 часа|AM/PM</string>
+    <string name="notification_sounds_vibration">Звуки и вибрация</string>
+    <string name="notification_delivery_value_local">Локально</string>
+    <string name="notification_delivery_value_push">Push</string>
+    <string name="notification_delivery_battery">Доставка и батарея</string>
+    <string name="notification_android_controls">Управление Android</string>
+    <string name="android_notification_settings">Настройки уведомлений Android</string>
+    <string name="settings_help_support">Помощь и поддержка</string>
+    <string name="settings_voice_language">Голос и язык</string>
 </resources>

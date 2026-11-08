@@ -262,7 +262,7 @@ class LocalizationResourceTest {
 
         assertEquals(AGENT_CONNECTOR_DOCS_URL, WhiteNoiseUrls.AGENT_CONNECTOR_DOCS)
         assertTrue(
-            "Agent connector copy must explain the installation flow first. Prompts must link " +
+            "Agent connector copy must explain the tap-copy-paste flow. Prompts must link " +
                 "the evergreen MDK connector guide once, include one %1\$s placeholder, explain " +
                 "the connector before requesting pre-change approval, and avoid operational " +
                 "mechanics. Offenders:\n" +
@@ -336,9 +336,6 @@ class LocalizationResourceTest {
             if (disclosure == null) {
                 add("${file.path}: missing ai_agents_clipboard_disclosure")
             } else {
-                if (!disclosure.startsWith(requirements.disclosurePrefix)) {
-                    add("${file.path}: disclosure does not identify installation prompts first")
-                }
                 if (!disclosure.contains(requirements.disclosureFlow)) {
                     add("${file.path}: disclosure does not explain choose-copy-paste flow")
                 }
@@ -886,7 +883,6 @@ class LocalizationResourceTest {
     }
 
     private data class AgentConnectorCopyRequirements(
-        val disclosurePrefix: String,
         val disclosureFlow: String,
         val promptPrefix: String,
         val explanation: String,
@@ -936,8 +932,7 @@ class LocalizationResourceTest {
             mapOf(
                 "values" to
                     AgentConnectorCopyRequirements(
-                        disclosurePrefix = "These are installation prompts.",
-                        disclosureFlow = "Choose your agent, copy its prompt, and paste it into that agent",
+                        disclosureFlow = "Tap your agent, copy its prompt, and paste it there",
                         promptPrefix = "This is an installation prompt",
                         explanation = "Explain to me how the connector works and what the installation will change.",
                         approval = "ask for my approval before making any changes.",
@@ -945,10 +940,7 @@ class LocalizationResourceTest {
                     ),
                 "values-de" to
                     AgentConnectorCopyRequirements(
-                        disclosurePrefix = "Dies sind Installationsanweisungen.",
-                        disclosureFlow =
-                            "Wähle deinen Agenten aus, kopiere seine Anweisung und füge sie " +
-                                "in diesen Agenten ein",
+                        disclosureFlow = "Tippe auf deinen Agenten, kopiere seine Anweisung und füge sie dort ein",
                         promptPrefix = "Dies ist eine Installationsanweisung",
                         explanation =
                             "Erkläre mir, wie der Konnektor funktioniert und was die Installation " +
@@ -958,8 +950,7 @@ class LocalizationResourceTest {
                     ),
                 "values-es" to
                     AgentConnectorCopyRequirements(
-                        disclosurePrefix = "Estas son instrucciones de instalación.",
-                        disclosureFlow = "Elige tu agente, copia su instrucción y pégala en ese agente",
+                        disclosureFlow = "Toca tu agente, copia su instrucción y pégala allí",
                         promptPrefix = "Esta es una instrucción de instalación",
                         explanation = "Explícame cómo funciona el conector y qué cambiará la instalación.",
                         approval = "pide mi aprobación antes de realizar cualquier cambio.",
@@ -967,8 +958,7 @@ class LocalizationResourceTest {
                     ),
                 "values-fr" to
                     AgentConnectorCopyRequirements(
-                        disclosurePrefix = "Voici des invites d’installation.",
-                        disclosureFlow = "Choisissez votre agent, copiez son invite et collez-la dans cet agent",
+                        disclosureFlow = "Touchez votre agent, copiez son invite et collez-la dans l’agent",
                         promptPrefix = "Ceci est une invite d’installation",
                         explanation =
                             "Expliquez-moi comment le connecteur fonctionne et ce que l’installation " +
@@ -978,8 +968,7 @@ class LocalizationResourceTest {
                     ),
                 "values-it" to
                     AgentConnectorCopyRequirements(
-                        disclosurePrefix = "Questi sono prompt di installazione.",
-                        disclosureFlow = "Scegli il tuo agente, copia il relativo prompt e incollalo in quell’agente",
+                        disclosureFlow = "Tocca il tuo agente, copia il suo prompt e incollalo lì",
                         promptPrefix = "Questo è un prompt di installazione",
                         explanation = "Spiegami come funziona il connettore e cosa cambierà l’installazione.",
                         approval = "chiedi la mia approvazione prima di apportare qualsiasi modifica.",
@@ -987,8 +976,7 @@ class LocalizationResourceTest {
                     ),
                 "values-pt" to
                     AgentConnectorCopyRequirements(
-                        disclosurePrefix = "Estes são prompts de instalação.",
-                        disclosureFlow = "Escolha seu agente, copie o prompt dele e cole-o nesse agente",
+                        disclosureFlow = "Toque no seu agente, copie o prompt dele e cole-o lá",
                         promptPrefix = "Este é um prompt de instalação",
                         explanation = "Explique como o conector funciona e o que a instalação alterará.",
                         approval = "peça minha aprovação antes de fazer qualquer alteração.",
@@ -996,8 +984,7 @@ class LocalizationResourceTest {
                     ),
                 "values-ru" to
                     AgentConnectorCopyRequirements(
-                        disclosurePrefix = "Это запросы на установку.",
-                        disclosureFlow = "Выберите своего агента, скопируйте запрос и вставьте его в этого агента",
+                        disclosureFlow = "Выберите агента, скопируйте его запрос и вставьте его туда",
                         promptPrefix = "Это запрос на установку",
                         explanation = "Объясните мне, как работает коннектор и что изменит установка.",
                         approval = "запросите мое одобрение, прежде чем вносить какие-либо изменения.",
@@ -1005,10 +992,7 @@ class LocalizationResourceTest {
                     ),
                 "values-tr" to
                     AgentConnectorCopyRequirements(
-                        disclosurePrefix = "Bunlar kurulum istemleridir.",
-                        disclosureFlow =
-                            "Ajanınızı seçin, istemini kopyalayın ve White Noise’a bağlamak için " +
-                                "o ajana yapıştırın",
+                        disclosureFlow = "Ajanınıza dokunun, istemini kopyalayın ve oraya yapıştırın",
                         promptPrefix = "Bu bir kurulum istemidir",
                         explanation =
                             "Bağlayıcının nasıl çalıştığını ve kurulumun neleri değiştireceğini " +
@@ -1018,8 +1002,7 @@ class LocalizationResourceTest {
                     ),
                 "values-zh" to
                     AgentConnectorCopyRequirements(
-                        disclosurePrefix = "这些是安装提示。",
-                        disclosureFlow = "选择你的代理，复制相应提示并将其粘贴到该代理中",
+                        disclosureFlow = "点按你的代理，复制其提示并粘贴到该代理中",
                         promptPrefix = "这是一条安装提示",
                         explanation = "请向我解释连接器的工作方式以及安装会带来哪些更改。",
                         approval = "并在进行任何更改之前请求我的批准。",
@@ -1027,8 +1010,7 @@ class LocalizationResourceTest {
                     ),
                 "values-b+zh+Hant" to
                     AgentConnectorCopyRequirements(
-                        disclosurePrefix = "這些是安裝提示。",
-                        disclosureFlow = "選擇你的代理，複製相應提示並將其貼到該代理中",
+                        disclosureFlow = "點按你的代理，複製其提示並貼到該代理中",
                         promptPrefix = "這是一則安裝提示",
                         explanation = "請向我解釋連接器的運作方式以及安裝會帶來哪些變更。",
                         approval = "並在進行任何變更之前請求我的核准。",
@@ -1205,6 +1187,10 @@ class LocalizationResourceTest {
                 // French) that share spelling with English.
                 "network_wifi",
                 "network_roaming",
+                // Notification delivery mode values: "Push" is the platform term and
+                // "Local" shares spelling with English in ES/FR/PT.
+                "notification_delivery_value_local",
+                "notification_delivery_value_push",
                 "media_type_images",
                 "media_type_audio",
                 "media_type_video",

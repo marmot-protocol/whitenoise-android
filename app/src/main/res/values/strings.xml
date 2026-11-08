@@ -791,19 +791,17 @@
     <string name="streaming_debug" translatable="false">Streaming debug</string>
     <string name="streaming_debug_subtitle" translatable="false">Show agent-stream and MLS signaling events inline in conversations</string>
     <string name="ai_agents">AI Agents</string>
-    <string name="ai_agents_about_title">About AI agents</string>
-    <string name="ai_agents_intro">Chat with AI agents, end-to-end encrypted like any other chat. Each agent runs on a computer or server you control, using its own account.</string>
-    <string name="ai_agents_clipboard_disclosure">These are installation prompts. Choose your agent, copy its prompt, and paste it into that agent to connect it to White Noise. The prompt includes your public npub, never your private key, and asks the agent to explain the connector before requesting your approval to install it. Use only an agent you run and trust.</string>
+    <string name="ai_agents_clipboard_disclosure">Tap your agent, copy its prompt, and paste it there. Only your public key is shared.</string>
     <string name="ai_agents_connectors_title">Connectors</string>
     <string name="ai_agents_prompt_copied">Prompt copied — paste it into your agent.</string>
     <string name="ai_agents_public_key_unavailable">Your public key is unavailable. Return to Settings and try another profile.</string>
     <string name="ai_agents_setup_title">Set up %1$s</string>
-    <string name="ai_agents_setup_instruction">Paste this prompt into %1$s. It includes your public npub and leaves out your private key. The agent must ask for your approval before it installs anything. Use this prompt only with an agent you run and trust.</string>
+    <string name="ai_agents_setup_instruction">Paste this into %1$s. It shares only your public key, and the agent asks before installing anything.</string>
     <string name="ai_agents_copy_prompt">Copy prompt</string>
     <string name="ai_agents_docs_opened">Opening the connector documentation.</string>
     <string name="ai_agents_docs_failed">The connector documentation could not be opened.</string>
     <string name="ai_agents_manual_setup_title">Manual setup</string>
-    <string name="ai_agents_manual_setup_body">Once the agent gives you its npub, add it as a contact from %1$s and start a chat. The connector docs cover the rest.</string>
+    <string name="ai_agents_manual_setup_body">Then add the agent as a contact from %1$s using its npub.</string>
     <string name="ai_agents_connector_docs_title">Agent connector documentation</string>
     <string name="ai_agents_connector_docs_subtitle">Install scripts, health checks, and troubleshooting</string>
     <string name="agent_connector_hermes_name">Hermes</string>
@@ -2565,7 +2563,7 @@
     <string name="agent_connector_claude_name" translatable="false">Claude Code</string>
     <string name="agent_connector_claude_subtitle">Claude Code CLI coding agent</string>
     <string name="agent_connector_claude_prompt">Installation prompt for connecting Claude Code to White Noise through Marmot. Paste this into Claude Code in a terminal on the computer where the agent will run. The Claude mobile app and its cloud sessions cannot install the connector on that computer. Read the authoritative Claude Code harness guide at https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md and the evergreen connector guide at https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Explain to me how the connector works and what the installation will change. Confirm prerequisites: Claude Code CLI is installed, authenticated, and available on PATH. If anything is missing, use https://code.claude.com/docs/en/setup to explain the required installation, PATH or sign-in steps and ask for my approval before any host changes, including installing Claude Code or changing PATH or sign-in setup. Ask me to check on my phone that its public relay list contains wss://relay.eu.whitenoise.chat and wss://relay.us.whitenoise.chat; do not claim to verify phone settings from this computer. Then propose the installation steps for my public npub: %1$s, and ask for my approval before making any changes. Once I approve, use the checksum-verified install-claude-marmot.sh release flow, bootstrap wn-agent with that npub as the only allowed welcomer, and verify wn-claude --version. Explain that the downloaded installer runs with bash install-claude-marmot.sh. Then reply with your agent npub and ask me to invite it from White Noise. In the invited group, my first message should select an existing folder relative to the agent computer’s home: /Claude selects $HOME/Claude, not /Users/me/Claude. Then ask me to send a test message from this allowed npub over the configured relays. Do not report setup complete until wn-claude returns a reply through White Noise; if that round trip cannot be verified automatically, mark device verification required.</string>
-    <string name="ai_agents_project_groups_tip">Use a separate group for each project and start with its location and context. Session controls vary by connector; check its guide before using resume or branch commands.</string>
+    <string name="ai_agents_project_groups_tip">Tip: use a separate group for each project.</string>
     <string name="nostr_event_view_image">View image</string>
     <string name="nostr_event_image_failed">Couldn’t load this image. Try again.</string>
     <string name="nostr_event_type_image">Image</string>

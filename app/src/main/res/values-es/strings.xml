@@ -1762,19 +1762,17 @@
     <string name="notify_for">Notificar</string>
     <string name="ok">OK</string>
     <string name="ai_agents">Agentes de IA</string>
-    <string name="ai_agents_about_title">Acerca de los agentes de IA</string>
-    <string name="ai_agents_intro">Chatea con agentes de IA, con cifrado de extremo a extremo como en cualquier otro chat. Cada agente se ejecuta con su propia cuenta en un ordenador o servidor que tú controlas.</string>
-    <string name="ai_agents_clipboard_disclosure">Estas son instrucciones de instalación. Elige tu agente, copia su instrucción y pégala en ese agente para conectarlo a White Noise. La instrucción incluye tu npub pública, nunca tu clave privada, y pide al agente que explique el conector antes de solicitar tu aprobación para instalarlo. Usa solo un agente que ejecutes tú y en el que confíes.</string>
+    <string name="ai_agents_clipboard_disclosure">Toca tu agente, copia su instrucción y pégala allí. Solo se comparte tu clave pública.</string>
     <string name="ai_agents_connectors_title">Conectores</string>
     <string name="ai_agents_prompt_copied">Indicación copiada — pégala en tu agente.</string>
     <string name="ai_agents_public_key_unavailable">Tu clave pública no está disponible. Vuelve a Configuración y prueba con otro perfil.</string>
     <string name="ai_agents_setup_title">Configurar %1$s</string>
-    <string name="ai_agents_setup_instruction">Pega esta instrucción en %1$s. Incluye tu npub pública y no incluye tu clave privada. El agente debe pedirte aprobación antes de instalar nada. Usa esta instrucción solo con un agente que ejecutes tú y en el que confíes.</string>
+    <string name="ai_agents_setup_instruction">Pega esto en %1$s. Solo comparte tu clave pública y el agente te preguntará antes de instalar nada.</string>
     <string name="ai_agents_copy_prompt">Copiar indicación</string>
     <string name="ai_agents_docs_opened">Abriendo la documentación del conector.</string>
     <string name="ai_agents_docs_failed">No se pudo abrir la documentación del conector.</string>
     <string name="ai_agents_manual_setup_title">Configuración manual</string>
-    <string name="ai_agents_manual_setup_body">Cuando el agente te dé su npub, añádelo como contacto desde %1$s e inicia un chat. La documentación del conector explica el resto.</string>
+    <string name="ai_agents_manual_setup_body">Después, añade el agente como contacto desde %1$s con su npub.</string>
     <string name="ai_agents_connector_docs_title">Documentación del conector de agentes</string>
     <string name="ai_agents_connector_docs_subtitle">Scripts de instalación, comprobaciones de estado y solución de problemas</string>
     <string name="agent_connector_hermes_name">Hermes</string>
@@ -2385,7 +2383,7 @@
     <string name="profile_readiness_field_optional">Opcional</string>
     <string name="agent_connector_claude_subtitle">Agente de programación con Claude Code CLI</string>
     <string name="agent_connector_claude_prompt">Esta es una instrucción de instalación para conectar esta configuración de Claude Code a White Noise mediante Marmot. Pega esto en Claude Code, en una terminal del ordenador donde se ejecutará el agente. La aplicación móvil de Claude y sus sesiones en la nube no pueden instalar el conector en ese ordenador. Lee la guía autorizada del harness de Claude Code en https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md y la guía permanente del conector en https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Explícame cómo funciona el conector y qué cambiará la instalación. Confirma los requisitos previos: la CLI de Claude Code está instalada, autenticada y disponible en PATH. Si falta algo, usa https://code.claude.com/docs/en/setup para explicar los pasos necesarios de instalación, PATH o inicio de sesión y pide mi aprobación antes de cualquier cambio en el ordenador, incluida la instalación de Claude Code o cambios en PATH o en el acceso. Pídeme que compruebe en el teléfono que la lista de relays públicos incluye wss://relay.eu.whitenoise.chat y wss://relay.us.whitenoise.chat; no afirmes verificar sus ajustes desde el ordenador. Después, propón los pasos de instalación para mi npub pública: %1$s, y pide mi aprobación antes de realizar cualquier cambio. Una vez que lo apruebe, usa el flujo de release install-claude-marmot.sh verificado por checksum, inicializa wn-agent con esa npub como único welcomer permitido y verifica wn-claude --version. Explica que el instalador descargado se ejecuta con bash install-claude-marmot.sh, no con doble clic. A continuación, responde con la npub de tu agente y pídeme que lo invite desde White Noise. Mi primer mensaje en el grupo invitado debe seleccionar una carpeta existente relativa al directorio personal del ordenador del agente: /Claude selecciona $HOME/Claude, no /Users/me/Claude. Después, pídeme que envíe un mensaje de prueba desde esta npub permitida mediante los relays configurados. No informes que la configuración está completa hasta que wn-claude responda a través de White Noise; si no se puede verificar automáticamente este recorrido, indica claramente que se requiere verificación en el dispositivo.</string>
-    <string name="ai_agents_project_groups_tip">Usa un grupo distinto para cada proyecto y empieza con su ubicación y contexto. Los controles de sesión varían según el conector; consulta su guía antes de usar comandos para reanudar o crear ramas.</string>
+    <string name="ai_agents_project_groups_tip">Consejo: usa un grupo distinto para cada proyecto.</string>
     <string name="nostr_event_view_image">Ver imagen</string>
     <string name="nostr_event_image_failed">No se pudo cargar esta imagen. Inténtalo de nuevo.</string>
     <string name="nostr_event_type_image">Imagen</string>
@@ -2593,4 +2591,12 @@
     <string name="time_format_24_hour">24 horas</string>
     <string name="date_time_format_help">Automático usa el idioma de la app y la región de tu teléfono.</string>
     <string name="settings_search_alias_date_time_format">formato de hora|formato de fecha|reloj|12 horas|24 horas|AM/PM</string>
+    <string name="notification_sounds_vibration">Sonidos y vibración</string>
+    <string name="notification_delivery_value_local">Local</string>
+    <string name="notification_delivery_value_push">Push</string>
+    <string name="notification_delivery_battery">Entrega y batería</string>
+    <string name="notification_android_controls">Controles de Android</string>
+    <string name="android_notification_settings">Ajustes de notificaciones de Android</string>
+    <string name="settings_help_support">Ayuda y soporte</string>
+    <string name="settings_voice_language">Voz e idioma</string>
 </resources>

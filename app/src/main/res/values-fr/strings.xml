@@ -1775,19 +1775,17 @@
     <string name="notify_for">Notifier</string>
     <string name="ok">OK</string>
     <string name="ai_agents">Agents IA</string>
-    <string name="ai_agents_about_title">À propos des agents IA</string>
-    <string name="ai_agents_intro">Discutez avec des agents IA, avec un chiffrement de bout en bout comme dans n’importe quelle autre discussion. Chaque agent s’exécute avec son propre compte sur un ordinateur ou un serveur que vous contrôlez.</string>
-    <string name="ai_agents_clipboard_disclosure">Voici des invites d’installation. Choisissez votre agent, copiez son invite et collez-la dans cet agent pour le connecter à White Noise. L’invite contient votre npub publique, jamais votre clé privée, et demande à l’agent d’expliquer le connecteur avant de solliciter votre approbation pour l’installer. Utilisez uniquement un agent que vous exécutez et auquel vous faites confiance.</string>
+    <string name="ai_agents_clipboard_disclosure">Touchez votre agent, copiez son invite et collez-la dans l’agent. Seule votre clé publique est partagée.</string>
     <string name="ai_agents_connectors_title">Connecteurs</string>
     <string name="ai_agents_prompt_copied">Invite copiée — collez-la dans votre agent.</string>
     <string name="ai_agents_public_key_unavailable">Votre clé publique n’est pas disponible. Revenez aux paramètres et essayez un autre profil.</string>
     <string name="ai_agents_setup_title">Configurer %1$s</string>
-    <string name="ai_agents_setup_instruction">Collez cette invite dans %1$s. Elle contient votre npub publique et omet votre clé privée. L’agent doit demander votre approbation avant d’installer quoi que ce soit. N’utilisez cette invite qu’avec un agent que vous exécutez et auquel vous faites confiance.</string>
+    <string name="ai_agents_setup_instruction">Collez ceci dans %1$s. Seule votre clé publique est partagée, et l’agent demande avant d’installer quoi que ce soit.</string>
     <string name="ai_agents_copy_prompt">Copier l’invite</string>
     <string name="ai_agents_docs_opened">Ouverture de la documentation du connecteur.</string>
     <string name="ai_agents_docs_failed">Impossible d’ouvrir la documentation du connecteur.</string>
     <string name="ai_agents_manual_setup_title">Configuration manuelle</string>
-    <string name="ai_agents_manual_setup_body">Une fois que l’agent vous donne sa npub, ajoutez-le comme contact depuis %1$s et démarrez une discussion. La documentation du connecteur couvre le reste.</string>
+    <string name="ai_agents_manual_setup_body">Ajoutez ensuite l’agent comme contact depuis %1$s avec sa npub.</string>
     <string name="ai_agents_connector_docs_title">Documentation du connecteur d\'agent</string>
     <string name="ai_agents_connector_docs_subtitle">Scripts d\'installation, vérifications d\'état et dépannage</string>
     <string name="agent_connector_hermes_name">Hermes</string>
@@ -2385,7 +2383,7 @@
     <string name="profile_readiness_field_optional">Facultatif</string>
     <string name="agent_connector_claude_subtitle">Agent de programmation Claude Code CLI</string>
     <string name="agent_connector_claude_prompt">Ceci est une invite d’installation pour connecter cette configuration Claude Code à White Noise via Marmot. Collez ceci dans Claude Code, dans un terminal sur l’ordinateur où fonctionnera l’agent. L’application mobile Claude et ses sessions cloud ne peuvent pas y installer le connecteur. Lisez le guide officiel du harness Claude Code à l’adresse https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md et le guide permanent du connecteur à l’adresse https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md. Expliquez-moi comment le connecteur fonctionne et ce que l’installation va modifier. Confirmez les prérequis : la CLI Claude Code est installée, authentifiée et disponible dans PATH. Si nécessaire, utilisez https://code.claude.com/docs/en/setup pour expliquer les étapes d’installation, de PATH ou de connexion et demandez mon approbation avant toute modification de l’ordinateur, y compris l’installation de Claude Code ou les changements de PATH ou de connexion. Demandez-moi de vérifier sur le téléphone que sa liste de relais publics contient wss://relay.eu.whitenoise.chat et wss://relay.us.whitenoise.chat ; ne prétendez pas vérifier ses réglages depuis cet ordinateur. Proposez ensuite les étapes d’installation pour ma npub publique : %1$s, et demandez mon approbation avant d’apporter la moindre modification. Une fois mon approbation donnée, utilisez le flux de release install-claude-marmot.sh vérifié par somme de contrôle, initialisez wn-agent avec cette npub comme seul welcomer autorisé et vérifiez wn-claude --version. Expliquez que le script téléchargé se lance avec bash install-claude-marmot.sh plutôt que par double-clic. Répondez ensuite avec la npub de votre agent et demandez-moi de l’inviter depuis White Noise. Mon premier message dans le groupe invité doit sélectionner un dossier existant relatif au dossier personnel de l’ordinateur de l’agent : /Claude sélectionne $HOME/Claude, pas /Users/me/Claude. Demandez-moi ensuite d’envoyer un message de test depuis cette npub autorisée via les relais configurés. Ne déclarez pas la configuration terminée tant que wn-claude n’a pas répondu via White Noise ; si cet aller-retour ne peut pas être vérifié automatiquement, indiquez clairement qu’une vérification sur l’appareil est requise.</string>
-    <string name="ai_agents_project_groups_tip">Utilise un groupe distinct pour chaque projet et commence par son emplacement et son contexte. Les commandes de session varient selon le connecteur ; consulte son guide avant de reprendre une session ou de créer une branche.</string>
+    <string name="ai_agents_project_groups_tip">Astuce : utilisez un groupe distinct pour chaque projet.</string>
     <string name="nostr_event_view_image">Afficher l’image</string>
     <string name="nostr_event_image_failed">Impossible de charger cette image. Réessayez.</string>
     <string name="nostr_event_type_image">Photo</string>
@@ -2593,4 +2591,12 @@
     <string name="time_format_24_hour">24 heures</string>
     <string name="date_time_format_help">Automatique utilise la langue de l\'app et la région de votre téléphone.</string>
     <string name="settings_search_alias_date_time_format">format de l\'heure|format de date|horloge|12 heures|24 heures|AM/PM</string>
+    <string name="notification_sounds_vibration">Sons et vibration</string>
+    <string name="notification_delivery_value_local">Local</string>
+    <string name="notification_delivery_value_push">Push</string>
+    <string name="notification_delivery_battery">Distribution et batterie</string>
+    <string name="notification_android_controls">Contrôles Android</string>
+    <string name="android_notification_settings">Paramètres de notification Android</string>
+    <string name="settings_help_support">Aide et assistance</string>
+    <string name="settings_voice_language">Voix et langue</string>
 </resources>

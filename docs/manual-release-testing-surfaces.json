@@ -21018,14 +21018,6 @@
         ]
       },
       {
-        "surface": "setting:ai_agents_about_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
-        "anchor": "R.string.ai_agents_about_title",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
         "surface": "string:ai_agents_clipboard_disclosure",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
         "anchor": "R.string.ai_agents_clipboard_disclosure",
@@ -21082,15 +21074,6 @@
         "surface": "string:ai_agents_docs_opened",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
         "anchor": "R.string.ai_agents_docs_opened",
-        "test_ids": [
-          "SET-016",
-          "SET-017"
-        ]
-      },
-      {
-        "surface": "string:ai_agents_intro",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AiAgentsScreen.kt",
-        "anchor": "R.string.ai_agents_intro",
         "test_ids": [
           "SET-016",
           "SET-017"

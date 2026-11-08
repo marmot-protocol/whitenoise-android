@@ -1755,19 +1755,17 @@
     <string name="notify_for">Bildirim</string>
     <string name="ok">Tamam</string>
     <string name="ai_agents">Yapay zeka ajanları</string>
-    <string name="ai_agents_about_title">Yapay zeka ajanları hakkında</string>
-    <string name="ai_agents_intro">Yapay zeka ajanlarıyla, diğer sohbetler gibi uçtan uca şifreli olarak sohbet edin. Her ajan, kendi hesabını kullanarak sizin denetlediğiniz bir bilgisayarda veya sunucuda çalışır.</string>
-    <string name="ai_agents_clipboard_disclosure">Bunlar kurulum istemleridir. Ajanınızı seçin, istemini kopyalayın ve White Noise’a bağlamak için o ajana yapıştırın. İstem, açık npub’ınızı içerir, özel anahtarınızı asla içermez ve ajandan, kurulum için onayınızı istemeden önce bağlayıcıyı açıklamasını ister. Yalnızca kendi çalıştırdığınız ve güvendiğiniz bir ajanı kullanın.</string>
+    <string name="ai_agents_clipboard_disclosure">Ajanınıza dokunun, istemini kopyalayın ve oraya yapıştırın. Yalnızca açık anahtarınız paylaşılır.</string>
     <string name="ai_agents_connectors_title">Bağlayıcılar</string>
     <string name="ai_agents_prompt_copied">İstem kopyalandı — ajana yapıştırın.</string>
     <string name="ai_agents_public_key_unavailable">Genel anahtarınız kullanılamıyor. Ayarlar’a dönün ve başka bir profil deneyin.</string>
     <string name="ai_agents_setup_title">%1$s kurulumu</string>
-    <string name="ai_agents_setup_instruction">Bu istemi %1$s içine yapıştırın. Açık npub’ınızı içerir, özel anahtarınızı içermez. Ajan, herhangi bir şey kurmadan önce onayınızı istemelidir. Bu istemi yalnızca kendi çalıştırdığınız ve güvendiğiniz bir ajanla kullanın.</string>
+    <string name="ai_agents_setup_instruction">Bunu %1$s içine yapıştırın. Yalnızca açık anahtarınız paylaşılır ve ajan bir şey kurmadan önce sorar.</string>
     <string name="ai_agents_copy_prompt">İstemi kopyala</string>
     <string name="ai_agents_docs_opened">Bağlayıcı belgeleri açılıyor.</string>
     <string name="ai_agents_docs_failed">Bağlayıcı belgeleri açılamadı.</string>
     <string name="ai_agents_manual_setup_title">Manuel kurulum</string>
-    <string name="ai_agents_manual_setup_body">Ajan size npub\'unu verdikten sonra %1$s üzerinden kişi olarak ekleyin ve sohbet başlatın. Gerisi bağlayıcı belgelerinde anlatılıyor.</string>
+    <string name="ai_agents_manual_setup_body">Ardından ajanı npub ile %1$s üzerinden kişi olarak ekleyin.</string>
     <string name="ai_agents_connector_docs_title">Ajan bağlayıcı belgeleri</string>
     <string name="ai_agents_connector_docs_subtitle">Kurulum betikleri, sağlık denetimleri ve sorun giderme</string>
     <string name="agent_connector_hermes_name">Hermes</string>
@@ -2378,7 +2376,7 @@
     <string name="profile_readiness_field_optional">İsteğe bağlı</string>
     <string name="agent_connector_claude_subtitle">Claude Code CLI kodlama aracısı</string>
     <string name="agent_connector_claude_prompt">Bu bir kurulum istemidir; bu Claude Code kurulumunu Marmot üzerinden White Noise’a bağlar. Bunu, ajanın çalışacağı bilgisayarda bir terminal içindeki Claude Code’a yapıştırın. Claude mobil uygulaması ve bulut oturumları bağlayıcıyı o bilgisayara kuramaz. https://github.com/marmot-protocol/mdk/blob/master/integrations/claude/marmot/README.md adresindeki yetkili Claude Code harness kılavuzunu ve https://github.com/marmot-protocol/mdk/blob/master/crates/agent-connector/README.md adresindeki kalıcı bağlayıcı kılavuzunu okuyun. Bağlayıcının nasıl çalıştığını ve kurulumun neleri değiştireceğini bana açıklayın. Önkoşulları doğrulayın: Claude Code CLI kurulu, kimliği doğrulanmış ve PATH üzerinde kullanılabilir durumda. Eksik varsa https://code.claude.com/docs/en/setup ile gerekli kurulum, PATH veya giriş adımlarını açıklayın ve Claude Code kurulumu ya da PATH veya giriş ayarları dahil bilgisayardaki her değişiklikten önce onayımı isteyin. Telefonumdaki genel relay listesinde wss://relay.eu.whitenoise.chat ve wss://relay.us.whitenoise.chat bulunduğunu kontrol etmemi isteyin; telefon ayarlarını bilgisayardan doğruladığınızı söylemeyin. Ardından genel npub’ım için kurulum adımlarını önerin: %1$s ve herhangi bir değişiklik yapmadan önce onayımı isteyin. Ben onayladıktan sonra sağlama toplamıyla doğrulanmış install-claude-marmot.sh sürüm akışını kullanın, yalnızca o npub’ı izin verilen welcomer olarak kullanarak wn-agent önyüklemesini yapın ve wn-claude --version komutunu doğrulayın. İndirilen betiğin çift tıklama yerine bash install-claude-marmot.sh ile çalıştırıldığını açıklayın. Ardından ajan npub’ınızla yanıt verin; benden onu White Noise üzerinden davet etmemi isteyin. Davet edilen gruptaki ilk mesajım, ajan bilgisayarının ev dizinine göre mevcut bir klasör seçmelidir: /Claude, $HOME/Claude demektir; /Users/me/Claude değil. Sonra yapılandırılmış relay’ler aracılığıyla bu izin verilen npub’dan bir test mesajı göndermemi isteyin. wn-claude White Noise üzerinden yanıt verene kadar kurulumun tamamlandığını bildirmeyin; bu gidiş dönüş otomatik olarak doğrulanamıyorsa cihaz doğrulaması gerektiğini açıkça belirtin.</string>
-    <string name="ai_agents_project_groups_tip">Her proje için ayrı bir grup kullan ve proje konumu ile bağlamını vererek başla. Oturum komutları bağlayıcıya göre değişir; sürdürme veya dallandırma komutlarından önce kılavuzunu kontrol et.</string>
+    <string name="ai_agents_project_groups_tip">İpucu: Her proje için ayrı bir grup kullanın.</string>
     <string name="nostr_event_view_image">Görseli görüntüle</string>
     <string name="nostr_event_image_failed">Bu görsel yüklenemedi. Tekrar deneyin.</string>
     <string name="nostr_event_type_image">Görsel</string>
@@ -2586,4 +2584,12 @@
     <string name="time_format_24_hour">24 saat</string>
     <string name="date_time_format_help">Otomatik, uygulama dilini ve telefonunuzun bölgesini kullanır.</string>
     <string name="settings_search_alias_date_time_format">saat biçimi|tarih biçimi|saat|12 saat|24 saat|ÖÖ/ÖS</string>
+    <string name="notification_sounds_vibration">Sesler ve titreşim</string>
+    <string name="notification_delivery_value_local">Yerel</string>
+    <string name="notification_delivery_value_push">Push</string>
+    <string name="notification_delivery_battery">Teslimat ve pil</string>
+    <string name="notification_android_controls">Android denetimleri</string>
+    <string name="android_notification_settings">Android bildirim ayarları</string>
+    <string name="settings_help_support">Yardım ve destek</string>
+    <string name="settings_voice_language">Ses ve dil</string>
 </resources>

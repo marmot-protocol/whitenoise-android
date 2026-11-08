@@ -41,7 +41,9 @@ class AiAgentsScreenScreenshotTest {
 
     /** RTL at a large font: connectors first, with the manual setup below. */
     @Test
-    fun aiAgentsScreenRtlLargeFont() = capture("ai_agents_screen_rtl_large_font", dark = false, fontScale = 1.6f, rtl = true)
+    fun aiAgentsScreenRtlLargeFont() {
+        capture("ai_agents_screen_rtl_large_font", dark = false, fontScale = 1.6f, rtl = true)
+    }
 
     /** Without a public key: the error callout above disabled connector rows. */
     @Test
