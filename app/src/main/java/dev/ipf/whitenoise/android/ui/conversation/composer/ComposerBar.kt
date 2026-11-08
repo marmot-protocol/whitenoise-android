@@ -32,7 +32,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -100,6 +99,7 @@ import dev.ipf.whitenoise.android.state.ComposerShortcutSide
 import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.ui.common.BottomPanelSurface
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.LocalFinishControlMorph
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
@@ -111,7 +111,6 @@ import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Delete
 import dev.ipf.whitenoise.android.ui.navigation.composerFabContent
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
@@ -197,15 +196,7 @@ internal fun RemovedMemberComposerNotice(
     modifier: Modifier = Modifier,
     deviceRemoved: Boolean = false,
 ) {
-    Surface(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .navigationBarsPadding(),
-        color = MaterialTheme.colorScheme.surface,
-        border = amoledSurfaceBorderStroke(),
-        tonalElevation = 3.dp,
-    ) {
+    BottomPanelSurface(modifier = modifier.navigationBarsPadding()) {
         Text(
             // Explains the disabled composer for a member who left or was removed, or a device that was
             // removed while its account stays in. The timeline system row carries the left-vs-removed distinction.

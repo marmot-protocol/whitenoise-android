@@ -11,15 +11,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Surface
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -28,8 +25,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.ipf.whitenoise.android.ui.common.BottomPanelSurface
 import dev.ipf.whitenoise.android.ui.theme.amoledSheetContainerColor
-import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 internal enum class EmojiPickerPurpose {
     USE,
@@ -109,16 +106,12 @@ internal fun ComposerEmojiPickerPane(
     onSearchRowHeightChange: (Dp) -> Unit = {},
 ) {
     val density = LocalDensity.current
-    Surface(
+    // The panel shape clips the animated height, so content never draws past the rounded corners.
+    BottomPanelSurface(
         modifier =
             modifier
-                .fillMaxWidth()
                 .then(if (searchRow) Modifier.heightIn(min = searchMinHeight) else Modifier.height(height))
-                .clipToBounds()
                 .alpha(alpha),
-        color = MaterialTheme.colorScheme.surface,
-        border = amoledSurfaceBorderStroke(),
-        tonalElevation = 3.dp,
     ) {
         EmojiPickerContent(
             onEmojiPicked = onEmojiPicked,
@@ -131,7 +124,7 @@ internal fun ComposerEmojiPickerPane(
             searchRow = searchRow,
             modifier =
                 if (searchRow) {
-                    // Measure the row at its own height: Surface passes searchMinHeight down as a
+                    // Measure the row at its own height: the surface passes searchMinHeight down as a
                     // minimum, and reporting that would feed the pane's own size back as its target.
                     Modifier
                         .fillMaxWidth()
