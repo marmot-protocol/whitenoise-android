@@ -725,7 +725,7 @@ class BaselineStagingTest(unittest.TestCase):
             destination = Path(directory)
             pin = destination / 'app/src/main/marmotkit/MARMOT_VERSION'
             pin.parent.mkdir(parents=True)
-            pin.write_text('mdk-sha=5286f86cd66af12705d33e1e7bf766bc7889441b\n')
+            pin.write_text('mdk-sha=9a45434cfbf0adaad2c34be861b6a71ebcf148b5\n')
             original = pin.read_bytes()
             with patch.object(staging.shutil, 'copytree') as copy:
                 staging.stage(destination)
@@ -736,8 +736,8 @@ class BaselineStagingTest(unittest.TestCase):
     def test_other_native_revisions_cannot_seed_the_reviewed_pair(self):
         """The former baseline, candidate itself and a partial SHA all fail before any source overlay."""
         from scripts import stage_mdk_baseline_fixture as staging
-        for source in ('0f3fe9e02828f57a4e4c10592df05b3835fc9f39',
-                       '9a45434cfbf0adaad2c34be861b6a71ebcf148b5', '5286f86c'):
+        for source in ('5286f86cd66af12705d33e1e7bf766bc7889441b',
+                       '580082a5840cc86d05263a0337041897f39864b0', '9a45434c'):
             with self.subTest(source=source), tempfile.TemporaryDirectory() as directory:
                 destination = Path(directory)
                 pin = destination / 'app/src/main/marmotkit/MARMOT_VERSION'
