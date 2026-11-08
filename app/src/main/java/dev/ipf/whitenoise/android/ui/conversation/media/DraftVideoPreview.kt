@@ -43,7 +43,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
 import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.delay
 
@@ -174,13 +173,13 @@ private fun KeepScreenOnWhilePlaying(playing: Boolean) {
 internal fun rememberDraftVideoPlayer(
     uri: Uri,
     active: Boolean,
-): ExoPlayer? {
+): Player? {
     val context = LocalContext.current.applicationContext
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var position by rememberSaveable(uri) { mutableLongStateOf(0L) }
     var volume by rememberSaveable(uri) { mutableFloatStateOf(1f) }
     var speed by rememberSaveable(uri) { mutableFloatStateOf(1f) }
-    var player by remember(uri) { mutableStateOf<ExoPlayer?>(null) }
+    var player by remember(uri) { mutableStateOf<Player?>(null) }
     DisposableEffect(context, lifecycle, uri, active) {
         fun release() {
             player?.let { live ->
@@ -197,21 +196,17 @@ internal fun rememberDraftVideoPlayer(
             if (!holds) {
                 release()
             } else if (player == null) {
-                val source = localVideoSource(context, uri) ?: return
+                val sourcePlayer = localVideoPlayer(context, uri) ?: return
                 player =
-                    ExoPlayer
-                        .Builder(context)
-                        .setAudioAttributes(draftVideoAudioAttributes, true)
-                        .setHandleAudioBecomingNoisy(true)
-                        .build()
-                        .apply {
-                            setMediaSource(source)
-                            seekTo(position)
-                            this.volume = volume
-                            setPlaybackSpeed(speed)
-                            playWhenReady = false
-                            prepare()
-                        }
+                    sourcePlayer.apply {
+                        setAudioAttributes(draftVideoAudioAttributes, true)
+                        setHandleAudioBecomingNoisy(true)
+                        seekTo(position)
+                        this.volume = volume
+                        setPlaybackSpeed(speed)
+                        playWhenReady = false
+                        prepare()
+                    }
             }
         }
 
@@ -230,7 +225,7 @@ internal fun rememberDraftVideoPlayer(
 @Composable
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 private fun DraftVideoSurface(
-    player: ExoPlayer?,
+    player: Player?,
     modifier: Modifier = Modifier,
 ) {
     androidx.compose.ui.viewinterop.AndroidView(
@@ -250,7 +245,7 @@ private fun DraftVideoSurface(
 /** Centre transport: rewind, play/pause and fast-forward, shown only when the frame is tall enough. */
 @Composable
 private fun DraftVideoTransport(
-    player: ExoPlayer,
+    player: Player,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -267,7 +262,7 @@ private fun DraftVideoTransport(
 /** Bottom bar: buffering line, scrub slider, and the speed and mute toggles pinned to its end. */
 @Composable
 private fun DraftVideoBottomBar(
-    player: ExoPlayer,
+    player: Player,
     buffering: Boolean,
     compact: Boolean,
     modifier: Modifier = Modifier,
@@ -303,7 +298,7 @@ private fun DraftVideoBottomBar(
 
 /** Scrub bar without an end-stop marker; dragging holds a local value until the pointer lifts. */
 @Composable
-private fun DraftVideoSeekSlider(player: ExoPlayer) {
+private fun DraftVideoSeekSlider(player: Player) {
     var duration by remember(player) { mutableLongStateOf(0L) }
     var position by remember(player) { mutableLongStateOf(0L) }
     var scrub by remember(player) { mutableStateOf<Float?>(null) }

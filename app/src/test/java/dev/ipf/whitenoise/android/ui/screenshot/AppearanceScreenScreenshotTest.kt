@@ -5,25 +5,35 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.core.DateFormatPreference
+import dev.ipf.whitenoise.android.core.DateTimeFormatState
+import dev.ipf.whitenoise.android.core.TimeFormatPreference
 import dev.ipf.whitenoise.android.state.AppThemeMode
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.settings.AppearanceScreen
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
+import org.junit.After
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.util.TimeZone
 
 /**
  * Screenshot baselines for the Appearance settings screen.
@@ -35,6 +45,23 @@ import org.robolectric.annotation.GraphicsMode
 class AppearanceScreenScreenshotTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    private val originalTimeZone = TimeZone.getDefault()
+
+    /** Keeps the synthetic sample timestamps independent of the host timezone. */
+    @Before
+    fun setTimeZone() {
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+        // Platform inputs are process-wide; start every frame from the regional defaults.
+        DateTimeFormatState.system24Hour = null
+        DateTimeFormatState.deviceRegion = null
+    }
+
+    /** Restores the host timezone for subsequent tests. */
+    @After
+    fun restoreTimeZone() {
+        TimeZone.setDefault(originalTimeZone)
+    }
 
     /** Default light rendering with the System theme card selected. */
     @Test
@@ -85,6 +112,40 @@ class AppearanceScreenScreenshotTest {
         capture("rtl")
     }
 
+    /** The date and time dialog: every choice labelled by its example, Automatic selected. */
+    @Test
+    fun dateTimeFormatDialogLight() {
+        render(mode = AppThemeMode.System, darkTheme = false)
+        captureDateTimeDialog("light")
+    }
+
+    /** An explicit 24-hour, year-first choice in the AMOLED palette, with Reset enabled. */
+    @Test
+    fun dateTimeFormatDialogAmoledExplicit() {
+        render(mode = AppThemeMode.Amoled, darkTheme = true, amoled = true) {
+            it.updateTimeFormat(TimeFormatPreference.TwentyFourHour)
+            it.updateDateFormat(DateFormatPreference.YearMonthDay)
+        }
+        captureDateTimeDialog("amoled_explicit")
+    }
+
+    /** The localized dialog fits at double font size in RTL. */
+    @Test
+    @Config(qualifiers = "en-rUS-w360dp-h2400dp-mdpi")
+    fun dateTimeFormatDialogLargeRtl() {
+        render(mode = AppThemeMode.System, darkTheme = false, fontScale = 2f, layoutDirection = LayoutDirection.Rtl)
+        captureDateTimeDialog("large_rtl")
+    }
+
+    private fun captureDateTimeDialog(variant: String) {
+        composeRule.onNodeWithTag("settings.list").performScrollToNode(hasTestTag("appearance.date_time_format"))
+        composeRule.onNodeWithTag("appearance.date_time_format").performClick()
+        composeRule.waitForIdle()
+        composeRule
+            .onNode(isDialog())
+            .captureRoboImage("src/test/snapshots/appearance_date_time_format_dialog_$variant.png")
+    }
+
     /** The actual local-only sample and its controls remain visible in the light palette. */
     @Test
     fun accessibilityPreviewLight() {
@@ -116,6 +177,8 @@ class AppearanceScreenScreenshotTest {
     /** Lazily compose the whole preview before capturing its production content and simulation controls. */
     private fun capturePreview(variant: String) {
         composeRule.onNodeWithTag("settings.list").performScrollToNode(hasTestTag("appearance.accessibility.preview"))
+        composeRule.onNodeWithText("Readability preview").performScrollTo().performClick()
+        composeRule.onNodeWithTag("appearance.accessibility.preview").performScrollTo()
         composeRule
             .onNodeWithTag("appearance.accessibility.preview")
             .captureRoboImage("src/test/snapshots/appearance_accessibility_preview_$variant.png")
@@ -128,8 +191,13 @@ class AppearanceScreenScreenshotTest {
         amoled: Boolean = false,
         fontScale: Float = 1f,
         layoutDirection: LayoutDirection = LayoutDirection.Ltr,
+        prepare: (WhiteNoiseAppState) -> Unit = {},
     ) {
-        val appState = appearanceAppState().also { it.updateThemeMode(mode) }
+        val appState =
+            appearanceAppState().also {
+                it.updateThemeMode(mode)
+                prepare(it)
+            }
         composeRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(

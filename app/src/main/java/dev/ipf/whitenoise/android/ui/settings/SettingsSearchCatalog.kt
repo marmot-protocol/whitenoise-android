@@ -35,7 +35,7 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
                 R.string.quick_account_switching,
                 R.string.appearance,
                 SettingsDetail.Appearance,
-                itemKey = "search.Appearance.1",
+                itemKey = "search.Appearance.6",
                 rowKey = "quick_account_switching",
                 summaryRes = R.string.quick_account_switching_detail,
             ),
@@ -46,7 +46,7 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
                 R.string.action_color,
                 R.string.appearance,
                 SettingsDetail.Appearance,
-                itemKey = "search.Appearance.5",
+                itemKey = "search.Appearance.2",
                 rowKey = "action_color",
                 nonAmoledRequired = true,
             ),
@@ -57,7 +57,7 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
                 R.string.chat_bubble_colors,
                 R.string.appearance,
                 SettingsDetail.Appearance,
-                itemKey = "search.Appearance.5",
+                itemKey = "search.Appearance.2",
                 rowKey = "chat_bubble_colors",
             ),
         )
@@ -67,7 +67,7 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
                 R.string.app_font,
                 R.string.appearance,
                 SettingsDetail.Appearance,
-                itemKey = "search.Appearance.6",
+                itemKey = "search.Appearance.4",
                 rowKey = "font_family",
             ),
         )
@@ -77,9 +77,20 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
                 R.string.font_size,
                 R.string.appearance,
                 SettingsDetail.Appearance,
-                itemKey = "search.Appearance.6",
+                itemKey = "search.Appearance.4",
                 rowKey = "font_size",
                 aliasesRes = R.string.settings_search_alias_font_size,
+            ),
+        )
+        add(
+            SettingsSearchEntry(
+                "Appearance.date_time_format",
+                R.string.date_time_format,
+                R.string.appearance,
+                SettingsDetail.Appearance,
+                itemKey = "search.Appearance.4",
+                rowKey = "date_time_format",
+                aliasesRes = R.string.settings_search_alias_date_time_format,
             ),
         )
         add(
@@ -94,11 +105,22 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
         )
         add(
             SettingsSearchEntry(
+                "Appearance.composer",
+                R.string.composer_settings,
+                R.string.appearance,
+                SettingsDetail.Appearance,
+                itemKey = "search.Appearance.6",
+                rowKey = "composer",
+                summaryRes = R.string.composer_settings_detail,
+            ),
+        )
+        add(
+            SettingsSearchEntry(
                 "Appearance.custom_emoji",
                 R.string.custom_emoji,
                 R.string.appearance,
                 SettingsDetail.Appearance,
-                itemKey = "search.Appearance.7",
+                itemKey = "search.Appearance.6",
                 rowKey = "custom_emoji",
             ),
         )
@@ -108,7 +130,7 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
                 R.string.language,
                 R.string.appearance,
                 SettingsDetail.Appearance,
-                itemKey = "search.Appearance.8",
+                itemKey = "search.Appearance.4",
                 rowKey = "language",
             ),
         )

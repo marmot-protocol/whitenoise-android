@@ -90,11 +90,30 @@ internal class AccountWideForwardTargets(
 
     /**
      * Whether this read still proves the complete chat list once merged with the retained window. Additions
-     * since the read reach the window, which overrides the snapshot, and local deletions are dropped by id,
-     * so only a removal of unknown cause — an eviction or a remote deletion — ends the proof.
+     * since the read reach the window, which overrides the snapshot, rows evicted past the window's bounds
+     * still exist, and local deletions are dropped by id, so only a removal of unknown cause — a native
+     * removal, or a row the window's span should still hold — ends the proof.
      */
     val coversCurrentMembership: Boolean
         get() = isCurrent && controller.ambiguousMembershipRemovalsRevision == membership.ambiguousRemovals
+
+    /** Lowercase IDs of every chat this read presented. */
+    private val presentedIds: Set<String> by lazy {
+        presented.mapTo(HashSet()) { it.row.groupIdHex.lowercase(Locale.ROOT) }
+    }
+
+    /**
+     * Whether this read can keep preparing the unread filter with no fresh read (#3586): it covers current
+     * membership and presented every chat the window retains, so the window can later evict any of them without
+     * the snapshot losing it. A chat created since the read, or one restored after a failed local deletion,
+     * needs a fresh read.
+     */
+    val preparesCurrentWindow: Boolean
+        get() {
+            if (!coversCurrentMembership) return false
+            val deletedIds = controller.locallyDeletedGroupIdsSince(membership.localDeletions)
+            return controller.retainedGroupIds().all { it in presentedIds && it !in deletedIds }
+        }
 
     /** Rejects expired bindings and prefers the current retained window over the account-wide snapshot. */
     fun items(): List<ChatListItem> {

@@ -2,21 +2,13 @@ package dev.ipf.whitenoise.android.ui.conversation.media
 
 import android.content.Context
 import android.net.Uri
-import androidx.media3.common.MediaItem
-import androidx.media3.datasource.DefaultDataSource
-import androidx.media3.exoplayer.source.MediaSource
-import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import dev.ipf.whitenoise.android.media.sandbox.IsolatedAttachmentPlayer
 
-/** Received and picked files cannot select a network playlist or streaming protocol by their suffix. */
+/** Only selected local capabilities may enter the attachment decoder; suffixes never enable network playlists. */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-internal fun localVideoSource(
+internal fun localVideoPlayer(
     context: Context,
     uri: Uri,
-): MediaSource? {
-    if (!isLocalVideoUri(uri)) return null
-    return ProgressiveMediaSource
-        .Factory(DefaultDataSource.Factory(context))
-        .createMediaSource(MediaItem.fromUri(uri))
-}
+): IsolatedAttachmentPlayer? = if (isLocalVideoUri(uri)) IsolatedAttachmentPlayer(context, uri) else null
 
 internal fun isLocalVideoUri(uri: Uri): Boolean = uri.scheme == "file" || uri.scheme == "content"

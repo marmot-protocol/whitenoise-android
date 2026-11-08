@@ -12,6 +12,9 @@
       "preferences-dark",
       "preferences-amoled"
     ],
+    "Composer": [
+      "settings-appearance"
+    ],
     "ActionColor": [
       "nested-action-color"
     ],

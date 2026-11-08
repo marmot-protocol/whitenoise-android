@@ -59,6 +59,7 @@ internal fun ConversationSurfaceState.hasVisibleComposer(
     blockMirror: BlockListMirror,
 ): Boolean =
     !showDetails.value &&
+        !showComposerSettings.value &&
         !searchOpen.value &&
         selectedMessages.isEmpty() &&
         !initialTimelineBackfillNoProgress.value &&

@@ -1,5 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="voice_recording_stopped_announcement">Recording stopped</string>
+    <string name="voice_message_seek">Playback position</string>
+    <string name="video_failed">Video couldn\'t load</string>
+    <string name="conversation_new_message_from">New message from %1$s</string>
+    <plurals name="conversation_new_messages">
+        <item quantity="one">%1$d new message</item>
+        <item quantity="other">%1$d new messages</item>
+    </plurals>
+    <plurals name="unread_mentions_count">
+        <item quantity="one">%1$d unread mention</item>
+        <item quantity="other">%1$d unread mentions</item>
+    </plurals>
     <string name="notification_channel_summary">Notification summary</string>
     <string name="notification_channel_summary_description">Silent summary of message and other event notifications</string>
     <plurals name="notification_group_count">
@@ -246,6 +258,7 @@
     <string name="toast_chat_deleted_local">Chat deleted from this device</string>
     <string name="toast_couldnt_delete_chat">Couldn\'t delete chat</string>
     <string name="chat_list_select_all">Select all</string>
+    <string name="toast_chat_list_select_all_loaded_only">Couldn’t select every chat. Only loaded chats are selected.</string>
     <string name="chat_list_deselect_all">Deselect all</string>
     <plurals name="chat_list_selected_count">
         <item quantity="one">%1$d chat selected</item>
@@ -495,6 +508,7 @@
     <string name="message_reacted">Reacted %1$s</string>
     <string name="message_reaction_fallback">to a message</string>
     <string name="message_actions">Message actions</string>
+    <string name="message_reply_quote_description">Replying to %1$s: %2$s</string>
     <string name="message_read_more">Read More</string>
     <string name="message_react">React</string>
     <string name="message_deleted_preview">Deleted a message</string>
@@ -1717,6 +1731,7 @@
     <string name="voice_recording_limit_reached">Five-minute recording limit reached. Review your voice note before sending.</string>
     <string name="voice_recording_interrupted">Recording interrupted. Review the captured audio before sending.</string>
     <string name="voice_message_locked">Locked</string>
+    <string name="voice_recording_resume">Resume</string>
     <string name="voice_message_cancel">Cancel voice message</string>
     <string name="reply_you">You</string>
     <string name="reply_media_photo">Photo</string>
@@ -2715,6 +2730,26 @@
     <string name="notification_tone_silent">Silent</string>
     <string name="notification_tone_off">Off</string>
     <string name="notification_tone_default">Default</string>
+    <string name="composer_customize">Customize composer</string>
+    <string name="composer_settings">Composer</string>
+    <string name="composer_settings_detail">Shortcuts, order and layout</string>
+    <string name="composer_layout">Layout</string>
+    <string name="composer_layout_automatic">Automatic</string>
+    <string name="composer_layout_expanded">Always expanded</string>
+    <string name="composer_move_earlier">Move earlier</string>
+    <string name="composer_move_later">Move later</string>
+    <string name="composer_add">Add shortcut</string>
+    <string name="composer_remove">Remove shortcut</string>
+    <string name="composer_reset">Reset to default</string>
+    <string name="composer_save_failed">Couldn’t save composer settings. Try again.</string>
+    <string name="composer_side_left">Left</string>
+    <string name="composer_side_right">Right</string>
+    <string name="composer_voice_placement">Voice note</string>
+    <string name="composer_voice_on_send">Send</string>
+    <string name="appearance_colors_heading">Theme &amp; colors</string>
+    <string name="appearance_text_heading">Text &amp; language</string>
+    <string name="appearance_conversation_heading">Conversation</string>
+    <string name="appearance_preview_intro">Try larger text and right-to-left layout.</string>
     <string name="media_viewer_fit_image">Fit image</string>
     <string name="media_viewer_zoom_image">Zoom in</string>
     <string name="media_viewer_image_scale">%1$d%% zoom</string>
@@ -2727,4 +2762,12 @@
     <string name="settings_search_alias_read_aloud">TTS|text to speech|read aloud</string>
     <string name="settings_search_alias_sound">notification sound|alert sound|ringtone</string>
     <string name="settings_search_revealed">%1$s. Setting highlighted.</string>
+    <string name="date_time_format">Date and time</string>
+    <string name="date_time_format_time">Time</string>
+    <string name="date_time_format_date">Date</string>
+    <string name="date_time_format_automatic">Automatic</string>
+    <string name="time_format_12_hour">12-hour</string>
+    <string name="time_format_24_hour">24-hour</string>
+    <string name="date_time_format_help">Automatic uses the app language and your phone\'s region.</string>
+    <string name="settings_search_alias_date_time_format">time format|date format|clock|12-hour|24-hour|AM/PM</string>
 </resources>

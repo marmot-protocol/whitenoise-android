@@ -90,6 +90,8 @@ import dev.ipf.whitenoise.android.audio.tts.resolveTtsOnDispatcher
 import dev.ipf.whitenoise.android.audio.tts.runtimeTrustForSelectionWarning
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.AvatarLoadRecovery
+import dev.ipf.whitenoise.android.core.DateFormatPreference
+import dev.ipf.whitenoise.android.core.DateTimeFormatState
 import dev.ipf.whitenoise.android.core.DiagnosticFormatter
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
 import dev.ipf.whitenoise.android.core.GroupAvatarImageLoader
@@ -102,6 +104,7 @@ import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
+import dev.ipf.whitenoise.android.core.TimeFormatPreference
 import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import dev.ipf.whitenoise.android.core.encryptedGroupAvatarCacheKey
 import dev.ipf.whitenoise.android.diagnostics.DmCreationAttempt
@@ -1567,7 +1570,13 @@ class WhiteNoiseAppState private constructor(
      * Network callbacks pass false: the widening target comes from the matrix and account state, which a network
      * edge cannot change, and those callbacks arrive often.
      */
-    internal fun refreshNativeAttachmentPermissions(widenWaiting: Boolean = true): Job? {
+    internal fun refreshNativeAttachmentPermissions(widenWaiting: Boolean = true): Job? =
+        refreshNativeAttachmentPermissions(widenWaiting, networkCallback = false)
+
+    private fun refreshNativeAttachmentPermissions(
+        widenWaiting: Boolean,
+        networkCallback: Boolean,
+    ): Job? {
         val accountRefs = accounts.filterNot { it.signedOut }.map { it.label }
         AutomaticAttachmentNetworkWaits.policyNetworkType = ::liveAutomaticNetworkType
         if (widenWaiting) widenWaitingAutomaticDownloads(accountRefs)
@@ -1575,19 +1584,41 @@ class WhiteNoiseAppState private constructor(
         val revision: Long
         synchronized(permissionRefreshLock) {
             runtime = marmotRuntime
-            revision = nativeAttachmentPermissions.invalidate(runtime)
-            if (runtime != null) nativeAttachmentPermissions.beginRefresh(revision)
+            revision =
+                if (networkCallback && runtime != null) {
+                    nativeAttachmentPermissions.beginNetworkRefresh(
+                        attachmentPermissionNetworkSnapshot(),
+                        accountRefs.toSet(),
+                        runtime,
+                    ) ?: return null
+                } else {
+                    nativeAttachmentPermissions.invalidate(runtime).also {
+                        if (runtime != null) nativeAttachmentPermissions.beginRefresh(it)
+                    }
+                }
         }
-        val engine = runtime?.marmot ?: return null
-        // Marmot binding calls remain on the mutations scope's Main.immediate dispatcher.
-        return mutationsScope.launch {
-            try {
-                applyNativeAttachmentPermissions(revision, runtime, engine, accountRefs)
-            } finally {
-                nativeAttachmentPermissions.endRefresh(revision)
+        return runtime?.let { activeRuntime ->
+            val engine = activeRuntime.marmot
+            // Marmot binding calls remain on the mutations scope's Main.immediate dispatcher.
+            mutationsScope.launch {
+                try {
+                    applyNativeAttachmentPermissions(revision, activeRuntime, engine, accountRefs, networkCallback)
+                } finally {
+                    nativeAttachmentPermissions.endRefresh(revision)
+                }
             }
         }
     }
+
+    /** Detached platform facts used for both network-only evaluation and its equivalence key. */
+    private fun attachmentPermissionNetworkSnapshot(): AttachmentPermissionNetworkSnapshot =
+        AttachmentPermissionNetworkSnapshot(
+            defaultNetworkHandle = activeDefaultNetwork.identitySnapshot(),
+            validatedNetworkHandles = validatedInternetNetworks.identitySnapshot(),
+            hasActiveNetwork = hasActiveNetworkSnapshot,
+            hasValidatedInternet = hasValidatedInternet(),
+            networkTypes = activeNetworkTypes().toSet(),
+        )
 
     /**
      * Coalesces refreshes requested by network callbacks, which can arrive in bursts. One refresh runs at a time and
@@ -1601,7 +1632,7 @@ class WhiteNoiseAppState private constructor(
         mutationsScope.launch {
             try {
                 while (networkPermissionRefreshRequested.getAndSet(false)) {
-                    refreshNativeAttachmentPermissions(widenWaiting = false)?.join()
+                    refreshNativeAttachmentPermissions(widenWaiting = false, networkCallback = true)?.join()
                 }
             } finally {
                 networkPermissionRefreshRunning.set(false)
@@ -1630,6 +1661,7 @@ class WhiteNoiseAppState private constructor(
         runtime: AppMarmotRuntime,
         engine: MarmotInterface,
         accountRefs: List<String>,
+        networkCallback: Boolean = false,
     ) {
         var pending = accountRefs.toSet()
         var attempt = 0
@@ -1639,9 +1671,13 @@ class WhiteNoiseAppState private constructor(
                     // The editor commits off-main. Revoke first, then wait for queued
                     // settings saves so this generation never restores an obsolete matrix.
                     hostPreferenceCommitMutex.withLock {
+                        val evaluatedNetwork = if (networkCallback) attachmentPermissionNetworkSnapshot() else null
+                        if (evaluatedNetwork != null) {
+                            nativeAttachmentPermissions.noteNetworkEvaluation(revision, runtime, evaluatedNetwork)
+                        }
                         loadMediaAutoDownloadMatrix(account).nativePermission(
-                            activeNetworkTypes(),
-                            hasValidatedInternet(),
+                            evaluatedNetwork?.networkTypes ?: activeNetworkTypes(),
+                            evaluatedNetwork?.hasValidatedInternet ?: hasValidatedInternet(),
                             attachmentDownloadIntents.isAutomaticPaused(account),
                         )
                     }
@@ -2331,6 +2367,10 @@ class WhiteNoiseAppState private constructor(
 
     /** App-wide preference owner, retained across account changes and reset by erased app preferences. */
     internal val quickAccountSwitchingPreference = QuickAccountSwitchingPreference(preferences)
+
+    internal val composerToolbarPreference by lazy {
+        ComposerToolbarPreference(preferences, mutationsScope, hostPreferenceCommitMutex)
+    }
 
     var languageTag by mutableStateOf(preferences.getString(APP_LANGUAGE_TAG_KEY, null).orEmpty())
         private set
@@ -9110,6 +9150,18 @@ class WhiteNoiseAppState private constructor(
         persistHostSetting { putString(ENTER_KEY_BEHAVIOR_KEY, behavior.preferenceValue) }
     }
 
+    /** Sets the clock system for every time label (#3602); Automatic follows Android and the region. */
+    fun updateTimeFormat(format: TimeFormatPreference) {
+        DateTimeFormatState.timeFormat = format
+        persistHostSetting { putString(TIME_FORMAT_KEY, format.preferenceValue) }
+    }
+
+    /** Sets the numeric date order for compact date labels (#3602); Automatic follows the region. */
+    fun updateDateFormat(format: DateFormatPreference) {
+        DateTimeFormatState.dateFormat = format
+        persistHostSetting { putString(DATE_FORMAT_KEY, format.preferenceValue) }
+    }
+
     /**
      * Update the outgoing-media quality ceiling (image downscale/JPEG quality
      * and voice-note bitrate). Persists immediately so the selection survives
@@ -9342,12 +9394,14 @@ class WhiteNoiseAppState private constructor(
             cm.registerDefaultNetworkCallback(
                 object : android.net.ConnectivityManager.NetworkCallback() {
                     override fun onAvailable(network: android.net.Network) {
-                        // Capabilities arrive in the onCapabilitiesChanged that
-                        // follows; until then only the yes/no bit is known and
-                        // the empty type set conservatively blocks auto-download.
+                        // A new identity waits conservatively for capabilities. A duplicate announcement
+                        // preserves capabilities already known for this same default network.
                         val update = activeDefaultNetwork.available(network.networkHandle)
                         if (update.identityChanged) connectivitySignalOwner.noteNetworkIdentityChange()
-                        noteActiveNetworkSnapshot(isOnline = true)
+                        noteActiveNetworkSnapshot(
+                            isOnline = true,
+                            networkTypes = if (update.identityChanged) emptySet() else activeNetworkTypesSnapshot,
+                        )
                     }
 
                     override fun onCapabilitiesChanged(
@@ -14401,6 +14455,11 @@ class WhiteNoiseAppState private constructor(
     // coroutines can execute immediately on another thread and must not observe
     // fields declared later in this class before their initializers have run.
     init {
+        // DateTimeFormatState owns the live values every formatter reads; this state persists them.
+        val storedTimeFormat = preferences.getString(TIME_FORMAT_KEY, null)
+        val storedDateFormat = preferences.getString(DATE_FORMAT_KEY, null)
+        DateTimeFormatState.timeFormat = TimeFormatPreference.fromPreference(storedTimeFormat)
+        DateTimeFormatState.dateFormat = DateFormatPreference.fromPreference(storedDateFormat)
         if (startPlatformServices) {
             mutationsScope.launch { notificationPreviewSettings.recover() }
             mutationsScope.launch {
@@ -14456,6 +14515,8 @@ class WhiteNoiseAppState private constructor(
         private const val MEDIA_AUTO_DOWNLOAD_MATRIX_KEY_PREFIX = "media_auto_download_matrix:"
         private const val MEDIA_QUALITY_KEY = "media_quality"
         private const val ENTER_KEY_BEHAVIOR_KEY = "enter_key_behavior"
+        private const val TIME_FORMAT_KEY = "time_format"
+        private const val DATE_FORMAT_KEY = "date_format"
         private const val DEFAULT_NOTIFICATIONS_ENABLE_ATTEMPTED_KEY = "default_notifications_enable_attempted"
         private const val DISAPPEARING_TOOLTIP_SHOWN_KEY = "disappearing_tooltip_shown"
 

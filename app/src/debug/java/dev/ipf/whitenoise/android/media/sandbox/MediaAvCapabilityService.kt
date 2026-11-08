@@ -250,8 +250,8 @@ internal object AvCapabilityOperations {
             "waveform" -> {
                 trace.phase("waveform")
                 val waveform =
-                    dev.ipf.whitenoise.android.audio.AudioWaveformExtractor
-                        .decodeFromDescriptor(input.fileDescriptor)
+                    dev.ipf.whitenoise.android.audio
+                        .decodeHistoricalWaveformFromDescriptor(input.fileDescriptor)
                 waveform?.let {
                     result.putFloatArray("waveform", it)
                     result.putBoolean("success", true)
@@ -287,7 +287,7 @@ internal object AvCapabilityOperations {
         trace.phase("probe")
         val offset = data.getLong("offset")
         val length = data.getLong("length")
-        val probe = probeMediaFromDescriptor(input, AV_EDGE, true, offset, length) ?: return
+        val probe = probeHistoricalMediaFromDescriptor(input, AV_EDGE, true, offset, length) ?: return
         result.putLong("duration", probe.durationMs)
         result.putInt("sourceWidth", probe.width)
         result.putInt("sourceHeight", probe.height)

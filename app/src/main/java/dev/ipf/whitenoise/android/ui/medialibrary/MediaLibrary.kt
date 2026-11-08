@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.ui.medialibrary
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -44,12 +45,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -63,10 +66,13 @@ import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.core.DateTimeDisplay
+import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.IndexedAttachment
 import dev.ipf.whitenoise.android.core.MessageAttachments
 import dev.ipf.whitenoise.android.core.MessageProjector
 import dev.ipf.whitenoise.android.core.Nip30Emoji
+import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.MediaInventory
 import dev.ipf.whitenoise.android.media.MediaReferenceSupport
 import dev.ipf.whitenoise.android.state.ConversationController
@@ -79,6 +85,7 @@ import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyColumn
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseLazyVerticalGrid
+import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
 import dev.ipf.whitenoise.android.ui.common.scrollEdgeFade
 import dev.ipf.whitenoise.android.ui.common.trackWhiteNoiseHeader
 import dev.ipf.whitenoise.android.ui.conversation.media.FullScreenMediaViewer
@@ -86,6 +93,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.MediaImageGridTile
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaVideoGridTile
 import dev.ipf.whitenoise.android.ui.conversation.media.MediaViewerPage
 import dev.ipf.whitenoise.android.ui.conversation.media.OpenAttachmentResult
+import dev.ipf.whitenoise.android.ui.conversation.media.attachmentSource
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeDescription
 import dev.ipf.whitenoise.android.ui.conversation.media.attachmentTypeLabel
 import dev.ipf.whitenoise.android.ui.conversation.media.fileIconFor
@@ -99,7 +107,7 @@ import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerChrom
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberMediaViewerForwardActions
 import dev.ipf.whitenoise.android.ui.conversation.media.resolveAttachmentPresentation
 import dev.ipf.whitenoise.android.ui.conversation.media.saveDocumentWithFallback
-import dev.ipf.whitenoise.android.ui.conversation.media.shareImage
+import dev.ipf.whitenoise.android.ui.conversation.media.shareAttachmentExternally
 import dev.ipf.whitenoise.android.ui.conversation.media.validatedAttachmentCacheFile
 import dev.ipf.whitenoise.android.ui.conversation.media.voicePlaybackKey
 import dev.ipf.whitenoise.android.ui.conversation.rememberForwardEligibilityNowSeconds
@@ -118,8 +126,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.URI
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
+import java.time.format.FormatStyle
 import java.util.Calendar
+import java.util.Locale
 import androidx.compose.foundation.lazy.grid.items as gridItems
 
 // A renderable image/video tile resolved from the conversation timeline. Unlike
@@ -1086,6 +1097,8 @@ internal fun FileLibraryRow(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val currentRow by rememberUpdatedState(row)
+    val shareChooserTitle = stringResource(R.string.shared_media_share)
     var inFlight by remember(row.messageIdHex, row.attachmentIndex) { mutableStateOf(false) }
     var menuOpen by remember(row.messageIdHex, row.attachmentIndex) { mutableStateOf(false) }
     val recordedAtLabel = rememberRelativeTimestamp(row.recordedAt)
@@ -1111,18 +1124,6 @@ internal fun FileLibraryRow(
         } else {
             null
         }
-
-    /** Loads the row's file bytes for Share from the retained or downloaded attachment, within the preview budget. */
-    suspend fun fetchBytes(): ByteArray {
-        val retained = retainedBytes()
-        return controller
-            .requestAttachmentTransfer(
-                messageIdHex = row.messageIdHex,
-                attachmentIndex = row.attachmentIndex,
-                reference = row.reference,
-                retainedPlaintext = retained,
-            ).await()
-    }
 
     /** Materializes the row's document for opening or saving by streaming it, whatever its size. */
     suspend fun fetchFile() =
@@ -1263,13 +1264,25 @@ internal fun FileLibraryRow(
                         onClick = {
                             menuOpen = false
                             scope.launch {
+                                val sharedRow = row
                                 runCatchingCancellable {
-                                    shareImage(
-                                        context,
-                                        fetchBytes(),
-                                        row.reference.fileName,
-                                        row.reference.mediaType,
-                                    ).getOrThrow()
+                                    // Streams the whole verified file to the share sheet, whatever its size, as
+                                    // Open and Save do. Leaving the screen cancels this scope, and a row rebound
+                                    // to another attachment opens no share sheet.
+                                    shareLibraryFile(
+                                        context = context,
+                                        row = sharedRow,
+                                        chooserTitle = shareChooserTitle,
+                                        currentRow = { currentRow },
+                                    ) {
+                                        attachmentSource(
+                                            controller,
+                                            sharedRow.messageIdHex,
+                                            sharedRow.attachmentIndex,
+                                            sharedRow.reference,
+                                            sharedRow.mine,
+                                        )
+                                    }
                                 }.onFailure { error ->
                                     appState.presentMediaLaunchFailure(
                                         R.string.media_couldnt_open,
@@ -1285,6 +1298,28 @@ internal fun FileLibraryRow(
         }
     }
 }
+
+private fun SharedMediaRow.attachmentKey() = messageIdHex to attachmentIndex
+
+/**
+ * Shares a Files-tab row's whole verified file through the outbound share sheet under its own name. The file is
+ * staged from [source], so a file of any size is streamed rather than read into memory under the preview budget.
+ * The share is dropped once [currentRow] shows another attachment than [row].
+ */
+internal suspend fun shareLibraryFile(
+    context: Context,
+    row: SharedMediaRow,
+    chooserTitle: String,
+    currentRow: () -> SharedMediaRow,
+    source: suspend () -> AttachmentPlaintext,
+) = shareAttachmentExternally(
+    context = context,
+    attachmentIndex = row.attachmentIndex,
+    reference = row.reference,
+    chooserTitle = chooserTitle,
+    isCurrent = { currentRow().attachmentKey() == row.attachmentKey() },
+    plaintext = source,
+)
 
 /** Links tab of the library. */
 @OptIn(ExperimentalFoundationApi::class)
@@ -1404,8 +1439,9 @@ private fun UrlLibraryRow(
 
 @Composable
 private fun rememberRelativeTimestamp(recordedAt: ULong): String {
-    val context = LocalContext.current
-    return remember(context, recordedAt) { relativeTimestamp(context, recordedAt) }
+    val locale = LocalConfiguration.current.locales[0]
+    val display = currentDateTimeDisplay()
+    return remember(recordedAt, locale, display) { relativeTimestamp(recordedAt, locale, display) }
 }
 
 /** Displays a media sender through the active viewer's local contact-picture choice. */
@@ -1430,23 +1466,24 @@ private fun hostOf(url: String): String = runCatching { URI(url).host }.getOrNul
 // Compact relative-ish timestamp for the media rows: today shows the clock,
 // older entries show the calendar date. `recordedAt` is epoch SECONDS.
 private fun relativeTimestamp(
-    context: android.content.Context,
     recordedAtSeconds: ULong,
+    locale: Locale,
+    display: DateTimeDisplay,
 ): String {
-    val millis = recordedAtSeconds.toLong() * 1000L
-    val now = Calendar.getInstance()
-    val then = Calendar.getInstance().apply { timeInMillis = millis }
+    val zone = ZoneId.systemDefault()
     val sameDay =
-        now.get(Calendar.YEAR) == then.get(Calendar.YEAR) &&
-            now.get(Calendar.DAY_OF_YEAR) == then.get(Calendar.DAY_OF_YEAR)
-    val flags =
-        if (sameDay) {
-            android.text.format.DateUtils.FORMAT_SHOW_TIME
-        } else {
-            android.text.format.DateUtils.FORMAT_SHOW_DATE or android.text.format.DateUtils.FORMAT_ABBREV_ALL
-        }
-    return android.text.format.DateUtils
-        .formatDateTime(context, millis, flags)
+        runCatching {
+            Instant.ofEpochSecond(recordedAtSeconds.toLong()).atZone(zone).toLocalDate() == LocalDate.now(zone)
+        }.getOrDefault(false)
+    return IdentityFormatter.dateTime(
+        recordedAtSeconds,
+        locale,
+        zone,
+        display,
+        dateStyle = if (sameDay) null else FormatStyle.MEDIUM,
+        timeStyle = if (sameDay) FormatStyle.SHORT else null,
+        withoutYear = IdentityFormatter.isCurrentYear(recordedAtSeconds, zone),
+    )
 }
 
 // Localized month/year header for a [monthKeyForMedia] key.

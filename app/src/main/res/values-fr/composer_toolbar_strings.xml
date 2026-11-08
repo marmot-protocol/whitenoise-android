@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="composer_customize">Personnaliser le champ de message</string>
+    <string name="composer_settings">Champ de message</string>
+    <string name="composer_settings_detail">Raccourcis, ordre et disposition</string>
+    <string name="composer_layout">Disposition</string>
+    <string name="composer_side_left">Gauche</string>
+    <string name="composer_side_right">Droite</string>
+    <string name="composer_voice_placement">Note vocale</string>
+    <string name="composer_voice_on_send">Envoyer</string>
+    <string name="composer_layout_automatic">Automatique</string>
+    <string name="composer_layout_expanded">Toujours agrandi</string>
+    <string name="composer_move_earlier">Déplacer plus tôt</string>
+    <string name="composer_move_later">Déplacer plus tard</string>
+    <string name="composer_add">Ajouter un raccourci</string>
+    <string name="composer_remove">Retirer le raccourci</string>
+    <string name="composer_reset">Rétablir les valeurs par défaut</string>
+    <string name="composer_save_failed">Impossible d’enregistrer les réglages de saisie. Réessayez.</string>
+</resources>

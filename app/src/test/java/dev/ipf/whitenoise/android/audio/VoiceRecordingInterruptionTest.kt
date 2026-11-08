@@ -134,14 +134,20 @@ class VoiceRecordingInterruptionTest {
                 controller.stop()
                 runCurrent()
                 assertTrue(completed.isEmpty())
+                // Still capturing the tail: the screen reader must not speak into it yet.
+                assertTrue(controller.isFinalizing)
                 advanceTimeBy(VoiceRecordingController.RECORDING_TAIL_MS)
                 runCurrent()
                 assertEquals(1, completed.size)
+                assertFalse(controller.isFinalizing)
                 assertTrue(reasons.isEmpty())
                 controller.start()
                 runCurrent()
                 controller.cancel()
+                // The discarded take keeps the microphone until its recorder is released.
+                assertTrue(controller.isFinalizing)
                 runCurrent()
+                assertFalse(controller.isFinalizing)
                 assertEquals(1, completed.size)
                 assertFalse(coordinator.isOwnedBy(controller))
             }
@@ -172,6 +178,83 @@ class VoiceRecordingInterruptionTest {
                 runCurrent()
                 assertTrue(controller.isRecording)
                 assertEquals(1, completed.size)
+            }
+        }
+
+    /** Another in-app sound pauses the take in place; only the user's resume continues it. */
+    @Test
+    fun inAppHandoffPausesTheTakeAndUserResumeContinuesIt() =
+        runTest {
+            withRecording {
+                controller.start()
+                runCurrent()
+                controller.lock()
+                advanceTimeBy(1_000L)
+                runCurrent()
+                val capturedBeforePause = controller.elapsedMs
+                var ttsSurrenders = 0
+                assertTrue(
+                    AudioFocusOwner.acquire(
+                        owner = AudioFocusOwner.Owner.Tts,
+                        audioAttributes = AudioFocusOwner.ttsSpeechAttributes,
+                        focusGain = AudioManager.AUDIOFOCUS_GAIN,
+                        onFocusLoss = {},
+                        onOwnerSurrender = { ttsSurrenders++ },
+                    ),
+                )
+                runCurrent()
+                val session = sessions.single()
+                assertTrue(controller.isRecording)
+                assertTrue(controller.isPaused)
+                assertTrue(controller.locked)
+                assertEquals(1, session.pauses)
+
+                advanceTimeBy(5_000L)
+                runCurrent()
+                assertEquals(capturedBeforePause, controller.elapsedMs)
+                assertEquals(0, session.resumes)
+                assertTrue(completed.isEmpty())
+
+                assertTrue(controller.resume())
+                assertEquals(1, ttsSurrenders)
+                assertFalse(controller.isPaused)
+                assertEquals(1, session.resumes)
+                advanceTimeBy(500L)
+                runCurrent()
+                assertEquals(capturedBeforePause + 500L, controller.elapsedMs)
+
+                controller.stop()
+                advanceTimeBy(VoiceRecordingController.RECORDING_TAIL_MS)
+                runCurrent()
+                assertEquals(1, session.stops)
+                assertEquals(1, completed.size)
+                assertFalse(controller.isPaused)
+            }
+        }
+
+    /** A take paused by another in-app sound can still be sent for review or discarded. */
+    @Test
+    fun pausedTakeCanBeInterruptedIntoReview() =
+        runTest {
+            withRecording {
+                controller.start()
+                runCurrent()
+                AudioFocusOwner.acquire(
+                    owner = AudioFocusOwner.Owner.Tts,
+                    audioAttributes = AudioFocusOwner.ttsSpeechAttributes,
+                    focusGain = AudioManager.AUDIOFOCUS_GAIN,
+                    onFocusLoss = {},
+                    onOwnerSurrender = {},
+                )
+                runCurrent()
+                assertTrue(controller.isPaused)
+                controller.interrupt()
+                runCurrent()
+                assertFalse(controller.isRecording)
+                assertFalse(controller.isPaused)
+                assertEquals(1, completed.size)
+                assertFalse(coordinator.isOwnedBy(controller))
+                AudioFocusOwner.release(AudioFocusOwner.Owner.Tts)
             }
         }
 
@@ -222,6 +305,7 @@ class VoiceRecordingInterruptionTest {
         } finally {
             fixture.controller.release()
             runCurrent()
+            AudioFocusOwner.release(AudioFocusOwner.Owner.Tts)
             fixture.output.deleteRecursively()
         }
     }
@@ -260,6 +344,8 @@ class VoiceRecordingInterruptionTest {
         var stops = 0
         var saveable = true
         var onStop: (() -> Unit)? = null
+        var pauses = 0
+        var resumes = 0
 
         /** Creates deterministic captured bytes without invoking the platform encoder. */
         override fun start() = file.writeText("captured audio")
@@ -273,6 +359,14 @@ class VoiceRecordingInterruptionTest {
                 return null
             }
             return VoiceRecordingResult(file, 2_000L)
+        }
+
+        override fun pause() {
+            pauses++
+        }
+
+        override fun resume() {
+            resumes++
         }
 
         /** Deletes an unfinished fake capture while leaving an already finalized result to its owner. */

@@ -1,5 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="voice_recording_stopped_announcement">Aufnahme beendet</string>
+    <string name="voice_message_seek">Wiedergabeposition</string>
+    <string name="video_failed">Video konnte nicht geladen werden</string>
+    <string name="conversation_new_message_from">Neue Nachricht von %1$s</string>
+    <plurals name="conversation_new_messages">
+        <item quantity="one">%1$d neue Nachricht</item>
+        <item quantity="other">%1$d neue Nachrichten</item>
+    </plurals>
+    <plurals name="unread_mentions_count">
+        <item quantity="one">%1$d ungelesene Erwähnung</item>
+        <item quantity="other">%1$d ungelesene Erwähnungen</item>
+    </plurals>
     <string name="notification_channel_summary">Benachrichtigungsübersicht</string>
     <string name="notification_channel_summary_description">Stille Übersicht der Nachrichten und anderer Ereignisse</string>
     <plurals name="notification_group_count">
@@ -191,6 +203,7 @@
     <string name="toast_chat_deleted_local">Chat von diesem Gerät gelöscht</string>
     <string name="toast_couldnt_delete_chat">Chat konnte nicht gelöscht werden</string>
     <string name="chat_list_select_all">Alle auswählen</string>
+    <string name="toast_chat_list_select_all_loaded_only">Nicht alle Chats konnten ausgewählt werden. Nur geladene Chats sind ausgewählt.</string>
     <string name="chat_list_deselect_all">Auswahl aufheben</string>
     <plurals name="chat_list_selected_count">
         <item quantity="one">%1$d Chat ausgewählt</item>
@@ -411,6 +424,7 @@
     <string name="message_reacted">Reagiert mit %1$s</string>
     <string name="message_reaction_fallback">auf eine Nachricht</string>
     <string name="message_actions">Nachrichtenaktionen</string>
+    <string name="message_reply_quote_description">Antwort – %1$s: %2$s</string>
     <string name="message_deleted_preview">Nachricht geloescht</string>
     <string name="agent_stream_started">Agent-Stream gestartet</string>
     <string name="stream_finished">Stream beendet</string>
@@ -1291,6 +1305,7 @@
     <string name="voice_message_speed">Wiedergabegeschwindigkeit %1$s</string>
     <string name="voice_message_failed">Sprachnachricht konnte nicht geladen werden</string>
     <string name="voice_message_locked">Gesperrt</string>
+    <string name="voice_recording_resume">Fortsetzen</string>
     <string name="reply_you">Du</string>
     <string name="reply_media_photo">Foto</string>
     <string name="media_album">Album</string>
@@ -2565,6 +2580,10 @@
     <string name="notification_tone_silent">Lautlos</string>
     <string name="notification_tone_off">Aus</string>
     <string name="notification_tone_default">Standard</string>
+    <string name="appearance_colors_heading">Design &amp; Farben</string>
+    <string name="appearance_text_heading">Text &amp; Sprache</string>
+    <string name="appearance_conversation_heading">Unterhaltung</string>
+    <string name="appearance_preview_intro">Größeren Text und Rechts-nach-links-Layout ausprobieren.</string>
     <string name="media_viewer_fit_image">Bild einpassen</string>
     <string name="media_viewer_zoom_image">Vergrößern</string>
     <string name="media_viewer_image_scale">%1$d%% Zoom</string>
@@ -2577,4 +2596,12 @@
     <string name="settings_search_alias_read_aloud">TTS|Sprachausgabe|vorlesen</string>
     <string name="settings_search_alias_sound">Benachrichtigungston|Hinweiston|Klingelton</string>
     <string name="settings_search_revealed">%1$s. Einstellung hervorgehoben.</string>
+    <string name="date_time_format">Datum und Uhrzeit</string>
+    <string name="date_time_format_time">Uhrzeit</string>
+    <string name="date_time_format_date">Datum</string>
+    <string name="date_time_format_automatic">Automatisch</string>
+    <string name="time_format_12_hour">12-Stunden</string>
+    <string name="time_format_24_hour">24-Stunden</string>
+    <string name="date_time_format_help">Automatisch nutzt die App-Sprache und die Region deines Telefons.</string>
+    <string name="settings_search_alias_date_time_format">Zeitformat|Datumsformat|Uhr|12-Stunden|24-Stunden|AM/PM</string>
 </resources>

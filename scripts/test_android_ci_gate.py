@@ -650,6 +650,25 @@ class AndroidCiGateTest(unittest.TestCase):
                 with self.subTest(workflow=name, script=script):
                     self.assertTrue(matches(script, triggers))
 
+    def test_native_decoder_build_inputs_start_release_checks_without_selecting_ui(self):
+        """Native-only and builder-only diffs start both optimized validation campaigns."""
+        root = APP_BUILD.parent.parent
+        native = root / 'native/media-decoder'
+        inputs = ['scripts/prepare_media_decoder.py'] + [
+            path.relative_to(root).as_posix() for path in sorted(native.rglob('*')) if path.is_file()]
+        for required in ('native/media-decoder/media_decoder.cpp', 'native/media-decoder/lock.json'):
+            self.assertIn(required, inputs)
+        self.assertGreater(len(inputs), 4)
+        ordinary = ('app/src/main/java/example/Screen.kt', 'app/src/main/res/values/strings.xml')
+        for name in ('android-release-runtime.yml', 'android-repro-verify.yml'):
+            triggers = pr_paths(WORKFLOW.with_name(name).read_text())
+            for path in inputs:
+                with self.subTest(workflow=name, native_input=path):
+                    self.assertTrue(matches(path, triggers))
+            for path in ordinary:
+                with self.subTest(workflow=name, ordinary_ui=path):
+                    self.assertFalse(matches(path, triggers))
+
     def test_any_non_successful_job_blocks(self):
         """Failure, cancellation, and skipped matrix jobs all block the gate."""
         for job in self.dependencies:

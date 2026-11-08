@@ -358,6 +358,19 @@ internal class TtsPlaybackQueue(
         pauseAt(speaking.chunkIndex)
     }
 
+    /**
+     * Pauses a session parked behind a pending target seek. The parked terminal was already spoken,
+     * so the cursor stays on it; the pending edge request no longer owns where playback goes.
+     */
+    fun pauseParked() {
+        val parked = _state.value as? TtsState.Preparing ?: return
+        if (parked.retained !is TtsState.Speaking) return
+        edgeRequestGeneration = null
+        targetSeekGeneration = null
+        parkedTerminalGeneration = null
+        pauseAt(currentIndex)
+    }
+
     /** Freezes playback at [chunkIndex] after invalidating callbacks from the stopped engine queue. */
     private fun pauseAt(chunkIndex: Int) {
         val frozenPassage =

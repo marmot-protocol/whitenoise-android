@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -51,9 +52,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -61,7 +65,9 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.SoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -70,6 +76,9 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
@@ -86,6 +95,9 @@ import dev.ipf.whitenoise.android.core.graphemeBoundaryAtOrAfter
 import dev.ipf.whitenoise.android.core.graphemeBoundaryAtOrBefore
 import dev.ipf.whitenoise.android.core.replyBodyWithTypedMediaFallback
 import dev.ipf.whitenoise.android.core.typedReplyMediaFallback
+import dev.ipf.whitenoise.android.state.ComposerShortcut
+import dev.ipf.whitenoise.android.state.ComposerShortcutSide
+import dev.ipf.whitenoise.android.state.ComposerToolbarSettings
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
@@ -97,14 +109,13 @@ import dev.ipf.whitenoise.android.ui.conversation.replies.ReplyPreviewCard
 import dev.ipf.whitenoise.android.ui.conversation.resolveAutomaticComposerCeiling
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.filled.Delete
-import dev.ipf.whitenoise.android.ui.navigation.DictationComposerControlSlot
-import dev.ipf.whitenoise.android.ui.navigation.LocalShellDictationControls
 import dev.ipf.whitenoise.android.ui.navigation.composerFabContent
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlin.math.roundToInt
 
 // One measured editor line, dedicated grip, bottom tools, and outer padding.
@@ -136,21 +147,21 @@ internal fun rememberComposerEditorLineHeight(): Dp {
  * picker, input row, and inline emoji pane) should apply
  * [imePadding]. Suppressed while the emoji pane owns the bottom region so the
  * keyboard/emoji swap does not double-count insets (#808, #895, #1109), but
- * restored while the emoji search field is active so the IME cannot cover the
- * filtered results grid (#1222).
+ * restored while the pane shows its search row, which sits on top of the
+ * keyboard (#1222, #3613).
  */
 internal fun composerBottomClusterAppliesImePadding(
     showEmojiPane: Boolean,
-    composerEmojiSearchActive: Boolean,
-): Boolean = !showEmojiPane || composerEmojiSearchActive
+    composerEmojiSearchRow: Boolean,
+): Boolean = !showEmojiPane || composerEmojiSearchRow
 
 internal fun composerBottomClusterModifier(
     showEmojiPane: Boolean,
-    composerEmojiSearchActive: Boolean,
+    composerEmojiSearchRow: Boolean,
     base: Modifier = Modifier,
 ): Modifier {
     val withNav = base.navigationBarsPadding()
-    return if (composerBottomClusterAppliesImePadding(showEmojiPane, composerEmojiSearchActive)) {
+    return if (composerBottomClusterAppliesImePadding(showEmojiPane, composerEmojiSearchRow)) {
         withNav.imePadding()
     } else {
         withNav
@@ -460,10 +471,12 @@ internal fun ComposerBar(
     dictationAccountRef: String? = null,
     dictationGroupIdHex: String? = null,
     dictationControlsVisible: Boolean = true,
+    dictationOriginVisible: Boolean = dictationControlsVisible,
     editingMessageId: String? = null,
     editingInitialText: String? = null,
     onCancelEdit: () -> Unit = {},
     appState: WhiteNoiseAppState? = null,
+    onCustomizeToolbar: (() -> Unit)? = null,
     // Group @-mention picker (#414): candidates the picker filters over, and
     // whether this conversation is a group (the picker is suppressed in DMs —
     // a 1:1 chat has no one to disambiguate, so typing `@` stays literal).
@@ -533,10 +546,22 @@ internal fun ComposerBar(
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val editorLineHeight = rememberComposerEditorLineHeight()
+    val layoutDirection = LocalLayoutDirection.current
+    val configuredToolbar = appState != null
+    val actionTargetWidth = if (configuredToolbar) ComposerShortcutPitch else ComposerToolbarSlotWidth
+    val toolbarPreference = appState?.composerToolbarPreference
+    val platformTextToolbar = LocalTextToolbar.current
+    var voiceSlotBounds by remember(draftKey, draftAccountRef, draftGroupIdHex) { mutableStateOf<Rect?>(null) }
+    var heldVoiceBounds by remember(draftKey, draftAccountRef, draftGroupIdHex) { mutableStateOf<Rect?>(null) }
+    var toolbarParentBounds by remember { mutableStateOf(Rect.Zero) }
+    var toolbarParentSize by remember { mutableStateOf(IntSize.Zero) }
+    var primaryActionSize by remember { mutableStateOf(IntSize.Zero) }
+
     var composerEmojiPickerOpen by remember { mutableStateOf(false) }
     var closeSendingIdentity by remember { mutableStateOf<(() -> Unit)?>(null) }
     var composerEmojiPickerRequested by remember { mutableStateOf(false) }
     var composerEmojiSearchActive by remember { mutableStateOf(false) }
+    var composerEmojiSearchRow by remember { mutableStateOf(false) }
     var composerKeyboardRestorePending by remember { mutableStateOf(false) }
     // Standalone fixtures keep a local fallback. Production binds the explicit
     // account/conversation owner below, with manual dp converted back to live
@@ -762,29 +787,53 @@ internal fun ComposerBar(
             composerImePaneHeightMemory[configuration.orientation] = rememberedImePaneHeight
         }
     }
-    val emojiPaneBaseHeight =
-        composerEmojiPaneHeight(
-            lockedPaneHeight = lockedComposerEmojiPaneHeight,
+    val composerKeyboardHeight =
+        composerEmojiPaneTargetHeight(
             currentImeHeight = currentImePaneHeight,
             targetImeHeight = targetImePaneHeight,
             rememberedImeHeight = rememberedImePaneHeight,
         )
+    val composerWindowHeight = configuration.screenHeightDp.dp
+    var composerEmojiSearchRowHeight by remember { mutableStateOf(ComposerEmojiSearchRowFallbackHeight) }
     val emojiPaneHeight =
-        if (composerEmojiSearchActive) {
-            emojiPaneBaseHeight + ComposerEmojiPickerSearchExtraHeight
-        } else {
-            emojiPaneBaseHeight
-        }
+        composerEmojiPaneHeight(
+            lockedPaneHeight = lockedComposerEmojiPaneHeight,
+            keyboardHeight = composerKeyboardHeight,
+            windowHeight = composerWindowHeight,
+            searchKeyboardWanted = composerEmojiSearchRow && targetImePaneHeight > 0.dp,
+            searchRowHeight = composerEmojiSearchRowHeight,
+        )
     // Keep exactly one opaque owner of the bottom region during the IME swap.
     // Fading this pane while the IME animates underneath exposes both surfaces
     // for several frames and looks like a duplicated, blinking composer.
     val showEmojiPane = composerEmojiPickerOpen
     val latestImePaneHeight by rememberUpdatedState(currentImePaneHeight)
+    val latestImeTargetPaneHeight by rememberUpdatedState(targetImePaneHeight)
     LaunchedEffect(showEmojiPane) {
         if (!showEmojiPane) {
             lockedComposerEmojiPaneHeight = 0.dp
             composerEmojiSearchActive = false
+            composerEmojiSearchRow = false
         }
+    }
+    LaunchedEffect(Unit) {
+        snapshotFlow {
+            composerEmojiSearchRowShown(
+                searchRowShown = composerEmojiSearchRow,
+                searchActive = composerEmojiSearchActive,
+                currentImeHeight = latestImePaneHeight,
+                targetImeHeight = latestImeTargetPaneHeight,
+            )
+        }.collect { composerEmojiSearchRow = it }
+    }
+    // Hiding the keyboard (Back, or its own hide key) leaves the search field
+    // focused; release it so the pane returns to browsing once the keyboard is gone.
+    LaunchedEffect(composerEmojiSearchActive) {
+        if (!composerEmojiSearchActive) return@LaunchedEffect
+        val imeShown = snapshotFlow { latestImeTargetPaneHeight > 0.dp }
+        imeShown.first { it }
+        imeShown.first { !it }
+        focusManager.clearFocus()
     }
     // The pane's rendered height is seeded from the live bottom inset on the
     // open edge, then animates to the locked target. Opening over a fully
@@ -804,7 +853,7 @@ internal fun ComposerBar(
         if (!showEmojiPane) return@LaunchedEffect
         snapshotFlow { latestEmojiPaneHeight }.collectLatest { target ->
             if (emojiPaneHeightAnim.value != target) {
-                emojiPaneHeightAnim.animateTo(target, tween(durationMillis = 250, easing = FastOutSlowInEasing))
+                emojiPaneHeightAnim.animateTo(target, tween(durationMillis = 300, easing = FastOutSlowInEasing))
             }
         }
     }
@@ -816,15 +865,10 @@ internal fun ComposerBar(
 
     fun restoreKeyboardFromEmojiPane() {
         if (!shouldStartComposerKeyboardRestore(composerEmojiPickerOpen, composerKeyboardRestorePending)) return
-        if (lockedComposerEmojiPaneHeight == 0.dp) {
-            lockedComposerEmojiPaneHeight =
-                composerEmojiPaneTargetHeight(
-                    currentImeHeight = currentImePaneHeight,
-                    targetImeHeight = targetImePaneHeight,
-                    rememberedImeHeight = rememberedImePaneHeight,
-                )
-        }
+        // The tall browsing pane shrinks toward the keyboard while it rises.
+        lockedComposerEmojiPaneHeight = composerKeyboardHeight
         composerEmojiSearchActive = false
+        composerEmojiSearchRow = false
         composerEmojiPickerRequested = false
         composerKeyboardRestorePending = true
         onKeyboardRestoreFromCustomInput()
@@ -954,8 +998,18 @@ internal fun ComposerBar(
         if (active != null && active.inputGeneration != textState.contentGeneration) sendMotion.clear()
     }
     var attachmentSendInFlight by remember(draftKey) { mutableStateOf(false) }
+    val attachmentSendEnabled = !attachmentsPreparing && !attachmentSendInFlight && onSendAttachments != null
+
+    /** Rechecks dictation ownership and pending completion before ordinary Send. */
+    fun originDictationRequiresCompletion(): Boolean =
+        dictationAccountRef != null &&
+            dictationGroupIdHex != null &&
+            dictationController?.isOwnedBy(dictationAccountRef, dictationGroupIdHex) == true &&
+            dictationController.completionControlsRequired
+
     val finishControlMorph = LocalFinishControlMorph.current
-    val submitMessage: () -> Unit = {
+    val submitMessage: () -> Unit = submit@{
+        if (originDictationRequiresCompletion()) return@submit
         finishControlMorph()
         // An IME can commit text and request Send before the next composition.
         // Eligibility and submission must use the same live editor content.
@@ -1033,13 +1087,9 @@ internal fun ComposerBar(
             onKeyboardRestoreFromCustomInputFailed()
         }
         composerEmojiSearchActive = false
+        composerEmojiSearchRow = false
         if (!composerEmojiPickerOpen || lockedComposerEmojiPaneHeight == 0.dp) {
-            lockedComposerEmojiPaneHeight =
-                composerEmojiPaneTargetHeight(
-                    currentImeHeight = currentImePaneHeight,
-                    targetImeHeight = targetImePaneHeight,
-                    rememberedImeHeight = rememberedImePaneHeight,
-                )
+            lockedComposerEmojiPaneHeight = composerEmojiBrowseHeight(composerKeyboardHeight, composerWindowHeight)
         }
         composerEmojiPickerRequested = true
         composerEmojiPickerOpen = true
@@ -1069,7 +1119,7 @@ internal fun ComposerBar(
         val appliesImePadding =
             composerBottomClusterAppliesImePadding(
                 showEmojiPane = showEmojiPane,
-                composerEmojiSearchActive = composerEmojiSearchActive,
+                composerEmojiSearchRow = composerEmojiSearchRow,
             )
         val bottomInset =
             with(density) {
@@ -1207,10 +1257,10 @@ internal fun ComposerBar(
             }
         }
 
-        Column(
+        Box(
             composerBottomClusterModifier(
                 showEmojiPane = showEmojiPane,
-                composerEmojiSearchActive = composerEmojiSearchActive,
+                composerEmojiSearchRow = composerEmojiSearchRow,
                 base = Modifier.fillMaxWidth(),
             ),
         ) {
@@ -1236,12 +1286,16 @@ internal fun ComposerBar(
                             ) {
                                 automaticComposerHeightPx = size.height.toFloat()
                             }
-                            onTimelineComposerMeasured(size.height, automaticComposerHeightPx.toInt().coerceAtLeast(0))
+                            onTimelineComposerMeasured(
+                                size.height,
+                                automaticComposerHeightPx.toInt().coerceAtLeast(0),
+                            )
                         }.padding(horizontal = 16.dp, vertical = ComposerOuterVerticalPadding),
                 fillEditorHeight = composerExpansion.mode != ComposerExpansionMode.Automatic,
                 minimumEditorHeight = with(density) { minimumManualComposerHeightPx.toDp() } - 12.dp,
             ) {
-                val voiceReviewClip = voiceReview?.clip?.takeUnless { voiceRecordingController?.isRecording == true }
+                val voiceReviewClip =
+                    voiceReview?.clip?.takeUnless { voiceRecordingController?.isRecording == true }
                 val accessoryContent: (@Composable () -> Unit)? =
                     // Edit shows its pill in the action row instead, and takes precedence over a reply.
                     if (editingMessageId == null && (replyingTo != null || attachmentContent != null)) {
@@ -1409,46 +1463,204 @@ internal fun ComposerBar(
                         dictationOwnedByComposer &&
                         dictationController?.completionControlsRequired == true
                 val dictationOriginHidden =
-                    !dictationControlsVisible &&
+                    !dictationOriginVisible &&
                         dictationOwnedByComposer &&
                         dictationController?.completionControlsRequired == true
                 val activeDictationController = dictationController?.takeIf { dictationActiveInComposer }
+                val canAcquireVoice: () -> Boolean = {
+                    val controller = dictationController
+                    controller == null ||
+                        (
+                            !controller.completionControlsRequired &&
+                                !controller.ownsMicrophone &&
+                                dictationAccountRef != null &&
+                                dictationGroupIdHex != null &&
+                                controller.composerAccess(dictationAccountRef, dictationGroupIdHex).phase ==
+                                dev.ipf.whitenoise.android.audio.ConversationDictationComposerPhase.Ready
+                        )
+                }
                 val showMicButton =
                     ((text.isBlank() && !hasPendingAttachments) || isRecordingVoice) &&
                         editingMessageId == null &&
                         voiceRecordingController != null &&
-                        !dictationActiveInComposer
+                        (isRecordingVoice || canAcquireVoice())
                 val showPrimaryTrailingAction =
                     voiceReviewClip == null &&
                         !dictationActiveInComposer &&
                         !dictationOriginHidden &&
                         !(showMicButton && dictationPendingElsewhere)
+                val attachmentActions =
+                    buildMap<ComposerShortcut, () -> Unit> {
+                        onCaptureFromCamera?.let { put(ComposerShortcut.Camera, it) }
+                        onPickFromGallery?.let { put(ComposerShortcut.Gallery, it) }
+                        onPickDocument?.let { put(ComposerShortcut.Files, it) }
+                        onShareLocation?.let { put(ComposerShortcut.Location, it) }
+                        onShareUser?.let { put(ComposerShortcut.Person, it) }
+                        onShareContact?.let { put(ComposerShortcut.Contact, it) }
+                        onCreatePoll?.let { put(ComposerShortcut.Poll, it) }
+                    }
+                val transactionActive =
+                    isRecordingVoice ||
+                        voiceReviewClip != null ||
+                        (dictationOwnedByComposer && dictationController?.completionControlsRequired == true)
+                val settings = toolbarPreference?.value ?: ComposerToolbarSettings()
+                val available =
+                    attachmentActions.keys +
+                        setOf(ComposerShortcut.Emoji, ComposerShortcut.Paste, ComposerShortcut.More) +
+                        (
+                            if (appState != null &&
+                                composerSendingAccount(appState, draftAccountRef) != null
+                            ) {
+                                setOf(ComposerShortcut.SendingIdentity)
+                            } else {
+                                emptySet()
+                            }
+                        ) +
+                        (if (startAppOwnedDictation != null) setOf(ComposerShortcut.Dictation) else emptySet()) +
+                        (
+                            if (voiceRecordingController != null && editingMessageId == null) {
+                                setOf(ComposerShortcut.VoiceNote)
+                            } else {
+                                emptySet()
+                            }
+                        )
+                val selectedShortcuts = settings.displayedShortcuts.filter { it in available }
+                val hiddenAttachments = attachmentActions.keys - selectedShortcuts.toSet()
+                // Unpinned text actions stay reachable from the Plus menu.
+                val hiddenMenuShortcuts =
+                    hiddenAttachments + (composerMenuTextShortcuts intersect available) - selectedShortcuts.toSet()
+                val liveShortcuts =
+                    selectedShortcuts.filter { it != ComposerShortcut.More || hiddenMenuShortcuts.isNotEmpty() }
+                var idleToolbar by remember(draftKey, draftAccountRef, draftGroupIdHex) {
+                    mutableStateOf(settings to liveShortcuts)
+                }
+                SideEffect { if (!transactionActive) idleToolbar = settings to liveShortcuts }
+                val renderedToolbar = if (transactionActive) idleToolbar else settings to liveShortcuts
+                val voiceSelected = configuredToolbar && ComposerShortcut.VoiceNote in renderedToolbar.second
+                val configuredVoiceVisible = voiceSelected && voiceSlotBounds != null
+                // Send placement shares Send's slot while empty, matching the unconfigured composer.
+                val voiceOnSend =
+                    !configuredToolbar || renderedToolbar.first.voiceOnSend
+                val showConfiguredMic =
+                    showMicButton &&
+                        (voiceOnSend || isRecordingVoice || configuredVoiceVisible)
+                val configuredVoiceUsesSlot =
+                    configuredToolbar && showMicButton && voiceSelected && voiceRecordingController?.locked != true
+                val lockedVoiceAtStart =
+                    showMicButton &&
+                        voiceRecordingController.locked &&
+                        voiceSelected &&
+                        renderedToolbar.first.side(ComposerShortcut.VoiceNote) ==
+                        if (layoutDirection == LayoutDirection.Rtl) {
+                            ComposerShortcutSide.Right
+                        } else {
+                            ComposerShortcutSide.Left
+                        }
+                val recordingActionAlignment =
+                    if (lockedVoiceAtStart) {
+                        remember {
+                            ComposerActionRowAlignment(Alignment.Start) { editingProgressSource?.value ?: 0f }
+                        }
+                    } else {
+                        trailingActionAlignment
+                    }
+                val toolbarRuntime = appState?.runtimeGeneration
+                // Receiving draft content does not acquire a recording or send transaction.
+                val canReceiveComposerContent: () -> Boolean = {
+                    appState?.runtimeGeneration == toolbarRuntime &&
+                        appState?.appLockScreenVisible != true &&
+                        appState?.signOutInProgress != true &&
+                        appState?.wipeInProgress != true
+                }
+                val canActivateToolbar: () -> Boolean = {
+                    canReceiveComposerContent() &&
+                        voiceRecordingController?.isRecording != true &&
+                        voiceReview?.clip == null &&
+                        dictationController?.blocksNewRequest != true &&
+                        !attachmentSendInFlight
+                }
+
+                /** Rechecks toolbar availability when a retained attachment callback is invoked. */
+                fun guardedAttachmentAction(action: () -> Unit): () -> Unit = { if (canActivateToolbar()) action() }
+                val beginCustomization: (() -> Unit)? =
+                    onCustomizeToolbar?.takeIf { toolbarPreference != null }?.let { open ->
+                        {
+                            if (canActivateToolbar()) {
+                                attachmentSheetState.dismiss()
+                                platformTextToolbar.hide()
+                                focusManager.clearFocus(force = true)
+                                keyboardController?.hide()
+                                composerEmojiPickerRequested = false
+                                composerEmojiPickerOpen = false
+                                open()
+                            }
+                        }
+                    }
+                val toolbarBindings =
+                    ComposerToolbarBindings(
+                        settings = renderedToolbar.first,
+                        shortcuts = renderedToolbar.second,
+                        attachmentActions =
+                            attachmentActions.mapValues { (_, action) ->
+                                { if (canActivateToolbar()) action() }
+                            },
+                        transactionActive = transactionActive,
+                        onCustomize = beginCustomization,
+                        canActivate = canActivateToolbar,
+                        onVoiceBounds = { if (!isRecordingVoice) voiceSlotBounds = it },
+                        voiceLauncherVisible = showConfiguredMic && configuredVoiceUsesSlot,
+                    )
                 val primaryTrailingActionWidth =
                     if (dictationActiveInComposer) {
                         0.dp
                     } else if (showMicButton && voiceRecordingController.locked) {
-                        ComposerToolbarSlotWidth * 2
+                        actionTargetWidth * 2
                     } else {
-                        ComposerToolbarSlotWidth
+                        // Keep Send's space reserved while the microphone occupies a configured slot.
+                        // Typing must not move the neighboring shortcuts when Send becomes visible.
+                        actionTargetWidth
                     }
+                val ordinarySendAlpha = if (originDictationRequiresCompletion()) 0.38f else 1f
+                val primaryActionEnabled =
+                    !originDictationRequiresCompletion() &&
+                        (!showMicButton || text.isNotBlank() || hasPendingAttachments) &&
+                        (!hasPendingAttachments || editingMessageId != null || attachmentSendEnabled)
                 val trailingControlsWidth = primaryTrailingActionWidth
                 BoxWithConstraints(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .onGloballyPositioned { toolbarParentBounds = it.boundsInWindow() }
+                            .onSizeChanged { toolbarParentSize = it },
                 ) {
                     // Keep the field composed and focusable throughout dictation. The
                     // app-owned controls replace only the waveform slot, so an open IME
                     // stays open and a closed IME is never raised implicitly.
+                    val openComposerOverlay =
+                        composerEmojiPickerOpen || attachmentSheetState.isOpen
                     ComposerPill(
                         sendingIdentity =
                             if (appState != null && composerSendingAccount(appState, draftAccountRef) != null) {
-                                {
-                                    ComposerSendingIdentity(appState, draftAccountRef, draftKey, overlayBackRegistrar) {
-                                        closeSendingIdentity = it
-                                    }
+                                { identityModifier ->
+                                    ComposerSendingIdentity(
+                                        appState,
+                                        draftAccountRef,
+                                        draftKey,
+                                        overlayBackRegistrar,
+                                        onOpenChange = { closeSendingIdentity = it },
+                                        enabled = !transactionActive,
+                                        slotWidth = ComposerShortcutTarget,
+                                        canActivate = canActivateToolbar,
+                                        modifier = identityModifier,
+                                    )
                                 }
                             } else {
                                 null
                             },
+                        toolbar = toolbarBindings.takeIf { configuredToolbar },
+                        toolbarHeightLimit =
+                            (maximumComposerHeight - editorLineHeight - ComposerShortcutTarget)
+                                .coerceIn(ComposerShortcutTarget, ComposerToolbarMaximumHeight),
                         accessoryContent = accessoryContent.takeIf { voiceReviewClip == null },
                         voiceReviewContent =
                             voiceReviewClip?.let { reviewedClip ->
@@ -1469,9 +1681,19 @@ internal fun ComposerBar(
                                             Modifier
                                                 .matchParentSize()
                                                 .padding(
+                                                    start =
+                                                        if (lockedVoiceAtStart) {
+                                                            trailingControlsWidth + 4.dp
+                                                        } else {
+                                                            0.dp
+                                                        },
                                                     end =
-                                                        primaryTrailingActionWidth +
-                                                            if (expandedControlLayout) 4.dp else 12.dp,
+                                                        if (lockedVoiceAtStart) {
+                                                            0.dp
+                                                        } else {
+                                                            trailingControlsWidth +
+                                                                if (expandedControlLayout) 4.dp else 12.dp
+                                                        },
                                                 ).pointerInput(recordingController) {
                                                     awaitPointerEventScope {
                                                         while (true) {
@@ -1519,27 +1741,51 @@ internal fun ComposerBar(
                             }
                         },
                         attachmentSheetOpen = false,
-                        attachmentMenu = { bounds ->
+                        attachmentMenu = { bounds, textShortcuts ->
                             ComposerAttachmentMenu(
                                 anchorBounds = bounds,
                                 expanded = attachmentSheetState.isOpen,
                                 onDismiss = attachmentSheetState::dismiss,
-                                onCamera = onCaptureFromCamera,
-                                onGallery = onPickFromGallery,
-                                onFiles = onPickDocument,
-                                onLocation = onShareLocation,
-                                onUser = onShareUser,
-                                onContact = onShareContact,
-                                onPoll = onCreatePoll,
+                                textShortcuts = textShortcuts.onlyHidden(hiddenMenuShortcuts),
+                                onCustomize = beginCustomization,
+                                onCamera =
+                                    onCaptureFromCamera
+                                        ?.takeIf { ComposerShortcut.Camera in hiddenAttachments }
+                                        ?.let(::guardedAttachmentAction),
+                                onGallery =
+                                    onPickFromGallery
+                                        ?.takeIf { ComposerShortcut.Gallery in hiddenAttachments }
+                                        ?.let(::guardedAttachmentAction),
+                                onFiles =
+                                    onPickDocument
+                                        ?.takeIf { ComposerShortcut.Files in hiddenAttachments }
+                                        ?.let(::guardedAttachmentAction),
+                                onLocation =
+                                    onShareLocation
+                                        ?.takeIf { ComposerShortcut.Location in hiddenAttachments }
+                                        ?.let(::guardedAttachmentAction),
+                                onUser =
+                                    onShareUser
+                                        ?.takeIf { ComposerShortcut.Person in hiddenAttachments }
+                                        ?.let(::guardedAttachmentAction),
+                                onContact =
+                                    onShareContact
+                                        ?.takeIf { ComposerShortcut.Contact in hiddenAttachments }
+                                        ?.let(::guardedAttachmentAction),
+                                onPoll =
+                                    onCreatePoll
+                                        ?.takeIf { ComposerShortcut.Poll in hiddenAttachments }
+                                        ?.let(::guardedAttachmentAction),
                             )
                         },
-                        // Android 13+ lets the open confirmation's overlay callback take Back ahead of the keyboard,
-                        // so the composer stands down. Earlier, only this pre-IME catch runs before the keyboard, so
-                        // it closes the confirmation itself and the keyboard stays up (#3553).
+                        // Android13+ gives the identity confirmation its single overlay-priority Back owner.
+                        // Earlier versions need this pre-IME catch to close it without hiding the keyboard.
                         preImeBackEnabled =
-                            !composerEmojiPickerOpen &&
-                                !attachmentSheetState.isOpen &&
-                                (closeSendingIdentity == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU),
+                            !openComposerOverlay &&
+                                (
+                                    closeSendingIdentity == null ||
+                                        Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
+                                ),
                         onPreImeBack = {
                             val closeConfirmation = closeSendingIdentity
                             if (closeConfirmation != null) {
@@ -1557,31 +1803,26 @@ internal fun ComposerBar(
                         hasContactShare = onShareContact != null,
                         onPickFromGallery = onPickFromGallery,
                         onPickDocument = onPickDocument,
+                        canReceiveContent = canReceiveComposerContent,
                         onPasteImageUris =
                             onPasteImageUris?.takeIf {
                                 editingMessageId == null && !isRecordingVoice && voiceReviewClip == null
                             },
                         onDictation =
                             startAppOwnedDictation?.takeIf {
-                                !dictationActiveInComposer &&
+                                dictationController?.completionControlsRequired != true &&
+                                    dictationController?.blocksNewRequest != true &&
                                     !isRecordingVoice &&
                                     voiceReviewClip == null
                             },
                         dictationControls =
                             activeDictationController?.takeIf { voiceReviewClip == null }?.let { activeController ->
                                 {
-                                    if (LocalShellDictationControls.current != null) {
-                                        DictationComposerControlSlot(
-                                            dictationState.compactActionsWidth(activeController.captureInProgress),
-                                            actionColors,
-                                        )
-                                    } else {
-                                        ConversationDictationCompactActions(
-                                            state = dictationState,
-                                            controller = activeController,
-                                            actionColors = actionColors,
-                                        )
-                                    }
+                                    ConversationDictationCompactActions(
+                                        state = dictationState,
+                                        controller = activeController,
+                                        actionColors = actionColors,
+                                    )
                                 }
                             },
                         highlightMentionChips = mentionPickerEnabled,
@@ -1736,9 +1977,34 @@ internal fun ComposerBar(
                         horizontalArrangement = Arrangement.spacedBy(0.dp),
                         modifier =
                             Modifier
-                                .align(trailingActionAlignment)
-                                .expandedComposerActionRow()
-                                .composerFabContent(),
+                                .align(recordingActionAlignment)
+                                .onSizeChanged { primaryActionSize = it }
+                                .absoluteOffset {
+                                    val target =
+                                        if (isRecordingVoice && voiceRecordingController?.locked != true) {
+                                            heldVoiceBounds
+                                        } else {
+                                            voiceSlotBounds
+                                        }
+                                    if (configuredVoiceUsesSlot && showConfiguredMic && target != null) {
+                                        val original =
+                                            recordingActionAlignment.align(
+                                                primaryActionSize,
+                                                toolbarParentSize,
+                                                layoutDirection,
+                                            )
+                                        IntOffset(
+                                            (target.left - toolbarParentBounds.left).roundToInt() - original.x,
+                                            (target.top - toolbarParentBounds.top).roundToInt() - original.y,
+                                        )
+                                    } else {
+                                        IntOffset.Zero
+                                    }
+                                }.expandedComposerActionRow(
+                                    // The configured Mic overlays an exact slot in either layout direction.
+                                    // A second end gutter would shift its child away from that slot in RTL.
+                                    reserveEndInset = !(configuredVoiceUsesSlot && showConfiguredMic),
+                                ).composerFabContent(),
                     ) {
                         // This call site stays shared by idle and recording states;
                         // moving it would break the active hold gesture's identity.
@@ -1746,7 +2012,11 @@ internal fun ComposerBar(
                             ComposerToolbarTargets {
                                 IconButton(
                                     onClick = { voiceRecordingController.cancel() },
-                                    modifier = Modifier.width(ComposerToolbarSlotWidth).height(ComposerActionRowHeight),
+                                    modifier =
+                                        Modifier
+                                            .width(
+                                                actionTargetWidth,
+                                            ).height(ComposerActionRowHeight),
                                 ) {
                                     Icon(
                                         Icons.Default.Delete,
@@ -1757,23 +2027,56 @@ internal fun ComposerBar(
                             }
                             ComposerActionDisc(
                                 onClick = { voiceRecordingController.stop() },
+                                width = actionTargetWidth,
                                 containerColor = actionColors.container,
                                 contentColor = actionColors.content,
                                 description = stringResource(R.string.voice_recording_stop),
                                 icon = R.drawable.ic_stop,
                             )
-                        } else if (showPrimaryTrailingAction && showMicButton) {
+                        } else if (showPrimaryTrailingAction && showConfiguredMic) {
                             Box(contentAlignment = Alignment.BottomCenter) {
                                 LockHintAbove(controller = voiceRecordingController)
-                                MicHoldButton(controller = voiceRecordingController)
+                                MicHoldButton(
+                                    controller = voiceRecordingController,
+                                    slotWidth = actionTargetWidth,
+                                    onHoldStart = { heldVoiceBounds = voiceSlotBounds },
+                                    canStart = canAcquireVoice,
+                                )
                             }
-                        } else if (showPrimaryTrailingAction) {
+                        } else if (showPrimaryTrailingAction &&
+                            !(configuredVoiceUsesSlot)
+                        ) {
                             ComposerActionDisc(
                                 onClick = { submitMessage() },
+                                enabled = primaryActionEnabled,
+                                width = actionTargetWidth,
                                 containerColor = actionColors.container,
                                 contentColor = actionColors.content,
                                 description = stringResource(R.string.send),
                                 icon = R.drawable.ic_arrow_upward,
+                                modifier = Modifier.alpha(alpha = ordinarySendAlpha),
+                            )
+                        }
+                    }
+                    if (showPrimaryTrailingAction && configuredVoiceUsesSlot) {
+                        // The mic overlays its toolbar slot, so Send keeps its own place, disabled until content.
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier =
+                                Modifier
+                                    .align(trailingActionAlignment)
+                                    .expandedComposerActionRow()
+                                    .composerFabContent(),
+                        ) {
+                            ComposerActionDisc(
+                                onClick = { submitMessage() },
+                                enabled = primaryActionEnabled,
+                                width = actionTargetWidth,
+                                containerColor = actionColors.container,
+                                contentColor = actionColors.content,
+                                description = stringResource(R.string.send),
+                                icon = R.drawable.ic_arrow_upward,
+                                modifier = Modifier.alpha(alpha = ordinarySendAlpha),
                             )
                         }
                     }
@@ -1798,6 +2101,15 @@ internal fun ComposerBar(
                         onSearchActiveChange = {
                             composerEmojiSearchActive = it
                             onBottomInputChanged()
+                        },
+                        searchRow = composerEmojiSearchRow,
+                        searchMinHeight =
+                            composerEmojiSearchRowMinHeight(
+                                paneHeight = emojiPaneHeightAnim.value,
+                                currentImeHeight = currentImePaneHeight,
+                            ),
+                        onSearchRowHeightChange = { measured ->
+                            if (measured > 0.dp) composerEmojiSearchRowHeight = measured
                         },
                     )
                 }

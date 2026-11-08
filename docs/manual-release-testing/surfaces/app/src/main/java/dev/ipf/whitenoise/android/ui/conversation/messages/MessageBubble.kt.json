@@ -198,6 +198,102 @@
         "test_ids": [
           "MSG-010"
         ]
+      },
+      {
+        "surface": "R.string.chat_list_search_open_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.chat_list_search_open_profile",
+        "test_ids": [
+          "AXY-013"
+        ]
+      },
+      {
+        "surface": "R.string.copy",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.copy",
+        "test_ids": [
+          "AXY-013"
+        ]
+      },
+      {
+        "surface": "R.string.delete",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.delete",
+        "test_ids": [
+          "AXY-013"
+        ]
+      },
+      {
+        "surface": "R.string.edit_history",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.edit_history",
+        "test_ids": [
+          "AXY-013"
+        ]
+      },
+      {
+        "surface": "R.string.forward",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.forward",
+        "test_ids": [
+          "AXY-013"
+        ]
+      },
+      {
+        "surface": "R.string.go_to_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.go_to_message",
+        "test_ids": [
+          "AXY-013"
+        ]
+      },
+      {
+        "surface": "R.string.info",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.info",
+        "test_ids": [
+          "AXY-013"
+        ]
+      },
+      {
+        "surface": "R.string.message_react",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.message_react",
+        "test_ids": [
+          "AXY-013"
+        ]
+      },
+      {
+        "surface": "R.string.reply",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.reply",
+        "test_ids": [
+          "AXY-013"
+        ]
+      },
+      {
+        "surface": "R.string.view_reactors",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.view_reactors",
+        "test_ids": [
+          "AXY-013"
+        ]
+      },
+      {
+        "surface": "R.string.retry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.retry",
+        "test_ids": [
+          "AXY-013"
+        ]
+      },
+      {
+        "surface": "R.string.discard_failed_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt",
+        "anchor": "R.string.discard_failed_message",
+        "test_ids": [
+          "AXY-013"
+        ]
       }
     ],
     "message_rendering_contracts": [

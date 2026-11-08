@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicReference
 /** Source capabilities and bounded provider staging, shared by codec and platform-service adapters. */
 internal class MediaSourceAccess(
     private val context: Context,
+    private val resources: MediaParentResources? = null,
 ) : java.io.Closeable {
     @Volatile private var closed = false
     private val sourceTimer =
@@ -24,6 +25,12 @@ internal class MediaSourceAccess(
     private val activeCancellation =
         AtomicReference<CancellationSignal?>()
 
+    /**
+     * Reserves process-wide provider admission through the block and its cleanup.
+     * The watchdog cancels the signal and closes the capability published through the atomic reference;
+     * providers may ignore cancellation, so this does not promise a hard return deadline.
+     * Retirement or refused admission returns null; the block must close capabilities it opens.
+     */
     @Suppress("ReturnCount") // Refuse expired or retired provider reads before holding scarce staging admission.
     fun <T> withProviderDeadline(block: (CancellationSignal, AtomicReference<AutoCloseable?>) -> T?): T? {
         if (closed ||
@@ -40,12 +47,20 @@ internal class MediaSourceAccess(
         activeSource.set(source)
         activeCancellation.set(signal)
         var timer: java.util.concurrent.ScheduledFuture<*>? = null
+        val timerCredit = resources?.task()
         return try {
             timer =
-                sourceWatchdog.schedule({
-                    runCatching { signal.cancel() }
-                    runCatching { source.get()?.close() }
-                }, MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)
+                registerTimeout {
+                    if (timerCredit == null || timerCredit.start()) {
+                        try {
+                            runCatching { signal.cancel() }
+                            runCatching { source.get()?.close() }
+                        } finally {
+                            timerCredit?.finish()
+                        }
+                    }
+                }
+            if (timer == null) return null
             signal.throwIfCanceled()
             if (closed) null else block(signal, source)
         } catch (failure: java.io.IOException) {
@@ -53,12 +68,54 @@ internal class MediaSourceAccess(
             if (closed) null else throw failure
         } finally {
             timer?.cancel(false)
+            timerCredit?.cancelBeforeStart()
             activeCancellation.compareAndSet(signal, null)
             activeSource.compareAndSet(source, null)
             providerAdmission.release()
         }
     }
 
+    /**
+     * Registers a millisecond watchdog, serializing AV timer creation against retirement.
+     * Provider work and cancellation calls execute outside the registration monitor.
+     */
+    private fun registerTimeout(block: () -> Unit): java.util.concurrent.ScheduledFuture<*>? {
+        if (resources == null) {
+            return sourceWatchdog.schedule(Runnable(block), MediaDecodePolicy.DEADLINE_MS, TimeUnit.MILLISECONDS)
+        }
+        // The AV close transition and lazy executor creation/registration share this monitor.
+        // No lock is held over provider work or cancellation RPCs.
+        return synchronized(this) {
+            if (closed) {
+                null
+            } else {
+                sourceWatchdog.schedule(
+                    Runnable(block),
+                    MediaDecodePolicy.DEADLINE_MS,
+                    TimeUnit.MILLISECONDS,
+                )
+            }
+        }
+    }
+
+    /**
+     * Borrows a read-only descriptor for a bounded regular file only during [block].
+     * Checks both pathname size and opened descriptor size; closes the descriptor on every exit.
+     */
+    fun <T> withMediaFileInput(
+        file: File,
+        block: (ParcelFileDescriptor) -> T?,
+    ): T? {
+        if (closed || !file.isFile || file.length() !in 1..MAX_MEDIA_SOURCE_BYTES) return null
+        return own(ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)).use { input ->
+            if (closed || input.value.statSize !in 1..MAX_MEDIA_SOURCE_BYTES) null else block(input.value)
+        }
+    }
+
+    /**
+     * Borrows a whole selected descriptor directly, or stages only the selected byte range.
+     * The caller retains ownership of [input]; a staged descriptor is valid only during [block].
+     */
     fun <T> withSelectedMediaInput(
         input: ParcelFileDescriptor,
         offset: Long,
@@ -71,6 +128,10 @@ internal class MediaSourceAccess(
             withStagedInput({ writer -> copySelectedMediaSlice(input.fileDescriptor, offset, length, writer) }, block)
         }
 
+    /**
+     * Stages bounded provider bytes before invoking [block] with a separate read-only capability.
+     * Provider admission is released before decoding; the borrowed descriptor closes after the block.
+     */
     fun <T> withUriInput(
         resolver: android.content.ContentResolver,
         uri: android.net.Uri,
@@ -78,23 +139,30 @@ internal class MediaSourceAccess(
     ): T? {
         val staged =
             withProviderDeadline { signal, opened ->
-                resolver.openAssetFileDescriptor(uri, "r", signal)?.use { asset ->
-                    opened.set(asset)
+                resolver.openAssetFileDescriptor(uri, "r", signal)?.let(::own)?.use { owner ->
+                    opened.set(owner)
+                    val asset = owner.value
                     // A provider can return after retirement despite cancellation.
                     if (closed || signal.isCanceled) {
                         return@use null
                     }
-                    asset.createInputStream().use { source ->
+                    own(asset.createInputStream()).use { sourceOwner ->
+                        val source = sourceOwner.value
                         withStagedInput({ writer -> copyBoundedSource(source, writer) }) { input ->
-                            ParcelFileDescriptor.dup(input.fileDescriptor)
+                            own(ParcelFileDescriptor.dup(input.fileDescriptor))
                         }
                     }
                 }
             }
         // Decoder admission/IPC owns the staged capability without occupying provider admission.
-        return staged?.use(block)
+        return staged?.use { block(it.value) }
     }
 
+    /**
+     * Accepts file/content URI ranges after size and offset validation under provider admission.
+     * Whole files keep the descriptor path; slices are staged. The separate capability passed to
+     * [block] closes on return and does not retain the provider admission slot.
+     */
     fun <T> withMediaUriInput(
         resolver: android.content.ContentResolver,
         uri: android.net.Uri,
@@ -103,8 +171,9 @@ internal class MediaSourceAccess(
         if (uri.scheme != "file" && uri.scheme != "content") return null
         val selected =
             withProviderDeadline { signal, opened ->
-                resolver.openAssetFileDescriptor(uri, "r", signal)?.use { asset ->
-                    opened.set(asset)
+                resolver.openAssetFileDescriptor(uri, "r", signal)?.let(::own)?.use { owner ->
+                    opened.set(owner)
+                    val asset = owner.value
                     if (closed || signal.isCanceled) {
                         return@use null
                     }
@@ -114,17 +183,21 @@ internal class MediaSourceAccess(
                         return@use null
                     }
                     signal.throwIfCanceled()
-                    ParcelFileDescriptor.dup(asset.fileDescriptor).use { input ->
-                        withSelectedMediaInput(input, asset.startOffset, length) { slice ->
-                            ParcelFileDescriptor.dup(slice.fileDescriptor)
+                    own(ParcelFileDescriptor.dup(asset.fileDescriptor)).use { inputOwner ->
+                        withSelectedMediaInput(inputOwner.value, asset.startOffset, length) { slice ->
+                            own(ParcelFileDescriptor.dup(slice.fileDescriptor))
                         }
                     }
                 }
             }
         // Parsing owns a separate capability; a stuck media service must not hold image-provider admission.
-        return selected?.use(block)
+        return selected?.use { block(it.value) }
     }
 
+    /**
+     * Copies nonempty provider bytes within the image staging byte and elapsed-time budgets.
+     * A blocking read can outlive the loop deadline; provider cancellation is handled by the watchdog.
+     */
     private fun copyBoundedSource(
         source: java.io.InputStream,
         writer: java.io.OutputStream,
@@ -146,6 +219,10 @@ internal class MediaSourceAccess(
         return count < 0 && total > 0L
     }
 
+    /**
+     * Stages caller-owned bytes and borrows the resulting descriptor only for [block].
+     * This helper does not impose its own byte-array size limit.
+     */
     fun <T> withInput(
         bytes: ByteArray,
         block: (ParcelFileDescriptor) -> T,
@@ -155,6 +232,10 @@ internal class MediaSourceAccess(
             true
         }, block)
 
+    /**
+     * Unlinks the staging pathname before writing while retaining open writer/read capabilities.
+     * A false writer result refuses decoding; all handles close and residual paths are removed on exit.
+     */
     private fun <T> withStagedInput(
         write: (java.io.OutputStream) -> Boolean,
         block: (ParcelFileDescriptor) -> T?,
@@ -162,8 +243,10 @@ internal class MediaSourceAccess(
         val directory = File(context.cacheDir, "media-decoder-input").apply { mkdirs() }
         val file = File.createTempFile("source-", ".bin", directory)
         return try {
-            file.outputStream().use { writer ->
-                ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { input ->
+            own(file.outputStream()).use { writerOwner ->
+                val writer = writerOwner.value
+                own(ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)).use { inputOwner ->
+                    val input = inputOwner.value
                     check(file.delete()) // No plaintext pathname survives, even if the app dies during staging.
                     if (write(writer)) {
                         writer.flush()
@@ -178,15 +261,43 @@ internal class MediaSourceAccess(
         }
     }
 
+    /**
+     * Tracks AV capability cleanup when a resource owner is supplied; otherwise preserves direct-close behavior.
+     */
+    private fun <T : AutoCloseable> own(value: T): MediaParentResource<T> {
+        val resource = resources?.own(value) ?: MediaParentResource(value)
+        return resource
+    }
+
+    /**
+     * Retires this source and queues cancellation/closure without holding a monitor over provider RPCs.
+     * Tracked cleanup retains admission credit until finished; rejected submission marks ownership uncertain.
+     */
+    @Synchronized
+    @Suppress("TooGenericExceptionCaught") // Rejected cleanup submission must retain every source/resource credit.
     override fun close() {
+        if (resources != null && closed) return
         closed = true
         if (sourceTimer.isInitialized()) {
             val signal = activeCancellation.get()
             val source = activeSource.get()
-            sourceWatchdog.execute {
-                runCatching { signal?.cancel() }
-                runCatching { source?.get()?.close() }
-                sourceWatchdog.shutdown()
+            val credit = resources?.task()
+            try {
+                sourceWatchdog.execute {
+                    if (credit == null || credit.start()) {
+                        try {
+                            runCatching { signal?.cancel() }
+                            runCatching { source?.get()?.close() }
+                            sourceWatchdog.shutdown()
+                        } finally {
+                            credit?.finish()
+                        }
+                    }
+                }
+            } catch (failure: RuntimeException) {
+                resources?.uncertain()
+                credit?.cancelBeforeStart()
+                throw failure
             }
         }
     }

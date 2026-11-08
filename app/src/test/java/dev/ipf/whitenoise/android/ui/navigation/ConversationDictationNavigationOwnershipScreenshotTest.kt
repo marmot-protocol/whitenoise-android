@@ -4,13 +4,18 @@ import android.content.Context
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -47,6 +52,64 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
 
     @After
     fun releaseMotionVoiceFixture() = releasePreviewVoiceController()
+
+    /** The origin uses the same single floating owner as every other route. */
+    @Test
+    fun sameOriginBubbleLight() {
+        render(configured = true)
+        composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed()
+        composeRule.onNodeWithContentDescription("Dictate text").assertIsNotEnabled()
+        val voiceLabel = ApplicationProvider.getApplicationContext<Context>().getString(R.string.voice_message_record)
+        composeRule.onAllNodesWithContentDescription(voiceLabel).assertCountEquals(1)
+        composeRule.onNodeWithContentDescription(voiceLabel).assertIsDisplayed().assertIsNotEnabled()
+        assertSingleActionSet()
+        composeRule.onNode(hasSetTextAction()).performTextReplacement("Draft in progress")
+        composeRule
+            .onNode(hasContentDescription("Send") and hasAnyAncestor(hasTestTag(COMPOSER_TAG)))
+            .assertIsDisplayed()
+            .assertIsNotEnabled()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_navigation_same_origin_light.png")
+    }
+
+    @Test
+    fun sameOriginTypedSendLargeFontRtlDark() {
+        render(dark = true, largeRtl = true, configured = true)
+        composeRule.onNode(hasSetTextAction()).performTextReplacement("Draft in progress")
+        composeRule
+            .onNode(hasContentDescription("Send") and hasAnyAncestor(hasTestTag(COMPOSER_TAG)))
+            .assertIsDisplayed()
+            .assertIsNotEnabled()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_navigation_same_origin_typed_rtl_dark.png")
+    }
+
+    @Test
+    fun sameOriginTypedSendAmoled() {
+        render(dark = true, amoled = true, configured = true)
+        composeRule.onNode(hasSetTextAction()).performTextReplacement("Draft in progress")
+        composeRule
+            .onNode(hasContentDescription("Send") and hasAnyAncestor(hasTestTag(COMPOSER_TAG)))
+            .assertIsDisplayed()
+            .assertIsNotEnabled()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_navigation_same_origin_typed_amoled.png")
+    }
+
+    /** The persistent origin bubble does not take over the destination's ordinary Send. */
+    @Test
+    fun foreignTypedSendLight() {
+        val fixture = render(configured = true)
+        composeRule.runOnIdle {
+            fixture.route = origin.copy(selectedChatId = "other-chat", selectedGroupIdHex = "other-group")
+        }
+        composeRule.onNode(hasSetTextAction()).performTextReplacement("Another conversation")
+        val voiceLabel = ApplicationProvider.getApplicationContext<Context>().getString(R.string.voice_message_record)
+        composeRule.onAllNodesWithContentDescription(voiceLabel).assertCountEquals(1)
+        composeRule.onNodeWithContentDescription(voiceLabel).assertIsDisplayed().assertIsNotEnabled()
+        composeRule
+            .onNode(hasContentDescription("Send") and hasAnyAncestor(hasTestTag(COMPOSER_TAG)))
+            .assertIsDisplayed()
+            .assertIsEnabled()
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_navigation_foreign_typed_send_light.png")
+    }
 
     @Test
     fun persistentActionsAboveKeyboardLight() = captureKeyboardActions(dark = false, largeRtl = false)
@@ -128,7 +191,7 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
     @Test
     fun returnedComposerLargeFontRtlDark() = captureNavigation(dark = true, largeRtl = true, returning = true)
 
-    /** A navigation commit alone transfers the actions, even with a retained outgoing composer. */
+    /** A navigation commit retains one floating action set above the outgoing composer. */
     @Test
     fun leaveOriginShowsActionsOnFirstCommittedFrame() {
         val fixture = render()
@@ -147,7 +210,7 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
         }
     }
 
-    /** Re-entering before outgoing disposal cannot leave a second root action set behind. */
+    /** Re-entering before outgoing disposal retains one persistent root action set. */
     @Test
     fun returnTransfersOwnershipOnFirstCommittedFrame() {
         val fixture = render()
@@ -157,7 +220,7 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
 
         firstNavigationFrame { fixture.route = origin }
 
-        composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed()
         assertSingleActionSet()
         assertSame(capture, fixture.controller.state)
     }
@@ -175,7 +238,7 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
             composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed()
             assertSingleActionSet()
             firstNavigationFrame { fixture.route = origin }
-            composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertDoesNotExist()
+            composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).assertIsDisplayed()
             assertSingleActionSet()
         }
     }
@@ -276,12 +339,12 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
         }
     }
 
-    /** Real shell actions keep their measured size while embedded chrome becomes a capsule. */
+    /** The same floating shell actions keep their measured size while the route changes. */
     @Test
     fun dictationActionsKeepWidthWhenLeavingComposer() {
         val fixture = render(dark = true, amoled = true)
         val embedded =
-            composeRule.onNodeWithTag("composer-dictation-shell-control").fetchSemanticsNode().boundsInRoot
+            composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).fetchSemanticsNode().boundsInRoot
         firstNavigationFrame { fixture.route = origin.copy(selectedChatId = null, selectedGroupIdHex = null) }
         val floating = composeRule.onNodeWithTag(APP_DICTATION_CONTROL_TAG).fetchSemanticsNode().boundsInRoot
         assertEquals(
@@ -364,7 +427,7 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
         verifyPersistentTrajectory(largeRtl = false, moveIme = true)
     }
 
-    /** An older inline departure must not retire into a newer midflight composer and jump. */
+    /** Interrupted route motion must not detach the persistent bubble from the painted border. */
     @Test
     fun rapidInlineToChatsToOtherChatKeepsBothClocksContinuous() = verifyMixedOwnershipTrajectory(moveIme = false)
 
@@ -385,7 +448,7 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
         }
         scheduler.runCurrent()
         composeRule.waitForIdle()
-        assertCommittedFailedFixture(fixture, persistent = false)
+        assertCommittedFailedFixture(fixture, persistent = true)
 
         fun commands(): androidx.compose.ui.geometry.Rect {
             val semanticsNode = composeRule.onNodeWithTag(COMPOSER_DICTATION_COMPACT_ACTIONS_TAG).fetchSemanticsNode()
@@ -402,7 +465,7 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
         assertEquals(referenceStart + 96L, composeRule.mainClock.currentTime)
         firstNavigationFrame { fixture.route = origin }
         composeRule.mainClock.advanceTimeBy(272)
-        assertCommittedFailedFixture(fixture, persistent = false)
+        assertCommittedFailedFixture(fixture, persistent = true)
 
         val reversalStart = composeRule.mainClock.currentTime
         firstNavigationFrame {
@@ -421,7 +484,7 @@ internal class ConversationDictationNavigationOwnershipScreenshotTest : Dictatio
         }
     }
 
-    /** Runs both production handoff clocks together; the existing isolation fixtures stay unchanged. */
+    /** Persistent dictation stays single-owned while the production composer handoff reverses. */
     @Test
     fun combinedComposerAndDictationFramesAmoled() {
         val fixture = render(dark = true, amoled = true, withComposerMorph = true)

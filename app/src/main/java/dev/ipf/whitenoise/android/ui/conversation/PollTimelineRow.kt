@@ -42,13 +42,14 @@ import dev.ipf.marmotkit.PollProjectionFfi
 import dev.ipf.marmotkit.PollTypeFfi
 import dev.ipf.marmotkit.SendAcceptDispositionFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.TimelineMessage
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
 import kotlinx.coroutines.delay
-import java.text.DateFormat
-import java.util.Date
+import java.time.format.FormatStyle
 
 private const val POLL_MILLIS_PER_SECOND = 1_000L
 internal const val POLL_VIEW_VOTES_TAG = "poll-view-votes"
@@ -195,6 +196,7 @@ internal fun PollCard(
     onViewVotes: (() -> Unit)? = null,
 ) {
     val locale = LocalConfiguration.current.locales[0]
+    val display = currentDateTimeDisplay()
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -234,9 +236,9 @@ internal fun PollCard(
             val endsAt = poll.endsAt
             if (open && endsAt != null) {
                 val deadline =
-                    DateFormat
-                        .getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, locale)
-                        .format(Date(endsAt.toLong() * 1_000L))
+                    remember(endsAt, locale, display) {
+                        IdentityFormatter.dateTime(endsAt, locale, display = display, dateStyle = FormatStyle.SHORT)
+                    }
                 Text(stringResource(R.string.poll_ends_at, deadline), style = MaterialTheme.typography.labelSmall)
             }
             PollVoteStatusLabel(status)

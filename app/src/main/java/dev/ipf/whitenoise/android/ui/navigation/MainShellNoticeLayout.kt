@@ -5,9 +5,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import dev.ipf.whitenoise.android.audio.ConversationDictationController
 import dev.ipf.whitenoise.android.state.TransientNotice
 import dev.ipf.whitenoise.android.ui.ShellTransientNoticeLayout
@@ -19,6 +21,7 @@ import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlHandoff
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
 import dev.ipf.whitenoise.android.ui.conversation.LocalShellPlaybackHost
 import dev.ipf.whitenoise.android.ui.conversation.ShellPlaybackHost
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerActionRowHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationNotificationNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationPersistentControl
 
@@ -45,6 +48,8 @@ internal fun MainShellNoticeLayout(
             recoveryHandedToComposer = dictationController.recoveryHandedToComposer,
         )
     val anchor = remember(handoffOwner, dictationController.state.sessionId) { FloatingDictationAnchor() }
+    val launcherOrigin = remember(handoffOwner) { DictationLauncherOrigin() }
+    val composerHeight = remember(handoffOwner) { mutableStateOf(ComposerActionRowHeight) }
     val dictationDestination = dictationControlOwner.takeUnless { it == ConversationDictationControlOwner.Hidden }
     val dictationMotion =
         rememberMeasuredControlHandoff(
@@ -79,6 +84,17 @@ internal fun MainShellNoticeLayout(
                 dictationDestination,
                 dictationMotionAllowed,
                 continueActiveMotion = persistentContainer != null,
+                entranceOrigin =
+                    launcherOrigin.takeEntrance(
+                        sessionId = dictationController.state.sessionId,
+                        eligible =
+                            canUseDictationLauncherOrigin(
+                                dictationMotionAllowed,
+                                dictationDestination,
+                                dictationController,
+                                dictationComposerRoute,
+                            ),
+                    ),
             )
         }
     LaunchedEffect(dictationMotion, dictationRequest) { dictationMotion.animatePrepared(dictationRequest) }
@@ -93,7 +109,10 @@ internal fun MainShellNoticeLayout(
         LocalShellPlaybackHost provides playbackHost,
         LocalFloatingDictationAnchor provides anchor,
         LocalShellDictationControls provides anchor,
+        LocalDictationLauncherOrigin provides launcherOrigin,
+        LocalDictationControlHandoff provides dictationMotion,
         LocalComposerFabHandoff provides handoff,
+        LocalComposerFabHeight provides composerHeight,
         LocalFinishControlMorph provides {
             handoff.finish()
             dictationMotion.finish()
@@ -132,6 +151,15 @@ internal fun MainShellNoticeLayout(
                 if (dictationControlOwner != ConversationDictationControlOwner.Hidden) {
                     ConversationDictationPersistentControl(
                         state = dictationController.state,
+                        modifier =
+                            Modifier.graphicsLayer {
+                                alpha =
+                                    if (dictationMotion.entranceActive) {
+                                        dictationMotion.renderedDecorationAlpha
+                                    } else {
+                                        1f
+                                    }
+                            },
                         controller = dictationController,
                         embedded = dictationControlOwner == ConversationDictationControlOwner.Composer,
                         movingChromeSize = {
@@ -163,3 +191,14 @@ internal fun MainShellNoticeLayout(
         )
     }
 }
+
+/** Reads session route state only after the existing motion and persistent-owner exclusions pass. */
+private fun canUseDictationLauncherOrigin(
+    motionAllowed: Boolean,
+    destination: ConversationDictationControlOwner?,
+    controller: ConversationDictationController,
+    route: ConversationDictationComposerRoute,
+): Boolean =
+    motionAllowed &&
+        destination == ConversationDictationControlOwner.Persistent &&
+        conversationDictationOriginComposerVisible(controller.state, route)

@@ -1,5 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="voice_recording_stopped_announcement">Registrazione interrotta</string>
+    <string name="voice_message_seek">Posizione di riproduzione</string>
+    <string name="video_failed">Impossibile caricare il video</string>
+    <string name="conversation_new_message_from">Nuovo messaggio da %1$s</string>
+    <plurals name="conversation_new_messages">
+        <item quantity="one">%1$d nuovo messaggio</item>
+        <item quantity="many">%1$d nuovi messaggi</item>
+        <item quantity="other">%1$d nuovi messaggi</item>
+    </plurals>
+    <plurals name="unread_mentions_count">
+        <item quantity="one">%1$d menzione non letta</item>
+        <item quantity="many">%1$d menzioni non lette</item>
+        <item quantity="other">%1$d menzioni non lette</item>
+    </plurals>
     <string name="notification_channel_summary">Riepilogo delle notifiche</string>
     <string name="notification_channel_summary_description">Riepilogo silenzioso dei messaggi e degli altri eventi</string>
     <plurals name="notification_group_count">
@@ -191,6 +205,7 @@
     <string name="toast_chat_deleted_local">Chat eliminata da questo dispositivo</string>
     <string name="toast_couldnt_delete_chat">Impossibile eliminare la chat</string>
     <string name="chat_list_select_all">Seleziona tutto</string>
+    <string name="toast_chat_list_select_all_loaded_only">Impossibile selezionare tutte le chat. Sono selezionate solo le chat caricate.</string>
     <string name="chat_list_deselect_all">Deseleziona tutto</string>
     <plurals name="chat_list_selected_count">
         <item quantity="one">%1$d chat selezionata</item>
@@ -411,6 +426,7 @@
     <string name="message_reacted">Ha reagito con %1$s</string>
     <string name="message_reaction_fallback">a un messaggio</string>
     <string name="message_actions">Azioni messaggio</string>
+    <string name="message_reply_quote_description">In risposta a %1$s: %2$s</string>
     <string name="message_deleted_preview">Messaggio eliminato</string>
     <string name="agent_stream_started">Stream agente avviato</string>
     <string name="stream_finished">Stream terminato</string>
@@ -1293,6 +1309,7 @@
     <string name="voice_message_speed">Velocità di riproduzione %1$s</string>
     <string name="voice_message_failed">Impossibile caricare il messaggio vocale</string>
     <string name="voice_message_locked">Bloccato</string>
+    <string name="voice_recording_resume">Riprendi</string>
     <string name="reply_you">Tu</string>
     <string name="reply_media_photo">Foto</string>
     <string name="media_album">Album</string>
@@ -2551,6 +2568,10 @@
     <string name="notification_tone_silent">Silenzioso</string>
     <string name="notification_tone_off">Disattivato</string>
     <string name="notification_tone_default">Predefinito</string>
+    <string name="appearance_colors_heading">Tema e colori</string>
+    <string name="appearance_text_heading">Testo e lingua</string>
+    <string name="appearance_conversation_heading">Conversazione</string>
+    <string name="appearance_preview_intro">Prova testo più grande e una disposizione da destra a sinistra.</string>
     <string name="media_viewer_fit_image">Adatta immagine</string>
     <string name="media_viewer_zoom_image">Ingrandisci</string>
     <string name="media_viewer_image_scale">Zoom %1$d%%</string>
@@ -2563,4 +2584,12 @@
     <string name="settings_search_alias_read_aloud">TTS|sintesi vocale|leggi ad alta voce</string>
     <string name="settings_search_alias_sound">suono delle notifiche|suono di avviso|suoneria</string>
     <string name="settings_search_revealed">%1$s. Impostazione evidenziata.</string>
+    <string name="date_time_format">Data e ora</string>
+    <string name="date_time_format_time">Ora</string>
+    <string name="date_time_format_date">Data</string>
+    <string name="date_time_format_automatic">Automatico</string>
+    <string name="time_format_12_hour">12 ore</string>
+    <string name="time_format_24_hour">24 ore</string>
+    <string name="date_time_format_help">Automatico usa la lingua dell\'app e la regione del telefono.</string>
+    <string name="settings_search_alias_date_time_format">formato ora|formato data|orologio|12 ore|24 ore|AM/PM</string>
 </resources>

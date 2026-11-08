@@ -13,10 +13,11 @@ import uuid
 OUT = Path('app/build/reports/media-startup-trace')
 STATE = OUT / 'state.json'
 MAX_BYTES = 128 * 1024 * 1024
-CONFIG = '''buffers { size_kb: 65536 fill_policy: DISCARD }
+CONFIG = '''buffers { size_kb: 65536 fill_policy: RING_BUFFER }
 duration_ms: 120000
 write_into_file: true
 file_write_period_ms: 1000
+flush_period_ms: 1000
 max_file_size_bytes: 134217728
 data_sources { config { name: "linux.ftrace" ftrace_config {
  atrace_categories: "am"
@@ -87,14 +88,41 @@ def full_bounded_stdout(row, label):
         raise RuntimeError('required capture is not UTF8:' + label) from error
 
 
+AV_ANNOTATION = 'dev.ipf.whitenoise.android.media.sandbox.MediaAvTraceCase'
+AV_CASE = 'dev.ipf.whitenoise.android.media.sandbox.MediaAvPerformanceDeviceTest#measureProductionCostsOnUnchangedCorpus'
+AV_SURFACE_CASE = 'dev.ipf.whitenoise.android.media.sandbox.IsolatedAttachmentPlayerDeviceTest#pausedSeekingSpeedPauseAndRepeatUseRealRawPlayback'
+AV_PLAYBACK_CASE = 'dev.ipf.whitenoise.android.media.sandbox.MediaAvPlaybackPerformanceDeviceTest#characterizePacedProductionPlaybackOnUnchangedCorpus'
+LEGACY_CASE = 'dev.ipf.whitenoise.android.media.sandbox.MediaWorkerHealthyBaselineDeviceTest#characterizeHealthyDirectStillTransportWithFixedSyntheticCorpus'
+
+
+def selection(mode='healthy', api='30'):
+    """Choose only the reviewed trace mode and supported API before any device command is admitted."""
+    if mode == 'healthy' and api == '30':
+        return CONFIG, list(COMMAND), LEGACY_CASE
+    if mode != 'av' or api not in ('30', '36'):
+        raise ValueError('fixed trace mode/API required')
+    config = CONFIG.replace('duration_ms: 120000', 'duration_ms: 600000').replace(
+        'scan_all_processes_on_start: true', 'scan_all_processes_on_start: true\n proc_stats_poll_ms: 100')
+    # AGP truncates comma-separated class selectors; the runtime method annotation
+    # selects all three exact cases without changing the required-result checks.
+    legacy_selector = '-Pandroid.testInstrumentationRunnerArguments.class=' + LEGACY_CASE
+    av_selector = '-Pandroid.testInstrumentationRunnerArguments.annotation=' + AV_ANNOTATION
+    command = [av_selector if value == legacy_selector else value.replace('BenchmarkRelease', 'Debug').replace(
+        'timeout_msec=120000', 'timeout_msec=600000') for value in COMMAND]
+    command.insert(1, '-PmediaAvStartupTrace=true')
+    return config, command, AV_CASE
+
+
 def start():
+    """Persist the exact trace intent before starting Perfetto once; retain failed or uncertain starts without retry."""
     state = json.loads(STATE.read_text())
+    config, _, _ = selection(state.get('trace_mode', 'healthy'), state.get('android_api', '30'))
     marker = OUT / 'start.intent'
     with marker.open('x') as f:
         f.write(state['key'])
     try:
         result = adb(['shell', 'perfetto', '--txt', '-c', '-', '-o', state['remote'],
-                      '--detach=' + state['key']], 'start', input_data=CONFIG.encode('utf-8'))
+                      '--detach=' + state['key']], 'start', input_data=config.encode('utf-8'))
         require_ok(result, 'trace start failed or uncertain; no retry')
     except Exception as error:
         save(OUT / 'start.failed', {'key': state['key'], 'error': str(error), 'error_class': type(error).__name__})
@@ -158,7 +186,9 @@ def finish(state):
     return issues
 
 
-def run():
+def run(mode='healthy', api='30'):
+    """Run the selected instrumentation command while preserving trace, exit and cleanup evidence on failure."""
+    config, selected_command, required_case = selection(mode, api)
     if os.environ.get('GITHUB_EVENT_NAME') != 'workflow_dispatch':
         raise RuntimeError('hosted explicit dispatch required')
     OUT.mkdir(parents=True, exist_ok=False)
@@ -168,7 +198,10 @@ def run():
     state = dict(schema=1, key=key, remote='/data/misc/perfetto-traces/' + key + '.perfetto-trace',
                  run_id=os.environ.get('GITHUB_RUN_ID'), run_attempt=os.environ.get('GITHUB_RUN_ATTEMPT'),
                  job_key=os.environ.get('GITHUB_JOB'), source=os.environ.get('GITHUB_SHA'),
-                 effect='hosted-only raw diagnostic capture; no qualification')
+                 effect='hosted-only raw diagnostic capture; no qualification',
+                 trace_mode=mode, android_api=api, required_case=required_case,
+                 additional_required_cases=[AV_PLAYBACK_CASE, AV_SURFACE_CASE] if mode == 'av' else [],
+                 memory_scope='caller and worker sampled RSS only; authenticated lifetime join required; no PSS or exact peak' if mode == 'av' else 'legacy trace')
     save(STATE, state)
     test_code = None
     try:
@@ -176,7 +209,7 @@ def run():
         if actual_source != state['source'] or len(actual_source) != 40:
             raise RuntimeError('checkout/source environment mismatch')
         require_ok(command(['git', 'rev-parse', 'HEAD^{tree}'], 'source-tree'), 'source tree unavailable')
-        for prop, expected in [('ro.build.version.sdk', '30'), ('ro.product.cpu.abi', 'x86_64')]:
+        for prop, expected in [('ro.build.version.sdk', api), ('ro.product.cpu.abi', 'x86_64')]:
             actual = require_ok(adb(['shell', 'getprop', prop], prop), 'runtime unavailable')
             if actual != expected:
                 raise RuntimeError('unsupported runtime:' + prop)
@@ -197,17 +230,29 @@ def run():
         require_ok(adb(['shell', 'test', '!', '-e', state['remote']], 'admit-output'), 'unique remote output already exists')
         state['remote_admitted'] = True
         save(STATE, state)
-        (OUT / 'config.pbtxt').write_text(CONFIG)
+        (OUT / 'config.pbtxt').write_text(config)
         # Compilation dependencies finish before the exact task doFirst starts capture.
-        r = command(['timeout', '--signal=INT', '--kill-after=30s', '25m', *COMMAND], 'instrumentation', 1535)
+        r = command(['timeout', '--signal=INT', '--kill-after=30s', '25m', *selected_command], 'instrumentation', 1535)
         test_code = r['code'] if r['code'] is not None else 124
         if test_code == 0:
             required = OUT / 'required-cases.txt'
-            required.write_text('dev.ipf.whitenoise.android.media.sandbox.MediaWorkerHealthyBaselineDeviceTest#characterizeHealthyDirectStillTransportWithFixedSyntheticCorpus\n')
+            required.write_text('\n'.join([required_case, *state['additional_required_cases']]) + '\n')
             checked = command(['python3', 'scripts/check_instrumented_required_cases.py',
                                'app/build/outputs/androidTest-results/connected', '--required', str(required)], 'required-case', 10)
             test_code = checked['code'] if checked['code'] is not None else 124
+            if test_code == 0 and mode == 'av':
+                reports = list(Path('app/build/outputs/connected_android_test_additional_output').rglob('media-av-paced-performance.jsonl'))
+                if len(reports) != 1:
+                    raise RuntimeError('exactly one retained paced performance report required')
+                state['paced_report'] = str(reports[0])
+                state['paced_report_sha256'] = hashlib.sha256(reports[0].read_bytes()).hexdigest()
+                validated = command(['python3', 'scripts/check_media_av_paced_report.py', str(reports[0])],
+                                    'paced-report-validation', 10)
+                test_code = validated['code'] if validated['code'] is not None else 124
+
     except Exception as error:
+        if test_code == 0:
+            test_code = 2
         state['setup_error'] = str(error)
         state['setup_error_class'] = type(error).__name__
     finally:
@@ -239,5 +284,7 @@ if __name__ == '__main__':
         start()
     elif sys.argv[1:] == ['run']:
         sys.exit(run())
+    elif len(sys.argv) == 3 and sys.argv[1] == 'run-av' and sys.argv[2] in ('30', '36'):
+        sys.exit(run('av', sys.argv[2]))
     else:
         raise SystemExit('Expected run or start; no arbitrary command')

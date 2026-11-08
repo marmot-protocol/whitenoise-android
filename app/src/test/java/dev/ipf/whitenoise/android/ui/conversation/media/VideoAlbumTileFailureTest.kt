@@ -88,7 +88,7 @@ class VideoAlbumTileFailureTest {
             offers(R.string.media_tap_to_retry)
         }
 
-        composeRule.onAllNodesWithContentDescription(text(R.string.voice_message_failed)).assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription(text(R.string.video_failed)).assertCountEquals(0)
     }
 
     /** True once a node carries the [label] string resource as its content description. */

@@ -22,7 +22,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.VolumeOff
@@ -36,7 +35,7 @@ private val TRANSPORT_ICON = 32.dp
 
 /** Toggles playback, restarting from the head once the clip has run to its end. */
 @Composable
-internal fun DraftVideoPlayPauseButton(player: ExoPlayer) {
+internal fun DraftVideoPlayPauseButton(player: Player) {
     var playing by remember(player) { mutableStateOf(player.isPlaying) }
     var ended by remember(player) { mutableStateOf(player.playbackState == Player.STATE_ENDED) }
     DisposableEffect(player) {
@@ -71,7 +70,7 @@ internal fun DraftVideoPlayPauseButton(player: ExoPlayer) {
 
 /** Steps playback back by the fixed seek interval, never below the head of the clip. */
 @Composable
-internal fun DraftVideoSeekBackButton(player: ExoPlayer) {
+internal fun DraftVideoSeekBackButton(player: Player) {
     DraftVideoIconButton(
         icon = Icons.Default.Replay10,
         description = stringResource(R.string.video_seek_back),
@@ -83,7 +82,7 @@ internal fun DraftVideoSeekBackButton(player: ExoPlayer) {
 
 /** Steps playback forward by the fixed seek interval, stopping at the end of the clip. */
 @Composable
-internal fun DraftVideoSeekForwardButton(player: ExoPlayer) {
+internal fun DraftVideoSeekForwardButton(player: Player) {
     DraftVideoIconButton(
         icon = Icons.Default.Forward10,
         description = stringResource(R.string.video_seek_forward),
@@ -96,7 +95,7 @@ internal fun DraftVideoSeekForwardButton(player: ExoPlayer) {
 
 /** Cycles the playback rate and labels itself with the rate now in effect. */
 @Composable
-internal fun DraftVideoSpeedButton(player: ExoPlayer) {
+internal fun DraftVideoSpeedButton(player: Player) {
     var speed by remember(player) { mutableFloatStateOf(player.playbackParameters.speed) }
     val label = stringResource(R.string.video_playback_speed)
     TextButton(
@@ -116,7 +115,7 @@ internal fun DraftVideoSpeedButton(player: ExoPlayer) {
 
 /** Silences or restores the clip's audio without disturbing its position. */
 @Composable
-internal fun DraftVideoMuteButton(player: ExoPlayer) {
+internal fun DraftVideoMuteButton(player: Player) {
     var muted by remember(player) { mutableStateOf(player.volume == 0f) }
     DraftVideoIconButton(
         icon = if (muted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,

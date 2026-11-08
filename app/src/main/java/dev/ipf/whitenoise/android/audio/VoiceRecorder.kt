@@ -34,6 +34,12 @@ internal interface VoiceRecordingSession {
 
     /** Discards capture without handing a file to the review owner. */
     fun cancel()
+
+    /** Suspends capture in place; the take continues in the same file on [resume]. */
+    fun pause() {}
+
+    /** Continues a paused take. */
+    fun resume() {}
 }
 
 internal data class VoiceRecordingResult(
@@ -48,6 +54,8 @@ internal class VoiceRecorder(
 ) : VoiceRecordingSession {
     private var recorder: MediaRecorder? = null
     private var startedAtNanos: Long = 0L
+    private var pausedAtNanos: Long? = null
+    private var pausedTotalNanos: Long = 0L
 
     @Volatile
     override var captureInterrupted: Boolean = false
@@ -103,6 +111,8 @@ internal class VoiceRecorder(
             r.start()
             recorder = r
             startedAtNanos = System.nanoTime()
+            pausedAtNanos = null
+            pausedTotalNanos = 0L
         } catch (t: Throwable) {
             // The MediaRecorder state machine is unforgiving: a failed
             // prepare/start leaves the instance unusable, so release it and
@@ -124,8 +134,10 @@ internal class VoiceRecorder(
         val r = recorder ?: return null
         recorder = null
         return try {
+            val stoppedAtNanos = pausedAtNanos ?: System.nanoTime()
             r.stop()
-            val durationMs = ((System.nanoTime() - startedAtNanos) / 1_000_000L).coerceAtLeast(0L)
+            val capturedNanos = stoppedAtNanos - startedAtNanos - pausedTotalNanos
+            val durationMs = (capturedNanos / 1_000_000L).coerceAtLeast(0L)
             release(r)
             if (outputFile.length() <= 0L) {
                 runCatching { outputFile.delete() }
@@ -155,6 +167,21 @@ internal class VoiceRecorder(
         runCatching { r.stop() }
         release(r)
         runCatching { outputFile.delete() }
+    }
+
+    override fun pause() {
+        val r = recorder ?: return
+        if (pausedAtNanos != null) return
+        r.pause()
+        pausedAtNanos = System.nanoTime()
+    }
+
+    override fun resume() {
+        val r = recorder ?: return
+        val pausedAt = pausedAtNanos ?: return
+        r.resume()
+        pausedTotalNanos += System.nanoTime() - pausedAt
+        pausedAtNanos = null
     }
 
     /** Retires the recording callback before releasing the native recorder. */

@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.media
 
+import dev.ipf.whitenoise.android.appModuleFile
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -198,7 +199,7 @@ class VideoMetadataScrubberFixtureTest {
     @Test
     fun deviceAssetsMatchTheJvmFixtures() {
         VIDEO_FIXTURES.forEach { name ->
-            val asset = File("src/androidTest/assets/video-metadata/$name.b64").readBytes()
+            val asset = appModuleFile("src/androidTest/assets/video-metadata/$name.b64").readBytes()
             val stream = checkNotNull(javaClass.getResourceAsStream("/video-metadata/$name.b64"))
             val resource = stream.use { it.readBytes() }
             assertArrayEquals(name, resource, asset)

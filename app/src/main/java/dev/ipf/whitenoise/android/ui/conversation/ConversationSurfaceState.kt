@@ -11,18 +11,21 @@ import dev.ipf.whitenoise.android.ui.chats.decodeGlobalSearchState
 import dev.ipf.whitenoise.android.ui.chats.encodeGlobalSearchState
 
 private const val SAVED_SEARCH_STATE_INDEX = 6
+private const val SAVED_COMPOSER_SETTINGS_INDEX = 7
 
 /**
  * Controller-scoped presentation shared by the shell and its conversation.
  *
- * Details and search controls enter Android saved state for configuration recreation.
+ * Details, composer settings and search controls enter Android saved state for configuration recreation.
  * Selection, navigation jobs and backfill remain transient; none enters protocol storage.
  */
 internal class ConversationSurfaceState(
     showDetailsInitially: Boolean = false,
     searchInitially: GlobalSearchState = GlobalSearchState(),
+    showComposerSettingsInitially: Boolean = false,
 ) {
     val showDetails = mutableStateOf(showDetailsInitially)
+    val showComposerSettings = mutableStateOf(showComposerSettingsInitially)
     val searchOpen = mutableStateOf(searchInitially.isOpen)
     val searchState = mutableStateOf(searchInitially)
     val initialTimelineBackfillNoProgress = mutableStateOf(false)
@@ -48,6 +51,7 @@ internal fun conversationSurfaceStateSaver(
                 runtimeGeneration,
                 state.showDetails.value,
                 encodeGlobalSearchState(state.searchState.value.copy(isOpen = state.searchOpen.value)),
+                state.showComposerSettings.value,
             )
         },
         restore = { saved ->
@@ -65,6 +69,10 @@ internal fun conversationSurfaceStateSaver(
                     } else {
                         GlobalSearchState()
                     },
+                showComposerSettingsInitially =
+                    identityMatches &&
+                        saved.size > SAVED_COMPOSER_SETTINGS_INDEX &&
+                        saved[SAVED_COMPOSER_SETTINGS_INDEX] as Boolean,
             )
         },
     )

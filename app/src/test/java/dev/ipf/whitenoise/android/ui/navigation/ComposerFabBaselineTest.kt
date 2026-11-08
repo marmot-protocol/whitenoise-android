@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.navigation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -15,6 +16,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
@@ -25,6 +28,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -34,6 +38,7 @@ import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.MessageTextCopy
 import dev.ipf.whitenoise.android.ui.chats.ChatsNewMessageFabContent
 import dev.ipf.whitenoise.android.ui.conversation.composer.COMPOSER_PILL_SURFACE_TAG
+import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerActionRowHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerBar
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
@@ -81,6 +86,57 @@ class ComposerFabBaselineTest {
         assertBaseline(name = "relay_warning", missingRelays = true, navigationBottomPx = 48)
     }
 
+    /** A retained portrait composer cannot move the home pen behind the current landscape header. */
+    @Test
+    @Config(sdk = [36], qualifiers = "en-w640dp-h360dp-mdpi")
+    fun tallRetainedComposerStaysInsideShortViewport() {
+        val height = mutableStateOf(1000.dp)
+        val contentTop = mutableStateOf<Float?>(null)
+        var measuredContentTop: Float? = null
+        rule.setContent {
+            WhiteNoiseTheme {
+                CompositionLocalProvider(LocalComposerFabHeight provides height) {
+                    Scaffold(
+                        topBar = { Box(Modifier.height(96.dp)) },
+                        floatingActionButton = {
+                            ChatsNewMessageFabContent(false, minimumTopInWindow = contentTop) {}
+                        },
+                    ) { padding ->
+                        Box(
+                            Modifier
+                                .fillMaxSize()
+                                .padding(padding)
+                                .onPlaced { measuredContentTop = it.positionInWindow().y }
+                                .testTag(VIEWPORT),
+                        )
+                    }
+                }
+            }
+        }
+        rule.waitForIdle()
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val body = rule.onNodeWithTag(VIEWPORT).fetchSemanticsNode().boundsInWindow
+        val initialPen =
+            rule
+                .onNodeWithContentDescription(context.getString(R.string.new_message))
+                .fetchSemanticsNode()
+                .boundsInWindow
+        assertTrue("Missing current measurement keeps the pen below the header", initialPen.top >= body.top)
+        assertTrue("The initial pen stays inside the body", initialPen.bottom <= body.bottom + 1.1f)
+        rule.runOnIdle { contentTop.value = requireNotNull(measuredContentTop) }
+        rule.waitForIdle()
+        val pen =
+            rule
+                .onNodeWithContentDescription(context.getString(R.string.new_message))
+                .fetchSemanticsNode()
+                .boundsInWindow
+        assertEquals("The tall retained reference clamps to the actual content boundary", body.top, pen.top, 1.1f)
+        assertTrue("The complete pen stays inside the current body", pen.bottom <= body.bottom + 1.1f)
+        assertEquals("Viewport clamping keeps the pen width", 48f, pen.width, 1.1f)
+        assertEquals("Viewport clamping keeps the pen height", 48f, pen.height, 1.1f)
+        rule.onRoot().captureRoboImage("src/test/snapshots/composer_fab_retained_tall_short_viewport.png")
+    }
+
     /** Keeps endpoint swaps and measured assertions in one inset-aware fixture with shared state. */
     @Suppress("LongMethod", "LongParameterList")
     private fun assertBaseline(
@@ -99,6 +155,7 @@ class ComposerFabBaselineTest {
         var fill = 0
         var actualNavigationBottom = 0
         val anchor = FloatingDictationAnchor()
+        val composerHeight = mutableStateOf(ComposerActionRowHeight)
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val layoutDirection = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
         rule.setContent {
@@ -109,7 +166,10 @@ class ComposerFabBaselineTest {
                     rootView = LocalView.current.rootView
                     density = LocalDensity.current.density
                     actualNavigationBottom = WindowInsets.navigationBars.getBottom(LocalDensity.current)
-                    CompositionLocalProvider(LocalFloatingDictationAnchor provides anchor) {
+                    CompositionLocalProvider(
+                        LocalFloatingDictationAnchor provides anchor,
+                        LocalComposerFabHeight provides composerHeight,
+                    ) {
                         Box(Modifier.fillMaxSize().testTag(VIEWPORT)) {
                             if (composer) {
                                 ComposerBar(
@@ -189,6 +249,19 @@ class ComposerFabBaselineTest {
         if (fontScale == 1f) {
             assertEquals("Normal resting outlines share the exact top edge", pill.top, fab.top, 1.1f)
         }
+        rule.runOnIdle { composer = false }
+        rule.waitForIdle()
+        rule.onRoot().captureRoboImage("src/test/snapshots/composer_fab_baseline_${name}_returning_pen.png")
+        val returningPen =
+            rule.onNodeWithContentDescription(context.getString(description)).fetchSemanticsNode().boundsInWindow
+        assertEquals("The pen retains the last real composer upper edge", pill.top, returningPen.top, 1.1f)
+        assertEquals("Retaining composer height must not resize the pen", fab.size, returningPen.size)
+        assertEquals(
+            "Dictation follows the raised visible pen",
+            returningPen.top,
+            requireNotNull(anchor.topInWindow),
+            1.1f,
+        )
     }
 
     /** Samples a straight top border and its adjacent fill, explicitly outside corners and the resize grip. */

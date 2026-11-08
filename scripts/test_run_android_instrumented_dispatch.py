@@ -1,6 +1,9 @@
 """Behavioral tests for explicitly dispatched Android instrumented suites."""
 import pathlib
+import importlib.util
 import subprocess
+import sys
+import xml.etree.ElementTree as ET
 import tempfile
 import unittest
 
@@ -102,6 +105,129 @@ class InstrumentedDispatchTest(unittest.TestCase):
         self.assertNotIn("PullRequestDeviceSmoke", output)
         with self.assertRaises(subprocess.CalledProcessError):
             self.run_dispatch("workflow_dispatch", "false", "false", "false", "true", fail_required=True)
+
+    def test_native_sandbox_player_and_corpus_are_selected_and_required(self):
+        """Native sandbox player and corpus are selected and required."""
+        directory = ROOT / "app/src/androidTest/java/dev/ipf/whitenoise/android/media/sandbox"
+        methods = {
+            "NativeMediaSandboxDeviceTest": (
+                "installerCoversExistingAndNewJavaAndNativeThreads",
+                "clone3IsDeniedOrThePlatformTerminatesItsDedicatedWorker",
+                "blockedNativeReadEndsWithObservedOsProcessDisappearance"),
+            "IsolatedAttachmentPlayerDeviceTest": (
+                "pausedSeekingSpeedPauseAndRepeatUseRealRawPlayback",
+                "pixelCopyBufferOutlivesTimedOutRequestUntilItsCallback",
+                "tinyRawSonicEosProducesNonzeroPcmAndDrainsTheUnityDeviceAtQuarterSpeed",
+                "quarterSpeedRawPcmRefillsAfterAnInteriorUnderrunWithoutResettingTheMediaClock"),
+            "MediaAvNativeCorpusDeviceTest": (
+                "commonVideoFormatsReturnRedPixelsFromFreshRestrictedWorkers",
+                "commonAudioFormatsReturnFiniteWaveformsAndDurations",
+                "silentAudioReturnsNoWaveformFromFreshRestrictedWorker"),
+        }
+        focused = self.run_dispatch("workflow_dispatch", "false", "false", "false", "true")
+        for name, names in methods.items():
+            source = (directory / (name + ".kt")).read_text()
+            self.assertIn("@MediaContainmentAcceptance", source)
+            self.assertIn("@PullRequestDeviceSmoke", source)
+            for method in names:
+                self.assertIn("fun " + method + "()", source)
+                case = "dev.ipf.whitenoise.android.media.sandbox." + name + "#" + method
+                self.assertIn(case, focused)
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.run_dispatch("workflow_dispatch", "false", "false", "false", "true", fail_app=True)
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.run_dispatch("workflow_dispatch", "false", "false", "false", "true", fail_required=True)
+
+    def test_production_performance_stays_required_without_joining_pr_smoke(self):
+        """Actual source annotations and consumed selectors keep expensive measurements in qualification lanes."""
+        name = "MediaAvPerformanceDeviceTest"
+        case = "dev.ipf.whitenoise.android.media.sandbox." + name + "#measureProductionCostsOnUnchangedCorpus"
+        directory = ROOT / "app/src/androidTest/java/dev/ipf/whitenoise/android/media/sandbox"
+        source = (directory / (name + ".kt")).read_text()
+        self.assertIn("@MediaContainmentAcceptance", source)
+        self.assertNotIn("@PullRequestDeviceSmoke", source)
+        self.assertNotIn("@ManualDeviceFixture", source)
+        smoke = self.run_dispatch("pull_request")
+        self.assertIn("RunnerArguments.annotation=dev.ipf.whitenoise.android.PullRequestDeviceSmoke", smoke)
+        self.assertNotIn(case, smoke)
+        for api in ("30", "36"):
+            focused = self.run_dispatch("workflow_dispatch", "false", "false", "false", "true",
+                                        "false", "false", "false", api)
+            annotation = "dev.ipf.whitenoise.android.media.sandbox.MediaContainmentAcceptance"
+            self.assertIn("RunnerArguments.annotation=" + annotation, focused)
+            self.assertIn(case, focused)
+        # The AV producer keeps this exact raw method required while selecting its three methods by annotation.
+        spec = importlib.util.spec_from_file_location("hosted_av_selection", ROOT / "scripts/hosted-startup-trace.py")
+        trace = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(trace)
+        for api in ("30", "36"):
+            _, command, required = trace.selection("av", api)
+            self.assertEqual(case, required)
+            self.assertIn('-Pandroid.testInstrumentationRunnerArguments.annotation=' + trace.AV_ANNOTATION, command)
+            self.assertFalse(any(value.startswith('-Pandroid.testInstrumentationRunnerArguments.class=')
+                                 for value in command))
+
+    def test_streaming_trace_modes_keep_ring_buffer_flush_and_bounded_capture(self):
+        """Actual mode selectors retain bounded streaming and explicit producer flush."""
+        spec = importlib.util.spec_from_file_location("hosted_streaming_trace", ROOT / "scripts/hosted-startup-trace.py")
+        trace = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(trace)
+        for mode, api in (("healthy", "30"), ("av", "30"), ("av", "36")):
+            with self.subTest(mode=mode, api=api):
+                config, command, required = trace.selection(mode, api)
+                self.assertIn("buffers { size_kb: 65536 fill_policy: RING_BUFFER }", config)
+                self.assertIn("write_into_file: true", config)
+                self.assertIn("file_write_period_ms: 1000", config)
+                self.assertEqual(1, config.count("flush_period_ms: 1000"))
+                self.assertIn("max_file_size_bytes: 134217728", config)
+                self.assertIn("duration_ms: " + ("600000" if mode == "av" else "120000"), config)
+                if mode == "av":
+                    self.assertIn("proc_stats_poll_ms: 100", config)
+                    self.assertIn("-Pandroid.testInstrumentationRunnerArguments.annotation=" + trace.AV_ANNOTATION, command)
+                    self.assertEqual(trace.AV_CASE, required)
+                else:
+                    self.assertEqual(trace.LEGACY_CASE, required)
+
+    def test_actual_checker_rejects_missing_or_skipped_selected_native_case(self):
+        """Actual checker rejects missing or skipped selected native case."""
+        for api in ("30", "36"):
+            focused = self.run_dispatch("workflow_dispatch", "false", "false", "false", "true", "false", "false", "false", api)
+            cases = [line for line in focused.splitlines() if line.startswith("dev.ipf.") and "#" in line]
+            native = [line for line in cases if any("." + name + "#" in line for name in (
+                "NativeMediaSandboxDeviceTest", "IsolatedAttachmentPlayerDeviceTest", "MediaAvNativeCorpusDeviceTest",
+                "MediaAvPerformanceDeviceTest"))]
+            self.assertEqual(11, len(native))
+            for method in ("tinyRawSonicEosProducesNonzeroPcmAndDrainsTheUnityDeviceAtQuarterSpeed",
+                           "quarterSpeedRawPcmRefillsAfterAnInteriorUnderrunWithoutResettingTheMediaClock",
+                           "measureProductionCostsOnUnchangedCorpus",
+                           "silentAudioReturnsNoWaveformFromFreshRestrictedWorker"):
+                self.assertTrue(any(case.endswith("#" + method) for case in native))
+            with tempfile.TemporaryDirectory() as temporary:
+                root = pathlib.Path(temporary)
+                required = root / "required.txt"
+                required.write_text("\n".join(cases) + "\n")
+
+                def run(missing=None, skipped=None):
+                    """Invoke the real selected-case checker on task-owned fixture files and retain its result."""
+                    suite = ET.Element("testsuite")
+                    for case in cases:
+                        if case == missing:
+                            continue
+                        classname, method = case.split("#")
+                        entry = ET.SubElement(suite, "testcase", classname=classname, name=method)
+                        if case == skipped:
+                            ET.SubElement(entry, "skipped")
+                    ET.ElementTree(suite).write(root / "results.xml")
+                    return subprocess.run([sys.executable, str(ROOT / "scripts/check_instrumented_required_cases.py"),
+                                           str(root), "--required", str(required)], capture_output=True, text=True)
+
+                self.assertEqual(0, run().returncode)
+                for case in native:
+                    for condition in ("missing", "skipped"):
+                        with self.subTest(case=case, condition=condition):
+                            result = run(**{condition: case})
+                            self.assertNotEqual(0, result.returncode)
+                            self.assertIn(case, result.stderr)
 
     def test_baseline_is_required_in_focused_containment_and_excluded_from_pr_smoke(self):
         """Check real class annotations plus the dispatcher's actual required-case selection."""

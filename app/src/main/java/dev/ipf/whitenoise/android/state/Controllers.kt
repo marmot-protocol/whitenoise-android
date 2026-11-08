@@ -3115,6 +3115,9 @@ class ChatsController private constructor(
     // projection.
     fun containsGroup(groupIdHex: String): Boolean = chatRowsByGroup.containsKey(chatRowKey(groupIdHex))
 
+    /** Lowercase IDs of every chat the bounded windows retain, as a read-only view of the raw rows. */
+    internal fun retainedGroupIds(): Set<String> = chatRowsByGroup.keys
+
     /**
      * Chats the active account can forward a message into, recent first.
      *
@@ -3359,7 +3362,7 @@ class ChatsController private constructor(
 
     /**
      * Replaces the chat-list window and refreshes mounted conversation metadata. [activeWindow], when known,
-     * classifies rows that left because they now rank past its retained tail as evictions rather than removals.
+     * classifies rows that left because they now rank outside its retained span as evictions rather than removals.
      */
     private fun replaceChatRows(
         incoming: List<ChatListRowFfi>,
@@ -3408,8 +3411,10 @@ class ChatsController private constructor(
         memberFetchRetryBackoffTierByGroup.keys.retainAll(liveGroupIds)
         failedMemberFetches.retainAll(liveGroupIds)
         if (previousKeys != chatRowsByGroup.keys.toSet()) {
-            // A bounded window evicts its tail whenever an off-window chat moves in. That chat still exists, so an
-            // earlier full read still covers it; only a row the window should still hold is an ambiguous removal.
+            // A bounded window evicts its tail whenever an off-window chat moves in, and a scrolled window also
+            // evicts past its first row. Those chats still exist, so an earlier full read still covers them; only a
+            // row the window's span should still hold is an ambiguous removal. A frame carries no new keys for a
+            // dropped row, so a mid-list chat that rose to the head on a new message counts as ambiguous too.
             val dropped =
                 previousRowsByGroup.any { (key, row) ->
                     key !in chatRowsByGroup && !row.evictedFrom(activeWindow)
@@ -4641,6 +4646,45 @@ class ChatsController private constructor(
         val eligibleOwner = ownsBinding && ownsSession
         val eligibleSession = selectedOrLegacy && available
         return eligibleOwner && eligibleSession
+    }
+
+    /**
+     * The complete native membership of [view] for select all (#2925), or null when this owner is stale.
+     * MDK throws ChatPresentationNotReady rather than returning a partial list; callers retry.
+     */
+    internal suspend fun completeChatListIds(
+        view: ChatListViewFfi,
+        owner: ChatListActionOwner,
+    ): List<String>? {
+        val read = liveSubscriptions.chatListIds?.takeIf { chatListActionIsCurrent(owner) } ?: return null
+        val ids = read(owner.accountRef, view)
+        return ids.takeIf { chatListActionIsCurrent(owner) }
+    }
+
+    /**
+     * Drops captured IDs that left [view]; keeps caller order and never adds chats (#2925). Departed groups
+     * render inside Chats and Archived but MDK places them in LEFT, so a loaded departed row that was
+     * selected stays selected while it is still departed.
+     */
+    internal suspend fun revalidateCompleteChatListIds(
+        view: ChatListViewFfi,
+        groupIds: List<String>,
+        owner: ChatListActionOwner,
+    ): List<String>? {
+        val revalidate = liveSubscriptions.revalidateChatListIds?.takeIf { chatListActionSessionIsCurrent(owner) }
+        return when {
+            groupIds.isEmpty() -> emptyList()
+            revalidate == null -> null
+            else -> {
+                val kept = revalidate(owner.accountRef, view, groupIds).mapTo(hashSetOf()) { it.lowercase(Locale.ROOT) }
+                val outside = groupIds.filter { it.lowercase(Locale.ROOT) !in kept }
+                if (outside.isNotEmpty()) {
+                    revalidate(owner.accountRef, ChatListViewFfi.LEFT, outside)
+                        .mapTo(kept) { it.lowercase(Locale.ROOT) }
+                }
+                groupIds.filter { it.lowercase(Locale.ROOT) in kept }.takeIf { chatListActionSessionIsCurrent(owner) }
+            }
+        }
     }
 
     /** Resolves a displayed full-list row without materializing it into the bounded controller window. */

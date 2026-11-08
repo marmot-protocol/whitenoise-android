@@ -1,0 +1,17 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/state/TtsTimingPreferences.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "source_coverage": [
+      {
+        "surface": "Read-aloud controller receives the headphone-disconnect listener",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/TtsTimingPreferences.kt",
+        "anchor": "noisyRoutes = AndroidNoisyAudioRouteRegistrar(context),",
+        "test_ids": [
+          "MED-047"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

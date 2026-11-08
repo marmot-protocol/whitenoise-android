@@ -17,7 +17,8 @@ import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
-@Suppress("TooManyFunctions") // One codec protocol; vector inspection/rendering retain the same isolated transport.
+// One isolated codec protocol owns raster, vector and AV worker lifecycle.
+@Suppress("TooManyFunctions")
 internal interface MediaDecodeTransport {
     fun decode(
         bytes: ByteArray,
@@ -64,6 +65,13 @@ internal interface MediaDecodeTransport {
     fun probeUri(
         resolver: android.content.ContentResolver,
         uri: android.net.Uri,
+        edge: Int,
+    ): MediaProbe? = null
+
+    fun probeUriAt(
+        resolver: android.content.ContentResolver,
+        uri: android.net.Uri,
+        positionMs: Long,
         edge: Int,
     ): MediaProbe? = null
 
@@ -742,5 +750,6 @@ internal data class MediaDecodeRequest(
     val offset: Long = 0L,
     val length: Long? = null,
     val region: MediaImageRegion? = null,
+    val positionUs: Long = 0L,
     val svgRegion: ViewerSvgRegion? = null,
 )

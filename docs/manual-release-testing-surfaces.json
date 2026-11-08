@@ -2,6 +2,7 @@
   "base_revision": "d2417ce5c7c6a3cb1512d3a1037487e931be83e7",
   "categories": {
     "composable_surfaces": [
+      {"surface": "AttachmentPreparationStatus", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/AttachmentPreparationStatus.kt", "anchor": "fun AttachmentPreparationStatus(", "test_ids": ["MED-001"]},
       {"surface": "Current viewport card ceiling", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardLayout.kt", "anchor": "fun nostrEventPreviewMaximumHeight(", "test_ids": ["RDR-005"]},
       {"surface": "NostrEventCardLayout", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardLayout.kt", "anchor": "fun NostrEventCardLayout(", "test_ids": ["RDR-005"]},
       {"surface": "NostrEventCardViewport", "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/nostr/NostrEventCardLayout.kt", "anchor": "fun NostrEventCardViewport(", "test_ids": ["RDR-005"]},

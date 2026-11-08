@@ -144,7 +144,7 @@ class MessageBubbleCustomReplyScreenshotTest : MessageBubbleFileAttachmentFixtur
                 }
             }
         }
-        composeRule.onAllNodesWithText("Parent message").assertCountEquals(rows.size)
+        composeRule.onAllNodesWithText("Parent message", substring = true).assertCountEquals(rows.size)
         composeRule.onNodeWithText("Custom sent text").assertExists()
         composeRule.onNodeWithText("Custom received text").assertExists()
         composeRule.onNodeWithText("Custom sent caption").assertExists()

@@ -6,12 +6,17 @@ import android.graphics.Color
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalCursorBlinkEnabled
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -114,24 +119,170 @@ class EmojiPickerRecentsBehaviorTest {
             }
         }
         waitForBrowseGrid()
-        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).performClick()
-        composeRule.waitForIdle()
+        openComposerSearch()
         composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).performTextInput("happy")
         composeRule.waitForIdle()
-        var found = false
-        repeat(100) {
-            if (found) return@repeat
-            composeRule.waitForIdle()
-            runCatching {
-                composeRule.onNodeWithText("😀").assertIsDisplayed()
-                found = true
-            }
-            if (!found) Thread.sleep(20)
-        }
+        composeRule.waitUntil(5_000) { isDisplayed("😀") }
         composeRule.onNodeWithText("😀").performClick()
         composeRule.waitForIdle()
 
         assertEquals(listOf("😀", "👍", "😂"), owner.recents)
+    }
+
+    /**
+     * The composer's search row keeps the query and focus after a pick, so several emoji can be
+     * added in a row, and each one is recorded as used (#3613).
+     */
+    @Test
+    fun composerSearchRowPickKeepsQueryAndRecordsRecent() {
+        val owner =
+            RecentEmojiRecentsOwner(
+                scope = scope,
+                loadFromDisk = { listOf("👍") },
+                saveToDisk = {},
+            )
+        runBlocking { owner.hydrateFromDisk() }
+        val picked = mutableListOf<String>()
+        composeRule.setContent {
+            var searchRow by remember { mutableStateOf(false) }
+            WhiteNoiseTheme {
+                ComposerEmojiPickerPane(
+                    height = ComposerEmojiPickerFallbackHeight,
+                    alpha = 1f,
+                    recentEmojis = owner.recents,
+                    onEmojiUsed = owner::onEmojiUsed,
+                    onEmojiPicked = { picked += it },
+                    onBackspace = {},
+                    onSearchActiveChange = { if (it) searchRow = true },
+                    searchRow = searchRow,
+                    modifier = Modifier.width(360.dp),
+                )
+            }
+        }
+        waitForBrowseGrid()
+        openComposerSearch()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).performTextInput("happy")
+        composeRule.waitUntil(5_000) { isDisplayed("😀") }
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_ROW_TEST_TAG).assertIsDisplayed()
+        composeRule
+            .onAllNodesWithTag(emojiPickerHeaderTestTag(EmojiCategory.SmileysAndPeople), useUnmergedTree = true)
+            .assertCountEquals(0)
+
+        composeRule.onNodeWithText("😀").performClick()
+        composeRule.onNodeWithText("😀").performClick()
+        composeRule.waitForIdle()
+
+        assertEquals(listOf("😀", "😀"), picked)
+        assertEquals(listOf("😀", "👍"), owner.recents)
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertIsFocused()
+        composeRule.onNodeWithText("happy").assertIsDisplayed()
+    }
+
+    /**
+     * The search row reports its own height, not the pane's minimum, so the composer's
+     * keyboard-plus-row target cannot grow from its own size while it animates.
+     */
+    @Test
+    fun composerSearchRowReportsItsOwnHeightUnderATallMinimum() {
+        var reported = 0.dp
+        composeRule.setContent {
+            var searchRow by remember { mutableStateOf(false) }
+            WhiteNoiseTheme {
+                ComposerEmojiPickerPane(
+                    height = ComposerEmojiPickerFallbackHeight,
+                    alpha = 1f,
+                    recentEmojis = emptyList(),
+                    onEmojiUsed = {},
+                    onEmojiPicked = {},
+                    onBackspace = {},
+                    onSearchActiveChange = { if (it) searchRow = true },
+                    searchRow = searchRow,
+                    searchMinHeight = 600.dp,
+                    onSearchRowHeightChange = { reported = it },
+                    modifier = Modifier.width(360.dp),
+                )
+            }
+        }
+        waitForBrowseGrid()
+        openComposerSearch()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_ROW_TEST_TAG).assertIsDisplayed()
+
+        assertTrue("reported $reported", reported > 0.dp && reported < 200.dp)
+    }
+
+    /**
+     * The composer pane opens on the full grid; its search icon opens a focused search field, and
+     * closing that field returns to browsing with the query cleared (#3613).
+     */
+    @Test
+    fun composerSearchOpensFromIconAndClosesBackToBrowsing() {
+        val searchActive = mutableListOf<Boolean>()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ComposerEmojiPickerPane(
+                    height = ComposerEmojiPickerFallbackHeight,
+                    alpha = 1f,
+                    recentEmojis = emptyList(),
+                    onEmojiUsed = {},
+                    onEmojiPicked = {},
+                    onBackspace = {},
+                    onSearchActiveChange = { searchActive += it },
+                    modifier = Modifier.width(360.dp),
+                )
+            }
+        }
+        waitForBrowseGrid()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertDoesNotExist()
+
+        openComposerSearch()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertIsFocused()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_OPEN_TEST_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).performTextInput("happy")
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_CLOSE_TEST_TAG, useUnmergedTree = true).performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertDoesNotExist()
+        composeRule.onNodeWithText("happy").assertDoesNotExist()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_OPEN_TEST_TAG).assertIsDisplayed()
+        assertEquals(false, searchActive.last())
+
+        openComposerSearch()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertIsFocused()
+        composeRule.onNodeWithText("happy").assertDoesNotExist()
+    }
+
+    /** While the composer still holds its one-row mode, closing keeps the matches until the row is released. */
+    @Test
+    fun composerSearchCloseWaitsForRowModeToEnd() {
+        var row by mutableStateOf(false)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ComposerEmojiPickerPane(
+                    height = ComposerEmojiPickerFallbackHeight,
+                    alpha = 1f,
+                    recentEmojis = emptyList(),
+                    onEmojiUsed = {},
+                    onEmojiPicked = {},
+                    onBackspace = {},
+                    onSearchActiveChange = { if (it) row = true },
+                    modifier = Modifier.width(360.dp),
+                    searchRow = row,
+                )
+            }
+        }
+        waitForBrowseGrid()
+        openComposerSearch()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).performTextInput("happy")
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_CLOSE_TEST_TAG, useUnmergedTree = true).performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertIsDisplayed()
+        composeRule.onNodeWithText("happy").assertIsDisplayed()
+
+        row = false
+        composeRule.waitForIdle()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_TEST_TAG).assertDoesNotExist()
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_OPEN_TEST_TAG).assertIsDisplayed()
     }
 
     /** Choosing an emoji while configuring quick reactions does not count as using it. */
@@ -279,16 +430,21 @@ class EmojiPickerRecentsBehaviorTest {
         return CustomEmojiSet(listOf(CustomEmoji(":party:", File("party.png"), bitmap.asImageBitmap())))
     }
 
+    /** Opens the composer pane's search from its category bar icon. */
+    private fun openComposerSearch() {
+        composeRule.onNodeWithTag(EMOJI_PICKER_SEARCH_OPEN_TEST_TAG).performClick()
+        composeRule.waitForIdle()
+    }
+
     /** Waits until the browse grid is composed. */
     private fun waitForBrowseGrid() {
-        repeat(100) {
-            composeRule.waitForIdle()
-            runCatching {
-                composeRule.onNodeWithText(string(R.string.emoji_category_smileys_people)).assertIsDisplayed()
-                composeRule.onNodeWithText("😀").assertIsDisplayed()
-            }.onSuccess { return }
-            Thread.sleep(20)
+        composeRule.waitUntil(5_000) {
+            isDisplayed(string(R.string.emoji_category_smileys_people)) && isDisplayed("😀")
         }
-        error("Emoji browse grid did not load")
+    }
+
+    private fun isDisplayed(text: String): Boolean {
+        val node = composeRule.onNodeWithText(text)
+        return runCatching { node.assertIsDisplayed() }.isSuccess
     }
 }

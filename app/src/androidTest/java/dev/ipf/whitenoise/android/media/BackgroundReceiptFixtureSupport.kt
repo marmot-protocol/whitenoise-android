@@ -1,6 +1,10 @@
 package dev.ipf.whitenoise.android.media
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.os.SystemClock
+import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import androidx.work.WorkInfo
@@ -88,22 +92,103 @@ internal object BackgroundReceiptFixtureSupport {
             events
         }
 
-    /** Turns the emulator's Wi-Fi on or off; the fixture's loopback servers stay reachable through adb either way. */
-    fun setWifiEnabled(enabled: Boolean) {
-        PlatformBackgroundAttachmentProbe.shell("cmd wifi set-wifi-enabled ${if (enabled) "enabled" else "disabled"}")
+    /** One existing network-change budget covers the toggle, commands and real default-network observation. */
+    fun wifiChangeDeadline(): Long = SystemClock.elapsedRealtime() + NETWORK_CHANGE_TIMEOUT_MILLIS
+
+    /** Turns only this fixture emulator's radio on or off; cleanup receives its own bounded deadline. */
+    fun setWifiEnabled(
+        enabled: Boolean,
+        deadline: Long = wifiChangeDeadline(),
+    ) {
+        wifiShell("cmd wifi set-wifi-enabled ${if (enabled) "enabled" else "disabled"}", deadline)
     }
 
-    /** Waits until [state]'s network snapshot for [account] matches Wi-Fi being [enabled]. */
+    /** Waits for the actual default network; command initiation alone supplies no successful observation. */
     suspend fun awaitWifiSnapshot(
         state: WhiteNoiseAppState,
         account: String,
         enabled: Boolean,
+        deadline: Long,
     ) {
-        withTimeout(NETWORK_CHANGE_TIMEOUT_MILLIS) {
-            while ((MediaAutoDownloadNetwork.WiFi in state.automaticAttachmentPolicy(account).networks) != enabled) {
-                delay(50L)
-            }
+        withTimeout(deadline - SystemClock.elapsedRealtime()) {
+            if (enabled) associateWifi(deadline)
+            while (!wifiSnapshotMatches(state, account, enabled)) delay(50L)
+            check(SystemClock.elapsedRealtime() < deadline) { "emulator Wi-Fi observation exceeded its deadline" }
         }
+    }
+
+    /** Initiates one association, never a retry loop, to the AP the host actually observed. */
+    private fun associateWifi(deadline: Long) {
+        val ssid = InstrumentationRegistry.getArguments().getString("fixtureWifiSsidHex")
+        check(ssid != null && Regex("(?:[0-9a-f]{2}){1,32}").matches(ssid)) {
+            "the disposable emulator AP observation is missing"
+        }
+        check(wifiShell("id -u", deadline, asRoot = true).trim() == "0") {
+            "the disposable emulator cannot associate Wi-Fi as root"
+        }
+        val help = wifiShell("cmd wifi help", deadline, asRoot = true)
+        val arguments = wifiAssociationArguments(ssid, help)
+        val result = wifiShell("cmd wifi connect-network $arguments", deadline, asRoot = true)
+        check("Connection initiated" in result) { "emulator Wi-Fi association was not initiated" }
+    }
+
+    /** Hex is supported by newer shells; older shells accept only safe, single-token observed names. */
+    private fun wifiAssociationArguments(
+        ssid: String,
+        help: String,
+    ): String {
+        if (help.lineSequence().any { it.trim().startsWith("-x - Specifies the SSID as hex") }) return "$ssid open -x"
+        val name =
+            ssid
+                .chunked(2)
+                .map { it.toInt(16).toByte() }
+                .toByteArray()
+                .toString(Charsets.US_ASCII)
+        check(Regex("[A-Za-z0-9_.-]{1,32}").matches(name)) {
+            "the emulator shell cannot safely represent this observed AP"
+        }
+        return "$name open"
+    }
+
+    /** A coroutine timeout cannot interrupt a blocking PFD read; toybox owns the command's real deadline. */
+    private fun wifiShell(
+        command: String,
+        deadline: Long,
+        asRoot: Boolean = false,
+    ): String {
+        val remaining = deadline - SystemClock.elapsedRealtime()
+        check(remaining > 0) { "emulator Wi-Fi command deadline expired" }
+        val seconds = remaining.toDouble() / 1000.0
+        val bounded = "/system/bin/toybox timeout -s KILL $seconds $command"
+        // The root timer must be able to signal its root child; a shell-UID timer cannot kill that child.
+        val invocation = if (asRoot) "/system/xbin/su 0 $bounded" else bounded
+        val result = PlatformBackgroundAttachmentProbe.shell(invocation)
+        check(SystemClock.elapsedRealtime() < deadline) { "emulator Wi-Fi command exceeded its deadline" }
+        return result
+    }
+
+    /** Association initiation is not qualification: require the real default, validation and app mirror. */
+    private fun wifiSnapshotMatches(
+        state: WhiteNoiseAppState,
+        account: String,
+        enabled: Boolean,
+    ): Boolean {
+        val appWifi = MediaAutoDownloadNetwork.WiFi in state.automaticAttachmentPolicy(account).networks
+        if (!enabled) return !appWifi
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val manager = context.getSystemService(ConnectivityManager::class.java)
+        val network = manager?.activeNetwork
+        val capabilities = manager?.getNetworkCapabilities(network)
+        val connected =
+            network != null &&
+                network == manager?.activeNetwork &&
+                capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+        val usable =
+            capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true &&
+                capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true &&
+                capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED) == true
+        val mirrored = appWifi && state.hasValidatedInternet()
+        return connected && usable && mirrored
     }
 
     /** Automatic downloads need validated internet; a run without it fails here with a plain reason. */

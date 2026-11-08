@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 
 /** Screen-owned switches survive lazy-item disposal; replacing the account/runtime creates fresh state. */
 internal class AppearancePreviewState {
+    var expanded by mutableStateOf(false)
     var rtl by mutableStateOf(false)
     var largeText by mutableStateOf(false)
 

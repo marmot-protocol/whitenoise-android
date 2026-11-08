@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.audio.tts
 
 import android.os.SystemClock
 import android.speech.tts.TextToSpeech
+import dev.ipf.whitenoise.android.audio.NoisyAudioRouteRegistrar
 import dev.ipf.whitenoise.android.audio.tts.speech.PreparedRenderedHit
 import dev.ipf.whitenoise.android.audio.tts.speech.PreparedSeekResolver
 import dev.ipf.whitenoise.android.audio.tts.speech.PreparedSeekTarget
@@ -89,7 +90,7 @@ internal enum class TtsStartFailure {
  */
 @Suppress("LargeClass", "LongParameterList", "TooManyFunctions")
 class TtsController internal constructor(
-    private val audioFocus: TtsAudioFocus,
+    audioFocus: TtsAudioFocus,
     private val maxChunkLength: Int = TextToSpeech.getMaxSpeechInputLength(),
     // Re-read per utterance so a rate change lands at the next sentence
     // boundary — quieter than re-queueing the current sentence.
@@ -100,11 +101,27 @@ class TtsController internal constructor(
     private val timingStore: TtsTimingStore? = null,
     private val preparationDispatcher: CoroutineDispatcher = Dispatchers.Default,
     private val clock: () -> Long = SystemClock::elapsedRealtime,
+    noisyRoutes: NoisyAudioRouteRegistrar = NoisyAudioRouteRegistrar.None,
 ) {
     private companion object {
         const val MIN_SPEECH_VOLUME = 0f
         const val MAX_SPEECH_VOLUME = 1f
     }
+
+    // Every focus request and release below goes through this wrapper, so the
+    // headphone-disconnect listener lives exactly as long as the focus hold.
+    private val audioFocus = TtsNoisyRouteFocus(audioFocus, noisyRoutes, ::pauseForNoisyRoute)
+
+    /** Advanced by each headphone disconnect; a seek loading across one cannot resume speech. */
+    private val routeSilences =
+        dev.ipf.whitenoise.android.state
+            .StalenessGuard()
+
+    /** Route generation when the pending target seek was deferred. */
+    private var targetSeekRoute = routeSilences.capture()
+
+    /** True while the headphone-disconnect listener is registered. */
+    internal val listensForNoisyRoute: Boolean get() = audioFocus.listening
 
     private val preparation = TtsQueuePreparation(maxChunkLength)
 
@@ -550,6 +567,26 @@ class TtsController internal constructor(
         }
     }
 
+    /**
+     * Headphones disconnected: nothing may continue on the speaker. Speech pauses at its sentence,
+     * a session parked for a seek pauses too, and a first start still preparing is cancelled.
+     */
+    @Synchronized
+    private fun pauseForNoisyRoute() {
+        routeSilences.advance()
+        when (val current = state.value) {
+            is TtsState.Speaking -> pause()
+            is TtsState.Preparing ->
+                if (current.retained is TtsState.Speaking) {
+                    queue.pauseParked()
+                    audioFocus.release()
+                } else {
+                    stop()
+                }
+            is TtsState.Paused, is TtsState.Error, is TtsState.Idle -> Unit
+        }
+    }
+
     @Synchronized
     fun resume() {
         if (state.value !is TtsState.Paused || !acquireAudioFocus()) return
@@ -650,7 +687,13 @@ class TtsController internal constructor(
     }
 
     @Synchronized
-    internal fun deferForTargetSeek(): Boolean = queue.deferForTargetSeek()
+    internal fun deferForTargetSeek(): Boolean {
+        targetSeekRoute = routeSilences.capture()
+        return queue.deferForTargetSeek()
+    }
+
+    /** A tap-to-jump resumes a paused session unless headphones disconnected while its target loaded. */
+    private fun targetSeekMayResume(): Boolean = routeSilences.isCurrent(targetSeekRoute)
 
     /** Prepares off-lock and resolves the rendered sentence against that exact speech without replacing the session. */
     internal suspend fun installRenderedSeekTarget(
@@ -727,7 +770,9 @@ class TtsController internal constructor(
                 TtsHistoryDirection.Newer
             }
         val merged = TtsHistoryWindow.merge(current, listOf(target), direction, entry.messageIdHex)
-        val wasPaused = state.value is TtsState.Paused
+        // A headphone disconnect while the target loaded paused the session;
+        // the seek still moves the cursor but must not resume speech.
+        val wasPaused = state.value is TtsState.Paused && targetSeekMayResume()
         if (wasPaused && !acquireAudioFocus()) return false
         val installed =
             queue.replaceWindow(

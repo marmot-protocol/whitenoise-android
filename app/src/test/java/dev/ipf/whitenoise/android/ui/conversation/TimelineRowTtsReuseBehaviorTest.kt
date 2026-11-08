@@ -176,7 +176,7 @@ class TimelineRowTtsReuseBehaviorTest {
         assertTrue(rendered.containsArgb(expectedPaint.sentenceMarker.toArgb()))
         assertTrue(rendered.containsArgbOutsideStartRail(expectedPaint.wordMarker.toArgb()))
         composeRule
-            .onNodeWithTag("tts-read-aloud-progress")
+            .onNodeWithTag("tts-read-aloud-progress", useUnmergedTree = true)
             .assert(
                 SemanticsMatcher.expectValue(
                     SemanticsProperties.ContentDescription,
@@ -198,7 +198,7 @@ class TimelineRowTtsReuseBehaviorTest {
         composeRule.onNodeWithText("Other", substring = true, useUnmergedTree = true).assertExists()
         composeRule.onNodeWithText("bright", substring = true, useUnmergedTree = true).assertDoesNotExist()
         assertNull(highlightRange("Other"))
-        composeRule.onNodeWithTag("tts-read-aloud-progress").assertDoesNotExist()
+        composeRule.onNodeWithTag("tts-read-aloud-progress", useUnmergedTree = true).assertDoesNotExist()
     }
 
     private fun highlightRange(text: String): IntRange? =

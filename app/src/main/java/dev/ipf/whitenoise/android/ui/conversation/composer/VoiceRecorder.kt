@@ -7,6 +7,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,12 +40,15 @@ import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -59,7 +64,14 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Lock
  * Compose doesn't fight us for the up event.
  */
 @Composable
-internal fun MicHoldButton(controller: dev.ipf.whitenoise.android.audio.VoiceRecordingController) {
+internal fun MicHoldButton(
+    controller: dev.ipf.whitenoise.android.audio.VoiceRecordingController,
+    slotWidth: Dp = ComposerToolbarSlotWidth,
+    canStart: () -> Boolean = { true },
+    onHoldStart: () -> Unit = {},
+) {
+    val latestHoldStart by rememberUpdatedState(onHoldStart)
+    val latestCanStart by rememberUpdatedState(canStart)
     val haptics = LocalHapticFeedback.current
     val cancelThresholdDp = 120.dp
     val lockThresholdDp = 80.dp
@@ -76,18 +88,22 @@ internal fun MicHoldButton(controller: dev.ipf.whitenoise.android.audio.VoiceRec
             onClick = {
                 if (controller.isRecording) {
                     controller.stop()
-                } else if (controller.start()) {
-                    controller.lock()
+                } else if (latestCanStart()) {
+                    latestHoldStart()
+                    if (controller.start()) controller.lock()
                 }
             },
             modifier =
                 Modifier
-                    .width(ComposerToolbarSlotWidth)
+                    .testTag("composer.voice.launcher")
+                    .width(slotWidth)
                     .height(48.dp)
                     .semantics { contentDescription = label }
                     .pointerInput(controller) {
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = false)
+                            if (!latestCanStart()) return@awaitEachGesture
+                            latestHoldStart()
                             val started = controller.start()
                             if (!started) return@awaitEachGesture
                             // Consume the down so the FAB's internal clickable
@@ -194,6 +210,7 @@ internal fun RecordingStripLeading(
     val pulseScale by rememberInfiniteRecordingPulse()
     val canceling = controller.willCancel
     val locked = controller.locked
+    val paused = controller.isPaused
     val cancelTint = MaterialTheme.colorScheme.error
     val nearLimit = controller.isNearLimit
     val remainingForDisplay = ((controller.remainingMs + 999L) / 1000L) * 1000L
@@ -220,10 +237,13 @@ internal fun RecordingStripLeading(
                 Modifier
                     .size(10.dp)
                     .graphicsLayer {
-                        scaleX = pulseScale
-                        scaleY = pulseScale
+                        val scale = if (paused) 1f else pulseScale
+                        scaleX = scale
+                        scaleY = scale
                     }.clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.error),
+                    .background(
+                        if (paused) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                    ),
         )
         Text(
             timing,
@@ -232,7 +252,24 @@ internal fun RecordingStripLeading(
             modifier = if (nearLimit) Modifier.clearAndSetSemantics { contentDescription = timerLabel } else Modifier,
         )
         Spacer(Modifier.weight(1f))
-        if (locked && !nearLimit) {
+        if (paused) {
+            // Another in-app sound took the microphone's focus: the take is
+            // held in place and only continues when the user asks.
+            // Compose extends this compact target's hit area to the 48dp minimum.
+            Text(
+                stringResource(R.string.voice_recording_resume),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier =
+                    Modifier
+                        .testTag("composer.voice.resume")
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(role = Role.Button) { controller.resume() }
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+            )
+        } else if (locked && !nearLimit) {
             // Locked: the user has handed off control. The hint copy
             // collapses to a compact "Locked" indicator so the row stays
             // visually quiet while the trailing Stop+Trash do the work.

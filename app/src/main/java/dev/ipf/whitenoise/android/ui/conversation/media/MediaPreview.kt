@@ -506,6 +506,7 @@ internal fun MediaPreviewContent(
                     initialCaption = initialCaption,
                     sending = sending,
                     sendEnabled = !sending && !preparing && items.isNotEmpty(),
+                    preparing = preparing,
                     onSend = { caption ->
                         sending = true
                         onSend(caption) { accepted -> if (!accepted) sending = false }

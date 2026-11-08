@@ -35,6 +35,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
@@ -435,7 +437,9 @@ internal fun QuickActionButton(
         FilledTonalIconButton(
             onClick = onClick,
             enabled = enabled && !inProgress,
-            modifier = Modifier.size(52.dp),
+            // The icon is decorative, so the button carries the visible caption; the caption itself is
+            // skipped by the screen reader to keep one stop per action.
+            modifier = Modifier.size(52.dp).semantics { contentDescription = label },
         ) {
             if (inProgress) {
                 CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
@@ -453,6 +457,7 @@ internal fun QuickActionButton(
                     MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
                 },
             maxLines = 1,
+            modifier = Modifier.semantics { hideFromAccessibility() },
             overflow = TextOverflow.Ellipsis,
         )
     }

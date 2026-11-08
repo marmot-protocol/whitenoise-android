@@ -199,6 +199,16 @@
           "CHL-002"
         ]
       }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.chat_list_search_open_profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRow.kt",
+        "anchor": "R.string.chat_list_search_open_profile",
+        "test_ids": [
+          "AXY-016"
+        ]
+      }
     ]
   },
   "discovery_exceptions": []

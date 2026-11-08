@@ -9,7 +9,7 @@
       "manual_ids": [
         "SET-001"
       ],
-      "assertions": "Appearance opens its expected content; toolbar Back returns to Settings and Chats.",
+      "assertions": "Appearance opens its theme content; Composer opens the shared immediately saving editor without Done or Cancel controls. Back returns to Appearance, then toolbar Back returns to Settings and Chats. Navigation assertions authored only; no saved preference, gesture or runtime execution proof.",
       "postcondition": "none"
     },
     "settings-notifications": {
@@ -184,9 +184,10 @@
       "suite": "preferences",
       "manual_ids": [
         "SET-024",
-        "SET-007"
+        "SET-007",
+        "SET-045"
       ],
-      "assertions": "System Back dismisses the font-size picker and retains Default; the real app-font picker exposes its preview and fixed System/Done actions, then Done dismisses it without changing the font.",
+      "assertions": "System Back dismisses the font-size picker and retains Default; the real app-font picker exposes its preview and fixed System/Done actions, then Done dismisses it without changing the font; the date and time picker opens with Automatic time and date choices and Done dismisses it without changing either.",
       "postcondition": "none"
     },
     "preferences-language-cancel": {
@@ -562,7 +563,7 @@
       "manual_ids": [
         "SET-002"
       ],
-      "assertions": "AMOLED theme survives leaving and reopening Appearance; fixture checks the state projection. Actual color-editor group is absent in AMOLED.",
+      "assertions": "AMOLED selection through the Theme picker survives leaving and reopening Appearance; the fixture checks the state projection. Action color is absent while Chat bubble colors remains available.",
       "postcondition": "amoled"
     },
     "nested-action-color": {

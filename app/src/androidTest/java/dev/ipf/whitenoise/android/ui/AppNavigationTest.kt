@@ -328,6 +328,14 @@ class AppNavigationTest {
         try {
             composeRule.onNodeWithContentDescription("Open settings", substring = true).performClick()
             composeRule.onNodeWithText(context.getString(R.string.appearance)).performScrollTo().performClick()
+            // The preview starts collapsed; expand it so its switches and sample exist.
+            composeRule
+                .onNodeWithTag("settings.list")
+                .performScrollToNode(hasTestTag("appearance.accessibility.preview"))
+            composeRule
+                .onNodeWithText(context.getString(R.string.appearance_accessibility_preview))
+                .performScrollTo()
+                .performClick()
             val initial = appearanceSampleLayout().layoutInput
             // Compose's text input retains a live Density; snapshot its value before changing the preview.
             val initialFontScale = initial.density.fontScale

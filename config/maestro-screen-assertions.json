@@ -3450,7 +3450,7 @@
           "selector": {
             "id": "bubble_colors.mine.picker"
           },
-          "scope": "Select AMOLED through real Appearance and enter per-chat bubble editor through group details. Both directional previews and pickers remain reachable although global color editors are hidden in Appearance; native proof requires AMOLED preference. No outline save, hardware or process-death claim. Generation-private preference cleanup is required."
+          "scope": "Select AMOLED through the real Appearance theme picker and enter the per-chat bubble editor through group details. Both directional previews and pickers remain reachable while Action color is hidden and Chat bubble colors stays available; native proof requires AMOLED preference. No outline save, hardware or process-death claim. Generation-private preference cleanup is required."
         },
         {
           "case": "preferences-bubble-colors-invalid-reset",
@@ -3535,6 +3535,26 @@
           "scope": "account-scoped folder management and persisted folder reopen."
         }
       ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ComposerSettingsScreen.kt",
+      "symbol": "ComposerSettingsScreen",
+      "bindings": [
+        {
+          "case": "settings-appearance",
+          "selector": {
+            "id": "composer.customize"
+          },
+          "scope": "Appearance opens the immediately saving Composer editor without Done or Cancel controls; Back restores Appearance. Assertions authored only, no save persistence, reorder, gesture or device execution proof.",
+          "entry_assertion": {
+            "id": "composer.customize"
+          },
+          "opened_by": {
+            "text": "Composer"
+          }
+        }
+      ],
+      "remaining": "Save persistence, reorder and drag, reset, shortcut actions, voice gestures, constrained layout and visual qualification remain separate; this navigation case is unexecuted."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/ConversationFixtureSeedDialog.kt",
@@ -6004,6 +6024,28 @@
         }
       ],
       "remaining": "All-family selection and persistence, preview typography and independent scrolling, font/RTL/AMOLED layout, lifecycle and accessibility remain separately qualified. The native short-window regressions do not grant executed Maestro or physical proof."
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+      "symbol": "DateTimeFormatDialog",
+      "bindings": [
+        {
+          "case": "preferences-font-cancel",
+          "entry_assertion": {
+            "id": "date_time_format.dialog"
+          },
+          "opened_by": {
+            "tapOn": {
+              "text": "Date and time"
+            }
+          },
+          "selector": {
+            "id": "date_time_format.time.automatic"
+          },
+          "scope": "The existing runtime preferences fixture opens the real Date and time dialog, directly asserts its Automatic time and date choices, then dismisses with Done without changing either format. Source registration only; actual Maestro execution remains separately required."
+        }
+      ],
+      "remaining": "Explicit 12/24-hour and date-order selection, persistence, Reset, phone-region automatic samples, font/RTL/AMOLED layout, lifecycle and accessibility remain separately qualified. A registered direct assertion is not executed Maestro or physical proof."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ComposerSendMotion.kt",

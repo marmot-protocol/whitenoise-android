@@ -1,5 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="voice_recording_stopped_announcement">Kayıt durduruldu</string>
+    <string name="voice_message_seek">Oynatma konumu</string>
+    <string name="video_failed">Video yüklenemedi</string>
+    <string name="conversation_new_message_from">%1$s kişisinden yeni mesaj</string>
+    <plurals name="conversation_new_messages">
+        <item quantity="one">%1$d yeni mesaj</item>
+        <item quantity="other">%1$d yeni mesaj</item>
+    </plurals>
+    <plurals name="unread_mentions_count">
+        <item quantity="one">%1$d okunmamış bahsetme</item>
+        <item quantity="other">%1$d okunmamış bahsetme</item>
+    </plurals>
     <string name="notification_channel_summary">Bildirim özeti</string>
     <string name="notification_channel_summary_description">Mesajların ve diğer olayların sessiz özeti</string>
     <plurals name="notification_group_count">
@@ -191,6 +203,7 @@
     <string name="toast_chat_deleted_local">Sohbet bu cihazdan silindi</string>
     <string name="toast_couldnt_delete_chat">Sohbet silinemedi</string>
     <string name="chat_list_select_all">Tümünü seç</string>
+    <string name="toast_chat_list_select_all_loaded_only">Tüm sohbetler seçilemedi. Yalnızca yüklenen sohbetler seçili.</string>
     <string name="chat_list_deselect_all">Seçimi kaldır</string>
     <plurals name="chat_list_selected_count">
         <item quantity="one">%1$d sohbet seçildi</item>
@@ -411,6 +424,7 @@
     <string name="message_reacted">%1$s ile tepki verildi</string>
     <string name="message_reaction_fallback">bir mesaja</string>
     <string name="message_actions">Mesaj eylemleri</string>
+    <string name="message_reply_quote_description">Yanıtlanan: %1$s, %2$s</string>
     <string name="message_deleted_preview">Mesaj silindi</string>
     <string name="agent_stream_started">Ajan akışı başlatıldı</string>
     <string name="stream_finished">Akış bitti</string>
@@ -1278,6 +1292,7 @@
     <string name="voice_message_speed">Oynatma hızı %1$s</string>
     <string name="voice_message_failed">Sesli mesaj yüklenemedi</string>
     <string name="voice_message_locked">Kilitli</string>
+    <string name="voice_recording_resume">Devam et</string>
     <string name="reply_you">Sen</string>
     <string name="reply_media_photo">Fotoğraf</string>
     <string name="media_album">Albüm</string>
@@ -2546,6 +2561,10 @@
     <string name="notification_tone_silent">Sessiz</string>
     <string name="notification_tone_off">Kapalı</string>
     <string name="notification_tone_default">Varsayılan</string>
+    <string name="appearance_colors_heading">Tema ve renkler</string>
+    <string name="appearance_text_heading">Metin ve dil</string>
+    <string name="appearance_conversation_heading">Sohbet</string>
+    <string name="appearance_preview_intro">Daha büyük metni ve sağdan sola düzeni deneyin.</string>
     <string name="media_viewer_fit_image">Görseli sığdır</string>
     <string name="media_viewer_zoom_image">Yakınlaştır</string>
     <string name="media_viewer_image_scale">%1$d%% yakınlaştırma</string>
@@ -2558,4 +2577,12 @@
     <string name="settings_search_alias_read_aloud">TTS|metin okuma|sesli oku</string>
     <string name="settings_search_alias_sound">bildirim sesi|uyarı sesi|zil sesi</string>
     <string name="settings_search_revealed">%1$s. Ayar vurgulandı.</string>
+    <string name="date_time_format">Tarih ve saat</string>
+    <string name="date_time_format_time">Saat</string>
+    <string name="date_time_format_date">Tarih</string>
+    <string name="date_time_format_automatic">Otomatik</string>
+    <string name="time_format_12_hour">12 saat</string>
+    <string name="time_format_24_hour">24 saat</string>
+    <string name="date_time_format_help">Otomatik, uygulama dilini ve telefonunuzun bölgesini kullanır.</string>
+    <string name="settings_search_alias_date_time_format">saat biçimi|tarih biçimi|saat|12 saat|24 saat|ÖÖ/ÖS</string>
 </resources>

@@ -1,0 +1,114 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "DateTimeFormatDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+        "anchor": "fun DateTimeFormatDialog(",
+        "test_ids": [
+          "SET-045"
+        ]
+      },
+      {
+        "surface": "TimeFormatChoices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+        "anchor": "fun TimeFormatChoices(",
+        "test_ids": [
+          "SET-045"
+        ]
+      },
+      {
+        "surface": "DateFormatChoices",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+        "anchor": "fun DateFormatChoices(",
+        "test_ids": [
+          "SET-045"
+        ]
+      },
+      {
+        "surface": "DateTimeGroupLabel",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+        "anchor": "fun DateTimeGroupLabel(",
+        "test_ids": [
+          "SET-045"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "setting:date_time_format",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+        "anchor": "R.string.date_time_format",
+        "test_ids": [
+          "SET-045"
+        ]
+      },
+      {
+        "surface": "setting:date_time_format_automatic",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+        "anchor": "R.string.date_time_format_automatic",
+        "test_ids": [
+          "SET-045"
+        ]
+      },
+      {
+        "surface": "setting:date_time_format_date",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+        "anchor": "R.string.date_time_format_date",
+        "test_ids": [
+          "SET-045"
+        ]
+      },
+      {
+        "surface": "setting:date_time_format_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+        "anchor": "R.string.date_time_format_help",
+        "test_ids": [
+          "SET-045"
+        ]
+      },
+      {
+        "surface": "setting:date_time_format_time",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+        "anchor": "R.string.date_time_format_time",
+        "test_ids": [
+          "SET-045"
+        ]
+      },
+      {
+        "surface": "setting:done",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+        "anchor": "R.string.done",
+        "test_ids": [
+          "SET-045"
+        ]
+      },
+      {
+        "surface": "setting:reset",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+        "anchor": "R.string.reset",
+        "test_ids": [
+          "SET-045"
+        ]
+      },
+      {
+        "surface": "setting:time_format_12_hour",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+        "anchor": "R.string.time_format_12_hour",
+        "test_ids": [
+          "SET-045"
+        ]
+      },
+      {
+        "surface": "setting:time_format_24_hour",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/DateTimeFormatDialog.kt",
+        "anchor": "R.string.time_format_24_hour",
+        "test_ids": [
+          "SET-045"
+        ]
+      }
+    ]
+  }
+}

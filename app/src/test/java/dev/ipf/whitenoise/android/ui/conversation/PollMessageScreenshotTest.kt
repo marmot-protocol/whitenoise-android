@@ -179,7 +179,11 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
             assertTrue("Preview footer must remain inside the card", footer.bottom <= card.bottom - 8f)
             assertEquals("Preview footer must follow trailing alignment", 12f, card.right - footer.right, 1f)
         } else {
-            val card = composeRule.onNodeWithTag("poll-message-card").fetchSemanticsNode().boundsInRoot
+            val card =
+                composeRule
+                    .onNodeWithTag("poll-message-card", useUnmergedTree = true)
+                    .fetchSemanticsNode()
+                    .boundsInRoot
             val footer =
                 composeRule
                     .onNodeWithTag("poll-message-footer", useUnmergedTree = true)
@@ -188,7 +192,11 @@ class PollMessageScreenshotTest : PollMessageTestFixtures() {
             assertTrue("Footer must remain inside the rounded card", footer.bottom <= card.bottom - 8f)
             val trailingInset = if (configuration.rtl) footer.left - card.left else card.right - footer.right
             assertEquals("Footer must follow the ordinary trailing alignment", 12f, trailingInset, 1f)
-            val reaction = composeRule.onNodeWithTag("$REACTION_PILL_TEST_TAG:0").fetchSemanticsNode().boundsInRoot
+            val reaction =
+                composeRule
+                    .onNodeWithTag("$REACTION_PILL_TEST_TAG:0", useUnmergedTree = true)
+                    .fetchSemanticsNode()
+                    .boundsInRoot
             assertEquals("Reactions must overlap the card's bottom edge", card.bottom - 21f, reaction.top, 1f)
         }
     }

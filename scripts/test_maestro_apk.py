@@ -278,7 +278,9 @@ class MaestroWorkflowTest(unittest.TestCase):
         return re.split(r'\n  [a-z][a-z-]*:\n', text, maxsplit=1)[0]
 
     def enabled(self, name, event, selected, responsiveness=False, media_sandbox=False, outbound_share=False,
-                mdk_adoption=False, startup_trace=False, mdk_qualification=False, mdk_preview_qualification=False, range_selection=False):
+                mdk_adoption=False, startup_trace=False, mdk_qualification=False, mdk_preview_qualification=False,
+                range_selection=False, trace_target='healthy', media_api='30',
+                review_demo=False, document_matrix=False):
         """Evaluate the trusted job condition with restricted event/input fixtures.
 
         Lane narrowing is tested in test_select_instrumented_lanes.py; here the
@@ -289,15 +291,24 @@ class MaestroWorkflowTest(unittest.TestCase):
             expression = expression[3:-2].strip()
         expression = expression.replace('&&', ' and ').replace('||', ' or ').replace('!inputs.', 'not inputs.').replace('!startsWith', 'not startsWith')
         lanes = SimpleNamespace(outputs=SimpleNamespace(attachment_fixture='true', connected='true'))
-        return eval(expression, {'__builtins__': {}},
-                    {'github': SimpleNamespace(event_name=event),
+        context = {'github': SimpleNamespace(event_name=event),
                      'inputs': SimpleNamespace(maestro_pilot=selected, maestro_suite='onboarding',
+                         media_trace_target=trace_target, media_sandbox_api=media_api,
+                         review_demo_e2e=review_demo, document_provider_matrix=document_matrix,
                          responsiveness_only=responsiveness, media_sandbox_only=media_sandbox,
                          outbound_share_only=outbound_share, mdk_adoption_only=mdk_adoption,
                          media_startup_trace=startup_trace, range_selection_only=range_selection, mdk_qualification=mdk_qualification,
                           mdk_preview_qualification=mdk_preview_qualification),
                      'needs': SimpleNamespace(changes=lanes),
-                     'startsWith': lambda value, prefix: value.startswith(prefix)})
+                     'startsWith': lambda value, prefix: value.startswith(prefix),
+                     'always': lambda: True, 'cancelled': lambda: False}
+        validation = re.search(r'^          TRACE_MODE_VALID: (.+)$', self.job('changes'), re.MULTILINE).group(1)
+        validation = validation.removeprefix('${{').removesuffix('}}')
+        validation = re.sub(r'!(?!=)', 'not ', validation.replace('&&', ' and ').replace('||', ' or ')).strip()
+        lanes.outputs.media_trace_allowed = 'true' if eval(validation, {'__builtins__': {}}, context) else ''
+        context['runtime_build_result'] = 'success'
+        expression = expression.replace('needs.maestro-runtime-build.result', 'runtime_build_result')
+        return eval(expression.replace('!cancelled()', 'not cancelled()'), {'__builtins__': {}}, context)
 
     def test_startup_trace_cannot_mix_with_mdk_campaigns(self):
         for name in ('mdk-qualification', 'mdk-signed-preview'):
@@ -436,7 +447,8 @@ class MaestroWorkflowTest(unittest.TestCase):
             expression = expression.replace('!inputs.', 'not inputs.').replace('!(', 'not (')
             return eval(expression, {'__builtins__': {}},
                         {'github': SimpleNamespace(event_name=event), 'inputs': SimpleNamespace(**fields)})
-        defaults = dict(media_startup_trace=False, media_sandbox_only=True, media_sandbox_api='30',
+        defaults = dict(media_trace_target='healthy', media_startup_trace=False,
+                        media_sandbox_only=True, media_sandbox_api='30',
                         maestro_pilot=False, responsiveness_only=False, outbound_share_only=False,
                         mdk_adoption_only=False, mdk_qualification=False, mdk_preview_qualification=False,
                         review_demo_e2e=False, document_provider_matrix=False)
@@ -452,6 +464,60 @@ class MaestroWorkflowTest(unittest.TestCase):
                                          trace and (event != 'workflow_dispatch' or bool(conflict)))
                         self.assertEqual(evaluate(cancel, event, fields),
                                          not (event == 'workflow_dispatch' and (fields['maestro_pilot'] or trace)))
+
+    def test_av_trace_job_admission_uses_complete_explicit_inputs(self):
+        """Av trace job admission uses complete explicit inputs."""
+        jobs=('attachment-fixture','instrumented','maestro-pilot','maestro-runtime-build',
+              'maestro-runtime','maestro-runtime-summary','mdk-qualification','mdk-signed-preview')
+        for api in ('30','36'):
+            valid=dict(media_sandbox=True,startup_trace=True,trace_target='av',media_api=api)
+            for job in jobs:
+                with self.subTest(api=api,job=job):
+                    self.assertEqual(self.enabled(job,'workflow_dispatch',False,**valid),job=='instrumented')
+        invalid=[dict(trace_target='av'),dict(trace_target='av',mdk_qualification=True),
+                 dict(trace_target='av',mdk_preview_qualification=True),dict(trace_target='other'),
+                 dict(trace_target='av',startup_trace=True,media_sandbox=True,media_api='34'),
+                 dict(trace_target='av',startup_trace=True,media_sandbox=True,review_demo=True),
+                 dict(trace_target='av',startup_trace=True,media_sandbox=True,document_matrix=True)]
+        for values in invalid:
+            for selected in (False,True):
+                for job in jobs:
+                    with self.subTest(values=values,selected=selected,job=job):
+                        self.assertFalse(self.enabled(job,'workflow_dispatch',selected,**values))
+        for event in ('push','pull_request','schedule'):
+            for job in jobs:
+                self.assertFalse(self.enabled(job,event,False,media_sandbox=True,startup_trace=True,
+                                              trace_target='av'))
+        # A genuinely absent GitHub choice is empty, not an arbitrary missing-attribute fallback.
+        for job in jobs:
+            self.assertEqual(self.enabled(job,'workflow_dispatch',False,trace_target=''),
+                             self.enabled(job,'workflow_dispatch',False,trace_target='healthy'))
+
+    def test_av_trace_step_refusal_and_cancellation_use_actual_expressions(self):
+        """Av trace step refusal and cancellation use actual expressions."""
+        rejection=self.job('instrumented').split('      - name: Reject incompatible startup trace inputs',1)[1]
+        reject=re.search(r'^        if: (.+)$',rejection,re.MULTILINE).group(1)
+        cancel=re.search(r'^  cancel-in-progress: \$\{\{ (.+) \}\}$',self.workflow,re.MULTILINE).group(1)
+        defaults=dict(media_trace_target='av',media_startup_trace=True,media_sandbox_only=True,
+                      media_sandbox_api='30',maestro_pilot=False,responsiveness_only=False,
+                      outbound_share_only=False,mdk_adoption_only=False,mdk_qualification=False,
+                      mdk_preview_qualification=False,review_demo_e2e=False,document_provider_matrix=False)
+        def evaluate(expression,event,fields):
+            """Evaluate the actual selected workflow condition against synthetic event and job outcomes."""
+            expression=expression.replace('&&',' and ').replace('||',' or ')
+            expression=re.sub(r'!(?!=)','not ',expression).strip()
+            return bool(eval(expression,{'__builtins__':{}},
+                        {'github':SimpleNamespace(event_name=event),'inputs':SimpleNamespace(**fields)}))
+        for api in ('30','36'):
+            fields={**defaults,'media_sandbox_api':api}
+            self.assertFalse(evaluate(reject,'workflow_dispatch',fields))
+            self.assertFalse(evaluate(cancel,'workflow_dispatch',fields))
+        for key,value in [('media_sandbox_api','34'),('media_sandbox_only',False),
+                          ('maestro_pilot',True),('review_demo_e2e',True),('document_provider_matrix',True)]:
+            self.assertTrue(evaluate(reject,'workflow_dispatch',{**defaults,key:value}))
+        for event in ('push','pull_request','schedule'):
+            self.assertTrue(evaluate(reject,event,defaults))
+            self.assertTrue(evaluate(cancel,event,defaults))
 
     def test_real_journey_and_negative_control_keep_assertions(self):
         """Check real UI assertions, offline installation and observable failure control."""

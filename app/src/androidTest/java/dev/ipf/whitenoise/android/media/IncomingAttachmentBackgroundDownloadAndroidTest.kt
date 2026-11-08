@@ -641,8 +641,9 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
         receiver: AccountSummaryFfi,
         enabled: Boolean,
     ) {
+        val deadline = BackgroundReceiptFixtureSupport.wifiChangeDeadline()
         reportBoundary(ReceiptBoundary.WIFI_COMMAND_START)
-        BackgroundReceiptFixtureSupport.setWifiEnabled(enabled)
+        BackgroundReceiptFixtureSupport.setWifiEnabled(enabled, deadline)
         reportBoundary(ReceiptBoundary.WIFI_COMMAND_COMPLETE)
         wifiDisabled = !enabled
         val receiverState = requireNotNull(state)
@@ -652,7 +653,7 @@ class IncomingAttachmentBackgroundDownloadAndroidTest {
             BackgroundReceiptPolicyStage.WifiSnapshot,
             { backgroundReceiptNetworkSnapshot(context, receiverState, receiver.label, enabled) },
         ) {
-            BackgroundReceiptFixtureSupport.awaitWifiSnapshot(receiverState, receiver.label, enabled)
+            BackgroundReceiptFixtureSupport.awaitWifiSnapshot(receiverState, receiver.label, enabled, deadline)
         }
         reportBoundary(ReceiptBoundary.WIFI_SNAPSHOT_CONFIRMED)
         if (enabled) {

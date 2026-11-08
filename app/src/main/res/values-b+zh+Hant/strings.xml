@@ -1,5 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="voice_recording_stopped_announcement">錄音已停止</string>
+    <string name="voice_message_seek">播放位置</string>
+    <string name="video_failed">影片載入失敗</string>
+    <string name="conversation_new_message_from">來自 %1$s 的新訊息</string>
+    <plurals name="conversation_new_messages">
+        <item quantity="other">%1$d 則新訊息</item>
+    </plurals>
+    <plurals name="unread_mentions_count">
+        <item quantity="other">%1$d 則未讀提及</item>
+    </plurals>
     <string name="notification_channel_summary">通知摘要</string>
     <string name="notification_channel_summary_description">訊息與其他事件的靜音摘要</string>
     <plurals name="notification_group_count">
@@ -187,6 +197,7 @@
     <string name="toast_chat_deleted_local">已從此裝置刪除聊天</string>
     <string name="toast_couldnt_delete_chat">無法刪除聊天</string>
     <string name="chat_list_select_all">全選</string>
+    <string name="toast_chat_list_select_all_loaded_only">無法選取所有聊天。僅選取了已載入的聊天。</string>
     <string name="chat_list_deselect_all">取消全選</string>
     <plurals name="chat_list_selected_count">
         <item quantity="other">已選擇 %1$d 個聊天</item>
@@ -400,6 +411,7 @@
     <string name="message_reacted">已回應 %1$s</string>
     <string name="message_reaction_fallback">一則訊息</string>
     <string name="message_actions">訊息操作</string>
+    <string name="message_reply_quote_description">回覆 %1$s：%2$s</string>
     <string name="message_deleted_preview">訊息已刪除</string>
     <string name="agent_stream_started">代理串流已開始</string>
     <string name="stream_finished">串流已結束</string>
@@ -1272,6 +1284,7 @@
     <string name="voice_message_speed">播放速度 %1$s</string>
     <string name="voice_message_failed">語音訊息載入失敗</string>
     <string name="voice_message_locked">已鎖定</string>
+    <string name="voice_recording_resume">繼續</string>
     <string name="reply_you">你</string>
     <string name="reply_media_photo">相片</string>
     <string name="media_album">相簿</string>
@@ -2511,6 +2524,10 @@
     <string name="notification_tone_silent">靜音</string>
     <string name="notification_tone_off">關閉</string>
     <string name="notification_tone_default">預設</string>
+    <string name="appearance_colors_heading">主題與顏色</string>
+    <string name="appearance_text_heading">文字與語言</string>
+    <string name="appearance_conversation_heading">聊天</string>
+    <string name="appearance_preview_intro">試用大字體和由右至左的版面。</string>
     <string name="media_viewer_toggle_controls">顯示或隱藏控制項</string>
     <string name="media_viewer_zoom_image">放大</string>
     <string name="media_viewer_zoom_out">縮小</string>
@@ -2523,4 +2540,12 @@
     <string name="settings_search_alias_read_aloud">TTS|文字轉語音|朗讀</string>
     <string name="settings_search_alias_sound">通知音效|提示音|鈴聲</string>
     <string name="settings_search_revealed">%1$s。已醒目標示設定。</string>
+    <string name="date_time_format">日期和時間</string>
+    <string name="date_time_format_time">時間</string>
+    <string name="date_time_format_date">日期</string>
+    <string name="date_time_format_automatic">自動</string>
+    <string name="time_format_12_hour">12 小時制</string>
+    <string name="time_format_24_hour">24 小時制</string>
+    <string name="date_time_format_help">自動模式使用應用程式語言和手機系統設定中的地區。</string>
+    <string name="settings_search_alias_date_time_format">時間格式|日期格式|時鐘|12 小時制|24 小時制|上午/下午</string>
 </resources>

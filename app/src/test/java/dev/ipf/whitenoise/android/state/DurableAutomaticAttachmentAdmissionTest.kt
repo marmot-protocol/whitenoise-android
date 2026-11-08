@@ -13,9 +13,11 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -196,7 +198,7 @@ class DurableAutomaticAttachmentAdmissionTest {
         runTest(dispatcher) {
             setNetwork(setOf(MediaAutoDownloadNetwork.WiFi))
             val download = async { durable(AttachmentDownloadPriority.Automatic) }
-            permissions().waitersForTest().first { it > 0 }
+            permissions().waitersForTest.first { it > 0 }
             assertFalse(download.isCompleted)
             assertEquals(0, fixture.automaticDemands.get())
 
@@ -285,13 +287,78 @@ class DurableAutomaticAttachmentAdmissionTest {
 
             commits.unlock()
             advanceUntilIdle()
-            assertEquals("they folded into one follow-up", 2, fixture.permissionBegins.get())
+            assertEquals("equivalent callbacks reuse the applied generation", 1, fixture.permissionBegins.get())
             assertEquals(
-                "the first generation was not superseded and applied, then the follow-up",
-                2,
+                "the first generation applied without an equivalent second update",
+                1,
                 fixture.permissionApplications.get(),
             )
         }
+
+    /** Completed duplicate callbacks preserve the native generation; a changed transport still applies. */
+    @Test
+    fun completedEquivalentNetworkCallbacksDoNotRevokeAgain() =
+        runTest(dispatcher) {
+            setNetwork(setOf(MediaAutoDownloadNetwork.WiFi))
+            requestNetworkRefresh()
+            advanceUntilIdle()
+            requestNetworkRefresh()
+            advanceUntilIdle()
+            assertEquals(1, fixture.permissionBegins.get())
+            assertEquals(1, fixture.permissionApplications.get())
+            setNetwork(setOf(MediaAutoDownloadNetwork.Mobile, MediaAutoDownloadNetwork.Metered))
+            requestNetworkRefresh()
+            advanceUntilIdle()
+            assertEquals(2, fixture.permissionBegins.get())
+            assertFalse(fixture.permissionHistory.last().images)
+        }
+
+    /** A captured allowing key cannot cache a live denial after preferences suspend its evaluation. */
+    @Test
+    fun allowingNetworkAbaDuringSuspendedPreferencesCorrectsTheAppliedInputs() =
+        runTest(dispatcher) {
+            assertSuspendedNetworkAba(allowA = true)
+        }
+
+    /** A captured denying key cannot cache a live approval after preferences suspend its evaluation. */
+    @Test
+    fun denyingNetworkAbaDuringSuspendedPreferencesCorrectsTheAppliedInputs() =
+        runTest(dispatcher) {
+            assertSuspendedNetworkAba(allowA = false)
+        }
+
+    /** Replays A -> wait on preferences -> evaluate/apply B -> A before the coalescer follow-up. */
+    private suspend fun TestScope.assertSuspendedNetworkAba(allowA: Boolean) {
+        val wifi = setOf(MediaAutoDownloadNetwork.WiFi)
+        val mobile = setOf(MediaAutoDownloadNetwork.Mobile, MediaAutoDownloadNetwork.Metered)
+        val a = if (allowA) wifi else mobile
+        val b = if (allowA) mobile else wifi
+        setNetwork(a)
+        val commits = hostPreferenceCommits()
+        commits.lock()
+        try {
+            requestNetworkRefresh()
+            runCurrent()
+            assertEquals(1, fixture.permissionBegins.get())
+            setNetwork(b)
+            requestNetworkRefresh()
+            // Restore A synchronously at the native set boundary, before the joined coalescer can read again.
+            fixture.onPermissionApplied = {
+                setNetwork(a)
+                requestNetworkRefresh()
+            }
+        } finally {
+            commits.unlock()
+        }
+        advanceUntilIdle()
+        assertEquals(2, fixture.permissionBegins.get())
+        assertEquals(2, fixture.permissionApplications.get())
+        assertEquals(!allowA, fixture.permissionHistory.first().images)
+        assertEquals(allowA, fixture.permissionHistory.last().images)
+        requestNetworkRefresh()
+        advanceUntilIdle()
+        assertEquals("the corrected A approval is reusable", 2, fixture.permissionBegins.get())
+    }
 
     /** A settle timeout's in-flight check and its refresh share one lock, so concurrent timeouts start one. */
     @Test
@@ -305,10 +372,20 @@ class DurableAutomaticAttachmentAdmissionTest {
         assertTrue("the check holds the refresh lock", "synchronized(permissionRefreshLock)" in timeout)
         val refresh =
             source
-                .substringAfter("internal fun refreshNativeAttachmentPermissions(")
-                .substringBefore("return mutationsScope")
-        val lock = refresh.indexOf("synchronized(permissionRefreshLock)")
-        assertTrue("the refresh invalidates under the same lock", lock in 0 until refresh.indexOf(".invalidate("))
+                .substringAfter("private fun refreshNativeAttachmentPermissions(", missingDelimiterValue = "")
+                .substringBefore("\n    }\n", missingDelimiterValue = "")
+        val lock =
+            refresh
+                .substringAfter("synchronized(permissionRefreshLock) {", missingDelimiterValue = "")
+                .substringBefore("\n        }", missingDelimiterValue = "")
+        assertTrue(
+            "the refresh invalidates under the same lock",
+            "nativeAttachmentPermissions.invalidate(runtime)" in lock,
+        )
+        assertTrue(
+            "a network refresh begins under the same lock",
+            "nativeAttachmentPermissions.beginNetworkRefresh(" in lock,
+        )
     }
 
     /** A refusal from a revocation window is asked again once the host's approval has moved on. */

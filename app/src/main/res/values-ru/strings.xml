@@ -1,5 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="voice_recording_stopped_announcement">Запись остановлена</string>
+    <string name="voice_message_seek">Позиция воспроизведения</string>
+    <string name="video_failed">Не удалось загрузить видео</string>
+    <string name="conversation_new_message_from">Новое сообщение от %1$s</string>
+    <plurals name="conversation_new_messages">
+        <item quantity="one">%1$d новое сообщение</item>
+        <item quantity="few">%1$d новых сообщения</item>
+        <item quantity="many">%1$d новых сообщений</item>
+        <item quantity="other">%1$d новых сообщения</item>
+    </plurals>
+    <plurals name="unread_mentions_count">
+        <item quantity="one">%1$d непрочитанное упоминание</item>
+        <item quantity="few">%1$d непрочитанных упоминания</item>
+        <item quantity="many">%1$d непрочитанных упоминаний</item>
+        <item quantity="other">%1$d непрочитанных упоминания</item>
+    </plurals>
     <string name="notification_channel_summary">Сводка уведомлений</string>
     <string name="notification_channel_summary_description">Беззвучная сводка сообщений и других событий</string>
     <plurals name="notification_group_count">
@@ -199,6 +215,7 @@
     <string name="toast_chat_deleted_local">Чат удалён с этого устройства</string>
     <string name="toast_couldnt_delete_chat">Не удалось удалить чат</string>
     <string name="chat_list_select_all">Выбрать все</string>
+    <string name="toast_chat_list_select_all_loaded_only">Не удалось выбрать все чаты. Выбраны только загруженные чаты.</string>
     <string name="chat_list_deselect_all">Снять выделение</string>
     <plurals name="chat_list_selected_count">
         <item quantity="one">%1$d чат выбран</item>
@@ -433,6 +450,7 @@
     <string name="message_reacted">Реакция: %1$s</string>
     <string name="message_reaction_fallback">на сообщение</string>
     <string name="message_actions">Действия с сообщением</string>
+    <string name="message_reply_quote_description">В ответ на: %1$s, %2$s</string>
     <string name="message_deleted_preview">Сообщение удалено</string>
     <string name="agent_stream_started">Поток агента запущен</string>
     <string name="stream_finished">Поток завершен</string>
@@ -1339,6 +1357,7 @@
     <string name="voice_message_speed">Скорость воспроизведения %1$s</string>
     <string name="voice_message_failed">Не удалось загрузить голосовое сообщение</string>
     <string name="voice_message_locked">Закреплено</string>
+    <string name="voice_recording_resume">Продолжить</string>
     <string name="reply_you">Вы</string>
     <string name="reply_media_photo">Фото</string>
     <string name="media_album">Альбом</string>
@@ -2626,6 +2645,10 @@
     <string name="notification_tone_silent">Без звука</string>
     <string name="notification_tone_off">Выключено</string>
     <string name="notification_tone_default">По умолчанию</string>
+    <string name="appearance_colors_heading">Тема и цвета</string>
+    <string name="appearance_text_heading">Текст и язык</string>
+    <string name="appearance_conversation_heading">Переписка</string>
+    <string name="appearance_preview_intro">Попробуйте крупный текст и расположение справа налево.</string>
     <string name="media_viewer_fit_image">Вписать изображение</string>
     <string name="media_viewer_zoom_image">Увеличить</string>
     <string name="media_viewer_image_scale">Масштаб: %1$d%%</string>
@@ -2638,4 +2661,12 @@
     <string name="settings_search_alias_read_aloud">TTS|синтез речи|читать вслух</string>
     <string name="settings_search_alias_sound">звук уведомлений|сигнал уведомления|мелодия</string>
     <string name="settings_search_revealed">%1$s. Настройка выделена.</string>
+    <string name="date_time_format">Дата и время</string>
+    <string name="date_time_format_time">Время</string>
+    <string name="date_time_format_date">Дата</string>
+    <string name="date_time_format_automatic">Автоматически</string>
+    <string name="time_format_12_hour">12-часовой</string>
+    <string name="time_format_24_hour">24-часовой</string>
+    <string name="date_time_format_help">Автоматически: язык приложения и регион телефона.</string>
+    <string name="settings_search_alias_date_time_format">формат времени|формат даты|часы|12 часов|24 часа|AM/PM</string>
 </resources>

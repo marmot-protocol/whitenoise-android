@@ -75,8 +75,13 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.onClick
@@ -90,6 +95,7 @@ import dev.ipf.whitenoise.android.audio.VoicePlaybackController
 import dev.ipf.whitenoise.android.core.AgentOperationProjector
 import dev.ipf.whitenoise.android.core.ChatListMessageSearch
 import dev.ipf.whitenoise.android.core.ConversationSearchMatch
+import dev.ipf.whitenoise.android.core.DateTimeFormatState
 import dev.ipf.whitenoise.android.core.ForwardBlockedReason
 import dev.ipf.whitenoise.android.core.ForwardEligibility
 import dev.ipf.whitenoise.android.core.ForwardMessagePayload
@@ -247,6 +253,7 @@ import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTilesState
 import dev.ipf.whitenoise.android.ui.medialibrary.toConversationViewerPages
 import dev.ipf.whitenoise.android.ui.navigation.conversationRouteBodyMotion
 import dev.ipf.whitenoise.android.ui.rememberRecentEmojiRecentsOwner
+import dev.ipf.whitenoise.android.ui.settings.ComposerSettingsScreen
 import dev.ipf.whitenoise.android.ui.settings.blockOutcomeMessage
 import dev.ipf.whitenoise.android.ui.settings.rememberRouteMotionModifier
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
@@ -559,6 +566,7 @@ internal fun ConversationScreen(
     onSaveScrollSnapshot: (ConversationScrollSnapshot?) -> Unit = {},
     surfaceState: ConversationSurfaceState? = null,
     dictationControlsVisible: Boolean = true,
+    dictationOriginVisible: Boolean = dictationControlsVisible,
     playbackTransport: @Composable () -> Unit = {},
     onStartGroupWithPeer: (RecipientSearch.Candidate) -> Unit = {},
     searchChatsController: ChatsController? = null,
@@ -645,6 +653,9 @@ internal fun ConversationScreen(
     // Keyed on the controller as well as chat.id so the same shared group under
     // another account cannot inherit this account's details route.
     var showDetails by presentationState.showDetails
+    var showComposerSettings by presentationState.showComposerSettings
+    // Either full-screen route replaces the transcript and stops it from owning visibility.
+    val transcriptRoutedAway = showDetails || showComposerSettings
     // Empty newly-created groups should route users into the existing member
     // invite flow instead of carrying a duplicate picker in the create sheet.
     var openAddMemberOnDetails by remember(chat.id) { mutableStateOf(false) }
@@ -742,7 +753,7 @@ internal fun ConversationScreen(
             conversationAccountRef,
             controller.group.groupIdHex,
             translationPreferences,
-            routeActive = !routeTransitionInProgress && !routePresentationFrozen && !showDetails,
+            routeActive = !routeTransitionInProgress && !routePresentationFrozen && !transcriptRoutedAway,
         )
     val freezeRoutePresentation =
         conversationRoutePresentationShouldFreeze(
@@ -903,8 +914,8 @@ internal fun ConversationScreen(
         // account-owned roster or first authoritative page is still withheld; it
         // must keep future notifications eligible until that presentation commits.
         // Details and their nested routes remain non-owning after the reveal too.
-        LaunchedEffect(controller, notificationOpenRequestId, showDetails, transcriptReadyToReveal) {
-            onNotificationTimelineVisibilityChanged(!showDetails && transcriptReadyToReveal)
+        LaunchedEffect(controller, notificationOpenRequestId, transcriptRoutedAway, transcriptReadyToReveal) {
+            onNotificationTimelineVisibilityChanged(!transcriptRoutedAway && transcriptReadyToReveal)
         }
 
         // Timeline publication can precede route settlement and the first visible
@@ -914,7 +925,7 @@ internal fun ConversationScreen(
             controller.hasPublishedAuthoritativeTimeline,
             transcriptReadyToReveal,
             routeTransitionInProgress,
-            showDetails,
+            transcriptRoutedAway,
             renderedTimeline.lastOrNull()?.presentationId,
             controller.inboundVisibleHostGeneration,
         ) {
@@ -923,7 +934,7 @@ internal fun ConversationScreen(
                     timelinePublished = controller.hasPublishedAuthoritativeTimeline,
                     transcriptReadyToReveal = transcriptReadyToReveal,
                     routeTransitionInProgress = routeTransitionInProgress,
-                    showingDetails = showDetails,
+                    showingDetails = transcriptRoutedAway,
                 )
             ) {
                 return@LaunchedEffect
@@ -1503,35 +1514,61 @@ internal fun ConversationScreen(
         )
     }
 
-    /** Lets user drags, never programmatic movement, cancel navigation and update reading intent. */
+    /** The reader moved the transcript: cancel navigation and take over reading intent and older paging. */
+    fun onReaderScrollStarted() {
+        navigationState.targetNavigation.cancel()
+        navigationState.targetHighlight.clear()
+        ttsFollowHandle.suspendForDirectDrag(
+            state = appState.ttsController.state.value,
+            ownsSession = appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
+        )
+        scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
+        controller.onOlderPagingGestureStarted()
+    }
+
+    fun onReaderScrollSettled() {
+        scrollCoordinator.onUserGestureSettled(currentScrollAnchor(), liveNearBottom())
+    }
+
+    /**
+     * Lets reader movement, never programmatic movement, cancel navigation and update reading intent.
+     *
+     * Touch drags report themselves through drag interactions. Every other scroll run, from a screen reader,
+     * keyboard or mouse wheel, is the reader's too unless a coordinator command, the read-aloud hold or
+     * drag-selection edge scrolling started it (#3603).
+     */
     @Composable
-    fun dragInteractionEffect() {
-        // Drag interactions are the authority for user intent. Programmatic list
-        // movement never emits these, so it cannot accidentally downgrade a tail
-        // follower or overwrite a history anchor.
+    fun readerScrollIntentEffects() {
+        var touchDragActive by remember(listState) { mutableStateOf(false) }
         LaunchedEffect(listState, scrollCoordinator) {
             listState.interactionSource.interactions.collectConversationDragInteractions(
                 onStarted = {
-                    navigationState.targetNavigation.cancel()
-                    navigationState.targetHighlight.clear()
-                    ttsFollowHandle.suspendForDirectDrag(
-                        state = appState.ttsController.state.value,
-                        ownsSession = appState.ownsTtsAutoReadSession(controller.group.groupIdHex),
-                    )
-                    scrollCoordinator.onUserGestureStarted(currentScrollAnchor())
-                    controller.onOlderPagingGestureStarted()
+                    touchDragActive = true
+                    onReaderScrollStarted()
                 },
                 awaitScrollSettled = {
                     snapshotFlow { listState.isScrollInProgress }.filter { !it }.first()
                 },
                 onSettled = {
-                    val liveHasOlderHeader = controller.hasMoreBefore || controller.isLoadingOlder
-                    scrollCoordinator.onUserGestureSettled(currentScrollAnchor(), liveNearBottom())
+                    touchDragActive = false
+                    onReaderScrollSettled()
                 },
             )
         }
+        LaunchedEffect(listState, scrollCoordinator) {
+            snapshotFlow { listState.isScrollInProgress }.collectUnclaimedScrollRuns(
+                claimedByApp = {
+                    scrollCoordinator.mode.ownsListMovement ||
+                        ttsQuickTransportViewportLock.holdsViewport ||
+                        dragAnchorTimelineId != null
+                },
+                touchDragActive = { touchDragActive },
+                onStarted = { onReaderScrollStarted() },
+                onSettled = { onReaderScrollSettled() },
+            )
+        }
     }
-    dragInteractionEffect()
+    readerScrollIntentEffects()
     // The read anchor, badge and unread jump target are written from callbacks and reconciled by
     // ConversationUnreadTracking, never read while composing this screen: a send moves all three in turn, and
     // each read here recomposed the whole conversation once more.
@@ -2693,7 +2730,7 @@ internal fun ConversationScreen(
                     .getOrNull(i)
                     ?.record
                     ?.recordedAt
-                    ?.let { messageDayLabel(it, transcriptLocale) }
+                    ?.let { messageDayLabel(it, transcriptLocale, DateTimeFormatState.dateFormat) }
                     .orEmpty()
             }
         }
@@ -3238,7 +3275,7 @@ internal fun ConversationScreen(
     composerSendMotion.readViewport = { presentationId ->
         timelineViewport.composerSendProjection(timelinePublication, presentationId)
     }
-    val motionRouteAvailable = !showDetails && !routeTransitionInProgress
+    val motionRouteAvailable = !transcriptRoutedAway && !routeTransitionInProgress
     val motionOwnerCurrent = controller.isCurrentGroupMutationOwner(appState, sendMotionRuntime) && motionRouteAvailable
     val motionTranscriptVisible = !routePresentationFrozen && transcriptReadyToReveal
     val surfaceMotionEnabled = rememberConversationMotionEnabled()
@@ -3263,6 +3300,8 @@ internal fun ConversationScreen(
             tailReached = { listState.firstVisibleItemIndex <= currentTailIndex },
         )
     TailEntranceSendClaim(tailEntrance, claimedSendPresentation)
+    // The media viewer session is created further down; it reports here so arrivals stay quiet under the viewer.
+    var mediaViewerCoversTranscript by remember(controller) { mutableStateOf(false) }
 
     /**
      * Follows the tail for membership activity and new rows, keeps viewport structure current and lands route focus
@@ -3284,8 +3323,16 @@ internal fun ConversationScreen(
         }
         // Survives the follow effect's restart within a burst, never a chat, account or runtime change.
         val incomingAppendLanding = remember(controller) { ConversationIncomingAppendLandingQueue() }
+        val arrivalView = LocalView.current
+        val arrivalResources = LocalResources.current
+        val arrivalBaseline = remember(controller) { ConversationArrivalBaseline() }
+        // An older page changes the first row and size but not the latest id, so the follow pass would miss it.
+        LaunchedEffect(controller, renderedTimeline.firstOrNull()?.presentationId, renderedTimeline.size) {
+            arrivalBaseline.noteRendered(renderedTimeline, navigationState.lastFollowedLatestId)
+        }
         LaunchedEffect(controller, latestTimelineItemId, initialTimelineAnchored) {
             if (!initialTimelineAnchored || renderedTimeline.isEmpty()) {
+                arrivalBaseline.markAllRendered(renderedTimeline, !controller.hasMoreAfterTimeline)
                 // A restart that cannot be an append still interrupts the burst, so its rows never join a later one.
                 incomingAppendLanding.retire()
                 return@LaunchedEffect
@@ -3300,7 +3347,28 @@ internal fun ConversationScreen(
                     latestId != previousId &&
                     renderedTimeline.any { it.presentationId == previousId }
             navigationState.lastFollowedLatestId = latestId ?: previousId
+            val arrivals =
+                arrivalBaseline.follow(
+                    timeline = renderedTimeline,
+                    previousLatestId = previousId.takeIf { isAppend },
+                    reachesLiveTail = !controller.hasMoreAfterTimeline,
+                ) { row -> controller.isMessageMine(row.record) }
             if (isAppend && previousId != null) {
+                // Before any suspension, so a later append restarting this effect cannot drop the notice. Group details
+                // and the media viewer cover the transcript, and an open microphone would record the speech.
+                val quiet =
+                    showDetails ||
+                        mediaViewerCoversTranscript ||
+                        voiceRecordingController.isRecording ||
+                        voiceRecordingController.isFinalizing
+                conversationArrivalAnnouncement(
+                    arrivals = arrivals,
+                    senderName = { row -> appState.displayName(row.record.sender) },
+                    resources = arrivalResources,
+                )?.takeUnless { quiet }?.let { notice ->
+                    @Suppress("DEPRECATION")
+                    arrivalView.announceForAccessibility(notice)
+                }
                 // #3558: an incoming row taller than the reading viewport lands at its beginning instead of its end.
                 val candidates =
                     incomingAppendLanding.admit(
@@ -3633,47 +3701,55 @@ internal fun ConversationScreen(
     key(controller, appState.runtimeGeneration) {
         RestoredForwardRequestHost(appState = appState, controller = controller)
     }
-    val detailsRouteMotion =
+    // One motion owner for the transcript and both full-screen routes, so Back animates the return.
+    val transcriptRouteMotion =
         rememberRouteMotionModifier(
-            target = showDetails,
-            depth = if (showDetails) 1 else 0,
+            target = showDetails to showComposerSettings,
+            depth = if (transcriptRoutedAway) 1 else 0,
             ownerKey = controller to appState.runtimeGeneration,
             animationsEnabled = surfaceMotionEnabled,
             suppressMotion = routeTransitionInProgress || routePresentationFrozen,
         )
-    if (showDetails) {
-        /** Shows group details in place of the transcript while they are open. */
-        @Composable
-        fun groupDetailsRoute() {
-            GroupDetailsScreen(
-                appState = appState,
-                controller = controller,
-                onBack = {
-                    showDetails = false
-                    openAddMemberOnDetails = false
-                },
-                onLeft = exitConversation,
-                onJumpToMessage = { messageId ->
-                    showDetails = false
-                    scrollToSearchMatch(messageId)
-                },
-                autoOpenAddMember = openAddMemberOnDetails,
-                onAutoOpenAddMemberConsumed = { openAddMemberOnDetails = false },
-                onOpenSearch = {
-                    showDetails = false
-                    presentationState.searchState.value =
-                        conversationSearchPreset(
-                            conversationAccountRef,
-                            appState.runtimeGeneration,
-                            chat.id,
-                            controller.title(groupTitleCopy),
-                        )
-                    navigationState.searchOpen = true
-                },
-                onStartGroupWithPeer = onStartGroupWithPeer,
-            )
+    if (transcriptRoutedAway) {
+        if (showDetails) {
+            /** Shows group details in place of the transcript while they are open. */
+            @Composable
+            fun groupDetailsRoute() {
+                GroupDetailsScreen(
+                    appState = appState,
+                    controller = controller,
+                    onBack = {
+                        showDetails = false
+                        openAddMemberOnDetails = false
+                    },
+                    onLeft = exitConversation,
+                    onJumpToMessage = { messageId ->
+                        showDetails = false
+                        scrollToSearchMatch(messageId)
+                    },
+                    autoOpenAddMember = openAddMemberOnDetails,
+                    onAutoOpenAddMemberConsumed = { openAddMemberOnDetails = false },
+                    onOpenSearch = {
+                        showDetails = false
+                        presentationState.searchState.value =
+                            conversationSearchPreset(
+                                conversationAccountRef,
+                                appState.runtimeGeneration,
+                                chat.id,
+                                controller.title(groupTitleCopy),
+                            )
+                        navigationState.searchOpen = true
+                    },
+                    onStartGroupWithPeer = onStartGroupWithPeer,
+                )
+            }
+            Box(Modifier.fillMaxSize().then(transcriptRouteMotion)) { groupDetailsRoute() }
+        } else {
+            // The same full-screen editor as Settings; Back returns to this conversation.
+            Box(Modifier.fillMaxSize().then(transcriptRouteMotion)) {
+                ComposerSettingsScreen(appState) { showComposerSettings = false }
+            }
         }
-        Box(Modifier.fillMaxSize().then(detailsRouteMotion)) { groupDetailsRoute() }
         return
     }
 
@@ -3687,6 +3763,11 @@ internal fun ConversationScreen(
                     runtimeGeneration = appState.runtimeGeneration,
                 ),
         )
+    val mediaViewerOpen = mediaViewerSessionState.active != null
+    DisposableEffect(mediaViewerSessionState, mediaViewerOpen) {
+        mediaViewerCoversTranscript = mediaViewerOpen
+        onDispose { mediaViewerCoversTranscript = false }
+    }
 
     RecordDmConversationFirstFrame(
         accountRef = conversationAccountRef,
@@ -3913,7 +3994,7 @@ internal fun ConversationScreen(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .then(detailsRouteMotion)
+                    .then(transcriptRouteMotion)
                     .blur(if (openActionMenuId != null) 24.dp else 0.dp)
                     .dismissTextSelectionOnOutsideTap(
                         active = textSelectionMessageId != null,
@@ -4011,8 +4092,10 @@ internal fun ConversationScreen(
             },
             bottomBar = {
                 ConversationBottomBar(
+                    onCustomizeComposer = { showComposerSettings = true },
                     compactHeight = compactHeightConversation,
                     dictationControlsVisible = dictationControlsVisible,
+                    dictationOriginVisible = dictationOriginVisible,
                     selectionMode = selectionMode,
                     selectionActionAvailability =
                         batchSelectionUi.actionAvailability.let { availability ->
@@ -4156,6 +4239,7 @@ internal fun ConversationScreen(
                                             documentUris = pendingDocumentUris,
                                             enabled = !attachmentSendClaim.isHeld,
                                             prepared = mediaDraftState.preparedPreviews(),
+                                            preparing = mediaDraftState.isPreparing,
                                             onPreview = { if (!attachmentSendClaim.isHeld) mediaPreviewIndex = it },
                                             onRemoveMedia = { slot ->
                                                 if (!attachmentSendClaim.isHeld) {
@@ -4867,8 +4951,14 @@ internal fun ConversationScreen(
                                         // mention and marks it read, so the count steps down.
                                         val mentionCount = unreadMentionMessageIds.size
                                         if (!selectionMode && mentionCount > 0) {
+                                            // The badge caps at 99+; the spoken label keeps the real count.
                                             val jumpToMentionLabel =
-                                                stringResource(R.string.conversation_jump_to_mention)
+                                                stringResource(R.string.conversation_jump_to_mention) + ", " +
+                                                    pluralStringResource(
+                                                        R.plurals.unread_mentions_count,
+                                                        mentionCount,
+                                                        mentionCount,
+                                                    )
                                             Surface(
                                                 shape = CircleShape,
                                                 color = MaterialTheme.colorScheme.tertiaryContainer,
@@ -4878,8 +4968,10 @@ internal fun ConversationScreen(
                                                     Modifier
                                                         .height(34.dp)
                                                         .performanceTestTag(PerformanceTestTags.JUMP_TO_MENTION)
-                                                        .semantics { contentDescription = jumpToMentionLabel }
-                                                        .clickable { jumpToNextUnreadMention() },
+                                                        .clickable(role = Role.Button) { jumpToNextUnreadMention() }
+                                                        .clearAndSetSemantics {
+                                                            contentDescription = jumpToMentionLabel
+                                                        },
                                             ) {
                                                 Row(
                                                     verticalAlignment = Alignment.CenterVertically,

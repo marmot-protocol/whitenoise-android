@@ -18,13 +18,13 @@ class ActionColorSurfaceCoverageTest {
         val accountSelector = source("account/AccountSelectorSheet.kt")
 
         assertEquals(
-            "Both text Send and locked-voice Send must use the resolved container",
-            2,
+            "Text Send, Send beside a pinned voice slot and locked-voice Send must use the resolved container",
+            3,
             Regex("""containerColor = actionColors\.container""").findAll(composer).count(),
         )
         assertEquals(
-            "Both text Send and locked-voice Send must use the resolved foreground",
-            2,
+            "Text Send, Send beside a pinned voice slot and locked-voice Send must use the resolved foreground",
+            3,
             Regex("""contentColor = actionColors\.content""").findAll(composer).count(),
         )
 

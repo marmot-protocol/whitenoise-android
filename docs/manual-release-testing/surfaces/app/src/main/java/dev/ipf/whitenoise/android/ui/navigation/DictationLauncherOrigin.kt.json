@@ -1,0 +1,27 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/DictationLauncherOrigin.kt",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "Modifier.dictationLauncherOrigin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/DictationLauncherOrigin.kt",
+        "anchor": "fun Modifier.dictationLauncherOrigin(): Modifier",
+        "test_ids": [
+          "CON-040"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "Current measured dictation launcher entry geometry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/DictationLauncherOrigin.kt",
+        "anchor": "internal class DictationLauncherOrigin",
+        "test_ids": [
+          "CON-040"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": [],
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8"
+}

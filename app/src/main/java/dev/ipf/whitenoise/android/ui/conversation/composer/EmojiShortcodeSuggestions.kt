@@ -2,23 +2,18 @@
 
 package dev.ipf.whitenoise.android.ui.conversation.composer
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextRange
@@ -88,19 +83,16 @@ internal fun EmojiShortcodeSuggestions(
     ) {
         LazyRow(contentPadding = PaddingValues(horizontal = 4.dp)) {
             itemsIndexed(suggestions, key = { _, emoji -> emoji }) { index, emoji ->
-                Surface(
+                EmojiTapTarget(
+                    emoji = emoji,
                     onClick = {
                         val insertion = ShortcodeComposer.insert(field.text, active, field.selection.start, emoji)
                         onPick(TextFieldValue(insertion.text, TextRange(insertion.selection)))
                     },
-                    modifier = Modifier.size(EmojiPickerMinimumCellSize).testTag(emojiSuggestionTestTag(index)),
-                    shape = CircleShape,
-                    color = Color.Transparent,
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        EmojiGlyph(emoji, size = EmojiSuggestionGlyphSize)
-                    }
-                }
+                    modifier = Modifier.testTag(emojiSuggestionTestTag(index)),
+                    glyphSize = EmojiSuggestionGlyphSize,
+                    fitPickerArtwork = false,
+                )
             }
         }
     }

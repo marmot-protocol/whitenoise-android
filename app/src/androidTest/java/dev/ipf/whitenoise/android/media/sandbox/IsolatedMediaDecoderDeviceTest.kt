@@ -27,6 +27,8 @@ import java.io.File
 @RunWith(AndroidJUnit4::class)
 @PullRequestDeviceSmoke
 @MediaContainmentAcceptance
+// These scenarios share real Binder lifecycle probes; added function docs must not force a fixture split.
+@Suppress("LargeClass")
 class IsolatedMediaDecoderDeviceTest {
     /** Each still input gets a fresh generation whose exact Binder death precedes its pixels and the next input. */
     @Test
@@ -177,6 +179,7 @@ class IsolatedMediaDecoderDeviceTest {
             assertDeathPrecedesEachNextInput(context.inputEndpoints())
         }
 
+    /** Isolated Images And Platform Video Use Selected Descriptors. */
     @Test
     fun isolatedImagesAndPlatformVideoUseSelectedDescriptors() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -200,38 +203,138 @@ class IsolatedMediaDecoderDeviceTest {
         val video = File.createTempFile("isolated-video", ".mp4", context.cacheDir)
         try {
             video.writeBytes(verifiedVideoFixture())
-            val probe = requireNotNull(IsolatedMediaDecoder.probe(video, edge = 96, poster = true))
-            assertEquals(320, probe.width)
-            assertEquals(240, probe.height)
-            assertTrue(probe.durationMs >= 9000L)
-            val poster = requireNotNull(probe.poster)
+            val canary = beginMediaCanary(context)
             try {
-                assertTrue(poster.width in 1..96 && poster.height in 1..96)
+                val previousReceipt = IsolatedMediaDecoder.lastAvIsolation
+                val probe = requireNotNull(IsolatedMediaDecoder.probe(video, edge = 96, poster = true))
+                assertEquals(320, probe.width)
+                assertEquals(240, probe.height)
+                assertTrue(probe.durationMs >= 9000L)
+                assertRestrictedMediaWorker(previousReceipt)
+                val poster = requireNotNull(probe.poster)
+                try {
+                    assertTrue(poster.width in 1..96 && poster.height in 1..96)
+                    val pixel = poster.getPixel(poster.width / 2, poster.height / 2)
+                    assertTrue(Color.red(pixel) <= 5 && Color.green(pixel) <= 5 && Color.blue(pixel) <= 5)
+                    assertEquals(255, Color.alpha(pixel))
+                } finally {
+                    poster.recycle()
+                }
             } finally {
-                poster.recycle()
+                canary.delete()
             }
         } finally {
             video.delete()
         }
     }
 
+    /** Audio Waveform And Duration Use Only The Selected Descriptor. */
     @Test
     fun audioWaveformAndDurationUseOnlyTheSelectedDescriptor() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         IsolatedMediaDecoder.install(context)
         val audio = File.createTempFile("isolated-waveform", ".wav", context.cacheDir)
+        val canary = beginMediaCanary(context)
         try {
             audio.writeBytes(pcmWaveFixture())
+            val previousReceipt = IsolatedMediaDecoder.lastAvIsolation
             val waveform = requireNotNull(IsolatedMediaDecoder.waveform(audio))
+            assertRestrictedMediaWorker(previousReceipt)
             assertEquals(dev.ipf.whitenoise.android.audio.AudioWaveformExtractor.BARS, waveform.size)
             assertTrue(waveform.all { it.isFinite() && it in 0f..1f })
             assertTrue(waveform.any { it > 0.05f })
+            val previousProbeReceipt = IsolatedMediaDecoder.lastAvIsolation
             val probe = requireNotNull(IsolatedMediaDecoder.probe(audio, edge = 32, poster = false))
             assertNull(probe.poster)
             assertTrue(probe.durationMs in 100L..300L)
+            assertRestrictedMediaWorker(previousProbeReceipt)
         } finally {
+            canary.delete()
             audio.delete()
         }
+    }
+
+    /** Malformed Automatic Media Cannot Poison Healthy Source Recovery. */
+    @Test
+    fun malformedAutomaticMediaCannotPoisonHealthySourceRecovery() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        IsolatedMediaDecoder.install(context)
+        val source = File.createTempFile("native-media-recovery", ".bin", context.cacheDir)
+        val canary = beginMediaCanary(context)
+        try {
+            repeat(3) {
+                source.writeBytes(verifiedVideoFixture().copyOf(16))
+                assertNull(IsolatedMediaDecoder.probe(source, 32, true))
+                source.writeBytes(verifiedVideoFixture())
+                val previousReceipt = IsolatedMediaDecoder.lastAvIsolation
+                val healthy = requireNotNull(IsolatedMediaDecoder.probe(source, 32, true))
+                try {
+                    assertNotNull(healthy.poster)
+                    assertTrue(healthy.durationMs >= 9000L)
+                    assertRestrictedMediaWorker(previousReceipt)
+                } finally {
+                    healthy.poster?.recycle()
+                }
+            }
+        } finally {
+            canary.delete()
+            source.delete()
+        }
+    }
+
+    /** Paused Seek Poster Uses The Requested Frame And Can Recover To The Start. */
+    @Test
+    fun pausedSeekPosterUsesTheRequestedFrameAndCanRecoverToTheStart() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        IsolatedMediaDecoder.install(context)
+        val source = File.createTempFile("native-seek-colors", ".mp4", context.cacheDir)
+        val canary = beginMediaCanary(context)
+        try {
+            source.writeBytes(android.util.Base64.decode(SEEK_COLORS, android.util.Base64.DEFAULT))
+            val uri = android.net.Uri.fromFile(source)
+            listOf(-1L, Long.MAX_VALUE).forEach { invalid ->
+                val previousReceipt = IsolatedMediaDecoder.lastAvIsolation
+                assertNull(IsolatedMediaDecoder.probeUriAt(context.contentResolver, uri, invalid, 32))
+                org.junit.Assert.assertSame(previousReceipt, IsolatedMediaDecoder.lastAvIsolation)
+            }
+            val targets = listOf(0L to Color.RED, 1500L to Color.BLUE, 1999L to Color.BLUE, 0L to Color.RED)
+            targets.forEach { (time, color) ->
+                val previousReceipt = IsolatedMediaDecoder.lastAvIsolation
+                val probe =
+                    requireNotNull(IsolatedMediaDecoder.probeUriAt(context.contentResolver, uri, time, 32))
+                val bitmap = requireNotNull(probe.poster)
+                try {
+                    val pixel = bitmap.getPixel(bitmap.width / 2, bitmap.height / 2)
+                    assertTrue(kotlin.math.abs(Color.red(pixel) - Color.red(color)) < 50)
+                    assertTrue(kotlin.math.abs(Color.blue(pixel) - Color.blue(color)) < 50)
+                    assertRestrictedMediaWorker(previousReceipt)
+                } finally {
+                    bitmap.recycle()
+                }
+            }
+        } finally {
+            canary.delete()
+            source.delete()
+        }
+    }
+
+    /** Starts the fixture canary used to observe whether media parsing reaches the privileged process. */
+    private fun beginMediaCanary(context: android.content.Context): File =
+        File(context.filesDir, "media-containment-canary").also {
+            check(it.createNewFile()) { "Another fixture owns the private canary" }
+            it.writeText("synthetic-private-media-canary")
+        }
+
+    /** A fresh automatic A/V receipt is required; a still-image reply cannot satisfy this proof. */
+    private fun assertRestrictedMediaWorker(previousReceipt: WorkerIsolation?) {
+        val worker = requireNotNull(IsolatedMediaDecoder.lastAvIsolation)
+        org.junit.Assert.assertNotSame(previousReceipt, worker)
+        assertNotEquals(Process.myUid(), worker.uid)
+        assertTrue(worker.isolated)
+        assertFalse(worker.internetGranted)
+        assertFalse(worker.runtimeInitialized)
+        assertTrue(worker.privateCanaryDenied)
+        assertEquals(android.system.OsConstants.EBADF, worker.inputWriteErrno)
     }
 
     @Test
@@ -387,10 +490,9 @@ class IsolatedMediaDecoderDeviceTest {
             )
             val retired = stubbornEndpoint.getLong("retire_elapsed_ns")
             val died = stubbornEndpoint.getLong("death_observed_elapsed_ns")
-            val grace =
-                java.util.concurrent.TimeUnit.MILLISECONDS
-                    .toNanos(MediaWorkerPool.RETIRE_ESCALATION_MS)
-            assertTrue("The worker ignored RETIRE and outlived the escalation grace", died - retired >= grace)
+            // The full pool-clock grace is checked by MediaWorkerRetirementBindingTest.
+            // This later Binder-send witness establishes ordering, not that clock's origin.
+            assertTrue("The parent requested RETIRE before observing death", died > retired)
             assertTrue("The next input was queued while the stubborn worker lived", queued < died)
             assertDeathPrecedesEachNextInput(inputs)
             assertFalse(WorkerCanary.processAlive(canary.pid))
@@ -435,10 +537,9 @@ class IsolatedMediaDecoderDeviceTest {
             )
             val retired = abandoned.getLong("retire_elapsed_ns")
             val died = abandoned.getLong("death_observed_elapsed_ns")
-            val grace =
-                java.util.concurrent.TimeUnit.MILLISECONDS
-                    .toNanos(MediaWorkerPool.RETIRE_ESCALATION_MS)
-            assertTrue("The worker ignored RETIRE and outlived the escalation grace", died - retired >= grace)
+            // The full pool-clock grace is checked by MediaWorkerRetirementBindingTest.
+            // This later Binder-send witness establishes ordering, not that clock's origin.
+            assertTrue("The parent requested RETIRE before observing death", died > retired)
             // Its own watchdog would end it after six seconds; the escalation must stop it far sooner.
             val watchdog =
                 java.util.concurrent.TimeUnit.MILLISECONDS
@@ -477,13 +578,12 @@ class IsolatedMediaDecoderDeviceTest {
             assertFalse("No request is waiting, yet the worker must die", endpoint.isNull("death_observed_elapsed_ns"))
             val retired = endpoint.getLong("retire_elapsed_ns")
             val died = endpoint.getLong("death_observed_elapsed_ns")
-            val grace =
-                java.util.concurrent.TimeUnit.MILLISECONDS
-                    .toNanos(MediaWorkerPool.RETIRE_ESCALATION_MS)
             val watchdog =
                 java.util.concurrent.TimeUnit.MILLISECONDS
                     .toNanos(MediaDecodePolicy.WATCHDOG_MS)
-            assertTrue("The worker ignored RETIRE", died - retired >= grace)
+            // The full pool-clock grace is checked by MediaWorkerRetirementBindingTest.
+            // This later Binder-send witness establishes ordering, not that clock's origin.
+            assertTrue("The parent requested RETIRE before observing death", died > retired)
             assertTrue("Android stopped it before the watchdog", died - retired < watchdog / 2)
             assertEquals(1, context.inputEndpoints().size)
             val exit = awaitExitRecordFor(endpoint.getString("instance"), since)
@@ -516,7 +616,7 @@ class IsolatedMediaDecoderDeviceTest {
         }
     }
 
-    /** Waits for a witnessed DECODE, not merely admission before the Messenger send. */
+    /** Waits for a witnessed parent-side DECODE, not merely admission before the Messenger send. */
     private fun awaitDispatch(
         context: MediaWorkerBaselineBinding,
         owner: IsolatedMediaTransport,
@@ -547,6 +647,7 @@ class IsolatedMediaDecoderDeviceTest {
 
     private fun png(color: Int = Color.RED): ByteArray = imageBytes(Bitmap.CompressFormat.PNG, color)
 
+    /** Produces deterministic bounded encoded-image fixture bytes for the selected decode operation. */
     private fun imageBytes(
         format: Bitmap.CompressFormat,
         color: Int,
@@ -558,5 +659,35 @@ class IsolatedMediaDecoderDeviceTest {
         } finally {
             bitmap.recycle()
         }
+    }
+
+    private companion object {
+        // Synthetic 2-second H.264 fixture: one red second followed by one blue second, four frames/second.
+        const val SEEK_COLORS =
+            "AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAODbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAAB9AAAQAAAQAA" +
+                "AAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAA" +
+                "Aq50cmFrAAAAXHRraGQAAAADAAAAAAAAAAAAAAABAAAAAAAAB9AAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAA" +
+                "AAAAAAAAAAAAAABAAAAAAEAAAAAwAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAfQAAAgAAABAAAAAAImbWRpYQAAACBtZGhk" +
+                "AAAAAAAAAAAAAAAAAABAAAAAgABVxAAAAAAALWhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAABWaWRlb0hhbmRsZXIAAAAB0W1p" +
+                "bmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAAZFzdGJsAAAAwXN0c2QA" +
+                "AAAAAAAAAQAAALFhdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAEAAMABIAAAASAAAAAAAAAABFUxhdmM2MS4xOS4xMDEgbGli" +
+                "eDI2NAAAAAAAAAAAAAAAGP//AAAAN2F2Y0MBZAAK/+EAGWdkAAqscgREewEQAAADABAAAAMAgPEiWEYBAAdo6EOCMsiw/fj4AAAA" +
+                "ABBwYXNwAAAAAQAAAAEAAAAUYnRydAAAAAAAAA2AAAAAAAAAABhzdHRzAAAAAAAAAAEAAAAIAAAQAAAAABRzdHNzAAAAAAAAAAEA" +
+                "AAABAAAAOGN0dHMAAAAAAAAABQAAAAEAACAAAAAAAQAAgAAAAAABAAAwAAAAAAIAAAAAAAAAAwAAEAAAAAAcc3RzYwAAAAAAAAAB" +
+                "AAAAAQAAAAgAAAABAAAANHN0c3oAAAAAAAAAAAAAAAgAAALdAAAAGgAAABwAAAANAAAADQAAABEAAAARAAAAEQAAABRzdGNvAAAA" +
+                "AAAAAAEAAAOzAAAAYXVkdGEAAABZbWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAbWRpcmFwcGwAAAAAAAAAAAAAAAAsaWxzdAAAACSp" +
+                "dG9vAAAAHGRhdGEAAAABAAAAAExhdmY2MS43LjEwMwAAAAhmcmVlAAADaG1kYXQAAAKvBgX//6vcRem95tlIt5Ys2CDZI+7veDI2" +
+                "NCAtIGNvcmUgMTY0IHIzMTA4IDMxZTE5ZjkgLSBILjI2NC9NUEVHLTQgQVZDIGNvZGVjIC0gQ29weWxlZnQgMjAwMy0yMDIzIC0g" +
+                "aHR0cDovL3d3dy52aWRlb2xhbi5vcmcveDI2NC5odG1sIC0gb3B0aW9uczogY2FiYWM9MSByZWY9MTYgZGVibG9jaz0xOjA6MCBh" +
+                "bmFseXNlPTB4MzoweDEzMyBtZT11bWggc3VibWU9MTAgcHN5PTEgcHN5X3JkPTEuMDA6MC4wMCBtaXhlZF9yZWY9MSBtZV9yYW5n" +
+                "ZT0yNCBjaHJvbWFfbWU9MSB0cmVsbGlzPTIgOHg4ZGN0PTEgY3FtPTAgZGVhZHpvbmU9MjEsMTEgZmFzdF9wc2tpcD0xIGNocm9t" +
+                "YV9xcF9vZmZzZXQ9LTIgdGhyZWFkcz0xIGxvb2thaGVhZF90aHJlYWRzPTEgc2xpY2VkX3RocmVhZHM9MCBucj0wIGRlY2ltYXRl" +
+                "PTEgaW50ZXJsYWNlZD0wIGJsdXJheV9jb21wYXQ9MCBjb25zdHJhaW5lZF9pbnRyYT0wIGJmcmFtZXM9OCBiX3B5cmFtaWQ9MiBi" +
+                "X2FkYXB0PTIgYl9iaWFzPTAgZGlyZWN0PTMgd2VpZ2h0Yj0xIG9wZW5fZ29wPTAgd2VpZ2h0cD0yIGtleWludD0yNTAga2V5aW50" +
+                "X21pbj00IHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByY19sb29rYWhlYWQ9NjAgcmM9Y3JmIG1idHJlZT0xIGNyZj0xOC4w" +
+                "IHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCBpcF9yYXRpbz0xLjQwIGFxPTE6MS4wMACAAAAAJmWIgQACX/7u" +
+                "gr4FNs0QPwcsKsvJ+Zz46oL00L6dDupUQrYoBcbBAAAAFkGaCOxjQfAS4FAB/A+Ae6CH//7WqQ4AAAAYQZ4QZxBH/84kP+6Kw9VH" +
+                "IeKGnLsL+5gvAAAACQGeGC6IIf8BWwAAAAkBnhhOiCH/AVsAAAANAZ4YjUgh/9gK/+55uQAAAA0BnhitSCH/2Ar/7nm5AAAADQGe" +
+                "GM1IIf/YCv/uebk="
     }
 }

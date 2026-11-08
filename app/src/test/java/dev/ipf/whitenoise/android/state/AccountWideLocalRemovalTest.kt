@@ -171,6 +171,65 @@ class AccountWideLocalRemovalTest {
             assertEquals(emptyList<String>(), read.chatListItems(emptyList()).map { it.id })
         }
 
+    /**
+     * #3586: a read keeps preparing the unread filter while the window only holds chats it presented, and stops
+     * once the window holds a chat it never saw, which a later eviction would otherwise lose, or loses one ambiguously.
+     */
+    @Test fun aReadPreparesTheWindowUntilItMissesARetainedChatOrLosesOne() =
+        runTest {
+            val fixture =
+                localGroupDeleteFixture(
+                    controllers,
+                    configureState = { state, _ ->
+                        state.liveSubscriptionOverrides.chatList =
+                            reader { listOf(presentedRow(LOCAL_DELETE_GROUP), presentedRow(SURVIVOR)) }
+                    },
+                )
+            val read = requireNotNull(fixture.controller.loadAccountWideForwardTargets())
+            assertTrue(read.preparesCurrentWindow)
+            fixture.controller.applyChatListRow(chatRow(SURVIVOR))
+            assertTrue("a presented chat entering the window keeps it serving", read.preparesCurrentWindow)
+
+            fixture.controller.applyChatListRow(chatRow(ARRIVAL))
+            assertTrue("an addition keeps the read complete", read.coversCurrentMembership)
+            assertFalse("but the read never saw the new chat", read.preparesCurrentWindow)
+
+            fixture.controller.applyChatListSubscriptionUpdate(
+                LOCAL_DELETE_ACCOUNT,
+                dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi.RemoveRow(
+                    dev.ipf.marmotkit.ChatListUpdateTriggerFfi.REMOVED,
+                    ARRIVAL,
+                ),
+            )
+            assertFalse("a removal of unknown cause ends it", read.preparesCurrentWindow)
+            val fresh = requireNotNull(fixture.controller.loadAccountWideForwardTargets())
+            assertTrue("a read presenting every retained chat serves again", fresh.preparesCurrentWindow)
+        }
+
+    /**
+     * #3586: a chat restored after a failed local deletion stays hidden from the earlier read by id, so it needs a
+     * fresh read.
+     */
+    @Test fun aChatRestoredAfterAFailedLocalDeletionNeedsAFreshRead() =
+        runTest {
+            val entered = CompletableDeferred<Unit>()
+            val release = CompletableDeferred<Unit>()
+            val fixture = heldRemovalFixture(entered, release, beforeCommit = { error("delete rejected") })
+            val read = requireNotNull(fixture.controller.loadAccountWideForwardTargets())
+            assertTrue(read.preparesCurrentWindow)
+            val deletion = async { fixture.controller.deleteGroupLocalFromChatList(LOCAL_DELETE_GROUP) }
+            try {
+                entered.await()
+                release.complete(Unit)
+                assertFalse(deletion.await())
+                assertTrue(fixture.controller.containsGroup(LOCAL_DELETE_GROUP))
+                assertFalse(read.preparesCurrentWindow)
+            } finally {
+                release.complete(Unit)
+                deletion.cancelAndJoin()
+            }
+        }
+
     /** The first native response captures rows before deletion, then returns them only after release. */
     private fun TestScope.fixtureWithHeldRead(
         readEntered: CompletableDeferred<Unit>,

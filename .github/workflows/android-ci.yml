@@ -104,7 +104,7 @@ jobs:
     needs: changes
     name: Validate tooling and documentation contracts
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -191,6 +191,12 @@ jobs:
 
       - name: Test DEX method budget reporting
         run: python3 -m unittest scripts/test_dex_method_budget.py
+
+      - name: Test analytics, invite-localization, media-latency and tooling-test wiring
+        run: python3 -m unittest scripts.test_invite_failure_localization scripts.test_media_latency_report scripts.test_product_analytics_config scripts.test_tooling_tests_are_wired
+
+      - name: Test media A/V decoder, sandbox and report tooling
+        run: python3 -m unittest scripts.test_check_media_av_paced_report scripts.test_media_seccomp_filter scripts.test_media_video_geometry scripts.test_prepare_media_decoder scripts.test_summarize_media_av_capability
 
       - name: Test package-replacement startup reporter
         run: bash .github/scripts/test-package-replacement-startup-report.sh

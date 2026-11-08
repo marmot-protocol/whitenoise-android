@@ -26,6 +26,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
+import dev.ipf.whitenoise.android.appModuleSource
 import dev.ipf.whitenoise.android.core.ReplyMediaKind
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.state.WCAG_AA_NORMAL_TEXT_CONTRAST
@@ -45,7 +46,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import java.io.File
 
 /** Real bubble/card surfaces pin quote separation independently of message direction and quoted author. */
 @RunWith(RobolectricTestRunner::class)
@@ -110,8 +110,7 @@ class ReplyQuoteContrastScreenshotTest {
     @Test
     fun productionQuotesUseTheSharedPolicyAtBothRenderingBoundaries() {
         val body =
-            File("src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt")
-                .readText()
+            appModuleSource("src/main/java/dev/ipf/whitenoise/android/ui/conversation/messages/MessageBubble.kt")
                 .functionBody("MessageBubble")
         assertTrue(body.contains("messageReplyQuoteColors("))
         assertTrue(body.contains("val replyFillColor = replyQuoteColors.container"))

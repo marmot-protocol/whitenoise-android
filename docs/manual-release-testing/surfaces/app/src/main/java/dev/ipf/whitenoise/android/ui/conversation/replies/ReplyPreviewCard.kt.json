@@ -38,6 +38,78 @@
         "test_ids": [
           "MSG-006"
         ]
+      },
+      {
+        "surface": "R.string.message_reply_quote_description",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/replies/ReplyPreviewCard.kt",
+        "anchor": "R.string.message_reply_quote_description",
+        "test_ids": [
+          "AXY-013",
+          "MSG-006"
+        ]
+      },
+      {
+        "surface": "R.string.reply",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/replies/ReplyPreviewCard.kt",
+        "anchor": "R.string.reply",
+        "test_ids": [
+          "AXY-013",
+          "MSG-006"
+        ]
+      },
+      {
+        "surface": "R.string.reply_media_document",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/replies/ReplyPreviewCard.kt",
+        "anchor": "R.string.reply_media_document",
+        "test_ids": [
+          "AXY-013",
+          "MSG-006"
+        ]
+      },
+      {
+        "surface": "R.string.reply_media_photo",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/replies/ReplyPreviewCard.kt",
+        "anchor": "R.string.reply_media_photo",
+        "test_ids": [
+          "AXY-013",
+          "MSG-006"
+        ]
+      },
+      {
+        "surface": "R.string.reply_media_video",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/replies/ReplyPreviewCard.kt",
+        "anchor": "R.string.reply_media_video",
+        "test_ids": [
+          "AXY-013",
+          "MSG-006"
+        ]
+      },
+      {
+        "surface": "R.string.reply_media_voice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/replies/ReplyPreviewCard.kt",
+        "anchor": "R.string.reply_media_voice",
+        "test_ids": [
+          "AXY-013",
+          "MSG-006"
+        ]
+      },
+      {
+        "surface": "R.string.reply_you",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/replies/ReplyPreviewCard.kt",
+        "anchor": "R.string.reply_you",
+        "test_ids": [
+          "AXY-013",
+          "MSG-006"
+        ]
+      },
+      {
+        "surface": "R.string.toast_original_message_unavailable",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/replies/ReplyPreviewCard.kt",
+        "anchor": "R.string.toast_original_message_unavailable",
+        "test_ids": [
+          "AXY-013",
+          "MSG-006"
+        ]
       }
     ]
   },

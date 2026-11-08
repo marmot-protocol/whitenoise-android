@@ -10,10 +10,10 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.DateTimeFormatState
+import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.search.GlobalSearchDateFilterSelection
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 
 internal const val GLOBAL_SEARCH_DATE_FILTER_SECTION_TAG = "global-search-date-filter-section"
 
@@ -52,12 +52,9 @@ internal fun globalSearchCustomDateRangeLabel(
     to: LocalDate,
 ): String {
     val locale = LocalConfiguration.current.locales[0]
-    val dateFormatter =
-        remember(locale) {
-            DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
-        }
-    val fromLabel = remember(from, locale) { from.format(dateFormatter) }
-    val toLabel = remember(to, locale) { to.format(dateFormatter) }
+    val dateFormat = DateTimeFormatState.dateFormat
+    val fromLabel = remember(from, locale, dateFormat) { IdentityFormatter.date(from, locale, dateFormat) }
+    val toLabel = remember(to, locale, dateFormat) { IdentityFormatter.date(to, locale, dateFormat) }
     return stringResource(
         R.string.global_search_date_custom_summary,
         fromLabel,

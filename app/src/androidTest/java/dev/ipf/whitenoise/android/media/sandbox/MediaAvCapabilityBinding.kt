@@ -523,7 +523,7 @@ private class AvCapabilityWorker(
 }
 
 /** Consume only the bounded primitive reply and copy pixels after the caller's exact-death barrier. */
-private object AvCapabilityEvidence {
+internal object AvCapabilityEvidence {
     fun validate(
         result: Bundle,
         output: SharedMemory,
@@ -563,6 +563,11 @@ private object AvCapabilityEvidence {
         JSONObject()
             .put("request", id)
             .put("kernel_reply_uid", result.getInt("uid"))
+            .put("isolated", result.getBoolean("isolated"))
+            .put("internet_granted", result.getBoolean("internetGranted"))
+            .put("runtime_initialized", result.getBoolean("runtimeInitialized"))
+            .put("private_canary_denied", result.getBoolean("privateCanaryDenied"))
+            .put("private_canary_errno", result.getInt("privateCanaryErrno"))
             .put("success", result.getBoolean("success"))
             .put("death_observed_before_output_read", true)
             .put("elapsed_ms", elapsed)

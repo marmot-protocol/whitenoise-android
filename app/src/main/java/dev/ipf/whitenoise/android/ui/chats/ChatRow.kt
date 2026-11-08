@@ -33,8 +33,11 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -287,6 +290,21 @@ internal fun ChatRow(
                     )
             else -> Modifier
         }
+    val openProfileLabel = stringResource(R.string.chat_list_search_open_profile)
+    val profileActionModifier =
+        if (!selectionMode && interactionsEnabled && openableDmAvatarAccount != null) {
+            Modifier.semantics {
+                customActions =
+                    listOf(
+                        CustomAccessibilityAction(openProfileLabel) {
+                            onOpenProfile(appState.npub(openableDmAvatarAccount))
+                            true
+                        },
+                    )
+            }
+        } else {
+            Modifier
+        }
     val pinned = item.pinned()
     val deliveryIndicator = item.projectedDeliveryIndicator()
     val actionColors = accountActionColors(appState, accountRef)
@@ -294,6 +312,7 @@ internal fun ChatRow(
         modifier =
             modifier
                 .then(rowModifier)
+                .then(profileActionModifier)
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp)
                 .testTag("chat.row.${item.id}"),
@@ -328,8 +347,10 @@ internal fun ChatRow(
             Box(
                 modifier =
                     if (!selectionMode && openableDmAvatarAccount != null) {
+                        // The row offers Open profile to the screen reader; a separate unlabelled stop would not.
                         Modifier
                             .clip(CircleShape)
+                            .clearAndSetSemantics {}
                             .clickable(enabled = interactionsEnabled, role = Role.Button) {
                                 onOpenProfile(appState.npub(openableDmAvatarAccount))
                             }

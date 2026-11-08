@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.ui.conversation.media
 
-import android.text.format.DateUtils
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -52,6 +51,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -68,6 +68,7 @@ import androidx.compose.ui.unit.offset
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.media.AttachmentTooLargeToPresentException
 import dev.ipf.whitenoise.android.media.IDENTITY_IMAGE_SOURCE_MAX_BYTES
 import dev.ipf.whitenoise.android.media.IdentityImageCropShape
@@ -88,6 +89,7 @@ import dev.ipf.whitenoise.android.ui.common.IdentityImageCropDialog
 import dev.ipf.whitenoise.android.ui.common.SwipeDismissibleSnackbar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseDropdownMenu
 import dev.ipf.whitenoise.android.ui.common.clampViewerPageIndex
+import dev.ipf.whitenoise.android.ui.common.currentDateTimeDisplay
 import dev.ipf.whitenoise.android.ui.common.resetViewerTransform
 import dev.ipf.whitenoise.android.ui.common.viewerPagerScrollEnabled
 import dev.ipf.whitenoise.android.ui.conversation.PlaybackDialog
@@ -348,7 +350,7 @@ internal fun ConversationMediaViewer(
     onShareRequest: (suspend (MediaViewerShareRequest) -> Result<Unit>)? = null,
     selectedAttachment: ConversationMediaViewerAttachmentId? = null,
     onSelectedAttachmentChange: (ConversationMediaViewerAttachmentId) -> Unit = {},
-    onVideoPlayerChanged: (androidx.media3.exoplayer.ExoPlayer?) -> Unit = {},
+    onVideoPlayerChanged: (androidx.media3.common.Player?) -> Unit = {},
     videoFileResolver: VideoViewerFileResolver = ::resolveVideoViewerFile,
     onGoToMessage: ((MediaViewerPage) -> Unit)? = null,
     forwardActions: MediaViewerForwardActions? = null,
@@ -412,7 +414,7 @@ internal fun FullScreenMediaViewer(
     onDismiss: () -> Unit,
     onShareRequest: (suspend (MediaViewerShareRequest) -> Result<Unit>)? = null,
     onCurrentPageChange: (MediaViewerPage) -> Unit = {},
-    onVideoPlayerChanged: (androidx.media3.exoplayer.ExoPlayer?) -> Unit = {},
+    onVideoPlayerChanged: (androidx.media3.common.Player?) -> Unit = {},
     videoFileResolver: VideoViewerFileResolver = ::resolveVideoViewerFile,
     onGoToMessage: ((MediaViewerPage) -> Unit)? = null,
     forwardActions: MediaViewerForwardActions? = null,
@@ -592,12 +594,18 @@ internal fun FullScreenMediaViewer(
         chromeVisible = mediaViewerChromeVisibilityAfterPageChange(chromeVisible, currentPageIsVideo)
     }
 
+    val viewerLocale = LocalConfiguration.current.locales[0]
+    val viewerDisplay = currentDateTimeDisplay()
     val currentRecordedAtLabel =
-        DateUtils.formatDateTime(
-            context,
-            currentPage.recordedAt.toLong() * 1000L,
-            DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_ABBREV_ALL,
-        )
+        remember(currentPage.recordedAt, viewerLocale, viewerDisplay) {
+            // Like the platform label it replaces, this year's dates omit the year.
+            IdentityFormatter.dateTime(
+                currentPage.recordedAt,
+                viewerLocale,
+                display = viewerDisplay,
+                withoutYear = IdentityFormatter.isCurrentYear(currentPage.recordedAt),
+            )
+        }
 
     var closingMotion by remember { mutableStateOf(false) }
     val openingMotionAttachment =
@@ -801,6 +809,7 @@ internal fun FullScreenMediaViewer(
                                                 file,
                                                 request.reference.fileName,
                                                 request.reference.mediaType,
+                                                chooserTitle = shareChooserTitle,
                                                 beforeLaunch = { requireExportPageOwner(selected, controller) },
                                             ).getOrThrow()
                                         }

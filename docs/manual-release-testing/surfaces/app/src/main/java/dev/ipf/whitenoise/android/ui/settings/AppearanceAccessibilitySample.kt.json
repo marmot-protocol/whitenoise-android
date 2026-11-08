@@ -10,6 +10,30 @@
         "test_ids": [
           "SET-007"
         ]
+      },
+      {
+        "surface": "R.string.appearance_preview_intro",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceAccessibilitySample.kt",
+        "anchor": "R.string.appearance_preview_intro",
+        "test_ids": [
+          "SET-007"
+        ]
+      },
+      {
+        "surface": "R.string.show",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceAccessibilitySample.kt",
+        "anchor": "R.string.show",
+        "test_ids": [
+          "SET-007"
+        ]
+      },
+      {
+        "surface": "R.string.hide",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceAccessibilitySample.kt",
+        "anchor": "R.string.hide",
+        "test_ids": [
+          "SET-007"
+        ]
       }
     ],
     "composable_surfaces": [
@@ -17,6 +41,22 @@
         "surface": "AppearanceAccessibilitySample",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceAccessibilitySample.kt",
         "anchor": "fun AppearanceAccessibilitySample(",
+        "test_ids": [
+          "SET-007"
+        ]
+      },
+      {
+        "surface": "AppearancePreviewDisclosure",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceAccessibilitySample.kt",
+        "anchor": "fun AppearancePreviewDisclosure(",
+        "test_ids": [
+          "SET-007"
+        ]
+      },
+      {
+        "surface": "AppearancePreviewContent",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/AppearanceAccessibilitySample.kt",
+        "anchor": "fun AppearancePreviewContent(",
         "test_ids": [
           "SET-007"
         ]
