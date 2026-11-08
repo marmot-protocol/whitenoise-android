@@ -17,11 +17,12 @@ internal object ForeignContentSource {
      * ContentResolver drops Android's `user@` prefix before choosing a provider, so the gate does too. Callers keep
      * the original URI for the read so the sender's grant still applies.
      */
-    fun providerUri(uri: Uri): Uri? {
-        if (uri.scheme != ContentResolver.SCHEME_CONTENT) return null
-        val authority = uri.authority?.substringAfterLast('@')?.takeIf { it.isNotBlank() } ?: return null
-        return uri.buildUpon().authority(authority).build()
-    }
+    fun providerUri(uri: Uri): Uri? =
+        uri.authority
+            ?.takeIf { uri.scheme == ContentResolver.SCHEME_CONTENT }
+            ?.substringAfterLast('@')
+            ?.takeIf { it.isNotBlank() }
+            ?.let { authority -> uri.buildUpon().authority(authority).build() }
 
     /** True when [providerUri] resolves to a provider running under this app's uid. */
     fun isAppOwned(
