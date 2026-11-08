@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -17,26 +16,84 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.toRect
+import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 import android.view.WindowInsets as PlatformWindowInsets
 
 /**
+ * How far up the side wall a display corner of reported radius R can curve. Many phones mask a smooth
+ * (squircle) corner whose curve starts about 1.53 R above the bottom edge, not at R.
+ */
+private const val DISPLAY_CORNER_CURVE_EXTENT_FACTOR = 1.53f
+
+/**
  * Bottom corner radius for a full-width panel whose bottom edge sits [bottomGap] above the window's
- * bottom edge. A rounded display corner of radius [displayCornerRadius] cuts into any corner whose
- * radius is below `displayCornerRadius - bottomGap`; a larger radius always stays inside the visible
- * display, so the panel keeps [designRadius] unless the display needs more.
+ * bottom edge. The display corner of reported radius [displayCornerRadius] curves away from the side
+ * walls up to [DISPLAY_CORNER_CURVE_EXTENT_FACTOR] times that radius above the bottom edge. A panel corner
+ * of radius `extent - bottomGap` lies inside that curve, so the panel keeps [designRadius] unless the
+ * display needs more. Using the bare reported radius would leave the two curves touching where the
+ * panel's side wall starts to bend, and a smooth display corner clips the wall there.
  */
 internal fun bottomPanelBottomCornerRadius(
     displayCornerRadius: Dp,
     bottomGap: Dp,
     designRadius: Dp = Radii.xxl,
-): Dp = maxOf(designRadius, displayCornerRadius - bottomGap)
+): Dp = maxOf(designRadius, displayCornerRadius * DISPLAY_CORNER_CURVE_EXTENT_FACTOR - bottomGap)
+
+/**
+ * Corner radii in pixels for a bottom panel of [height]: the bottom corners keep [bottomRadius] (capped by
+ * the height and half the width), and the top corners give way first when the panel is too short for both.
+ * [androidx.compose.foundation.shape.RoundedCornerShape] would shrink all four corners instead, pulling
+ * the bottom corners back into the display's curve.
+ */
+internal fun bottomPanelCornerRadiiPx(
+    width: Float,
+    height: Float,
+    topRadius: Float,
+    bottomRadius: Float,
+): Pair<Float, Float> {
+    val bottom = bottomRadius.coerceIn(0f, minOf(height, width / 2))
+    val top = topRadius.coerceIn(0f, maxOf(0f, minOf(height - bottom, width / 2)))
+    return top to bottom
+}
+
+/** Rounded rectangle with [top] and [bottom] corner radii; see [bottomPanelCornerRadiiPx]. */
+private data class BottomPanelShape(
+    private val top: Dp,
+    private val bottom: Dp,
+) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density,
+    ): Outline {
+        val (topPx, bottomPx) =
+            with(density) {
+                bottomPanelCornerRadiiPx(size.width, size.height, top.toPx(), bottom.toPx())
+            }
+        return Outline.Rounded(
+            RoundRect(
+                rect = size.toRect(),
+                topLeft = CornerRadius(topPx),
+                topRight = CornerRadius(topPx),
+                bottomRight = CornerRadius(bottomPx),
+                bottomLeft = CornerRadius(bottomPx),
+            ),
+        )
+    }
+}
 
 /**
  * Shape for panels docked above the system navigation bar or keyboard: the sheet's 28 dp top corners,
@@ -60,14 +117,7 @@ internal fun rememberBottomPanelShape(): Shape {
             }
         }
     }
-    return remember(bottomRadius) {
-        RoundedCornerShape(
-            topStart = Radii.xxl,
-            topEnd = Radii.xxl,
-            bottomStart = bottomRadius,
-            bottomEnd = bottomRadius,
-        )
-    }
+    return remember(bottomRadius) { BottomPanelShape(top = Radii.xxl, bottom = bottomRadius) }
 }
 
 /**

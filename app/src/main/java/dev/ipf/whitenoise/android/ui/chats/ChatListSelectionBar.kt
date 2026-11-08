@@ -1,7 +1,6 @@
 package dev.ipf.whitenoise.android.ui.chats
 
 import androidx.annotation.DrawableRes
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -38,8 +37,8 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.common.BottomPanelSurface
 import dev.ipf.whitenoise.android.ui.navigation.floatingDictationFooter
-import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
 /** Selection title and Close remain separate from the prototype's pinned bulk controls. */
 @Suppress("FunctionNaming")
@@ -115,169 +114,175 @@ internal fun ChatListSelectionControls(
         stringResource(
             if (archiveAction == ChatListBulkArchiveAction.Archive) R.string.archive else R.string.unarchive,
         )
-    // Icon actions wrap as whole 48 dp targets at narrow widths.
-    FlowRow(
-        Modifier
-            .floatingDictationFooter()
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin, vertical = WhiteNoiseSpacing.Related)
-            .testTag("chats.selectionControls")
-            .semantics {
-                liveRegion = LiveRegionMode.Polite
-                contentDescription = description
-            },
-        horizontalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-        verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
-        itemVerticalAlignment = Alignment.CenterVertically,
-    ) {
-        DirectSelectionAction(
-            label = selectAllLabel,
-            icon = if (allVisibleSelected) R.drawable.ic_deselect_all else R.drawable.ic_select_all,
-            enabled = actionsEnabled,
-            modifier = Modifier.testTag("chats.selectAllAction"),
-            onClick = { perform(if (allVisibleSelected) onDeselectAll else onSelectAll) },
-        )
-        DirectSelectionAction(
-            label = archiveLabel,
-            icon =
-                if (archiveAction == ChatListBulkArchiveAction.Archive) {
-                    R.drawable.ic_archive
-                } else {
-                    R.drawable.ic_unarchive
+    // The same rounded bottom panel as message selection; icon actions wrap as whole 48 dp targets.
+    BottomPanelSurface(Modifier.floatingDictationFooter().navigationBarsPadding()) {
+        FlowRow(
+            Modifier
+                .fillMaxWidth()
+                .padding(4.dp)
+                .testTag("chats.selectionControls")
+                .semantics {
+                    liveRegion = LiveRegionMode.Polite
+                    contentDescription = description
                 },
-            enabled = actionsEnabled,
-            onClick = { perform(onArchive) },
-        )
-        if (showAddToFolder) {
+            itemVerticalAlignment = Alignment.CenterVertically,
+        ) {
             DirectSelectionAction(
-                label = stringResource(R.string.chat_list_action_add_to_folder),
-                icon = R.drawable.ic_folder_add,
+                label = selectAllLabel,
+                icon = if (allVisibleSelected) R.drawable.ic_deselect_all else R.drawable.ic_select_all,
                 enabled = actionsEnabled,
-                onClick = { perform(onAddToFolder) },
+                modifier = Modifier.testTag("chats.selectAllAction"),
+                onClick = { perform(if (allVisibleSelected) onDeselectAll else onSelectAll) },
             )
-        }
-        if (showMarkRead) {
             DirectSelectionAction(
-                stringResource(R.string.chat_row_action_mark_read),
-                chatReadIcon(markRead = true),
-                actionsEnabled,
-            ) {
-                perform(onMarkRead)
-            }
-        }
-        if (showMarkUnread) {
-            DirectSelectionAction(
-                stringResource(R.string.chat_row_action_mark_unread),
-                chatReadIcon(markRead = false),
-                actionsEnabled,
-            ) {
-                perform(onMarkUnread)
-            }
-        }
-        if (showMute) {
-            DirectSelectionAction(
-                stringResource(R.string.chat_row_action_mute),
-                R.drawable.ic_notifications_off,
-                actionsEnabled,
-            ) {
-                perform { onSetMuted(true) }
-            }
-        }
-        if (showUnmute) {
-            DirectSelectionAction(
-                stringResource(R.string.chat_row_action_unmute),
-                R.drawable.ic_settings_notifications,
-                actionsEnabled,
-            ) {
-                perform { onSetMuted(false) }
-            }
-        }
-        if (showPin) {
-            DirectSelectionAction(
-                stringResource(R.string.chat_row_action_pin),
-                R.drawable.ic_push_pin,
-                actionsEnabled,
-            ) {
-                perform { onSetPinned(true) }
-            }
-        }
-        if (showUnpin) {
-            DirectSelectionAction(stringResource(R.string.chat_row_action_unpin), R.drawable.ic_unpin, actionsEnabled) {
-                perform { onSetPinned(false) }
-            }
-        }
-        onAlternateArchive?.let { alternate ->
-            DirectSelectionAction(
-                stringResource(
-                    if (archiveAction == ChatListBulkArchiveAction.Archive) R.string.unarchive else R.string.archive,
-                ),
-                if (archiveAction == ChatListBulkArchiveAction.Archive) {
-                    R.drawable.ic_unarchive
-                } else {
-                    R.drawable.ic_archive
-                },
-                actionsEnabled,
-            ) { perform(alternate) }
-        }
-        onExcludeFromFolder?.let { exclude ->
-            DirectSelectionAction(
-                stringResource(R.string.folder_exclude_chat),
-                R.drawable.ic_folder_remove,
-                actionsEnabled,
-            ) {
-                perform(exclude)
-            }
-        }
-        if (showMovePinnedUp) {
-            DirectSelectionAction(
-                stringResource(R.string.chat_row_action_move_up),
-                R.drawable.ic_arrow_up,
-                actionsEnabled,
-            ) {
-                perform { onMovePinned(-1) }
-            }
-        }
-        if (showMovePinnedDown) {
-            DirectSelectionAction(
-                stringResource(R.string.chat_row_action_move_down),
-                R.drawable.ic_arrow_down,
-                actionsEnabled,
-            ) {
-                perform { onMovePinned(1) }
-            }
-        }
-        onDeleteLocal?.let { deleteLocal ->
-            DirectSelectionAction(
-                label = stringResource(R.string.delete_from_device),
-                icon = R.drawable.ic_delete,
-                enabled = actionsEnabled,
-                destructive = true,
-                onClick = { perform(deleteLocal) },
-            )
-        }
-        if (showDelete) {
-            DirectSelectionAction(
-                label = deleteLabel,
+                label = archiveLabel,
                 icon =
-                    if (deleteLabel == stringResource(R.string.leave_and_delete)) {
-                        R.drawable.ic_logout
+                    if (archiveAction == ChatListBulkArchiveAction.Archive) {
+                        R.drawable.ic_archive
                     } else {
-                        R.drawable.ic_delete
+                        R.drawable.ic_unarchive
                     },
                 enabled = actionsEnabled,
-                destructive = true,
-                onClick = { perform(onDelete) },
+                onClick = { perform(onArchive) },
             )
-        }
-        abandonLabel?.let { label ->
-            DirectSelectionAction(
-                label = label,
-                icon = R.drawable.ic_person_remove,
-                enabled = actionsEnabled,
-                destructive = true,
-                onClick = { perform(onAbandon) },
-            )
+            if (showAddToFolder) {
+                DirectSelectionAction(
+                    label = stringResource(R.string.chat_list_action_add_to_folder),
+                    icon = R.drawable.ic_folder_add,
+                    enabled = actionsEnabled,
+                    onClick = { perform(onAddToFolder) },
+                )
+            }
+            if (showMarkRead) {
+                DirectSelectionAction(
+                    stringResource(R.string.chat_row_action_mark_read),
+                    chatReadIcon(markRead = true),
+                    actionsEnabled,
+                ) {
+                    perform(onMarkRead)
+                }
+            }
+            if (showMarkUnread) {
+                DirectSelectionAction(
+                    stringResource(R.string.chat_row_action_mark_unread),
+                    chatReadIcon(markRead = false),
+                    actionsEnabled,
+                ) {
+                    perform(onMarkUnread)
+                }
+            }
+            if (showMute) {
+                DirectSelectionAction(
+                    stringResource(R.string.chat_row_action_mute),
+                    R.drawable.ic_notifications_off,
+                    actionsEnabled,
+                ) {
+                    perform { onSetMuted(true) }
+                }
+            }
+            if (showUnmute) {
+                DirectSelectionAction(
+                    stringResource(R.string.chat_row_action_unmute),
+                    R.drawable.ic_settings_notifications,
+                    actionsEnabled,
+                ) {
+                    perform { onSetMuted(false) }
+                }
+            }
+            if (showPin) {
+                DirectSelectionAction(
+                    stringResource(R.string.chat_row_action_pin),
+                    R.drawable.ic_push_pin,
+                    actionsEnabled,
+                ) {
+                    perform { onSetPinned(true) }
+                }
+            }
+            if (showUnpin) {
+                DirectSelectionAction(
+                    stringResource(R.string.chat_row_action_unpin),
+                    R.drawable.ic_unpin,
+                    actionsEnabled,
+                ) {
+                    perform { onSetPinned(false) }
+                }
+            }
+            onAlternateArchive?.let { alternate ->
+                DirectSelectionAction(
+                    stringResource(
+                        if (archiveAction == ChatListBulkArchiveAction.Archive) {
+                            R.string.unarchive
+                        } else {
+                            R.string.archive
+                        },
+                    ),
+                    if (archiveAction == ChatListBulkArchiveAction.Archive) {
+                        R.drawable.ic_unarchive
+                    } else {
+                        R.drawable.ic_archive
+                    },
+                    actionsEnabled,
+                ) { perform(alternate) }
+            }
+            onExcludeFromFolder?.let { exclude ->
+                DirectSelectionAction(
+                    stringResource(R.string.folder_exclude_chat),
+                    R.drawable.ic_folder_remove,
+                    actionsEnabled,
+                ) {
+                    perform(exclude)
+                }
+            }
+            if (showMovePinnedUp) {
+                DirectSelectionAction(
+                    stringResource(R.string.chat_row_action_move_up),
+                    R.drawable.ic_arrow_up,
+                    actionsEnabled,
+                ) {
+                    perform { onMovePinned(-1) }
+                }
+            }
+            if (showMovePinnedDown) {
+                DirectSelectionAction(
+                    stringResource(R.string.chat_row_action_move_down),
+                    R.drawable.ic_arrow_down,
+                    actionsEnabled,
+                ) {
+                    perform { onMovePinned(1) }
+                }
+            }
+            onDeleteLocal?.let { deleteLocal ->
+                DirectSelectionAction(
+                    label = stringResource(R.string.delete_from_device),
+                    icon = R.drawable.ic_delete,
+                    enabled = actionsEnabled,
+                    destructive = true,
+                    onClick = { perform(deleteLocal) },
+                )
+            }
+            if (showDelete) {
+                DirectSelectionAction(
+                    label = deleteLabel,
+                    icon =
+                        if (deleteLabel == stringResource(R.string.leave_and_delete)) {
+                            R.drawable.ic_logout
+                        } else {
+                            R.drawable.ic_delete
+                        },
+                    enabled = actionsEnabled,
+                    destructive = true,
+                    onClick = { perform(onDelete) },
+                )
+            }
+            abandonLabel?.let { label ->
+                DirectSelectionAction(
+                    label = label,
+                    icon = R.drawable.ic_person_remove,
+                    enabled = actionsEnabled,
+                    destructive = true,
+                    onClick = { perform(onAbandon) },
+                )
+            }
         }
     }
 }

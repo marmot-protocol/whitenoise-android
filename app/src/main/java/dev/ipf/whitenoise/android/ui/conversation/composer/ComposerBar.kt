@@ -1077,7 +1077,7 @@ internal fun ComposerBar(
         composerEmojiSearchActive = false
         composerEmojiSearchRow = false
         if (!composerEmojiPickerOpen || lockedComposerEmojiPaneHeight == 0.dp) {
-            lockedComposerEmojiPaneHeight = composerKeyboardHeight
+            lockedComposerEmojiPaneHeight = composerEmojiBrowsePaneHeight(composerKeyboardHeight)
         }
         composerEmojiPickerRequested = true
         composerEmojiPickerOpen = true

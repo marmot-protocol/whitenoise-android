@@ -140,9 +140,9 @@ class ComposerEmojiPaneLayoutTest {
     }
 
     @Test
-    fun unlockedBrowsingPaneMatchesTheKeyboardHeight() {
+    fun unlockedBrowsingPaneIsOneEmojiRowTallerThanTheKeyboard() {
         assertEquals(
-            300.dp,
+            348.dp,
             composerEmojiPaneHeight(
                 lockedPaneHeight = 0.dp,
                 keyboardHeight = 300.dp,

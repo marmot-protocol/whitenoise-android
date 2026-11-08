@@ -173,11 +173,14 @@ internal fun composerEmojiPaneTargetHeight(
     return if (knownHeight > 0.dp) knownHeight else ComposerEmojiPickerFallbackHeight
 }
 
+/** Browsing shows one emoji row more than the keyboard's space. */
+internal fun composerEmojiBrowsePaneHeight(keyboardHeight: Dp): Dp = keyboardHeight + EmojiPickerMinimumCellSize
+
 /**
- * Height the composer emoji pane animates toward. Browsing matches the
- * [keyboardHeight] (or the [lockedPaneHeight] set on open and on the way back to
- * the keyboard), so swapping between keyboard and emoji keeps the composer
- * still. While the search keyboard is wanted the target is the keyboard plus
+ * Height the composer emoji pane animates toward. Browsing is one emoji row
+ * taller than the [keyboardHeight] (or the [lockedPaneHeight] set on open, and
+ * the keyboard height on the way back to the keyboard so the swap stays
+ * still). While the search keyboard is wanted the target is the keyboard plus
  * the [searchRowHeight] above it, the pane's final total, so
  * the pane glides straight there while the keyboard rises instead of dipping
  * below the row and growing back. It flips back to browsing as soon as the
@@ -192,7 +195,7 @@ internal fun composerEmojiPaneHeight(
     when {
         searchKeyboardWanted -> keyboardHeight + searchRowHeight
         lockedPaneHeight > 0.dp -> lockedPaneHeight
-        else -> keyboardHeight
+        else -> composerEmojiBrowsePaneHeight(keyboardHeight)
     }
 
 internal fun updatedComposerRememberedImeHeight(
