@@ -67,8 +67,6 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Notifications
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.profile.AddIdentitySheet
 import dev.ipf.whitenoise.android.ui.profile.ProfileEditScreen
-import dev.ipf.whitenoise.android.ui.profile.ProfileReadiness
-import dev.ipf.whitenoise.android.ui.profile.rememberProfileReadiness
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.updates.AppUpdateEmblem
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
@@ -77,19 +75,23 @@ import kotlinx.coroutines.launch
 
 /**
  * Keyed items of the Settings home list, in display order; the viewport is restored by section key.
- * The labelled hub sections carry the heading shown above their group of [SettingsHomeRow]s, every other
- * item renders its own content.
+ * The group sections render an unheaded connected group of [SettingsHomeRow]s; every other item renders its own
+ * content. [searchCategoryRes] labels a group's rows in Settings search only.
  */
 internal enum class SettingsHomeSection(
-    @param:StringRes val groupTitleRes: Int? = null,
+    val isGroup: Boolean = false,
+    @param:StringRes val searchCategoryRes: Int? = null,
 ) {
+    /** Profile row, Account, then add or switch profile, in one group. */
     Profile,
 
     /** A newer version is waiting, so the offer sits where a reader lands. */
     AppUpdateAvailable,
-    Account(R.string.account),
-    AppPreferences(R.string.app_preferences),
-    Support(R.string.support),
+
+    AppPreferences(isGroup = true, searchCategoryRes = R.string.app_preferences),
+
+    /** Agents and Help & support close the list of destinations. */
+    Assist(isGroup = true),
     SignOut,
 
     /** Nothing to install: the check stays reachable, quietly, beside the version it reports on. */
@@ -98,142 +100,84 @@ internal enum class SettingsHomeSection(
 }
 
 /**
- * Rows of the Settings home in display order, grouped under the labelled [section] each one belongs to.
- * Each row carries its label, Material Symbols icon and test-tag suffix; [detail] is the destination it
- * opens, or null for rows that run an action instead.
+ * Rows of the Settings home in display order, grouped under the [section] each one belongs to. Each row
+ * carries its label, Material Symbols icon and test-tag suffix, and the [detail] it opens.
  */
 internal enum class SettingsHomeRow(
-    val section: SettingsHomeSection,
     @param:StringRes val titleRes: Int,
     @param:DrawableRes val iconRes: Int,
     val iconTag: String,
-    val detail: SettingsDetail?,
+    val detail: SettingsDetail,
+    val section: SettingsHomeSection,
 ) {
-    Profile(
-        SettingsHomeSection.Account,
-        R.string.profile,
+    Account(
+        R.string.account,
         R.drawable.ic_settings_account_circle,
-        "profile",
-        SettingsDetail.Profile,
-    ),
-    ProfileKeys(
-        SettingsHomeSection.Account,
-        R.string.settings_profile_keys,
-        R.drawable.ic_settings_key,
-        "profile_keys",
-        SettingsDetail.AccountKeys,
-    ),
-    Relays(
-        SettingsHomeSection.Account,
-        R.string.relays,
-        R.drawable.ic_settings_cell_tower,
-        "relays",
-        SettingsDetail.Relays,
-    ),
-    Appearance(
-        SettingsHomeSection.AppPreferences,
-        R.string.appearance,
-        R.drawable.ic_settings_contrast,
-        "appearance",
-        SettingsDetail.Appearance,
-    ),
-    Gestures(
-        SettingsHomeSection.AppPreferences,
-        R.string.gestures_title,
-        R.drawable.ic_settings_front_hand,
-        "gestures",
-        SettingsDetail.Gestures,
-    ),
-    ChatFolders(
-        SettingsHomeSection.AppPreferences,
-        R.string.chat_folders_title,
-        R.drawable.ic_folder,
-        "folders",
-        SettingsDetail.ChatFolders,
+        "account",
+        SettingsDetail.Account,
+        SettingsHomeSection.Profile,
     ),
     Notifications(
-        SettingsHomeSection.AppPreferences,
         R.string.notifications,
         R.drawable.ic_settings_notifications,
         "notifications",
         SettingsDetail.Notifications,
-    ),
-    ReadAloud(
         SettingsHomeSection.AppPreferences,
-        R.string.settings_read_aloud,
-        R.drawable.ic_volume_up,
-        "read_aloud",
-        SettingsDetail.TextToSpeech,
     ),
-    Translation(
+    Chats(
+        R.string.chats,
+        R.drawable.ic_settings_chat_bubble_outline,
+        "chats",
+        SettingsDetail.Chats,
         SettingsHomeSection.AppPreferences,
-        R.string.translation_title,
+    ),
+    Appearance(
+        R.string.appearance,
+        R.drawable.ic_settings_contrast,
+        "appearance",
+        SettingsDetail.Appearance,
+        SettingsHomeSection.AppPreferences,
+    ),
+    VoiceLanguage(
+        R.string.settings_voice_language,
         R.drawable.ic_translate,
-        "translation",
-        SettingsDetail.Translation,
-    ),
-    Dictation(
+        "voice_language",
+        SettingsDetail.VoiceLanguage,
         SettingsHomeSection.AppPreferences,
-        R.string.dictation_settings_title,
-        R.drawable.ic_mic,
-        "dictation",
-        SettingsDetail.Dictation,
-    ),
-    DataUsage(
-        SettingsHomeSection.AppPreferences,
-        R.string.settings_data_usage,
-        R.drawable.ic_settings_hard_drive,
-        "data_usage",
-        SettingsDetail.Data,
     ),
     PrivacySecurity(
-        SettingsHomeSection.AppPreferences,
         R.string.settings_privacy_security,
         R.drawable.ic_settings_front_hand,
         "privacy_security",
         SettingsDetail.DevicePrivacy,
+        SettingsHomeSection.AppPreferences,
+    ),
+    DataUsage(
+        R.string.settings_data_usage,
+        R.drawable.ic_settings_hard_drive,
+        "data_usage",
+        SettingsDetail.Data,
+        SettingsHomeSection.AppPreferences,
     ),
     AiAgents(
-        SettingsHomeSection.AppPreferences,
         R.string.ai_agents,
         R.drawable.ic_ai_agents,
         "ai_agents",
         SettingsDetail.AiAgents,
+        SettingsHomeSection.Assist,
     ),
-    Help(
-        SettingsHomeSection.Support,
-        R.string.help,
+    HelpSupport(
+        R.string.settings_help_support,
         R.drawable.ic_info,
-        "help",
-        SettingsDetail.Help,
-    ),
-    ChatWithSupport(
-        SettingsHomeSection.Support,
-        R.string.chat_with_support,
-        R.drawable.ic_settings_chat_bubble_outline,
-        "support",
-        null,
-    ),
-    Donate(
-        SettingsHomeSection.Support,
-        R.string.settings_donate,
-        R.drawable.ic_settings_favorite_border,
-        "donate",
-        SettingsDetail.Donate,
-    ),
-    DeveloperTools(
-        SettingsHomeSection.Support,
-        R.string.settings_developer_tools,
-        R.drawable.ic_settings_handyman,
-        "developer_tools",
-        SettingsDetail.Developer,
+        "help_support",
+        SettingsDetail.HelpSupport,
+        SettingsHomeSection.Assist,
     ),
 }
 
-/** One labelled group of the Settings home: its section key, heading and rows in display order. */
+/** One connected group of the Settings home: its section key and rows in display order. */
 internal data class SettingsHomeGroup(
     val section: SettingsHomeSection,
-    @param:StringRes val titleRes: Int,
     val rows: List<SettingsHomeRow>,
 )
 
@@ -305,13 +249,13 @@ internal data class SettingsHomeState(
     val showProfileHeader: Boolean,
 )
 
-/** The labelled hub sections in display order, derived from the enum rather than from fixed indices. */
+/** The group sections in display order, derived from the enum rather than from fixed indices. */
 private val settingsHomeGroupSections: List<SettingsHomeSection>
-    get() = SettingsHomeSection.entries.filter { it.groupTitleRes != null }
+    get() = SettingsHomeSection.entries.filter { it.isGroup }
 
 /**
  * Sections and groups of the Settings home; the account-bound sections appear only with an active account.
- * Every labelled section always appears, with the rows that declare it as their [SettingsHomeRow.section].
+ * Every group section always appears, with the rows that declare it as their [SettingsHomeRow.section].
  */
 internal fun settingsHomeState(
     hasActiveAccount: Boolean,
@@ -339,7 +283,6 @@ internal fun settingsHomeState(
             settingsHomeGroupSections.map { section ->
                 SettingsHomeGroup(
                     section = section,
-                    titleRes = requireNotNull(section.groupTitleRes),
                     rows = SettingsHomeRow.entries.filter { it.section == section },
                 )
             },
@@ -347,27 +290,58 @@ internal fun settingsHomeState(
     )
 
 // Parent of a settings detail for back navigation; null means the Settings
-// home. Kept pure so the back-stack shape (Key Packages → Developer tools → home,
-// About → Help → home, ChatBubbleColors → Appearance) is unit-testable without Compose.
+// home. Kept pure so the back-stack shape (Key Packages → Developer tools → Help & support → home,
+// Sounds & vibration → Notifications → home) is unit-testable without Compose.
 
 /** Parent destination a nested settings detail returns to. */
 internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
     when (detail) {
+        SettingsDetail.Profile,
+        SettingsDetail.AccountKeys,
+        SettingsDetail.Relays,
+        -> SettingsDetail.Account
         SettingsDetail.ActionColor,
         SettingsDetail.ChatBubbleColors,
-        SettingsDetail.Language,
-        SettingsDetail.CustomEmoji,
-        SettingsDetail.Composer,
         -> SettingsDetail.Appearance
+        SettingsDetail.ChatFolders,
+        SettingsDetail.Gestures,
+        SettingsDetail.Composer,
+        SettingsDetail.CustomEmoji,
+        -> SettingsDetail.Chats
+        SettingsDetail.Language,
+        SettingsDetail.TextToSpeech,
+        SettingsDetail.Translation,
+        SettingsDetail.Dictation,
+        -> SettingsDetail.VoiceLanguage
+        SettingsDetail.NotificationSounds,
+        SettingsDetail.NotificationDelivery,
+        -> SettingsDetail.Notifications
+        SettingsDetail.DiagnosticsImprovements,
+        SettingsDetail.BlockedUsers,
+        -> SettingsDetail.DevicePrivacy
+        SettingsDetail.Help,
+        SettingsDetail.Support,
+        SettingsDetail.Donate,
+        SettingsDetail.Developer,
+        -> SettingsDetail.HelpSupport
         SettingsDetail.About,
         SettingsDetail.BugReport,
         -> SettingsDetail.Help
-        SettingsDetail.KeyPackages -> SettingsDetail.Developer
-        SettingsDetail.QuarantinedGroups -> SettingsDetail.Developer
         SettingsDetail.SupportRelays -> SettingsDetail.Support
-        SettingsDetail.DiagnosticsImprovements -> SettingsDetail.DevicePrivacy
-        SettingsDetail.BlockedUsers -> SettingsDetail.DevicePrivacy
-        else -> null
+        SettingsDetail.KeyPackages,
+        SettingsDetail.QuarantinedGroups,
+        -> SettingsDetail.Developer
+        SettingsDetail.ShareConnect,
+        SettingsDetail.Account,
+        SettingsDetail.Appearance,
+        SettingsDetail.Chats,
+        SettingsDetail.VoiceLanguage,
+        SettingsDetail.HelpSupport,
+        SettingsDetail.Notifications,
+        SettingsDetail.DevicePrivacy,
+        SettingsDetail.Data,
+        SettingsDetail.AiAgents,
+        -> null
     }
 
 /** Back handler: nested detail, then home, blocked during sign-out. */
@@ -375,6 +349,7 @@ internal fun settingsDetailParent(detail: SettingsDetail): SettingsDetail? =
 private fun settingsBackHandler(
     signOutInProgress: Boolean,
     detail: SettingsDetail?,
+    parentOf: (SettingsDetail) -> SettingsDetail?,
     onBackToChats: () -> Unit,
     onDetailChange: (SettingsDetail?) -> Unit,
 ) {
@@ -383,7 +358,7 @@ private fun settingsBackHandler(
         if (detail == null) {
             onBackToChats()
         } else {
-            onDetailChange(settingsDetailParent(detail))
+            onDetailChange(parentOf(detail))
         }
     }
 }
@@ -440,10 +415,15 @@ internal fun SettingsScreen(
             searchOriginId = null
         }
     }
+    // The profile photo on the home header opens Profile directly, so back returns home instead of Account.
+    var profileFromHeader by rememberSaveable(appState.activeAccountRef) { mutableStateOf(false) }
+    val parentOf: (SettingsDetail) -> SettingsDetail? = { target ->
+        if (target == SettingsDetail.Profile && profileFromHeader) null else settingsDetailParent(target)
+    }
     val changeDetail: (SettingsDetail?) -> Unit = { destination ->
         if (searchOrigin != null &&
             detail == searchOrigin.destination &&
-            destination == detail?.let(::settingsDetailParent)
+            destination == detail?.let(parentOf)
         ) {
             searchOriginId = null
             onDetailChange(null)
@@ -452,7 +432,7 @@ internal fun SettingsScreen(
             onDetailChange(destination)
         }
     }
-    settingsBackHandler(appState.signOutInProgress, detail, {
+    settingsBackHandler(appState.signOutInProgress, detail, parentOf, {
         if (searchOrigin != null) {
             searchOriginId = null
         } else if (searchOpen) {
@@ -518,10 +498,11 @@ internal fun SettingsScreen(
                         }
                     },
                     onOpenDetail = {
-                        if (it == SettingsDetail.Profile) openProfilePictureActions = false
+                        profileFromHeader = false
                         onDetailChange(it)
                     },
                     onOpenProfilePictureActions = {
+                        profileFromHeader = true
                         openProfilePictureActions = true
                         onDetailChange(SettingsDetail.Profile)
                     },
@@ -534,20 +515,24 @@ internal fun SettingsScreen(
                     detail = route,
                     onOpenSupportChat = onOpenSupportChat,
                     onOpenDiagnostics = onOpenDiagnostics,
-                    onDetailChange = changeDetail,
+                    onDetailChange = { target ->
+                        // Hub rows open their page from within a detail, so the header shortcut is spent.
+                        if (target != null) profileFromHeader = false
+                        changeDetail(target)
+                    },
+                    onBack = {
+                        openProfilePictureActions = false
+                        changeDetail(parentOf(route))
+                    },
                     openProfilePictureActionsOnEntry = openProfilePictureActions,
                     onProfilePictureActionsOpened = { openProfilePictureActions = false },
-                    onProfileBack = {
-                        openProfilePictureActions = false
-                        changeDetail(null)
-                    },
                 )
             }
         }
     }
 }
 
-/** Every Settings detail destination and the parent each one returns to. */
+/** Every Settings detail destination; each returns through [onBack] to the parent chosen by the caller. */
 @Composable
 @Suppress("FunctionNaming", "LongMethod", "CyclomaticComplexMethod")
 private fun SettingsDetailRoute(
@@ -556,84 +541,89 @@ private fun SettingsDetailRoute(
     onOpenSupportChat: (ChatListItem) -> Unit,
     onOpenDiagnostics: () -> Unit,
     onDetailChange: (SettingsDetail?) -> Unit,
+    onBack: () -> Unit,
     openProfilePictureActionsOnEntry: Boolean,
     onProfilePictureActionsOpened: () -> Unit,
-    onProfileBack: () -> Unit,
 ) {
     when (detail) {
-        SettingsDetail.ShareConnect -> ShareConnectScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.ShareConnect -> ShareConnectScreen(appState, onBack = onBack)
+        SettingsDetail.Account ->
+            AccountScreen(appState, onBack = onBack, onOpenDetail = onDetailChange)
+        SettingsDetail.Chats -> ChatsScreen(appState, onBack = onBack, onOpenDetail = onDetailChange)
+        SettingsDetail.VoiceLanguage ->
+            VoiceLanguageScreen(appState, onBack = onBack, onOpenDetail = onDetailChange)
+        SettingsDetail.HelpSupport ->
+            HelpSupportScreen(appState, onBack = onBack, onOpenDetail = onDetailChange)
         SettingsDetail.Appearance ->
             AppearanceScreen(
                 appState = appState,
-                onBack = { onDetailChange(null) },
+                onBack = onBack,
                 onOpenActionColor = { onDetailChange(SettingsDetail.ActionColor) },
                 onOpenChatBubbleColors = { onDetailChange(SettingsDetail.ChatBubbleColors) },
-                onOpenLanguage = { onDetailChange(SettingsDetail.Language) },
-                onOpenCustomEmoji = { onDetailChange(SettingsDetail.CustomEmoji) },
-                onOpenComposer = { onDetailChange(SettingsDetail.Composer) },
             )
-        SettingsDetail.Composer -> ComposerSettingsScreen(appState) { onDetailChange(SettingsDetail.Appearance) }
-        SettingsDetail.ActionColor ->
-            ActionColorScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
-        SettingsDetail.ChatBubbleColors ->
-            ChatBubbleColorsScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
-        SettingsDetail.Language -> LanguageScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
-        SettingsDetail.CustomEmoji ->
-            CustomEmojiScreen(appState, onBack = { onDetailChange(SettingsDetail.Appearance) })
-        SettingsDetail.Data -> DataUsageScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.Composer -> ComposerSettingsScreen(appState, onBack = onBack)
+        SettingsDetail.ActionColor -> ActionColorScreen(appState, onBack = onBack)
+        SettingsDetail.ChatBubbleColors -> ChatBubbleColorsScreen(appState, onBack = onBack)
+        SettingsDetail.Language -> LanguageScreen(appState, onBack = onBack)
+        SettingsDetail.CustomEmoji -> CustomEmojiScreen(appState, onBack = onBack)
+        SettingsDetail.Data -> DataUsageScreen(appState, onBack = onBack)
         SettingsDetail.Profile ->
             ProfileEditScreen(
                 appState = appState,
-                onBack = onProfileBack,
+                onBack = onBack,
                 openPictureActionsOnEntry = openProfilePictureActionsOnEntry,
                 onPictureActionsOpened = onProfilePictureActionsOpened,
             )
-        SettingsDetail.AccountKeys -> AccountKeysScreen(appState, onBack = { onDetailChange(null) })
-        SettingsDetail.Relays -> RelaysScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.AccountKeys -> AccountKeysScreen(appState, onBack = onBack)
+        SettingsDetail.Relays -> RelaysScreen(appState, onBack = onBack)
         SettingsDetail.Support ->
             SupportScreen(
                 appState = appState,
-                onBack = { onDetailChange(null) },
+                onBack = onBack,
                 onOpenSupportChat = onOpenSupportChat,
                 onRelays = { onDetailChange(SettingsDetail.SupportRelays) },
             )
-        SettingsDetail.SupportRelays ->
-            RelaysScreen(appState, onBack = { onDetailChange(SettingsDetail.Support) })
-        SettingsDetail.KeyPackages ->
-            KeyPackagesScreen(appState, onBack = { onDetailChange(SettingsDetail.Developer) })
+        SettingsDetail.SupportRelays -> RelaysScreen(appState, onBack = onBack)
+        SettingsDetail.KeyPackages -> KeyPackagesScreen(appState, onBack = onBack)
         SettingsDetail.QuarantinedGroups -> {
             if (appState.developerMode) {
-                QuarantinedGroupsScreen(appState, onBack = { onDetailChange(SettingsDetail.Developer) })
+                QuarantinedGroupsScreen(appState, onBack = onBack)
             } else {
-                LaunchedEffect(detail) { onDetailChange(SettingsDetail.Developer) }
+                LaunchedEffect(detail) { onBack() }
             }
         }
-        SettingsDetail.Notifications -> NotificationsScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.Notifications ->
+            NotificationsScreen(
+                appState,
+                onBack = onBack,
+                onOpenSounds = { onDetailChange(SettingsDetail.NotificationSounds) },
+                onOpenDelivery = { onDetailChange(SettingsDetail.NotificationDelivery) },
+            )
+        SettingsDetail.NotificationSounds -> NotificationSoundsScreen(appState, onBack = onBack)
+        SettingsDetail.NotificationDelivery -> NotificationDeliveryScreen(appState, onBack = onBack)
         SettingsDetail.DevicePrivacy ->
             DevicePrivacyScreen(
                 appState,
-                onBack = { onDetailChange(null) },
+                onBack = onBack,
                 onOpenDiagnostics = { onDetailChange(SettingsDetail.DiagnosticsImprovements) },
                 onOpenBlockedUsers = { onDetailChange(SettingsDetail.BlockedUsers) },
             )
-        SettingsDetail.BlockedUsers ->
-            BlockedUsersScreen(appState, onBack = { onDetailChange(SettingsDetail.DevicePrivacy) })
-        SettingsDetail.DiagnosticsImprovements ->
-            DiagnosticsImprovementsScreen(appState, onBack = { onDetailChange(SettingsDetail.DevicePrivacy) })
-        SettingsDetail.AiAgents -> AiAgentsScreen(appState, onBack = { onDetailChange(null) })
-        SettingsDetail.Donate -> DonateScreen(onBack = { onDetailChange(null) })
-        SettingsDetail.TextToSpeech -> TextToSpeechScreen(appState, onBack = { onDetailChange(null) })
-        SettingsDetail.Translation -> TranslationSettingsScreen(onBack = { onDetailChange(null) })
-        SettingsDetail.Dictation -> DictationSettingsScreen(appState, onBack = { onDetailChange(null) })
-        SettingsDetail.Gestures -> GestureSettingsScreen(appState, onBack = { onDetailChange(null) })
-        SettingsDetail.ChatFolders -> ChatFoldersScreen(appState, onBack = { onDetailChange(null) })
+        SettingsDetail.BlockedUsers -> BlockedUsersScreen(appState, onBack = onBack)
+        SettingsDetail.DiagnosticsImprovements -> DiagnosticsImprovementsScreen(appState, onBack = onBack)
+        SettingsDetail.AiAgents -> AiAgentsScreen(appState, onBack = onBack)
+        SettingsDetail.Donate -> DonateScreen(onBack = onBack)
+        SettingsDetail.TextToSpeech -> TextToSpeechScreen(appState, onBack = onBack)
+        SettingsDetail.Translation -> TranslationSettingsScreen(onBack = onBack)
+        SettingsDetail.Dictation -> DictationSettingsScreen(appState, onBack = onBack)
+        SettingsDetail.Gestures -> GestureSettingsScreen(appState, onBack = onBack)
+        SettingsDetail.ChatFolders -> ChatFoldersScreen(appState, onBack = onBack)
         SettingsDetail.Help ->
             HelpScreen(
-                onBack = { onDetailChange(null) },
+                onBack = onBack,
                 onOpenBugReport = { onDetailChange(SettingsDetail.BugReport) },
                 onOpenAbout = { onDetailChange(SettingsDetail.About) },
             )
-        SettingsDetail.BugReport -> BugReportScreen(onBack = { onDetailChange(SettingsDetail.Help) })
+        SettingsDetail.BugReport -> BugReportScreen(onBack = onBack)
         SettingsDetail.About ->
             AboutScreen(
                 appState = appState,
@@ -641,12 +631,12 @@ private fun SettingsDetailRoute(
                 versionName = BuildConfig.VERSION_NAME,
                 buildNumber = BuildConfig.VERSION_CODE.toString(),
                 mdkShortSha = BuildConfig.MDK_SHORT_SHA,
-                onBack = { onDetailChange(SettingsDetail.Help) },
+                onBack = onBack,
             )
         SettingsDetail.Developer ->
             DeveloperScreen(
                 appState = appState,
-                onBack = { onDetailChange(null) },
+                onBack = onBack,
                 onOpenDiagnostics = onOpenDiagnostics,
                 onOpenKeyPackages = { onDetailChange(SettingsDetail.KeyPackages) },
                 onOpenQuarantinedGroups = { onDetailChange(SettingsDetail.QuarantinedGroups) },
@@ -692,14 +682,6 @@ private fun SettingsHomeScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val activeAccount = appState.activeAccount
-    val readiness =
-        rememberProfileReadiness(
-            appState,
-            activeAccount?.accountIdHex,
-            appState.profileRevisionForCompose,
-            appState::userProfileCached,
-            appState::loadUserProfile,
-        )
 
     // Read the live flag on invocation as teardown can begin before the next recomposition.
 
@@ -721,7 +703,6 @@ private fun SettingsHomeScreen(
             activeAccount,
             appState.runtimeGeneration,
             appState.profileRevisionForCompose,
-            readiness,
             homeConfiguration,
         ) {
             activeAccount?.let { account ->
@@ -755,7 +736,6 @@ private fun SettingsHomeScreen(
                 updateAvailable = appState.appUpdateInfo.isUpdateAvailable,
             ),
         account = homeAccount,
-        profileReadiness = readiness,
         profileCount = appState.accounts.size,
         appUpdateInfo = appState.appUpdateInfo,
         versionName = BuildConfig.VERSION_NAME,
@@ -765,7 +745,6 @@ private fun SettingsHomeScreen(
         onAddProfile = { whenIdle { showAddIdentity = true } },
         onSwitchProfile = { whenIdle { showAccountSelector = true } },
         onOpenDetail = { detail -> whenIdle { onOpenDetail(detail) } },
-        onChatWithSupport = { whenIdle { onOpenDetail(SettingsDetail.Support) } },
         onSignOut = { whenIdle { showSignOut = true } },
         viewport = viewport,
         onViewportChange = onViewportChange,
@@ -836,7 +815,6 @@ private fun canActivateSettingsSearchResult(
 internal fun SettingsHomeContent(
     state: SettingsHomeState,
     account: SettingsHomeAccount?,
-    profileReadiness: ProfileReadiness = ProfileReadiness.Loading,
     profileCount: Int,
     appUpdateInfo: AppUpdateInfo,
     versionName: String,
@@ -847,7 +825,6 @@ internal fun SettingsHomeContent(
     onSwitchProfile: () -> Unit,
     onOpenDetail: (SettingsDetail) -> Unit,
     onAppUpdateAction: () -> Unit,
-    onChatWithSupport: () -> Unit = {},
     onSignOut: () -> Unit = {},
     viewport: SettingsHomeViewport = SettingsHomeViewport.Top,
     onViewportChange: (SettingsHomeViewport) -> Unit = {},
@@ -906,23 +883,18 @@ internal fun SettingsHomeContent(
                                         onOpenProfilePictureActions = onOpenProfilePictureActions,
                                         onAddProfile = onAddProfile,
                                         onSwitchProfile = onSwitchProfile,
+                                        onOpenAccount = { onOpenDetail(SettingsHomeRow.Account.detail) },
                                     )
                                 }
                             SettingsHomeSection.AppUpdateAvailable ->
                                 AppUpdateGroup(appUpdateInfo, onAppUpdateAction, prominent = true)
                             SettingsHomeSection.AppUpdateControls ->
                                 AppUpdateGroup(appUpdateInfo, onAppUpdateAction, prominent = false)
-                            SettingsHomeSection.Account,
                             SettingsHomeSection.AppPreferences,
-                            SettingsHomeSection.Support,
+                            SettingsHomeSection.Assist,
                             ->
                                 state.groups.firstOrNull { it.section == section }?.let { group ->
-                                    SettingsHubSection(
-                                        group,
-                                        onOpenDetail,
-                                        onChatWithSupport,
-                                        profileReadiness.takeIf { account != null },
-                                    )
+                                    SettingsHubSection(group, onOpenDetail)
                                 }
                             SettingsHomeSection.SignOut -> SignOutGroup(onSignOut)
                             SettingsHomeSection.Version -> SettingsVersionFooter(versionName)
@@ -954,7 +926,7 @@ private fun SettingsHomeSearchAction(
     }
 }
 
-/** Profile header group: the active profile row that opens Share & Connect, then add or switch profile. */
+/** Profile header group: the active profile row that opens Share & Connect, Account, then add or switch profile. */
 @Composable
 @Suppress("FunctionNaming")
 private fun SettingsProfileHeader(
@@ -964,11 +936,26 @@ private fun SettingsProfileHeader(
     onOpenProfilePictureActions: () -> Unit,
     onAddProfile: () -> Unit,
     onSwitchProfile: () -> Unit,
+    onOpenAccount: () -> Unit,
 ) {
     Column(Modifier.padding(vertical = WhiteNoiseSpacing.Related).testTag("settings.profile_group")) {
         SettingsGroup {
             row("profile") { context ->
                 SettingsProfileRow(context, account, onOpenShareConnect, onOpenProfilePictureActions)
+            }
+            row(SettingsHomeRow.Account.name) { context ->
+                SettingsLink(
+                    context = context,
+                    title = stringResource(SettingsHomeRow.Account.titleRes),
+                    onClick = onOpenAccount,
+                    leading = {
+                        SettingsHubIcon(
+                            SettingsHomeRow.Account.iconRes,
+                            SettingsHomeRow.Account.iconTag,
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
+                )
             }
             if (profileCount == 1) {
                 row("add_profile") { context ->
@@ -1092,76 +1079,32 @@ private fun SettingsProfileTrailing() {
     }
 }
 
-/** A labelled hub section: the heading at the 32 dp content line, then one connected group of its rows. */
+/** A hub section: one connected, unheaded group of its rows. */
 @Composable
 @Suppress("FunctionNaming")
 internal fun SettingsHubSection(
     group: SettingsHomeGroup,
     onOpenDetail: (SettingsDetail) -> Unit,
-    onChatWithSupport: () -> Unit,
-    profileReadiness: ProfileReadiness?,
 ) {
     Column(
         modifier = Modifier.testTag("settings.section.${group.section.name}"),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
     ) {
-        SettingsSection(stringResource(group.titleRes))
-        SettingsHubGroup(
-            rows = group.rows,
-            onOpenDetail = onOpenDetail,
-            onChatWithSupport = onChatWithSupport,
-            profileReadiness = profileReadiness,
-        )
-    }
-}
-
-/** One connected group of hub rows; every labelled section renders its rows through it. */
-@Composable
-@Suppress("FunctionNaming")
-private fun SettingsHubGroup(
-    rows: List<SettingsHomeRow>,
-    onOpenDetail: (SettingsDetail) -> Unit,
-    onChatWithSupport: () -> Unit,
-    profileReadiness: ProfileReadiness?,
-) {
-    SettingsGroup {
-        rows.forEach { entry ->
-            row(entry.name) { context ->
-                SettingsHubLink(
-                    context = context,
-                    row = entry,
-                    subtitle =
-                        if (entry == SettingsHomeRow.Profile && profileReadiness != null) {
-                            stringResource(profileReadiness.summary)
-                        } else {
-                            null
+        SettingsGroup {
+            group.rows.forEach { entry ->
+                row(entry.name) { context ->
+                    SettingsLink(
+                        context = context,
+                        title = stringResource(entry.titleRes),
+                        onClick = { onOpenDetail(entry.detail) },
+                        leading = {
+                            SettingsHubIcon(entry.iconRes, entry.iconTag, MaterialTheme.colorScheme.onSurfaceVariant)
                         },
-                    onClick = {
-                        val detail = entry.detail
-                        if (detail != null) onOpenDetail(detail) else onChatWithSupport()
-                    },
-                )
+                    )
+                }
             }
         }
     }
-}
-
-/** Hub row: title from the row's string, Material Symbols glyph at the leading slot. */
-@Composable
-@Suppress("FunctionNaming")
-private fun SettingsHubLink(
-    context: SettingsRowContext,
-    row: SettingsHomeRow,
-    onClick: () -> Unit,
-    subtitle: String?,
-) {
-    SettingsLink(
-        context = context,
-        title = stringResource(row.titleRes),
-        subtitle = subtitle,
-        onClick = onClick,
-        leading = { SettingsHubIcon(row.iconRes, row.iconTag, MaterialTheme.colorScheme.onSurfaceVariant) },
-    )
 }
 
 /** 24 dp leading glyph carrying the prototype's `settings.icon.*` test tag. */

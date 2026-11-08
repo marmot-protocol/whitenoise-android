@@ -2,8 +2,10 @@ appId: dev.ipf.whitenoise.android.maestrolab
 name: lifecycle-settings-help-rotation
 ---
 - runFlow:
-    file: ../fixtures/open-fixture-settings-destination.yaml
+    file: ../fixtures/open-fixture-settings-hub-destination.yaml
     env:
+      SETTINGS_HUB: "Help & support"
+      SETTINGS_HUB_GROUP: "settings.help_support.group"
       SETTINGS_DESTINATION: Help
 - assertVisible:
     id: help.destinations
@@ -14,6 +16,9 @@ name: lifecycle-settings-help-rotation
 - assertVisible:
     id: help.destinations
 - tapOn: Back
+- assertVisible:
+    id: "settings.help_support.group"
+- tapOn: "Back"
 - assertVisible: Settings
 - tapOn: Back
 - assertVisible: Maestro group

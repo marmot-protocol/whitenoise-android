@@ -7,10 +7,20 @@ name: nested-donate
 - assertVisible: "Settings"
 - scrollUntilVisible:
     element:
+      text: "Help & support"
+    direction: DOWN
+- tapOn: "Help & support"
+- assertVisible:
+    id: "settings.help_support.group"
+- scrollUntilVisible:
+    element:
       text: "Donate"
     direction: DOWN
 - tapOn: "Donate"
 - assertVisible:
     id: "donate.open"
+- back
+- assertVisible:
+    id: "settings.help_support.group"
 - back
 - assertVisible: "Settings"

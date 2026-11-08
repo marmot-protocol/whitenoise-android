@@ -22,10 +22,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
-import dev.ipf.whitenoise.android.ui.settings.SettingsHomeGroup
-import dev.ipf.whitenoise.android.ui.settings.SettingsHomeRow
-import dev.ipf.whitenoise.android.ui.settings.SettingsHomeSection
-import dev.ipf.whitenoise.android.ui.settings.SettingsHubSection
+import dev.ipf.whitenoise.android.ui.settings.AccountHubGroup
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -68,16 +65,7 @@ class ProfileReadinessScreenshotTest {
                 ) {
                     Surface {
                         Column(Modifier.width(if (theme.value == "narrow") 280.dp else 360.dp).padding(16.dp)) {
-                            SettingsHubSection(
-                                SettingsHomeGroup(
-                                    SettingsHomeSection.Account,
-                                    requireNotNull(SettingsHomeSection.Account.groupTitleRes),
-                                    listOf(SettingsHomeRow.Profile),
-                                ),
-                                { opened = it },
-                                {},
-                                frame.value,
-                            )
+                            AccountHubGroup(frame.value) { opened = it }
                             ProfileReadinessChecklist(frame.value)
                         }
                     }

@@ -151,7 +151,7 @@ class DataUsageScreenBehaviorTest {
         composeRule.onNodeWithText("Automatic downloads are paused").assertExists()
         composeRule.onNodeWithText("Restart automatic downloads").performClick()
         composeRule.runOnIdle { assertFalse(appState.automaticAttachmentDownloadsPaused()) }
-        composeRule.onNodeWithText("Automatic downloads follow your network rules").assertExists()
+        composeRule.onNodeWithText("Auto-downloads follow your network rules").assertExists()
     }
 
     /** The quality dialog shows each option with its size hint and writes the tapped one. */
@@ -159,7 +159,7 @@ class DataUsageScreenBehaviorTest {
     fun qualityDialogWritesTheChoice() {
         assertEquals(MediaQuality.Standard, appState.mediaQuality)
         composeRule.onNodeWithText("Media quality").performClick()
-        composeRule.onNodeWithText("About 1.5 MB per photo — quality over data cost").assertExists()
+        composeRule.onNodeWithText("~1.5 MB per photo, quality over data").assertExists()
         composeRule.onNodeWithText("High").performClick()
         composeRule.runOnIdle { assertEquals(MediaQuality.High, appState.mediaQuality) }
         composeRule.onNodeWithText("Original").assertDoesNotExist()
@@ -170,8 +170,7 @@ class DataUsageScreenBehaviorTest {
         const val ACCOUNT_REF = "account-a"
         const val METERED_SUMMARY = "Wi-Fi, Mobile data, Metered network"
         const val STOP_CONFIRMATION =
-            "Clear waiting automatic downloads for this profile? " +
-                "Active downloads and downloads you started yourself will continue."
+            "Clear queued auto-downloads for this profile? Active and manual downloads continue."
     }
 }
 

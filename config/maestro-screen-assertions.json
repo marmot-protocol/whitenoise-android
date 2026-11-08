@@ -3541,11 +3541,11 @@
       "symbol": "ComposerSettingsScreen",
       "bindings": [
         {
-          "case": "settings-appearance",
+          "case": "settings-chats",
           "selector": {
             "id": "composer.customize"
           },
-          "scope": "Appearance opens the immediately saving Composer editor without Done or Cancel controls; Back restores Appearance. Assertions authored only, no save persistence, reorder, gesture or device execution proof.",
+          "scope": "Chats opens the immediately saving Composer editor without Done or Cancel controls; Back restores Chats. Assertions authored only, no save persistence, reorder, gesture or device execution proof.",
           "entry_assertion": {
             "id": "composer.customize"
           },
@@ -3709,7 +3709,7 @@
             "id": "data_usage.downloads.group"
           },
           "opened_by": {
-            "text": "Data Usage"
+            "text": "Data & storage"
           }
         }
       ]
@@ -6089,6 +6089,108 @@
             "text": "Audio transcript"
           },
           "visible_on_entry": true
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+      "symbol": "AccountScreen",
+      "bindings": [
+        {
+          "case": "settings-account",
+          "selector": {
+            "id": "settings.account.group"
+          },
+          "scope": "Account hub group renders its rows; toolbar Back.",
+          "entry_assertion": {
+            "id": "settings.account.group"
+          },
+          "opened_by": {
+            "text": "Account"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+      "symbol": "ChatsScreen",
+      "bindings": [
+        {
+          "case": "settings-chats",
+          "selector": {
+            "id": "settings.chats.group"
+          },
+          "scope": "Chats hub group renders its rows and opens Composer; toolbar Back.",
+          "entry_assertion": {
+            "id": "settings.chats.group"
+          },
+          "opened_by": {
+            "text": "Chats"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+      "symbol": "VoiceLanguageScreen",
+      "bindings": [
+        {
+          "case": "settings-voice-language",
+          "selector": {
+            "id": "settings.voice_language.group"
+          },
+          "scope": "Voice & language hub group renders its rows; toolbar Back.",
+          "entry_assertion": {
+            "id": "settings.voice_language.group"
+          },
+          "opened_by": {
+            "text": "Voice & language"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+      "symbol": "HelpSupportScreen",
+      "bindings": [
+        {
+          "case": "settings-help-support",
+          "selector": {
+            "id": "settings.help_support.group"
+          },
+          "scope": "Help & support hub group renders its rows; toolbar Back.",
+          "entry_assertion": {
+            "id": "settings.help_support.group"
+          },
+          "opened_by": {
+            "text": "Help & support"
+          }
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+      "symbol": "NotificationSoundsScreen",
+      "bindings": [
+        {
+          "case": "settings-notification-sounds",
+          "selector": {
+            "id": "notification-quiet-spoken-audio"
+          },
+          "scope": "Notification sounds page renders the quiet spoken audio control; toolbar Back."
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+      "symbol": "NotificationDeliveryScreen",
+      "bindings": [
+        {
+          "case": "settings-notification-delivery",
+          "selector": {
+            "id": "notification-delivery.choices"
+          },
+          "scope": "Delivery & battery page renders delivery choices; toolbar Back."
         }
       ]
     }

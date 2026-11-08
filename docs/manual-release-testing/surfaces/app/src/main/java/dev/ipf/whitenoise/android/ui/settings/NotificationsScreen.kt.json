@@ -60,6 +60,38 @@
           "NTF-001",
           "NTF-023"
         ]
+      },
+      {
+        "surface": "NotificationDeliveryScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "fun NotificationDeliveryScreen(",
+        "test_ids": [
+          "NTF-047"
+        ]
+      },
+      {
+        "surface": "NotificationSoundsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "fun NotificationSoundsScreen(",
+        "test_ids": [
+          "NTF-047"
+        ]
+      },
+      {
+        "surface": "NotificationPermissionPrompt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "fun NotificationPermissionPrompt(",
+        "test_ids": [
+          "NTF-047"
+        ]
+      },
+      {
+        "surface": "NotificationStateRefresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "fun NotificationStateRefresh(",
+        "test_ids": [
+          "NTF-047"
+        ]
       }
     ],
     "settings_controls": [
@@ -387,6 +419,60 @@
         "anchor": "R.string.notification_tone_scope",
         "test_ids": [
           "NTF-045"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: android_notification_settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.android_notification_settings",
+        "test_ids": [
+          "NTF-047",
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: notification_android_controls",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_android_controls",
+        "test_ids": [
+          "NTF-047",
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: notification_delivery_battery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_delivery_battery",
+        "test_ids": [
+          "NTF-047",
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: notification_delivery_value_local",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_delivery_value_local",
+        "test_ids": [
+          "NTF-047",
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: notification_delivery_value_push",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_delivery_value_push",
+        "test_ids": [
+          "NTF-047",
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: notification_sounds_vibration",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "R.string.notification_sounds_vibration",
+        "test_ids": [
+          "NTF-047",
+          "SET-046"
         ]
       }
     ],

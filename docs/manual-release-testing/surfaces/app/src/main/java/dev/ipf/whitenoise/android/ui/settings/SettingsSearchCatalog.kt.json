@@ -648,6 +648,14 @@
         ]
       },
       {
+        "surface": "setting:settings_search_alias_gestures",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.settings_search_alias_gestures",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
         "surface": "setting:sign_out",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
         "anchor": "R.string.sign_out",
@@ -785,6 +793,156 @@
           "SET-042",
           "SET-043",
           "SET-044"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.account",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: chat_with_support",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.chat_with_support",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.chats",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: gestures_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.gestures_title",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.help",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: notification_delivery_battery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.notification_delivery_battery",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: notification_sounds_vibration",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.notification_sounds_vibration",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: notifications",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.notifications",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.profile",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.relays",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.settings",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: settings_donate",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.settings_donate",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: settings_help_support",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.settings_help_support",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: settings_voice_language",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.settings_voice_language",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: translation_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchCatalog.kt",
+        "anchor": "R.string.translation_title",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-046"
         ]
       }
     ]

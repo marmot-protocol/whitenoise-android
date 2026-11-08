@@ -1,0 +1,19 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+---
+# Opens a settings page that sits behind a hub: SETTINGS_HUB is the home row, SETTINGS_DESTINATION the hub row.
+- runFlow: ../fixtures/runtime-ready.yaml
+- assertVisible: Maestro group
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: Settings
+- scrollUntilVisible:
+    element:
+      text: ${SETTINGS_HUB}
+    direction: DOWN
+- tapOn: ${SETTINGS_HUB}
+- assertVisible:
+    id: ${SETTINGS_HUB_GROUP}
+- scrollUntilVisible:
+    element:
+      text: ${SETTINGS_DESTINATION}
+    direction: DOWN
+- tapOn: ${SETTINGS_DESTINATION}

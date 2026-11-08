@@ -13,7 +13,7 @@
       "preferences-amoled"
     ],
     "Composer": [
-      "settings-appearance"
+      "settings-chats"
     ],
     "ActionColor": [
       "nested-action-color"
@@ -152,6 +152,24 @@
     ],
     "Translation": [
       "settings-translation"
+    ],
+    "Account": [
+      "settings-account"
+    ],
+    "Chats": [
+      "settings-chats"
+    ],
+    "VoiceLanguage": [
+      "settings-voice-language"
+    ],
+    "HelpSupport": [
+      "settings-help-support"
+    ],
+    "NotificationSounds": [
+      "settings-notification-sounds"
+    ],
+    "NotificationDelivery": [
+      "settings-notification-delivery"
     ]
   },
   "main_routes": {

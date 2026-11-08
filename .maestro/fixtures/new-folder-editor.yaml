@@ -5,6 +5,13 @@ name: new-folder-editor
 - runFlow: open-settings.yaml
 - scrollUntilVisible:
     element:
+      text: "Chats"
+    direction: DOWN
+- tapOn: "Chats"
+- assertVisible:
+    id: "settings.chats.group"
+- scrollUntilVisible:
+    element:
       text: Folders
     direction: DOWN
 - tapOn: Folders

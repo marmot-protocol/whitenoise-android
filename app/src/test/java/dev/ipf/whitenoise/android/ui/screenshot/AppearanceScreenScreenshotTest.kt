@@ -210,8 +210,6 @@ class AppearanceScreenScreenshotTest {
                         onBack = {},
                         onOpenActionColor = {},
                         onOpenChatBubbleColors = {},
-                        onOpenLanguage = {},
-                        onOpenCustomEmoji = {},
                     )
                 }
             }

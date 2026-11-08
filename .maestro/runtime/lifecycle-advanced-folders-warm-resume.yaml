@@ -2,13 +2,18 @@ appId: dev.ipf.whitenoise.android.maestrolab
 name: lifecycle-advanced-folders-warm-resume
 ---
 - runFlow:
-    file: ../fixtures/open-fixture-settings-destination.yaml
+    file: ../fixtures/open-fixture-settings-hub-destination.yaml
     env:
+      SETTINGS_HUB: "Chats"
+      SETTINGS_HUB_GROUP: "settings.chats.group"
       SETTINGS_DESTINATION: Folders
 - assertVisible:
     id: chat-folders-content
 - runFlow: ../fixtures/runtime-warm-resume.yaml
 - assertVisible:
     id: chat-folders-content
+- back
+- assertVisible:
+    id: "settings.chats.group"
 - back
 - assertVisible: Settings

@@ -1,11 +1,14 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.unit.LayoutDirection
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.ui.settings.AiAgentsContent
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -35,6 +38,12 @@ class AiAgentsScreenScreenshotTest {
     /** AMOLED: outlined groups on black. */
     @Test
     fun aiAgentsScreenAmoled() = capture("ai_agents_screen_amoled", dark = true, amoled = true)
+
+    /** RTL at a large font: connectors first, with the manual setup below. */
+    @Test
+    fun aiAgentsScreenRtlLargeFont() {
+        capture("ai_agents_screen_rtl_large_font", dark = false, fontScale = 1.6f, rtl = true)
+    }
 
     /** Without a public key: the error callout above disabled connector rows. */
     @Test
@@ -77,6 +86,7 @@ class AiAgentsScreenScreenshotTest {
             dark = false,
             amoled = false,
             connector = "goose",
+            rtl = true,
         )
     }
 
@@ -96,8 +106,10 @@ class AiAgentsScreenScreenshotTest {
         dark: Boolean,
         amoled: Boolean = false,
         npub: String? = PREVIEW_NPUB,
+        fontScale: Float = 1f,
+        rtl: Boolean = false,
     ) {
-        render(dark, amoled, npub)
+        render(dark, amoled, npub, fontScale, rtl)
         composeRule.onRoot().captureRoboImage("src/test/snapshots/$name.png")
     }
 
@@ -108,8 +120,9 @@ class AiAgentsScreenScreenshotTest {
         amoled: Boolean,
         connector: String = "codex",
         fontScale: Float = 1f,
+        rtl: Boolean = false,
     ) {
-        render(dark, amoled, PREVIEW_NPUB, fontScale)
+        render(dark, amoled, PREVIEW_NPUB, fontScale, rtl)
         composeRule.onNodeWithTag("settings.list").performScrollToNode(hasTestTag("ai_agents.connector.$connector"))
         composeRule.onNodeWithTag("ai_agents.connector.$connector").performClick()
         composeRule.waitForIdle()
@@ -122,10 +135,15 @@ class AiAgentsScreenScreenshotTest {
         amoled: Boolean,
         npub: String?,
         fontScale: Float = 1f,
+        rtl: Boolean = false,
     ) {
         composeRule.setContent {
-            WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = fontScale) {
-                AiAgentsContent(npub = npub, onBack = {}, onCopy = { _, _ -> }, onOpenDocs = { true })
+            CompositionLocalProvider(
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr,
+            ) {
+                WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = fontScale) {
+                    AiAgentsContent(npub = npub, onBack = {}, onCopy = { _, _ -> }, onOpenDocs = { true })
+                }
             }
         }
     }

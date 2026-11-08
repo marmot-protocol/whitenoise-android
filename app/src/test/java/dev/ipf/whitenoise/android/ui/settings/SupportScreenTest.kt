@@ -118,8 +118,9 @@ class SupportScreenTest {
     /** Recovery returns to the Support destination before returning to the Settings hub. */
     @Test fun recoveryParentPreservesSupportDestination() {
         assertEquals(SettingsDetail.Support, settingsDetailParent(SettingsDetail.SupportRelays))
-        assertNull(settingsDetailParent(SettingsDetail.Support))
-        assertNull(settingsDetailParent(SettingsDetail.Relays))
+        assertEquals(SettingsDetail.HelpSupport, settingsDetailParent(SettingsDetail.Support))
+        assertNull(settingsDetailParent(SettingsDetail.HelpSupport))
+        assertEquals(SettingsDetail.Account, settingsDetailParent(SettingsDetail.Relays))
     }
 
     /** Missing publication and unsafe imported URLs never qualify a new support-chat profile handoff. */

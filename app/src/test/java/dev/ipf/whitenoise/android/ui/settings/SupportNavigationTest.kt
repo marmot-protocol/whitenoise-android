@@ -39,6 +39,7 @@ class SupportNavigationTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val appState = supportTestAccount(context, "alice")
         val support = context.getString(R.string.chat_with_support)
+        val hub = context.getString(R.string.settings_help_support)
         var current: SettingsDetail? = null
         composeRule.setContent {
             var detail by remember { mutableStateOf<SettingsDetail?>(null) }
@@ -59,8 +60,10 @@ class SupportNavigationTest {
                 )
             }
         }
-        composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(support))
-        val original = composeRule.onNodeWithText(support).fetchSemanticsNode().boundsInRoot
+        composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(hub))
+        val original = composeRule.onNodeWithText(hub).fetchSemanticsNode().boundsInRoot
+        composeRule.onNodeWithText(hub).performClick()
+        assertEquals(SettingsDetail.HelpSupport, current)
         composeRule.onNodeWithText(support).performClick()
         assertEquals(SettingsDetail.Support, current)
         // The relays row is only emitted once the support relay state has left
@@ -75,9 +78,11 @@ class SupportNavigationTest {
         composeRule.onNodeWithContentDescription(back).performClick()
         assertEquals(SettingsDetail.Support, current)
         composeRule.onNodeWithContentDescription(back).performClick()
+        assertEquals(SettingsDetail.HelpSupport, current)
+        composeRule.onNodeWithContentDescription(back).performClick()
         assertNull(current)
         composeRule.waitForIdle()
-        val restored = composeRule.onNodeWithText(support).fetchSemanticsNode().boundsInRoot
+        val restored = composeRule.onNodeWithText(hub).fetchSemanticsNode().boundsInRoot
         assertTrue("expected $original but was $restored", kotlin.math.abs(original.top - restored.top) <= 1f)
     }
 }

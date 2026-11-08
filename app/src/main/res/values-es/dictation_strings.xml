@@ -6,10 +6,10 @@
     <string name="notification_channel_dictation">Dictado</string>
     <string name="notification_channel_dictation_description">Controla una sesión de dictado activa en el compositor</string>
     <string name="dictation_settings_title">Dictado</string>
-    <string name="dictation_settings_explainer">El servicio de voz instalado en este dispositivo procesa el audio y puede enviarlo a su proveedor. El texto recuperado permanece en el borrador original.</string>
+    <string name="dictation_settings_explainer">El servicio de voz de tu dispositivo procesa el audio y puede enviarlo a su proveedor. El texto recuperado queda en el borrador.</string>
     <string name="dictation_ostt_recommendation_title">Obtener Offline Speech to Text</string>
-    <string name="dictation_ostt_recommendation_summary">Aplicación de transcripción recomendada para el dictado privado en el dispositivo. Disponible en Zapstore, no en Google Play.</string>
-    <string name="dictation_ostt_recommendation_open_failed">No se pudo abrir la página de Offline Speech to Text en Zapstore.</string>
+    <string name="dictation_ostt_recommendation_summary">Recomendada para dictado privado en el dispositivo. En Zapstore, no en Google Play.</string>
+    <string name="dictation_ostt_recommendation_open_failed">No se pudo abrir Offline Speech to Text en Zapstore.</string>
     <string name="dictation_finish_title">Terminar dictado</string>
     <string name="dictation_finish_manual">Cuando elija Pegar o Enviar</string>
     <string name="dictation_finish_after_silence">Después de %1$d segundos de silencio</string>
@@ -17,8 +17,8 @@
     <string name="dictation_result_paste">Pegar en el borrador</string>
     <string name="dictation_result_paste_description">Revisar o editar el texto antes de enviarlo</string>
     <string name="dictation_result_send">Enviar mensaje</string>
-    <string name="dictation_result_send_description">Solo se envía si el chat y el borrador no han cambiado</string>
-    <string name="dictation_send_safety_note">Si se bloquea el envío, el texto reconocido disponible se recupera en el borrador original. Revísalo antes de enviarlo de nuevo.</string>
+    <string name="dictation_result_send_description">Envía solo si el chat y el borrador no han cambiado</string>
+    <string name="dictation_send_safety_note">Si se bloquea el envío, el texto reconocido vuelve al borrador. Revísalo antes de enviar de nuevo.</string>
     <string name="dictation_send_blocked">No enviado</string>
     <string name="dictation_retry_send">Reintentar envío</string>
     <string name="dictation_recovery_title">El dictado necesita atención</string>

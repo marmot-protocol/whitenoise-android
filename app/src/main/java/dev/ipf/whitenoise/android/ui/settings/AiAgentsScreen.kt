@@ -45,8 +45,8 @@ import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 import dev.ipf.whitenoise.android.ui.theme.amoledOutlineBorder
 
 /**
- * AI Agents: what an agent is, the connectors whose rows open a setup sheet, and manual setup with the
- * public key and the connector documentation. Only the active account's public npub reaches the clipboard,
+ * AI Agents: the connectors whose rows open a setup sheet, then manual setup with the public key and the
+ * connector documentation. Only the active account's public npub reaches the clipboard,
  * and nothing here installs a connector, creates an account or contacts an agent.
  */
 @Suppress("FunctionNaming")
@@ -84,12 +84,6 @@ internal fun AiAgentsContent(
     val manualSetup = stringResource(R.string.ai_agents_manual_setup_body, stringResource(R.string.new_message))
     SettingsScaffold(title = stringResource(R.string.ai_agents), onBack = onBack) {
         SettingsList {
-            item(key = "search.AiAgents.1") {
-                SettingsCallout(
-                    text = stringResource(R.string.ai_agents_intro),
-                    title = stringResource(R.string.ai_agents_about_title),
-                )
-            }
             if (npub == null) {
                 item(key = "search.AiAgents.2") {
                     SettingsCallout(
@@ -152,7 +146,6 @@ internal fun AiAgentsContent(
                 }
             }
             item(key = "search.AiAgents.8") { SettingsExplainer(manualSetup) }
-            item(key = "search.AiAgents.9") { SettingsExplainer(stringResource(R.string.ai_agents_project_groups_tip)) }
             feedback?.let { message ->
                 item(key = "search.AiAgents.10") {
                     SettingsCallout(
@@ -236,6 +229,7 @@ private fun AgentSetupSheet(
                     )
                 }
                 SettingsExplainer(manualSetup)
+                SettingsExplainer(stringResource(R.string.ai_agents_project_groups_tip))
             }
             SettingsBottomAction(color = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 0.dp) {
                 if (copied) {

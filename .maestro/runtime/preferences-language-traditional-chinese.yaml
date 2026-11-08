@@ -7,9 +7,11 @@ name: preferences-language-traditional-chinese
 - assertVisible: "Settings"
 - scrollUntilVisible:
     element:
-      text: "Appearance"
+      text: "Voice & language"
     direction: DOWN
-- tapOn: "Appearance"
+- tapOn: "Voice & language"
+- assertVisible:
+    id: "settings.voice_language.group"
 - scrollUntilVisible:
     element:
       text: "Language"
@@ -22,7 +24,8 @@ name: preferences-language-traditional-chinese
 - tapOn: "繁體中文"
 - assertVisible: "語言"
 - back
-- assertVisible: "外觀"
+- assertVisible:
+    id: "settings.voice_language.group"
 - scrollUntilVisible:
     element:
       id: "appearance.language.group"
@@ -42,7 +45,8 @@ name: preferences-language-traditional-chinese
 - tapOn: "System default"
 - assertVisible: "Language"
 - back
-- assertVisible: "Appearance"
+- assertVisible:
+    id: "settings.voice_language.group"
 - back
 - assertVisible: "Settings"
 - back

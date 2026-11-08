@@ -4,6 +4,9 @@ appId: dev.ipf.whitenoise.android.maestrolab
 - assertVisible: Maestro group
 - runFlow: ../fixtures/open-settings.yaml
 - assertVisible: Settings
+- tapOn: "Account"
+- assertVisible:
+    id: "settings.account.group"
 - tapOn: Profile
 - assertVisible:
     id: profile.edit

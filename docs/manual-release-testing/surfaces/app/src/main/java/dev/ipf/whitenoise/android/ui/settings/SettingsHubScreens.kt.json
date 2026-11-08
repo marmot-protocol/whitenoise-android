@@ -1,0 +1,267 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "settings_controls": [
+      {
+        "surface": "setting:custom_emoji",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.custom_emoji",
+        "test_ids": [
+          "SET-001",
+          "SET-030"
+        ]
+      },
+      {
+        "surface": "setting:appearance_enter_help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.appearance_enter_help",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "setting:enter_key_behavior_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.enter_key_behavior_title",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "R.string.quick_account_switching",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.quick_account_switching",
+        "test_ids": [
+          "ACC-017",
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "R.string.quick_account_switching_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.quick_account_switching_detail",
+        "test_ids": [
+          "ACC-017",
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:chat_folders_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.chat_folders_title",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "setting:chat_with_support",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.chat_with_support",
+        "test_ids": [
+          "SET-001",
+          "SET-002",
+          "SET-003",
+          "SET-004",
+          "SET-005",
+          "SET-006",
+          "SET-007",
+          "SET-008",
+          "SET-009",
+          "SET-010",
+          "SET-011",
+          "SET-012",
+          "SET-016",
+          "SET-017",
+          "SET-018",
+          "SET-019",
+          "SET-020",
+          "SET-021",
+          "SET-022",
+          "SET-023",
+          "SET-024",
+          "SET-025"
+        ]
+      },
+      {
+        "surface": "string:dictation_settings_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.dictation_settings_title",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:help",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.help",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:relays",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.relays",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:settings_developer_tools",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.settings_developer_tools",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:settings_donate",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.settings_donate",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:settings_profile_keys",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.settings_profile_keys",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "string:settings_read_aloud",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.settings_read_aloud",
+        "test_ids": [
+          "SET-001"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.account",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.chats",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: composer_settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.composer_settings",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: composer_settings_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.composer_settings_detail",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: gestures_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.gestures_title",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: language",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.language",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.profile",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: settings_help_support",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.settings_help_support",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: settings_voice_language",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.settings_voice_language",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: translation_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.translation_title",
+        "test_ids": [
+          "SET-046"
+        ]
+      }
+    ],
+    "composable_surfaces": [
+      {
+        "surface": "AccountHubGroup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "fun AccountHubGroup(",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "AccountScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "fun AccountScreen(",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "ChatsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "fun ChatsScreen(",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "HelpSupportScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "fun HelpSupportScreen(",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "VoiceLanguageScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "fun VoiceLanguageScreen(",
+        "test_ids": [
+          "SET-046"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

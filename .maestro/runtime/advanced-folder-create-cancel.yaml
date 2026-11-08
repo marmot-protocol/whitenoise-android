@@ -7,6 +7,13 @@ name: advanced-folder-create-cancel
 - assertVisible: "Settings"
 - scrollUntilVisible:
     element:
+      text: "Chats"
+    direction: DOWN
+- tapOn: "Chats"
+- assertVisible:
+    id: "settings.chats.group"
+- scrollUntilVisible:
+    element:
       text: "Folders"
     direction: DOWN
 - tapOn: "Folders"

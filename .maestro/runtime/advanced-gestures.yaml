@@ -7,6 +7,13 @@ name: advanced-gestures
 - assertVisible: "Settings"
 - scrollUntilVisible:
     element:
+      text: "Chats"
+    direction: DOWN
+- tapOn: "Chats"
+- assertVisible:
+    id: "settings.chats.group"
+- scrollUntilVisible:
+    element:
       text: "Swipe actions"
     direction: DOWN
 - tapOn: "Swipe actions"
@@ -29,5 +36,8 @@ name: advanced-gestures
     id: speech.choice.0
 - assertVisible:
     id: gestures.MessageLeft
+- back
+- assertVisible:
+    id: "settings.chats.group"
 - back
 - assertVisible: "Settings"

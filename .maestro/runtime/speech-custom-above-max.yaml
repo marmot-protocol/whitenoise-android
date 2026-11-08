@@ -7,6 +7,13 @@ name: speech-custom-above-max
 - assertVisible: Settings
 - scrollUntilVisible:
     element:
+      text: "Voice & language"
+    direction: DOWN
+- tapOn: "Voice & language"
+- assertVisible:
+    id: "settings.voice_language.group"
+- scrollUntilVisible:
+    element:
       text: Read Aloud
     direction: DOWN
 - tapOn: Read Aloud

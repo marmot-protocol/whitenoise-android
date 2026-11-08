@@ -5,6 +5,13 @@ appId: dev.ipf.whitenoise.android.maestrolab
 - assertVisible: Settings
 - scrollUntilVisible:
     element:
+      text: "Help & support"
+    direction: DOWN
+- tapOn: "Help & support"
+- assertVisible:
+    id: "settings.help_support.group"
+- scrollUntilVisible:
+    element:
       text: Help
     direction: DOWN
 - tapOn: Help
@@ -25,6 +32,9 @@ appId: dev.ipf.whitenoise.android.maestrolab
     id: about.developer
 - assertVisible:
     id: developer.warning
+- back
+- assertVisible:
+    id: "settings.help_support.group"
 - back
 - assertVisible: Settings
 - assertNotVisible:

@@ -5,8 +5,14 @@ name: settings-profile-keys
 - assertVisible: "Maestro group"
 - runFlow: ../fixtures/open-settings.yaml
 - assertVisible: "Settings"
+- tapOn: "Account"
+- assertVisible:
+    id: "settings.account.group"
 - tapOn: "Profile Keys"
 - assertVisible: "Show private key"
 - assertVisible: "Private key hidden"
+- back
+- assertVisible:
+    id: "settings.account.group"
 - back
 - assertVisible: "Settings"

@@ -8,11 +8,21 @@ name: settings-help
 - assertVisible: "Settings"
 - scrollUntilVisible:
     element:
+      text: "Help & support"
+    direction: DOWN
+- tapOn: "Help & support"
+- assertVisible:
+    id: "settings.help_support.group"
+- scrollUntilVisible:
+    element:
       text: "Help"
     direction: DOWN
 - tapOn: "Help"
 - assertVisible:
     id: "help.destinations"
+- tapOn: "Back"
+- assertVisible:
+    id: "settings.help_support.group"
 - tapOn: "Back"
 - assertVisible: "Settings"
 - tapOn: "Back"

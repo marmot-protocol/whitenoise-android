@@ -1,0 +1,25 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-settings-help-support-rotation
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+# The instrumentation host owns launch, reset and disposal.
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Help & support"
+    direction: DOWN
+- tapOn: "Help & support"
+- assertVisible:
+    id: "settings.help_support.group"
+- setOrientation: LANDSCAPE_LEFT
+- assertVisible:
+    id: "settings.help_support.group"
+- setOrientation: PORTRAIT
+- assertVisible:
+    id: "settings.help_support.group"
+- tapOn: "Back"
+- assertVisible: "Settings"
+- tapOn: "Back"
+- assertVisible: "Maestro group"

@@ -1,0 +1,22 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: lifecycle-settings-chats-warm-resume
+---
+- runFlow: ../fixtures/runtime-ready.yaml
+# The instrumentation host owns launch, reset and disposal.
+- assertVisible: "Maestro group"
+- runFlow: ../fixtures/open-settings.yaml
+- assertVisible: "Settings"
+- scrollUntilVisible:
+    element:
+      text: "Chats"
+    direction: DOWN
+- tapOn: "Chats"
+- assertVisible:
+    id: "settings.chats.group"
+- runFlow: ../fixtures/runtime-warm-resume.yaml
+- assertVisible:
+    id: "settings.chats.group"
+- tapOn: "Back"
+- assertVisible: "Settings"
+- tapOn: "Back"
+- assertVisible: "Maestro group"

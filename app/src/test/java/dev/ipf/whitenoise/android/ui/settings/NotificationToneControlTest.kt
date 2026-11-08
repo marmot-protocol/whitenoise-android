@@ -35,7 +35,7 @@ class NotificationToneControlTest {
             composeRule.onNodeWithTag("notification-tone-pulse-v1").assertTextContains("Tap to preview")
             composeRule
                 .onNodeWithTag("notification-tone-import")
-                .assertTextContains("Make these tones available in Android’s sound picker.")
+                .assertTextContains("Adds these tones to Android’s sound picker.")
             composeRule.onNodeWithTag("notification-tone-ding-v1").performClick()
             composeRule.runOnIdle {
                 players.last().setState(ShadowMediaPlayer.State.PREPARED)

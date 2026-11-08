@@ -130,7 +130,7 @@ class ChatBubbleColorsScreenBehaviorTest {
 
         composeRule.onNodeWithText("Their message").assertExists()
         composeRule.onNodeWithText("Your message").assertExists()
-        composeRule.onNodeWithText("AMOLED action buttons use fixed white", substring = true).assertDoesNotExist()
+        composeRule.onNodeWithText("AMOLED action buttons stay white", substring = true).assertDoesNotExist()
         composeRule.onNode(swatch("#B91C1C", "mine")).performScrollTo().performClick()
         composeRule.onNode(swatch("#15803D", "other")).performScrollTo().performClick()
         composeRule.onNodeWithTag("bubble_colors.save").assertIsEnabled().performClick()
