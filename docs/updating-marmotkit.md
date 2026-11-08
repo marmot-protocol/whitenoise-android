@@ -5,8 +5,10 @@ Normal builds never regenerate bindings from a local MDK checkout. Maintainers
 update the reviewed pin in `app/src/main/marmotkit/MARMOT_VERSION` only after
 MDK has published the corresponding release.
 
-The [8 November nightly](marmotkit-nightly-20261108.md) is the current testing-only
-pin; replace it with the formal `marmotkit-v0.15.0` release once MDK publishes one.
+The November 8 nightly is the current testing-only pin. Replace it with the
+formal `marmotkit-v0.15.0` release once MDK publishes one.
+[November 8 release](https://github.com/marmot-protocol/mdk/releases/tag/marmotkit-v0.15.0-nightly.20261108)
+
 The [6 November nightly](marmotkit-nightly-20261106.md) is the populated campaign's
 upgrade baseline. The [5 November nightly](marmotkit-nightly-20261105.md),
 [4 November nightly](marmotkit-nightly-20261104.md),
