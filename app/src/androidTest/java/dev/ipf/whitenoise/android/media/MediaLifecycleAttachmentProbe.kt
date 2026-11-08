@@ -201,7 +201,7 @@ internal object MediaLifecycleAttachmentProbe {
         HeldAttachmentCancellationProbe.control(session.blobPort, "/__acquisition-unavailable")
         val receipt = JSONObject().put("schema", 1).put("prepare_pid", Process.myPid()).put("items", manifest)
         File(session.root, MANIFEST).writeText(receipt.toString())
-        ControlledAttachmentProbe.report(JSONObject().put("phase", "fixture-stage").put("stage", "media-prepared"))
+        ControlledAttachmentProbe.checkpoint("media-prepared")
     }
 
     /** The sender's genuine native copy is complete, exact and independent of any receiver download. */
