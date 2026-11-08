@@ -10981,9 +10981,16 @@ class ConversationController(
                     presentConversationTransient(R.string.toast_invite_declined)
                 }
                 true
-            }.getOrElse {
-                it.rethrowIfCancellation()
-                appState.presentFailure(R.string.toast_couldnt_decline_invite, "GROUP_INVITE_DECLINE", it)
+            }.getOrElse { failure ->
+                failure.rethrowIfCancellation()
+                if (
+                    failure is MarmotKitException.WouldRemoveLastAdmin &&
+                    failure.groupIdHex.equals(invitation.groupIdHex, ignoreCase = true)
+                ) {
+                    appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
+                } else {
+                    appState.presentFailure(R.string.toast_couldnt_decline_invite, "GROUP_INVITE_DECLINE", failure)
+                }
                 false
             }
         }

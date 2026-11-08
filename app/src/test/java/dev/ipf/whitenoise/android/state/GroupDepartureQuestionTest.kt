@@ -128,6 +128,21 @@ class GroupDepartureQuestionTest {
             assertFalse("selfDemoteAdminDetailed" in calls)
         }
 
+    /** A sole admin keeps the pending invite and gets the same guidance as Leave. */
+    @Test
+    fun soleAdminInviteKeepsTheGroupAdmin() =
+        runBlocking {
+            val invite = conversationTimelineTestGroup().copy(pendingConfirmation = true, admins = listOf(SELF))
+            val state = appState(inviteRuntime(invite))
+            val controller = ConversationController(appState = state, initialGroup = invite)
+
+            assertFalse(controller.declineInvite())
+            assertEquals(1, calls.count { it == "declineGroupInvite" })
+            assertTrue(controller.group.pendingConfirmation)
+            assertEquals(listOf(SELF), controller.group.admins)
+            assertEquals(AppText.Resource(R.string.toast_make_another_admin_before_leaving), state.toast?.title)
+        }
+
     /** Waiting on the step-down leaves the same invitation pending with its original role. */
     @Test
     fun waitingOnAdminDeclineKeepsTheInvite() =
@@ -217,11 +232,15 @@ class GroupDepartureQuestionTest {
                     }
                 "selfDemoteAdminDetailed" -> {
                     check(isAdmin)
-                    if (holdStepDown) {
-                        failSuspendedNativeCall(arguments, MarmotKitException.GroupCatchingUp(GROUP))
-                    } else {
-                        isAdmin = false
-                        mutation.copy(details = mutation.details.copy(group = steppedDown))
+                    when {
+                        invite.admins == listOf(SELF) ->
+                            failSuspendedNativeCall(arguments, MarmotKitException.WouldRemoveLastAdmin(GROUP))
+                        holdStepDown ->
+                            failSuspendedNativeCall(arguments, MarmotKitException.GroupCatchingUp(GROUP))
+                        else -> {
+                            isAdmin = false
+                            mutation.copy(details = mutation.details.copy(group = steppedDown))
+                        }
                     }
                 }
                 else -> error("Unexpected native call: $name")
