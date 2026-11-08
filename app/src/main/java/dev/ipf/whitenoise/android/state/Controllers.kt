@@ -11013,7 +11013,7 @@ class ConversationController(
                                 selfDemoteAdminDetailed(account, groupIdHex)
                             }
                         applyMutationDetails(account, demotion.details)
-                        // Admission may retry the step-down, so return the follow-up result without retrying that commit.
+                        // Keep a failed decline from retrying a step-down that already succeeded.
                         runCatchingCancellable { appState.marmotIo { declineGroupInvite(account, groupIdHex) } }
                     }
                 }.getOrThrow()

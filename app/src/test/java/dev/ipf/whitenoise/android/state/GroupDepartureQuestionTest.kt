@@ -103,7 +103,8 @@ class GroupDepartureQuestionTest {
     @Test
     fun adminInviteDeclinesAfterSteppingDown() =
         runBlocking {
-            val invite = conversationTimelineTestGroup().copy(pendingConfirmation = true, admins = listOf(SELF, OTHER_ADMIN))
+            val invite =
+                conversationTimelineTestGroup().copy(pendingConfirmation = true, admins = listOf(SELF, OTHER_ADMIN))
             val controller = ConversationController(appState = appState(inviteRuntime(invite)), initialGroup = invite)
 
             assertTrue(controller.declineInvite())
@@ -131,10 +132,14 @@ class GroupDepartureQuestionTest {
     @Test
     fun waitingOnAdminDeclineKeepsTheInvite() =
         runBlocking {
-            val invite = conversationTimelineTestGroup().copy(pendingConfirmation = true, admins = listOf(SELF, OTHER_ADMIN))
+            val invite =
+                conversationTimelineTestGroup().copy(pendingConfirmation = true, admins = listOf(SELF, OTHER_ADMIN))
             val state = appState(inviteRuntime(invite, holdStepDown = true))
             val controller = ConversationController(appState = state, initialGroup = invite)
-            val decline = CoroutineScope(Job()).async(start = CoroutineStart.UNDISPATCHED) { controller.declineInvite() }
+            val decline =
+                CoroutineScope(Job()).async(start = CoroutineStart.UNDISPATCHED) {
+                    controller.declineInvite()
+                }
             try {
                 awaitWithMainLooper { state.groupChangeConfirmations.pending != null }
                 checkNotNull(state.groupChangeConfirmations.pending).answer(proceed = false)
@@ -205,7 +210,10 @@ class GroupDepartureQuestionTest {
                     if (isAdmin) {
                         failSuspendedNativeCall(arguments, MarmotKitException.AdminCannotSelfRemove(GROUP))
                     } else {
-                        GroupInviteDeclineResultFfi(steppedDown.copy(pendingConfirmation = false, archived = true), mutation.summary)
+                        GroupInviteDeclineResultFfi(
+                            steppedDown.copy(pendingConfirmation = false, archived = true),
+                            mutation.summary,
+                        )
                     }
                 "selfDemoteAdminDetailed" -> {
                     check(isAdmin)
