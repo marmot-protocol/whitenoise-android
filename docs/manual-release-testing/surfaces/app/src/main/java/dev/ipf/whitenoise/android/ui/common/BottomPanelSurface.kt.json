@@ -12,9 +12,9 @@
         ]
       },
       {
-        "surface": "Display-corner-aware bottom panel shape",
+        "surface": "Display-corner-aware bottom panel inset",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/common/BottomPanelSurface.kt",
-        "anchor": "fun rememberBottomPanelShape(",
+        "anchor": "fun rememberBottomPanelHorizontalInset(",
         "test_ids": [
           "CON-044"
         ]

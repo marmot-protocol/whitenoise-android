@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.union
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+import kotlin.math.sqrt
 import android.view.WindowInsets as PlatformWindowInsets
 
 /**
@@ -38,25 +40,34 @@ import android.view.WindowInsets as PlatformWindowInsets
  */
 private const val DISPLAY_CORNER_CURVE_EXTENT_FACTOR = 1.53f
 
+/** Bottom corner radius of a docked panel, matching the composer pill. */
+internal val BottomPanelBottomRadius = Radii.xl
+
 /**
- * Bottom corner radius for a full-width panel whose bottom edge sits [bottomGap] above the window's
- * bottom edge. The display corner of reported radius [displayCornerRadius] curves away from the side
- * walls up to [DISPLAY_CORNER_CURVE_EXTENT_FACTOR] times that radius above the bottom edge. A panel corner
- * of radius `extent - bottomGap` lies inside that curve, so the panel keeps [designRadius] unless the
- * display needs more. Using the bare reported radius would leave the two curves touching where the
- * panel's side wall starts to bend, and a smooth display corner clips the wall there.
+ * Horizontal inset that keeps a panel's [bottomRadius] corners inside a rounded display corner of reported
+ * radius [displayCornerRadius] when the panel's bottom edge sits [bottomGap] above the window's bottom edge.
+ * The display curve is treated as a circle of [DISPLAY_CORNER_CURVE_EXTENT_FACTOR] times the reported
+ * radius, and the panel corner circle must fit inside it. Panels high above the display corner, such as
+ * those over the keyboard or a three-button navigation bar, stay full width.
  */
-internal fun bottomPanelBottomCornerRadius(
+internal fun bottomPanelHorizontalInset(
     displayCornerRadius: Dp,
     bottomGap: Dp,
-    designRadius: Dp = Radii.xxl,
-): Dp = maxOf(designRadius, displayCornerRadius * DISPLAY_CORNER_CURVE_EXTENT_FACTOR - bottomGap)
+    bottomRadius: Dp = BottomPanelBottomRadius,
+): Dp {
+    val extent = (displayCornerRadius * DISPLAY_CORNER_CURVE_EXTENT_FACTOR).value
+    val radius = bottomRadius.value
+    val rise = extent - bottomGap.value - radius
+    if (extent <= radius || rise <= 0f) return 0.dp
+    val reach = extent - radius
+    return maxOf(0f, reach - sqrt(reach * reach - rise * rise)).dp
+}
 
 /**
  * Corner radii in pixels for a bottom panel of [height]: the bottom corners keep [bottomRadius] (capped by
  * the height and half the width), and the top corners give way first when the panel is too short for both.
- * [androidx.compose.foundation.shape.RoundedCornerShape] would shrink all four corners instead, pulling
- * the bottom corners back into the display's curve.
+ * [androidx.compose.foundation.shape.RoundedCornerShape] would shrink all four corners instead, flattening
+ * the bottom corners that match the composer.
  */
 internal fun bottomPanelCornerRadiiPx(
     width: Float,
@@ -96,34 +107,36 @@ private data class BottomPanelShape(
 }
 
 /**
- * Shape for panels docked above the system navigation bar or keyboard: the sheet's 28 dp top corners,
- * and bottom corners that stay inside a rounded display corner (see [bottomPanelBottomCornerRadius]).
+ * Side inset for panels docked above the system navigation bar or keyboard, so their composer-sized
+ * bottom corners stay inside a rounded display corner (see [bottomPanelHorizontalInset]).
  */
 @Composable
-internal fun rememberBottomPanelShape(): Shape {
+private fun rememberBottomPanelHorizontalInset(): Dp {
     val view = LocalView.current
     val density = LocalDensity.current
     val navigationBars = WindowInsets.navigationBars
     val ime = WindowInsets.ime
     val bottomInsets = remember(navigationBars, ime) { navigationBars.union(ime) }
-    val bottomRadius by remember(view, density, bottomInsets) {
+    val inset by remember(view, density, bottomInsets) {
         derivedStateOf {
             val bottomGapPx = bottomInsets.getBottom(density)
             with(density) {
-                bottomPanelBottomCornerRadius(
+                bottomPanelHorizontalInset(
                     displayCornerRadius = displayBottomCornerRadiusPx(view).toDp(),
                     bottomGap = bottomGapPx.toDp(),
                 )
             }
         }
     }
-    return remember(bottomRadius) { BottomPanelShape(top = Radii.xxl, bottom = bottomRadius) }
+    return inset
 }
+
+private val BottomPanelOutline = BottomPanelShape(top = Radii.xxl, bottom = BottomPanelBottomRadius)
 
 /**
  * The elevated surface shared by the composer's emoji pane, the disabled-composer notices and the
  * message selection bar. Callers keep their own window inset padding; the surface supplies the
- * rounded, display-corner-safe outline and the AMOLED border.
+ * rounded outline, the side inset that keeps it clear of the display corner, and the AMOLED border.
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -132,8 +145,8 @@ internal fun BottomPanelSurface(
     content: @Composable () -> Unit,
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = rememberBottomPanelShape(),
+        modifier = modifier.padding(horizontal = rememberBottomPanelHorizontalInset()).fillMaxWidth(),
+        shape = BottomPanelOutline,
         color = MaterialTheme.colorScheme.surface,
         border = amoledSurfaceBorderStroke(),
         tonalElevation = 3.dp,
