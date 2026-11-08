@@ -294,8 +294,7 @@ internal fun inertDocumentExtension(
     }
 
 @VisibleForTesting
-internal fun isActiveContentMime(normalizedMime: String): Boolean =
-    normalizedMime in ACTIVE_CONTENT_MIMES || normalizedMime.endsWith("+xml")
+internal fun isActiveContentMime(normalizedMime: String): Boolean = normalizedMime in ACTIVE_CONTENT_MIMES || normalizedMime.endsWith("+xml")
 
 /**
  * Dispatch an already materialized [source] via the app's FileProvider.
