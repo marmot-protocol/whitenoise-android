@@ -21,6 +21,7 @@ import dev.ipf.whitenoise.android.media.AttachmentPlaintext
 import dev.ipf.whitenoise.android.media.AttachmentPlaintextCache
 import dev.ipf.whitenoise.android.media.MediaCacheDirs
 import dev.ipf.whitenoise.android.media.MediaPipeline
+import dev.ipf.whitenoise.android.share.ForeignContentSource
 import dev.ipf.whitenoise.android.share.OutboundShareStream
 import dev.ipf.whitenoise.android.share.launchOutboundShare
 import dev.ipf.whitenoise.android.share.outboundShareIntent
@@ -97,6 +98,49 @@ private val ANDROID_PACKAGE_CONTAINER_MIMES =
         "application/zip",
         "application/x-zip-compressed",
     )
+
+/**
+ * Types a browser or viewer may render as live content. Opening one runs its scripts and fetches its remote
+ * resources, which tells the sender when, and from which IP address, the attachment was opened. These open as
+ * text; saving to Downloads keeps the original type for deliberate use.
+ */
+private val ACTIVE_CONTENT_MIMES =
+    setOf(
+        "text/html",
+        "application/xhtml+xml",
+        "image/svg+xml",
+        "text/xml",
+        "application/xml",
+        "text/javascript",
+        "application/javascript",
+        "application/x-javascript",
+        "application/ecmascript",
+        "text/ecmascript",
+        "message/rfc822",
+        "multipart/related",
+        "application/x-mimearchive",
+    )
+private val ACTIVE_CONTENT_EXTENSIONS =
+    setOf(
+        "htm",
+        "html",
+        "shtml",
+        "xht",
+        "xhtml",
+        "svg",
+        "svgz",
+        "xml",
+        "xsl",
+        "xslt",
+        "js",
+        "mjs",
+        "mht",
+        "mhtml",
+        "hta",
+    )
+private const val INERT_TEXT_MIME = "text/plain"
+private const val INERT_TEXT_EXTENSION = "txt"
+
 private const val MEDIA_STORE_INSERT_ATTEMPTS = 2
 private const val MEDIA_STORE_INSERT_RETRY_DELAY_MILLIS = 150L
 
@@ -221,13 +265,36 @@ private fun documentAttachmentExtension(
             .takeIf { candidate ->
                 candidate.length in 1..MAX_DOCUMENT_EXTENSION_LENGTH && candidate.all { it.isLetterOrDigit() }
             }
-    if (fromName != null) return fromName
-    return android.webkit.MimeTypeMap
-        .getSingleton()
-        .getExtensionFromMimeType(mediaType.lowercase())
-        ?.takeIf { it.length in 1..MAX_DOCUMENT_EXTENSION_LENGTH && it.all(Char::isLetterOrDigit) }
-        ?: "bin"
+    val extension =
+        fromName
+            ?: android.webkit.MimeTypeMap
+                .getSingleton()
+                .getExtensionFromMimeType(normalizeDocumentMime(mediaType))
+                ?.takeIf { it.length in 1..MAX_DOCUMENT_EXTENSION_LENGTH && it.all(Char::isLetterOrDigit) }
+            ?: "bin"
+    return inertDocumentExtension(extension, mediaType)
 }
+
+/**
+ * FileProvider reports a cached document's type from its extension, so the cached copy must agree with the
+ * inert open type: an active extension or an active sender type is cached as text, whichever one is present.
+ */
+@VisibleForTesting
+internal fun inertDocumentExtension(
+    extension: String,
+    mediaType: String,
+): String =
+    if (
+        extension.lowercase(java.util.Locale.ROOT) in ACTIVE_CONTENT_EXTENSIONS ||
+        isActiveContentMime(normalizeDocumentMime(mediaType))
+    ) {
+        INERT_TEXT_EXTENSION
+    } else {
+        extension
+    }
+
+@VisibleForTesting
+internal fun isActiveContentMime(mime: String): Boolean = mime in ACTIVE_CONTENT_MIMES || mime.endsWith("+xml")
 
 /**
  * Dispatch an already materialized [source] via the app's FileProvider.
@@ -443,6 +510,7 @@ internal fun classifyAttachmentOpen(
             } else {
                 AttachmentOpenClassification.InvalidAndroidPackage
             }
+        isActiveContentMime(openMime) -> AttachmentOpenClassification.Ready(INERT_TEXT_MIME)
         else -> AttachmentOpenClassification.Ready(openMime)
     }
 }
@@ -925,13 +993,18 @@ internal fun createImageCaptureFile(context: android.content.Context): java.io.F
  * Clipboard/IME providers may revoke the grant as soon as the receive-content
  * callback returns. The composer staging shelf previews and sends later, so it
  * must hold a local FileProvider URI rather than the provider's raw URI.
+ *
+ * The keyboard or clipboard app chooses [uri], so it passes the same foreign-source gate as share intents: a
+ * `file:` URI or one of our own providers is refused before any read.
  */
 internal fun materializeReceiveContentImageUri(
     context: android.content.Context,
     uri: android.net.Uri,
     maxBytes: Long = ConversationController.MEDIA_RETAINED_MAX_BYTES,
+    isAppOwnedProvider: (android.net.Uri) -> Boolean = { ForeignContentSource.isAppOwned(context, it) },
 ): android.net.Uri? =
     runCatching {
+        if (!ForeignContentSource.isForeign(uri, isAppOwnedProvider)) return@runCatching null
         val resolver = context.contentResolver
         val suffix = receiveContentImageCacheSuffix(safeGetType(resolver, uri))
         val dir = java.io.File(context.cacheDir, MediaCacheDirs.COMPOSER_PASTE).apply { mkdirs() }

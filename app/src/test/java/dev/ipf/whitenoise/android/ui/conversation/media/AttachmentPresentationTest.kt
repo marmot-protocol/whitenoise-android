@@ -167,6 +167,57 @@ class AttachmentPresentationTest {
         assertEquals(4, archiveChecks)
     }
 
+    /** Markup and script attachments open as text, so no viewer runs their code or fetches their resources. */
+    @Test
+    fun activeContentOpensAsPlainText() {
+        listOf(
+            "text/html",
+            " Text/HTML ; charset=utf-8",
+            "application/xhtml+xml",
+            "image/svg+xml",
+            "application/xml",
+            "text/javascript",
+            "application/rss+xml",
+            "message/rfc822",
+        ).forEach { mime ->
+            assertEquals(
+                mime,
+                AttachmentOpenClassification.Ready("text/plain"),
+                classifyAttachmentOpen(mime, "page") { false },
+            )
+        }
+        assertEquals(
+            AttachmentOpenClassification.Ready("application/pdf"),
+            classifyAttachmentOpen("application/pdf", "page.html") { false },
+        )
+        assertEquals(
+            AttachmentOpenClassification.Ready("application/json"),
+            classifyAttachmentOpen("application/json", "data.json") { false },
+        )
+    }
+
+    /** FileProvider types the cached copy by extension, so active extensions are cached as text. */
+    @Test
+    fun activeDocumentExtensionsAreCachedAsText() {
+        listOf("html", "HTM", "svg", "xhtml", "xml", "js", "mhtml", "hta").forEach { extension ->
+            assertEquals(extension, "txt", inertDocumentExtension(extension, "application/pdf"))
+        }
+        listOf("pdf", "txt", "docx", "apk", "bin", "json").forEach { extension ->
+            assertEquals(extension, inertDocumentExtension(extension, "application/pdf"))
+        }
+    }
+
+    /** An active sender type opens as text, so its cached copy must be typed as text even without a name hint. */
+    @Test
+    fun activeDocumentMimeTypesAreCachedAsText() {
+        listOf("text/html; charset=utf-8", "IMAGE/SVG+XML", "application/xhtml+xml", "application/rss+xml").forEach {
+            assertEquals(it, "txt", inertDocumentExtension("bin", it))
+            assertEquals(it, "txt", inertDocumentExtension("pdf", it))
+        }
+        assertEquals("bin", inertDocumentExtension("bin", "application/octet-stream"))
+        assertEquals("pdf", inertDocumentExtension("pdf", "application/pdf; charset=binary"))
+    }
+
     /** Only plausible APKs move from the route-scoped viewer to the app owner. */
     @Test
     fun installerHandoffCandidateHonorsSpecificMimeMetadata() {

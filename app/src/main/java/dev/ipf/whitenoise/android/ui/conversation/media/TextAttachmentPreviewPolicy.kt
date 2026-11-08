@@ -58,13 +58,7 @@ internal fun textAttachmentCandidate(
     mediaType: String,
     fileName: String,
 ): TextAttachmentCandidate? {
-    val displayName =
-        MediaPipeline
-            .safeDisplayName(fileName)
-            .filterNot { character -> Character.getType(character) == Character.FORMAT.toInt() }
-            .trim()
-            .takeUnless { it.isBlank() || it == "." || it == ".." }
-            ?: "attachment"
+    val displayName = MediaPipeline.safeDisplayName(fileName, "attachment")
     val mime =
         mediaType
             .substringBefore(';')

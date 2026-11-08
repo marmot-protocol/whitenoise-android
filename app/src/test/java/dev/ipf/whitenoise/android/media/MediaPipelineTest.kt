@@ -145,6 +145,16 @@ class MediaPipelineTest {
     }
 
     @Test
+    fun safeDisplayName_stripsBidiAndInvisibleFormatCharacters() {
+        // Right-to-left override would display "invoice\u202Efdp.apk" as "invoicekpa.pdf".
+        assertEquals("invoicefdp.apk", MediaPipeline.safeDisplayName("invoice\u202Efdp.apk"))
+        assertEquals("report.pdf", MediaPipeline.safeDisplayName("\u2066report\u2069.pdf"))
+        assertEquals("ab.txt", MediaPipeline.safeDisplayName("a\u200Bb\uFEFF.txt"))
+        assertEquals("image.jpg", MediaPipeline.safeDisplayName("\u200B.\u200B."))
+        assertEquals("file", MediaPipeline.safeDisplayName("\u202E\u2066", "file"))
+    }
+
+    @Test
     fun safeDisplayName_clampsLongNamesAndPreservesExtension() {
         val sanitized = MediaPipeline.safeDisplayName("a".repeat(240) + ".jpeg")
 
