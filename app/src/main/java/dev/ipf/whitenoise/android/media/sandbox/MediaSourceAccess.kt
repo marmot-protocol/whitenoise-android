@@ -3,6 +3,8 @@ package dev.ipf.whitenoise.android.media.sandbox
 import android.content.Context
 import android.os.CancellationSignal
 import android.os.ParcelFileDescriptor
+import android.system.Os
+import android.system.OsConstants
 import java.io.File
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
@@ -113,7 +115,9 @@ internal class MediaSourceAccess(
     }
 
     /**
-     * Borrows a whole selected descriptor directly, or stages only the selected byte range.
+     * Borrows a whole read-only selected descriptor directly, or stages the selected byte range.
+     * A provider chooses the descriptor's open mode, so one opened for writing is staged rather than
+     * handed to a worker that could then modify the provider's file.
      * The caller retains ownership of [input]; a staged descriptor is valid only during [block].
      */
     fun <T> withSelectedMediaInput(
@@ -122,8 +126,8 @@ internal class MediaSourceAccess(
         length: Long,
         block: (ParcelFileDescriptor) -> T?,
     ): T? =
-        if (offset == 0L && length == input.statSize) {
-            block(input) // Whole selected files keep the zero-copy video path.
+        if (canLendWholeDescriptor(offset, length, input.statSize, descriptorAccessMode(input))) {
+            block(input) // Whole read-only files keep the zero-copy video path.
         } else {
             withStagedInput({ writer -> copySelectedMediaSlice(input.fileDescriptor, offset, length, writer) }, block)
         }
@@ -306,3 +310,15 @@ internal class MediaSourceAccess(
         private val providerAdmission = Semaphore(1)
     }
 }
+
+/** Kernel access mode (`O_RDONLY`, `O_WRONLY` or `O_RDWR`) of [input], or null when it cannot be read. */
+private fun descriptorAccessMode(input: ParcelFileDescriptor): Int? =
+    runCatching { Os.fcntlInt(input.fileDescriptor, OsConstants.F_GETFL, 0) and OsConstants.O_ACCMODE }.getOrNull()
+
+/** Only an unmodified, whole, read-only descriptor may reach a worker; anything else is staged. */
+internal fun canLendWholeDescriptor(
+    offset: Long,
+    length: Long,
+    statSize: Long,
+    accessMode: Int?,
+): Boolean = offset == 0L && length == statSize && accessMode == OsConstants.O_RDONLY

@@ -347,12 +347,7 @@ private class CancellableOutputStream(
     }
 }
 
-internal fun safeOutboundFileName(untrustedName: String): String =
-    MediaPipeline.safeDisplayName(
-        untrustedName.filterNot { character ->
-            character.isISOControl() || Character.getType(character) == Character.FORMAT.toInt()
-        },
-    )
+internal fun safeOutboundFileName(untrustedName: String): String = MediaPipeline.safeDisplayName(untrustedName)
 
 // A staged set must fit the shared cache's budget, so its trim never evicts a stream the receiving app has yet to
 // read. That is also MarmotKit's attachment ceiling, so one large sent or received file can be shared.

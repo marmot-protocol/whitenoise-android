@@ -26,6 +26,22 @@
         "test_ids": [
           "MED-016"
         ]
+      },
+      {
+        "surface": "Active-content attachments open as inert text",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaIo.kt",
+        "anchor": "isActiveContentMime(openMime) -> AttachmentOpenClassification.Ready(INERT_TEXT_MIME)",
+        "test_ids": [
+          "MED-049"
+        ]
+      },
+      {
+        "surface": "Keyboard paste refuses app-owned and non-provider sources",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/media/MediaIo.kt",
+        "anchor": "if (!ForeignContentSource.isForeign(uri, isAppOwnedProvider)) return@runCatching null",
+        "test_ids": [
+          "MED-049"
+        ]
       }
     ]
   },

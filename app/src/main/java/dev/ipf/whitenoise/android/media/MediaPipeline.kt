@@ -9,6 +9,7 @@ import android.graphics.Matrix
 import android.graphics.drawable.Drawable
 import android.media.ExifInterface
 import android.net.Uri
+import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.media.sandbox.MediaTrustScope
 import java.io.ByteArrayOutputStream
 import java.io.IOException
@@ -245,15 +246,19 @@ object MediaPipeline {
      */
     fun safeDisplayName(name: String): String = safeDisplayName(name, "image.jpg")
 
-    /** Applies [fallback] to empty/dot names after removing unsafe path and control characters. */
+    /**
+     * Applies [fallback] to empty/dot names after removing path components, control characters and
+     * the invisible or bidirectional format characters that can disguise an extension
+     * (`invoice` + U+202E + `fdp.apk` displays as `invoicekpa.pdf`). Every remote filename
+     * shown, saved, shared or opened uses this one predicate.
+     */
     fun safeDisplayName(
         name: String,
         fallback: String,
     ): String {
         val base =
-            name
-                .replace('\\', '/')
-                .substringAfterLast('/')
+            ProfileSanitizer
+                .stripUnsafe(name.replace('\\', '/').substringAfterLast('/'))
                 .filterNot { it.isISOControl() }
                 .trim()
                 .takeUnless { it.isBlank() || it == "." || it == ".." }

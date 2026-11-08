@@ -77,10 +77,7 @@ internal class ShareFileImporter(
         PrivateShareFiles(context),
         { uri, signal -> readShareSourceMetadata(context, uri, signal) },
         { uri, signal -> context.contentResolver.openAssetFileDescriptor(uri, "r", signal)?.createInputStream() },
-        { uri ->
-            val provider = context.packageManager.resolveContentProvider(uri.authority.orEmpty(), 0)
-            provider?.applicationInfo?.uid == context.applicationInfo.uid
-        },
+        { uri -> ForeignContentSource.isAppOwned(context, uri) },
         trustedSource = { uri -> stagedDiagnosticExportSource(context, uri) },
     )
 
@@ -188,10 +185,7 @@ internal class ShareFileImporter(
      * authorities.
      */
     private fun isRejectedSource(uri: Uri): Boolean {
-        if (uri.scheme != "content" || uri.authority.isNullOrBlank()) return true
-        // ContentResolver strips Android's user-id prefix before choosing a provider.
-        // Normalize that lookup here too, while retaining the original URI for external grants.
-        val provider = uri.buildUpon().authority(uri.authority.orEmpty().substringAfterLast('@')).build()
+        val provider = ForeignContentSource.providerUri(uri) ?: return true
         return files.owns(provider) || isAppOwnedProvider(provider)
     }
 
