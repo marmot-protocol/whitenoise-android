@@ -28,7 +28,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
@@ -105,8 +104,7 @@ internal fun StorageUsagePanel(
 ) {
     val categories = usage?.let { storageCategories(it) }.orEmpty()
     val total = usage?.let { storageBytes(it.totalBytes) }
-    val context = LocalContext.current
-    val parts = categories.joinToString { "${context.getString(it.labelRes)} ${formatStorageBytes(context, it.bytes)}" }
+    val parts = categories.map { "${stringResource(it.labelRes)} ${storageBytes(it.bytes)}" }.joinToString()
     val described =
         stringResource(
             R.string.storage_usage_description,
