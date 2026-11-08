@@ -68,7 +68,6 @@ internal class NotificationCardContent(
      * drops custom views, so the card's reaction artwork views are copied across, and its text, extras and grouping
      * are kept.
      */
-    @Suppress("DEPRECATION") // Built custom views live only in these Notification fields.
     fun reactorPictureNotification(
         active: Notification,
         reactor: NotificationIdentityImage,
@@ -77,11 +76,8 @@ internal class NotificationCardContent(
             .Builder(context, active)
             .setGroupAlertBehavior(active.groupAlertBehavior)
             .setOnlyAlertOnce(true)
-            .apply {
-                active.contentView?.let(::setCustomContentView)
-                active.bigContentView?.let(::setCustomBigContentView)
-                active.headsUpContentView?.let(::setCustomHeadsUpContentView)
-            }.setConversationIdentityImage(reactor)
+            .keepingCustomViews(active)
+            .setConversationIdentityImage(reactor)
             .build()
 
     /**

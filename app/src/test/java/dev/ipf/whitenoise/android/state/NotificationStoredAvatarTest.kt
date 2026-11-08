@@ -85,6 +85,32 @@ class NotificationStoredAvatarTest {
         assertNull(item.readyStoredAvatarBitmap("another-account"))
     }
 
+    /**
+     * A direct chat whose contact has a private picture shows it before the stored picture, as its chat row and the
+     * Direct Share shortcut do, and the stored picture once there is no choice.
+     */
+    @Test
+    fun directChatShowsItsContactsPrivatePictureBeforeTheStoredOne() {
+        val asset = asset("peer-picture")
+        val item = chatListItemFromProjection(directRow(), peerPresentation(), asset)
+        val stored = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        val private = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        AvatarImageLoader.putCached(checkNotNull(asset.cacheKey(ACCOUNT)), stored.asImageBitmap())
+
+        assertEquals(PEER, item.privatePictureContact())
+        assertSame(private, item.readyNotificationPicture(ACCOUNT) { contact -> (contact == PEER) to private })
+        assertSame(stored, item.readyNotificationPicture(ACCOUNT) { false to null })
+    }
+
+    /** A named group's picture is its own, so no member's private picture is consulted for it. */
+    @Test
+    fun namedGroupNeverTakesAMembersPrivatePicture() {
+        val item = chatListItemFromProjection(groupRow(), peerPresentation(), asset("peer-picture"))
+
+        assertNull(item.privatePictureContact())
+        assertNull(item.readyNotificationPicture(ACCOUNT) { error("a named group consults no contact") })
+    }
+
     /** A named group row whose own picture is MDK's encrypted image. */
     private fun groupRow() =
         notificationChatListRow().copy(

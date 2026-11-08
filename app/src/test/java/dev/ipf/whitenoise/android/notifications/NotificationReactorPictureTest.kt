@@ -56,6 +56,25 @@ class NotificationReactorPictureTest {
             assertNotNull("a late picture can still redraw it", card.recordedIdentityInputs())
         }
 
+    /**
+     * A reactor with a private contact picture is shown with it, as on their group rows, and the card keeps its
+     * reaction artwork through the final write that applies it.
+     */
+    @Test
+    fun reactionCardShowsTheReactorsPrivatePictureAndKeepsItsArtwork() =
+        runBlocking {
+            val update = reaction(":marmot:")
+            val reactor = update.sender.accountIdHex
+            val presenter = presenter(contactAvatar = { _, contact -> (contact == reactor) to solid(Color.GREEN) })
+            assertTrue(show(presenter, update, picture = solid(Color.RED)))
+
+            val card = liveCard()
+            assertEquals("the private picture", Color.GREEN, largeIconPixel(card))
+            assertNotNull("the artwork survives", card.contentView)
+            assertNotNull(card.bigContentView)
+            assertEquals(NotificationChannelSpec.REACTIONS.id, card.channelId)
+        }
+
     /** Without a picture in hand, the reaction card shows the reactor's monogram. */
     @Test
     fun reactionCardWithoutAPictureShowsTheReactorsMonogram() =
@@ -137,9 +156,10 @@ class NotificationReactorPictureTest {
             assertEquals(1, posts.size)
         }
 
-    /** Builds a presenter whose posts and late picture resolution the scenario controls. */
+    /** Builds a presenter whose posts, late picture resolution and private contact pictures the scenario controls. */
     private fun presenter(
         posts: MutableList<Notification> = mutableListOf(),
+        contactAvatar: (String, String) -> Pair<Boolean, Bitmap?> = { _, _ -> false to null },
         resolver: suspend (String?) -> Bitmap? = { null },
     ): LocalNotificationPresenter =
         LocalNotificationPresenter(
@@ -153,6 +173,7 @@ class NotificationReactorPictureTest {
             },
             cachedAvatarBitmap = { null },
             avatarBitmapResolver = resolver,
+            contactAvatarOverride = contactAvatar,
         ).also { it.ensureChannels() }
 
     /** Posts one reaction with an optional ready reactor picture. */

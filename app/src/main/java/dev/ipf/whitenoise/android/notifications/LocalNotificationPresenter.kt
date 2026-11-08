@@ -1273,11 +1273,11 @@ class LocalNotificationPresenter(
      * Resolves both picture slots concurrently off the main thread, keeping a present bitmap and never fetching it.
      * The conversation slot first reads MDK's stored copy of the picture the chat list draws (#3635), so a picture
      * already on the device never depends on the network, and it replaces a picture the first post drew from
-     * elsewhere, which stays when the store has none. A conversation picture with no URL, such as a group's
-     * encrypted image, then comes from the sources' loader. The sender slot tries its loader before its URL (#3635).
-     * Loaders run only in the late refresh, after the enrichment permit is released, so they get a longer bound than
-     * a URL picture and a slow network or a newly started decoder still gets the picture. A loader that fails yields
-     * no picture for its slot without cancelling the other.
+     * elsewhere, which stays when the store has none. A missing picture then comes from the slot's loader, or from
+     * its raw URL only when the slot has no loader, as on the first post. Loaders run only in the late refresh, after
+     * the enrichment permit is released, so they get a longer bound than a URL picture and a slow network or a newly
+     * started decoder still gets the picture. A loader that stops behind the app lock or fails is never followed by
+     * a URL fetch (#3635). A loader that fails yields no picture for its slot without cancelling the other.
      */
     private suspend fun resolveAvatars(sources: NotificationIdentityPictureSources): Pair<Bitmap?, Bitmap?> =
         withContext(Dispatchers.Default) {
@@ -1286,16 +1286,18 @@ class LocalNotificationPresenter(
                     async {
                         sources.storedConversationLoader?.let { boundedIdentityLoad(it) }
                             ?: sources.conversationBitmap
-                            ?: withContext(MediaTrustScope.element(sources.conversationDomain)) {
-                                avatarBitmapResolver(sources.conversationUrl)
-                            }
                             ?: sources.conversationLoader?.let { boundedIdentityLoad(it) }
+                            ?: sources.conversationUrl.takeUnless { sources.hasConversationLoader }?.let { url ->
+                                withContext(MediaTrustScope.element(sources.conversationDomain)) {
+                                    avatarBitmapResolver(url)
+                                }
+                            }
                     }
                 val senderAvatar =
                     async {
                         sources.senderBitmap
                             ?: sources.senderLoader?.let { boundedIdentityLoad(it) }
-                            ?: sources.senderUrl?.let { url ->
+                            ?: sources.senderUrl.takeIf { sources.senderLoader == null }?.let { url ->
                                 withContext(MediaTrustScope.element(sources.senderDomain)) {
                                     avatarBitmapResolver(url)
                                 }

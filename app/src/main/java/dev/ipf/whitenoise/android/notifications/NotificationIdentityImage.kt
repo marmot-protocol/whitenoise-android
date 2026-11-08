@@ -48,8 +48,8 @@ internal fun LocalNotificationContent.identityImage(
 
 /**
  * A reaction card's picture is the person who reacted (#3635): their picture when one is in hand, else their
- * monogram. It names no contact, because the final write's contact refresh would rebuild the card without its
- * reaction artwork views.
+ * monogram. It names the reactor as its contact, so their private contact picture wins at the final write, as on
+ * their group rows, and the refresh keeps the card's reaction artwork views.
  */
 internal fun LocalNotificationContent.reactorImage(senderAvatar: Bitmap?): NotificationIdentityImage {
     val seed = senderKey.ifBlank { notificationTag }
@@ -57,7 +57,7 @@ internal fun LocalNotificationContent.reactorImage(senderAvatar: Bitmap?): Notif
         bitmap = senderAvatar ?: notificationMonogramBitmap(senderName, seed),
         title = senderName,
         seed = seed,
-        contactKey = null,
+        contactKey = senderKey.takeIf(String::isNotBlank),
     )
 }
 
@@ -67,9 +67,10 @@ internal fun LocalNotificationContent.reactorImage(senderAvatar: Bitmap?): Notif
  * [storedConversationLoader] reads MDK's stored copy of the picture the chat list draws (#3635) and is tried first,
  * also over a [conversationBitmap] the first post drew from elsewhere, such as a direct chat's published sender
  * picture on an account whose chat list was not loaded, so the card still ends on the picture the chat list shows.
- * [conversationLoader] supplies a group picture that has no URL, such as a Marmot encrypted group image, and is
- * consulted only when neither the bitmap, the stored copy nor the URL gives one. [senderLoader] fetches the sender's
- * picture with the late refresh's longer bound, before the bounded URL fetch, so a cold download still arrives.
+ * [conversationLoader] fetches a missing conversation picture itself: the URL, or a group picture that has no URL,
+ * such as a Marmot encrypted group image. [senderLoader] fetches the sender's picture with the late refresh's longer
+ * bound, so a cold download still arrives. A slot with a loader never falls back to its raw URL, so a loader that
+ * stops because the app lock appeared is not followed by a fetch behind the lock, and a failed fetch is not retried.
  */
 internal data class NotificationIdentityPictureSources(
     val conversationBitmap: Bitmap?,
@@ -95,6 +96,10 @@ internal data class NotificationIdentityPictureSources(
             storedConversationLoader != null ||
                 (conversationBitmap == null && (!conversationUrl.isNullOrBlank() || conversationLoader != null)) ||
                 (senderBitmap == null && (!senderUrl.isNullOrBlank() || senderLoader != null))
+
+    /** True when a loader, not the raw URL, supplies the conversation picture. */
+    val hasConversationLoader: Boolean
+        get() = storedConversationLoader != null || conversationLoader != null
 }
 
 /**
@@ -123,9 +128,10 @@ private fun NotificationIdentityImage.refreshInputs(): Bundle =
     }
 
 /**
- * Applies the current account-scoped contact choice to a direct chat's identity picture at the final write, the
- * same way the sender Person is refreshed, so a concurrent Save or Clear never posts stale private pixels. A cleared
- * or app-locked choice falls back to the monogram, never to captured private pixels. Groups are left unchanged.
+ * Applies the current account-scoped contact choice to a direct chat's or a reaction's identity picture at the final
+ * write, the same way the sender Person is refreshed, so a concurrent Save or Clear never posts stale private pixels.
+ * A cleared or app-locked choice falls back to the monogram, never to captured private pixels. Groups are left
+ * unchanged. The card keeps its custom views, such as a reaction's artwork, and its group alert behavior.
  */
 internal fun withCurrentIdentityContact(
     context: Context,
@@ -142,7 +148,18 @@ internal fun withCurrentIdentityContact(
         val seed = identity.getString(IDENTITY_SEED) ?: contact
         NotificationCompat
             .Builder(context, notification)
+            .setGroupAlertBehavior(notification.groupAlertBehavior)
+            .keepingCustomViews(notification)
             .setLargeIcon(pixels ?: notificationMonogramBitmap(title, seed))
             .build()
     }
 }
+
+/** Copies [source]'s custom views, which the recovery builder drops, such as a reaction card's artwork (#3635). */
+@Suppress("DEPRECATION") // Built custom views live only in these Notification fields.
+internal fun NotificationCompat.Builder.keepingCustomViews(source: Notification): NotificationCompat.Builder =
+    apply {
+        source.contentView?.let(::setCustomContentView)
+        source.bigContentView?.let(::setCustomBigContentView)
+        source.headsUpContentView?.let(::setCustomHeadsUpContentView)
+    }

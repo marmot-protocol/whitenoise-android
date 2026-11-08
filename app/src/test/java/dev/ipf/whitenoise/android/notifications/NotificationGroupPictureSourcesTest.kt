@@ -132,20 +132,62 @@ class NotificationGroupPictureSourcesTest {
             assertEquals(Color.GREEN, identityPixel(liveCard()))
         }
 
-    /** With no stored copy, the late refresh still falls back to the group's URL picture. */
+    /** With no stored copy, the late refresh still falls back to the group's URL picture, through its loader. */
     @Test
     fun lateIdentityRefreshFallsBackToTheUrlWithoutAStoredPicture() =
         runBlocking {
             val posts = mutableListOf<Notification>()
             val groupUrl = "https://example.com/group.png"
-            val presenter = presenter(posts, resolver = { url -> url?.let { solid(Color.BLUE) } })
+            val presenter = presenter(posts, resolver = { error("the late refresh fetches only through loaders") })
             show(presenter, group())
             val sources =
-                NotificationIdentityPictureSources(null, groupUrl, null, null, storedConversationLoader = { null })
+                NotificationIdentityPictureSources(
+                    null,
+                    groupUrl,
+                    null,
+                    null,
+                    conversationLoader = { solid(Color.BLUE) },
+                    storedConversationLoader = { null },
+                )
 
             assertTrue(refreshLateIdentity(presenter, group(), sources))
 
             assertEquals(Color.BLUE, identityPixel(liveCard()))
+        }
+
+    /**
+     * #3635: when the app lock appears while the late refresh's loaders run, they return nothing, and neither slot
+     * then fetches its raw URL behind the lock, nor asks a host that just failed a second time.
+     */
+    @Test
+    fun lateIdentityRefreshFetchesNoUrlAfterItsLoadersStopForTheLock() =
+        runBlocking {
+            val posts = mutableListOf<Notification>()
+            val fetched = mutableListOf<String>()
+            val presenter =
+                presenter(posts, resolver = { url -> url?.also { fetched += it }?.let { solid(Color.RED) } })
+            show(presenter, group())
+            var locked = false
+            val stopsForTheLock: suspend () -> Bitmap? = {
+                locked = true
+                null
+            }
+            val sources =
+                NotificationIdentityPictureSources(
+                    null,
+                    "https://example.com/group.png",
+                    null,
+                    PICTURE_URL,
+                    conversationLoader = stopsForTheLock,
+                    storedConversationLoader = stopsForTheLock,
+                    senderLoader = stopsForTheLock,
+                )
+
+            assertFalse(refreshLateIdentity(presenter, group(), sources))
+
+            assertTrue("the loaders ran into the lock", locked)
+            assertTrue("no URL was fetched after them", fetched.isEmpty())
+            assertEquals("the card was not rewritten", 1, posts.size)
         }
 
     /**

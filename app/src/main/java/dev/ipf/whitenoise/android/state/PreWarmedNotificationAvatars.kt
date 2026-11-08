@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import dev.ipf.marmotkit.AvatarAssetFfi
 import dev.ipf.marmotkit.PresentedChatRowFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.notifications.LocalNotificationContent
@@ -21,10 +22,35 @@ internal data class StoredNotificationAvatar(
  * group never borrows a member's face while a direct chat shows its contact. Null when the row selects no stored
  * picture the device holds now.
  */
-internal fun PresentedChatRowFfi.storedNotificationAvatar(accountRef: String): StoredNotificationAvatar? {
-    val item = chatListItemFromProjection(row, presentation, avatarAsset)
-    val asset = item.selectedAvatarAsset?.takeIf { it.isRenderable() } ?: return null
-    return StoredNotificationAvatar(asset, chatListAvatarDomain(item, accountRef))
+internal fun PresentedChatRowFfi.storedNotificationAvatar(accountRef: String): StoredNotificationAvatar? =
+    chatListItemFromProjection(row, presentation, avatarAsset).storedNotificationAvatar(accountRef)
+
+/** #3635: [storedNotificationAvatar] for a row already projected as the chat list's item. */
+internal fun ChatListItem.storedNotificationAvatar(accountRef: String): StoredNotificationAvatar? {
+    val asset = selectedAvatarAsset?.takeIf { it.isRenderable() } ?: return null
+    return StoredNotificationAvatar(asset, chatListAvatarDomain(this, accountRef))
+}
+
+/**
+ * #3635: the peer whose private contact picture this chat row shows instead of its stored picture, by the chat row's
+ * own rule: the account the projector names for a direct chat or an unnamed pair, unless the group owns its picture.
+ */
+internal fun ChatListItem.privatePictureContact(): String? =
+    GroupProjector
+        .avatarAccount(group, presentationOtherMemberAccount, presentationMemberCount)
+        ?.takeUnless { GroupProjector.ownsGroupPicture(this) }
+
+/**
+ * #3635: the picture a notification's first post shows for this chat row, as the row shows it: the viewer's private
+ * picture of its [privatePictureContact] when [contactPicture] reports a choice for them, else the pixels the chat
+ * list already decoded for its stored picture. Null when neither is in hand.
+ */
+internal fun ChatListItem.readyNotificationPicture(
+    accountRef: String,
+    contactPicture: (String) -> Pair<Boolean, Bitmap?>,
+): Bitmap? {
+    val (chosen, private) = privatePictureContact()?.let(contactPicture) ?: (false to null)
+    return if (chosen) private else readyStoredAvatarBitmap(accountRef)
 }
 
 /** #3635: the pixels the chat list already decoded for this row's stored selected avatar, or null without them. */
