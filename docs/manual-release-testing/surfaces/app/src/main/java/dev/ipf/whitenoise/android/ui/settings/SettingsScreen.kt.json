@@ -341,6 +341,30 @@
           "SET-043",
           "SET-044"
         ]
+      },
+      {
+        "surface": "Settings hierarchy: chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.chats",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: settings_help_support",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.settings_help_support",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: settings_voice_language",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
+        "anchor": "R.string.settings_voice_language",
+        "test_ids": [
+          "SET-046"
+        ]
       }
     ],
     "source_coverage": [

@@ -138,6 +138,86 @@
         "test_ids": [
           "SET-001"
         ]
+      },
+      {
+        "surface": "Settings hierarchy: account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.account",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: chats",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.chats",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: composer_settings",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.composer_settings",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: composer_settings_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.composer_settings_detail",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: gestures_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.gestures_title",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: language",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.language",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: profile",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.profile",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: settings_help_support",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.settings_help_support",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: settings_voice_language",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.settings_voice_language",
+        "test_ids": [
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: translation_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+        "anchor": "R.string.translation_title",
+        "test_ids": [
+          "SET-046"
+        ]
       }
     ],
     "composable_surfaces": [

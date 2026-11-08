@@ -766,6 +766,26 @@
         "test_ids": [
           "SET-044"
         ]
+      },
+      {
+        "surface": "Settings hierarchy: notification_delivery_battery",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.notification_delivery_battery",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-046"
+        ]
+      },
+      {
+        "surface": "Settings hierarchy: notification_sounds_vibration",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsSearchAdditionalControls.kt",
+        "anchor": "R.string.notification_sounds_vibration",
+        "test_ids": [
+          "SET-042",
+          "SET-043",
+          "SET-046"
+        ]
       }
     ]
   }
