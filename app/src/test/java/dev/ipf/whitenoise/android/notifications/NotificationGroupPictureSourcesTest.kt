@@ -8,6 +8,7 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
+import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.runBlocking
@@ -260,6 +261,80 @@ class NotificationGroupPictureSourcesTest {
             assertEquals("and moves so SystemUI draws it again", postedAt + 1, lastMessage(liveCard()).timestamp)
         }
 
+    /**
+     * #3635: a direct chat MDK reports as a group records its chat-row peer as the card's contact, so the write shows
+     * the peer's private picture, and the shortcut is stamped with the peer for a later Save or Clear.
+     */
+    @Test
+    fun directChatReportedAsAGroupShowsItsPeersPrivatePicture() {
+        val peer = group().sender.accountIdHex
+        val shortcuts = mutableListOf<ShortcutInfoCompat>()
+        val presenter =
+            presenter(
+                contactAvatar = { _, contact -> if (contact == peer) true to solid(Color.RED) else false to null },
+                shortcutPublisher = { shortcut ->
+                    shortcuts += shortcut
+                    ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+                },
+            )
+        show(presenter, group(), conversation = solid(Color.BLUE), identityContact = peer)
+
+        val card = liveCard()
+        assertEquals(peer, card.recordedIdentityContact())
+        assertEquals(Color.RED, identityPixel(card))
+        assertTrue("the shortcut follows the peer's picture", contactPictureOwnsConversationIcon(shortcuts.last()))
+    }
+
+    /**
+     * #3635: a private picture cleared after the shortcut was published and before the card's write never reaches
+     * the card. The snapshot holds only the stored picture, and the write reads the choice current at that moment.
+     */
+    @Test
+    fun privatePictureClearedBeforeTheWriteNeverReachesTheCard() {
+        val peer = group().sender.accountIdHex
+        var choice: Pair<Boolean, Bitmap?> = true to solid(Color.RED)
+        var shortcutWrites = 0
+        val presenter =
+            presenter(
+                contactAvatar = { _, contact -> if (contact == peer) choice else false to null },
+                shortcutPublisher = { shortcut ->
+                    ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+                    shortcutWrites += 1
+                    choice = false to null
+                },
+            )
+        show(presenter, group(), conversation = solid(Color.BLUE), identityContact = peer)
+
+        assertTrue("the Clear landed between the shortcut and the card", shortcutWrites > 0)
+        assertEquals("the stored picture, never the cleared one", Color.BLUE, identityPixel(liveCard()))
+    }
+
+    /**
+     * #3635: a card posted without the chat-row peer, as on an account whose chat list was not loaded, is rewritten
+     * by the late refresh to record them, with its pictures unchanged, so the write applies their private picture.
+     */
+    @Test
+    fun lateIdentityRefreshRecordsTheRowsPeerOnACardWithoutOne() =
+        runBlocking {
+            val peer = group().sender.accountIdHex
+            val private = solid(Color.RED)
+            val presenter =
+                presenter(contactAvatar = { _, contact -> if (contact == peer) true to private else false to null })
+            val stored = solid(Color.BLUE)
+            show(presenter, group(), conversation = stored)
+            assertEquals("a group card records no contact", Color.BLUE, identityPixel(liveCard()))
+            val sources = NotificationIdentityPictureSources(stored, null, null, null, identityContact = peer)
+
+            assertTrue(refreshLateIdentity(presenter, group(), sources))
+
+            assertEquals(peer, liveCard().recordedIdentityContact())
+            assertEquals(Color.RED, identityPixel(liveCard()))
+            assertFalse(
+                "a card that records the peer is not rewritten again",
+                refreshLateIdentity(presenter, group(), sources),
+            )
+        }
+
     /** Runs one late identity refresh of the fixture group card with [sources]. */
     private suspend fun refreshLateIdentity(
         presenter: LocalNotificationPresenter,
@@ -288,11 +363,12 @@ class NotificationGroupPictureSourcesTest {
         resolver: suspend (String?) -> Bitmap? = { null },
         launcher: (suspend () -> Unit) -> Unit = { error("ready pictures must not launch enrichment") },
         contactAvatar: (String, String) -> Pair<Boolean, Bitmap?> = { _, _ -> false to null },
+        shortcutPublisher: (ShortcutInfoCompat) -> Unit = { ShortcutManagerCompat.pushDynamicShortcut(context, it) },
     ): LocalNotificationPresenter =
         LocalNotificationPresenter(
             context = context,
             groupReconciliation = {},
-            shortcutPublisher = { ShortcutManagerCompat.pushDynamicShortcut(context, it) },
+            shortcutPublisher = shortcutPublisher,
             notificationPoster = { notificationManager, tag, id, notification ->
                 posts += notification
                 notificationManager.notify(tag, id, notification)
@@ -303,7 +379,7 @@ class NotificationGroupPictureSourcesTest {
             contactAvatarOverride = contactAvatar,
         ).also { it.ensureChannels() }
 
-    /** Posts one message with the given ready pictures and cold picture URLs. */
+    /** Posts one message with the given ready pictures, cold picture URLs and chat-row peer. */
     private fun show(
         presenter: LocalNotificationPresenter,
         update: dev.ipf.marmotkit.NotificationUpdateFfi,
@@ -311,6 +387,7 @@ class NotificationGroupPictureSourcesTest {
         sender: Bitmap? = null,
         senderUrl: String? = null,
         conversationUrl: String? = null,
+        identityContact: String? = null,
     ) {
         assertTrue(
             runBlocking {
@@ -321,6 +398,7 @@ class NotificationGroupPictureSourcesTest {
                     conversationAvatarUrl = conversationUrl,
                     senderAvatarBitmap = sender,
                     senderAvatarUrl = senderUrl,
+                    identityContact = identityContact,
                     shortNpub = { "npub1test" },
                 )
             },

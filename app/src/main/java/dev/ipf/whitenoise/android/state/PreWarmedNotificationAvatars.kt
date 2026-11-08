@@ -40,19 +40,6 @@ internal fun ChatListItem.privatePictureContact(): String? =
         .avatarAccount(group, presentationOtherMemberAccount, presentationMemberCount)
         ?.takeUnless { GroupProjector.ownsGroupPicture(this) }
 
-/**
- * #3635: the picture a notification's first post shows for this chat row, as the row shows it: the viewer's private
- * picture of its [privatePictureContact] when [contactPicture] reports a choice for them, else the pixels the chat
- * list already decoded for its stored picture. Null when neither is in hand.
- */
-internal fun ChatListItem.readyNotificationPicture(
-    accountRef: String,
-    contactPicture: (String) -> Pair<Boolean, Bitmap?>,
-): Bitmap? {
-    val (chosen, private) = privatePictureContact()?.let(contactPicture) ?: (false to null)
-    return if (chosen) private else readyStoredAvatarBitmap(accountRef)
-}
-
 /** #3635: the pixels the chat list already decoded for this row's stored selected avatar, or null without them. */
 internal fun ChatListItem.readyStoredAvatarBitmap(accountRef: String): Bitmap? =
     selectedAvatarAsset
@@ -64,6 +51,8 @@ internal fun ChatListItem.readyStoredAvatarBitmap(accountRef: String): Bitmap? =
 /**
  * Avatar warmup metadata or exact ready-local bitmaps retained across first publication and correction.
  * [storedConversationBitmap] holds the pixels the chat list decoded for the row's stored selected avatar (#3635).
+ * [identityContact] is the peer whose private picture the chat row shows instead (#3635). The snapshot never holds
+ * that private picture: the card records the peer, and each write applies the choice current at that moment.
  */
 internal data class PreWarmedNotificationAvatars(
     val senderAvatarUrl: String?,
@@ -71,6 +60,7 @@ internal data class PreWarmedNotificationAvatars(
     val senderAvatarBitmap: Bitmap? = null,
     val groupAvatarBitmap: Bitmap? = null,
     val storedConversationBitmap: Bitmap? = null,
+    val identityContact: String? = null,
 ) {
     /**
      * Chooses the card image from the same immutable snapshot as the sender image: the picture the chat list shows
@@ -106,6 +96,79 @@ internal fun PreWarmedNotificationAvatars.lateIdentitySources(
         conversationDomain = conversationDomain,
         senderDomain = senderDomain,
     )
+
+/**
+ * #3635: adds what the chat row shows for this conversation, [item], to a first-post snapshot: the pixels the chat
+ * list already decoded for its stored picture, and the peer whose private picture the row shows instead. A missing
+ * row, such as on an account whose chat list is not loaded, adds neither.
+ */
+internal fun PreWarmedNotificationAvatars.withChatRow(
+    item: ChatListItem?,
+    accountRef: String,
+): PreWarmedNotificationAvatars =
+    copy(
+        storedConversationBitmap = item?.readyStoredAvatarBitmap(accountRef),
+        identityContact = item?.privatePictureContact(),
+    )
+
+/**
+ * #3635: what MDK's presented chat row adds to a late refresh: [storedLoader] reads MDK's stored copy of its picture,
+ * and [contact] is the peer whose private picture the row shows instead.
+ */
+internal data class LateRowIdentity(
+    val storedLoader: (suspend () -> Bitmap?)?,
+    val contact: String?,
+)
+
+/**
+ * #3635: gives each picture a late refresh may still supply a loader, so the refresh fetches only through loaders
+ * and never through a raw URL. A reaction card, or a card that already shows the stored picture, reads no [row]: its
+ * conversation picture is settled. Otherwise the stored copy comes first and the row's peer is carried along, a
+ * missing URL picture gets a [urlLoader], and a group picture that has no URL, such as a Marmot encrypted image,
+ * gets the [encryptedGroupLoader]. A missing sender picture with a URL gets a [urlLoader] too.
+ */
+internal suspend fun NotificationIdentityPictureSources.withLateLoaders(
+    isDm: Boolean,
+    reaction: Boolean,
+    storedShown: Boolean,
+    row: suspend () -> LateRowIdentity?,
+    encryptedGroupLoader: suspend () -> (suspend () -> Bitmap?)?,
+    urlLoader: (String, MediaTrustDomain) -> suspend () -> Bitmap?,
+): NotificationIdentityPictureSources {
+    val conversation =
+        if (reaction || storedShown) {
+            this
+        } else {
+            val shown = conversationBitmap != null
+            val url = conversationUrl?.takeUnless { shown || it.isBlank() }
+            val stored = row()
+            copy(
+                storedConversationLoader = stored?.storedLoader,
+                identityContact = stored?.contact,
+                conversationLoader =
+                    when {
+                        url != null -> urlLoader(url, conversationDomain)
+                        !isDm && !shown -> encryptedGroupLoader()
+                        else -> null
+                    },
+            )
+        }
+    return conversation.senderUrl
+        ?.takeIf { conversation.senderBitmap == null }
+        ?.let { url -> conversation.copy(senderLoader = urlLoader(url, conversation.senderDomain)) }
+        ?: conversation
+}
+
+/**
+ * #3635: a late picture loader for [url] that starts nothing while [locked] and drops a picture that finishes after
+ * the lock appears. A download already running when the lock appears is not cancelled, only its result is dropped.
+ */
+internal fun lockCheckedPictureLoader(
+    url: String,
+    domain: MediaTrustDomain,
+    locked: () -> Boolean,
+    load: suspend (String, MediaTrustDomain) -> Bitmap?,
+): suspend () -> Bitmap? = { if (locked()) null else load(url, domain)?.takeUnless { locked() } }
 
 /**
  * #3311: a late picture refresh prepared inside the enrichment permit, from the content the card shows and where its

@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.Application
 import android.app.Notification
 import android.app.NotificationManager
+import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.drawable.Icon
 import android.os.Looper
@@ -102,11 +103,33 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
             longBody = true,
         )
 
+    /** #3635: the group's picture and its member's keep their own slots in the dark theme. */
+    @Test
+    @Config(qualifiers = "en-rUS-w360dp-h800dp-night-xhdpi")
+    fun groupPicturesKeepTheirSlotsInTheDarkTheme() =
+        captureFirstPost(
+            cachedAvatar = true,
+            isDm = false,
+            snapshotPath = GROUP_DARK_SNAPSHOT_PATH,
+        )
+
+    /**
+     * #3635: the group's picture and its member's keep their own slots at a 200% font. Robolectric lays these platform
+     * templates out left to right even under an RTL configuration, so right to left stays a manual check (NTF-042).
+     */
+    @Test
+    fun groupPicturesKeepTheirSlotsAtALargeFont() {
+        RuntimeEnvironment.setFontScale(2.0f)
+        restartActivity()
+        captureFirstPost(cachedAvatar = true, isDm = false, snapshotPath = GROUP_LARGE_SNAPSHOT_PATH)
+    }
+
     /** Exercises the same typed first-post path for ready-image and intentional-monogram rendering. */
     private fun captureFirstPost(
         cachedAvatar: Boolean,
         isDm: Boolean = true,
         longBody: Boolean = false,
+        snapshotPath: String = snapshotPath(cachedAvatar, isDm, longBody),
     ) = runBlocking {
         val writes = AtomicInteger(0)
         val events = CopyOnWriteArrayList<NotificationFirstPostTimingEvent>()
@@ -150,21 +173,32 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
                         chats = attachReadyGroup(fixture)
                     }
                 }
-            val card = assertFirstPostTemplate(notification, preview, isDm)
-            card.captureRoboImage(
-                when {
-                    longBody && !isDm -> LONG_GROUP_SNAPSHOT_PATH
-                    longBody -> LONG_DM_SNAPSHOT_PATH
-                    !isDm -> GROUP_AVATAR_SNAPSHOT_PATH
-                    cachedAvatar -> AVATAR_SNAPSHOT_PATH
-                    else -> SNAPSHOT_PATH
-                },
-            )
+            assertFirstPostTemplate(notification, preview, isDm).captureRoboImage(snapshotPath)
         } finally {
             fixture.appState.attachChatsController(null)
             chats?.onCleared()
             fixture.close()
         }
+    }
+
+    /** The baseline a light, left-to-right capture of this card shape is compared with. */
+    private fun snapshotPath(
+        cachedAvatar: Boolean,
+        isDm: Boolean,
+        longBody: Boolean,
+    ): String =
+        when {
+            longBody && !isDm -> LONG_GROUP_SNAPSHOT_PATH
+            longBody -> LONG_DM_SNAPSHOT_PATH
+            !isDm -> GROUP_AVATAR_SNAPSHOT_PATH
+            cachedAvatar -> AVATAR_SNAPSHOT_PATH
+            else -> SNAPSHOT_PATH
+        }
+
+    /** Rebuilds the rendering activity so it takes a configuration the test changed, such as its font scale. */
+    private fun restartActivity() {
+        activityController.pause().stop().destroy()
+        activityController = Robolectric.buildActivity(Activity::class.java).setup()
     }
 
     /**
@@ -287,10 +321,15 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
             }
         }
 
-    /** Recovers and lays out Android's real API 30 notification RemoteViews on a light shade surface. */
+    /**
+     * Recovers and lays out Android's real API 30 notification RemoteViews on a light shade surface, or a dark one in
+     * the dark theme.
+     */
     private fun renderPlatformTemplate(notification: Notification): View {
         val activity = activityController.get()
-        val parent = FrameLayout(activity).apply { setBackgroundColor(Color.WHITE) }
+        val nightMode = activity.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        val night = nightMode == Configuration.UI_MODE_NIGHT_YES
+        val parent = FrameLayout(activity).apply { setBackgroundColor(if (night) DARK_SHADE else Color.WHITE) }
         activity.setContentView(parent)
         val remoteViews = Notification.Builder.recoverBuilder(activity, notification).createContentView()
         val card = remoteViews.apply(activity, parent)
@@ -347,6 +386,9 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
         const val SNAPSHOT_PATH = "src/test/snapshots/notification_first_post_remote_views_api30.png"
         const val AVATAR_SNAPSHOT_PATH = "src/test/snapshots/notification_first_post_cached_avatar_api30.png"
         const val GROUP_AVATAR_SNAPSHOT_PATH = "src/test/snapshots/notification_first_post_group_avatar_api30.png"
+        const val GROUP_DARK_SNAPSHOT_PATH = "src/test/snapshots/notification_first_post_group_dark_api30.png"
+        const val GROUP_LARGE_SNAPSHOT_PATH = "src/test/snapshots/notification_first_post_group_large_font_api30.png"
+        val DARK_SHADE = Color.rgb(32, 33, 36)
         const val AVATAR_URL = "https://profiles.example/first-card.png"
         const val GROUP_PICTURE_URL = "https://profiles.example/first-card-group.png"
         const val FIRST_POST_CONTENT_DEADLINE_MS = 100L

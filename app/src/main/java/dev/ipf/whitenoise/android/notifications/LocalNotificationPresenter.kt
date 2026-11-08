@@ -334,6 +334,9 @@ class LocalNotificationPresenter(
      * write observer runs after the first successful platform notification write.
      * A quiet write settles its alert flags at that final write, against the live
      * same-key card, so it never ends a heads-up banner that card is still showing.
+     * [identityContact] is the chat row's peer for a direct chat MDK reports as a
+     * group (#3635). The card and its shortcut record them, and each write applies
+     * their private picture as chosen at that moment, as for any direct chat.
      */
     @SuppressLint("MissingPermission")
     suspend fun show(
@@ -350,6 +353,7 @@ class LocalNotificationPresenter(
         conversationAvatarBitmap: Bitmap? = null,
         senderAvatarUrl: String? = null,
         senderAvatarBitmap: Bitmap? = null,
+        identityContact: String? = null,
         silentUpdate: Boolean = false,
         replaceCurrentMessage: Boolean = false,
         onNotificationWritten: (() -> Unit)? = null,
@@ -739,6 +743,7 @@ class LocalNotificationPresenter(
                                         titleOverride = conversationTitleOverride,
                                         conversationAvatar = resolvedConversationAvatarBitmap,
                                         senderAvatar = resolvedSenderAvatarBitmap,
+                                        contact = identityContact,
                                     ),
                                 )
                             }
@@ -793,6 +798,7 @@ class LocalNotificationPresenter(
                                     conversationAvatarBitmap = resolvedConversationAvatarBitmap,
                                     senderAvatarUrl = senderAvatarUrl,
                                     senderAvatarBitmap = resolvedSenderAvatarBitmap,
+                                    identityContact = identityContact,
                                 )
                         }
 
@@ -1182,6 +1188,7 @@ class LocalNotificationPresenter(
                 directShareEligible = directShareEligible,
                 isPublishAllowed = isPublishAllowed,
                 holdForPost = true,
+                identityContact = messaging.identityContact,
             )
         }.takeIf { it }?.let { shortcutId }
     }
@@ -1371,6 +1378,7 @@ class LocalNotificationPresenter(
                             ConversationCardPostSynchronizer.isShowCurrent(showToken) &&
                             publisher.canPublishPreviewShortcut(content, active)
                     },
+                    identityContact = messaging.identityContact,
                 )
             }
             // The late picture replaces the identity image and the sender together, for either card template.
@@ -1380,6 +1388,7 @@ class LocalNotificationPresenter(
                     titleOverride = messaging.conversationTitleOverride,
                     conversationAvatar = conversationAvatarBitmap,
                     senderAvatar = senderAvatarBitmap,
+                    contact = messaging.identityContact,
                 )
             postEnrichedAvatarCard(content, active, enrichedSender, identity, showToken)
         }
@@ -1447,7 +1456,13 @@ class LocalNotificationPresenter(
             // Nothing is fetched or decrypted for a card that can no longer take it, and the card is checked again
             // once the pictures arrive, since it may have been dismissed, read or replaced meanwhile.
             val refreshable = { isRefreshCurrent() && refreshableIdentityCard(update, content) != null }
-            val arrived = if (refreshable()) arrivedPictures(pictures)?.takeIf { refreshable() } else null
+            val arrived =
+                if (refreshable()) {
+                    (arrivedPictures(pictures) ?: unrecordedContactPictures(update, content, pictures))
+                        ?.takeIf { refreshable() }
+                } else {
+                    null
+                }
             if (arrived == null) {
                 false
             } else {
@@ -1459,7 +1474,15 @@ class LocalNotificationPresenter(
                     content.notificationId,
                     ConversationCardOp.SHOW_ENRICH,
                 ) {
-                    val refresh = LateIdentityRefresh(update, content, arrived, directShareEligible, isRefreshCurrent)
+                    val refresh =
+                        LateIdentityRefresh(
+                            update,
+                            content,
+                            arrived,
+                            directShareEligible,
+                            isRefreshCurrent,
+                            pictures.identityContact,
+                        )
                     refreshableIdentityCard(update, content)
                         ?.takeIf { isRefreshCurrent() }
                         ?.let { live ->
@@ -1487,6 +1510,21 @@ class LocalNotificationPresenter(
                 (conversation !== shown && conversation?.sameAs(shown) != true) || sender !== sources.senderBitmap
             }
         }
+
+    /**
+     * #3635: the card's own pictures when the late refresh found the peer whose private picture the card follows, and
+     * the live card does not record them yet, as on an account whose chat list was not loaded at the post. The
+     * rewrite records the peer, so the final write and every later Save or Clear apply their current choice.
+     */
+    private fun unrecordedContactPictures(
+        update: NotificationUpdateFfi,
+        content: LocalNotificationContent,
+        sources: NotificationIdentityPictureSources,
+    ): Pair<Bitmap?, Bitmap?>? {
+        val contact = sources.identityContact ?: return null
+        val recorded = refreshableIdentityCard(update, content)?.notification?.recordedIdentityContact()
+        return (sources.conversationBitmap to sources.senderBitmap).takeIf { recorded != contact }
+    }
 
     /**
      * The live card a late picture may rewrite: this message's card, the app's latest write for its key and not
@@ -1536,12 +1574,14 @@ class LocalNotificationPresenter(
         val sender =
             senderPicture?.let { livePerson.toBuilder().setIcon(IconCompat.createWithBitmap(it)).build() } ?: livePerson
         val (title, seed) = inputs
+        val contact = card.recordedIdentityContact() ?: refresh.identityContact
         val identity =
             refresh.content.identityImage(
                 seed = seed,
                 titleOverride = title,
                 conversationAvatar = conversation,
                 senderAvatar = senderPicture,
+                contact = contact,
             )
         card.shortcutId?.let { shortcutId ->
             conversationShortcuts.publishConversationShortcut(
@@ -1558,6 +1598,7 @@ class LocalNotificationPresenter(
                 isPublishAllowed = {
                     refresh.isCurrent() && publisher.canPublishPreviewShortcut(refresh.content, card)
                 },
+                identityContact = contact,
             )
         }
         return cardContent.enrichedIdentityNotification(card, sender, identity)?.let { rewritten ->
@@ -1803,6 +1844,7 @@ private data class MessagingPostContext(
     val conversationAvatarBitmap: Bitmap?,
     val senderAvatarUrl: String?,
     val senderAvatarBitmap: Bitmap?,
+    val identityContact: String?,
 ) {
     val requiresRemoteAvatarResolution: Boolean
         get() =
@@ -1810,13 +1852,17 @@ private data class MessagingPostContext(
                 (!senderAvatarUrl.isNullOrBlank() && senderAvatarBitmap == null)
 }
 
-/** One late identity-picture rewrite (#3311): the message, its posted content and the card's final pictures. */
+/**
+ * One late identity-picture rewrite (#3311): the message, its posted content and the card's final pictures, and the
+ * peer whose private picture the chat row shows, which the rewrite records when the card does not yet (#3635).
+ */
 private data class LateIdentityRefresh(
     val update: NotificationUpdateFfi,
     val content: LocalNotificationContent,
     val pictures: Pair<Bitmap?, Bitmap?>,
     val directShareEligible: Boolean,
     val isCurrent: () -> Boolean,
+    val identityContact: String?,
 )
 
 private const val AVATAR_NOTIFICATION_FETCH_TIMEOUT_MS = 2_500L

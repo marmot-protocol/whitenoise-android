@@ -28,12 +28,15 @@ internal data class NotificationIdentityImage(
 /**
  * Resolves this card's identity snapshot. A direct chat prefers the conversation image the caller resolved for it
  * (the peer's picture), then the sender's own picture. A group never borrows a member's face as its identity.
+ * [contact] names the peer whose private picture the chat row shows for a direct chat MDK reports as a group
+ * (#3635), so the final write applies that peer's current choice, as it does for any direct chat.
  */
 internal fun LocalNotificationContent.identityImage(
     seed: String,
     titleOverride: String?,
     conversationAvatar: Bitmap?,
     senderAvatar: Bitmap?,
+    contact: String? = null,
 ): NotificationIdentityImage {
     val directChat = !isGroupConversation
     val title = titleOverride?.takeIf(String::isNotBlank) ?: conversationTitle ?: this.title
@@ -42,7 +45,7 @@ internal fun LocalNotificationContent.identityImage(
         bitmap = picture ?: notificationMonogramBitmap(title, seed),
         title = title,
         seed = seed,
-        contactKey = senderKey.takeIf { directChat && it.isNotBlank() },
+        contactKey = contact?.takeIf(String::isNotBlank) ?: senderKey.takeIf { directChat && it.isNotBlank() },
     )
 }
 
@@ -71,6 +74,8 @@ internal fun LocalNotificationContent.reactorImage(senderAvatar: Bitmap?): Notif
  * such as a Marmot encrypted group image. [senderLoader] fetches the sender's picture with the late refresh's longer
  * bound, so a cold download still arrives. A slot with a loader never falls back to its raw URL, so a loader that
  * stops because the app lock appeared is not followed by a fetch behind the lock, and a failed fetch is not retried.
+ * [identityContact] is the peer whose private picture the chat row shows, read with the stored picture, so a rewrite
+ * records them and the final write applies their current choice. No private pixels travel in these sources.
  */
 internal data class NotificationIdentityPictureSources(
     val conversationBitmap: Bitmap?,
@@ -86,6 +91,7 @@ internal data class NotificationIdentityPictureSources(
     val senderDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
     val senderLoader: (suspend () -> Bitmap?)? = null,
+    val identityContact: String? = null,
 ) {
     /**
      * True when the card was drawn without a picture that a URL or a loader may still supply, or without the stored
@@ -100,7 +106,17 @@ internal data class NotificationIdentityPictureSources(
     /** True when a loader, not the raw URL, supplies the conversation picture. */
     val hasConversationLoader: Boolean
         get() = storedConversationLoader != null || conversationLoader != null
+
+    /** True when a late refresh may still change the card: a missing picture, or a contact it may not record yet. */
+    val mayRefresh: Boolean
+        get() = hasMissingPicture || identityContact != null
 }
+
+/** The contact whose private picture a live card's identity follows at the final write, or null for none. */
+internal fun Notification.recordedIdentityContact(): String? =
+    extras
+        ?.getBundle(EXTRA_IDENTITY_IMAGE)
+        ?.getString(IDENTITY_CONTACT)
 
 /**
  * The title and monogram seed a live card's identity snapshot recorded, so a late picture redraws the same snapshot

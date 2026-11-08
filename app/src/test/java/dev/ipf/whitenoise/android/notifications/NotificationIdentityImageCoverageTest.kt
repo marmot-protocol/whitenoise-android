@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.notifications
 
 import dev.ipf.whitenoise.android.functionBody
 import dev.ipf.whitenoise.android.kotlinBlockFrom
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -177,10 +178,13 @@ class NotificationIdentityImageCoverageTest {
     fun lateGroupIdentityLoadsTheEncryptedGroupPicture() {
         val appState = stateSource("AppState.kt")
         val prepare = appState.functionBody("prepareLateNotificationIdentity")
-        assertTrue("only a group card asks for the loader", "!update.isDm" in prepare)
         assertTrue(
             "the late sources carry it, from the encrypted-picture loader",
-            "encryptedGroupPicture -> encryptedGroupIdentityLoader(update)" in prepare,
+            "encryptedGroupLoader = { encryptedGroupIdentityLoader(update) }" in prepare,
+        )
+        assertTrue(
+            "only for a group card without a shown picture or a URL",
+            "!isDm && !shown -> encryptedGroupLoader()" in lateLoaders(),
         )
         val loader = appState.functionBody("encryptedGroupIdentityLoader")
         assertTrue("through the group avatar cache", "GroupAvatarImageLoader" in loader)
@@ -201,19 +205,19 @@ class NotificationIdentityImageCoverageTest {
      * list decoded for the row's stored selected avatar, and the late refresh reads MDK's stored copy first, through
      * the chat list's own adoption rule, never acquiring a missing copy and never behind the app lock. Only a card that
      * already shows the stored picture skips it, so one first drawn from elsewhere, such as a direct chat's published
-     * sender picture on an account whose chat list was not loaded, still ends on the chat list's picture. A peer's
-     * private contact picture replaces the stored one by the chat row's own rule, on the card as on Direct Share.
+     * sender picture on an account whose chat list was not loaded, still ends on the chat list's picture. The row's
+     * peer, whose private picture replaces the stored one by the chat row's own rule, is named but never read here.
      */
     @Test
     fun conversationPictureComesFromTheChatListsStoredAvatarFirst() {
         val appState = stateSource("AppState.kt")
         val ready = appState.functionBody("readyNotificationAvatars")
-        assertTrue("the first post reads the row's picture", "readyNotificationPicture(update.accountRef)" in ready)
-        assertTrue("kept apart from the group's own caches", "storedConversationBitmap = stored" in ready)
+        assertTrue("the first post reads the row", ".withChatRow(item, update.accountRef)" in ready)
+        assertFalse("but never a private picture", "contactAvatarOverride" in ready)
         val avatars = stateSource("PreWarmedNotificationAvatars.kt")
-        val picture = avatars.extensionBody("readyNotificationPicture")
-        assertTrue("the private picture of the row's peer", "privatePictureContact()?.let(contactPicture)" in picture)
-        assertTrue("else the stored picture", "readyStoredAvatarBitmap(accountRef)" in picture)
+        val row = avatars.declaration("internal fun PreWarmedNotificationAvatars.withChatRow(")
+        assertTrue("apart from group caches", "storedConversationBitmap = item?.readyStoredAvatarBitmap(" in row)
+        assertTrue("naming the row's peer", "identityContact = item?.privatePictureContact()" in row)
         val rule = avatars.declaration("internal fun ChatListItem.privatePictureContact(")
         assertTrue(
             "the row's peer, as the chat row names it",
@@ -234,22 +238,23 @@ class NotificationIdentityImageCoverageTest {
         assertTrue("of the row's selected asset", "selectedAvatarAsset" in peek)
         assertTrue("from the pixels the chat list decoded", "AvatarImageLoader::cachedImage" in peek)
         val prepare = appState.functionBody("prepareLateNotificationIdentity")
+        assertTrue("the late refresh reads the row", "row = { storedConversationIdentity(update) }" in prepare)
         assertTrue(
-            "the late refresh carries the stored copy",
-            "storedConversationLoader = storedConversationIdentityLoader(update)" in prepare,
+            "unless the card already shows its stored picture",
+            "storedShown = firstPost.avatars.storedConversationBitmap != null" in prepare,
         )
-        assertTrue(
-            "unless the card already shows it",
-            "if (reaction || firstPost.avatars.storedConversationBitmap != null)" in prepare,
-        )
-        assertFalse("not whenever it shows any picture", "reaction || urlSources.conversationBitmap != null" in prepare)
-        val stored = appState.functionBody("storedConversationIdentityLoader")
+        val late = lateLoaders()
+        assertTrue("which settles it, as for a reaction", "if (reaction || storedShown)" in late)
+        assertTrue("the stored copy is carried", "storedConversationLoader = stored?.storedLoader" in late)
+        assertTrue("with the row's peer", "identityContact = stored?.contact" in late)
+        val stored = appState.functionBody("storedConversationIdentity")
         assertTrue("from the chat list's own row", "presentedChatListRow(" in stored)
         assertTrue("as the chat list projects it", "chatListItemFromProjection(" in stored)
         assertTrue("through its adoption rule", "storedNotificationAvatar(" in stored)
-        assertTrue("with the row's private picture first", "item.privatePictureContact()" in stored)
+        assertTrue("naming the row's peer", "item.privatePictureContact()" in stored)
+        assertFalse("whose private picture is never read here", "contactAvatarOverride(" in stored)
         assertTrue("never acquiring a missing copy", "acquireMissing = false" in stored)
-        assertTrue("nothing is read behind the lock", stored.split("appLockScreenVisible").size - 1 >= 2)
+        assertTrue("nothing starts behind the lock", stored.split("appLockScreenVisible").size - 1 >= 3)
         val presenter = source("LocalNotificationPresenter.kt")
         val resolve = presenter.declaration("private suspend fun resolveAvatars(")
         val storedAt = resolve.indexOf("sources.storedConversationLoader")
@@ -266,18 +271,23 @@ class NotificationIdentityImageCoverageTest {
     /**
      * #3635: the late refresh fetches every missing picture through a loader that checks the app lock, and a slot with
      * a loader never falls back to its raw URL, so a loader that stops behind the lock is not followed by a fetch.
+     * NotificationLateLoadersTest runs this wiring; this keeps AppState on it.
      */
     @Test
     fun lateRefreshFetchesOnlyThroughLockCheckingLoaders() {
         val appState = stateSource("AppState.kt")
         val prepare = appState.functionBody("prepareLateNotificationIdentity")
-        assertTrue(
-            "a conversation URL gets a loader",
-            "url != null -> latePictureLoader(url, urlSources.conversationDomain)" in prepare,
-        )
-        assertTrue("as does a sender URL", "senderLoader = latePictureLoader(url, sources.senderDomain)" in prepare)
+        assertTrue("the late sources get their loaders", ".withLateLoaders(" in prepare)
+        assertTrue("URL pictures through the lock-checked loader", "urlLoader = ::latePictureLoader" in prepare)
+        assertTrue("a refresh needs a missing picture or a peer", "pictures.mayRefresh" in prepare)
+        val late = lateLoaders()
+        assertTrue("a conversation URL gets a loader", "url != null -> urlLoader(url, conversationDomain)" in late)
+        assertTrue("as does a sender URL", "senderLoader = urlLoader(url, conversation.senderDomain)" in late)
         val loader = appState.declaration("private fun latePictureLoader(")
-        assertTrue("nothing is fetched behind the lock", loader.split("appLockScreenVisible").size - 1 >= 2)
+        assertTrue(
+            "nothing starts behind the lock",
+            "lockCheckedPictureLoader(url, domain, { appLockScreenVisible })" in loader,
+        )
         val resolve = source("LocalNotificationPresenter.kt").declaration("private suspend fun resolveAvatars(")
         assertTrue(
             "a conversation slot with a loader skips its URL",
@@ -331,8 +341,7 @@ class NotificationIdentityImageCoverageTest {
                 "internal fun PreWarmedNotificationAvatars.lateIdentitySources(",
             )
         assertTrue("every sender has a late source", "senderUrl = warmed.senderAvatarUrl," in sources)
-        val prepare = stateSource("AppState.kt").functionBody("prepareLateNotificationIdentity")
-        assertTrue("a cold sender picture gets a loader", "senderLoader = latePictureLoader(" in prepare)
+        assertTrue("a cold sender picture gets a loader", "senderLoader = urlLoader(" in lateLoaders())
         val resolve = presenter.declaration("private suspend fun resolveAvatars(")
         val loaderAt = resolve.indexOf("sources.senderLoader?.let { boundedIdentityLoad(it) }")
         assertTrue("with the late bound, before the short URL fetch", loaderAt in 0 until resolve.indexOf("senderUrl"))
@@ -375,6 +384,45 @@ class NotificationIdentityImageCoverageTest {
         assertFalse("a reaction's picture is warmed", "isReaction" in warm)
     }
 
+    /**
+     * #3635: MDK reports every direct chat as a group (mdk#2773), so the chat row's peer travels with each card and
+     * shortcut write instead of private pixels. The card records the peer and the final write applies their current
+     * choice, the shortcut reads it under the publication lock and is stamped for a later Save or Clear, and a late
+     * refresh records the peer on a card posted without them.
+     */
+    @Test
+    fun directChatReportedAsAGroupFollowsItsPeerAtEachWrite() {
+        val appState = stateSource("AppState.kt")
+        assertEquals(
+            "both message posts pass the peer",
+            2,
+            appState.split("identityContact = firstPost.avatars.identityContact").size - 1,
+        )
+        val presenter = source("LocalNotificationPresenter.kt")
+        val firstPost = presenter.branch("NotificationStyleChoice.Messaging -> {")
+        assertTrue("the first post records the peer", "contact = identityContact," in firstPost)
+        assertTrue("and hands them to the shortcut", "identityContact = identityContact," in firstPost)
+        val enriched = presenter.functionBody("postEnrichedMessagingNotification")
+        assertTrue("an enriched rewrite keeps them", "contact = messaging.identityContact," in enriched)
+        val late = presenter.functionBody("rewriteWithLatePictures")
+        assertTrue("a late rewrite keeps or adds them", "recordedIdentityContact() ?: refresh.identityContact" in late)
+        val route = presenter.functionBody("refreshLateIdentityImage")
+        assertTrue("an unrecorded peer is enough to rewrite", "unrecordedContactPictures(" in route)
+        val image = source("NotificationIdentityImage.kt").extensionBody("identityImage")
+        assertTrue("the peer is the card's contact", "contact?.takeIf(String::isNotBlank) ?:" in image)
+        val shortcuts = source("NotificationConversationShortcuts.kt")
+        val owned = shortcuts.functionBody("ownedShortcutAvatars")
+        assertTrue("the shortcut reads the peer's choice", "directContactAvatar(update, identityContact)" in owned)
+        val publish = shortcuts.functionBody("publishConversationShortcut")
+        assertTrue("again under the lock", "directContactAvatar(update, identityContact)" in publish)
+        assertTrue("where it is applied", "withPictureContact(context, contact, update.sender.accountIdHex," in publish)
+        val stamp = shortcuts.extensionBody("withPictureContact")
+        assertTrue(
+            "and is stamped for a later Save or Clear",
+            "stampContactPictureShortcut(this, contact ?: sender, conversationIcon = contact != null)" in stamp,
+        )
+    }
+
     /** An unchanged snapshot is re-read under the publication lock before only reporting use of the shortcut. */
     @Test
     fun unchangedSnapshotIsReReadUnderTheLockBeforeOnlyReportingUse() {
@@ -412,6 +460,9 @@ class NotificationIdentityImageCoverageTest {
         require(end >= 0) { "Missing $marker" }
         return substring(0, end)
     }
+
+    /** The late refresh's loader wiring, which AppState hands its loaders to. */
+    private fun lateLoaders(): String = stateSource("PreWarmedNotificationAvatars.kt").extensionBody("withLateLoaders")
 
     /** Reads one state source by file name. */
     private fun stateSource(name: String): String = File(notificationsRoot().parentFile, "state/$name").readText()

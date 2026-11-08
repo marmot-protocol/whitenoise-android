@@ -86,29 +86,39 @@ class NotificationStoredAvatarTest {
     }
 
     /**
-     * A direct chat whose contact has a private picture shows it before the stored picture, as its chat row and the
-     * Direct Share shortcut do, and the stored picture once there is no choice.
+     * A direct chat's first-post snapshot names the contact whose private picture its chat row shows, so the card
+     * applies their choice at the write, and holds only the stored picture's pixels, never a private picture.
      */
     @Test
-    fun directChatShowsItsContactsPrivatePictureBeforeTheStoredOne() {
+    fun directChatSnapshotNamesItsContactAndHoldsOnlyTheStoredPicture() {
         val asset = asset("peer-picture")
         val item = chatListItemFromProjection(directRow(), peerPresentation(), asset)
         val stored = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
-        val private = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
         AvatarImageLoader.putCached(checkNotNull(asset.cacheKey(ACCOUNT)), stored.asImageBitmap())
 
+        val snapshot = PreWarmedNotificationAvatars(null, null).withChatRow(item, ACCOUNT)
+
         assertEquals(PEER, item.privatePictureContact())
-        assertSame(private, item.readyNotificationPicture(ACCOUNT) { contact -> (contact == PEER) to private })
-        assertSame(stored, item.readyNotificationPicture(ACCOUNT) { false to null })
+        assertEquals(PEER, snapshot.identityContact)
+        assertSame(stored, snapshot.storedConversationBitmap)
     }
 
-    /** A named group's picture is its own, so no member's private picture is consulted for it. */
+    /** A named group's picture is its own, so its snapshot names no member whose private picture could replace it. */
     @Test
-    fun namedGroupNeverTakesAMembersPrivatePicture() {
+    fun namedGroupSnapshotNamesNoContact() {
         val item = chatListItemFromProjection(groupRow(), peerPresentation(), asset("peer-picture"))
 
         assertNull(item.privatePictureContact())
-        assertNull(item.readyNotificationPicture(ACCOUNT) { error("a named group consults no contact") })
+        assertNull(PreWarmedNotificationAvatars(null, null).withChatRow(item, ACCOUNT).identityContact)
+    }
+
+    /** Without a loaded chat row, as on an account whose chat list is not open, the snapshot adds nothing. */
+    @Test
+    fun missingChatRowAddsNothingToTheSnapshot() {
+        val snapshot = PreWarmedNotificationAvatars(null, null).withChatRow(null, ACCOUNT)
+
+        assertNull(snapshot.identityContact)
+        assertNull(snapshot.storedConversationBitmap)
     }
 
     /** A named group row whose own picture is MDK's encrypted image. */
