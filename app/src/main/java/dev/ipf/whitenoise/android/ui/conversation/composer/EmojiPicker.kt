@@ -176,8 +176,9 @@ internal fun composerEmojiPaneTargetHeight(
 /**
  * Height the composer emoji pane animates toward. Browsing matches the
  * [keyboardHeight] (or the [lockedPaneHeight] set on open and on the way back to
- * the keyboard), so swapping between keyboard and emoji keeps the composer still. While the search keyboard is wanted the target is
- * the keyboard plus the [searchRowHeight] above it, the pane's final total, so
+ * the keyboard), so swapping between keyboard and emoji keeps the composer
+ * still. While the search keyboard is wanted the target is the keyboard plus
+ * the [searchRowHeight] above it, the pane's final total, so
  * the pane glides straight there while the keyboard rises instead of dipping
  * below the row and growing back. It flips back to browsing as soon as the
  * keyboard starts hiding, so the grid grows during the hide rather than after.
