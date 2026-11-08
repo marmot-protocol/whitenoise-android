@@ -165,8 +165,7 @@ class ActionColorScreenBehaviorTest {
         }
         composeRule
             .onNodeWithText(
-                "AMOLED action buttons use fixed white. " +
-                    "Message bubble outlines can be customized under Chat bubble colors.",
+                "AMOLED action buttons stay white. Bubble outlines are set in Chat bubble colors.",
             ).assertExists()
         composeRule.onNodeWithTag("action_color.save").assertDoesNotExist()
     }

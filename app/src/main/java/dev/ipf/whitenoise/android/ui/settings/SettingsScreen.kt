@@ -75,12 +75,12 @@ import kotlinx.coroutines.launch
 
 /**
  * Keyed items of the Settings home list, in display order; the viewport is restored by section key.
- * The group sections render a connected group of [SettingsHomeRow]s, optionally under a heading; every other
- * item renders its own content.
+ * The group sections render an unheaded connected group of [SettingsHomeRow]s; every other item renders its own
+ * content. [searchCategoryRes] labels a group's rows in Settings search only.
  */
 internal enum class SettingsHomeSection(
     val isGroup: Boolean = false,
-    @param:StringRes val groupTitleRes: Int? = null,
+    @param:StringRes val searchCategoryRes: Int? = null,
 ) {
     Profile,
 
@@ -89,7 +89,7 @@ internal enum class SettingsHomeSection(
 
     /** One row into the Account hub: profile, keys and relays. */
     Account(isGroup = true),
-    AppPreferences(isGroup = true, groupTitleRes = R.string.app_preferences),
+    AppPreferences(isGroup = true, searchCategoryRes = R.string.app_preferences),
 
     /** Agents and Help & support close the list of destinations. */
     Assist(isGroup = true),
@@ -176,10 +176,9 @@ internal enum class SettingsHomeRow(
     ),
 }
 
-/** One connected group of the Settings home: its section key, optional heading and rows in display order. */
+/** One connected group of the Settings home: its section key and rows in display order. */
 internal data class SettingsHomeGroup(
     val section: SettingsHomeSection,
-    @param:StringRes val titleRes: Int?,
     val rows: List<SettingsHomeRow>,
 )
 
@@ -285,7 +284,6 @@ internal fun settingsHomeState(
             settingsHomeGroupSections.map { section ->
                 SettingsHomeGroup(
                     section = section,
-                    titleRes = section.groupTitleRes,
                     rows = SettingsHomeRow.entries.filter { it.section == section },
                 )
             },
@@ -1067,7 +1065,7 @@ private fun SettingsProfileTrailing() {
     }
 }
 
-/** A hub section: the optional heading at the 32 dp content line, then one connected group of its rows. */
+/** A hub section: one connected, unheaded group of its rows. */
 @Composable
 @Suppress("FunctionNaming")
 internal fun SettingsHubSection(
@@ -1078,7 +1076,6 @@ internal fun SettingsHubSection(
         modifier = Modifier.testTag("settings.section.${group.section.name}"),
         verticalArrangement = Arrangement.spacedBy(WhiteNoiseSpacing.Related),
     ) {
-        group.titleRes?.let { SettingsSection(stringResource(it)) }
         SettingsGroup {
             group.rows.forEach { entry ->
                 row(entry.name) { context ->

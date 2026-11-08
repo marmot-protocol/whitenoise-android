@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
@@ -78,16 +79,17 @@ class SettingsHomeBehaviorTest {
         composeRule.runOnIdle { assertEquals(expected, opened) }
     }
 
-    /** Account and Assist stand alone; only the preferences group carries a heading, announced as one. */
+    /** Every home group stands alone without a heading, and AI Agents follows the preferences group. */
     @Test
-    fun onlyThePreferencesGroupIsHeadedAndAgentsFollowIt() {
+    fun homeGroupsAreUnheadedAndAgentsFollowPreferences() {
         mount(profileCount = 1)
-        val headed = SettingsHomeSection.entries.filter { it.groupTitleRes != null }
-        assertEquals(listOf(SettingsHomeSection.AppPreferences), headed)
         composeRule
             .onNode(hasScrollToNodeAction())
             .performScrollToNode(hasTestTag("settings.section.AppPreferences"))
-        composeRule.onNode(hasText("Preferences") and isHeading()).assertIsDisplayed()
+        composeRule
+            .onAllNodes(isHeading() and hasAnyAncestor(hasTestTag("settings.section.AppPreferences")))
+            .assertCountEquals(0)
+        composeRule.onNode(hasText("Preferences")).assertDoesNotExist()
         composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Account"))
         composeRule.onNode(hasText("Account") and hasAnyAncestor(hasTestTag("settings.section.Account"))).assertExists()
         composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("AI Agents"))

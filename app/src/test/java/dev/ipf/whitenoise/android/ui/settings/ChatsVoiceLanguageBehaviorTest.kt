@@ -47,7 +47,7 @@ class ChatsVoiceLanguageBehaviorTest {
         val appState = freshState()
         composeRule.setContent { WhiteNoiseTheme { ChatsScreen(appState, {}, {}) } }
         composeRule.onNodeWithText("Enter key behavior").performClick()
-        composeRule.onNodeWithText("Shift+Enter always inserts a new line on a hardware keyboard.").assertExists()
+        composeRule.onNodeWithText("Shift+Enter always adds a new line on a hardware keyboard.").assertExists()
         composeRule.onNodeWithText("Send message").performClick()
         composeRule.runOnIdle { assertEquals(EnterKeyBehavior.SendMessage, appState.enterKeyBehavior) }
         composeRule.onNodeWithText("Enter key behavior").performClick()

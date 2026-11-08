@@ -190,7 +190,7 @@ class SettingsScreenScreenshotTest {
         }
 
         composeRule
-            .onNodeWithText("The speech service installed on this device processes the audio", substring = true)
+            .onNodeWithText("Your device’s speech service processes audio", substring = true)
             .assertExists()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_settings_default_light.png")
     }
@@ -214,7 +214,7 @@ class SettingsScreenScreenshotTest {
 
         composeRule.onNodeWithText("Get Offline Speech to Text").assertDoesNotExist()
         composeRule
-            .onNodeWithText("Offline Speech to Text processes dictation on this device.", substring = true)
+            .onNodeWithText("Offline Speech to Text runs on this device.", substring = true)
             .assertExists()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/dictation_settings_ostt_installed_light.png")
     }
@@ -264,13 +264,13 @@ class SettingsScreenScreenshotTest {
 
         // Resolve the provider before scrolling: its explainer changes the height of the first item.
         composeRule
-            .onNodeWithText("The speech service installed on this device processes the audio", substring = true)
+            .onNodeWithText("Your device’s speech service processes audio", substring = true)
             .assertExists()
         composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasTestTag("dictation.pause_other_audio"))
         composeRule.onNodeWithTag("dictation.pause_other_audio").assertIsDisplayed().performClick()
         composeRule.onNodeWithText("Pause other audio").assertExists()
         composeRule
-            .onNodeWithText("Pause music and podcasts during dictation", substring = true)
+            .onNodeWithText("Pauses music and podcasts while you dictate", substring = true)
             .assertExists()
             .performScrollTo()
         assertEquals(false, appState.conversationDictationPreferences.current().pauseOtherAudio)

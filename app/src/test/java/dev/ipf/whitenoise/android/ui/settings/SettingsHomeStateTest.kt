@@ -13,7 +13,7 @@ class SettingsHomeStateTest {
             val entry = catalog.getValue("home.${row.name}")
             assertEquals(row.titleRes, entry.titleRes)
             assertEquals(row.detail, entry.destination)
-            assertEquals(row.section.groupTitleRes ?: R.string.settings, entry.categoryRes)
+            assertEquals(row.section.searchCategoryRes ?: R.string.settings, entry.categoryRes)
         }
     }
 
@@ -97,12 +97,10 @@ class SettingsHomeStateTest {
             listOf(
                 SettingsHomeGroup(
                     section = SettingsHomeSection.Account,
-                    titleRes = null,
                     rows = listOf(SettingsHomeRow.Account),
                 ),
                 SettingsHomeGroup(
                     section = SettingsHomeSection.AppPreferences,
-                    titleRes = R.string.app_preferences,
                     rows =
                         listOf(
                             SettingsHomeRow.Notifications,
@@ -115,7 +113,6 @@ class SettingsHomeStateTest {
                 ),
                 SettingsHomeGroup(
                     section = SettingsHomeSection.Assist,
-                    titleRes = null,
                     rows = listOf(SettingsHomeRow.AiAgents, SettingsHomeRow.HelpSupport),
                 ),
             ),

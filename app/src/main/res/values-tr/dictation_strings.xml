@@ -6,10 +6,10 @@
     <string name="notification_channel_dictation">Dikte</string>
     <string name="notification_channel_dictation_description">Mesaj düzenleyicideki etkin dikte oturumunu denetler</string>
     <string name="dictation_settings_title">Dikte</string>
-    <string name="dictation_settings_explainer">Bu cihazda yüklü konuşma hizmeti sesi işler ve sağlayıcısına gönderebilir. Kurtarılan metin özgün taslakta kalır.</string>
+    <string name="dictation_settings_explainer">Cihazınızın konuşma hizmeti sesi işler ve sağlayıcısına gönderebilir. Kurtarılan metin taslakta kalır.</string>
     <string name="dictation_ostt_recommendation_title">Offline Speech to Text’i edinin</string>
-    <string name="dictation_ostt_recommendation_summary">Özel, cihaz üzerinde dikte için önerilen yazıya dökme uygulaması. Zapstore’da mevcuttur, Google Play’de değildir.</string>
-    <string name="dictation_ostt_recommendation_open_failed">Zapstore’daki Offline Speech to Text sayfası açılamadı.</string>
+    <string name="dictation_ostt_recommendation_summary">Özel, cihaz içi dikte için önerilir. Zapstore’da var, Google Play’de yok.</string>
+    <string name="dictation_ostt_recommendation_open_failed">Zapstore’da Offline Speech to Text açılamadı.</string>
     <string name="dictation_finish_title">Dikteyi bitir</string>
     <string name="dictation_finish_manual">Yapıştır veya Gönder’i seçtiğimde</string>
     <string name="dictation_finish_after_silence">%1$d saniye sessizlikten sonra</string>
@@ -17,8 +17,8 @@
     <string name="dictation_result_paste">Taslağa yapıştır</string>
     <string name="dictation_result_paste_description">Göndermeden önce metni gözden geçirin veya düzenleyin</string>
     <string name="dictation_result_send">Mesaj gönder</string>
-    <string name="dictation_result_send_description">Yalnızca sohbet ve taslak değişmediyse gönderir</string>
-    <string name="dictation_send_safety_note">Gönderim engellenirse kullanılabilir tanınan metin özgün taslağa kurtarılır. Yeniden göndermeden önce gözden geçirin.</string>
+    <string name="dictation_result_send_description">Yalnızca sohbet ve taslak değişmemişse gönderir</string>
+    <string name="dictation_send_safety_note">Gönderim engellenirse tanınan metin taslağa döner. Yeniden göndermeden önce inceleyin.</string>
     <string name="dictation_send_blocked">Gönderilmedi</string>
     <string name="dictation_retry_send">Yeniden gönder</string>
     <string name="dictation_recovery_title">Dikte için işlem gerekiyor</string>

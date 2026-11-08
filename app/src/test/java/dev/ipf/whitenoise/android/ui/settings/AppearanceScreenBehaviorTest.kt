@@ -135,7 +135,7 @@ class AppearanceScreenBehaviorTest {
     @Test
     fun fontSizeSheetPreviewsEveryStepUntilDone() {
         composeRule.onNodeWithText("Font size").performClick()
-        composeRule.onNodeWithText("Text size adds to your device font-size setting.").assertExists()
+        composeRule.onNodeWithText("Adds to your device font size.").assertExists()
         for (scale in AppFontScale.entries) {
             composeRule.onNodeWithTag("font_size.${scale.name}").performClick()
             composeRule.runOnIdle { assertEquals(scale, appState.fontScale) }

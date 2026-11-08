@@ -12,7 +12,7 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
                 SettingsSearchEntry(
                     id = "home.${row.name}",
                     titleRes = row.titleRes,
-                    categoryRes = row.section.groupTitleRes ?: R.string.settings,
+                    categoryRes = row.section.searchCategoryRes ?: R.string.settings,
                     destination = row.detail,
                     accountRequired = row.section == SettingsHomeSection.Account,
                 ),

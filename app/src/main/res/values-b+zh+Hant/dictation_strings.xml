@@ -6,10 +6,10 @@
     <string name="notification_channel_dictation">聽寫</string>
     <string name="notification_channel_dictation_description">控制訊息輸入框中的進行中聽寫工作階段</string>
     <string name="dictation_settings_title">聽寫</string>
-    <string name="dictation_settings_explainer">此裝置上安裝的語音服務會處理音訊，並可能將其傳送給供應商。復原的文字會保留在原始草稿中。</string>
+    <string name="dictation_settings_explainer">裝置的語音服務會處理音訊，並可能傳送給其供應商。復原的文字會保留在草稿中。</string>
     <string name="dictation_ostt_recommendation_title">取得 Offline Speech to Text</string>
-    <string name="dictation_ostt_recommendation_summary">推薦用於私密裝置端聽寫的轉寫應用程式。可從 Zapstore 取得，Google Play 不提供。</string>
-    <string name="dictation_ostt_recommendation_open_failed">無法開啟 Zapstore 上的 Offline Speech to Text 頁面。</string>
+    <string name="dictation_ostt_recommendation_summary">推薦用於私密的本機聽寫。在 Zapstore 上提供，Google Play 上沒有。</string>
+    <string name="dictation_ostt_recommendation_open_failed">無法在 Zapstore 開啟 Offline Speech to Text。</string>
     <string name="dictation_finish_title">結束聽寫</string>
     <string name="dictation_finish_manual">當我選擇「貼上」或「傳送」時</string>
     <string name="dictation_finish_after_silence">靜音 %1$d 秒後</string>
@@ -17,8 +17,8 @@
     <string name="dictation_result_paste">貼到草稿</string>
     <string name="dictation_result_paste_description">傳送前檢閱或編輯文字</string>
     <string name="dictation_result_send">傳送訊息</string>
-    <string name="dictation_result_send_description">僅在聊天和草稿未變更時傳送</string>
-    <string name="dictation_send_safety_note">如果傳送遭到阻擋，可用的辨識文字會復原到原始草稿中。再次傳送前請檢查文字。</string>
+    <string name="dictation_result_send_description">僅當聊天和草稿未變時才傳送</string>
+    <string name="dictation_send_safety_note">若傳送被阻擋，辨識的文字會回到草稿。重新傳送前請檢查。</string>
     <string name="dictation_send_blocked">未傳送</string>
     <string name="dictation_retry_send">重試傳送</string>
     <string name="dictation_recovery_title">語音輸入需要處理</string>

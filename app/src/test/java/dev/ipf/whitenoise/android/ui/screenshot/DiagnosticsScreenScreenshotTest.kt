@@ -125,8 +125,8 @@ class DiagnosticsScreenScreenshotTest {
 
         composeRule
             .onNodeWithTag("diagnostics.health")
-            .performScrollToNode(hasText("This session will be included", substring = true))
-        composeRule.onNodeWithText("This session will be included", substring = true).assertIsDisplayed()
+            .performScrollToNode(hasText("Included in the next Stored Diagnostic Logs export", substring = true))
+        composeRule.onNodeWithText("Included in the next Stored Diagnostic Logs export", substring = true).assertIsDisplayed()
     }
 
     /** Renders the SDK event through the formatter while suppressing wall-clock-dependent relative time. */
