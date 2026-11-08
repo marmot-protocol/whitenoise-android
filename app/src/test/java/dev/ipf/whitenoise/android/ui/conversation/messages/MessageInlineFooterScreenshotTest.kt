@@ -136,8 +136,9 @@ class MessageInlineFooterScreenshotTest {
     }
 
     /**
-     * The settled disc is a drawn circle, not a square fill that relies on a layer clip (#3610): the four
-     * corners of its 14 dp box show the bubble fill, and the disc colour shows above and below the check.
+     * The settled disc renders round (#3610): the four corners of its 14 dp box show the bubble fill, and the
+     * disc colour shows above and below the check. Robolectric applies layer clips, so this alone cannot tell a
+     * drawn circle from a clipped square; [sentDiscDrawsWithoutAGraphicsLayer] covers that.
      */
     @Test
     fun sentDiscCornersShowTheBubbleFill() {
@@ -170,6 +171,27 @@ class MessageInlineFooterScreenshotTest {
                 assertColorNear("$name disc ($x, $y)", disc, pixels[x, y])
             }
         }
+    }
+
+    /**
+     * The disc draws its circle itself, with no graphics layer on its node (#3610). A clipped square needs a layer
+     * whose clip a device can skip, which is how the disc showed as a grey square; this fails on that version.
+     */
+    @Test
+    fun sentDiscDrawsWithoutAGraphicsLayer() {
+        composeRule.setContent {
+            WhiteNoiseTheme(darkTheme = false) { SentFooterSample("layer-free", mutableListOf()) }
+        }
+        composeRule.waitForIdle()
+        val layers =
+            composeRule
+                .onNodeWithContentDescription("Sent", useUnmergedTree = true)
+                .fetchSemanticsNode()
+                .layoutInfo
+                .getModifierInfo()
+                .filter { it.extra != null }
+                .map { it.modifier }
+        assertTrue("the disc must not draw through a graphics layer: $layers", layers.isEmpty())
     }
 
     /** Each delivery state keeps a description, so the state never rests on colour alone. */
