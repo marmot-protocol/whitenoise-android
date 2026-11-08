@@ -1813,7 +1813,7 @@
     <string name="external_open_failed_detail">暫時無法使用。請重試或返回「關於與授權」。</string>
     <string name="developer_tools_unlocked">開發者工具已解鎖</string>
     <string name="developer_tools_already_enabled">開發者工具已開啟</string>
-    <string name="appearance_outline_colors_fixed">AMOLED 操作按鈕維持白色。氣泡外框在「氣泡顏色」中設定。</string>
+    <string name="appearance_outline_colors_fixed">AMOLED 操作按鈕維持白色。氣泡外框在「聊天氣泡顏色」中設定。</string>
     <string name="appearance_theme">主題</string>
     <string name="appearance_theme_help">「系統」跟隨裝置。AMOLED 增加純黑、自訂氣泡外框和白色操作按鈕。</string>
     <string name="appearance_amoled_detail">純黑，氣泡外框可自訂。</string>
