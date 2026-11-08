@@ -40,4 +40,10 @@ internal enum class SettingsDetail {
     BugReport,
     About,
     Developer,
+    Account,
+    Chats,
+    VoiceLanguage,
+    HelpSupport,
+    NotificationSounds,
+    NotificationDelivery,
 }

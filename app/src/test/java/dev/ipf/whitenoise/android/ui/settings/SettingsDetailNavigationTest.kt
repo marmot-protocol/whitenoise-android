@@ -12,8 +12,6 @@ class SettingsDetailNavigationTest {
         assertEquals(SettingsDetail.Help, settingsDetailParent(SettingsDetail.About))
         assertEquals(SettingsDetail.Appearance, catalog.getValue("Appearance.font_size").destination)
         assertNull(settingsDetailParent(SettingsDetail.Appearance))
-        assertNull(catalog.getValue("home.ChatWithSupport").destination)
-        assertEquals("ChatWithSupport", catalog.getValue("home.ChatWithSupport").rowKey)
     }
 
     /** Key Packages returns to Developer Tools, a hub destination; About returns to Help, which returns home. */
@@ -21,18 +19,27 @@ class SettingsDetailNavigationTest {
     fun developerToolsAndHelpFormBackStacksDownToHome() {
         // Key Packages → Developer Tools → home (null); About → Help → home (null).
         assertEquals(SettingsDetail.Developer, settingsDetailParent(SettingsDetail.KeyPackages))
-        assertNull(settingsDetailParent(SettingsDetail.Developer))
+        assertEquals(SettingsDetail.HelpSupport, settingsDetailParent(SettingsDetail.Developer))
+        assertNull(settingsDetailParent(SettingsDetail.HelpSupport))
         assertEquals(SettingsDetail.Help, settingsDetailParent(SettingsDetail.About))
         assertEquals(SettingsDetail.Help, settingsDetailParent(SettingsDetail.BugReport))
-        assertNull(settingsDetailParent(SettingsDetail.Help))
+        assertEquals(SettingsDetail.HelpSupport, settingsDetailParent(SettingsDetail.Help))
     }
 
     @Test
     fun appearanceSubscreensReturnToAppearance() {
         assertEquals(SettingsDetail.Appearance, settingsDetailParent(SettingsDetail.ActionColor))
         assertEquals(SettingsDetail.Appearance, settingsDetailParent(SettingsDetail.ChatBubbleColors))
-        assertEquals(SettingsDetail.Appearance, settingsDetailParent(SettingsDetail.CustomEmoji))
-        assertEquals(SettingsDetail.Appearance, settingsDetailParent(SettingsDetail.Composer))
+    }
+
+    @Test
+    fun chatsAndVoiceLanguageSubscreensReturnToTheirHubs() {
+        assertEquals(SettingsDetail.Chats, settingsDetailParent(SettingsDetail.CustomEmoji))
+        assertEquals(SettingsDetail.Chats, settingsDetailParent(SettingsDetail.Composer))
+        assertEquals(SettingsDetail.Chats, settingsDetailParent(SettingsDetail.Gestures))
+        assertEquals(SettingsDetail.VoiceLanguage, settingsDetailParent(SettingsDetail.Language))
+        assertEquals(SettingsDetail.Account, settingsDetailParent(SettingsDetail.Relays))
+        assertEquals(SettingsDetail.Notifications, settingsDetailParent(SettingsDetail.NotificationDelivery))
     }
 
     /** Diagnostics & Improvements returns to Privacy & Security, which returns home. */
@@ -45,12 +52,13 @@ class SettingsDetailNavigationTest {
     @Test
     fun topLevelDetailsReturnToHome() {
         listOf(
-            SettingsDetail.AccountKeys,
+            SettingsDetail.Account,
             SettingsDetail.AiAgents,
             SettingsDetail.DevicePrivacy,
-            SettingsDetail.Relays,
             SettingsDetail.Notifications,
-            SettingsDetail.Gestures,
+            SettingsDetail.Chats,
+            SettingsDetail.VoiceLanguage,
+            SettingsDetail.HelpSupport,
             SettingsDetail.Appearance,
         ).forEach { assertNull(settingsDetailParent(it)) }
     }

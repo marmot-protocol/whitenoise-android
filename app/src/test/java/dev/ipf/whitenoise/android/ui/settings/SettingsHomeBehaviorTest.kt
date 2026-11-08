@@ -39,17 +39,10 @@ class SettingsHomeBehaviorTest {
     private var editProfilePictureCount = 0
     private var addProfileCount = 0
     private var switchProfileCount = 0
-    private var supportChatCount = 0
     private var signOutCount = 0
     private var appUpdateCount = 0
     private var backCount = 0
     private var searchOpenCount = 0
-
-    @Test
-    fun translationUsesTheDedicatedLanguageGlyph() {
-        assertEquals(R.drawable.ic_translate, SettingsHomeRow.Translation.iconRes)
-        org.junit.Assert.assertNotEquals(R.drawable.ic_text_fields, SettingsHomeRow.Translation.iconRes)
-    }
 
     @Test fun searchToolbarActionIsAccessibleAndOpensOnlySearch() {
         mount(profileCount = 1)
@@ -66,12 +59,12 @@ class SettingsHomeBehaviorTest {
         }
     }
 
-    /** Signed-out Settings retains its Profile action without claiming a profile read is running. */
+    /** Signed-out Settings retains its Account entry without claiming a profile read is running. */
     @Test fun signedOutHasNoReadinessSpinnerCopy() {
         mount(profileCount = 0, hasActiveAccount = false)
         composeRule.onNodeWithText("Loading profile…").assertDoesNotExist()
-        scrollToAndClick("Profile")
-        composeRule.runOnIdle { assertEquals(listOf(SettingsDetail.Profile), opened) }
+        scrollToAndClick("Account")
+        composeRule.runOnIdle { assertEquals(listOf(SettingsDetail.Account), opened) }
     }
 
     /** Every hub and support row with a destination opens exactly that detail, in the prototype's order. */
@@ -85,36 +78,22 @@ class SettingsHomeBehaviorTest {
         composeRule.runOnIdle { assertEquals(expected, opened) }
     }
 
-    /** The rows sit under three labelled groups whose headings are announced as headings, in display order. */
+    /** Account and Assist stand alone; only the preferences group carries a heading, announced as one. */
     @Test
-    fun rowsAreGroupedUnderAccountAppAndSupportHeadings() {
+    fun onlyThePreferencesGroupIsHeadedAndAgentsFollowIt() {
         mount(profileCount = 1)
-        val expectedHeadings = listOf("Account", "App", "Support")
-        val sections = SettingsHomeSection.entries.filter { it.groupTitleRes != null }
-        assertEquals(expectedHeadings, sections.map { context.getString(requireNotNull(it.groupTitleRes)) })
-        sections.zip(expectedHeadings).forEach { (section, heading) ->
-            composeRule
-                .onNode(hasScrollToNodeAction())
-                .performScrollToNode(hasTestTag("settings.section.${section.name}"))
-            composeRule.onNode(hasText(heading) and isHeading()).assertIsDisplayed()
-        }
-        composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Relays"))
-        composeRule.onNode(hasText("Relays") and hasAnyAncestor(hasTestTag("settings.section.Account"))).assertExists()
+        val headed = SettingsHomeSection.entries.filter { it.groupTitleRes != null }
+        assertEquals(listOf(SettingsHomeSection.AppPreferences), headed)
+        composeRule
+            .onNode(hasScrollToNodeAction())
+            .performScrollToNode(hasTestTag("settings.section.AppPreferences"))
+        composeRule.onNode(hasText("Preferences") and isHeading()).assertIsDisplayed()
+        composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Account"))
+        composeRule.onNode(hasText("Account") and hasAnyAncestor(hasTestTag("settings.section.Account"))).assertExists()
         composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("AI Agents"))
         composeRule
-            .onNode(hasText("AI Agents") and hasAnyAncestor(hasTestTag("settings.section.AppPreferences")))
+            .onNode(hasText("AI Agents") and hasAnyAncestor(hasTestTag("settings.section.Assist")))
             .assertExists()
-    }
-
-    /** Chat with support runs the support-chat routing instead of opening a detail. */
-    @Test
-    fun chatWithSupportRunsTheSupportAction() {
-        mount(profileCount = 1)
-        scrollToAndClick("Chat with support")
-        composeRule.runOnIdle {
-            assertEquals(1, supportChatCount)
-            assertEquals(emptyList<SettingsDetail>(), opened)
-        }
     }
 
     /** The profile row opens Share & Connect; a single signed-in profile offers Add Profile, not switching. */
@@ -181,7 +160,7 @@ class SettingsHomeBehaviorTest {
         mount(profileCount = 0, hasActiveAccount = false)
         composeRule.onNodeWithTag("settings.active_profile").assertDoesNotExist()
         composeRule.onNodeWithText("Sign Out").assertDoesNotExist()
-        composeRule.onNodeWithText("Profile").assertExists()
+        composeRule.onNodeWithText("Account").assertExists()
     }
 
     /** The concise available row reports the actual newest version without installed/count fixture text. */
@@ -281,7 +260,6 @@ class SettingsHomeBehaviorTest {
                     onSwitchProfile = { switchProfileCount++ },
                     onOpenDetail = { opened += it },
                     onAppUpdateAction = { appUpdateCount++ },
-                    onChatWithSupport = { supportChatCount++ },
                     onSignOut = { signOutCount++ },
                     onSearchOpenChange = { if (it) searchOpenCount++ },
                 )

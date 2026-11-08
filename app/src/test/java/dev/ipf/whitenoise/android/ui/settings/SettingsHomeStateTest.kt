@@ -13,7 +13,7 @@ class SettingsHomeStateTest {
             val entry = catalog.getValue("home.${row.name}")
             assertEquals(row.titleRes, entry.titleRes)
             assertEquals(row.detail, entry.destination)
-            assertEquals(row.section.groupTitleRes, entry.categoryRes)
+            assertEquals(row.section.groupTitleRes ?: R.string.settings, entry.categoryRes)
         }
     }
 
@@ -29,7 +29,7 @@ class SettingsHomeStateTest {
                 SettingsHomeSection.AppUpdateAvailable,
                 SettingsHomeSection.Account,
                 SettingsHomeSection.AppPreferences,
-                SettingsHomeSection.Support,
+                SettingsHomeSection.Assist,
                 SettingsHomeSection.SignOut,
                 SettingsHomeSection.Version,
             ),
@@ -47,7 +47,7 @@ class SettingsHomeStateTest {
                 SettingsHomeSection.Profile,
                 SettingsHomeSection.Account,
                 SettingsHomeSection.AppPreferences,
-                SettingsHomeSection.Support,
+                SettingsHomeSection.Assist,
                 SettingsHomeSection.SignOut,
                 SettingsHomeSection.AppUpdateControls,
                 SettingsHomeSection.Version,
@@ -97,36 +97,26 @@ class SettingsHomeStateTest {
             listOf(
                 SettingsHomeGroup(
                     section = SettingsHomeSection.Account,
-                    titleRes = R.string.account,
-                    rows = listOf(SettingsHomeRow.Profile, SettingsHomeRow.ProfileKeys, SettingsHomeRow.Relays),
+                    titleRes = null,
+                    rows = listOf(SettingsHomeRow.Account),
                 ),
                 SettingsHomeGroup(
                     section = SettingsHomeSection.AppPreferences,
                     titleRes = R.string.app_preferences,
                     rows =
                         listOf(
-                            SettingsHomeRow.Appearance,
-                            SettingsHomeRow.Gestures,
-                            SettingsHomeRow.ChatFolders,
                             SettingsHomeRow.Notifications,
-                            SettingsHomeRow.ReadAloud,
-                            SettingsHomeRow.Translation,
-                            SettingsHomeRow.Dictation,
-                            SettingsHomeRow.DataUsage,
+                            SettingsHomeRow.Chats,
+                            SettingsHomeRow.Appearance,
+                            SettingsHomeRow.VoiceLanguage,
                             SettingsHomeRow.PrivacySecurity,
-                            SettingsHomeRow.AiAgents,
+                            SettingsHomeRow.DataUsage,
                         ),
                 ),
                 SettingsHomeGroup(
-                    section = SettingsHomeSection.Support,
-                    titleRes = R.string.support,
-                    rows =
-                        listOf(
-                            SettingsHomeRow.Help,
-                            SettingsHomeRow.ChatWithSupport,
-                            SettingsHomeRow.Donate,
-                            SettingsHomeRow.DeveloperTools,
-                        ),
+                    section = SettingsHomeSection.Assist,
+                    titleRes = null,
+                    rows = listOf(SettingsHomeRow.AiAgents, SettingsHomeRow.HelpSupport),
                 ),
             ),
             state.groups,
@@ -139,7 +129,7 @@ class SettingsHomeStateTest {
         val state = settingsHomeState(hasActiveAccount = true, selfUpdateEnabled = false)
         assertEquals(SettingsHomeRow.entries, state.groups.flatMap { it.rows })
         assertTrue(state.groups.none { it.rows.isEmpty() })
-        assertEquals(state.groups.map { it.section }, state.sections.filter { it.groupTitleRes != null })
+        assertEquals(state.groups.map { it.section }, state.sections.filter { it.isGroup })
     }
 
     /** Without an account the profile header and sign out disappear; store builds also drop app updates. */
@@ -151,17 +141,17 @@ class SettingsHomeStateTest {
             listOf(
                 SettingsHomeSection.Account,
                 SettingsHomeSection.AppPreferences,
-                SettingsHomeSection.Support,
+                SettingsHomeSection.Assist,
                 SettingsHomeSection.Version,
             ),
             state.sections,
         )
     }
 
-    /** Every hub row except Chat with support opens a settings detail. */
+    /** Every home row opens a settings detail, and each detail is owned by exactly one home row. */
     @Test
-    fun onlyChatWithSupportRunsAnActionInsteadOfOpeningADetail() {
-        val actionRows = SettingsHomeRow.entries.filter { it.detail == null }
-        assertEquals(listOf(SettingsHomeRow.ChatWithSupport), actionRows)
+    fun everyHomeRowOpensADistinctDetail() {
+        val details = SettingsHomeRow.entries.map { it.detail }
+        assertEquals(details.distinct(), details)
     }
 }

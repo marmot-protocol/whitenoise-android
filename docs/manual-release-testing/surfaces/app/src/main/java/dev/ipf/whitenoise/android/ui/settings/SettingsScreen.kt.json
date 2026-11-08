@@ -12,14 +12,6 @@
         ]
       },
       {
-        "surface": "gestures_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "R.string.gestures_title",
-        "test_ids": [
-          "SET-032"
-        ]
-      },
-      {
         "surface": "Settings profile avatar picture edit shortcut",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
         "anchor": "R.string.profile_picture_edit",
@@ -78,25 +70,9 @@
         ]
       },
       {
-        "surface": "SettingsHubGroup",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "fun SettingsHubGroup(",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
         "surface": "SettingsHubIcon",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
         "anchor": "fun SettingsHubIcon(",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "SettingsHubLink",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "fun SettingsHubLink(",
         "test_ids": [
           "SET-001"
         ]
@@ -154,14 +130,6 @@
         "test_ids": [
           "SET-001",
           "ONB-009"
-        ]
-      },
-      {
-        "surface": "R.string.translation_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "R.string.translation_title",
-        "test_ids": [
-          "SET-033"
         ]
       },
       {
@@ -272,59 +240,6 @@
         ]
       },
       {
-        "surface": "string:chat_folders_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "R.string.chat_folders_title",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "setting:chat_with_support",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "R.string.chat_with_support",
-        "test_ids": [
-          "SET-001",
-          "SET-002",
-          "SET-003",
-          "SET-004",
-          "SET-005",
-          "SET-006",
-          "SET-007",
-          "SET-008",
-          "SET-009",
-          "SET-010",
-          "SET-011",
-          "SET-012",
-          "SET-016",
-          "SET-017",
-          "SET-018",
-          "SET-019",
-          "SET-020",
-          "SET-021",
-          "SET-022",
-          "SET-023",
-          "SET-024",
-          "SET-025"
-        ]
-      },
-      {
-        "surface": "string:dictation_settings_title",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "R.string.dictation_settings_title",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "string:help",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "R.string.help",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
         "surface": "string:notifications",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
         "anchor": "R.string.notifications",
@@ -336,14 +251,6 @@
         "surface": "string:profile",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
         "anchor": "R.string.profile",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "string:relays",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "R.string.relays",
         "test_ids": [
           "SET-001"
         ]
@@ -374,22 +281,6 @@
         ]
       },
       {
-        "surface": "string:settings_developer_tools",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "R.string.settings_developer_tools",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "string:settings_donate",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "R.string.settings_donate",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
         "surface": "string:settings_open_share_connect_for",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
         "anchor": "R.string.settings_open_share_connect_for",
@@ -401,22 +292,6 @@
         "surface": "string:settings_privacy_security",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
         "anchor": "R.string.settings_privacy_security",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "string:settings_profile_keys",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "R.string.settings_profile_keys",
-        "test_ids": [
-          "SET-001"
-        ]
-      },
-      {
-        "surface": "string:settings_read_aloud",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "R.string.settings_read_aloud",
         "test_ids": [
           "SET-001"
         ]
@@ -438,14 +313,6 @@
         "test_ids": [
           "SET-001",
           "ONB-009"
-        ]
-      },
-      {
-        "surface": "string:support",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsScreen.kt",
-        "anchor": "R.string.support",
-        "test_ids": [
-          "SET-001"
         ]
       },
       {

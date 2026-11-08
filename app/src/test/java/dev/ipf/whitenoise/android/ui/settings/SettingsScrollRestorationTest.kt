@@ -48,7 +48,7 @@ class SettingsScrollRestorationTest {
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
-    private val help = context.getString(R.string.help)
+    private val help = context.getString(R.string.settings_help_support)
     private val back = context.getString(R.string.back)
 
     @Test fun searchResultOffsetSurvivesARealDetailVisit() {
@@ -132,14 +132,15 @@ class SettingsScrollRestorationTest {
             }
         }
         val helpBounds = scrollToAndOpen(help)
+        composeRule.onNodeWithText(context.getString(R.string.help)).performClick()
         composeRule.onNodeWithText(context.getString(R.string.report_a_bug)).performClick()
 
-        // Report a bug is a second level under Help, so two backs return to the Settings home.
-        composeRule.onNodeWithContentDescription(back).performClick()
-        composeRule.onNodeWithContentDescription(back).performClick()
+        // Report a bug is a third level (Help & support, Help, Report a bug): three backs return home.
+        repeat(3) { composeRule.onNodeWithContentDescription(back).performClick() }
         assertRestoredBounds(help, helpBounds)
 
         // Diagnostics leaves Settings entirely; returning must land on the same viewport.
+        composeRule.onNodeWithText(help).performClick()
         val developerBounds = scrollToAndOpen(context.getString(R.string.settings_developer_tools))
         composeRule
             .onNode(hasScrollToNodeAction())
@@ -147,7 +148,7 @@ class SettingsScrollRestorationTest {
         composeRule.onNodeWithText(context.getString(R.string.diagnostics)).performClick()
         composeRule.runOnIdle { diagnosticsOpen = false }
 
-        // Developer tools is a hub destination, so one back returns to the Settings home.
+        // Developer tools sits under Help & support, so one back returns to that hub.
         composeRule.onNodeWithContentDescription(back).performClick()
 
         assertRestoredBounds(context.getString(R.string.settings_developer_tools), developerBounds)
@@ -184,6 +185,7 @@ class SettingsScrollRestorationTest {
             }
         }
         val helpBounds = scrollToAndOpenHelp()
+        composeRule.onNodeWithText(context.getString(R.string.help)).performClick()
         composeRule.onNodeWithText(context.getString(R.string.about_and_licenses)).performClick()
         val developer = context.getString(R.string.developer)
         composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(developer))
@@ -194,8 +196,8 @@ class SettingsScrollRestorationTest {
         composeRule.onNodeWithText(context.getString(R.string.diagnostics)).performClick()
         composeRule.runOnIdle { diagnosticsOpen = false }
 
-        // Developer tools is a hub destination, so one back returns to the Settings home.
-        composeRule.onNodeWithContentDescription(back).performClick()
+        // Developer tools sits under Help & support, so two backs return to the Settings home.
+        repeat(2) { composeRule.onNodeWithContentDescription(back).performClick() }
 
         assertRestoredHelpBounds(helpBounds)
     }
@@ -214,7 +216,7 @@ class SettingsScrollRestorationTest {
             showSettings = true
         }
 
-        composeRule.onNodeWithText(context.getString(R.string.profile)).fetchSemanticsNode()
+        composeRule.onNodeWithText(context.getString(R.string.account)).fetchSemanticsNode()
     }
 
     /** Keyed section wins when the section set changes. */
@@ -222,14 +224,14 @@ class SettingsScrollRestorationTest {
     fun keyedSectionWinsWhenTheSectionSetChanges() {
         val viewport =
             SettingsHomeViewport(
-                section = SettingsHomeSection.Support,
+                section = SettingsHomeSection.Assist,
                 fallbackIndex = 3,
                 scrollOffset = 17,
             )
         val sections =
             listOf(
                 SettingsHomeSection.Profile,
-                SettingsHomeSection.Support,
+                SettingsHomeSection.Assist,
                 SettingsHomeSection.Version,
             )
 
@@ -240,7 +242,7 @@ class SettingsScrollRestorationTest {
     fun shellEventsPreserveOnlyTheCurrentDiagnosticsVisit() {
         val viewport =
             SettingsHomeViewport(
-                section = SettingsHomeSection.Support,
+                section = SettingsHomeSection.Assist,
                 fallbackIndex = 2,
                 scrollOffset = 17,
             )

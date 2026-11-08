@@ -27,7 +27,6 @@ import dev.ipf.whitenoise.android.state.AppFont
 import dev.ipf.whitenoise.android.state.AppFontScale
 import dev.ipf.whitenoise.android.state.AppThemeMode
 import dev.ipf.whitenoise.android.state.DraftStore
-import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import dev.ipf.whitenoise.android.ui.theme.fontFamilyOrNull
@@ -52,8 +51,6 @@ class AppearanceScreenBehaviorTest {
     private var backCount = 0
     private var actionColorCount = 0
     private var bubbleColorsCount = 0
-    private var languageCount = 0
-    private var customEmojiCount = 0
 
     /** Start each test from default appearance preferences and fresh callback counters. */
     @Before
@@ -79,28 +76,21 @@ class AppearanceScreenBehaviorTest {
                     onBack = { backCount++ },
                     onOpenActionColor = { actionColorCount++ },
                     onOpenChatBubbleColors = { bubbleColorsCount++ },
-                    onOpenLanguage = { languageCount++ },
-                    onOpenCustomEmoji = { customEmojiCount++ },
                 )
             }
         }
     }
 
-    /** Back, the colour editor, custom emoji and language rows each invoke their caller exactly once per tap. */
+    /** Back and the colour editor rows each invoke their caller exactly once per tap. */
     @Test
     fun navigationCallbacksFireOncePerTap() {
         composeRule.onNodeWithContentDescription("Back").performClick()
         composeRule.onNodeWithText("Action color").performClick()
         composeRule.onNodeWithText("Chat bubble colors").performClick()
-        composeRule.onNodeWithText("Custom emoji").performClick()
-        composeRule.onNodeWithText("Language").performClick()
         composeRule.runOnIdle {
             assertEquals(1, backCount)
             assertEquals(1, actionColorCount)
             assertEquals(1, bubbleColorsCount)
-            assertEquals(1, customEmojiCount)
-            assertEquals(1, languageCount)
-            assertEquals("", appState.languageTag)
         }
     }
 
@@ -200,28 +190,6 @@ class AppearanceScreenBehaviorTest {
         assertEquals(systemFamily, sampleFamily())
         composeRule.onNodeWithText("Done").performClick()
         composeRule.onNodeWithTag("font_family.preview").assertDoesNotExist()
-    }
-
-    /** The Enter key dialog explains Shift+Enter, applies on tap, and Cancel keeps the stored choice. */
-    @Test
-    fun enterKeyDialogAppliesOnTapAndCancelKeepsIt() {
-        composeRule.onNodeWithText("Enter key behavior").performClick()
-        composeRule.onNodeWithText("Shift+Enter always inserts a new line on a hardware keyboard.").assertExists()
-        composeRule.onNodeWithText("Send message").performClick()
-        composeRule.runOnIdle { assertEquals(EnterKeyBehavior.SendMessage, appState.enterKeyBehavior) }
-        composeRule.onNodeWithText("Enter key behavior").performClick()
-        composeRule.onNodeWithText("Cancel").performClick()
-        composeRule.runOnIdle { assertEquals(EnterKeyBehavior.SendMessage, appState.enterKeyBehavior) }
-        composeRule.onNodeWithText("New line").assertDoesNotExist()
-    }
-
-    /** The language row shows the current choice and is a destination, so no list opens in place. */
-    @Test
-    fun languageRowShowsTheCurrentChoiceAndOpensNothingInPlace() {
-        composeRule.onNode(hasText("Language") and hasText("System default")).assertExists()
-        composeRule.onNodeWithText("Language").performClick()
-        composeRule.onNodeWithText("Deutsch").assertDoesNotExist()
-        composeRule.runOnIdle { assertEquals(1, languageCount) }
     }
 
     /** Sample switches and reset affect only the inline sample, never the persistent appearance owner. */

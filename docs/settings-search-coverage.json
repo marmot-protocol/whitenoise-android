@@ -41,18 +41,6 @@
           "represented_by": "Appearance.chat_bubble_colors"
         },
         {
-          "declaration": "\"composer\"",
-          "represented_by": "Appearance.composer"
-        },
-        {
-          "declaration": "\"custom_emoji\"",
-          "represented_by": "Appearance.custom_emoji"
-        },
-        {
-          "declaration": "\"enter_behavior\"",
-          "represented_by": "Appearance.enter_behavior"
-        },
-        {
           "declaration": "\"font_family\"",
           "represented_by": "Appearance.font_family"
         },
@@ -63,14 +51,6 @@
         {
           "declaration": "\"date_time_format\"",
           "represented_by": "Appearance.date_time_format"
-        },
-        {
-          "declaration": "\"language\"",
-          "represented_by": "Appearance.language"
-        },
-        {
-          "declaration": "\"quick_account_switching\"",
-          "represented_by": "Appearance.quick_account_switching"
         },
         {
           "declaration": "\"theme\"",
@@ -169,12 +149,20 @@
           "excluded": "Retry, permission-grant failure, storage recovery and update-install progress actions exist only during a transient state and retain their visible parent management entry."
         },
         {
+          "declaration": "\"android_settings\"",
+          "excluded": "Opens the Android system notification settings for this app; the system owns that page, and the parent Notifications entry is indexed."
+        },
+        {
           "declaration": "\"battery\"",
           "represented_by": "Notifications.battery"
         },
         {
           "declaration": "\"blocked\"",
           "excluded": "Retry, permission-grant failure, storage recovery and update-install progress actions exist only during a transient state and retain their visible parent management entry."
+        },
+        {
+          "declaration": "\"delivery\"",
+          "represented_by": "home.NotificationDelivery"
         },
         {
           "declaration": "\"fcm\"",
@@ -187,6 +175,10 @@
         {
           "declaration": "\"permission\"",
           "represented_by": "Notifications.permission"
+        },
+        {
+          "declaration": "\"sounds\"",
+          "represented_by": "home.NotificationSounds"
         },
         {
           "declaration": "channel.id",
@@ -538,7 +530,7 @@
       "controls": [
         {
           "declaration": "option.tag.ifEmpty { \"system\" }",
-          "represented_by": "Appearance.language"
+          "represented_by": "VoiceLanguage.language"
         }
       ]
     },
@@ -660,6 +652,78 @@
           "represented_by": "Help.open_bug_report"
         }
       ]
+    },
+    "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt": {
+      "controls": [
+        {
+          "declaration": "\"profile\"",
+          "represented_by": "home.Profile"
+        },
+        {
+          "declaration": "\"profile_keys\"",
+          "represented_by": "home.ProfileKeys"
+        },
+        {
+          "declaration": "\"relays\"",
+          "represented_by": "home.Relays"
+        },
+        {
+          "declaration": "\"chat_folders\"",
+          "represented_by": "home.ChatFolders"
+        },
+        {
+          "declaration": "\"gestures\"",
+          "represented_by": "home.Gestures"
+        },
+        {
+          "declaration": "\"composer\"",
+          "represented_by": "Chats.composer"
+        },
+        {
+          "declaration": "\"enter_behavior\"",
+          "represented_by": "Chats.enter_behavior"
+        },
+        {
+          "declaration": "\"custom_emoji\"",
+          "represented_by": "Chats.custom_emoji"
+        },
+        {
+          "declaration": "\"quick_account_switching\"",
+          "represented_by": "Chats.quick_account_switching"
+        },
+        {
+          "declaration": "\"language\"",
+          "represented_by": "VoiceLanguage.language"
+        },
+        {
+          "declaration": "\"read_aloud\"",
+          "represented_by": "home.ReadAloud"
+        },
+        {
+          "declaration": "\"dictation\"",
+          "represented_by": "home.Dictation"
+        },
+        {
+          "declaration": "\"translation\"",
+          "represented_by": "home.Translation"
+        },
+        {
+          "declaration": "\"help\"",
+          "represented_by": "home.Help"
+        },
+        {
+          "declaration": "\"chat_with_support\"",
+          "represented_by": "home.ChatWithSupport"
+        },
+        {
+          "declaration": "\"donate\"",
+          "represented_by": "home.Donate"
+        },
+        {
+          "declaration": "\"developer_tools\"",
+          "represented_by": "home.DeveloperTools"
+        }
+      ]
     }
   },
   "destinations": {
@@ -677,10 +741,10 @@
       "catalog_id": "Appearance.chat_bubble_colors"
     },
     "Language": {
-      "catalog_id": "Appearance.language"
+      "catalog_id": "VoiceLanguage.language"
     },
     "CustomEmoji": {
-      "catalog_id": "Appearance.custom_emoji"
+      "catalog_id": "Chats.custom_emoji"
     },
     "Data": {
       "catalog_id": "home.DataUsage"
@@ -752,7 +816,25 @@
       "catalog_id": "home.DeveloperTools"
     },
     "Composer": {
-      "catalog_id": "Appearance.composer"
+      "catalog_id": "Chats.composer"
+    },
+    "Account": {
+      "catalog_id": "home.Account"
+    },
+    "Chats": {
+      "catalog_id": "home.Chats"
+    },
+    "VoiceLanguage": {
+      "catalog_id": "home.VoiceLanguage"
+    },
+    "HelpSupport": {
+      "catalog_id": "home.HelpSupport"
+    },
+    "NotificationSounds": {
+      "catalog_id": "home.NotificationSounds"
+    },
+    "NotificationDelivery": {
+      "catalog_id": "home.NotificationDelivery"
     }
   },
   "exclusions": {

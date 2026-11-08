@@ -19,6 +19,7 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.settings.NotificationPreviewControl
 import dev.ipf.whitenoise.android.ui.settings.NotificationPreviewControlState
+import dev.ipf.whitenoise.android.ui.settings.NotificationSoundsScreen
 import dev.ipf.whitenoise.android.ui.settings.NotificationsScreen
 import dev.ipf.whitenoise.android.ui.settings.SettingsList
 import dev.ipf.whitenoise.android.ui.settings.SettingsScaffold
@@ -67,7 +68,7 @@ class NotificationsScreenScreenshotTest {
         )
     }
 
-    /** The changed explanation remains readable in a large-font RTL scrolled viewport. */
+    /** The tone explanation on Sounds & vibration remains readable in a large-font RTL scrolled viewport. */
     @Test
     fun notificationToneScopeRtlLargeFont() {
         capture(
@@ -136,7 +137,11 @@ class NotificationsScreenScreenshotTest {
                 LocalLayoutDirection provides layoutDirection,
             ) {
                 WhiteNoiseTheme(darkTheme = darkTheme, amoled = amoled) {
-                    NotificationsScreen(appState = appState, onBack = {})
+                    if (scrollToToneScope) {
+                        NotificationSoundsScreen(appState = appState, onBack = {})
+                    } else {
+                        NotificationsScreen(appState = appState, onBack = {})
+                    }
                 }
             }
         }

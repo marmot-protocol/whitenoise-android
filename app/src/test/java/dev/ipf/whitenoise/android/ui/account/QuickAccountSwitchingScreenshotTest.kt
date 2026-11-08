@@ -20,7 +20,7 @@ import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.updateQuickAccountSwitching
 import dev.ipf.whitenoise.android.ui.chats.ChatListTopBar
-import dev.ipf.whitenoise.android.ui.settings.AppearanceScreen
+import dev.ipf.whitenoise.android.ui.settings.ChatsScreen
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import dev.ipf.whitenoise.android.ui.updateTestInfo
 import org.junit.Rule
@@ -121,7 +121,7 @@ class QuickAccountSwitchingScreenshotTest {
                 WhiteNoiseTheme(darkTheme = dark, amoled = amoled, fontScale = if (rtl) 2f else 1f) {
                     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
                         if (settings) {
-                            AppearanceScreen(app, {}, {}, {}, {}, {})
+                            ChatsScreen(app, {}, {})
                         } else {
                             Column {
                                 ChatListTopBar(

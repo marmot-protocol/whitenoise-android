@@ -149,7 +149,7 @@ class NotificationRevocationTest {
         runBlocking { owner.bootstrap() }
         composeRule.setContent {
             CompositionLocalProvider(LocalActivityResultRegistryOwner provides permissionRegistry) {
-                WhiteNoiseTheme { NotificationsScreen(owner.appState, onBack = {}) }
+                WhiteNoiseTheme { NotificationDeliveryScreen(owner.appState, onBack = {}) }
             }
         }
         composeRule.waitUntil(5_000) { owner.appState.localNotificationSettings != null }

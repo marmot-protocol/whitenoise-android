@@ -84,12 +84,6 @@ internal fun AiAgentsContent(
     val manualSetup = stringResource(R.string.ai_agents_manual_setup_body, stringResource(R.string.new_message))
     SettingsScaffold(title = stringResource(R.string.ai_agents), onBack = onBack) {
         SettingsList {
-            item(key = "search.AiAgents.1") {
-                SettingsCallout(
-                    text = stringResource(R.string.ai_agents_intro),
-                    title = stringResource(R.string.ai_agents_about_title),
-                )
-            }
             if (npub == null) {
                 item(key = "search.AiAgents.2") {
                     SettingsCallout(
@@ -118,6 +112,12 @@ internal fun AiAgentsContent(
             }
             item(key = "search.AiAgents.5") {
                 SettingsExplainer(stringResource(R.string.ai_agents_clipboard_disclosure))
+            }
+            item(key = "search.AiAgents.1") {
+                SettingsCallout(
+                    text = stringResource(R.string.ai_agents_intro),
+                    title = stringResource(R.string.ai_agents_about_title),
+                )
             }
             item(key = "search.AiAgents.6") { SettingsSection(stringResource(R.string.ai_agents_manual_setup_title)) }
             item(key = "search.AiAgents.7") {

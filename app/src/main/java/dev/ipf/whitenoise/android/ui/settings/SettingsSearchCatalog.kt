@@ -8,38 +8,17 @@ import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
     buildList {
         SettingsHomeRow.entries.forEach { row ->
-            val destination = row.detail
             add(
                 SettingsSearchEntry(
                     id = "home.${row.name}",
                     titleRes = row.titleRes,
-                    categoryRes = requireNotNull(row.section.groupTitleRes),
-                    destination = destination,
-                    itemKey = if (destination == null) row.section.name else null,
-                    rowKey = if (destination == null) row.name else null,
+                    categoryRes = row.section.groupTitleRes ?: R.string.settings,
+                    destination = row.detail,
                     accountRequired = row.section == SettingsHomeSection.Account,
-                    aliasesRes =
-                        if (destination ==
-                            SettingsDetail.TextToSpeech
-                        ) {
-                            R.string.settings_search_alias_read_aloud
-                        } else {
-                            null
-                        },
                 ),
             )
         }
-        add(
-            SettingsSearchEntry(
-                "Appearance.quick_account_switching",
-                R.string.quick_account_switching,
-                R.string.appearance,
-                SettingsDetail.Appearance,
-                itemKey = "search.Appearance.6",
-                rowKey = "quick_account_switching",
-                summaryRes = R.string.quick_account_switching_detail,
-            ),
-        )
+        addAll(settingsHubDestinationEntries())
         add(
             SettingsSearchEntry(
                 "Appearance.action_color",
@@ -91,47 +70,6 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
                 itemKey = "search.Appearance.4",
                 rowKey = "date_time_format",
                 aliasesRes = R.string.settings_search_alias_date_time_format,
-            ),
-        )
-        add(
-            SettingsSearchEntry(
-                "Appearance.enter_behavior",
-                R.string.enter_key_behavior_title,
-                R.string.appearance,
-                SettingsDetail.Appearance,
-                itemKey = "search.Appearance.6",
-                rowKey = "enter_behavior",
-            ),
-        )
-        add(
-            SettingsSearchEntry(
-                "Appearance.composer",
-                R.string.composer_settings,
-                R.string.appearance,
-                SettingsDetail.Appearance,
-                itemKey = "search.Appearance.6",
-                rowKey = "composer",
-                summaryRes = R.string.composer_settings_detail,
-            ),
-        )
-        add(
-            SettingsSearchEntry(
-                "Appearance.custom_emoji",
-                R.string.custom_emoji,
-                R.string.appearance,
-                SettingsDetail.Appearance,
-                itemKey = "search.Appearance.6",
-                rowKey = "custom_emoji",
-            ),
-        )
-        add(
-            SettingsSearchEntry(
-                "Appearance.language",
-                R.string.language,
-                R.string.appearance,
-                SettingsDetail.Appearance,
-                itemKey = "search.Appearance.4",
-                rowKey = "language",
             ),
         )
         add(
@@ -563,3 +501,130 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
         )
         addAll(settingsSearchAdditionalControls())
     }
+
+private fun hubEntry(
+    id: String,
+    title: Int,
+    category: Int,
+    destination: SettingsDetail,
+    item: String? = null,
+    row: String? = null,
+    summary: Int? = null,
+    alias: Int? = null,
+    account: Boolean = false,
+) = SettingsSearchEntry(
+    id,
+    title,
+    category,
+    destination,
+    itemKey = item,
+    rowKey = row,
+    summaryRes = summary,
+    aliasesRes = alias,
+    accountRequired = account,
+)
+
+/** Destinations and controls reached through the intermediate Account, Chats, Voice & language and Help pages. */
+@Suppress("LongMethod") // Declarative static UI metadata, kept in hub order.
+private fun settingsHubDestinationEntries(): List<SettingsSearchEntry> =
+    listOf(
+        hubEntry("home.Profile", R.string.profile, R.string.account, SettingsDetail.Profile, account = true),
+        hubEntry(
+            "home.ProfileKeys",
+            R.string.settings_profile_keys,
+            R.string.account,
+            SettingsDetail.AccountKeys,
+            account = true,
+        ),
+        hubEntry("home.Relays", R.string.relays, R.string.account, SettingsDetail.Relays, account = true),
+        hubEntry("home.ChatFolders", R.string.chat_folders_title, R.string.chats, SettingsDetail.ChatFolders),
+        hubEntry("home.Gestures", R.string.gestures_title, R.string.chats, SettingsDetail.Gestures),
+        hubEntry(
+            "Chats.composer",
+            R.string.composer_settings,
+            R.string.chats,
+            SettingsDetail.Chats,
+            "search.Chats.1",
+            "composer",
+            R.string.composer_settings_detail,
+        ),
+        hubEntry(
+            "Chats.enter_behavior",
+            R.string.enter_key_behavior_title,
+            R.string.chats,
+            SettingsDetail.Chats,
+            "search.Chats.1",
+            "enter_behavior",
+        ),
+        hubEntry(
+            "Chats.custom_emoji",
+            R.string.custom_emoji,
+            R.string.chats,
+            SettingsDetail.Chats,
+            "search.Chats.1",
+            "custom_emoji",
+        ),
+        hubEntry(
+            "Chats.quick_account_switching",
+            R.string.quick_account_switching,
+            R.string.chats,
+            SettingsDetail.Chats,
+            "search.Chats.1",
+            "quick_account_switching",
+            R.string.quick_account_switching_detail,
+        ),
+        hubEntry(
+            "VoiceLanguage.language",
+            R.string.language,
+            R.string.settings_voice_language,
+            SettingsDetail.VoiceLanguage,
+            "search.VoiceLanguage.1",
+            "language",
+        ),
+        hubEntry(
+            "home.ReadAloud",
+            R.string.settings_read_aloud,
+            R.string.settings_voice_language,
+            SettingsDetail.TextToSpeech,
+            alias = R.string.settings_search_alias_read_aloud,
+        ),
+        hubEntry(
+            "home.Dictation",
+            R.string.dictation_settings_title,
+            R.string.settings_voice_language,
+            SettingsDetail.Dictation,
+        ),
+        hubEntry(
+            "home.Translation",
+            R.string.translation_title,
+            R.string.settings_voice_language,
+            SettingsDetail.Translation,
+        ),
+        hubEntry("home.Help", R.string.help, R.string.settings_help_support, SettingsDetail.Help),
+        hubEntry(
+            "home.ChatWithSupport",
+            R.string.chat_with_support,
+            R.string.settings_help_support,
+            SettingsDetail.Support,
+            account = true,
+        ),
+        hubEntry("home.Donate", R.string.settings_donate, R.string.settings_help_support, SettingsDetail.Donate),
+        hubEntry(
+            "home.DeveloperTools",
+            R.string.settings_developer_tools,
+            R.string.settings_help_support,
+            SettingsDetail.Developer,
+        ),
+        hubEntry(
+            "home.NotificationSounds",
+            R.string.notification_sounds_vibration,
+            R.string.notifications,
+            SettingsDetail.NotificationSounds,
+        ),
+        hubEntry(
+            "home.NotificationDelivery",
+            R.string.notification_delivery_battery,
+            R.string.notifications,
+            SettingsDetail.NotificationDelivery,
+        ),
+    )

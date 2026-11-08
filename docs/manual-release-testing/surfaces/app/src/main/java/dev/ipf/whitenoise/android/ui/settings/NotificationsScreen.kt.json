@@ -60,6 +60,38 @@
           "NTF-001",
           "NTF-023"
         ]
+      },
+      {
+        "surface": "NotificationDeliveryScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "fun NotificationDeliveryScreen(",
+        "test_ids": [
+          "NTF-047"
+        ]
+      },
+      {
+        "surface": "NotificationSoundsScreen",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "fun NotificationSoundsScreen(",
+        "test_ids": [
+          "NTF-047"
+        ]
+      },
+      {
+        "surface": "NotificationPermissionPrompt",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "fun NotificationPermissionPrompt(",
+        "test_ids": [
+          "NTF-047"
+        ]
+      },
+      {
+        "surface": "NotificationStateRefresh",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
+        "anchor": "fun NotificationStateRefresh(",
+        "test_ids": [
+          "NTF-047"
+        ]
       }
     ],
     "settings_controls": [

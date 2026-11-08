@@ -21,8 +21,6 @@ import dev.ipf.whitenoise.android.state.BubbleSide
 import dev.ipf.whitenoise.android.state.BubbleTheme
 import dev.ipf.whitenoise.android.state.EnterKeyBehavior
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
-import dev.ipf.whitenoise.android.state.quickAccountSwitching
-import dev.ipf.whitenoise.android.state.updateQuickAccountSwitching
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
 
 internal val AppThemeMode.labelRes: Int
@@ -64,7 +62,7 @@ private fun AppFont.pickerLabel(): String =
 
 /**
  * Appearance preserves existing preference owners and adds the explicit app-wide profile-cycle opt-in.
- * Shared groups retain Theme, AMOLED color rules, typography, Enter-key choices and the language destination.
+ * Groups cover Theme, AMOLED color rules and typography; chat and language preferences live on their own pages.
  */
 @Suppress("FunctionNaming", "LongMethod")
 @Composable
@@ -73,22 +71,16 @@ internal fun AppearanceScreen(
     onBack: () -> Unit,
     onOpenActionColor: () -> Unit,
     onOpenChatBubbleColors: () -> Unit,
-    onOpenLanguage: () -> Unit,
-    onOpenCustomEmoji: () -> Unit,
-    onOpenComposer: () -> Unit = {},
 ) {
     var themeOpen by rememberSaveable { mutableStateOf(false) }
     var fontFamilyOpen by rememberSaveable { mutableStateOf(false) }
     var fontSizeOpen by rememberSaveable { mutableStateOf(false) }
-    var enterOpen by rememberSaveable { mutableStateOf(false) }
     var dateTimeOpen by rememberSaveable { mutableStateOf(false) }
     val previewState = remember(appState.activeAccountRef, appState.runtimeGeneration) { AppearancePreviewState() }
     val familyThemeLabels = AppThemeMode.entries.associateWith { stringResource(it.labelRes) }
     val familyLabels = AppFont.entries.associateWith { it.pickerLabel() }
     val fontLabels = AppFontScale.entries.associateWith { stringResource(it.labelRes) }
-    val enterLabels = EnterKeyBehavior.entries.associateWith { stringResource(it.labelRes) }
     val amoled = appState.themeMode == AppThemeMode.Amoled
-    val language = languageOptions.firstOrNull { it.tag == appState.languageTag } ?: languageOptions.first()
     if (themeOpen) {
         ChoiceDialog(
             title = stringResource(R.string.appearance_theme),
@@ -128,20 +120,6 @@ internal fun AppearanceScreen(
             selected = appState.fontScale,
             onSelect = appState::updateFontScale,
             onDismiss = { fontSizeOpen = false },
-        )
-    }
-    if (enterOpen) {
-        ChoiceDialog(
-            title = stringResource(R.string.enter_key_behavior_title),
-            values = EnterKeyBehavior.entries,
-            selected = appState.enterKeyBehavior,
-            label = enterLabels::getValue,
-            supportingText = stringResource(R.string.appearance_enter_help),
-            onDismiss = { enterOpen = false },
-            onSelect = {
-                enterOpen = false
-                appState.updateEnterKeyBehavior(it)
-            },
         )
     }
     if (dateTimeOpen) {
@@ -215,56 +193,6 @@ internal fun AppearanceScreen(
                             value = dateTimeSample,
                             modifier = Modifier.testTag("appearance.date_time_format"),
                             onClick = { dateTimeOpen = true },
-                        )
-                    }
-                    row("language") { context ->
-                        SettingsLink(
-                            context = context,
-                            title = stringResource(R.string.language),
-                            value = stringResource(language.labelRes),
-                            modifier = Modifier.testTag("appearance.language.group"),
-                            onClick = onOpenLanguage,
-                        )
-                    }
-                }
-            }
-            item(key = "search.Appearance.5") {
-                SettingsSection(stringResource(R.string.appearance_conversation_heading))
-            }
-            item(key = "search.Appearance.6") {
-                SettingsGroup {
-                    row("composer") { context ->
-                        SettingsLink(
-                            context = context,
-                            title = stringResource(R.string.composer_settings),
-                            subtitle = stringResource(R.string.composer_settings_detail),
-                            onClick = onOpenComposer,
-                        )
-                    }
-                    row("enter_behavior") { context ->
-                        SettingsLink(
-                            context = context,
-                            title = stringResource(R.string.enter_key_behavior_title),
-                            value = enterLabels.getValue(appState.enterKeyBehavior),
-                            onClick = { enterOpen = true },
-                        )
-                    }
-                    row("custom_emoji") { context ->
-                        SettingsLink(
-                            context = context,
-                            title = stringResource(R.string.custom_emoji),
-                            modifier = Modifier.testTag("appearance.custom_emoji.group"),
-                            onClick = onOpenCustomEmoji,
-                        )
-                    }
-                    row("quick_account_switching") { context ->
-                        SettingsSwitch(
-                            context = context,
-                            title = stringResource(R.string.quick_account_switching),
-                            checked = appState.quickAccountSwitching,
-                            subtitle = stringResource(R.string.quick_account_switching_detail),
-                            modifier = Modifier.testTag("appearance.quick_account_switching"),
-                            onCheckedChange = appState::updateQuickAccountSwitching,
                         )
                     }
                 }

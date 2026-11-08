@@ -82,9 +82,9 @@ internal fun settingsSearchAdditionalControls(): List<SettingsSearchEntry> =
         control(
             "Notifications.push",
             R.string.notification_delivery_push,
-            R.string.notifications,
-            SettingsDetail.Notifications,
-            "search.Notifications.3",
+            R.string.notification_delivery_battery,
+            SettingsDetail.NotificationDelivery,
+            "search.NotificationDelivery.2",
             "fcm",
             R.string.notification_delivery_push_detail,
             push = true,
@@ -92,9 +92,9 @@ internal fun settingsSearchAdditionalControls(): List<SettingsSearchEntry> =
         control(
             "Notifications.local",
             R.string.local_notifications,
-            R.string.notifications,
-            SettingsDetail.Notifications,
-            "search.Notifications.3",
+            R.string.notification_delivery_battery,
+            SettingsDetail.NotificationDelivery,
+            "search.NotificationDelivery.2",
             "local",
             R.string.notification_delivery_local_detail,
         )
@@ -103,49 +103,49 @@ internal fun settingsSearchAdditionalControls(): List<SettingsSearchEntry> =
             R.string.notification_show_previews,
             R.string.notifications,
             SettingsDetail.Notifications,
-            "search.Notifications.6",
+            "search.Notifications.1",
             "previews",
             R.string.notification_show_previews_detail,
         )
         control(
             "Notifications.permission",
             R.string.notification_permission_status,
-            R.string.notifications,
-            SettingsDetail.Notifications,
-            "search.Notifications.8",
+            R.string.notification_delivery_battery,
+            SettingsDetail.NotificationDelivery,
+            "search.NotificationDelivery.6",
             "permission",
         )
         control(
             "Notifications.battery",
             R.string.notification_battery_policy,
-            R.string.notifications,
-            SettingsDetail.Notifications,
-            "search.Notifications.8",
+            R.string.notification_delivery_battery,
+            SettingsDetail.NotificationDelivery,
+            "search.NotificationDelivery.6",
             "battery",
         )
         control(
             "Notifications.sound",
             R.string.notification_tones,
-            R.string.notifications,
-            SettingsDetail.Notifications,
-            "search.Notifications.11",
+            R.string.notification_sounds_vibration,
+            SettingsDetail.NotificationSounds,
+            "search.NotificationSounds.5",
             aliases = R.string.settings_search_alias_sound,
         )
         control(
             "Notifications.spoken_audio",
             R.string.notification_quiet_during_spoken_audio,
-            R.string.notifications,
-            SettingsDetail.Notifications,
-            "search.Notifications.13",
+            R.string.notification_sounds_vibration,
+            SettingsDetail.NotificationSounds,
+            "search.NotificationSounds.7",
             "spoken-audio",
             R.string.notification_quiet_during_spoken_audio_detail,
         )
         control(
             "Notifications.categories",
             R.string.notification_categories,
-            R.string.notifications,
-            SettingsDetail.Notifications,
-            "search.Notifications.15",
+            R.string.notification_sounds_vibration,
+            SettingsDetail.NotificationSounds,
+            "search.NotificationSounds.2",
             summary = R.string.notification_categories_detail,
         )
         MediaAutoDownloadType.entries.forEach { type ->

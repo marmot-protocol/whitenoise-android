@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions")
+
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.Manifest
@@ -37,18 +39,35 @@ import dev.ipf.whitenoise.android.state.NotificationDeliveryMode
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseSpacing
 
-/**
- * Presents one delivery policy while retaining Android permission, battery policy, and category controls.
- * The mode rows project existing runtime settings instead of persisting a second Android-owned mode value.
- */
-@Suppress("FunctionNaming", "LongMethod")
+/** Refreshes Android permission, battery policy and local settings now and whenever the screen resumes. */
+@Suppress("FunctionNaming")
 @Composable
-internal fun NotificationsScreen(
-    appState: WhiteNoiseAppState,
-    onBack: () -> Unit,
-) {
-    val context = LocalContext.current
+private fun NotificationStateRefresh(appState: WhiteNoiseAppState) {
     val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(appState.activeAccountRef) {
+        appState.refreshLocalNotificationPermission()
+        appState.refreshNotificationBatteryPolicy()
+        appState.refreshLocalNotificationSettings()
+    }
+    DisposableEffect(lifecycleOwner, appState) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    appState.refreshLocalNotificationPermission()
+                    appState.refreshNotificationBatteryPolicy()
+                    appState.launchMutation { appState.refreshPushStorageRecovery() }
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+}
+
+/** Shows the request or blocked row only until Android allows notifications. */
+@Suppress("FunctionNaming")
+@Composable
+private fun NotificationPermissionPrompt(appState: WhiteNoiseAppState) {
+    val context = LocalContext.current
     var permissionDenied by rememberSaveable { mutableStateOf(false) }
     val permissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -62,47 +81,140 @@ internal fun NotificationsScreen(
                 appState.present(R.string.toast_notification_permission_denied)
             }
         }
-
-    LaunchedEffect(appState.activeAccountRef) {
-        appState.refreshLocalNotificationPermission()
-        appState.refreshNotificationBatteryPolicy()
-        appState.refreshLocalNotificationSettings()
+    if (!appState.localNotificationPermissionGranted) {
+        NotificationPermissionGroup(
+            denied = permissionDenied,
+            onRequest = { permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
+            onOpenSettings = { openAppNotificationSettings(context) },
+        )
     }
+}
 
-    DisposableEffect(lifecycleOwner, appState) {
-        val observer =
-            LifecycleEventObserver { _, event ->
-                if (event == Lifecycle.Event.ON_RESUME) {
-                    appState.refreshLocalNotificationPermission()
-                    appState.refreshNotificationBatteryPolicy()
-                    appState.launchMutation { appState.refreshPushStorageRecovery() }
-                }
-            }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    val permissionGranted = appState.localNotificationPermissionGranted
-    val hasAccount = appState.activeAccountRef != null
-    val capability = appState.nativePushCapability()
-    val selectedMode = appState.notificationDeliveryMode()
-    val soundLabels = rememberNotificationSoundLabels()
+/**
+ * Notifications overview: the preview switch and links to the sound, delivery and Android settings pages.
+ * Detailed controls live on the child pages so this screen stays short.
+ */
+@Suppress("FunctionNaming")
+@Composable
+internal fun NotificationsScreen(
+    appState: WhiteNoiseAppState,
+    onBack: () -> Unit,
+    onOpenSounds: () -> Unit = {},
+    onOpenDelivery: () -> Unit = {},
+) {
+    val context = LocalContext.current
+    NotificationStateRefresh(appState)
+    val deliveryValue =
+        stringResource(
+            when (appState.notificationDeliveryMode()) {
+                NotificationDeliveryMode.Fcm -> R.string.notification_delivery_value_push
+                NotificationDeliveryMode.Local -> R.string.notification_delivery_value_local
+            },
+        )
 
     SettingsScaffold(title = stringResource(R.string.notifications), onBack = onBack) {
         SettingsList {
-            if (!permissionGranted) {
-                item {
-                    NotificationPermissionGroup(
-                        denied = permissionDenied,
-                        onRequest = { permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) },
-                        onOpenSettings = { openAppNotificationSettings(context) },
-                    )
+            if (!appState.localNotificationPermissionGranted) {
+                item { NotificationPermissionPrompt(appState) }
+            }
+            item(key = "search.Notifications.1") {
+                val previews = appState.notificationPreviewSettings
+                NotificationPreviewControl(
+                    state = NotificationPreviewControlState(previews.enabled, previews.busy, previews.failed),
+                    onChange = { value -> appState.launchMutation { previews.setEnabled(value) } },
+                    onRetry = { appState.launchMutation { previews.retry() } },
+                )
+            }
+            item(key = "search.Notifications.2") {
+                SettingsGroup(modifier = Modifier.padding(top = WhiteNoiseSpacing.Section)) {
+                    row("sounds") { rowContext ->
+                        SettingsLink(
+                            context = rowContext,
+                            title = stringResource(R.string.notification_sounds_vibration),
+                            onClick = onOpenSounds,
+                            modifier = Modifier.testTag("notifications.sounds"),
+                        )
+                    }
+                    row("delivery") { rowContext ->
+                        SettingsLink(
+                            context = rowContext,
+                            title = stringResource(R.string.notification_delivery_battery),
+                            value = deliveryValue,
+                            onClick = onOpenDelivery,
+                            modifier = Modifier.testTag("notifications.delivery"),
+                        )
+                    }
+                    row("android_settings") { rowContext ->
+                        SettingsLink(
+                            context = rowContext,
+                            title = stringResource(R.string.android_notification_settings),
+                            onClick = { openAppNotificationSettings(context) },
+                            modifier = Modifier.testTag("notifications.android-settings"),
+                        )
+                    }
                 }
             }
-            item(key = "search.Notifications.2") { SettingsSection(stringResource(R.string.delivery)) }
-            item(key = "search.Notifications.3") {
+        }
+    }
+}
+
+/** Notification categories, the bundled White Noise sounds and the podcast quiet switch. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun NotificationSoundsScreen(
+    appState: WhiteNoiseAppState,
+    onBack: () -> Unit,
+) {
+    val context = LocalContext.current
+    NotificationStateRefresh(appState)
+    val soundLabels = rememberNotificationSoundLabels()
+
+    SettingsScaffold(title = stringResource(R.string.notification_sounds_vibration), onBack = onBack) {
+        SettingsList {
+            item(key = "search.NotificationSounds.1") {
+                SettingsSection(stringResource(R.string.notification_categories))
+            }
+            item(key = "search.NotificationSounds.2") {
+                GlobalNotificationCategories(
+                    onOpenChannel = { openNotificationChannelSettings(context, it) },
+                    soundLabels = soundLabels,
+                )
+            }
+            item(key = "search.NotificationSounds.3") {
+                SettingsExplainer(stringResource(R.string.notification_categories_detail))
+            }
+            item(key = "search.NotificationSounds.4") { SettingsSection(stringResource(R.string.notification_tones)) }
+            item(key = "search.NotificationSounds.5") { NotificationToneControl() }
+            item(key = "search.NotificationSounds.6") {
+                SettingsExplainer(stringResource(R.string.notification_tone_scope))
+            }
+            item(key = "search.NotificationSounds.7") { SpokenAudioAlertControl() }
+        }
+    }
+}
+
+/** Delivery method (push or local) plus the Android permission and battery controls that affect it. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun NotificationDeliveryScreen(
+    appState: WhiteNoiseAppState,
+    onBack: () -> Unit,
+) {
+    val context = LocalContext.current
+    NotificationStateRefresh(appState)
+    val permissionGranted = appState.localNotificationPermissionGranted
+    val hasAccount = appState.activeAccountRef != null
+    val capability = appState.nativePushCapability()
+
+    SettingsScaffold(title = stringResource(R.string.notification_delivery_battery), onBack = onBack) {
+        SettingsList {
+            if (!permissionGranted) {
+                item { NotificationPermissionPrompt(appState) }
+            }
+            item(key = "search.NotificationDelivery.1") { SettingsSection(stringResource(R.string.delivery)) }
+            item(key = "search.NotificationDelivery.2") {
                 NotificationDeliverySelector(
-                    selectedMode = selectedMode,
+                    selectedMode = appState.notificationDeliveryMode(),
                     capability = capability,
                     enabled = hasAccount && permissionGranted && !appState.notificationDeliveryModeBusy,
                     onSelect = { mode -> appState.launchMutation { appState.setNotificationDeliveryMode(mode) } },
@@ -112,7 +224,7 @@ internal fun NotificationsScreen(
                 appState.pushStorageRecovery != PushStorageRecovery.Checking &&
                 appState.pushStorageRecovery != PushStorageRecovery.Ready
             ) {
-                item(key = "search.Notifications.4") {
+                item(key = "search.NotificationDelivery.3") {
                     PushStorageRecoveryControl(
                         state = appState.pushStorageRecovery,
                         busy = appState.pushStorageRecoveryBusy,
@@ -121,22 +233,14 @@ internal fun NotificationsScreen(
                 }
             }
             if (!capability.isAvailable) {
-                item(key = "search.Notifications.5") {
+                item(key = "search.NotificationDelivery.4") {
                     SettingsExplainer(stringResource(capability.subtitleResource()))
                 }
             }
-            item(key = "search.Notifications.6") {
-                val previews = appState.notificationPreviewSettings
-                NotificationPreviewControl(
-                    state = NotificationPreviewControlState(previews.enabled, previews.busy, previews.failed),
-                    onChange = { value -> appState.launchMutation { previews.setEnabled(value) } },
-                    onRetry = { appState.launchMutation { previews.retry() } },
-                )
+            item(key = "search.NotificationDelivery.5") {
+                SettingsSection(stringResource(R.string.notification_android_controls))
             }
-            item(key = "search.Notifications.7") {
-                SettingsSection(stringResource(R.string.notification_device_policy))
-            }
-            item(key = "search.Notifications.8") {
+            item(key = "search.NotificationDelivery.6") {
                 NotificationDevicePolicyGroup(
                     permissionGranted = permissionGranted,
                     batteryPolicy = appState.notificationBatteryPolicy,
@@ -148,24 +252,8 @@ internal fun NotificationsScreen(
                     },
                 )
             }
-            item(key = "search.Notifications.9") {
+            item(key = "search.NotificationDelivery.7") {
                 SettingsExplainer(stringResource(R.string.notification_device_policy_detail))
-            }
-            item(key = "search.Notifications.10") { SettingsSection(stringResource(R.string.notification_tones)) }
-            item(key = "search.Notifications.11") { NotificationToneControl() }
-            item(key = "search.Notifications.12") {
-                SettingsExplainer(stringResource(R.string.notification_tone_scope))
-            }
-            item(key = "search.Notifications.13") { SpokenAudioAlertControl() }
-            item(key = "search.Notifications.14") { SettingsSection(stringResource(R.string.notification_categories)) }
-            item(key = "search.Notifications.15") {
-                GlobalNotificationCategories(
-                    onOpenChannel = { openNotificationChannelSettings(context, it) },
-                    soundLabels = soundLabels,
-                )
-            }
-            item(key = "search.Notifications.16") {
-                SettingsExplainer(stringResource(R.string.notification_categories_detail))
             }
         }
     }

@@ -79,7 +79,9 @@ class SettingsUpdatePlacementTest {
         assumeTrue("a store-managed build shows no update section at all", BuildConfig.SELF_UPDATE_ENABLED)
         mountSettings()
         composeRule.onNodeWithTag("settings.section.Account").assertExists()
-        composeRule.onNodeWithTag("settings.app_updates").assertDoesNotExist()
+        val account = composeRule.onNodeWithTag("settings.section.Account").fetchSemanticsNode().boundsInRoot
+        val lower = composeRule.onNodeWithTag("settings.app_updates").fetchSemanticsNode().boundsInRoot
+        assertTrue("the row must sit below the account group: $lower vs $account", lower.top > account.top)
 
         composeRule
             .onNode(hasScrollToNodeAction())
@@ -124,11 +126,10 @@ class SettingsUpdatePlacementTest {
             .putString("last_attempt_error_report", "network unreachable")
             .commit()
         mountSettings()
-        composeRule.onNodeWithTag("settings.app_updates").assertDoesNotExist()
-        composeRule
-            .onNode(hasScrollToNodeAction())
-            .performScrollToNode(hasTestTag("settings.app_updates"))
-        composeRule.onNodeWithTag("settings.app_updates").assertExists()
+        composeRule.onNodeWithTag("settings.section.Account").assertExists()
+        val account = composeRule.onNodeWithTag("settings.section.Account").fetchSemanticsNode().boundsInRoot
+        val lower = composeRule.onNodeWithTag("settings.app_updates").fetchSemanticsNode().boundsInRoot
+        assertTrue("a failed check must stay below the account group: $lower vs $account", lower.top > account.top)
     }
 
     private fun storeLatestVersion(version: String) {

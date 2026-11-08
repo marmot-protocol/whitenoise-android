@@ -405,7 +405,8 @@ class SettingsSearchNavigationTest {
         composeRule.onNodeWithTag("about.developer").performScrollTo()
         composeRule.onNodeWithTag("about.developer").performClick()
         composeRule.onNodeWithTag("settings.search.field").assertDoesNotExist()
-        composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
+        // Developer tools returns to Help & support; one more back leaves it for the active search.
+        repeat(2) { composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick() }
         composeRule.onNodeWithTag("settings.search.field").assertTextContains("about")
     }
 

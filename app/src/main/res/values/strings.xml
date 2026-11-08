@@ -878,7 +878,7 @@
     <string name="local_notifications">Local notifications</string>
     <string name="keep_connected">Keep connected</string>
     <string name="native_push">Push notifications</string>
-    <string name="native_push_subtitle">Wake the app when the relay has new events to deliver.</string>
+    <string name="native_push_subtitle">Uses Google servers (Firebase Cloud Messaging) to wake the app when the relay has new events to deliver.</string>
     <string name="native_push_missing_server_subtitle">Push is unavailable because this build has no push server configured.</string>
     <string name="native_push_google_play_unavailable_subtitle">Push requires compatible Google Play services on this device.</string>
     <string name="native_push_firebase_unavailable_subtitle">Push is unavailable because Firebase is not configured or could not initialize.</string>
@@ -1307,12 +1307,14 @@
         <item quantity="other">%1$d selected</item>
     </plurals>
     <string name="appearance">Appearance</string>
-    <string name="app_preferences">App</string>
+    <string name="app_preferences">Preferences</string>
     <string name="settings_version_label">Version %1$s</string>
     <string name="settings_profile_keys">Profile Keys</string>
     <string name="settings_read_aloud">Read Aloud</string>
     <string name="settings_privacy_security">Privacy &amp; Security</string>
-    <string name="settings_data_usage">Data Usage</string>
+    <string name="settings_data_usage">Data &amp; storage</string>
+    <string name="settings_voice_language">Voice &amp; language</string>
+    <string name="settings_help_support">Help &amp; support</string>
     <string name="settings_developer_tools">Developer Tools</string>
     <string name="settings_donate">Donate</string>
     <string name="settings_add_profile">Add Profile</string>
@@ -1355,8 +1357,14 @@
     <string name="notifications_are_off_detail">Turn them on in Android Settings to use these options.</string>
     <string name="delivery">Delivery</string>
     <string name="notification_delivery_push">Push notifications</string>
-    <string name="notification_delivery_push_detail">Wake briefly when new activity may be available, then check securely for messages.</string>
+    <string name="notification_delivery_push_detail">Uses Google servers (Firebase Cloud Messaging) to wake White Noise briefly when new activity may be available, then checks securely for messages.</string>
     <string name="notification_delivery_local_detail">Keep a persistent connection while notifications are enabled.</string>
+    <string name="notification_sounds_vibration">Sounds &amp; vibration</string>
+    <string name="notification_delivery_battery">Delivery &amp; battery</string>
+    <string name="notification_delivery_value_push">Push</string>
+    <string name="notification_delivery_value_local">Local</string>
+    <string name="android_notification_settings">Android notification settings</string>
+    <string name="notification_android_controls">Android controls</string>
     <string name="notification_device_policy">Device status</string>
     <string name="notification_device_policy_detail">Notification permission controls whether alerts appear. Battery policy may delay background delivery in either mode. Status refreshes when you return to this screen.</string>
     <string name="notification_permission_status">Notification permission</string>

@@ -20,7 +20,7 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.state.quickAccountSwitching
 import dev.ipf.whitenoise.android.state.updateQuickAccountSwitching
 import dev.ipf.whitenoise.android.ui.chats.ChatListTopBar
-import dev.ipf.whitenoise.android.ui.settings.AppearanceScreen
+import dev.ipf.whitenoise.android.ui.settings.ChatsScreen
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -46,7 +46,7 @@ class QuickAccountSwitchingUiTest {
     @Test fun appearanceOptOutDoesNotChangeTheActiveAccount() {
         val app = state(listOf(A, B))
         composeRule.setContent {
-            WhiteNoiseTheme { AppearanceScreen(app, {}, {}, {}, {}, {}) }
+            WhiteNoiseTheme { ChatsScreen(app, {}, {}) }
         }
         composeRule.onNodeWithTag("settings.list").performScrollToNode(hasTestTag("appearance.quick_account_switching"))
         composeRule.onNodeWithTag("appearance.quick_account_switching").performClick()
