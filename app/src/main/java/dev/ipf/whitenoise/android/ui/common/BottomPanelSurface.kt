@@ -137,15 +137,20 @@ private val BottomPanelOutline = BottomPanelShape(top = Radii.xxl, bottom = Bott
  * The elevated surface shared by the composer's emoji pane, the disabled-composer notices and the
  * message selection bar. Callers keep their own window inset padding; the surface supplies the
  * rounded outline, the side inset that keeps it clear of the display corner, and the AMOLED border.
+ * A fixed [horizontalPadding] replaces that inset for panels that must line up with the composer.
  */
 @Composable
 @Suppress("FunctionNaming")
 internal fun BottomPanelSurface(
     modifier: Modifier = Modifier,
+    horizontalPadding: Dp? = null,
     content: @Composable () -> Unit,
 ) {
     Surface(
-        modifier = modifier.padding(horizontal = rememberBottomPanelHorizontalInset()).fillMaxWidth(),
+        modifier =
+            modifier
+                .padding(horizontal = horizontalPadding ?: rememberBottomPanelHorizontalInset())
+                .fillMaxWidth(),
         shape = BottomPanelOutline,
         color = MaterialTheme.colorScheme.surface,
         border = amoledSurfaceBorderStroke(),
