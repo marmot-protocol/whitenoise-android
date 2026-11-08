@@ -26,7 +26,8 @@ private const val DISABLED_DISC_CONTENT_ALPHA = 0.38f
 
 /**
  * The prototype's send disc: a flat 32dp circle centred in the 40dp trailing slot, with the account's action
- * colours (the AMOLED outline theme paints the surface with an outline instead). A disabled disc is grey.
+ * colours (the AMOLED outline theme paints the surface with an outline instead). A disabled disc is grey, and its
+ * AMOLED outline dims to the same grey as the icon.
  */
 @Composable
 @Suppress("FunctionNaming")
@@ -40,7 +41,7 @@ internal fun ComposerActionDisc(
     width: Dp = ComposerToolbarSlotWidth,
     modifier: Modifier = Modifier,
 ) {
-    val outline = amoledOutlineBorder()
+    val outline = amoledOutlineBorder(enabled)
     ComposerToolbarTargets {
         IconButton(onClick = onClick, enabled = enabled, modifier = modifier.width(width).height(48.dp)) {
             Surface(
