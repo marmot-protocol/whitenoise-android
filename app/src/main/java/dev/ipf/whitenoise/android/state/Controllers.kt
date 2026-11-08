@@ -11001,22 +11001,24 @@ class ConversationController(
             } catch (refusal: MarmotKitException.AdminCannotSelfRemove) {
                 if (!refusal.groupIdHex.equals(groupIdHex, ignoreCase = true)) throw refusal
                 if (!stillPending()) return@withGroupCommitLock false
-                appState.runGroupChange(
-                    account,
-                    groupIdHex,
-                    stillWanted = stillPending,
-                    actionLabel = R.string.decline,
-                ) {
-                    withContext(NonCancellable) {
-                        val demotion =
-                            appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
-                                selfDemoteAdminDetailed(account, groupIdHex)
-                            }
-                        applyMutationDetails(account, demotion.details)
-                        // Keep a failed decline from retrying a step-down that already succeeded.
-                        runCatchingCancellable { appState.marmotIo { declineGroupInvite(account, groupIdHex) } }
+                val declineResult =
+                    appState.runGroupChange(
+                        account,
+                        groupIdHex,
+                        stillWanted = stillPending,
+                        actionLabel = R.string.decline,
+                    ) {
+                        withContext(NonCancellable) {
+                            val demotion =
+                                appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
+                                    selfDemoteAdminDetailed(account, groupIdHex)
+                                }
+                            applyMutationDetails(account, demotion.details)
+                            // Keep a failed decline from retrying a step-down that already succeeded.
+                            runCatchingCancellable { appState.marmotIo { declineGroupInvite(account, groupIdHex) } }
+                        }
                     }
-                }.getOrThrow()
+                declineResult.getOrThrow()
             }
             true
         }
