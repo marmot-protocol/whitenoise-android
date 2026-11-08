@@ -1549,7 +1549,7 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/NotificationsScreen.kt",
       "calls": {
-        "SettingsList": 1
+        "SettingsList": 3
       },
       "family": "settings",
       "policy": "ordinary",
@@ -1594,6 +1594,20 @@
       },
       "family": "settings",
       "policy": "Relay lists retain fades; the Add Relay keyboard form retains ordinary scrolling pending its own real-IME geometry validation.",
+      "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/SettingsHubScreens.kt",
+      "calls": {
+        "SettingsList": 4
+      },
+      "family": "settings",
+      "policy": "ordinary",
       "test_ids": [
         "SCR-001",
         "SCR-002",
