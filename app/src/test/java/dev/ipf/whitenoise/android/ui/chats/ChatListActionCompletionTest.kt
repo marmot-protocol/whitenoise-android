@@ -236,17 +236,10 @@ class ChatListActionCompletionTest {
         assertTrue("all original-account pending commands must clean up", pendingMuteCommands(fixture).isEmpty())
     }
 
-    private fun pendingMuteCommands(fixture: OffWindowActionFixture): Map<*, *> =
-        fixture.state.javaClass
-            .getDeclaredField("pendingMuteCommands")
-            .apply { isAccessible = true }
-            .get(fixture.state) as Map<*, *>
+    private fun pendingMuteCommands(fixture: OffWindowActionFixture): Set<String> =
+        fixture.state.chatMuteOwner.pendingKeys
 
-    private fun muteOverrides(fixture: OffWindowActionFixture): Map<*, *> =
-        fixture.state.javaClass
-            .getDeclaredField("authoritativeMuteOverrides")
-            .apply { isAccessible = true }
-            .get(fixture.state) as Map<*, *>
+    private fun muteOverrides(fixture: OffWindowActionFixture): Set<String> = fixture.state.chatMuteOwner.committedKeys
 
     /** A real synchronous native command is held after its admission and before its authoritative return. */
     private fun checkNativeCompletions(retirement: Retirement) =

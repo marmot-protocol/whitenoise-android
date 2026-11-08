@@ -8032,14 +8032,7 @@ class ConversationController(
                 // flip to the read-only removed state — the same realization the
                 // conversation-open and refresh paths perform — instead of
                 // surfacing the raw backend error.
-                rollbackOptimisticChatListPreview(tempId)
-                optimisticMessages.remove(optimisticKey)
-                durableAcceptanceCallbacks.remove(optimisticKey)
-                messageById.remove(tempId)
-                retentionAtSendByMessageId.remove(tempId)
-                optimisticSendPhases.remove(optimisticKey)
-                appState.pendingSendDiagnostics.forget(tempId)
-                publishTimelineFromIndexes()
+                discardOptimisticSend(optimisticKey, tempId, OptimisticSendDiscard.ABANDONED)
                 markActiveAccountRemovedFromMembers(account)
                 onTerminalFailure()
                 return
@@ -8696,16 +8689,7 @@ class ConversationController(
                     appState.mediaUploadSessionEpoch(),
                 )
             ) {
-                optimisticMessages.remove(key)
-                optimisticSendPhases.remove(key)
-                durableAcceptanceCallbacks.remove(key)
-                messageById.remove(tempId)
-                retentionAtSendByMessageId.remove(tempId)
-                retainedMediaUploads.remove(key)
-                activeUploadKeys.remove(key)
-                rollbackOptimisticChatListPreview(tempId)
-                diagnostics.forget(tempId)
-                publishTimelineFromIndexes()
+                discardOptimisticSend(key, tempId, OptimisticSendDiscard.ABANDONED)
                 return
             }
             // queueAttachments and uploadQueued are intentionally separate so
@@ -8815,15 +8799,7 @@ class ConversationController(
                         }
                 // Stop before publication after a discard; an unreferenced Blossom blob is inert.
                 if (discardedDuringRetry.remove(key)) {
-                    optimisticMessages.remove(key)
-                    durableAcceptanceCallbacks.remove(key)
-                    messageById.remove(tempId)
-                    retentionAtSendByMessageId.remove(tempId)
-                    retainedMediaUploads.remove(key)
-                    activeUploadKeys.remove(key)
-                    rollbackOptimisticChatListPreview(tempId)
-                    diagnostics.forget(tempId)
-                    publishTimelineFromIndexes()
+                    discardOptimisticSend(key, tempId, OptimisticSendDiscard.DISCARDED_IN_FLIGHT)
                     trimCancelledSendTombstones()
                     return
                 }
@@ -8872,14 +8848,7 @@ class ConversationController(
                     // use the canonical id to restore a deferred projection.
                     if (discardedDuringRetry.remove(key)) {
                         acceptedPendingMessageIdHex?.let(pendingProjectionsAwaitingBridge::remove)
-                        optimisticMessages.remove(key)
-                        messageById.remove(tempId)
-                        retentionAtSendByMessageId.remove(tempId)
-                        retainedMediaUploads.remove(key)
-                        activeUploadKeys.remove(key)
-                        rollbackOptimisticChatListPreview(tempId)
-                        diagnostics.forget(tempId)
-                        publishTimelineFromIndexes()
+                        discardOptimisticSend(key, tempId, OptimisticSendDiscard.DISCARDED_IN_FLIGHT)
                         trimCancelledSendTombstones()
                         return
                     }
@@ -8943,19 +8912,10 @@ class ConversationController(
                 // INVARIANT: the discard re-check must run BEFORE any cache mutation
                 // below, so a mid-flight discard never seeds the just-sent bytes.
                 if (discardedDuringRetry.remove(key)) {
-                    optimisticMessages.remove(key)
-                    messageById.remove(tempId)
                     // User discarded after publish committed; drop the local
                     // optimistic + bytes. The published event may still echo back
                     // via projection (publish already succeeded — not retractable).
-                    retainedMediaUploads.remove(key)
-                    activeUploadKeys.remove(key)
-                    diagnostics.complete(
-                        tempId,
-                        PerformancePhase.SEND_COMPLETE,
-                        PerformanceResult.DROPPED,
-                    )
-                    publishTimelineFromIndexes()
+                    discardOptimisticSend(key, tempId, OptimisticSendDiscard.DISCARDED_AFTER_PUBLISH)
                     trimCancelledSendTombstones()
                     return
                 }
@@ -9113,14 +9073,7 @@ class ConversationController(
                 }
                 if (discardedDuringRetry.remove(key)) {
                     sendHostAttempt.cancel()
-                    optimisticMessages.remove(key)
-                    durableAcceptanceCallbacks.remove(key)
-                    messageById.remove(tempId)
-                    retentionAtSendByMessageId.remove(tempId)
-                    retainedMediaUploads.remove(key)
-                    activeUploadKeys.remove(key)
-                    rollbackOptimisticChatListPreview(tempId)
-                    publishTimelineFromIndexes()
+                    discardOptimisticSend(key, tempId, OptimisticSendDiscard.DISCARDED_AFTER_MEDIA_FAILURE)
                     trimCancelledSendTombstones()
                     return
                 }
@@ -9413,18 +9366,46 @@ class ConversationController(
     private fun removeCancelledOptimisticSend(
         optimisticKey: String,
         tempId: String,
+    ) = discardOptimisticSend(optimisticKey, tempId, OptimisticSendDiscard.CANCELLED)
+
+    /**
+     * Drops one optimistic send from Android presentation state. [discard]
+     * names the intended differences between cancellation, abandonment and
+     * the in-flight discard paths; traces, host attempts, membership and
+     * tombstones stay with each caller.
+     */
+    private fun discardOptimisticSend(
+        optimisticKey: String,
+        tempId: String,
+        discard: OptimisticSendDiscard,
     ) {
-        pendingMessageEditHandoff.abandon(pendingEditKey(tempId))
-        optimisticEdits.remove(tempId)
+        if (discard.releasesEditsAndFailureNotice) {
+            pendingMessageEditHandoff.abandon(pendingEditKey(tempId))
+            optimisticEdits.remove(tempId)
+        }
         optimisticMessages.remove(optimisticKey)
         durableAcceptanceCallbacks.remove(optimisticKey)
         messageById.remove(tempId)
-        retentionAtSendByMessageId.remove(tempId)
         retainedMediaUploads.remove(optimisticKey)
         activeUploadKeys.remove(optimisticKey)
-        rollbackOptimisticChatListPreview(tempId)
-        appState.pendingSendDiagnostics.forget(tempId)
-        appState.dismissSendFailureNotice(sendFailureAttempt(optimisticKey))
+        if (discard.rollsBackPreview) {
+            retentionAtSendByMessageId.remove(tempId)
+            rollbackOptimisticChatListPreview(tempId)
+        }
+        if (discard.removesPhase) optimisticSendPhases.remove(optimisticKey)
+        when (discard.diagnostic) {
+            DiscardedSendDiagnostic.FORGET -> appState.pendingSendDiagnostics.forget(tempId)
+            DiscardedSendDiagnostic.COMPLETE_DROPPED ->
+                appState.pendingSendDiagnostics.complete(
+                    tempId,
+                    PerformancePhase.SEND_COMPLETE,
+                    PerformanceResult.DROPPED,
+                )
+            DiscardedSendDiagnostic.LEAVE_TRACKED -> Unit
+        }
+        if (discard.releasesEditsAndFailureNotice) {
+            appState.dismissSendFailureNotice(sendFailureAttempt(optimisticKey))
+        }
         publishTimelineFromIndexes()
     }
 
@@ -10494,12 +10475,7 @@ class ConversationController(
             completeDurableAcceptance(key)
             if (discardedDuringRetry.remove(key)) {
                 // User discarded mid-flight; drop the result entirely.
-                optimisticMessages.remove(key)
-                messageById.remove(tempId)
-                retentionAtSendByMessageId.remove(tempId)
-                rollbackOptimisticChatListPreview(tempId)
-                appState.pendingSendDiagnostics.forget(tempId)
-                publishTimelineFromIndexes()
+                discardOptimisticSend(key, tempId, OptimisticSendDiscard.DISCARDED_IN_FLIGHT)
                 trimCancelledSendTombstones()
                 return
             }
@@ -10582,24 +10558,11 @@ class ConversationController(
         when {
             discardedDuringRetry.remove(key) -> {
                 // User discarded mid-flight; don't restore the Failed bubble.
-                optimisticMessages.remove(key)
-                durableAcceptanceCallbacks.remove(key)
-                messageById.remove(tempId)
-                retentionAtSendByMessageId.remove(tempId)
-                rollbackOptimisticChatListPreview(tempId)
-                appState.pendingSendDiagnostics.forget(tempId)
-                publishTimelineFromIndexes()
+                discardOptimisticSend(key, tempId, OptimisticSendDiscard.DISCARDED_IN_FLIGHT)
                 trimCancelledSendTombstones()
             }
             throwable.isUseAfterEviction() -> {
-                rollbackOptimisticChatListPreview(tempId)
-                optimisticMessages.remove(key)
-                durableAcceptanceCallbacks.remove(key)
-                messageById.remove(tempId)
-                retentionAtSendByMessageId.remove(tempId)
-                optimisticSendPhases.remove(key)
-                appState.pendingSendDiagnostics.forget(tempId)
-                publishTimelineFromIndexes()
+                discardOptimisticSend(key, tempId, OptimisticSendDiscard.ABANDONED)
                 markActiveAccountRemovedFromMembers(account)
             }
             isAmbiguousRelayDeliveryError(throwable) -> {

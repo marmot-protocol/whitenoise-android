@@ -1801,8 +1801,7 @@ class WhiteNoiseAppState private constructor(
     private val appUpdateNotifier = AppUpdateNotifier(appContext)
     private val appSelfUpdateFlow = AppSelfUpdateFlows.create(appContext)
     internal val chatMutePreferences = ChatMutePreferences(appContext)
-    private val authoritativeMuteOverrides = mutableStateMapOf<String, dev.ipf.marmotkit.ChatNotificationSettingsFfi>()
-    private val pendingMuteCommands = mutableStateMapOf<String, Int>()
+    internal val chatMuteOwner = ChatMuteOwner()
     internal val chatFolderPreferences = ChatFolderPreferences(appContext)
     internal val ttsWarningPreferences = TtsWarningPreferences(appContext)
     internal val ttsEnginePreferences = TtsEnginePreferences(appContext)
@@ -7364,8 +7363,7 @@ class WhiteNoiseAppState private constructor(
         profileCacheLifetime.advance()
         inviteNotificationIdentityRefreshStore.clear()
         accountScopedCaches.clearAll()
-        authoritativeMuteOverrides.clear()
-        pendingMuteCommands.clear()
+        chatMuteOwner.clear()
         AvatarImageLoader.clearStoredAvatars()
         GroupAvatarImageLoader.clear()
         pruneIdleGroupCommitLocks()
@@ -8606,23 +8604,38 @@ class WhiteNoiseAppState private constructor(
 
     fun isConversationMuted(groupIdHex: String): Boolean {
         val accountRef = activeAccountRef ?: return false
-        return effectiveMuteOverride(
-            authoritativeMuteOverrides[ChatMutePreferences.compositeKey(accountRef, groupIdHex)],
-            System.currentTimeMillis(),
-        )?.muted
-            ?: engineConversationMuted(groupIdHex)
+        val key = ChatMutePreferences.compositeKey(accountRef, groupIdHex)
+        return chatMuteOwner.muted(key, System.currentTimeMillis()) {
+            engineConversationMuted(groupIdHex)
+        }
     }
 
     fun isConversationMutePending(groupIdHex: String): Boolean {
         val accountRef = activeAccountRef ?: return false
-        return (pendingMuteCommands[ChatMutePreferences.compositeKey(accountRef, groupIdHex)] ?: 0) > 0
+        return chatMuteOwner.isPending(ChatMutePreferences.compositeKey(accountRef, groupIdHex))
     }
 
-    internal fun conversationMuteOverride(groupIdHex: String): dev.ipf.marmotkit.ChatNotificationSettingsFfi? {
-        val accountRef = activeAccountRef ?: return null
-        return effectiveMuteOverride(
-            authoritativeMuteOverrides[ChatMutePreferences.compositeKey(accountRef, groupIdHex)],
-            System.currentTimeMillis(),
+    /** Group details' muted flag and expiry; [row] and [targeted] are the screen's own MDK reads. */
+    internal fun groupDetailsMuteDisplay(
+        groupIdHex: String,
+        row: ChatListRowFfi?,
+        targeted: dev.ipf.marmotkit.ChatNotificationSettingsFfi?,
+    ): ChatMuteDisplay {
+        val listMuted = { row?.muted ?: engineConversationMuted(groupIdHex) }
+        val accountRef =
+            activeAccountRef
+                ?: return ChatMuteDisplay(
+                    muted = row?.muted ?: targeted?.muted ?: listMuted(),
+                    mutedUntilMs = row?.mutedUntilMs ?: targeted?.mutedUntilMs,
+                )
+        return chatMuteOwner.groupDetails(
+            key = ChatMutePreferences.compositeKey(accountRef, groupIdHex),
+            nowMillis = System.currentTimeMillis(),
+            rowMuted = row?.muted,
+            rowMutedUntilMs = row?.mutedUntilMs,
+            targeted = targeted,
+            listMuted = listMuted,
+            listMutedUntilMs = { conversationMuteExpiryMillis(groupIdHex) },
         )
     }
 
@@ -8711,12 +8724,7 @@ class WhiteNoiseAppState private constructor(
         mutedUntilMs: Long?,
     ) {
         accountRef ?: return
-        val key = ChatMutePreferences.compositeKey(accountRef, groupIdHex)
-        val override = authoritativeMuteOverrides[key] ?: return
-        val commandPending = (pendingMuteCommands[key] ?: 0) > 0
-        if (shouldDropMuteOverride(override, muted, mutedUntilMs, commandPending)) {
-            authoritativeMuteOverrides.remove(key)
-        }
+        chatMuteOwner.acceptProjection(ChatMutePreferences.compositeKey(accountRef, groupIdHex), muted, mutedUntilMs)
     }
 
     fun setConversationNotifyForMode(
@@ -8736,25 +8744,16 @@ class WhiteNoiseAppState private constructor(
         isCurrent: () -> Boolean,
     ): Boolean {
         if (!isCurrent()) return false
-        val key = ChatMutePreferences.compositeKey(account, groupId)
-        pendingMuteCommands[key] = (pendingMuteCommands[key] ?: 0) + 1
-        try {
-            val result =
-                if (muted) {
-                    chatMuteRepository.setMuted(account, groupId, null, isCurrent)
-                } else {
-                    chatMuteRepository.clearMuted(account, groupId, isCurrent)
-                }
-            if (!isCurrent()) return false
-            return result.fold(
+        return chatMuteOwner.admit(ChatMutePreferences.compositeKey(account, groupId)).execute {
+            val result = muteRepositoryCommand(account, groupId, muted, null, isCurrent)
+            if (!isCurrent()) return@execute false
+            result.fold(
                 onSuccess = {
-                    authoritativeMuteOverrides[key] = it
+                    commit(it)
                     true
                 },
                 onFailure = { false },
             )
-        } finally {
-            finishMuteCommand(key)
         }
     }
 
@@ -8766,11 +8765,7 @@ class WhiteNoiseAppState private constructor(
         completionIsCurrent: () -> Boolean = isCurrent,
     ) {
         val accountRef = activeAccountRef ?: return
-        if (muted) {
-            submitMuteCommand(accountRef, groupIdHex, null, onCommitted, isCurrent, completionIsCurrent)
-        } else {
-            submitUnmuteCommand(accountRef, groupIdHex, onCommitted, isCurrent, completionIsCurrent)
-        }
+        submitMuteCommand(accountRef, groupIdHex, muted, null, onCommitted, isCurrent, completionIsCurrent)
     }
 
     /** Mute the chat for [durationMillis], auto-restoring the current mode after. */
@@ -8780,7 +8775,7 @@ class WhiteNoiseAppState private constructor(
     ) {
         val accountRef = activeAccountRef ?: return
         val expiry = if (durationMillis <= 0) null else System.currentTimeMillis() + durationMillis
-        submitMuteCommand(accountRef, groupIdHex, expiry)
+        submitMuteCommand(accountRef, groupIdHex, true, expiry)
     }
 
     /** Mute the chat until the exact future Unix epoch-millisecond [expiryMillis]. */
@@ -8789,7 +8784,7 @@ class WhiteNoiseAppState private constructor(
         expiryMillis: Long,
     ) {
         val accountRef = activeAccountRef ?: return
-        if (expiryMillis > System.currentTimeMillis()) submitMuteCommand(accountRef, groupIdHex, expiryMillis)
+        if (expiryMillis > System.currentTimeMillis()) submitMuteCommand(accountRef, groupIdHex, true, expiryMillis)
     }
 
     /** Sends the command to MDK; UI changes only after MDK returns its authoritative settings. */
@@ -8797,74 +8792,45 @@ class WhiteNoiseAppState private constructor(
     private fun submitMuteCommand(
         accountRef: String,
         groupIdHex: String,
+        muted: Boolean,
         mutedUntilMs: Long?,
         onCommitted: () -> Unit = {},
         isCurrent: () -> Boolean = { true },
         completionIsCurrent: () -> Boolean = isCurrent,
     ) {
-        val key = ChatMutePreferences.compositeKey(accountRef, groupIdHex)
         val runtime = runtimeGeneration
-        pendingMuteCommands[key] = (pendingMuteCommands[key] ?: 0) + 1
+        val ownsSession = { activeAccountRef == accountRef && runtimeGeneration == runtime }
+        val command = chatMuteOwner.admit(ChatMutePreferences.compositeKey(accountRef, groupIdHex))
         mutationsScope.launch {
-            try {
-                val ownsSession = activeAccountRef == accountRef && runtimeGeneration == runtime
-                if (!ownsSession || !isCurrent()) return@launch
-                chatMuteRepository
-                    .setMuted(accountRef, groupIdHex, mutedUntilMs) {
-                        activeAccountRef == accountRef && runtimeGeneration == runtime && isCurrent()
-                    }.onSuccess {
-                        if (activeAccountRef == accountRef && runtimeGeneration == runtime && completionIsCurrent()) {
-                            authoritativeMuteOverrides[key] = it
+            command.execute<Unit> {
+                if (!ownsSession() || !isCurrent()) return@execute
+                muteRepositoryCommand(accountRef, groupIdHex, muted, mutedUntilMs) { ownsSession() && isCurrent() }
+                    .onSuccess {
+                        if (ownsSession() && completionIsCurrent()) {
+                            commit(it)
                             onCommitted()
                         }
                     }.onFailure {
-                        if (activeAccountRef == accountRef && runtimeGeneration == runtime && isCurrent()) {
+                        if (ownsSession() && isCurrent()) {
                             presentFailure(R.string.toast_couldnt_update_notifications, "CHAT_MUTE_UPDATE", it)
                         }
                     }
-            } finally {
-                finishMuteCommand(key)
             }
         }
     }
 
-    private fun submitUnmuteCommand(
+    private suspend fun muteRepositoryCommand(
         accountRef: String,
         groupIdHex: String,
-        onCommitted: () -> Unit = {},
-        isCurrent: () -> Boolean = { true },
-        completionIsCurrent: () -> Boolean = isCurrent,
-    ) {
-        val key = ChatMutePreferences.compositeKey(accountRef, groupIdHex)
-        val runtime = runtimeGeneration
-        pendingMuteCommands[key] = (pendingMuteCommands[key] ?: 0) + 1
-        mutationsScope.launch {
-            try {
-                val ownsSession = activeAccountRef == accountRef && runtimeGeneration == runtime
-                if (!ownsSession || !isCurrent()) return@launch
-                chatMuteRepository
-                    .clearMuted(accountRef, groupIdHex) {
-                        activeAccountRef == accountRef && runtimeGeneration == runtime && isCurrent()
-                    }.onSuccess {
-                        if (activeAccountRef == accountRef && runtimeGeneration == runtime && completionIsCurrent()) {
-                            authoritativeMuteOverrides[key] = it
-                            onCommitted()
-                        }
-                    }.onFailure {
-                        if (activeAccountRef == accountRef && runtimeGeneration == runtime && isCurrent()) {
-                            presentFailure(R.string.toast_couldnt_update_notifications, "CHAT_MUTE_UPDATE", it)
-                        }
-                    }
-            } finally {
-                finishMuteCommand(key)
-            }
+        muted: Boolean,
+        mutedUntilMs: Long?,
+        isCurrent: () -> Boolean,
+    ): Result<dev.ipf.marmotkit.ChatNotificationSettingsFfi> =
+        if (muted) {
+            chatMuteRepository.setMuted(accountRef, groupIdHex, mutedUntilMs, isCurrent)
+        } else {
+            chatMuteRepository.clearMuted(accountRef, groupIdHex, isCurrent)
         }
-    }
-
-    private fun finishMuteCommand(key: String) {
-        val remaining = (pendingMuteCommands[key] ?: 0) - 1
-        if (remaining <= 0) pendingMuteCommands.remove(key) else pendingMuteCommands[key] = remaining
-    }
 
     private suspend fun migrateLegacyMutePreferences() {
         chatMutePreferences.legacyMuteEntries().forEach { legacy ->
@@ -8962,10 +8928,8 @@ class WhiteNoiseAppState private constructor(
     /** Remaining timed-mute expiry (epoch millis) for the chat, or null. */
     fun conversationMuteExpiryMillis(groupIdHex: String): Long? {
         val accountRef = activeAccountRef ?: return null
-        val override = authoritativeMuteOverrides[ChatMutePreferences.compositeKey(accountRef, groupIdHex)]
-        return if (override != null) {
-            effectiveMuteOverride(override, System.currentTimeMillis())?.mutedUntilMs
-        } else {
+        val key = ChatMutePreferences.compositeKey(accountRef, groupIdHex)
+        return chatMuteOwner.mutedUntilMs(key, System.currentTimeMillis()) {
             (chatsController?.items.orEmpty() + chatsController?.archivedItems.orEmpty())
                 .firstOrNull { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
                 ?.projection
