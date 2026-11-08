@@ -423,6 +423,23 @@ class NotificationIdentityImageCoverageTest {
         )
     }
 
+    /**
+     * #3635: a cleared private picture shows what the chat row shows, the public picture or the row's stored copy,
+     * at every write that reads the choice, and the app lock is checked before either is read.
+     */
+    @Test
+    fun clearedPictureShowsWhatTheChatRowShows() {
+        val choice = stateSource("AppState.kt").functionBody("contactAvatarOverride")
+        val lock = choice.indexOf("if (appLockScreenVisible) return true to null")
+        val fallback = choice.indexOf("?: contactRowPicture(account, contact)")
+        assertTrue("the row's stored copy follows the public picture", fallback > choice.indexOf("peekBitmap("))
+        assertTrue("and only after the lock check", lock in 0 until fallback)
+        val row =
+            stateSource("PreWarmedNotificationAvatars.kt")
+                .declaration("internal fun List<ChatListItem>.readyContactRowPicture(")
+        assertTrue("through the chat row's own peer rule", "privatePictureContact().equals(contact" in row)
+    }
+
     /** An unchanged snapshot is re-read under the publication lock before only reporting use of the shortcut. */
     @Test
     fun unchangedSnapshotIsReReadUnderTheLockBeforeOnlyReportingUse() {

@@ -112,6 +112,24 @@ class NotificationStoredAvatarTest {
         assertNull(PreWarmedNotificationAvatars(null, null).withChatRow(item, ACCOUNT).identityContact)
     }
 
+    /**
+     * A cleared private picture falls back to the stored picture the contact's chat row shows, from this account's
+     * decoded pixels, matching the contact in any case. A named group never lends the face MDK selected for it.
+     */
+    @Test
+    fun clearedPictureFallsBackToTheStoredPictureTheContactsRowShows() {
+        val asset = asset("peer-picture")
+        val named = chatListItemFromProjection(groupRow(), peerPresentation(), asset)
+        val direct = chatListItemFromProjection(directRow(), peerPresentation(), asset)
+        val stored = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
+        AvatarImageLoader.putCached(checkNotNull(asset.cacheKey(ACCOUNT)), stored.asImageBitmap())
+
+        assertSame(stored, listOf(named, direct).readyContactRowPicture(ACCOUNT, PEER.uppercase()))
+        assertNull("a named group lends nothing", listOf(named).readyContactRowPicture(ACCOUNT, PEER))
+        assertNull("another contact", listOf(direct).readyContactRowPicture(ACCOUNT, "c".repeat(64)))
+        assertNull("another account's pixels", listOf(direct).readyContactRowPicture("another-account", PEER))
+    }
+
     /** Without a loaded chat row, as on an account whose chat list is not open, the snapshot adds nothing. */
     @Test
     fun missingChatRowAddsNothingToTheSnapshot() {

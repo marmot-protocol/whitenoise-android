@@ -287,7 +287,8 @@ class NotificationGroupPictureSourcesTest {
 
     /**
      * #3635: a private picture cleared after the shortcut was published and before the card's write never reaches
-     * the card. The snapshot holds only the stored picture, and the write reads the choice current at that moment.
+     * the card. Production records a Clear as a choice with no private picture, so the write applies it instead of
+     * keeping the snapshot. With no public or stored picture in memory, the card draws the peer's monogram.
      */
     @Test
     fun privatePictureClearedBeforeTheWriteNeverReachesTheCard() {
@@ -300,13 +301,15 @@ class NotificationGroupPictureSourcesTest {
                 shortcutPublisher = { shortcut ->
                     ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
                     shortcutWrites += 1
-                    choice = false to null
+                    choice = true to null
                 },
             )
         show(presenter, group(), conversation = solid(Color.BLUE), identityContact = peer)
 
         assertTrue("the Clear landed between the shortcut and the card", shortcutWrites > 0)
-        assertEquals("the stored picture, never the cleared one", Color.BLUE, identityPixel(liveCard()))
+        val card = liveCard()
+        val (_, seed) = checkNotNull(card.recordedIdentityInputs())
+        assertEquals("the write applied the Clear", notificationMonogramBackgroundColor(seed), identityPixel(card))
     }
 
     /**

@@ -49,6 +49,21 @@ internal fun ChatListItem.readyStoredAvatarBitmap(accountRef: String): Bitmap? =
         ?.asAndroidBitmap()
 
 /**
+ * #3635: the stored picture a chat row shows for [contact] when no private picture of theirs is in memory, such as
+ * after a Clear, from the pixels the chat list already decoded. A cleared choice then shows what the row shows instead
+ * of a monogram. Null when no row names [contact] as its peer, or none of their rows has decoded pixels.
+ */
+internal fun List<ChatListItem>.readyContactRowPicture(
+    accountRef: String,
+    contact: String,
+): Bitmap? =
+    firstNotNullOfOrNull { item ->
+        item
+            .takeIf { it.privatePictureContact().equals(contact, ignoreCase = true) }
+            ?.readyStoredAvatarBitmap(accountRef)
+    }
+
+/**
  * Avatar warmup metadata or exact ready-local bitmaps retained across first publication and correction.
  * [storedConversationBitmap] holds the pixels the chat list decoded for the row's stored selected avatar (#3635).
  * [identityContact] is the peer whose private picture the chat row shows instead (#3635). The snapshot never holds

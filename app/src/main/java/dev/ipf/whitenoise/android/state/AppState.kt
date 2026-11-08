@@ -11831,7 +11831,11 @@ class WhiteNoiseAppState private constructor(
         return profile
     }
 
-    /** Pure cache snapshot used at the final Android write, including a cleared private choice. */
+    /**
+     * Pure cache snapshot used at the final Android write, including a cleared private choice. Without private pixels
+     * in memory, as after a Clear, the choice shows what the chat row shows: the public picture, or the row's stored
+     * copy (#3635), and only then the monogram. The app lock always shows the monogram.
+     */
     @Suppress("ReturnCount") // Reject ineligible or revoked owners before accessing private pixels.
     private fun contactAvatarOverride(
         account: String,
@@ -11846,8 +11850,23 @@ class WhiteNoiseAppState private constructor(
         if (appLockScreenVisible) return true to null
         val private = contactPictureStore.reference(account, contact)?.cacheKey?.let(AvatarImageLoader::cachedImage)
         val published = synchronized(profilePresentationLock) { profilePresentations[contact]?.avatarUrl }
-        return true to (private?.asAndroidBitmap() ?: AvatarImageLoader.peekBitmap(published))
+        return true to
+            (
+                private?.asAndroidBitmap()
+                    ?: AvatarImageLoader.peekBitmap(published)
+                    ?: contactRowPicture(account, contact)
+            )
     }
+
+    /** #3635: the stored picture [account]'s chat rows show for [contact], when the chat list already decoded it. */
+    private fun contactRowPicture(
+        account: String,
+        contact: String,
+    ): android.graphics.Bitmap? =
+        chatsController
+            ?.takeIf { it.boundAccountRef == account }
+            ?.items
+            ?.readyContactRowPicture(account, contact)
 
     /** Bounded local file decode shares the first-post deadline; it can never acquire a public URL. */
     private suspend fun warmPrivateContactAvatar(

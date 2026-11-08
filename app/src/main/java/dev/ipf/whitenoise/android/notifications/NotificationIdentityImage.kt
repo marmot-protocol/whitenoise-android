@@ -146,8 +146,9 @@ private fun NotificationIdentityImage.refreshInputs(): Bundle =
 /**
  * Applies the current account-scoped contact choice to a direct chat's or a reaction's identity picture at the final
  * write, the same way the sender Person is refreshed, so a concurrent Save or Clear never posts stale private pixels.
- * A cleared or app-locked choice falls back to the monogram, never to captured private pixels. Groups are left
- * unchanged. The card keeps its custom views, such as a reaction's artwork, and its group alert behavior.
+ * A cleared choice draws the public or stored picture [contactAvatar] hands back. A choice without pixels, such as
+ * the app lock, falls back to the monogram, never to captured private pixels. Groups are left unchanged. The card
+ * keeps its custom views, such as a reaction's artwork, and its group alert behavior.
  */
 internal fun withCurrentIdentityContact(
     context: Context,
