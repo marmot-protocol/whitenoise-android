@@ -940,6 +940,14 @@
           "MSG-017",
           "MSG-031"
         ]
+      },
+      {
+        "surface": "Every discarded optimistic send releases its bubble, upload state and chat-list preview through one shared cleanup",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private fun discardOptimisticSend(",
+        "test_ids": [
+          "MSG-019"
+        ]
       }
     ]
   },

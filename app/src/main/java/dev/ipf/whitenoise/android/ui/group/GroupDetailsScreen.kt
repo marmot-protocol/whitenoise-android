@@ -559,9 +559,6 @@ internal fun GroupDetailsScreen(
             remember(appState.activeAccountRef, controller.group.groupIdHex, vibrationSelections) {
                 appState.conversationVibrationPattern(controller.group.groupIdHex)
             }
-        val engineMuted =
-            controller.latestChatListRow?.muted
-                ?: appState.engineConversationMuted(controller.group.groupIdHex)
         var targetedMuteSettings by remember(appState.activeAccountRef, controller.group.groupIdHex) {
             mutableStateOf<dev.ipf.marmotkit.ChatNotificationSettingsFfi?>(null)
         }
@@ -571,12 +568,13 @@ internal fun GroupDetailsScreen(
                 targetedMuteSettings = appState.authoritativeConversationMuteSettings(controller.group.groupIdHex)
             }
         }
-        val muteOverride = appState.conversationMuteOverride(controller.group.groupIdHex)
-        val conversationMuted =
-            muteOverride?.muted
-                ?: controller.latestChatListRow?.muted
-                ?: targetedMuteSettings?.muted
-                ?: engineMuted
+        val muteDisplay =
+            appState.groupDetailsMuteDisplay(
+                controller.group.groupIdHex,
+                controller.latestChatListRow,
+                targetedMuteSettings,
+            )
+        val conversationMuted = muteDisplay.muted
         val muteCommandPending = appState.isConversationMutePending(controller.group.groupIdHex)
         // Android retains only the All/Only-mentions preference behind MDK's mute.
         val conversationRestoreMode =
@@ -587,14 +585,7 @@ internal fun GroupDetailsScreen(
             ) {
                 appState.conversationRestoreNotifyMode(controller.group.groupIdHex)
             }
-        val conversationMuteExpiry =
-            if (muteOverride != null) {
-                muteOverride.mutedUntilMs
-            } else {
-                controller.latestChatListRow?.mutedUntilMs
-                    ?: targetedMuteSettings?.mutedUntilMs
-                    ?: appState.conversationMuteExpiryMillis(controller.group.groupIdHex)
-            }
+        val conversationMuteExpiry = muteDisplay.mutedUntilMs
 
         suspend fun refreshMlsDetails() {
             if (!appState.developerMode) return

@@ -1165,6 +1165,14 @@
         "test_ids": [
           "ACC-022"
         ]
+      },
+      {
+        "surface": "Group details mute row reads the shared mute owner",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "appState.groupDetailsMuteDisplay(",
+        "test_ids": [
+          "GRP-015"
+        ]
       }
     ]
   },
