@@ -1773,7 +1773,7 @@
     <string name="ai_agents_prompt_copied">Eingabeaufforderung kopiert — füge sie in deinen Agenten ein.</string>
     <string name="ai_agents_public_key_unavailable">Öffentlicher Schlüssel nicht verfügbar. Gehe zurück und wähle ein anderes Profil.</string>
     <string name="ai_agents_setup_title">%1$s einrichten</string>
-    <string name="ai_agents_setup_instruction">Füge dies in %1$s ein. Es teilt nur deinen öffentlichen Schlüssel; der Agent fragt, bevor er etwas installiert.</string>
+    <string name="ai_agents_setup_instruction">Füge dies in %1$s ein. Es teilt nur deinen öffentlichen Schlüssel und bittet den Agenten, vor der Installation deine Zustimmung einzuholen. Nur mit einem Agenten verwenden, dem du vertraust.</string>
     <string name="ai_agents_copy_prompt">Eingabeaufforderung kopieren</string>
     <string name="ai_agents_docs_opened">Die Konnektor-Dokumentation wird geöffnet.</string>
     <string name="ai_agents_docs_failed">Die Konnektor-Dokumentation ließ sich nicht öffnen.</string>

@@ -1767,7 +1767,7 @@
     <string name="ai_agents_prompt_copied">Indicación copiada — pégala en tu agente.</string>
     <string name="ai_agents_public_key_unavailable">Clave pública no disponible. Vuelve y elige otro perfil.</string>
     <string name="ai_agents_setup_title">Configurar %1$s</string>
-    <string name="ai_agents_setup_instruction">Pega esto en %1$s. Solo comparte tu clave pública; el agente pregunta antes de instalar nada.</string>
+    <string name="ai_agents_setup_instruction">Pega esto en %1$s. Solo comparte tu clave pública y pide al agente tu aprobación antes de instalar. Úsalo solo con un agente de confianza.</string>
     <string name="ai_agents_copy_prompt">Copiar indicación</string>
     <string name="ai_agents_docs_opened">Abriendo la documentación del conector.</string>
     <string name="ai_agents_docs_failed">No se pudo abrir la documentación del conector.</string>

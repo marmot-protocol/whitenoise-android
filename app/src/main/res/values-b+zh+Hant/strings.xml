@@ -1742,7 +1742,7 @@
     <string name="ai_agents_prompt_copied">提示已複製——請貼到你的代理中。</string>
     <string name="ai_agents_public_key_unavailable">公鑰無法使用。返回並嘗試其他個人檔案。</string>
     <string name="ai_agents_setup_title">設定 %1$s</string>
-    <string name="ai_agents_setup_instruction">將此貼到 %1$s。只會分享你的公開金鑰；代理安裝任何項目前會先詢問。</string>
+    <string name="ai_agents_setup_instruction">將此貼到 %1$s。只會分享你的公開金鑰，並要求代理在安裝前取得你的同意。僅用於你信任的代理。</string>
     <string name="ai_agents_copy_prompt">複製提示</string>
     <string name="ai_agents_docs_opened">正在開啟連接器文件。</string>
     <string name="ai_agents_docs_failed">無法開啟連接器文件。</string>

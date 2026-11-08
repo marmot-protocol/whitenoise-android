@@ -1780,7 +1780,7 @@
     <string name="ai_agents_prompt_copied">Invite copiée — collez-la dans votre agent.</string>
     <string name="ai_agents_public_key_unavailable">Clé publique indisponible. Revenez et choisissez un autre profil.</string>
     <string name="ai_agents_setup_title">Configurer %1$s</string>
-    <string name="ai_agents_setup_instruction">Collez ceci dans %1$s. Seule votre clé publique est partagée ; l’agent demande avant d’installer quoi que ce soit.</string>
+    <string name="ai_agents_setup_instruction">Collez ceci dans %1$s. Seule votre clé publique est partagée, et l’agent est invité à demander votre accord avant d’installer. À utiliser uniquement avec un agent de confiance.</string>
     <string name="ai_agents_copy_prompt">Copier l’invite</string>
     <string name="ai_agents_docs_opened">Ouverture de la documentation du connecteur.</string>
     <string name="ai_agents_docs_failed">Impossible d’ouvrir la documentation du connecteur.</string>

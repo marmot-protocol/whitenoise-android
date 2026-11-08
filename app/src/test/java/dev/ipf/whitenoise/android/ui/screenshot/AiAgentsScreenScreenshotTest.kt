@@ -86,6 +86,7 @@ class AiAgentsScreenScreenshotTest {
             dark = false,
             amoled = false,
             connector = "goose",
+            rtl = true,
         )
     }
 
@@ -119,8 +120,9 @@ class AiAgentsScreenScreenshotTest {
         amoled: Boolean,
         connector: String = "codex",
         fontScale: Float = 1f,
+        rtl: Boolean = false,
     ) {
-        render(dark, amoled, PREVIEW_NPUB, fontScale)
+        render(dark, amoled, PREVIEW_NPUB, fontScale, rtl)
         composeRule.onNodeWithTag("settings.list").performScrollToNode(hasTestTag("ai_agents.connector.$connector"))
         composeRule.onNodeWithTag("ai_agents.connector.$connector").performClick()
         composeRule.waitForIdle()

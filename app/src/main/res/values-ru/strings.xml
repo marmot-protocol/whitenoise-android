@@ -1845,7 +1845,7 @@
     <string name="ai_agents_prompt_copied">Запрос скопирован — вставьте его в ваш агент.</string>
     <string name="ai_agents_public_key_unavailable">Открытый ключ недоступен. Вернитесь и попробуйте другой профиль.</string>
     <string name="ai_agents_setup_title">Настройка %1$s</string>
-    <string name="ai_agents_setup_instruction">Вставьте это в %1$s. Передаётся только ваш открытый ключ; агент спросит перед любой установкой.</string>
+    <string name="ai_agents_setup_instruction">Вставьте это в %1$s. Передаётся только ваш открытый ключ, а агента просят получить ваше согласие перед установкой. Используйте только с агентом, которому доверяете.</string>
     <string name="ai_agents_copy_prompt">Копировать запрос</string>
     <string name="ai_agents_docs_opened">Открытие документации коннектора.</string>
     <string name="ai_agents_docs_failed">Не удалось открыть документацию коннектора.</string>

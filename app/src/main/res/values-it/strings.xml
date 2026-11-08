@@ -1780,7 +1780,7 @@
     <string name="ai_agents_prompt_copied">Prompt copiato — incollalo nel tuo agente.</string>
     <string name="ai_agents_public_key_unavailable">Chiave pubblica non disponibile. Torna indietro e prova un altro profilo.</string>
     <string name="ai_agents_setup_title">Configura %1$s</string>
-    <string name="ai_agents_setup_instruction">Incolla questo in %1$s. Condivide solo la tua chiave pubblica; l’agente chiede prima di installare qualsiasi cosa.</string>
+    <string name="ai_agents_setup_instruction">Incolla questo in %1$s. Condivide solo la tua chiave pubblica e chiede all’agente la tua approvazione prima di installare. Usalo solo con un agente di cui ti fidi.</string>
     <string name="ai_agents_copy_prompt">Copia prompt</string>
     <string name="ai_agents_docs_opened">Apertura della documentazione del connettore.</string>
     <string name="ai_agents_docs_failed">Impossibile aprire la documentazione del connettore.</string>
