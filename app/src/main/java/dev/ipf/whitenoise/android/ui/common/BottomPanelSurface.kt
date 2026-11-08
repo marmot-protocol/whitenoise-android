@@ -3,7 +3,6 @@ package dev.ipf.whitenoise.android.ui.common
 import android.os.Build
 import android.view.RoundedCorner
 import android.view.View
-import android.view.WindowInsets as PlatformWindowInsets
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,6 +24,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.ui.theme.Radii
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
+import android.view.WindowInsets as PlatformWindowInsets
 
 /**
  * Bottom corner radius for a full-width panel whose bottom edge sits [bottomGap] above the window's
