@@ -5,9 +5,9 @@ Normal builds never regenerate bindings from a local MDK checkout. Maintainers
 update the reviewed pin in `app/src/main/marmotkit/MARMOT_VERSION` only after
 MDK has published the corresponding release.
 
-The November 8 nightly is the current testing-only pin. Replace it with the
-formal `marmotkit-v0.15.0` release once MDK publishes one.
-[November 8 release](https://github.com/marmot-protocol/mdk/releases/tag/marmotkit-v0.15.0-nightly.20261108)
+The [November 8 nightly](https://github.com/marmot-protocol/mdk/releases/tag/marmotkit-v0.15.0-nightly.20261108)
+is the current testing-only pin. Replace it with the formal `marmotkit-v0.15.0`
+release once MDK publishes one.
 
 The [6 November nightly](marmotkit-nightly-20261106.md) is the populated campaign's
 upgrade baseline. The [5 November nightly](marmotkit-nightly-20261105.md),
@@ -81,7 +81,7 @@ It seeds two accounts, history, retained attachments, a pending upload and cache
 avatars through MDK. Upgrade and cold restart must preserve their original bytes
 with acquisition disabled, and normal MainActivity must open usable retained
 chats. Separate phases send the baseline's original pending upload unchanged,
-restart again and recover corrupt/lost disposable media. The November 5 baseline
+restart again and recover corrupt/lost disposable media. The November 6 baseline
 already supplies upload branch identity, which the private fixture receipt must
 retain. A deliberately stripped copy must be refused as stale, while the complete
 reference must send successfully. The historical November 2-to-4 pair instead

@@ -10960,23 +10960,65 @@ class ConversationController(
         inviteConfirmationAuthority.finish()
     }
 
-    /** Declines only after conflicting chat-list confirmation snapshots have been resolved. */
+    /** Declines the current pending Welcome, stepping down first when MDK refuses an admin's decline. */
     suspend fun declineInvite(): Boolean =
         withMutationLockResult(false) {
             if (inviteAcceptanceResolutionPending) return@withMutationLockResult false
             val account = conversationAccountRef ?: return@withMutationLockResult false
+            val invitation = inviteGeneration(group)
+            val stillPending = {
+                mutationPresentation.ownsCurrentPresentation() &&
+                    !inviteAcceptanceResolutionPending &&
+                    group.pendingConfirmation &&
+                    inviteGeneration(group) == invitation
+            }
             runCatching {
-                appState.marmotIo { declineGroupInvite(account, group.groupIdHex) }
-                appState.dismissConversationNotifications(account, group.groupIdHex)
-                group = group.copy(pendingConfirmation = false, archived = true)
-                appState.applyLocalGroupUpdate(group)
-                presentConversationTransient(R.string.toast_invite_declined)
+                if (!declinePendingInvite(account, invitation.groupIdHex, stillPending)) return@runCatching false
+                appState.dismissConversationNotifications(account, invitation.groupIdHex)
+                if (mutationPresentation.ownsCurrentPresentation() && inviteGeneration(group) == invitation) {
+                    group = group.copy(pendingConfirmation = false, archived = true)
+                    appState.applyLocalGroupUpdate(group, account)
+                    presentConversationTransient(R.string.toast_invite_declined)
+                }
                 true
             }.getOrElse {
                 it.rethrowIfCancellation()
                 appState.presentFailure(R.string.toast_couldnt_decline_invite, "GROUP_INVITE_DECLINE", it)
                 false
             }
+        }
+
+    /** Serializes decline with commits and keeps an admitted step-down and its decline together. */
+    private suspend fun declinePendingInvite(
+        account: String,
+        groupIdHex: String,
+        stillPending: () -> Boolean,
+    ): Boolean =
+        appState.withGroupCommitLock(account, groupIdHex) {
+            if (!stillPending()) return@withGroupCommitLock false
+            try {
+                appState.marmotIo { declineGroupInvite(account, groupIdHex) }
+            } catch (refusal: MarmotKitException.AdminCannotSelfRemove) {
+                if (!refusal.groupIdHex.equals(groupIdHex, ignoreCase = true)) throw refusal
+                if (!stillPending()) return@withGroupCommitLock false
+                appState.runGroupChange(
+                    account,
+                    groupIdHex,
+                    stillWanted = stillPending,
+                    actionLabel = R.string.decline,
+                ) {
+                    withContext(NonCancellable) {
+                        val demotion =
+                            appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
+                                selfDemoteAdminDetailed(account, groupIdHex)
+                            }
+                        applyMutationDetails(account, demotion.details)
+                        // Admission may retry the step-down, so return the follow-up result without retrying that commit.
+                        runCatchingCancellable { appState.marmotIo { declineGroupInvite(account, groupIdHex) } }
+                    }
+                }.getOrThrow()
+            }
+            true
         }
 
     /**

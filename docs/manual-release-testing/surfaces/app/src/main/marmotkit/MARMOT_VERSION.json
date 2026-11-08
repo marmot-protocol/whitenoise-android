@@ -4,7 +4,7 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "Testing-only MarmotKit November 8 nightly from 580082a5 with new recovery and account migrations over the November 6 baseline. Verify retained accounts, history, media and avatar bytes, original pending upload with branch identity, cold restart and recovery. Experimental device groups stay disabled.",
+        "surface": "Testing-only MarmotKit November 8 nightly from 580082a5 with recovery and account migrations over the November 6 baseline, Odin Markdown parsing, and admin invitation decline. Verify retained data, the original pending upload, cold restart and recovery.",
         "source": "app/src/main/marmotkit/MARMOT_VERSION",
         "anchor": "artifact-id=0.15.0-nightly.20261108",
         "test_ids": [
@@ -21,10 +21,13 @@
           "ONB-020",
           "SEC-007",
           "SET-021",
+          "MSG-002",
+          "MSG-015",
           "MSG-017",
           "MED-019",
           "MED-020",
           "NCH-006",
+          "GRP-030",
           "GRP-032",
           "MED-035",
           "MSG-031"

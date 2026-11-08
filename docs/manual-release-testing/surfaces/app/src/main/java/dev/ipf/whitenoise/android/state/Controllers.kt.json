@@ -885,6 +885,14 @@
       },
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "surface": "Decline a pending invitation with an admin step-down when required",
+        "anchor": "R.string.decline",
+        "test_ids": [
+          "GRP-030"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "surface": "Coherent group details refresh",
         "anchor": "groupSnapshotReader(account",
         "test_ids": [
