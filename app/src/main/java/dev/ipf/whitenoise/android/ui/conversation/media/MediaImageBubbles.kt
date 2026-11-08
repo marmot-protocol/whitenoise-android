@@ -158,124 +158,29 @@ internal fun MediaImageBubble(
 ) {
     val record = item.record
     val key = record.messageIdHex
-    val cachedThumbnail =
-        remember(controller, key, attachmentIndex, reference.sourceEpoch) {
-            controller.thumbnailEntryFor(key, attachmentIndex)
-        }
     val bubbleAspectRatio =
         rememberMediaBubbleAspectRatio(
             messageIdHex = key,
             attachmentIndex = attachmentIndex,
             dim = reference.dim,
         )
-    // Decode-state keys split into two buckets:
-    //   - Bytes-level state (bitmap, failed, reloadToken): keyed on
-    //     `sourceEpoch` so a typed-reference upgrade from imeta-fallback
-    //     (epoch = 0) to the real listMedia value clears a stuck failure.
-    //   - User-interaction state (materialization intent): NOT keyed on
-    //     epoch, because we never want a background typed-ref upgrade to
-    //     close a viewer the user just opened, or re-gate a download the
-    //     user just consented to.
-    val epoch = reference.sourceEpoch
-    val decodeRequest =
-        remember(controller, key, attachmentIndex, epoch) {
-            val cachedRatio = cachedThumbnail?.bitmap?.let { it.width.toFloat() / it.height }
-            ThumbnailDecodeRequest(cachedRatio ?: bubbleAspectRatio)
-        }
-    val requestedMaxEdgePx = decodeRequest.maxEdgePx
-    var presentationMaxEdgePx by remember(controller, key, attachmentIndex, epoch) {
-        mutableIntStateOf(cachedThumbnail?.maxEdgePx ?: 0)
-    }
-    // Seed from the decoded-thumbnail cache so an already-fetched or just-sent
-    // image paints on the first frame — no decode spinner, no visible "reload".
-    // Animated GIF/WebP and byte-sniffed unknowns skip the static thumbnail
-    // cache so they always decode through the ImageDecoder path.
-    var presentation by remember(controller, key, attachmentIndex, epoch) {
-        val cached =
-            if (MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
-                cachedThumbnail?.bitmap
-            } else {
-                null
-            }
-        mutableStateOf<DecodedAttachmentPresentation?>(
-            cached?.let { DecodedAttachmentPresentation.Static(it) },
-        )
-    }
-    val animationSource =
-        rememberInlineAnimationSource(
-            listOf(controller, key, attachmentIndex, epoch),
-            appState,
-            controller.boundAccountRef,
-            controller.group.groupIdHex,
-        ) {
-            localAttachmentBytes(controller, key, attachmentIndex, mine)
-        }
-    val mediaApplyHostAttempt = remember(key, attachmentIndex, epoch) { HostPerformanceAttemptSlot() }
-    DisposableEffect(mediaApplyHostAttempt) {
-        onDispose(mediaApplyHostAttempt::cancel)
-    }
-    var failed by remember(key, attachmentIndex, epoch) { mutableStateOf(false) }
-    var storageFailed by remember(key, attachmentIndex, epoch) { mutableStateOf(false) }
-
-    /** Fails this attachment, saying "Not enough storage" only when [cause] is a storage park. */
-    fun markFailed(cause: Throwable? = null) {
-        storageFailed = cause.parksForStorage()
-        failed = true
-    }
-    // A verified image above the preview budget is not a failure: Retry cannot shrink it, so the tile opens the
-    // viewer instead, where Save and Share still work.
-    var tooLargeToPreview by remember(key, attachmentIndex, epoch) { mutableStateOf(false) }
-    var reloadToken by remember(key, attachmentIndex, epoch) { mutableIntStateOf(0) }
-    storageReadmissionEffect(controller, key, attachmentIndex, parked = failed && storageFailed) {
-        failed = false
-        storageFailed = false
-        reloadToken++
-    }
-    val cacheAvailability =
-        rememberImageAttachmentCacheAvailability(controller, key, attachmentIndex, epoch, presentation != null)
-    var cachedPlaintextOnEntry by cacheAvailability.cached
-    val retainedPlaintextOnEntry =
-        mine && controller.pendingAttachmentsList(key).getOrNull(attachmentIndex)?.inMemoryBytes != null
-    // Auto-download gating (#10): retained/cached own bytes always render;
-    // idle network fallback obeys policy. Once accepted, materialization stays
-    // latched across policy recomposition so an active UI waiter is not lost.
-    val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
-    // The reader's Cancel is persisted per attachment, so policy cannot restart what they stopped.
-    val cancelledByReader = controller.automaticAttachmentDownloadSuppressed(key, attachmentIndex)
-    val autoAllowed = appState.shouldAutoDownloadMedia(MediaAutoDownloadType.Image) && !cancelledByReader
-    val automaticNetworkAllowed by rememberUpdatedState(
-        shouldMaterializeAttachmentAutomatically(mine, autoAllowed, automaticDownloadsPaused),
-    )
-    val policyAllowsMaterialization =
-        shouldMaterializeAttachmentAutomatically(
+    // Bytes-level state is keyed on `sourceEpoch` so a typed-reference upgrade from imeta-fallback (epoch = 0)
+    // clears a stuck failure; the materialization intent is not, so that upgrade cannot close a viewer the user
+    // opened or re-gate a download they consented to.
+    val load =
+        rememberImageLoadState(
+            controller = controller,
+            appState = appState,
+            messageIdHex = key,
+            attachmentIndex = attachmentIndex,
+            reference = reference,
             mine = mine,
-            mediaAutoDownloadAllowed = autoAllowed,
-            automaticDownloadsPaused = automaticDownloadsPaused,
-            hasCachedAttachment = cachedPlaintextOnEntry,
-            hasRetainedPlaintext = retainedPlaintextOnEntry,
+            decodeKeys = listOf(controller, key, attachmentIndex, reference.sourceEpoch),
+            fallbackAspectRatio = bubbleAspectRatio,
+            intentIdentity = "$key#$attachmentIndex",
+            failureLogTag = "MediaImageBubble",
+            failureLogMessage = "image_auto_download_failed",
         )
-    var appliedPolicy by remember { mutableStateOf<Boolean?>(null) }
-    var materializationIntent by
-        rememberAttachmentMaterializationIntent(
-            identity = "$key#$attachmentIndex",
-            policyAllowsMaterialization = policyAllowsMaterialization,
-            onPolicyApplied = { appliedPolicy = it },
-        )
-    val startDownload = materializationIntent.shouldMaterialize
-    val cacheAvailabilityResolved by cacheAvailability.resolved
-    // Offer Download only once the probes answered and the intent has absorbed the policy they produced.
-    val downloadActionReady = cacheAvailabilityResolved && appliedPolicy == policyAllowsMaterialization
-    restoreParkedDownloadOnEntry(
-        identity = Triple(controller, key, attachmentIndex),
-        enabled = !mine && !startDownload && !cancelledByReader,
-        parkedByReader = failed && storageFailed && materializationIntent.readerRequested,
-        recordParkedByReader = { controller.recordReaderParkedDownload(key, attachmentIndex) },
-        readerParkHeld = { controller.readerDownloadParkedForStorage(key, attachmentIndex) },
-    ) {
-        materializationIntent = materializationIntent.afterParkedDownloadFound()
-    }
-    val transfer =
-        rememberTileTransfer(controller, key, attachmentIndex, reference, mine, cancelledByReader, startDownload)
 
     /** Hands the logical image to the conversation-owned viewer before row disposal can occur. */
     fun dispatchViewerOpen() {
@@ -291,94 +196,9 @@ internal fun MediaImageBubble(
         )
     }
 
-    LaunchedEffect(controller, key, attachmentIndex, epoch, materializationIntent, reloadToken, requestedMaxEdgePx) {
-        if (requestedMaxEdgePx == 0) return@LaunchedEffect
-        if (presentation != null && presentationMaxEdgePx >= requestedMaxEdgePx) return@LaunchedEffect
-        if (!startDownload) return@LaunchedEffect
-        val cached = controller.thumbnailEntryFor(key, attachmentIndex, requestedMaxEdgePx)
-        if (cached != null && MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
-            presentation = DecodedAttachmentPresentation.Static(cached.bitmap)
-            presentationMaxEdgePx = cached.maxEdgePx
-            decodeRequest.onDecodedSize(cached.bitmap.width, cached.bitmap.height)
-            return@LaunchedEffect
-        }
-        failed = false
-        tooLargeToPreview = false
-        try {
-            val data =
-                imageAttachmentBytes(
-                    controller = controller,
-                    messageIdHex = key,
-                    attachmentIndex = attachmentIndex,
-                    reference = reference,
-                    mine = mine,
-                    priority = materializationIntent.priority,
-                    allowNetwork = attachmentTransferAllowsNetwork(materializationIntent, automaticNetworkAllowed),
-                ) ?: run {
-                    cachedPlaintextOnEntry = false
-                    materializationIntent =
-                        AttachmentMaterializationIntent.Idle.withPolicyAllowed(automaticNetworkAllowed)
-                    // A grant during the local read preserves the intent, so it needs a new effect key.
-                    if (automaticNetworkAllowed) reloadToken++
-                    return@LaunchedEffect
-                }
-            val decoded =
-                appState.measureHostPerformance(HostPerformanceOperationFfi.MEDIA_DECODE) {
-                    decodeMessageAttachmentImage(
-                        bytes = data,
-                        mediaType = reference.mediaType,
-                        staticMaxEdgePx = requestedMaxEdgePx,
-                        domain = controller.mediaTrustDomain,
-                    )
-                }
-            if (decoded != null) {
-                if (decoded is DecodedAttachmentPresentation.Static && !decoded.animationDeferred) {
-                    controller.cacheThumbnail(key, attachmentIndex, decoded.bitmap, requestedMaxEdgePx)
-                }
-                mediaApplyHostAttempt.replace(
-                    appState.beginHostPerformance(HostPerformanceOperationFfi.MEDIA_APPLY),
-                )
-                presentation = decoded
-                presentationMaxEdgePx = requestedMaxEdgePx
-                if (decoded is DecodedAttachmentPresentation.Static) {
-                    decodeRequest.onDecodedSize(decoded.bitmap.width, decoded.bitmap.height)
-                }
-            } else {
-                markFailed()
-            }
-        } catch (cancel: kotlinx.coroutines.CancellationException) {
-            materializationIntent = materializationIntent.afterProducerCancellation(cancel)
-        } catch (_: AttachmentTooLargeToPresentException) {
-            tooLargeToPreview = true
-        } catch (
-            // Any failure leaves Retry; only a storage-parked body changes what it says.
-            @Suppress("TooGenericExceptionCaught") failure: Throwable,
-        ) {
-            android.util.Log.w("MediaImageBubble", "image_auto_download_failed")
-            markFailed(failure)
-        }
-    }
-
-    persistedAttachmentDownloadEffect(
-        messageIdHex = key,
-        attachmentIndex = attachmentIndex,
-        sourceEpoch = epoch,
-        controller = controller,
-        appState = appState,
-        // A download of an image that turned out too large to preview is settled once that is known.
-        isReady = { presentation != null || tooLargeToPreview },
-        ensureMaterialization = {
-            if (failed) {
-                failed = false
-                reloadToken++
-            }
-            materializationIntent = materializationIntent.afterInteractiveRequest()
-        },
-    )
-
     // A GIF is framed by the prototype's fixed banner instead of its own aspect ratio.
     val gifFrame =
-        isGifAttachmentMediaType(reference.mediaType) || presentation is DecodedAttachmentPresentation.Animated
+        isGifAttachmentMediaType(reference.mediaType) || load.presentation is DecodedAttachmentPresentation.Animated
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
         shape = ConversationRichContentShape,
@@ -388,7 +208,7 @@ internal fun MediaImageBubble(
         // upload-phase bubble so the optimistic → confirmed swap is a
         // visual no-op.
         modifier =
-            modifier.onSizeChanged(decodeRequest::onSizeChanged).then(
+            modifier.onSizeChanged(load.decodeRequest::onSizeChanged).then(
                 if (gifFrame) {
                     Modifier
                         .width(ConversationMessageMetrics.RichContentCanvasWidth)
@@ -403,7 +223,7 @@ internal fun MediaImageBubble(
             val downloadingLabel = stringResource(R.string.media_downloading)
             val openingLabel = stringResource(R.string.media_opening)
             val openLabel = stringResource(R.string.media_open)
-            val current = presentation
+            val current = load.presentation
             val placeholder = rememberThumbhashImage(reference.thumbhash)
             // Paint the blurred placeholder behind whatever loading-state is
             // shown so the bubble has a perceptual preview before the real
@@ -420,7 +240,7 @@ internal fun MediaImageBubble(
                 is DecodedAttachmentPresentation.Static ->
                     InlineAttachmentImage(
                         still = current,
-                        source = animationSource,
+                        source = load.animationSource,
                         contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
                         contentScale = ContentScale.Crop,
                         modifier =
@@ -432,7 +252,7 @@ internal fun MediaImageBubble(
                                     onLongClick = onLongPress,
                                     onClick = ::dispatchViewerOpen,
                                 ).mediaViewerThumbnail(key, attachmentIndex, reference.sourceEpoch)
-                                .reportMediaApplyAfterDraw(mediaApplyHostAttempt),
+                                .reportMediaApplyAfterDraw(load.mediaApplyHostAttempt),
                     )
                 is DecodedAttachmentPresentation.Animated ->
                     AnimatedDrawableAttachmentImage(
@@ -448,14 +268,14 @@ internal fun MediaImageBubble(
                                     onLongClick = onLongPress,
                                     onClick = ::dispatchViewerOpen,
                                 ).mediaViewerThumbnail(key, attachmentIndex, reference.sourceEpoch)
-                                .reportMediaApplyAfterDraw(mediaApplyHostAttempt),
+                                .reportMediaApplyAfterDraw(load.mediaApplyHostAttempt),
                     )
                 null ->
                     when {
-                        tooLargeToPreview ->
+                        load.tooLargeToPreview ->
                             MediaTooLargeToPreviewControl(onOpen = ::dispatchViewerOpen, showCaption = true)
                         // A load parked for lack of free space names storage beside its Retry.
-                        failed && storageFailed ->
+                        load.failed && load.storageFailed ->
                             TileTransferControl(
                                 transfer = storageBlockedTileTransfer(),
                                 onRetry = {
@@ -463,12 +283,12 @@ internal fun MediaImageBubble(
                                         key,
                                         attachmentIndex,
                                         onAccepted = { controller.requestAttachmentDownload(key, attachmentIndex) },
-                                        onFailure = { markFailed(it) },
+                                        onFailure = { load.markFailed(it) },
                                     )
                                 },
                                 showCaption = true,
                             )
-                        failed ->
+                        load.failed ->
                             MediaCircleAction(
                                 icon = Icons.Default.Refresh,
                                 contentDescription = stringResource(R.string.media_tap_to_retry),
@@ -477,26 +297,26 @@ internal fun MediaImageBubble(
                                         key,
                                         attachmentIndex,
                                         onAccepted = { controller.requestAttachmentDownload(key, attachmentIndex) },
-                                        onFailure = { markFailed(it) },
+                                        onFailure = { load.markFailed(it) },
                                     )
                                 },
                             )
-                        transfer.visible ->
+                        load.transfer.visible ->
                             TileTransferControl(
-                                transfer = transfer,
+                                transfer = load.transfer,
                                 onRetry = {
                                     controller.retryAttachmentTransfer(
                                         key,
                                         attachmentIndex,
                                         onAccepted = { controller.requestAttachmentDownload(key, attachmentIndex) },
-                                        onFailure = { markFailed(it) },
+                                        onFailure = { load.markFailed(it) },
                                     )
                                 },
                                 showCaption = true,
                             )
                         // Until the retained-bytes probes answer, a file MDK holds must not flash a Download action.
-                        !startDownload && !downloadActionReady -> Unit
-                        !startDownload ->
+                        !load.startDownload && !load.downloadActionReady -> Unit
+                        !load.startDownload ->
                             MediaCircleAction(
                                 icon = Icons.Default.ArrowDownward,
                                 contentDescription = downloadLabel,
@@ -513,7 +333,7 @@ internal fun MediaImageBubble(
                                     Modifier
                                         .size(48.dp)
                                         .then(
-                                            if (cachedPlaintextOnEntry || retainedPlaintextOnEntry) {
+                                            if (load.cachedPlaintextOnEntry || load.retainedPlaintextOnEntry) {
                                                 Modifier
                                                     .semantics { contentDescription = openingLabel }
                                                     .clickable(onClickLabel = openLabel, onClick = ::dispatchViewerOpen)
@@ -748,23 +568,233 @@ internal fun MediaImageGridTile(
     onLongPress: () -> Unit = {},
     uploading: Boolean = false,
 ) {
-    // Two-bucket key model (mirrors `MediaImageBubble`):
-    //   - `decodeKey` includes `sourceEpoch`, scoped to bytes-level state.
-    //   - `tileSlot` omits the epoch, scoped to user-choice state
-    //     (materialization intent) so a background ref upgrade can't re-gate a tile
-    //     the user already consented to fetch.
+    // Two-bucket key model: `decodeKey` includes `sourceEpoch` and scopes bytes-level state; the intent identity
+    // omits it so a background ref upgrade cannot re-gate a tile the user already consented to fetch.
     val decodeKey = "$messageIdHex#$attachmentIndex#${reference.sourceEpoch}"
-    val tileSlot = "$messageIdHex#$attachmentIndex"
-    val cachedThumbnail =
-        remember(controller, decodeKey) { controller.thumbnailEntryFor(messageIdHex, attachmentIndex) }
+    val load =
+        rememberImageLoadState(
+            controller = controller,
+            appState = appState,
+            messageIdHex = messageIdHex,
+            attachmentIndex = attachmentIndex,
+            reference = reference,
+            mine = mine,
+            decodeKeys = listOf(controller, decodeKey),
+            fallbackAspectRatio = aspectRatioFromDim(reference.dim),
+            intentIdentity = "$messageIdHex#$attachmentIndex",
+            failureLogTag = "MediaImageGridTile",
+            failureLogMessage = "image_tile_auto_download_failed",
+        )
+
+    Box(
+        modifier =
+            modifier.onSizeChanged(load.decodeRequest::onSizeChanged).combinedClickable(
+                interactionSource = null,
+                indication =
+                    rememberMediaViewerPressIndication(
+                        ready = load.presentation != null && !load.transfer.cancelling,
+                    ),
+                onLongClick = onLongPress,
+                // Two modes:
+                //   - Bytes ready (`bitmap != null`): tap opens the viewer.
+                //   - Bytes pending: tap persists an interactive download that
+                //     decodes in place and never opens the viewer by itself.
+                // While the reader's Cancel awaits acknowledgement a tap does nothing, so it cannot restart it.
+                onClick = {
+                    when {
+                        load.transfer.cancelling -> Unit
+                        load.tooLargeToPreview -> onTap()
+                        // A visible image opens the viewer even if its sharper decode failed, as in the single bubble.
+                        load.presentation != null -> onTap()
+                        load.failed ->
+                            controller.retryAttachmentTransfer(
+                                messageIdHex,
+                                attachmentIndex,
+                                onAccepted = { controller.requestAttachmentDownload(messageIdHex, attachmentIndex) },
+                                onFailure = { load.markFailed(it) },
+                            )
+                        // Bytes already on the device, cached or the reader's own still held for upload, are only
+                        // being read, so the tap opens the viewer now rather than downloading.
+                        load.cachedPlaintextOnEntry || load.retainedPlaintextOnEntry -> onTap()
+                        else -> controller.requestAttachmentDownload(messageIdHex, attachmentIndex)
+                    }
+                },
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        val current = load.presentation
+        val placeholder = rememberThumbhashImage(reference.thumbhash)
+        if (current == null && placeholder != null) {
+            Image(
+                bitmap = placeholder,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        when (current) {
+            is DecodedAttachmentPresentation.Static ->
+                InlineAttachmentImage(
+                    still = current,
+                    source = load.animationSource,
+                    contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
+                    contentScale = ContentScale.Crop,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .mediaViewerThumbnail(messageIdHex, attachmentIndex, reference.sourceEpoch, gridTile = true)
+                            .reportMediaApplyAfterDraw(load.mediaApplyHostAttempt),
+                )
+            is DecodedAttachmentPresentation.Animated ->
+                AnimatedDrawableAttachmentImage(
+                    drawable = current.drawable,
+                    contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
+                    contentScale = ContentScale.Crop,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .mediaViewerThumbnail(messageIdHex, attachmentIndex, reference.sourceEpoch, gridTile = true)
+                            .reportMediaApplyAfterDraw(load.mediaApplyHostAttempt),
+                )
+            null ->
+                when {
+                    load.tooLargeToPreview -> MediaTooLargeToPreviewControl(onOpen = onTap)
+                    load.failed ->
+                        MediaCircleAction(
+                            icon = Icons.Default.Refresh,
+                            contentDescription =
+                                stringResource(
+                                    if (load.storageFailed) {
+                                        R.string.media_storage_blocked
+                                    } else {
+                                        R.string.media_tap_to_retry
+                                    },
+                                ),
+                            onClick = {
+                                controller.retryAttachmentTransfer(
+                                    messageIdHex,
+                                    attachmentIndex,
+                                    onAccepted = {
+                                        controller.requestAttachmentDownload(messageIdHex, attachmentIndex)
+                                    },
+                                    onFailure = { load.markFailed(it) },
+                                )
+                            },
+                        )
+                    load.transfer.visible ->
+                        TileTransferControl(
+                            transfer = load.transfer,
+                            onRetry = {
+                                controller.retryAttachmentTransfer(
+                                    messageIdHex,
+                                    attachmentIndex,
+                                    onAccepted = {
+                                        controller.requestAttachmentDownload(messageIdHex, attachmentIndex)
+                                    },
+                                    onFailure = { load.markFailed(it) },
+                                )
+                            },
+                        )
+                    // Until the retained-bytes probes answer, a file MDK holds must not flash a Download action.
+                    !load.startDownload && !load.downloadActionReady -> Unit
+                    !load.startDownload ->
+                        MediaCircleAction(
+                            icon = Icons.Default.ArrowDownward,
+                            contentDescription = stringResource(R.string.media_tap_to_download),
+                            onClick = {
+                                controller.requestAttachmentDownload(messageIdHex, attachmentIndex)
+                            },
+                        )
+                    else ->
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp,
+                        )
+                }
+        }
+        if (overflowCount > 0 && current != null) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = ALBUM_OVERFLOW_SCRIM_ALPHA)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "+$overflowCount",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+        if (uploading) {
+            Box(
+                modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = ScrimAlpha.FAINT)),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(28.dp),
+                    strokeWidth = 2.5.dp,
+                    color = Color.White,
+                )
+            }
+        }
+    }
+}
+
+/** Everything an image surface's layout reads from [rememberImageLoadState]. */
+internal class ImageLoadState(
+    val decodeRequest: ThumbnailDecodeRequest,
+    val presentation: DecodedAttachmentPresentation?,
+    val failed: Boolean,
+    val storageFailed: Boolean,
+    val tooLargeToPreview: Boolean,
+    val transfer: TileTransfer,
+    val startDownload: Boolean,
+    val downloadActionReady: Boolean,
+    val cachedPlaintextOnEntry: Boolean,
+    val retainedPlaintextOnEntry: Boolean,
+    val animationSource: InlineAnimationSource,
+    val mediaApplyHostAttempt: HostPerformanceAttemptSlot,
+    val markFailed: (Throwable?) -> Unit,
+)
+
+/**
+ * The image load shared by the single bubble and album tiles: thumbnail cache seed, failed, storage-parked and
+ * too-large state, the automatic download gate, the materialization intent, the bytes-to-decode effect and the
+ * failure handling. Callers pass the remember [decodeKeys] for bytes-level state, the [intentIdentity] for the
+ * user-choice state, and the log tag and message of the failure line; each keeps its own layout and viewer open.
+ */
+@Composable
+@Suppress("LongMethod", "LongParameterList", "CyclomaticComplexMethod")
+internal fun rememberImageLoadState(
+    controller: ConversationController,
+    appState: WhiteNoiseAppState,
+    messageIdHex: String,
+    attachmentIndex: Int,
+    reference: MediaAttachmentReferenceFfi,
+    mine: Boolean,
+    decodeKeys: List<Any>,
+    fallbackAspectRatio: Float?,
+    intentIdentity: String,
+    failureLogTag: String,
+    failureLogMessage: String,
+): ImageLoadState {
+    val keys = decodeKeys.toTypedArray()
+    val cachedThumbnail = remember(*keys) { controller.thumbnailEntryFor(messageIdHex, attachmentIndex) }
     val decodeRequest =
-        remember(controller, decodeKey) {
+        remember(*keys) {
             val cachedRatio = cachedThumbnail?.bitmap?.let { it.width.toFloat() / it.height }
-            ThumbnailDecodeRequest(cachedRatio ?: aspectRatioFromDim(reference.dim))
+            ThumbnailDecodeRequest(cachedRatio ?: fallbackAspectRatio)
         }
     val requestedMaxEdgePx = decodeRequest.maxEdgePx
-    var presentationMaxEdgePx by remember(controller, decodeKey) { mutableIntStateOf(cachedThumbnail?.maxEdgePx ?: 0) }
-    var presentation by remember(controller, decodeKey) {
+    var presentationMaxEdgePx by remember(*keys) { mutableIntStateOf(cachedThumbnail?.maxEdgePx ?: 0) }
+    // Seed from the decoded-thumbnail cache so an already-fetched or just-sent
+    // image paints on the first frame — no decode spinner, no visible "reload".
+    // Animated GIF/WebP and byte-sniffed unknowns skip the static thumbnail
+    // cache so they always decode through the ImageDecoder path.
+    var presentation by remember(*keys) {
         val cached =
             if (MediaPipeline.canSeedStaticThumbnailFromMediaType(reference.mediaType)) {
                 cachedThumbnail?.bitmap
@@ -777,28 +807,29 @@ internal fun MediaImageGridTile(
     }
     val animationSource =
         rememberInlineAnimationSource(
-            controller to decodeKey,
+            decodeKeys,
             appState,
             controller.boundAccountRef,
             controller.group.groupIdHex,
         ) {
             localAttachmentBytes(controller, messageIdHex, attachmentIndex, mine)
         }
-    val mediaApplyHostAttempt = remember(decodeKey) { HostPerformanceAttemptSlot() }
+    val mediaApplyHostAttempt = remember(*keys) { HostPerformanceAttemptSlot() }
     DisposableEffect(mediaApplyHostAttempt) {
         onDispose(mediaApplyHostAttempt::cancel)
     }
-    var failed by remember(decodeKey) { mutableStateOf(false) }
-    var storageFailed by remember(decodeKey) { mutableStateOf(false) }
+    var failed by remember(*keys) { mutableStateOf(false) }
+    var storageFailed by remember(*keys) { mutableStateOf(false) }
 
     /** Fails this attachment, saying "Not enough storage" only when [cause] is a storage park. */
     fun markFailed(cause: Throwable? = null) {
         storageFailed = cause.parksForStorage()
         failed = true
     }
-    // Mirrors the single bubble: a verified image above the preview budget opens the viewer instead of retrying.
-    var tooLargeToPreview by remember(decodeKey) { mutableStateOf(false) }
-    var reloadToken by remember(decodeKey) { mutableIntStateOf(0) }
+    // A verified image above the preview budget is not a failure: Retry cannot shrink it, so the surface opens the
+    // viewer instead, where Save and Share still work.
+    var tooLargeToPreview by remember(*keys) { mutableStateOf(false) }
+    var reloadToken by remember(*keys) { mutableIntStateOf(0) }
     storageReadmissionEffect(controller, messageIdHex, attachmentIndex, parked = failed && storageFailed) {
         failed = false
         storageFailed = false
@@ -815,10 +846,9 @@ internal fun MediaImageGridTile(
     var cachedPlaintextOnEntry by cacheAvailability.cached
     val retainedPlaintextOnEntry =
         mine && controller.pendingAttachmentsList(messageIdHex).getOrNull(attachmentIndex)?.inMemoryBytes != null
-    // Mirror the single-image bubble's auto-download gate (#10) so the
-    // policy applies to album tiles too. Retained/cached outgoing bytes still
-    // materialize during a pause, but a cache-missing network fallback waits
-    // for restart or a tap. Tightening policy never abandons accepted work.
+    // Auto-download gating (#10): retained/cached own bytes always render;
+    // idle network fallback obeys policy. Once accepted, materialization stays
+    // latched across policy recomposition so an active UI waiter is not lost.
     val automaticDownloadsPaused = appState.automaticAttachmentDownloadsPaused()
     // The reader's Cancel is persisted per attachment, so policy cannot restart what they stopped.
     val cancelledByReader = controller.automaticAttachmentDownloadSuppressed(messageIdHex, attachmentIndex)
@@ -837,7 +867,7 @@ internal fun MediaImageGridTile(
     var appliedPolicy by remember { mutableStateOf<Boolean?>(null) }
     var materializationIntent by
         rememberAttachmentMaterializationIntent(
-            identity = tileSlot,
+            identity = intentIdentity,
             policyAllowsMaterialization = policyAllowsMaterialization,
             onPolicyApplied = { appliedPolicy = it },
         )
@@ -865,7 +895,7 @@ internal fun MediaImageGridTile(
             startDownload,
         )
 
-    LaunchedEffect(controller, decodeKey, materializationIntent, reloadToken, requestedMaxEdgePx) {
+    LaunchedEffect(*keys, materializationIntent, reloadToken, requestedMaxEdgePx) {
         if (requestedMaxEdgePx == 0) return@LaunchedEffect
         if (presentation != null && presentationMaxEdgePx >= requestedMaxEdgePx) return@LaunchedEffect
         if (!startDownload) return@LaunchedEffect
@@ -928,7 +958,7 @@ internal fun MediaImageGridTile(
             // Any failure leaves Retry; only a storage-parked body changes what it says.
             @Suppress("TooGenericExceptionCaught") failure: Throwable,
         ) {
-            android.util.Log.w("MediaImageGridTile", "image_tile_auto_download_failed")
+            android.util.Log.w(failureLogTag, failureLogMessage)
             markFailed(failure)
         }
     }
@@ -949,156 +979,19 @@ internal fun MediaImageGridTile(
             materializationIntent = materializationIntent.afterInteractiveRequest()
         },
     )
-
-    Box(
-        modifier =
-            modifier.onSizeChanged(decodeRequest::onSizeChanged).combinedClickable(
-                interactionSource = null,
-                indication =
-                    rememberMediaViewerPressIndication(
-                        ready = presentation != null && !transfer.cancelling,
-                    ),
-                onLongClick = onLongPress,
-                // Two modes:
-                //   - Bytes ready (`bitmap != null`): tap opens the viewer.
-                //   - Bytes pending: tap persists an interactive download that
-                //     decodes in place and never opens the viewer by itself.
-                // While the reader's Cancel awaits acknowledgement a tap does nothing, so it cannot restart it.
-                onClick = {
-                    when {
-                        transfer.cancelling -> Unit
-                        tooLargeToPreview -> onTap()
-                        // A visible image opens the viewer even if its sharper decode failed, as in the single bubble.
-                        presentation != null -> onTap()
-                        failed ->
-                            controller.retryAttachmentTransfer(
-                                messageIdHex,
-                                attachmentIndex,
-                                onAccepted = { controller.requestAttachmentDownload(messageIdHex, attachmentIndex) },
-                                onFailure = { markFailed(it) },
-                            )
-                        // Bytes already on the device, cached or the reader's own still held for upload, are only
-                        // being read, so the tap opens the viewer now rather than downloading.
-                        cachedPlaintextOnEntry || retainedPlaintextOnEntry -> onTap()
-                        else -> controller.requestAttachmentDownload(messageIdHex, attachmentIndex)
-                    }
-                },
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        val current = presentation
-        val placeholder = rememberThumbhashImage(reference.thumbhash)
-        if (current == null && placeholder != null) {
-            Image(
-                bitmap = placeholder,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-        when (current) {
-            is DecodedAttachmentPresentation.Static ->
-                InlineAttachmentImage(
-                    still = current,
-                    source = animationSource,
-                    contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
-                    contentScale = ContentScale.Crop,
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .mediaViewerThumbnail(messageIdHex, attachmentIndex, reference.sourceEpoch, gridTile = true)
-                            .reportMediaApplyAfterDraw(mediaApplyHostAttempt),
-                )
-            is DecodedAttachmentPresentation.Animated ->
-                AnimatedDrawableAttachmentImage(
-                    drawable = current.drawable,
-                    contentDescription = MediaPipeline.safeDisplayName(reference.fileName),
-                    contentScale = ContentScale.Crop,
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .mediaViewerThumbnail(messageIdHex, attachmentIndex, reference.sourceEpoch, gridTile = true)
-                            .reportMediaApplyAfterDraw(mediaApplyHostAttempt),
-                )
-            null ->
-                when {
-                    tooLargeToPreview -> MediaTooLargeToPreviewControl(onOpen = onTap)
-                    failed ->
-                        MediaCircleAction(
-                            icon = Icons.Default.Refresh,
-                            contentDescription =
-                                stringResource(
-                                    if (storageFailed) R.string.media_storage_blocked else R.string.media_tap_to_retry,
-                                ),
-                            onClick = {
-                                controller.retryAttachmentTransfer(
-                                    messageIdHex,
-                                    attachmentIndex,
-                                    onAccepted = {
-                                        controller.requestAttachmentDownload(messageIdHex, attachmentIndex)
-                                    },
-                                    onFailure = { markFailed(it) },
-                                )
-                            },
-                        )
-                    transfer.visible ->
-                        TileTransferControl(
-                            transfer = transfer,
-                            onRetry = {
-                                controller.retryAttachmentTransfer(
-                                    messageIdHex,
-                                    attachmentIndex,
-                                    onAccepted = {
-                                        controller.requestAttachmentDownload(messageIdHex, attachmentIndex)
-                                    },
-                                    onFailure = { markFailed(it) },
-                                )
-                            },
-                        )
-                    // Until the retained-bytes probes answer, a file MDK holds must not flash a Download action.
-                    !startDownload && !downloadActionReady -> Unit
-                    !startDownload ->
-                        MediaCircleAction(
-                            icon = Icons.Default.ArrowDownward,
-                            contentDescription = stringResource(R.string.media_tap_to_download),
-                            onClick = {
-                                controller.requestAttachmentDownload(messageIdHex, attachmentIndex)
-                            },
-                        )
-                    else ->
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp,
-                        )
-                }
-        }
-        if (overflowCount > 0 && current != null) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = ALBUM_OVERFLOW_SCRIM_ALPHA)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = "+$overflowCount",
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-        }
-        if (uploading) {
-            Box(
-                modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = ScrimAlpha.FAINT)),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(28.dp),
-                    strokeWidth = 2.5.dp,
-                    color = Color.White,
-                )
-            }
-        }
-    }
+    return ImageLoadState(
+        decodeRequest = decodeRequest,
+        presentation = presentation,
+        failed = failed,
+        storageFailed = storageFailed,
+        tooLargeToPreview = tooLargeToPreview,
+        transfer = transfer,
+        startDownload = startDownload,
+        downloadActionReady = downloadActionReady,
+        cachedPlaintextOnEntry = cachedPlaintextOnEntry,
+        retainedPlaintextOnEntry = retainedPlaintextOnEntry,
+        animationSource = animationSource,
+        mediaApplyHostAttempt = mediaApplyHostAttempt,
+        markFailed = { markFailed(it) },
+    )
 }

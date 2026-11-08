@@ -146,6 +146,30 @@ class MeteredImageAutoDownloadTest {
         assertEquals(1, fixture.calls.size)
     }
 
+    /** A grid tile shares the bubble's holder, so the default metered policy also leaves it untransferred. */
+    @Test
+    fun gridTileOnMeteredStartsNoTransferUntilOptIn() {
+        composeRule.setContent { WhiteNoiseTheme { Tile() } }
+        composeRule.waitForIdle()
+        assertEquals(0, fixture.calls.size)
+        awaitDownloadAffordance()
+        assertEquals(0, fixture.calls.size)
+    }
+
+    /** An explicit metered opt-in transfers a grid tile automatically, exactly like the single bubble. */
+    @Test
+    fun gridTileTransfersAutomaticallyAfterMeteredOptIn() {
+        fixture.state.setMediaAutoDownload(MediaAutoDownloadType.Image, MediaAutoDownloadNetwork.Metered, true)
+        fixture.state.setMediaAutoDownload(MediaAutoDownloadType.Image, MediaAutoDownloadNetwork.Mobile, true)
+        composeRule.setContent { WhiteNoiseTheme { Tile() } }
+
+        composeRule.waitUntil(WAIT_MS) {
+            composeRule.waitForIdle()
+            fixture.calls.size == 1
+        }
+        assertEquals(1, fixture.calls.size)
+    }
+
     /** The production bubble for a received image, refreshed on each [revision]. */
     @Composable
     private fun Bubble(revision: Int = 0) {
@@ -160,6 +184,21 @@ class MeteredImageAutoDownloadTest {
             appState = fixture.state,
             onOpenConversationMedia = {},
             mine = false,
+        )
+    }
+
+    /** The production album tile for the same received image. */
+    @Composable
+    private fun Tile() {
+        MediaImageGridTile(
+            messageIdHex = request(0).messageIdHex,
+            attachmentIndex = 0,
+            reference = reference(0).copy(),
+            controller = controller,
+            appState = fixture.state,
+            mine = false,
+            onTap = {},
+            overflowCount = 0,
         )
     }
 
