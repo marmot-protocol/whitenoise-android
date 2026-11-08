@@ -82,13 +82,12 @@ internal enum class SettingsHomeSection(
     val isGroup: Boolean = false,
     @param:StringRes val searchCategoryRes: Int? = null,
 ) {
+    /** Profile row, Account, then add or switch profile, in one group. */
     Profile,
 
     /** A newer version is waiting, so the offer sits where a reader lands. */
     AppUpdateAvailable,
 
-    /** One row into the Account hub: profile, keys and relays. */
-    Account(isGroup = true),
     AppPreferences(isGroup = true, searchCategoryRes = R.string.app_preferences),
 
     /** Agents and Help & support close the list of destinations. */
@@ -116,7 +115,7 @@ internal enum class SettingsHomeRow(
         R.drawable.ic_settings_account_circle,
         "account",
         SettingsDetail.Account,
-        SettingsHomeSection.Account,
+        SettingsHomeSection.Profile,
     ),
     Notifications(
         R.string.notifications,
@@ -884,13 +883,13 @@ internal fun SettingsHomeContent(
                                         onOpenProfilePictureActions = onOpenProfilePictureActions,
                                         onAddProfile = onAddProfile,
                                         onSwitchProfile = onSwitchProfile,
+                                        onOpenAccount = { onOpenDetail(SettingsHomeRow.Account.detail) },
                                     )
                                 }
                             SettingsHomeSection.AppUpdateAvailable ->
                                 AppUpdateGroup(appUpdateInfo, onAppUpdateAction, prominent = true)
                             SettingsHomeSection.AppUpdateControls ->
                                 AppUpdateGroup(appUpdateInfo, onAppUpdateAction, prominent = false)
-                            SettingsHomeSection.Account,
                             SettingsHomeSection.AppPreferences,
                             SettingsHomeSection.Assist,
                             ->
@@ -927,7 +926,7 @@ private fun SettingsHomeSearchAction(
     }
 }
 
-/** Profile header group: the active profile row that opens Share & Connect, then add or switch profile. */
+/** Profile header group: the active profile row that opens Share & Connect, Account, then add or switch profile. */
 @Composable
 @Suppress("FunctionNaming")
 private fun SettingsProfileHeader(
@@ -937,11 +936,26 @@ private fun SettingsProfileHeader(
     onOpenProfilePictureActions: () -> Unit,
     onAddProfile: () -> Unit,
     onSwitchProfile: () -> Unit,
+    onOpenAccount: () -> Unit,
 ) {
     Column(Modifier.padding(vertical = WhiteNoiseSpacing.Related).testTag("settings.profile_group")) {
         SettingsGroup {
             row("profile") { context ->
                 SettingsProfileRow(context, account, onOpenShareConnect, onOpenProfilePictureActions)
+            }
+            row(SettingsHomeRow.Account.name) { context ->
+                SettingsLink(
+                    context = context,
+                    title = stringResource(SettingsHomeRow.Account.titleRes),
+                    onClick = onOpenAccount,
+                    leading = {
+                        SettingsHubIcon(
+                            SettingsHomeRow.Account.iconRes,
+                            SettingsHomeRow.Account.iconTag,
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
+                )
             }
             if (profileCount == 1) {
                 row("add_profile") { context ->

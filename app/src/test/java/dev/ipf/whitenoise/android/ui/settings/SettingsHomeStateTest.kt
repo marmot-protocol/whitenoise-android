@@ -27,7 +27,6 @@ class SettingsHomeStateTest {
             listOf(
                 SettingsHomeSection.Profile,
                 SettingsHomeSection.AppUpdateAvailable,
-                SettingsHomeSection.Account,
                 SettingsHomeSection.AppPreferences,
                 SettingsHomeSection.Assist,
                 SettingsHomeSection.SignOut,
@@ -45,7 +44,6 @@ class SettingsHomeStateTest {
         assertEquals(
             listOf(
                 SettingsHomeSection.Profile,
-                SettingsHomeSection.Account,
                 SettingsHomeSection.AppPreferences,
                 SettingsHomeSection.Assist,
                 SettingsHomeSection.SignOut,
@@ -89,16 +87,12 @@ class SettingsHomeStateTest {
         )
     }
 
-    /** Account holds the identity rows, App the preferences, Support the help rows, each under its own heading. */
+    /** Preferences hold the app rows and Assist the help rows; Account lives in the profile group instead. */
     @Test
-    fun groupsSplitTheRowsUnderAccountAppAndSupportHeadings() {
+    fun groupsSplitTheRowsIntoPreferencesAndAssist() {
         val state = settingsHomeState(hasActiveAccount = true, selfUpdateEnabled = false)
         assertEquals(
             listOf(
-                SettingsHomeGroup(
-                    section = SettingsHomeSection.Account,
-                    rows = listOf(SettingsHomeRow.Account),
-                ),
                 SettingsHomeGroup(
                     section = SettingsHomeSection.AppPreferences,
                     rows =
@@ -124,7 +118,9 @@ class SettingsHomeStateTest {
     @Test
     fun everyRowAppearsInExactlyOneGroup() {
         val state = settingsHomeState(hasActiveAccount = true, selfUpdateEnabled = false)
-        assertEquals(SettingsHomeRow.entries, state.groups.flatMap { it.rows })
+        val profileRows = SettingsHomeRow.entries.filter { it.section == SettingsHomeSection.Profile }
+        assertEquals(listOf(SettingsHomeRow.Account), profileRows)
+        assertEquals(SettingsHomeRow.entries - profileRows.toSet(), state.groups.flatMap { it.rows })
         assertTrue(state.groups.none { it.rows.isEmpty() })
         assertEquals(state.groups.map { it.section }, state.sections.filter { it.isGroup })
     }
@@ -136,7 +132,6 @@ class SettingsHomeStateTest {
         assertFalse(state.showProfileHeader)
         assertEquals(
             listOf(
-                SettingsHomeSection.Account,
                 SettingsHomeSection.AppPreferences,
                 SettingsHomeSection.Assist,
                 SettingsHomeSection.Version,

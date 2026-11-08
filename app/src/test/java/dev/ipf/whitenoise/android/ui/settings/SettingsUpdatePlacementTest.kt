@@ -55,14 +55,14 @@ class SettingsUpdatePlacementTest {
         updatePreferences().edit().clear().commit()
     }
 
-    /** With a newer release recorded, the row leads: it sits above the account group. */
+    /** With a newer release recorded, the row leads: it sits above the preferences group. */
     @Test
     fun anAvailableUpdateLeadsTheRealSettingsScreen() {
         assumeTrue("a store-managed build shows no update section at all", BuildConfig.SELF_UPDATE_ENABLED)
         storeLatestVersion("2999.1.1")
         mountSettings()
         val update = composeRule.onNodeWithTag("settings.app_updates").fetchSemanticsNode().boundsInRoot
-        val account = composeRule.onNodeWithTag("settings.section.Account").fetchSemanticsNode().boundsInRoot
+        val account = composeRule.onNodeWithTag("settings.section.AppPreferences").fetchSemanticsNode().boundsInRoot
         assertTrue("an available update must lead the screen: $update vs $account", update.top < account.top)
     }
 
@@ -71,17 +71,17 @@ class SettingsUpdatePlacementTest {
      * groups, and only appears once the list is scrolled to it.
      *
      * Asserted by presence rather than by comparing bounds, because scrolling the row into view takes
-     * the account group out of the semantics tree — the comparison would be between one node and one
+     * the preferences group out of the semantics tree — the comparison would be between one node and one
      * that no longer exists.
      */
     @Test
     fun withNothingNewerTheRowLeavesTheFirstScreenful() {
         assumeTrue("a store-managed build shows no update section at all", BuildConfig.SELF_UPDATE_ENABLED)
         mountSettings()
-        composeRule.onNodeWithTag("settings.section.Account").assertExists()
-        val account = composeRule.onNodeWithTag("settings.section.Account").fetchSemanticsNode().boundsInRoot
+        composeRule.onNodeWithTag("settings.section.AppPreferences").assertExists()
+        val account = composeRule.onNodeWithTag("settings.section.AppPreferences").fetchSemanticsNode().boundsInRoot
         val lower = composeRule.onNodeWithTag("settings.app_updates").fetchSemanticsNode().boundsInRoot
-        assertTrue("the row must sit below the account group: $lower vs $account", lower.top > account.top)
+        assertTrue("the row must sit below the preferences group: $lower vs $account", lower.top > account.top)
 
         composeRule
             .onNode(hasScrollToNodeAction())
@@ -109,7 +109,7 @@ class SettingsUpdatePlacementTest {
         updatePreferences().edit().putString("dismissed_version", "2999.1.1").commit()
         mountSettings()
         val update = composeRule.onNodeWithTag("settings.app_updates").fetchSemanticsNode().boundsInRoot
-        val account = composeRule.onNodeWithTag("settings.section.Account").fetchSemanticsNode().boundsInRoot
+        val account = composeRule.onNodeWithTag("settings.section.AppPreferences").fetchSemanticsNode().boundsInRoot
         assertTrue("a dismissed update must still be offered here: $update vs $account", update.top < account.top)
     }
 
@@ -126,10 +126,10 @@ class SettingsUpdatePlacementTest {
             .putString("last_attempt_error_report", "network unreachable")
             .commit()
         mountSettings()
-        composeRule.onNodeWithTag("settings.section.Account").assertExists()
-        val account = composeRule.onNodeWithTag("settings.section.Account").fetchSemanticsNode().boundsInRoot
+        composeRule.onNodeWithTag("settings.section.AppPreferences").assertExists()
+        val account = composeRule.onNodeWithTag("settings.section.AppPreferences").fetchSemanticsNode().boundsInRoot
         val lower = composeRule.onNodeWithTag("settings.app_updates").fetchSemanticsNode().boundsInRoot
-        assertTrue("a failed check must stay below the account group: $lower vs $account", lower.top > account.top)
+        assertTrue("a failed check must stay below the preferences group: $lower vs $account", lower.top > account.top)
     }
 
     private fun storeLatestVersion(version: String) {

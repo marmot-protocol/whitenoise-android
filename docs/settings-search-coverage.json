@@ -9,6 +9,10 @@
           "represented_by": "Home.add_profile"
         },
         {
+          "declaration": "SettingsHomeRow.Account.name",
+          "represented_by": "home.Account"
+        },
+        {
           "declaration": "\"app_updates\"",
           "represented_by": "Home.update_controls"
         },

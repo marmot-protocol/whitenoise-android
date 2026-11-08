@@ -21,6 +21,7 @@ import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import dev.ipf.whitenoise.android.updates.AppUpdateInfo
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -60,12 +61,12 @@ class SettingsHomeBehaviorTest {
         }
     }
 
-    /** Signed-out Settings retains its Account entry without claiming a profile read is running. */
+    /** Signed-out Settings keeps its app rows without claiming a profile read is running. */
     @Test fun signedOutHasNoReadinessSpinnerCopy() {
         mount(profileCount = 0, hasActiveAccount = false)
         composeRule.onNodeWithText("Loading profile…").assertDoesNotExist()
-        scrollToAndClick("Account")
-        composeRule.runOnIdle { assertEquals(listOf(SettingsDetail.Account), opened) }
+        scrollToAndClick("Notifications")
+        composeRule.runOnIdle { assertEquals(listOf(SettingsDetail.Notifications), opened) }
     }
 
     /** Every hub and support row with a destination opens exactly that detail, in the prototype's order. */
@@ -90,8 +91,6 @@ class SettingsHomeBehaviorTest {
             .onAllNodes(isHeading() and hasAnyAncestor(hasTestTag("settings.section.AppPreferences")))
             .assertCountEquals(0)
         composeRule.onNode(hasText("Preferences")).assertDoesNotExist()
-        composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("Account"))
-        composeRule.onNode(hasText("Account") and hasAnyAncestor(hasTestTag("settings.section.Account"))).assertExists()
         composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("AI Agents"))
         composeRule
             .onNode(hasText("AI Agents") and hasAnyAncestor(hasTestTag("settings.section.Assist")))
@@ -129,6 +128,21 @@ class SettingsHomeBehaviorTest {
         }
     }
 
+    /** Account sits in the profile group, between the profile row and Switch profile, and opens the Account hub. */
+    @Test
+    fun accountSitsInTheProfileGroupAboveSwitchProfile() {
+        mount(profileCount = 2)
+        val profileGroup = hasAnyAncestor(hasTestTag("settings.profile_group"))
+        val profile = composeRule.onNodeWithTag("settings.active_profile").fetchSemanticsNode().boundsInRoot
+        val account = composeRule.onNode(hasText("Account") and profileGroup).fetchSemanticsNode().boundsInRoot
+        val switch = composeRule.onNodeWithTag("settings.switch_profile").fetchSemanticsNode().boundsInRoot
+        assertTrue("Account must follow the profile row: $account vs $profile", account.top > profile.top)
+        assertTrue("Switch profile must follow Account: $switch vs $account", switch.top > account.top)
+        composeRule.onNodeWithTag("settings.section.Account").assertDoesNotExist()
+        composeRule.onNode(hasText("Account") and profileGroup).performClick()
+        composeRule.runOnIdle { assertEquals(listOf(SettingsDetail.Account), opened) }
+    }
+
     /** With more than one profile the header offers switching, which opens the production selector. */
     @Test
     fun severalProfilesOfferSwitchProfileInsteadOfAddProfile() {
@@ -156,13 +170,13 @@ class SettingsHomeBehaviorTest {
         }
     }
 
-    /** Without an active account the home shows neither the profile header nor sign out. */
+    /** Without an active account the home shows neither the profile group, its Account row, nor sign out. */
     @Test
     fun withoutAnAccountTheHomeHasNoProfileHeaderOrSignOut() {
         mount(profileCount = 0, hasActiveAccount = false)
         composeRule.onNodeWithTag("settings.active_profile").assertDoesNotExist()
         composeRule.onNodeWithText("Sign Out").assertDoesNotExist()
-        composeRule.onNodeWithText("Account").assertExists()
+        composeRule.onNodeWithText("Account").assertDoesNotExist()
     }
 
     /** The concise available row reports the actual newest version without installed/count fixture text. */

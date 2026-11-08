@@ -14,7 +14,7 @@ internal fun settingsSearchCatalog(): List<SettingsSearchEntry> =
                     titleRes = row.titleRes,
                     categoryRes = row.section.searchCategoryRes ?: R.string.settings,
                     destination = row.detail,
-                    accountRequired = row.section == SettingsHomeSection.Account,
+                    accountRequired = row.section == SettingsHomeSection.Profile,
                 ),
             )
         }
