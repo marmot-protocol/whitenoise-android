@@ -5,8 +5,8 @@
     <string name="storage_calculating">Wird berechnet…</string>
     <string name="storage_used_by_profile">Von diesem Profil auf diesem Gerät belegt</string>
     <string name="storage_usage_description">Belegter Speicher: %1$s. %2$s</string>
-    <string name="storage_usage_category">%1$s, %2$s.</string>
-    <string name="storage_usage_category_detail">%1$s, %2$s, %3$s.</string>
+    <string name="storage_usage_category">%1$s: %2$s.</string>
+    <string name="storage_usage_category_detail">%1$s: %2$s, %3$s.</string>
     <string name="storage_attachments">Anhänge</string>
     <plurals name="storage_attachment_count">
         <item quantity="one">%d Anhang</item>
