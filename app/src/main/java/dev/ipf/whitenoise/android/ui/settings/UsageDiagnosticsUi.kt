@@ -270,7 +270,6 @@ private fun IndependentAuditLogChoice(
 ) {
     var failed by remember { mutableStateOf(false) }
     var pendingChoice by remember { mutableStateOf<Boolean?>(null) }
-    var confirmUpload by remember { mutableStateOf(false) }
 
     fun saveChoice(enabled: Boolean) {
         pendingChoice = enabled
@@ -292,24 +291,15 @@ private fun IndependentAuditLogChoice(
         saving = busy,
         onCheckedChange = { enabled ->
             onChoiceStarted()
-            if (enabled) confirmUpload = true else saveChoice(false)
+            saveChoice(enabled)
         },
     )
-    if (confirmUpload) {
-        AuditUploadConsentDialog(
-            onDismiss = { confirmUpload = false },
-            onConfirm = {
-                confirmUpload = false
-                saveChoice(true)
-            },
-        )
-    }
     if (failed) {
         Text(stringResource(R.string.usage_diagnostics_error), color = MaterialTheme.colorScheme.error)
     }
 }
 
-/** Prominent disclosure shared by both audit opt-in entry points. */
+/** Prominent disclosure shown before enabling audit uploads from Diagnostics & Improvements settings. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AuditUploadConsentDialog(

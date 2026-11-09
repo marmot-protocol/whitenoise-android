@@ -91,6 +91,24 @@ class UsageDiagnosticsPromptDismissTest {
         composeRule.onNodeWithContentDescription(CLOSE).assertIsDisplayed()
     }
 
+    /** Turning diagnostic logs on from the sheet saves directly, like usage, with no confirmation dialog. */
+    @Test
+    fun enablingLogsSavesWithoutConfirmation() {
+        val state = privacyAppState(UsageDiagnosticsDecisionFfi.ACCEPTANCE_REQUIRED)
+        runBlocking { state.refreshSecurityPrivacySettings() }
+        composeRule.setContent {
+            WhiteNoiseTheme { UsageDiagnosticsPrompt(state, onCloseStarted = {}, onDone = {}) }
+        }
+
+        composeRule.onAllNodes(isToggleable())[1].performClick()
+        composeRule.waitUntil(timeoutMillis = TIMEOUT_MS) { idleAnd { state.auditLogSettings?.enabled == true } }
+
+        assertTrue(
+            "the onboarding logs toggle must not open the upload confirmation",
+            composeRule.onAllNodesWithText(AUDIT_CONFIRMATION_TITLE).fetchSemanticsNodes().isEmpty(),
+        )
+    }
+
     /** Exercises the production startup owner rather than an always-mounted callback-only sheet. */
     @Test
     fun failedStartupDismissalOffersRetryAndPersistsTheDecline() {
@@ -313,6 +331,7 @@ class UsageDiagnosticsPromptDismissTest {
         const val CLOSE = "Close"
         const val TIMEOUT_MS = 5_000L
         const val RETRY = "Retry"
+        const val AUDIT_CONFIRMATION_TITLE = "Share group diagnostic logs with White Noise?"
 
         /** Wall-clock bound for waits that a saturated full-suite run can stretch well past [TIMEOUT_MS]. */
         const val LOADED_SUITE_TIMEOUT_MS = 30_000L

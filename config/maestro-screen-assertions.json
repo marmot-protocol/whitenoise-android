@@ -4362,21 +4362,8 @@
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
       "symbol": "AuditUploadConsentDialog",
-      "bindings": [
-        {
-          "case": "consent-log-confirm-cancel",
-          "selector": {
-            "text": "Share group diagnostic logs with White Noise[?]"
-          },
-          "scope": "diagnostics consent confirmation dismisses without enabling log upload.",
-          "entry_assertion": {
-            "text": "Share group diagnostic logs with White Noise[?]"
-          },
-          "opened_by": {
-            "text": "Share diagnostic logs"
-          }
-        }
-      ]
+      "bindings": [],
+      "remaining": "Only the Diagnostics & Improvements settings toggle opens this confirmation now; it needs its own runtime flow before Maestro covers it."
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/share/ShareChatPickerAccountSheet.kt",

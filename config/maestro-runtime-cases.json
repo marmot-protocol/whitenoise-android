@@ -1117,16 +1117,6 @@
       "postcondition": "consent-pending",
       "fixture": "consent"
     },
-    "consent-log-confirm-cancel": {
-      "suite": "consent",
-      "manual_ids": [
-        "SEC-012",
-        "SEC-016"
-      ],
-      "assertions": "Enabling diagnostic logs requires the explicit upload disclosure; Cancel leaves native logging off and consent undecided.",
-      "postcondition": "consent-pending",
-      "fixture": "consent"
-    },
     "keys-empty": {
       "suite": "keys",
       "manual_ids": [
