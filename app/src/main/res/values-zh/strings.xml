@@ -352,6 +352,7 @@
     <string name="group_leave_blocked_hint">你是唯一的管理员。取消退出即可留在此群组。</string>
     <string name="group_cancel_leave">取消退出</string>
     <string name="group_leave_refresh_hint">刷新以确认你是否仍在此群组中。</string>
+    <string name="group_leave_refresh_action">刷新</string>
     <string name="toast_couldnt_cancel_leave">无法取消退出</string>
     <string name="export_conversation_transcript">导出会话记录</string>
     <string name="toast_couldnt_export_transcript">无法导出记录</string>

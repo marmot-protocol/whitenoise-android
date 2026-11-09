@@ -36,8 +36,9 @@ internal fun BlockedLeaveCancelNotice(
             val hint =
                 if (refreshingMembership) R.string.group_leave_refresh_hint else R.string.group_leave_blocked_hint
             Text(stringResource(hint), style = MaterialTheme.typography.bodySmall)
+            val action = if (refreshingMembership) R.string.group_leave_refresh_action else R.string.group_cancel_leave
             TextButton(onClick = onCancel, enabled = enabled, modifier = Modifier.align(Alignment.End)) {
-                Text(stringResource(if (refreshingMembership) R.string.refresh else R.string.group_cancel_leave))
+                Text(stringResource(action))
             }
         }
     }

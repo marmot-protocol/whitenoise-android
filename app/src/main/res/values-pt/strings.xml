@@ -367,6 +367,7 @@
     <string name="group_leave_blocked_hint">Você é o único administrador. Cancele a saída para continuar neste grupo.</string>
     <string name="group_cancel_leave">Cancelar saída</string>
     <string name="group_leave_refresh_hint">Atualize para verificar se você ainda está neste grupo.</string>
+    <string name="group_leave_refresh_action">Atualizar</string>
     <string name="toast_couldnt_cancel_leave">Não foi possível cancelar a saída</string>
     <string name="export_conversation_transcript">Exportar transcrição da conversa</string>
     <string name="toast_couldnt_export_transcript">Não foi possível exportar a transcrição</string>

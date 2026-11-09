@@ -391,6 +391,7 @@
     <string name="group_leave_blocked_hint">Вы единственный администратор. Отмените выход, чтобы остаться в этой группе.</string>
     <string name="group_cancel_leave">Отменить выход</string>
     <string name="group_leave_refresh_hint">Обновите, чтобы проверить, состоите ли вы ещё в этой группе.</string>
+    <string name="group_leave_refresh_action">Обновить</string>
     <string name="toast_couldnt_cancel_leave">Не удалось отменить выход</string>
     <string name="export_conversation_transcript">Экспортировать стенограмму беседы</string>
     <string name="toast_couldnt_export_transcript">Не удалось экспортировать стенограмму</string>

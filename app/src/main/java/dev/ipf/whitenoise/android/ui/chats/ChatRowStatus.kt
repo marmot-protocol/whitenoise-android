@@ -33,7 +33,10 @@ internal fun chatRowMembershipStatus(
 }
 
 /** Whether the group is disbanding or gone, or this account's leave is pending or blocked. */
-private fun ChatListItem.groupEnding(leaveBlocked: Boolean): Boolean = group.disbanded || group.disbanding || group.leaveRequestPending || leaveBlocked
+private fun ChatListItem.groupEnding(leaveBlocked: Boolean): Boolean {
+    val ending = group.disbanded || group.disbanding
+    return ending || group.leaveRequestPending || leaveBlocked
+}
 
 /** Whether the group record or its native projection reports this self-membership state. */
 private fun ChatListItem.hasSelfMembership(state: SelfMembershipFfi): Boolean =

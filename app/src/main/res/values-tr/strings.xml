@@ -365,6 +365,7 @@
     <string name="group_leave_blocked_hint">Tek yönetici sizsiniz. Bu grupta kalmak için ayrılmayı iptal edin.</string>
     <string name="group_cancel_leave">Ayrılmayı iptal et</string>
     <string name="group_leave_refresh_hint">Hâlâ bu grupta olup olmadığınızı görmek için yenileyin.</string>
+    <string name="group_leave_refresh_action">Yenile</string>
     <string name="toast_couldnt_cancel_leave">Ayrılma iptal edilemedi</string>
     <string name="export_conversation_transcript">Konuşma dökümünü dışa aktar</string>
     <string name="toast_couldnt_export_transcript">Döküm dışa aktarılamadı</string>

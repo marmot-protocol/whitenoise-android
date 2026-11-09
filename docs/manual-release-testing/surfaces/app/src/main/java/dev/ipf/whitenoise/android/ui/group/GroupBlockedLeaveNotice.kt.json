@@ -36,9 +36,9 @@
         ]
       },
       {
-        "surface": "R.string.refresh",
+        "surface": "R.string.group_leave_refresh_action",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupBlockedLeaveNotice.kt",
-        "anchor": "R.string.refresh",
+        "anchor": "R.string.group_leave_refresh_action",
         "test_ids": [
           "GRP-032"
         ]

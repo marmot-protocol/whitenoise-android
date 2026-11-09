@@ -905,7 +905,11 @@ private fun AppGroupRecordFfi.hasSettledDeparture(): Boolean =
     selfMembership.isNonMember() && !(selfMembership == SelfMembershipFfi.LEFT && leaveRequestPending)
 
 /** Distinguishes an actual eviction from a provisional voluntary departure. */
-private fun SelfMembershipFfi.isGroupEviction(): Boolean = this == SelfMembershipFfi.REMOVED || this == SelfMembershipFfi.DEVICE_REMOVED
+private fun SelfMembershipFfi.isGroupEviction(): Boolean =
+    when (this) {
+        SelfMembershipFfi.REMOVED, SelfMembershipFfi.DEVICE_REMOVED -> true
+        else -> false
+    }
 
 /** A readback can rejoin only an active, confirmed group with no outstanding leave request. */
 private fun AppGroupRecordFfi.isJoinedAfterLeave(): Boolean =
