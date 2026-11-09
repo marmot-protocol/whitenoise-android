@@ -68,7 +68,8 @@ internal fun SignUpScreen(
     randomName: (String?) -> String,
     onBack: () -> Unit,
 ) {
-    val name = remember(controller) { TextFieldState(controller.draft?.name.orEmpty()) }
+    // A fresh form opens with a generated name; a kept draft, even a cleared one, keeps its own name.
+    val name = remember(controller) { TextFieldState(controller.draft?.name ?: randomName(null)) }
     val about = remember(controller) { TextFieldState(controller.draft?.about.orEmpty()) }
     var photo by remember(controller) { mutableStateOf(controller.draft?.photo) }
     var preparingPhoto by remember(controller) { mutableStateOf(false) }
