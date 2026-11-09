@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import android.os.SystemClock
 import android.util.Log
 import dev.ipf.marmotkit.MarmotKitException
 import kotlinx.coroutines.CancellationException
@@ -11,6 +12,9 @@ import kotlinx.coroutines.withContext
 /** Retry spacing while MarmotKit is still preparing the presentation a folder window's query reads. */
 private const val FOLDER_WINDOW_RETRY_INITIAL_MS = 500L
 private const val FOLDER_WINDOW_RETRY_MAX_MS = 5_000L
+
+/** How long a folder stream must stay open before its next reopen starts again from the shortest retry delay. */
+private const val FOLDER_WINDOW_STABLE_MS = 10_000L
 
 /**
  * Keeps the selected folder's own windows open beside [plain] until cancelled (#3652). Each folder change closes the
@@ -58,7 +62,7 @@ private suspend fun ChatsController.keepFolderWindowsOpen(
                 return
             }
         if (windows != null) {
-            backoff = FOLDER_WINDOW_RETRY_INITIAL_MS
+            val opened = SystemClock.elapsedRealtime()
             replaceFolderWindows(windows)
             applyChatListWindowRows(account, plain)
             runCatchingCancellable { windows.receive { _, _ -> applyChatListWindowRows(account, plain) } }
@@ -66,6 +70,9 @@ private suspend fun ChatsController.keepFolderWindowsOpen(
                 ?.let { Log.w("DMChats", "${releaseFailureMarker("CHAT_FOLDER_WINDOW_RECEIVE", it)} reopening=true") }
             replaceFolderWindows(null)
             applyChatListWindowRows(account, plain)
+            // A stream that ended quickly, or with an error, keeps backing off instead of reopening twice a second.
+            val stable = SystemClock.elapsedRealtime() - opened >= FOLDER_WINDOW_STABLE_MS
+            if (stable) backoff = FOLDER_WINDOW_RETRY_INITIAL_MS
         }
         delay(backoff)
         backoff = (backoff * 2).coerceAtMost(FOLDER_WINDOW_RETRY_MAX_MS)

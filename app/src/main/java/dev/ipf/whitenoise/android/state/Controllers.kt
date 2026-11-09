@@ -4759,6 +4759,9 @@ class ChatsController private constructor(
                     matching.mapTo(kept) { it.lowercase(Locale.ROOT) }
                 }
                 val outside = groupIds.filter { it.lowercase(Locale.ROOT) !in kept }
+                // Deliberately unfiltered, like the plain path: a departed chat the folder showed was matched by the
+                // loaded-rows evaluator, and MarmotKit's Left scope cannot re-evaluate rules such as Unread there, so
+                // a selected departed chat stays selected for as long as it is still departed.
                 if (outside.isNotEmpty()) {
                     revalidate(owner.accountRef, ChatListViewQueryFfi(ChatListViewFfi.LEFT, emptyList()), outside)
                         .mapTo(kept) { it.lowercase(Locale.ROOT) }

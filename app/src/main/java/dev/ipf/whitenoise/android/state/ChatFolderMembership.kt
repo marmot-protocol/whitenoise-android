@@ -59,6 +59,22 @@ internal class ChatFolderMembership(
     var folders: Map<String, NativeFolderMembership> by mutableStateOf(emptyMap())
         private set
     private var job: Job? = null
+    private val departed = HashMap<String, Pair<DepartedInputs, Set<String>>>()
+
+    /**
+     * [folderId]'s departed matches, computed once per [inputs]: chips, Settings, chat details and the forward picker
+     * all ask per folder, and the loaded-rows evaluation only changes when the rows or the folder do.
+     */
+    fun departedMatches(
+        folderId: String,
+        inputs: DepartedInputs,
+        compute: () -> Set<String>,
+    ): Set<String> =
+        synchronized(departed) {
+            departed[folderId]?.takeIf { it.first == inputs }?.second
+                ?: compute().also { departed[folderId] = inputs to it }
+        }
+
     private var pending: Map<String, ChatFolderQuery> = emptyMap()
     private var dirty = false
 
@@ -211,17 +227,57 @@ internal fun WhiteNoiseAppState.nativeFolderMembership(
     val preferences = chatFolderPreferences
     val query = preferences.folderQuery(accountRef, folderId)
     val native = chatFolderMembership?.current(accountRef, folderId, query) ?: return null
-    val departed =
-        departedFolderMatches(
+    val inputs =
+        DepartedInputs(
+            accountRef = accountRef,
             rule = preferences.folderRule(accountRef, folderId),
             manualChatIds = preferences.membershipFor(accountRef, folderId),
             excludedChatIds = preferences.excludedChats(accountRef, folderId),
             active = chatListItems,
             archived = archivedChatListItems,
-            activeAccountIdHex = accounts.firstOrNull { it.label == accountRef }?.accountIdHex,
-            displayTitle = { chatListItemDisplayTitle(it, this, notificationGroupTitleCopy(appContext)) },
         )
+    val departed =
+        chatFolderMembership
+            ?.departedMatches(folderId, inputs) {
+                departedFolderMatches(
+                    rule = inputs.rule,
+                    manualChatIds = inputs.manualChatIds,
+                    excludedChatIds = inputs.excludedChatIds,
+                    active = inputs.active,
+                    archived = inputs.archived,
+                    activeAccountIdHex = accounts.firstOrNull { it.label == accountRef }?.accountIdHex,
+                    displayTitle = { chatListItemDisplayTitle(it, this, notificationGroupTitleCopy(appContext)) },
+                )
+            }.orEmpty()
     return native.withDeparted(departed)
+}
+
+/**
+ * What a folder's departed matches depend on. The row lists compare by identity: the controller publishes new lists
+ * whenever rows change, so the same instances mean the same rows without walking them.
+ */
+internal class DepartedInputs(
+    val accountRef: String,
+    val rule: ChatFolderRule?,
+    val manualChatIds: Set<String>,
+    val excludedChatIds: Set<String>,
+    val active: List<ChatListItem>,
+    val archived: List<ChatListItem>,
+) {
+    /** Equal when the folder's settings are equal and both row lists are the very same instances. */
+    override fun equals(other: Any?): Boolean =
+        other is DepartedInputs &&
+            accountRef == other.accountRef &&
+            rule == other.rule &&
+            manualChatIds == other.manualChatIds &&
+            excludedChatIds == other.excludedChatIds &&
+            active === other.active &&
+            archived === other.archived
+
+    /** Hashes the folder's settings and the row lists' identities, consistent with [equals]. */
+    override fun hashCode(): Int =
+        listOf(accountRef, rule, manualChatIds, excludedChatIds).hashCode() * 31 +
+            System.identityHashCode(active) * 17 + System.identityHashCode(archived)
 }
 
 /**

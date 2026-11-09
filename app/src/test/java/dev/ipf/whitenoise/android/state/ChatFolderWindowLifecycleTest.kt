@@ -57,7 +57,8 @@ class ChatFolderWindowLifecycleTest {
 
             fixture.controller.folderSource.folder.value = null
             awaitFolderCondition { !fixture.controller.hasFolderWindows() }
-            assertTrue(fixture.folderHandles.all { it.closes.get() == 1 })
+            // A retired window set releases its native handles asynchronously, so wait for the release.
+            awaitFolderCondition { fixture.folderHandles.all { it.closes.get() == 1 } }
             assertEquals(3, fixture.plainOpens.get())
             assertTrue(fixture.plainHandles.none { it.closes.get() > 0 })
         }
