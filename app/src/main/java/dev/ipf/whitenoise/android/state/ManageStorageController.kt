@@ -111,7 +111,15 @@ internal class ManageStorageController(
         if (!current) return retire()
         loadJob?.cancel()
         replaceChatCursor(null)
-        mutable.value = state.value.copy(chats = emptyList(), chatsComplete = false, chatsFailed = false)
+        // A cancelled load never clears its own loading flags, so the replacement starts from idle.
+        mutable.value =
+            state.value.copy(
+                chats = emptyList(),
+                chatsComplete = false,
+                chatsFailed = false,
+                chatsLoading = false,
+                usageLoading = false,
+            )
         loadJob =
             scope.launch {
                 if (readUsage) reloadUsage()
