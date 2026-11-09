@@ -538,11 +538,19 @@ object AvatarImageLoader {
      * Retires account-private stored pixels, animation bytes and reads while preserving already decoded
      * public URL images and their animated sources.
      */
-    internal fun clearStoredAvatars() {
+    internal fun clearStoredAvatars() = clearStoredAvatarsWithPrefix(STORED_AVATAR_KEY_PREFIX)
+
+    /**
+     * [clearStoredAvatars] narrowed to the stored keys that begin with [keyPrefix], such as one contact's private
+     * pictures after a Save or Clear, so every other stored avatar, such as the chat row picture a cleared choice
+     * falls back to (#3635), stays decoded. Reads and the cache lifetime are still retired.
+     */
+    internal fun clearStoredAvatarsWithPrefix(keyPrefix: String) {
+        val retired = { key: String -> isStoredAvatarKey(key) && key.startsWith(keyPrefix) }
         synchronized(lock) {
             observedCacheLifetime.longValue = cacheLifetime.advance()
-            cache.evictStoredAvatars()
-            animatedSources.keysSnapshot().filter(::isStoredAvatarKey).forEach(animatedSources::remove)
+            cache.evictStoredAvatars(retired)
+            animatedSources.keysSnapshot().filter(retired).forEach(animatedSources::remove)
             retireRequestsLocked()
             publications.retireAll()
         }
@@ -822,12 +830,15 @@ internal class PartitionedProfileImageCache(
         banners.evictAll()
     }
 
-    /** Stored MDK avatar keys hold account-scoped plaintext; public URL keys retain their warm pixels. */
-    fun evictStoredAvatars() {
+    /**
+     * Stored MDK avatar keys hold account-scoped plaintext; public URL keys retain their warm pixels. [retired] picks
+     * which stored keys go.
+     */
+    fun evictStoredAvatars(retired: (String) -> Boolean) {
         avatars
             .snapshot()
             .keys
-            .filter(::isStoredAvatarKey)
+            .filter(retired)
             .forEach(avatars::remove)
     }
 

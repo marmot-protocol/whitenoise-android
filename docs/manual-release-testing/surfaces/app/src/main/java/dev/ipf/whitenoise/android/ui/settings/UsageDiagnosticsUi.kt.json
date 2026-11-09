@@ -17,8 +17,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/UsageDiagnosticsUi.kt",
         "anchor": "fun AuditUploadConsentDialog(",
         "test_ids": [
-          "SEC-008",
-          "SEC-012"
+          "SEC-008"
         ]
       },
       {

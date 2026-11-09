@@ -5,6 +5,8 @@ import android.app.Activity
 import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Color
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -21,6 +23,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.util.ReflectionHelpers
 
 /** Collapsed and expanded Android templates verify visible reaction artwork and accessible fallback states. */
 @RunWith(RobolectricTestRunner::class)
@@ -114,7 +117,7 @@ class NotificationReactionArtworkScreenshotTest {
     fun unavailableCustomArtwork() =
         runBlocking {
             val card = post(":party:")
-            assertNull(card.getLargeIcon())
+            assertNotNull("the card shows who reacted (#3635)", card.getLargeIcon())
             capture(card, "notification_reaction_unavailable_light")
         }
 
@@ -128,7 +131,7 @@ class NotificationReactionArtworkScreenshotTest {
     fun rejectedPictureShowsTextFallback() =
         runBlocking {
             val card = post(":marmot:", rejectPicture = true)
-            assertNull(card.getLargeIcon())
+            assertNotNull("the card shows who reacted (#3635)", card.getLargeIcon())
             capture(card, "notification_reaction_rejected_picture_light")
         }
 
@@ -143,6 +146,16 @@ class NotificationReactionArtworkScreenshotTest {
             capture(card, "notification_reaction_hidden_large_rtl")
         }
 
+    /** The native conversation template places the reactor picture in the same slot as a message. */
+    @Test
+    fun nativeReactionUsesConversationTemplate() =
+        runBlocking {
+            val avatar = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
+            val card = post("👍", nativeAvatar = avatar)
+            assertNotNull(card.shortcutId)
+            capture(card, "notification_reaction_native_conversation")
+        }
+
     /** Capture real platform RemoteViews, showing collapsed then expanded forms. */
     @Suppress("DEPRECATION")
     private fun capture(
@@ -155,6 +168,10 @@ class NotificationReactionArtworkScreenshotTest {
             val parent = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
             activity.setContentView(parent, ViewGroup.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT))
             val builder = Notification.Builder.recoverBuilder(activity, notification)
+            if (notification.shortcutId != null) {
+                // SystemUI marks a ranked conversation before asking the platform builder for these views.
+                ReflectionHelpers.setField(checkNotNull(builder.style), "mConversationType", 1)
+            }
             parent.addView(builder.createContentView().apply(activity, parent))
             parent.addView(requireNotNull(builder.createBigContentView()).apply(activity, parent))
             parent.measure(
@@ -172,10 +189,12 @@ class NotificationReactionArtworkScreenshotTest {
         redacted: Boolean = false,
         rejectPicture: Boolean = false,
         preview: String? = null,
+        nativeAvatar: Bitmap? = null,
     ): Notification {
         val presenter =
             LocalNotificationPresenter(
                 context,
+                shortcutPublisher = { checkNotNull(nativeAvatar) },
                 nowMillis = { 0L },
                 groupReconciliation = {},
                 enrichmentLauncher = {},
@@ -199,6 +218,7 @@ class NotificationReactionArtworkScreenshotTest {
                 },
                 redactContent = redacted,
                 shortNpub = { "npub1fixture" },
+                senderAvatarBitmap = nativeAvatar,
             ),
         )
         return manager.activeNotifications.single().notification

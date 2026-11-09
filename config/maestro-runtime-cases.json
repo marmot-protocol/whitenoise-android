@@ -647,6 +647,14 @@
       "assertions": "Sharing choices open and dismiss without granting usage or diagnostic sharing.",
       "postcondition": "none"
     },
+    "nested-diagnostics-log-confirm-cancel": {
+      "suite": "nested",
+      "manual_ids": [
+        "SEC-008"
+      ],
+      "assertions": "Enabling group diagnostic logs in Diagnostics & Improvements requires the explicit upload disclosure; Cancel leaves log sharing off.",
+      "postcondition": "none"
+    },
     "nested-default-retention": {
       "suite": "nested",
       "manual_ids": [
@@ -1114,16 +1122,6 @@
         "SEC-016"
       ],
       "assertions": "Usage disclosure stays expanded across landscape and portrait configuration changes without recording consent.",
-      "postcondition": "consent-pending",
-      "fixture": "consent"
-    },
-    "consent-log-confirm-cancel": {
-      "suite": "consent",
-      "manual_ids": [
-        "SEC-012",
-        "SEC-016"
-      ],
-      "assertions": "Enabling diagnostic logs requires the explicit upload disclosure; Cancel leaves native logging off and consent undecided.",
       "postcondition": "consent-pending",
       "fixture": "consent"
     },

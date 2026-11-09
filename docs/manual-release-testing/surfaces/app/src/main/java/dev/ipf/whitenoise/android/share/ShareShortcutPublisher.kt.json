@@ -37,6 +37,14 @@
           "NTF-041",
           "NTF-030"
         ]
+      },
+      {
+        "surface": "card shortcut rebuilt as a recent chat keeps the chat row's stored picture",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/share/ShareShortcutPublisher.kt",
+        "anchor": "item.readyStoredAvatarBitmap(accountRef)",
+        "test_ids": [
+          "NTF-042"
+        ]
       }
     ]
   },
