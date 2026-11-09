@@ -885,6 +885,14 @@
       },
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "surface": "Decline a pending invitation with an admin step-down when required",
+        "anchor": "R.string.decline",
+        "test_ids": [
+          "GRP-030"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "surface": "Coherent group details refresh",
         "anchor": "groupSnapshotReader(account",
         "test_ids": [
@@ -947,6 +955,23 @@
         "anchor": "private fun discardOptimisticSend(",
         "test_ids": [
           "MSG-019"
+        ]
+      },
+      {
+        "surface": "Mark all read, mark unread and pin run through one admission check, account recheck and failure path",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private suspend fun <T> runAdmittedChatListAction(",
+        "test_ids": [
+          "CHL-006",
+          "CHL-008"
+        ]
+      },
+      {
+        "surface": "Read anchors, send retention and pending edits drop together when their message leaves the loaded window",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private fun MutableMap<String, *>.retainTimelineWindow()",
+        "test_ids": [
+          "CON-003"
         ]
       }
     ]

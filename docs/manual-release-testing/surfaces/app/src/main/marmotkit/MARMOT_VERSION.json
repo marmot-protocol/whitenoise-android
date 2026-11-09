@@ -4,9 +4,9 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "Testing-only MarmotKit November 6 nightly from 9a45434c: cheaper idle maintenance, preserved Blossom base paths and publication uncertainty; one-way migration 0177 over the November 5 baseline; retained account/history/media/avatar bytes, original pending upload with branch identity, cold restart and recovery; experimental device groups stay disabled",
+        "surface": "Testing-only MarmotKit November 8 nightly from 580082a5 with recovery and account migrations over the November 6 baseline, Odin Markdown parsing, and admin invitation decline. Verify retained data, the original pending upload, cold restart and recovery.",
         "source": "app/src/main/marmotkit/MARMOT_VERSION",
-        "anchor": "artifact-id=0.15.0-nightly.20261106",
+        "anchor": "artifact-id=0.15.0-nightly.20261108",
         "test_ids": [
           "INT-010",
           "INT-003",
@@ -21,10 +21,13 @@
           "ONB-020",
           "SEC-007",
           "SET-021",
+          "MSG-002",
+          "MSG-015",
           "MSG-017",
           "MED-019",
           "MED-020",
           "NCH-006",
+          "GRP-030",
           "GRP-032",
           "MED-035",
           "MSG-031"

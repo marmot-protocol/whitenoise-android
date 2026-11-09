@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -179,6 +180,35 @@ class MarkdownLinkCopyTest {
         actions.single().action()
 
         composeRule.runOnIdle { assertEquals(url, copiedUrl) }
+    }
+
+    /** A chat link names a chat the viewer is in, opens through the app on tap and copies its canonical link. */
+    @Test
+    fun chatLinkShowsChatNameAndOpensInApp() {
+        val opened = mutableListOf<String>()
+        var copiedUrl: String? = null
+        val handler = InAppLinkHandler(open = { opened += it }, chatTitle = { "Book club" })
+
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                CompositionLocalProvider(LocalInAppLinkHandler provides handler) {
+                    MarkdownMessageBody(
+                        document = autolinkDocument("marmot://chat/00112233AABBCCDD"),
+                        onCopyLink = { copiedUrl = it },
+                    )
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Book club").performClick()
+        val actions =
+            composeRule.onNodeWithText("Book club").fetchSemanticsNode().config[SemanticsActions.CustomActions]
+        actions.single().action()
+
+        composeRule.runOnIdle {
+            assertEquals(listOf("marmot://chat/00112233aabbccdd"), opened)
+            assertEquals("marmot://chat/00112233aabbccdd", copiedUrl)
+        }
     }
 
     /** Long-presses [visibleText] in a rendered [document] and reports what was copied and forwarded. */

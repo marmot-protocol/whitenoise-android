@@ -12,6 +12,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -67,6 +68,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,6 +85,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isShiftPressed
@@ -285,26 +288,36 @@ private suspend fun ScrollState.keepComposerSelectionVisible(selection: Composer
 private fun Modifier.keepComposerSelectionVisibleDuringLayout(
     scrollState: ScrollState,
     correctionGate: ComposerLayoutCaretCorrectionGate,
+    anchoredGrowth: () -> Boolean,
     selectionLayout: () -> ComposerSelectionLayout?,
 ): Modifier =
     layout { measurable, constraints ->
         val placeable = measurable.measure(constraints)
-        selectionLayout()?.let { selection ->
-            val target =
-                composerCaretScrollTarget(
-                    currentScroll = scrollState.value,
-                    viewportHeight = scrollState.viewportSize,
-                    maxScroll = scrollState.maxValue,
-                    selection = selection,
-                )
-            val delta = target - scrollState.value
-            // One measure-time dispatch per distinct correction: this pass
-            // reads geometry that can be one frame stale, so re-dispatching the
-            // same correction against the settled effect-time value ping-pongs
-            // the scroll forever and Compose never goes idle. The ordinary
-            // effect owns steady-state convergence.
-            if (delta != 0 && correctionGate.shouldCorrect(selection, scrollState.viewportSize, scrollState.maxValue)) {
-                scrollState.dispatchRawDelta(delta.toFloat())
+        if (anchoredGrowth()) {
+            // The draft fits its destination height: hold the first line still while the row
+            // reveals the next one, instead of scrolling the caret line into a one-line viewport.
+            if (scrollState.value != 0) scrollState.dispatchRawDelta(-scrollState.value.toFloat())
+        } else {
+            selectionLayout()?.let { selection ->
+                val target =
+                    composerCaretScrollTarget(
+                        currentScroll = scrollState.value,
+                        viewportHeight = scrollState.viewportSize,
+                        maxScroll = scrollState.maxValue,
+                        selection = selection,
+                    )
+                val delta = target - scrollState.value
+                // One measure-time dispatch per distinct correction: this pass
+                // reads geometry that can be one frame stale, so re-dispatching the
+                // same correction against the settled effect-time value ping-pongs
+                // the scroll forever and Compose never goes idle. The ordinary
+                // effect owns steady-state convergence.
+                val correct =
+                    delta != 0 &&
+                        correctionGate.shouldCorrect(selection, scrollState.viewportSize, scrollState.maxValue)
+                if (correct) {
+                    scrollState.dispatchRawDelta(delta.toFloat())
+                }
             }
         }
         layout(placeable.width, placeable.height) {
@@ -333,6 +346,8 @@ private class ComposerLayoutCaretCorrectionGate {
         return changed
     }
 }
+
+private const val COMPOSER_PLACEHOLDER_FADE_MILLIS = 150
 
 /**
  * Renders the editable composer pill and coordinates its compact, multiline,
@@ -666,6 +681,8 @@ internal fun ComposerPill(
         if (readingScrollAnchor != null && !caretFollowSuspended) readingScrollAnchor = null
     }
     val layoutCorrectionGate = remember(scrollOwnerKey) { ComposerLayoutCaretCorrectionGate() }
+    // Set once the animated text height is known below; read during layout and by the caret effect.
+    var anchoredTextGrowth by remember(scrollOwnerKey) { mutableStateOf(false) }
     var textLayoutSnapshot by remember { mutableStateOf<ComposerTextLayoutSnapshot?>(null) }
     val selectionLayout =
         remember(textLayoutSnapshot, textFieldValue.text, textFieldValue.selection, transformedText) {
@@ -686,8 +703,9 @@ internal fun ComposerPill(
         composerScrollState.viewportSize,
         composerScrollState.maxValue,
         caretFollowSuspended,
+        anchoredTextGrowth,
     ) {
-        if (!caretFollowSuspended) {
+        if (!caretFollowSuspended && !anchoredTextGrowth) {
             selectionLayout?.let { composerScrollState.keepComposerSelectionVisible(it) }
         }
     }
@@ -964,6 +982,43 @@ internal fun ComposerPill(
                 label = "composer text height",
             )
         }
+    // While the row tweens toward a height that holds the whole draft, the scroll viewport is briefly
+    // shorter than the text. Following the caret there scrolls the first line away and flashes the
+    // overflow thumb for a frame or two before the row catches up; keep the draft top-anchored instead.
+    // Only a one-line step is anchored: a bulk paste still follows its end caret, and without a
+    // ceiling the outer layout owns the cap, so the draft may not fit what is actually rendered.
+    val draftFitsTextHeightTarget =
+        compactTextLayout != null &&
+            automaticTextHeightCeilingPx != null &&
+            expansionMode == ComposerExpansionMode.Automatic &&
+            !multilineControlsSuppressed &&
+            compactTextLayout.size.height <= automaticTextHeightCeilingPx
+    val singleLineStep =
+        remember(renderedTextHeightTarget, compactTextLayout) {
+            val lineHeight = compactTextLayout?.let { it.size.height / it.lineCount.coerceAtLeast(1) } ?: 0
+            // Latched when the target changes; reading the tween here must not recompose every frame.
+            val from = Snapshot.withoutReadObservation { animatedTextHeight.value }
+            renderedTextHeightTarget - from <= lineHeight + 1
+        }
+    // Derived so the per-frame tween only recomposes when the anchoring actually flips.
+    val nextAnchoredTextGrowth by
+        remember(
+            draftFitsTextHeightTarget,
+            singleLineStep,
+            renderedTextHeightTarget,
+            caretFollowSuspended,
+            animatedTextHeight,
+        ) {
+            derivedStateOf {
+                draftFitsTextHeightTarget &&
+                    singleLineStep &&
+                    !caretFollowSuspended &&
+                    animatedTextHeight.value != renderedTextHeightTarget
+            }
+        }
+    if (anchoredTextGrowth != nextAnchoredTextGrowth) {
+        SideEffect { anchoredTextGrowth = nextAnchoredTextGrowth }
+    }
     // Record the exact clipping bounds used by the rendered editor, not its unbounded draft height.
     val textHeightBounds = remember(scrollOwnerKey) { mutableStateOf(0..Int.MAX_VALUE) }
     val usesAnimatedTextHeight =
@@ -1521,7 +1576,8 @@ internal fun ComposerPill(
                                                 drawContent()
                                                 drawComposerEditorOverflowAffordance(
                                                     scrollValue = composerScrollState.value,
-                                                    maxScroll = composerScrollState.maxValue,
+                                                    maxScroll =
+                                                        if (anchoredTextGrowth) 0 else composerScrollState.maxValue,
                                                     color = editorOverflowColor,
                                                     // Painted in the inset the editor already leaves, so the
                                                     // thumb never covers a glyph and the row keeps its width.
@@ -1539,6 +1595,7 @@ internal fun ComposerPill(
                                             }.keepComposerSelectionVisibleDuringLayout(
                                                 composerScrollState,
                                                 layoutCorrectionGate,
+                                                anchoredGrowth = { anchoredTextGrowth },
                                             ) {
                                                 if (readingScrollAnchor?.matches(textFieldValue) == true) {
                                                     return@keepComposerSelectionVisibleDuringLayout null
@@ -1739,9 +1796,20 @@ internal fun ComposerPill(
                                     },
                                 )
                             }
-                            if (textFieldValue.text.isEmpty()) {
+                            // The hint leaves with the first character so it never overlaps typed text,
+                            // and returns with a short fade once a cleared or sent draft empties the row.
+                            val placeholderShown = textFieldValue.text.isEmpty()
+                            val placeholderAlpha by
+                                animateFloatAsState(
+                                    targetValue = if (placeholderShown) 1f else 0f,
+                                    animationSpec =
+                                        if (placeholderShown) tween(COMPOSER_PLACEHOLDER_FADE_MILLIS) else snap(),
+                                    label = "composer placeholder",
+                                )
+                            if (placeholderShown) {
                                 Text(
                                     stringResource(R.string.message),
+                                    modifier = Modifier.graphicsLayer { alpha = placeholderAlpha },
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     style = MaterialTheme.typography.bodyLarge,

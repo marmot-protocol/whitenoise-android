@@ -182,7 +182,8 @@
                 <category android:name="android.intent.category.BROWSABLE" />
 
                 <data android:scheme="${deepLinkScheme}" />
-                <!-- Cross-client Marmot profile links (marmot://profile/<npub>);
+                <!-- Cross-client Marmot profile and chat links (marmot://profile/<npub>,
+                     marmot://chat/<group-id>);
                      the flavored scheme above stays for the app's own links. -->
                 <data android:scheme="marmot" />
             </intent-filter>

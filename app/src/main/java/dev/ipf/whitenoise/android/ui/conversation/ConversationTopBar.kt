@@ -23,6 +23,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -56,9 +57,12 @@ import dev.ipf.whitenoise.android.state.selectedAvatarIsPersonPicture
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.chats.ConversationSearchTopBar
 import dev.ipf.whitenoise.android.ui.common.GroupAvatar
+import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.PreparedGroupAvatarContent
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
+import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
+import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
 import dev.ipf.whitenoise.android.ui.group.disappearingMessagesLabel
 import dev.ipf.whitenoise.android.ui.testing.PerformanceTestTags
 import dev.ipf.whitenoise.android.ui.testing.performanceTestTag
@@ -195,22 +199,25 @@ internal fun ConversationTopBar(
         } else {
             presentedGroup
         }
-    Column {
+    val searchCollapse = rememberSearchCollapse(searchOpen && !selectionMode)
+    Column(Modifier.searchCollapseHost(searchCollapse)) {
         if (selectionMode) {
             MessageSelectionBar(
                 count = selectedCount,
                 onClose = onCloseSelection,
             )
         } else if (searchOpen) {
-            ConversationSearchTopBar(
-                query = searchQuery,
-                onQueryChange = onSearchQueryChange,
-                onClear = onClearSearch,
-                onClose = onCloseSearch,
-                onSearchAction = onSearchAction,
-                focusRequester = searchFocusRequester,
-                filterAction = searchFilterAction,
-            )
+            CompositionLocalProvider(LocalSearchCollapse provides searchCollapse) {
+                ConversationSearchTopBar(
+                    query = searchQuery,
+                    onQueryChange = onSearchQueryChange,
+                    onClear = onClearSearch,
+                    onClose = onCloseSearch,
+                    onSearchAction = onSearchAction,
+                    focusRequester = searchFocusRequester,
+                    filterAction = searchFilterAction,
+                )
+            }
             searchFilterControls()
         } else {
             PreparedGroupAvatarContent(

@@ -60,8 +60,12 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
 import dev.ipf.whitenoise.android.ui.common.Avatar
+import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.PublicKeyCopyText
+import dev.ipf.whitenoise.android.ui.common.SearchCollapse
+import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.rememberSystemAnimationsEnabled
+import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
 import dev.ipf.whitenoise.android.ui.icons.filled.Help
 import dev.ipf.whitenoise.android.ui.icons.filled.Notifications
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
@@ -378,6 +382,7 @@ internal fun SettingsScreen(
     homeViewport: SettingsHomeViewport,
     onHomeViewportChange: (SettingsHomeViewport) -> Unit,
     suppressMotion: Boolean = false,
+    selfUpdateEnabled: Boolean = BuildConfig.SELF_UPDATE_ENABLED,
 ) {
     // Issue #121: the prior shape only handled back from a detail
     // subscreen; when on the Settings home (detail == null) the system
@@ -452,6 +457,7 @@ internal fun SettingsScreen(
         ownerKey = appState.activeAccountRef to appState.runtimeGeneration,
         suppressMotion = suppressMotion,
         contentVisible = !appState.appLockScreenVisible,
+        cardMorph = true,
     ) { route ->
         CompositionLocalProvider(
             LocalSettingsSearchTarget provides
@@ -468,6 +474,7 @@ internal fun SettingsScreen(
                     searchEligibility = eligibility,
                     searchDocuments = searchDocuments,
                     suppressSearchMotion = suppressMotion,
+                    selfUpdateEnabled = selfUpdateEnabled,
                     onSearchOpenChange = {
                         if (it) searchOriginId = null
                         searchOpen = it
@@ -682,6 +689,7 @@ private fun SettingsHomeScreen(
     onOpenProfilePictureActions: () -> Unit,
     viewport: SettingsHomeViewport,
     onViewportChange: (SettingsHomeViewport) -> Unit,
+    selfUpdateEnabled: Boolean,
 ) {
     var showAccountSelector by remember { mutableStateOf(false) }
     var showAddIdentity by remember { mutableStateOf(false) }
@@ -739,7 +747,7 @@ private fun SettingsHomeScreen(
         state =
             settingsHomeState(
                 hasActiveAccount = activeAccount != null,
-                selfUpdateEnabled = BuildConfig.SELF_UPDATE_ENABLED,
+                selfUpdateEnabled = selfUpdateEnabled,
                 updateAvailable = appState.appUpdateInfo.isUpdateAvailable,
             ),
         account = homeAccount,
@@ -866,10 +874,12 @@ internal fun SettingsHomeContent(
             )
         }.distinctUntilChanged().collect(currentOnViewportChange)
     }
+    val searchCollapse = rememberSearchCollapse(searchOpen)
     SettingsScaffold(
         title = stringResource(R.string.settings),
         onBack = { if (searchOpen) onSearchOpenChange(false) else onBack() },
-        titleContent = settingsHomeSearchTitle(searchOpen, searchQuery, onSearchQueryChange),
+        titleContent = settingsHomeSearchTitle(searchOpen, searchQuery, onSearchQueryChange, searchCollapse),
+        topBarModifier = Modifier.searchCollapseHost(searchCollapse),
         topBarActions = { SettingsHomeSearchAction(searchOpen) { onSearchOpenChange(true) } },
         modifier = Modifier.testTag(SETTINGS_HOME_CONTENT_TAG),
         prominentTitle = true,
@@ -918,7 +928,17 @@ private fun settingsHomeSearchTitle(
     searchOpen: Boolean,
     query: String,
     onQueryChange: (String) -> Unit,
-): (@Composable () -> Unit)? = if (searchOpen) ({ SettingsSearchField(query, onQueryChange) }) else null
+    searchCollapse: SearchCollapse,
+): (@Composable () -> Unit)? =
+    if (searchOpen) {
+        {
+            CompositionLocalProvider(LocalSearchCollapse provides searchCollapse) {
+                SettingsSearchField(query, onQueryChange)
+            }
+        }
+    } else {
+        null
+    }
 
 @Composable
 @Suppress("FunctionNaming")

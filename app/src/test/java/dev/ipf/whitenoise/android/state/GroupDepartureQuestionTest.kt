@@ -4,6 +4,8 @@ import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.AppGroupRecordFfi
+import dev.ipf.marmotkit.GroupInviteDeclineResultFfi
 import dev.ipf.marmotkit.GroupMutationResultFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
@@ -97,6 +99,77 @@ class GroupDepartureQuestionTest {
             assertEquals(AppText.Resource(R.string.toast_granted_but_couldnt_step_down), state.toast?.title)
         }
 
+    /** An admin invitee can decline after MDK requires and records a step-down. */
+    @Test
+    fun adminInviteDeclinesAfterSteppingDown() =
+        runBlocking {
+            val invite =
+                conversationTimelineTestGroup().copy(pendingConfirmation = true, admins = listOf(SELF, OTHER_ADMIN))
+            val controller = ConversationController(appState = appState(inviteRuntime(invite)), initialGroup = invite)
+
+            assertTrue(controller.declineInvite())
+            assertEquals(
+                listOf("declineGroupInvite", "selfDemoteAdminDetailed", "declineGroupInvite"),
+                calls.filter { it == "declineGroupInvite" || it == "selfDemoteAdminDetailed" },
+            )
+            assertFalse(controller.group.pendingConfirmation)
+            assertTrue(controller.group.archived)
+        }
+
+    /** A member invitee declines directly, without changing group roles. */
+    @Test
+    fun memberInviteDeclinesWithoutSteppingDown() =
+        runBlocking {
+            val invite = conversationTimelineTestGroup().copy(pendingConfirmation = true, admins = listOf(OTHER_ADMIN))
+            val controller = ConversationController(appState = appState(inviteRuntime(invite)), initialGroup = invite)
+
+            assertTrue(controller.declineInvite())
+            assertEquals(1, calls.count { it == "declineGroupInvite" })
+            assertFalse("selfDemoteAdminDetailed" in calls)
+        }
+
+    /** A sole admin keeps the pending invite and gets the same guidance as Leave. */
+    @Test
+    fun soleAdminInviteKeepsTheGroupAdmin() =
+        runBlocking {
+            val invite = conversationTimelineTestGroup().copy(pendingConfirmation = true, admins = listOf(SELF))
+            val state = appState(inviteRuntime(invite))
+            val controller = ConversationController(appState = state, initialGroup = invite)
+
+            assertFalse(controller.declineInvite())
+            assertEquals(1, calls.count { it == "declineGroupInvite" })
+            assertTrue(controller.group.pendingConfirmation)
+            assertEquals(listOf(SELF), controller.group.admins)
+            assertEquals(AppText.Resource(R.string.toast_make_another_admin_before_leaving), state.toast?.title)
+        }
+
+    /** Waiting on the step-down leaves the same invitation pending with its original role. */
+    @Test
+    fun waitingOnAdminDeclineKeepsTheInvite() =
+        runBlocking {
+            val invite =
+                conversationTimelineTestGroup().copy(pendingConfirmation = true, admins = listOf(SELF, OTHER_ADMIN))
+            val state = appState(inviteRuntime(invite, holdStepDown = true))
+            val controller = ConversationController(appState = state, initialGroup = invite)
+            val decline =
+                CoroutineScope(Job()).async(start = CoroutineStart.UNDISPATCHED) {
+                    controller.declineInvite()
+                }
+            try {
+                awaitWithMainLooper { state.groupChangeConfirmations.pending != null }
+                checkNotNull(state.groupChangeConfirmations.pending).answer(proceed = false)
+                awaitWithMainLooper { decline.isCompleted }
+            } finally {
+                decline.cancel()
+                state.groupChangeConfirmations.pending?.answer(proceed = false)
+            }
+
+            assertTrue(decline.isCancelled)
+            assertEquals(1, calls.count { it == "declineGroupInvite" })
+            assertTrue(controller.group.pendingConfirmation)
+            assertTrue(SELF in controller.group.admins)
+        }
+
     /** The test thread is Robolectric's main thread, so its looper runs between polls for main-thread steps. */
     private suspend fun awaitWithMainLooper(done: () -> Boolean) {
         withTimeout(QUESTION_TIMEOUT_MILLIS) {
@@ -107,8 +180,8 @@ class GroupDepartureQuestionTest {
         }
     }
 
-    /** One signed-in admin whose runtime holds the self-demotion back as catching up. */
-    private fun appState() =
+    /** Creates one signed-in account with the supplied native runtime for the departure. */
+    private fun appState(runtime: MarmotInterface = catchingUpRuntime()) =
         WhiteNoiseAppState(
             context = ApplicationProvider.getApplicationContext(),
             draftStore = DraftStore(NoDrafts),
@@ -126,8 +199,54 @@ class GroupDepartureQuestionTest {
                     ),
                 ),
             activeAccountRef = ConversationTimelineTestIds.ACCOUNT_REF,
-            initialMarmotRuntime = AppMarmotRuntime("test", catchingUpRuntime()),
+            initialMarmotRuntime = AppMarmotRuntime("test", runtime),
         )
+
+    /** Refuses admin declines before demotion and optionally holds back the step-down while catching up. */
+    private fun inviteRuntime(
+        invite: AppGroupRecordFfi,
+        holdStepDown: Boolean = false,
+    ): MarmotInterface {
+        var isAdmin = SELF in invite.admins
+        val steppedDown = invite.copy(admins = listOf(OTHER_ADMIN))
+        val mutation = testGroupMutationResult(roster().map { it.memberIdHex }, steppedDown.admins)
+        return Proxy.newProxyInstance(MarmotInterface::class.java.classLoader, arrayOf(MarmotInterface::class.java)) {
+            _,
+            method,
+            arguments,
+            ->
+            val name = method.name.substringBefore('-')
+            calls += name
+            when (name) {
+                "npub" -> null
+                "recordHostTiming" -> ProductRecordResultFfi.IGNORED_DISABLED
+                "groupCommitDelivery" -> null
+                "declineGroupInvite" ->
+                    if (isAdmin) {
+                        failSuspendedNativeCall(arguments, MarmotKitException.AdminCannotSelfRemove(GROUP))
+                    } else {
+                        GroupInviteDeclineResultFfi(
+                            steppedDown.copy(pendingConfirmation = false, archived = true),
+                            mutation.summary,
+                        )
+                    }
+                "selfDemoteAdminDetailed" -> {
+                    check(isAdmin)
+                    when {
+                        invite.admins == listOf(SELF) ->
+                            failSuspendedNativeCall(arguments, MarmotKitException.WouldRemoveLastAdmin(GROUP))
+                        holdStepDown ->
+                            failSuspendedNativeCall(arguments, MarmotKitException.GroupCatchingUp(GROUP))
+                        else -> {
+                            isAdmin = false
+                            mutation.copy(details = mutation.details.copy(group = steppedDown))
+                        }
+                    }
+                }
+                else -> error("Unexpected native call: $name")
+            }
+        } as MarmotInterface
+    }
 
     /** Answers the roster read and refuses every self-demotion as catching up; anything else is unexpected. */
     private fun catchingUpRuntime(): MarmotInterface =

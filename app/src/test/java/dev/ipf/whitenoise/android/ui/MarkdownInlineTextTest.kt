@@ -920,4 +920,101 @@ class MarkdownInlineTextTest {
         assertEquals("4294967295.", markdownListMarker(huge, index = 0))
         assertEquals("4294967296.", markdownListMarker(huge, index = 1))
     }
+
+    @Test
+    fun chatLinkAutolinkOpensInAppWithItsSentText() {
+        val annotated = build(listOf(appAutolink("marmot://chat/00112233AABBCCDD")))
+
+        assertEquals("marmot://chat/00112233AABBCCDD", annotated.text)
+        val link = annotated.getLinkAnnotations(0, annotated.length).single()
+        assertEquals(
+            APP_LINK_TAG_PREFIX + "marmot://chat/00112233aabbccdd",
+            (link.item as LinkAnnotation.Clickable).tag,
+        )
+    }
+
+    @Test
+    fun chatLinkToAKnownChatShowsTheChatName() {
+        val inlines = listOf(appAutolink("marmot://chat/00112233aabbccdd"))
+        val annotated =
+            markdownInlinesToAnnotatedString(
+                inlines,
+                codeStyle,
+                linkStyle,
+                chatLinkTitle = { id -> "Book club".takeIf { id == "00112233aabbccdd" } },
+            )
+
+        assertEquals(setOf("00112233aabbccdd"), markdownInlineChatLinkGroupIds(inlines))
+        assertEquals("Book club", annotated.text)
+        assertTrue(annotated.spanStyles.any { it.item.fontWeight == FontWeight.Bold })
+        val link = annotated.getLinkAnnotations(0, annotated.length).single()
+        assertEquals(
+            APP_LINK_TAG_PREFIX + "marmot://chat/00112233aabbccdd",
+            (link.item as LinkAnnotation.Clickable).tag,
+        )
+    }
+
+    @Test
+    fun chatLinkToAnUnknownChatKeepsTheSentText() {
+        val annotated =
+            markdownInlinesToAnnotatedString(
+                listOf(appAutolink("marmot://chat/00112233aabbccdd")),
+                codeStyle,
+                linkStyle,
+                chatLinkTitle = { null },
+            )
+
+        assertEquals("marmot://chat/00112233aabbccdd", annotated.text)
+    }
+
+    @Test
+    fun malformedChatLinkStaysInert() {
+        val annotated = build(listOf(appAutolink("marmot://chat/not-hex")))
+
+        assertEquals("marmot://chat/not-hex", annotated.text)
+        assertTrue(annotated.getLinkAnnotations(0, annotated.length).isEmpty())
+    }
+
+    @Test
+    fun labelledChatLinkOpensInAppWithoutConfirmation() {
+        val annotated =
+            build(
+                listOf(
+                    MarkdownInlineFfi.Link(
+                        dest = "whitenoise://chat/00112233aabbccdd",
+                        title = null,
+                        children = listOf(MarkdownInlineFfi.Text("https://example.com")),
+                        classification = MarkdownLinkDestinationKindFfi.WEB,
+                    ),
+                ),
+            )
+
+        val link = annotated.getLinkAnnotations(0, annotated.length).single()
+        assertEquals(
+            APP_LINK_TAG_PREFIX + "marmot://chat/00112233aabbccdd",
+            (link.item as LinkAnnotation.Clickable).tag,
+        )
+    }
+
+    @Test
+    fun profileLinkAutolinkOpensInApp() {
+        val npub = "npub1" + "a".repeat(58)
+        val annotated = build(listOf(appAutolink("marmot://profile/$npub")))
+
+        val link = annotated.getLinkAnnotations(0, annotated.length).single()
+        assertEquals(APP_LINK_TAG_PREFIX + "marmot://profile/$npub", (link.item as LinkAnnotation.Clickable).tag)
+    }
+
+    @Test
+    fun inAppLinksCoverOnlyChatAndProfileRoutes() {
+        assertEquals("marmot://chat/0a", inAppMarkdownLink(" whitenoise://chat/0A "))
+        assertEquals(null, inAppMarkdownLink("https://example.com/chat/0a"))
+        assertEquals(null, inAppMarkdownLink("marmot://settings"))
+        assertEquals(null, inAppMarkdownLink("marmot://chat/0a/extra"))
+    }
+
+    private fun appAutolink(url: String): MarkdownInlineFfi.Autolink {
+        val kind = MarkdownLinkDestinationKindFfi.WEB
+        return MarkdownInlineFfi.Autolink(url, MarkdownAutolinkKindFfi.URI, kind)
+    }
 }

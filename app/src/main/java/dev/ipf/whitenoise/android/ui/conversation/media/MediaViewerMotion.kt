@@ -47,7 +47,7 @@ import kotlinx.coroutines.launch
 
 private const val MAX_REGISTERED_MEDIA_THUMBNAILS = 128
 private const val MEDIA_OPEN_MILLIS = 220
-private const val MEDIA_CLOSE_MILLIS = 180
+internal const val MEDIA_CLOSE_MILLIS = 180
 private const val MEDIA_CONTENT_BLEND_START = 0.85f
 private const val MEDIA_CONTENT_BLEND_INTERVAL = 0.15f
 
@@ -240,10 +240,13 @@ internal fun MediaViewerMotion(
     onClosed: () -> Unit,
     selectedSourceEpoch: ULong? = null,
     attachmentAspectRatio: Float? = null,
+    fallbackCloseAllowed: Boolean = false,
     content: @Composable (Modifier) -> Unit,
 ) {
+    val motionEnabled = rememberConversationMotionEnabled()
+    val fallbackProgress = remember { Animatable(1f) }
     val knownAspect = attachmentAspectRatio?.takeIf { it.isFinite() && it > 0f }
-    val enabled = rememberConversationMotionEnabled() && allowMotion && knownAspect != null
+    val enabled = motionEnabled && allowMotion && knownAspect != null
     val openingToken =
         remember(registry, opening) {
             // The animation monitor and draw/layer phases observe live geometry. Initial admission
@@ -264,16 +267,19 @@ internal fun MediaViewerMotion(
         if (!enabled || readThumbnail() == null) {
             entrySettled = true
             progress.snapTo(1f)
-            if (closing) latestClosed()
+            if (closing) closeWithoutTravel(fallbackProgress, motionEnabled, fallbackCloseAllowed, latestClosed)
         } else if (closing || !entrySettled) {
-            animateMediaViewerMotion(
-                progress,
-                closing,
-                sourceAvailable = { readThumbnail() != null },
-                awaitEntryFrame = awaitEntryFrame,
-                onSettled = { entrySettled = true },
-            )
-            if (closing) latestClosed()
+            val sourceLost =
+                animateMediaViewerMotion(
+                    progress,
+                    closing,
+                    sourceAvailable = { readThumbnail() != null },
+                    awaitEntryFrame = awaitEntryFrame,
+                    onSettled = { entrySettled = true },
+                )
+            // Motion is enabled here. A thumbnail lost mid-travel snaps the viewer back,
+            // so it then leaves like one that never had a thumbnail.
+            if (closing) closeWithoutTravel(fallbackProgress, sourceLost, fallbackCloseAllowed, latestClosed)
         }
     }
     val bodyModifier =
@@ -282,7 +288,12 @@ internal fun MediaViewerMotion(
                 alpha = mediaViewerContentAlpha(enabled, progress.value) { readThumbnail() != null }
             }
         }
-    Box(Modifier.fillMaxSize().onGloballyPositioned { geometry[0] = it }) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .mediaViewerFallbackClose { fallbackProgress.value }
+            .onGloballyPositioned { geometry[0] = it },
+    ) {
         CompositionLocalProvider(LocalMediaViewerPressFeedback provides enabled) {
             content(bodyModifier)
         }
@@ -293,6 +304,7 @@ internal fun MediaViewerMotion(
 }
 
 /** Reads actual viewer coordinates only while its traveling copy can still paint. */
+
 private fun mediaMotionDrawGeometry(
     geometry: Array<LayoutCoordinates?>,
     progress: () -> Float,
@@ -315,14 +327,17 @@ private fun mediaMotionDrawGeometry(
     }
 }
 
-/** Monitors source eligibility during window admission and travel, cancelling either before direct fallback. */
+/**
+ * Monitors source eligibility during window admission and travel, cancelling either before direct fallback.
+ * Returns whether the source was lost, leaving the viewer at full size.
+ */
 internal suspend fun animateMediaViewerMotion(
     progress: Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
     closing: Boolean,
     sourceAvailable: () -> Boolean,
     awaitEntryFrame: suspend () -> Unit,
     onSettled: () -> Unit,
-) {
+): Boolean {
     var sourceLost = false
     coroutineScope {
         val animation =
@@ -348,6 +363,7 @@ internal suspend fun animateMediaViewerMotion(
     }
     if (sourceLost) progress.snapTo(1f)
     onSettled()
+    return sourceLost
 }
 
 /** Draws a fresh eligible source with reusable clipping objects and the existing pixel handoff. */

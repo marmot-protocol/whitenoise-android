@@ -42,6 +42,7 @@ import dev.ipf.marmotkit.GroupRosterFfi
 import dev.ipf.marmotkit.HostPerformanceOperationFfi
 import dev.ipf.marmotkit.LocalSendStatusFfi
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MarmotKitException
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
@@ -4748,32 +4749,22 @@ class ChatsController private constructor(
                 ?.messageIdHex
                 ?.takeIf { it.isNotBlank() }
         val hasReadTarget = lastId != null || item.projection?.manuallyMarkedUnread == true
+        val gid = item.group.groupIdHex
         return hasReadTarget &&
-            runCatchingCancellable {
-                var admitted = false
-                val row =
-                    appState.marmotIo {
-                        if (!chatListActionIsCurrent(owner)) return@marmotIo null
-                        admitted = true
-                        if (lastId != null) {
-                            markTimelineMessageRead(account, item.group.groupIdHex, lastId)
-                        } else {
-                            setChatManuallyUnread(account, item.group.groupIdHex, false)
-                        }
+            runAdmittedChatListAction(
+                owner,
+                "markAllRead",
+                command = {
+                    if (lastId != null) {
+                        markTimelineMessageRead(account, gid, lastId)
+                    } else {
+                        setChatManuallyUnread(account, gid, false)
                     }
-                if (!admitted || !chatListActionSessionIsCurrent(owner)) return@runCatchingCancellable false
+                },
+            ) { row ->
                 applyChatListActionRow(row)
-                appState.dismissConversationNotifications(account, item.group.groupIdHex)
-                true
-            }.onFailure {
-                // Quiet for the user (marking read is an idempotent
-                // affordance and surfacing a toast on every flake would be
-                // noisy) — but still log the failure so the trace surfaces
-                // in `adb logcat` when someone reports "mark read does
-                // nothing". `take(8)` on the group id keeps the privacy
-                // posture: no full ids in logs.
-                if (BuildConfig.DEBUG) Log.w("DMChatsController", "markAllRead failed", it)
-            }.getOrDefault(false)
+                appState.dismissConversationNotifications(account, gid)
+            }
     }
 
     /** Flag the chat unread until it is next read; the engine owns the clear. */
@@ -4784,24 +4775,11 @@ class ChatsController private constructor(
         if (owner == null || !chatListActionIsCurrent(owner)) return false
         val account = owner.accountRef
         return !item.removedFromGroup(appState.activeAccount?.accountIdHex) &&
-            runCatchingCancellable {
-                var admitted = false
-                val row =
-                    appState.marmotIo {
-                        if (chatListActionIsCurrent(owner)) {
-                            admitted = true
-                            setChatManuallyUnread(account, item.group.groupIdHex, true)
-                        } else {
-                            null
-                        }
-                    }
-                if (!admitted || !chatListActionSessionIsCurrent(owner)) return@runCatchingCancellable false
-                applyChatListActionRow(row)
-                true
-            }.onFailure {
-                // Same quiet posture as markAllRead: log-only, no toast.
-                if (BuildConfig.DEBUG) Log.w("DMChatsController", "markUnread failed", it)
-            }.getOrDefault(false)
+            runAdmittedChatListAction(
+                owner,
+                "markUnread",
+                command = { setChatManuallyUnread(account, item.group.groupIdHex, true) },
+            ) { row -> applyChatListActionRow(row) }
     }
 
     /** Pin or unpin one chat; newly pinned chats enter at the top of the pinned block. */
@@ -4811,23 +4789,46 @@ class ChatsController private constructor(
         owner: ChatListActionOwner? = captureChatListActionOwner(),
     ): Boolean {
         if (owner == null || !chatListActionIsCurrent(owner)) return false
-        return runCatchingCancellable {
-            val state =
-                appState.marmotIo {
-                    if (chatListActionIsCurrent(owner)) {
-                        setChatPinned(owner.accountRef, item.group.groupIdHex, pinned)
-                    } else {
-                        null
-                    }
-                }
-            if (state == null || !chatListActionSessionIsCurrent(owner)) return@runCatchingCancellable false
+        return runAdmittedChatListAction(
+            owner,
+            "setPinned",
+            command = { setChatPinned(owner.accountRef, item.group.groupIdHex, pinned) },
+        ) { state ->
             applyPinState(state)
             scheduleRecompute()
-            true
-        }.onFailure {
-            if (BuildConfig.DEBUG) Log.w("DMChatsController", "setPinned failed", it)
-        }.getOrDefault(false)
+        }
     }
+
+    /** Boxes a native result so a null row still counts as admitted. */
+    private class AdmittedChatListAction<T>(
+        val value: T,
+    )
+
+    /**
+     * Runs one chat-list row command: [command] only while [owner] is still current, and [apply]
+     * only while its session still owns the result. Failures stay quiet for the user and are
+     * logged in debug builds, since these are idempotent affordances.
+     */
+    private suspend fun <T> runAdmittedChatListAction(
+        owner: ChatListActionOwner,
+        label: String,
+        command: suspend MarmotInterface.() -> T,
+        apply: suspend (T) -> Unit,
+    ): Boolean =
+        runCatchingCancellable {
+            val admitted =
+                appState.marmotIo {
+                    if (chatListActionIsCurrent(owner)) AdmittedChatListAction(command()) else null
+                }
+            if (admitted == null || !chatListActionSessionIsCurrent(owner)) {
+                false
+            } else {
+                apply(admitted.value)
+                true
+            }
+        }.onFailure {
+            if (BuildConfig.DEBUG) Log.w("DMChatsController", "$label failed", it)
+        }.getOrDefault(false)
 
     /** Atomically replace the pinned block's manual order; ids must cover the pinned set exactly. */
     suspend fun setPinnedOrder(orderedGroupIds: List<String>): Boolean {
@@ -10923,23 +10924,74 @@ class ConversationController(
         inviteConfirmationAuthority.finish()
     }
 
-    /** Declines only after conflicting chat-list confirmation snapshots have been resolved. */
+    /** Declines the current pending Welcome, stepping down first when MDK refuses an admin's decline. */
     suspend fun declineInvite(): Boolean =
         withMutationLockResult(false) {
             if (inviteAcceptanceResolutionPending) return@withMutationLockResult false
             val account = conversationAccountRef ?: return@withMutationLockResult false
+            val invitation = inviteGeneration(group)
+            val stillPending = {
+                mutationPresentation.ownsCurrentPresentation() &&
+                    !inviteAcceptanceResolutionPending &&
+                    group.pendingConfirmation &&
+                    inviteGeneration(group) == invitation
+            }
             runCatching {
-                appState.marmotIo { declineGroupInvite(account, group.groupIdHex) }
-                appState.dismissConversationNotifications(account, group.groupIdHex)
-                group = group.copy(pendingConfirmation = false, archived = true)
-                appState.applyLocalGroupUpdate(group)
-                presentConversationTransient(R.string.toast_invite_declined)
+                if (!declinePendingInvite(account, invitation.groupIdHex, stillPending)) return@runCatching false
+                appState.dismissConversationNotifications(account, invitation.groupIdHex)
+                if (mutationPresentation.ownsCurrentPresentation() && inviteGeneration(group) == invitation) {
+                    group = group.copy(pendingConfirmation = false, archived = true)
+                    appState.applyLocalGroupUpdate(group, account)
+                    presentConversationTransient(R.string.toast_invite_declined)
+                }
                 true
-            }.getOrElse {
-                it.rethrowIfCancellation()
-                appState.presentFailure(R.string.toast_couldnt_decline_invite, "GROUP_INVITE_DECLINE", it)
+            }.getOrElse { failure ->
+                failure.rethrowIfCancellation()
+                if (
+                    failure is MarmotKitException.WouldRemoveLastAdmin &&
+                    failure.groupIdHex.equals(invitation.groupIdHex, ignoreCase = true)
+                ) {
+                    appState.present(R.string.toast_make_another_admin_before_leaving, R.string.toast_group_needs_admin)
+                } else {
+                    appState.presentFailure(R.string.toast_couldnt_decline_invite, "GROUP_INVITE_DECLINE", failure)
+                }
                 false
             }
+        }
+
+    /** Serializes decline with commits and keeps an admitted step-down and its decline together. */
+    private suspend fun declinePendingInvite(
+        account: String,
+        groupIdHex: String,
+        stillPending: () -> Boolean,
+    ): Boolean =
+        appState.withGroupCommitLock(account, groupIdHex) {
+            if (!stillPending()) return@withGroupCommitLock false
+            try {
+                appState.marmotIo { declineGroupInvite(account, groupIdHex) }
+            } catch (refusal: MarmotKitException.AdminCannotSelfRemove) {
+                if (!refusal.groupIdHex.equals(groupIdHex, ignoreCase = true)) throw refusal
+                if (!stillPending()) return@withGroupCommitLock false
+                val declineResult =
+                    appState.runGroupChange(
+                        account,
+                        groupIdHex,
+                        stillWanted = stillPending,
+                        actionLabel = R.string.decline,
+                    ) {
+                        withContext(NonCancellable) {
+                            val demotion =
+                                appState.marmotIo(MarmotTraceSection.SELF_DEMOTE_ADMIN) {
+                                    selfDemoteAdminDetailed(account, groupIdHex)
+                                }
+                            applyMutationDetails(account, demotion.details)
+                            // Keep a failed decline from retrying a step-down that already succeeded.
+                            runCatchingCancellable { appState.marmotIo { declineGroupInvite(account, groupIdHex) } }
+                        }
+                    }
+                declineResult.getOrThrow()
+            }
+            true
         }
 
     /**
@@ -12525,9 +12577,9 @@ class ConversationController(
         // from where the window used to sit. Display sorts on that ordinal, so re-stamp it before
         // publishing or a slid window would reorder history the reader is looking at.
         if (prepared.mode == WindowApplyMode.EXTEND) refreshAuthoritativeOrder(applied)
-        pruneReadAnchorsToWindow()
+        readAnchoredAtSeconds.retainTimelineWindow()
         pruneConfirmedOptimisticMessages()
-        pruneRetentionAtSendToWindow()
+        retentionAtSendByMessageId.retainTimelineWindow()
         pruneConfirmedOptimisticReactions()
         pruneMessageOverlaysToWindow()
         pruneRetainedTimelineRows(prepared)
@@ -12542,8 +12594,11 @@ class ConversationController(
         // A non-replaceWindow page (older-history load once hasLoadedOlderPages
         // is set) skips the replaceWindow trim above, so prune messageById to the
         // current window + optimistic records here too (#373).
-        pruneMessageByIdToWindow(messageById, timelineRecords.keys, optimisticMessages.values)
-        pruneOptimisticEditsToWindow()
+        messageById.retainTimelineWindow()
+        // Edits whose target left the window: the status-based prune in
+        // publishTimelineFromIndexesInternal can't fire once aggregated[target]
+        // goes null, so a never-echoed Pending edit would otherwise leak (#691).
+        optimisticEdits.retainTimelineWindow()
         // The pass above already projected every record into the by-id and
         // order indexes (and reconciled optimistics), exactly like the live
         // update paths do — so publish directly. A second full rebuild here
@@ -12763,12 +12818,12 @@ class ConversationController(
         // after loadOlder(), deliberately-loaded history is preserved and only
         // post-pagination live Upserts are trimmed (#1163 / #537).
         trimLiveTimelineWindow(LIVE_TIMELINE_WINDOW_CAP)
-        pruneRetentionAtSendToWindow()
+        retentionAtSendByMessageId.retainTimelineWindow()
         // Live Upsert/Projection batches add to messageById but never trim it;
         // prune to the (now-bounded) window + optimistic records so it doesn't
         // grow unbounded for an actively-watched conversation (#373).
-        pruneMessageByIdToWindow(messageById, timelineRecords.keys, optimisticMessages.values)
-        pruneOptimisticEditsToWindow()
+        messageById.retainTimelineWindow()
+        optimisticEdits.retainTimelineWindow()
         pruneMessageOverlaysToWindow()
         publishTimelineFromIndexes()
         // Don't relaunch a watcher for a stream finalized in this same batch
@@ -13492,33 +13547,11 @@ class ConversationController(
         if (evictedIds.isNotEmpty()) {
             evictedIds.forEach(::removeProjectedRecord)
         }
-        pruneReadAnchorsToWindow()
+        readAnchoredAtSeconds.retainTimelineWindow()
     }
 
-    private fun pruneReadAnchorsToWindow() {
-        if (readAnchoredAtSeconds.isEmpty()) return
-        val retained = HashSet(timelineRecords.keys)
-        optimisticMessages.values.forEach { retained.add(it.record.messageIdHex) }
-        readAnchoredAtSeconds.keys.retainAll(retained)
-    }
-
-    private fun pruneRetentionAtSendToWindow() {
-        if (retentionAtSendByMessageId.isEmpty()) return
-        val retained = HashSet(timelineRecords.keys)
-        optimisticMessages.values.forEach { retained.add(it.record.messageIdHex) }
-        retentionAtSendByMessageId.keys.retainAll(retained)
-    }
-
-    // Drop optimistic edits whose target message has left the window (no longer
-    // in timelineRecords nor backed by an optimistic record). The status-based
-    // prune in publishTimelineFromIndexesInternal can't fire once aggregated[target]
-    // goes null, so a never-echoed Pending edit would otherwise leak (#691).
-    private fun pruneOptimisticEditsToWindow() {
-        if (optimisticEdits.isEmpty()) return
-        val present = HashSet(timelineRecords.keys)
-        optimisticMessages.values.forEach { present.add(it.record.messageIdHex) }
-        optimisticEdits.keys.retainAll { it in present }
-    }
+    /** Drops entries for messages that left the loaded window and have no in-flight optimistic record. */
+    private fun MutableMap<String, *>.retainTimelineWindow() = retainWindowMessageKeys(this, timelineRecords.keys, optimisticMessages.values)
 
     private fun pruneMessageOverlaysToWindow() {
         if (deletedMessageIds.isEmpty() && optimisticReactionChanges.isEmpty()) return

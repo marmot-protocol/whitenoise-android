@@ -505,8 +505,8 @@ class OptimisticMessageReconciliationTest {
 
         // Only the latest two records are in the loaded window; one optimistic
         // send is still in flight under its temp id.
-        pruneMessageByIdToWindow(
-            messageById = messageById,
+        retainWindowMessageKeys(
+            map = messageById,
             windowIds = setOf("m98", "m99"),
             optimisticMessages = listOf(timelineMessage("temp-pending", MessageStatus.Pending)),
         )

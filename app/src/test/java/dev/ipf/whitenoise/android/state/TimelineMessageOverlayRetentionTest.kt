@@ -31,7 +31,7 @@ class TimelineMessageOverlayRetentionTest {
         val overlays = setOf(record.messageIdHex, loaded.messageIdHex, stale.messageIdHex)
 
         retainFailedOptimisticTextSend(optimistic, records, "msg:pending", record, 7uL)
-        pruneMessageByIdToWindow(records, windowIds, optimistic.values)
+        retainWindowMessageKeys(records, windowIds, optimistic.values)
 
         val failed = checkNotNull(optimistic["msg:pending"])
         assertEquals(MessageStatus.Failed, failed.status)
@@ -49,10 +49,30 @@ class TimelineMessageOverlayRetentionTest {
         )
 
         optimistic.clear()
-        pruneMessageByIdToWindow(records, windowIds, optimistic.values)
+        retainWindowMessageKeys(records, windowIds, optimistic.values)
 
         assertEquals(setOf("loaded"), records.keys)
         assertEquals(setOf("loaded"), retainedMessageOverlayTargets(windowIds, emptySet(), overlays))
         assertNull(retentionHintForProjection(null, 0uL, null, failed.retentionAtSendSeconds))
+    }
+
+    @Test
+    fun windowKeyHelperKeepsWindowAndOptimisticKeysForAnyValueType() {
+        val pending =
+            TimelineMessage(
+                id = "msg:pending",
+                record = TimelineProjector.toAppMessageRecord(timelineRecord("pending", 2uL)),
+                status = MessageStatus.Pending,
+                timelineOrder = 2uL,
+            )
+        val anchors = mutableMapOf("loaded" to 1uL, "pending" to 2uL, "evicted" to 3uL)
+
+        retainWindowMessageKeys(anchors, setOf("loaded"), listOf(pending))
+
+        assertEquals(mapOf("loaded" to 1uL, "pending" to 2uL), anchors)
+
+        val empty = mutableMapOf<String, ULong>()
+        retainWindowMessageKeys(empty, setOf("loaded"), listOf(pending))
+        assertEquals(emptyMap<String, ULong>(), empty)
     }
 }

@@ -952,6 +952,22 @@
         ]
       },
       {
+        "surface": "R.string.copy_chat_link",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.copy_chat_link",
+        "test_ids": [
+          "SYS-015"
+        ]
+      },
+      {
+        "surface": "R.string.copy_chat_link_subtitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
+        "anchor": "R.string.copy_chat_link_subtitle",
+        "test_ids": [
+          "SYS-015"
+        ]
+      },
+      {
         "surface": "R.string.copy_public_key",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsScreen.kt",
         "anchor": "R.string.copy_public_key",

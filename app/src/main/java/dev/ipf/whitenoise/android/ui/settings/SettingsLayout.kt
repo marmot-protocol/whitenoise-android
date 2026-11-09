@@ -67,6 +67,7 @@ internal fun SettingsScaffold(
     topBarScrolledContainerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
     topBarActions: @Composable RowScope.() -> Unit = {},
     titleContent: (@Composable () -> Unit)? = null,
+    topBarModifier: Modifier = Modifier,
     bottomBar: @Composable () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
@@ -76,6 +77,7 @@ internal fun SettingsScaffold(
         topBar = {
             WhiteNoiseTopBar(
                 title = title,
+                modifier = topBarModifier,
                 titleContent = titleContent,
                 onBack = onBack,
                 titleStyle =
@@ -302,7 +304,11 @@ internal fun SettingsPanel(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(
-        modifier = modifier.fillMaxWidth().padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(horizontal = WhiteNoiseSpacing.CompactScreenMargin)
+                .settingsCardMorph(),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerLowest,
         border = amoledOutlineBorder(),

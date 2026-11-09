@@ -505,6 +505,9 @@
     <string name="toast_reply_draft_restore_failed">Couldn\'t restore reply.</string>
     <string name="toast_draft_save_failed">Couldn\'t save draft.</string>
     <string name="toast_notification_conversation_unavailable">That conversation is no longer available</string>
+    <string name="chat_link_not_found">Chat not found</string>
+    <string name="chat_link_invalid">That chat link isn\'t valid</string>
+    <string name="chat_link_choose_account_title">Open chat in</string>
     <string name="message_reacted">Reacted %1$s</string>
     <string name="message_reaction_fallback">to a message</string>
     <string name="message_actions">Message actions</string>
@@ -1322,6 +1325,8 @@
     <string name="scan_to_connect">Scan to connect.</string>
     <string name="not_copied">Not copied</string>
     <string name="copy_public_key">Copy public key</string>
+    <string name="copy_chat_link">Copy chat link</string>
+    <string name="copy_chat_link_subtitle">Opens this chat for people already in it</string>
     <string name="public_key_copy_action_with_value">Copy public key %1$s</string>
     <string name="button_in_progress">In progress</string>
     <string name="private_key">Private key</string>
