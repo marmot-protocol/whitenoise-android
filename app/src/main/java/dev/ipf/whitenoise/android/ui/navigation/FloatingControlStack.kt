@@ -52,7 +52,10 @@ internal val FloatingControlGap = 8.dp
 internal const val FLOATING_CONTROL_MOTION_MILLIS = 180
 
 internal fun <T> floatingControlMotionSpec(): FiniteAnimationSpec<T> =
-    tween(FLOATING_CONTROL_MOTION_MILLIS, easing = FastOutSlowInEasing)
+    tween(
+        durationMillis = FLOATING_CONTROL_MOTION_MILLIS,
+        easing = FastOutSlowInEasing,
+    )
 
 /**
  * Grows a floating control out of its bottom-end corner and shrinks it back there, while the stack

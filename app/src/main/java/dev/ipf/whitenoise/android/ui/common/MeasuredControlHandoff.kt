@@ -349,7 +349,17 @@ internal fun Modifier.controlHandoffEndpoint(
             kotlin.math.abs(raw.right - visible.right) < 0.5f &&
                 kotlin.math.abs(raw.bottom - visible.bottom) < 0.5f
         val whole = unclippedStart && unclippedEnd
-        state?.report(key, token, if (whole) raw else if (clipToVisible) visible else Rect.Zero)
+        state?.report(
+            key,
+            token,
+            if (whole) {
+                raw
+            } else if (clipToVisible) {
+                visible
+            } else {
+                Rect.Zero
+            },
+        )
     }
 }
 

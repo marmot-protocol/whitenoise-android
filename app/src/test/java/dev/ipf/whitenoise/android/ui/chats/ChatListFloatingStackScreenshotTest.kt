@@ -138,7 +138,10 @@ class ChatListFloatingStackScreenshotTest {
     }
 
     private fun bounds(tag: String): Rect =
-        composeRule.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInWindow
+        composeRule
+            .onNodeWithTag(tag, useUnmergedTree = true)
+            .fetchSemanticsNode()
+            .boundsInWindow
 
     /** The pen's painted button; its slot wrapper sits higher because the pen aligns with the composer row. */
     private fun penBounds(): Rect =
