@@ -114,7 +114,7 @@ class NotificationReactionArtworkScreenshotTest {
     fun unavailableCustomArtwork() =
         runBlocking {
             val card = post(":party:")
-            assertNotNull("the card shows who reacted (#3635)", card.getLargeIcon())
+            assertNotNull("the card records a leading reactor picture", card.recordedIdentityInputs())
             capture(card, "notification_reaction_unavailable_light")
         }
 
@@ -128,7 +128,8 @@ class NotificationReactionArtworkScreenshotTest {
     fun rejectedPictureShowsTextFallback() =
         runBlocking {
             val card = post(":marmot:", rejectPicture = true)
-            assertNotNull("the card shows who reacted (#3635)", card.getLargeIcon())
+            assertNull(card.getLargeIcon())
+            assertNull(card.recordedIdentityInputs())
             capture(card, "notification_reaction_rejected_picture_light")
         }
 

@@ -11,6 +11,8 @@ internal const val EXTRA_IDENTITY_IMAGE = "dev.ipf.whitenoise.android.notify.ide
 private const val IDENTITY_TITLE = "title"
 private const val IDENTITY_SEED = "seed"
 private const val IDENTITY_CONTACT = "contact"
+private const val IDENTITY_LEADING_REACTION = "leading_reaction"
+private const val IDENTITY_REACTION_ARTWORK_BODY = "reaction_artwork_body"
 
 /**
  * The one conversation identity picture a rich message card shows in its primary image slot (#3311). A direct chat
@@ -135,6 +137,34 @@ internal fun Notification.recordedIdentityInputs(): Pair<String, String>? =
 internal fun NotificationCompat.Builder.setConversationIdentityImage(image: NotificationIdentityImage) =
     setLargeIcon(image.bitmap).addExtras(Bundle().apply { putBundle(EXTRA_IDENTITY_IMAGE, image.refreshInputs()) })
 
+/** Records how to refresh a reactor whose avatar is drawn inside the card instead of by the system image slot. */
+internal fun NotificationCompat.Builder.recordLeadingReactionIdentity(
+    image: NotificationIdentityImage,
+    artworkBody: String?,
+): NotificationCompat.Builder =
+    addExtras(
+        Bundle().apply {
+            val identity = image.refreshInputs()
+            identity.putBoolean(IDENTITY_LEADING_REACTION, true)
+            artworkBody?.let { identity.putString(IDENTITY_REACTION_ARTWORK_BODY, it) }
+            putBundle(EXTRA_IDENTITY_IMAGE, identity)
+        },
+    )
+
+/** Repaints the same slot the card used at first post, including cards posted before the reaction layout changed. */
+internal fun NotificationCompat.Builder.withRepaintedIdentityImage(
+    context: Context,
+    source: Notification,
+    image: NotificationIdentityImage,
+): NotificationCompat.Builder {
+    val identity = source.extras?.getBundle(EXTRA_IDENTITY_IMAGE)
+    return if (identity?.getBoolean(IDENTITY_LEADING_REACTION) == true) {
+        withUpdatedReactionAvatar(context, source, image, identity.getString(IDENTITY_REACTION_ARTWORK_BODY))
+    } else {
+        keepingCustomViews(source).setConversationIdentityImage(image)
+    }
+}
+
 /** The monogram inputs and direct-chat contact a final write needs to redraw this picture without its pixels. */
 private fun NotificationIdentityImage.refreshInputs(): Bundle =
     Bundle().apply {
@@ -163,11 +193,11 @@ internal fun withCurrentIdentityContact(
     } else {
         val title = identity.getString(IDENTITY_TITLE).orEmpty()
         val seed = identity.getString(IDENTITY_SEED) ?: contact
+        val image = NotificationIdentityImage(pixels ?: notificationMonogramBitmap(title, seed), title, seed, contact)
         NotificationCompat
             .Builder(context, notification)
             .setGroupAlertBehavior(notification.groupAlertBehavior)
-            .keepingCustomViews(notification)
-            .setLargeIcon(pixels ?: notificationMonogramBitmap(title, seed))
+            .withRepaintedIdentityImage(context, notification, image)
             .build()
     }
 }

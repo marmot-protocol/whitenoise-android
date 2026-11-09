@@ -76,8 +76,7 @@ internal class NotificationCardContent(
             .Builder(context, active)
             .setGroupAlertBehavior(active.groupAlertBehavior)
             .setOnlyAlertOnce(true)
-            .keepingCustomViews(active)
-            .setConversationIdentityImage(reactor)
+            .withRepaintedIdentityImage(context, active, reactor)
             .build()
 
     /**
