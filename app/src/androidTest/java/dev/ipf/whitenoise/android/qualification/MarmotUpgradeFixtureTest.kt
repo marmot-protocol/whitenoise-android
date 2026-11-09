@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.os.Process
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AttachmentLocalTargetFfi
 import dev.ipf.marmotkit.AttachmentPageReadFfi
 import dev.ipf.marmotkit.Marmot
@@ -16,6 +17,7 @@ import dev.ipf.whitenoise.android.ManualDeviceFixture
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertArrayEquals
@@ -23,6 +25,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -404,11 +407,7 @@ class MarmotUpgradeFixtureTest {
                 .reference
         requireNotNull(original.sourceEpochIdentity)
         runtime.updateGroupProfile(sender.label, group, "Stale upload retry advanced", null)
-        var epoch = runtime.groupDetails(sender.label, group).mlsState.epoch
-        while (epoch <= original.sourceEpoch || runtime.groupDetails(peer.label, group).mlsState.epoch != epoch) {
-            delay(100L)
-            epoch = runtime.groupDetails(sender.label, group).mlsState.epoch
-        }
+        val epoch = awaitAdvancedEpoch(runtime, sender, peer, group, original.sourceEpoch)
 
         val refusal =
             try {
@@ -463,10 +462,13 @@ class MarmotUpgradeFixtureTest {
         val read = runtime.readAttachmentAsset(peer, asset, 0uL, plaintext.size.toUInt() + 1u)
         assertTrue(read.available)
         assertArrayEquals(plaintext, read.bytes)
-        delay(2_000L) // Let duplicate relay deliveries settle before checking the complete fixture conversation.
+        // Watch for a duplicate relay delivery over a bounded window, failing on the first observation that has one.
         val query = TimelineMessageQueryFfi(group, null, null, null, null, null, 100u)
-        val messages = runtime.timelineMessages(peer, query).messages
-        assertEquals(listOf(message), messages.filter { it.plaintext == caption }.map { it.messageIdHex })
+        repeat(DUPLICATE_OBSERVATIONS) {
+            val messages = runtime.timelineMessages(peer, query).messages
+            assertEquals(listOf(message), messages.filter { it.plaintext == caption }.map { it.messageIdHex })
+            delay(DUPLICATE_OBSERVATION_INTERVAL_MS)
+        }
         val page = (runtime.attachmentHistoryPage(peer, group, 100u, null) as AttachmentPageReadFfi.Page).page
         try {
             assertFalse(page.hasMore)
@@ -475,6 +477,30 @@ class MarmotUpgradeFixtureTest {
             page.nextCursor?.close()
             page.version.close()
         }
+    }
+
+    /**
+     * Waits until the sender's epoch has moved past [sourceEpoch] and the peer has reached it, and returns that epoch.
+     * Fails with the epochs it saw, before the outer timeout would hide which account fell behind.
+     */
+    private suspend fun awaitAdvancedEpoch(
+        runtime: Marmot,
+        sender: AccountSummaryFfi,
+        peer: AccountSummaryFfi,
+        group: String,
+        sourceEpoch: ULong,
+    ): ULong {
+        var epoch = runtime.groupDetails(sender.label, group).mlsState.epoch
+        withTimeoutOrNull(EPOCH_SYNC_TIMEOUT_MS) {
+            while (epoch <= sourceEpoch || runtime.groupDetails(peer.label, group).mlsState.epoch != epoch) {
+                delay(100L)
+                epoch = runtime.groupDetails(sender.label, group).mlsState.epoch
+            }
+        } ?: fail(
+            "Epoch did not advance past $sourceEpoch on both accounts: sender at $epoch, " +
+                "peer at ${runtime.groupDetails(peer.label, group).mlsState.epoch}",
+        )
+        return epoch
     }
 
     /** The native account roster and usable chat projections must match what the baseline actually wrote. */
@@ -499,6 +525,13 @@ class MarmotUpgradeFixtureTest {
         const val PAYLOAD_SIZE = 16 * 1024 * 1024
         const val PENDING_SIZE = 1024
         const val READ_SIZE = 1024 * 1024
+
+        /** How long both accounts get to agree on the advanced epoch before the stale-upload phase fails. */
+        const val EPOCH_SYNC_TIMEOUT_MS = 60_000L
+
+        /** Timeline observations, and the spacing between them, that must each hold exactly one stale-retry message. */
+        const val DUPLICATE_OBSERVATIONS = 8
+        const val DUPLICATE_OBSERVATION_INTERVAL_MS = 250L
 
         /** Deterministic synthetic bytes let both runtime generations assert content, not just attachment counts. */
         fun payload(offset: Int = 0): ByteArray {
