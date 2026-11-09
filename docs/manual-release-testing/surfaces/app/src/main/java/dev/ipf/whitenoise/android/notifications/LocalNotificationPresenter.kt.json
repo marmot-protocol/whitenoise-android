@@ -68,7 +68,7 @@
         ]
       },
       {
-        "surface": "late picture silently rewrites a card first drawn without it",
+        "surface": "late picture silently updates a message card or native reaction group header",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
         "anchor": "internal suspend fun refreshLateIdentityImage(",
         "test_ids": [

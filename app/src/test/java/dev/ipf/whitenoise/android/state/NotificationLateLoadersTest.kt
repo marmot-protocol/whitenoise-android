@@ -32,7 +32,7 @@ class NotificationLateLoadersTest {
             val sources =
                 sources(conversationUrl = GROUP_URL, senderUrl = SENDER_URL).withLateLoaders(
                     isDm = false,
-                    reaction = false,
+                    reactorOnly = false,
                     storedShown = false,
                     row = { LateRowIdentity(null, null) },
                     encryptedGroupLoader = { error("a group picture with a URL decrypts nothing") },
@@ -56,7 +56,7 @@ class NotificationLateLoadersTest {
             val sources =
                 sources().withLateLoaders(
                     isDm = false,
-                    reaction = false,
+                    reactorOnly = false,
                     storedShown = false,
                     row = { null },
                     encryptedGroupLoader = { encrypted },
@@ -73,7 +73,7 @@ class NotificationLateLoadersTest {
             val sources =
                 sources().withLateLoaders(
                     isDm = true,
-                    reaction = false,
+                    reactorOnly = false,
                     storedShown = false,
                     row = { null },
                     encryptedGroupLoader = { error("a direct chat has no group picture") },
@@ -90,7 +90,7 @@ class NotificationLateLoadersTest {
             val sources =
                 sources(conversation = picture, conversationUrl = GROUP_URL).withLateLoaders(
                     isDm = false,
-                    reaction = false,
+                    reactorOnly = false,
                     storedShown = false,
                     row = { null },
                     encryptedGroupLoader = { error("a shown picture decrypts nothing") },
@@ -111,7 +111,7 @@ class NotificationLateLoadersTest {
             val withStored =
                 sources().withLateLoaders(
                     isDm = true,
-                    reaction = false,
+                    reactorOnly = false,
                     storedShown = false,
                     row = { LateRowIdentity(stored, PEER) },
                     encryptedGroupLoader = { null },
@@ -120,7 +120,7 @@ class NotificationLateLoadersTest {
             val peerOnly =
                 sources().withLateLoaders(
                     isDm = true,
-                    reaction = false,
+                    reactorOnly = false,
                     storedShown = false,
                     row = { LateRowIdentity(null, PEER) },
                     encryptedGroupLoader = { null },
@@ -141,7 +141,7 @@ class NotificationLateLoadersTest {
                 val sources =
                     sources(senderUrl = SENDER_URL).withLateLoaders(
                         isDm = false,
-                        reaction = reaction,
+                        reactorOnly = reaction,
                         storedShown = storedShown,
                         row = { error("a settled conversation picture reads no row") },
                         encryptedGroupLoader = { error("a settled conversation picture decrypts nothing") },

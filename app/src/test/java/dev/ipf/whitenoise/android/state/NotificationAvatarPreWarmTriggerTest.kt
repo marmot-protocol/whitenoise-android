@@ -128,7 +128,7 @@ class NotificationAvatarPreWarmTriggerTest {
         assertEquals(warmed.senderAvatarUrl, group.senderUrl)
         assertNull("a group never borrows the sender's face", group.conversationBitmap)
         assertEquals(warmed.groupAvatarUrl, group.conversationUrl)
-        val reaction = ready.lateIdentitySources(warmed, isDm = false, isReaction = true)
+        val reaction = ready.lateIdentitySources(warmed, isDm = false, reactorOnly = true)
         assertSame(picture, reaction.senderBitmap)
         assertEquals(warmed.senderAvatarUrl, reaction.senderUrl)
         assertNull(reaction.conversationBitmap)

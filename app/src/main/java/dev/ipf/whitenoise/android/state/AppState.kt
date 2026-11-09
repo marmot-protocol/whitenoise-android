@@ -13372,16 +13372,20 @@ class WhiteNoiseAppState private constructor(
      * sender picture on an account whose chat list was not loaded. The row's
      * peer, whose private picture the row shows instead, is carried along so
      * the rewrite records them. A missing sender picture gets a loader with
-     * the late refresh's longer bound. A reaction card draws only the person
-     * who reacted.
+     * the late refresh's longer bound. Reactions also draw the group image
+     * when Android rendered the reaction with a native group header.
      */
     private suspend fun prepareLateNotificationIdentity(
         update: NotificationUpdateFfi,
         firstPost: NotificationFirstPost,
         content: LocalNotificationContent?,
     ): LateNotificationIdentity? {
+        if (content == null) return null
         val reaction = LocalNotificationFormatter.isReaction(update)
-        val warmed = notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)
+        val nativeGroupReaction =
+            reaction && !update.isDm && localNotificationPresenter.hasNativeGroupReaction(update, content)
+        val reactorOnly = reaction && !nativeGroupReaction
+        val warmed = notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted, nativeGroupReaction)
         val pictures =
             firstPost.avatars
                 .lateIdentitySources(
@@ -13391,16 +13395,18 @@ class WhiteNoiseAppState private constructor(
                         .notificationConversationDomain(update),
                     dev.ipf.whitenoise.android.notifications
                         .notificationSenderDomain(update),
-                    isReaction = reaction,
+                    reactorOnly = reactorOnly,
                 ).withLateLoaders(
                     isDm = update.isDm,
-                    reaction = reaction,
+                    reactorOnly = reactorOnly,
                     storedShown = firstPost.avatars.storedConversationBitmap != null,
-                    row = { storedConversationIdentity(update) },
+                    row = {
+                        storedConversationIdentity(update)?.takeUnless { reaction && it.contact != null }
+                    },
                     encryptedGroupLoader = { encryptedGroupIdentityLoader(update) },
                     urlLoader = ::latePictureLoader,
                 )
-        return if (content != null && pictures.mayRefresh) LateNotificationIdentity(content, pictures) else null
+        return if (pictures.mayRefresh) LateNotificationIdentity(content, pictures) else null
     }
 
     /**

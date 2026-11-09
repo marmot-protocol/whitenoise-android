@@ -135,7 +135,17 @@ class NotificationReactorPictureTest {
                 presenter.refreshLateIdentityImage(
                     update = update,
                     content = content(update),
-                    pictures = NotificationIdentityPictureSources(null, null, null, PICTURE_URL),
+                    pictures =
+                        NotificationIdentityPictureSources(
+                            null,
+                            null,
+                            null,
+                            PICTURE_URL,
+                            conversationLoader = {
+                                fetched += "group photo"
+                                solid(Color.BLUE)
+                            },
+                        ),
                     directShareEligible = false,
                     isRefreshCurrent = { true },
                 )
@@ -149,6 +159,58 @@ class NotificationReactorPictureTest {
             assertNotNull(card.bigContentView)
             assertTrue(card.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
             assertEquals(NotificationChannelSpec.REACTIONS.id, card.channelId)
+        }
+
+    /** A group photo arriving on its own refreshes the header without replacing the reactor row or card. */
+    @Test
+    fun lateGroupPhotoRefreshesTheNativeReactionHeader() =
+        runBlocking {
+            val posts = mutableListOf<Notification>()
+            val shortcuts = mutableListOf<ShortcutInfoCompat>()
+            val presenter = presenter(posts, shortcutPublisher = { shortcuts.add(it) })
+            val update = reaction("👍")
+            val actorPicture = solid(Color.RED)
+            assertTrue(show(presenter, update, picture = actorPicture))
+            val before = liveCard()
+            val header = content(update).conversationTitle
+            val groupPicture = solid(Color.BLUE)
+
+            assertTrue(
+                presenter.refreshLateIdentityImage(
+                    update,
+                    content(update),
+                    NotificationIdentityPictureSources(
+                        null,
+                        null,
+                        actorPicture,
+                        null,
+                        conversationLoader = { groupPicture },
+                    ),
+                    directShareEligible = true,
+                    isRefreshCurrent = { true },
+                ),
+            )
+
+            assertEquals(2, posts.size)
+            assertEquals(2, shortcuts.size)
+            val shortcut = shortcuts.last()
+            assertEquals(before.shortcutId, shortcut.id)
+            assertEquals(header, shortcut.longLabel)
+            assertTrue(shortcut.categories.isNullOrEmpty())
+            val icon = checkNotNull(shortcut.icon?.loadDrawable(context)).toBitmap(PICTURE_PX, PICTURE_PX)
+            assertEquals(Color.BLUE, icon.getPixel(PICTURE_PX / 2, PICTURE_PX / 2))
+            val after = liveCard()
+            val style = checkNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(after))
+            val line = style.messages.single()
+            val actor = line.person?.icon?.loadDrawable(context)
+            assertEquals(Color.RED, actor?.toBitmap()?.getPixel(0, 0))
+            assertEquals(header, style.conversationTitle)
+            assertEquals(content(update).body, line.text.toString())
+            assertEquals(before.shortcutId, after.shortcutId)
+            assertEquals(before.channelId, after.channelId)
+            assertEquals(before.group, after.group)
+            assertEquals(before.`when`, after.`when`)
+            assertTrue(after.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
         }
 
     /** A late picture never reaches a reaction card that was dismissed meanwhile. */

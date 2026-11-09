@@ -238,13 +238,13 @@ class NotificationIdentityImageCoverageTest {
         assertTrue("of the row's selected asset", "selectedAvatarAsset" in peek)
         assertTrue("from the pixels the chat list decoded", "AvatarImageLoader::cachedImage" in peek)
         val prepare = appState.functionBody("prepareLateNotificationIdentity")
-        assertTrue("the late refresh reads the row", "row = { storedConversationIdentity(update) }" in prepare)
+        assertTrue("the late refresh reads the row", "storedConversationIdentity(update)" in prepare)
         assertTrue(
             "unless the card already shows its stored picture",
             "storedShown = firstPost.avatars.storedConversationBitmap != null" in prepare,
         )
         val late = lateLoaders()
-        assertTrue("which settles it, as for a reaction", "if (reaction || storedShown)" in late)
+        assertTrue("which settles it, as for a reactor-only card", "if (reactorOnly || storedShown)" in late)
         assertTrue("the stored copy is carried", "storedConversationLoader = stored?.storedLoader" in late)
         assertTrue("with the row's peer", "identityContact = stored?.contact" in late)
         val read = appState.functionBody("storedConversationIdentity")
@@ -356,7 +356,7 @@ class NotificationIdentityImageCoverageTest {
 
     /**
      * #3635: a reaction card shows who reacted through the shared identity snapshot, never on a redacted or
-     * hidden-preview card. A late picture rewrites only that picture and keeps the reaction artwork views. The reactor
+     * hidden-preview card. A late refresh keeps the reaction artwork views in the fallback. The reactor
      * is the picture's contact, so their private contact picture wins at the final write, which keeps the artwork too.
      */
     @Test
@@ -367,7 +367,16 @@ class NotificationIdentityImageCoverageTest {
         assertTrue("the reaction card draws who reacted", reactor >= 0)
         val guard = plain.substring(plain.lastIndexOf("if (", reactor), reactor)
         assertTrue("never on a redacted or hidden-preview card", "!redactContent && previewToken.allowed" in guard)
-        assertTrue("through the shared snapshot", "setConversationIdentityImage(" in plain)
+        val presentation =
+            presenter
+                .functionBody("show")
+                .substringAfter("val reactionInlineArtwork =")
+                .substringBefore("val buildSettled =")
+        val native = presentation.branch("if (heldShortcutId != null) {")
+        val fallback = presentation.substringAfter("} else {")
+        assertTrue("the native reaction records the reactor's identity", "recordIdentityImage(reactor)" in native)
+        assertFalse("the native reaction has no separate large icon", "setConversationIdentityImage(" in native)
+        assertTrue("the fallback draws the reactor's picture", "setConversationIdentityImage(reactor)" in fallback)
         val route = presenter.functionBody("refreshLateIdentityImage")
         assertTrue("a late picture takes the reaction path", "rewriteWithLateReactorPicture(" in route)
         val rewrite = source("NotificationCardContent.kt").declaration("fun reactorPictureNotification(")
@@ -414,9 +423,13 @@ class NotificationIdentityImageCoverageTest {
         assertTrue("the peer is the card's contact", "contact?.takeIf(String::isNotBlank) ?:" in image)
         val shortcuts = source("NotificationConversationShortcuts.kt")
         val owned = shortcuts.functionBody("ownedShortcutAvatars")
-        assertTrue("the shortcut reads the peer's choice", "directContactAvatar(update, identityContact)" in owned)
+        val readPeerChoice = "directContactAvatar(update, identityContact, reaction)"
+        assertTrue("the shortcut reads the peer's choice", readPeerChoice in owned)
         val publish = shortcuts.functionBody("publishConversationShortcut")
-        assertTrue("again under the lock", "directContactAvatar(update, identityContact)" in publish)
+        val locked = publish.substringAfter("synchronized(UserEventNotificationGroup.mutationLock)")
+        assertTrue("again under the lock", readPeerChoice in locked)
+        val directChoice = shortcuts.functionBody("directContactAvatar")
+        assertTrue("the reaction header skips private contact pixels", ".takeUnless { reaction }" in directChoice)
         assertTrue("where it is applied", "withPictureContact(context, contact, update.sender.accountIdHex," in publish)
         val stamp = shortcuts.extensionBody("withPictureContact")
         assertTrue(

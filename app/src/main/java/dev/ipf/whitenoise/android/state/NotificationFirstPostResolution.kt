@@ -518,10 +518,11 @@ internal class NotificationAvatarCoordinator(
     private val senderAvatarUrl: suspend (NotificationUpdateFfi) -> String?,
     private val groupAvatarUrl: suspend (NotificationUpdateFfi) -> String?,
 ) {
-    /** Starts bounded remote work only after the first notification write. */
+    /** Warms pictures after the first write; only a native group reaction has a group header to warm. */
     suspend fun preWarm(
         update: NotificationUpdateFfi,
         engineMuted: Boolean,
+        nativeGroupReaction: Boolean = false,
     ): PreWarmedNotificationAvatars {
         val eligible =
             shouldPreWarmNotificationAvatars(
@@ -543,7 +544,12 @@ internal class NotificationAvatarCoordinator(
                 null
             }
         preWarmIfUnlocked(sender, published)
-        val group = if (target.resolveGroupAvatar) bestEffort { groupAvatarUrl(update) } else null
+        val group =
+            if (target.resolveGroupAvatar || (nativeGroupReaction && !appLocked())) {
+                bestEffort { groupAvatarUrl(update) }
+            } else {
+                null
+            }
         // A group's URL picture has host-chosen bytes, so it decodes single-use, never in the conversation's worker.
         preWarmIfUnlocked(group, dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique)
         return PreWarmedNotificationAvatars(sender, group)

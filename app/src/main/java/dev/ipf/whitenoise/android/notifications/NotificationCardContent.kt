@@ -68,7 +68,7 @@ internal class NotificationCardContent(
      */
     fun reactorPictureNotification(
         active: Notification,
-        reactor: NotificationIdentityImage,
+        reactor: NotificationIdentityImage?,
     ): Notification {
         val builder =
             NotificationCompat
@@ -76,10 +76,13 @@ internal class NotificationCardContent(
                 .setGroupAlertBehavior(active.groupAlertBehavior)
                 .setOnlyAlertOnce(true)
                 .keepingCustomViews(active)
-        val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(active)
-        if (style == null) builder.setConversationIdentityImage(reactor)
-        style?.messages?.singleOrNull()?.person?.let { person ->
-            builder.setStyle(copiedMessagingStyle(style, contactAvatarPerson(person, reactor.bitmap), repaint = true))
+        if (reactor != null) {
+            val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(active)
+            if (style == null) builder.setConversationIdentityImage(reactor)
+            style?.messages?.singleOrNull()?.person?.let { person ->
+                val sender = contactAvatarPerson(person, reactor.bitmap)
+                builder.setStyle(copiedMessagingStyle(style, sender, repaint = true))
+            }
         }
         return builder.build()
     }

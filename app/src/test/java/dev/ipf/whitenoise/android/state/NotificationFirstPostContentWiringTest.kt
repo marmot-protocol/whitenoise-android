@@ -91,10 +91,13 @@ class NotificationFirstPostContentWiringTest {
             "firstPost.content ?:" !in enrichment &&
                 "notificationContentResolution.firstPost.resolve(candidate, localOnly = false)" in enrichment,
         )
+        val lateIdentity = source.functionBody("prepareLateNotificationIdentity")
+        val nativeGroupCheck = lateIdentity.indexOf("localNotificationPresenter.hasNativeGroupReaction(")
+        val avatarPreWarm = lateIdentity.indexOf("notificationAvatarCoordinator.preWarm(")
         assertTrue(
-            "avatar lookup must remain behind the content-routing decision",
-            "notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)" in
-                source.functionBody("prepareLateNotificationIdentity"),
+            "post-write prewarm must resolve the group header only after it knows the native reaction is live",
+            nativeGroupCheck in 0 until avatarPreWarm &&
+                "nativeGroupReaction" in lateIdentity.substring(avatarPreWarm),
         )
         val pictureRefresh = source.functionBody("refreshLateNotificationIdentity")
         assertTrue(

@@ -133,7 +133,11 @@ internal fun Notification.recordedIdentityInputs(): Pair<String, String>? =
  * attribution and exact geometry; the app adds no separate trailing image view.
  */
 internal fun NotificationCompat.Builder.setConversationIdentityImage(image: NotificationIdentityImage) =
-    setLargeIcon(image.bitmap).addExtras(Bundle().apply { putBundle(EXTRA_IDENTITY_IMAGE, image.refreshInputs()) })
+    setLargeIcon(image.bitmap).recordIdentityImage(image)
+
+/** Retains refresh inputs for a native reaction, whose avatar pixels live in the sender Person. */
+internal fun NotificationCompat.Builder.recordIdentityImage(image: NotificationIdentityImage) =
+    addExtras(Bundle().apply { putBundle(EXTRA_IDENTITY_IMAGE, image.refreshInputs()) })
 
 /** The monogram inputs and direct-chat contact a final write needs to redraw this picture without its pixels. */
 private fun NotificationIdentityImage.refreshInputs(): Bundle =

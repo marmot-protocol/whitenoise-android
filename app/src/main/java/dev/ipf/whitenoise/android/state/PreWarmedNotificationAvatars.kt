@@ -137,8 +137,8 @@ internal data class PreWarmedNotificationAvatars(
  * #3311: where a card first drawn from this ready snapshot may still get a missing picture, using the URLs the
  * post-write prewarm resolved in [warmed]. A direct chat's identity picture is its sender's, so both slots follow
  * the sender URL, and a group's identity comes only from the group URL. Every sender row draws its sender's picture,
- * in a group too (#3635). A reaction card draws only the person who reacted, so it has no conversation slot. A
- * picture the card already showed is kept.
+ * in a group too (#3635). [reactorOnly] omits the conversation slot for a reaction without a native group header.
+ * A picture the card already showed is kept.
  */
 internal fun PreWarmedNotificationAvatars.lateIdentitySources(
     warmed: PreWarmedNotificationAvatars,
@@ -147,11 +147,11 @@ internal fun PreWarmedNotificationAvatars.lateIdentitySources(
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
     senderDomain: dev.ipf.whitenoise.android.media.MediaTrustDomain =
         dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique,
-    isReaction: Boolean = false,
+    reactorOnly: Boolean = false,
 ): NotificationIdentityPictureSources =
     NotificationIdentityPictureSources(
-        conversationBitmap = conversationBitmap(isDm).takeUnless { isReaction },
-        conversationUrl = (if (isDm) warmed.senderAvatarUrl else warmed.groupAvatarUrl).takeUnless { isReaction },
+        conversationBitmap = conversationBitmap(isDm).takeUnless { reactorOnly },
+        conversationUrl = (if (isDm) warmed.senderAvatarUrl else warmed.groupAvatarUrl).takeUnless { reactorOnly },
         senderBitmap = senderAvatarBitmap,
         senderUrl = warmed.senderAvatarUrl,
         conversationDomain = conversationDomain,
@@ -183,21 +183,21 @@ internal data class LateRowIdentity(
 
 /**
  * #3635: gives each picture a late refresh may still supply a loader, so the refresh fetches only through loaders
- * and never through a raw URL. A reaction card, or a card that already shows the stored picture, reads no [row]: its
- * conversation picture is settled. Otherwise the stored copy comes first and the row's peer is carried along, a
+ * and never through a raw URL. A [reactorOnly] card or a card already showing the stored picture reads no [row].
+ * Otherwise the stored copy comes first and the row's peer is carried along, a
  * missing URL picture gets a [urlLoader], and a group picture that has no URL, such as a Marmot encrypted image,
  * gets the [encryptedGroupLoader]. A missing sender picture with a URL gets a [urlLoader] too.
  */
 internal suspend fun NotificationIdentityPictureSources.withLateLoaders(
     isDm: Boolean,
-    reaction: Boolean,
+    reactorOnly: Boolean,
     storedShown: Boolean,
     row: suspend () -> LateRowIdentity?,
     encryptedGroupLoader: suspend () -> (suspend () -> Bitmap?)?,
     urlLoader: (String, MediaTrustDomain) -> suspend () -> Bitmap?,
 ): NotificationIdentityPictureSources {
     val conversation =
-        if (reaction || storedShown) {
+        if (reactorOnly || storedShown) {
             this
         } else {
             val shown = conversationBitmap != null
