@@ -52,6 +52,11 @@ private object StorageUsageDefaults {
     const val PulseLowAlpha = 0.4f
     const val PulseMillis = 900
 
+    /** Accent tints stepped far enough apart to tell the categories apart in light and dark themes. */
+    const val ChatDataAlpha = 0.68f
+    const val PicturesAlpha = 0.42f
+    const val TemporaryAlpha = 0.2f
+
     /** From this font scale the size moves under its label, so labels never break mid-word. */
     const val StackedFontScale = 1.5f
 
@@ -71,6 +76,7 @@ internal data class StorageCategory(
 @Composable
 internal fun storageCategories(usage: StorageUsage): List<StorageCategory> {
     val scheme = MaterialTheme.colorScheme
+    val tint = { alpha: Float -> scheme.primary.copy(alpha = alpha) }
     val count = usage.attachmentCount.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     return listOfNotNull(
         StorageCategory(
@@ -79,14 +85,14 @@ internal fun storageCategories(usage: StorageUsage): List<StorageCategory> {
             scheme.primary,
             pluralStringResource(R.plurals.storage_attachment_count, count, usage.attachmentCount),
         ),
-        StorageCategory(R.string.storage_chat_data, usage.chatDataBytes, scheme.primary.copy(alpha = 0.62f)),
+        StorageCategory(R.string.storage_chat_data, usage.chatDataBytes, tint(StorageUsageDefaults.ChatDataAlpha)),
         StorageCategory(R.string.storage_unused_space, usage.unusedDatabaseBytes, scheme.outlineVariant)
             .takeIf { usage.unusedDatabaseBytes > 0 },
-        StorageCategory(R.string.storage_pictures, usage.pictureCacheBytes, scheme.primary.copy(alpha = 0.36f)),
+        StorageCategory(R.string.storage_pictures, usage.pictureCacheBytes, tint(StorageUsageDefaults.PicturesAlpha)),
         StorageCategory(
             R.string.storage_temporary,
             usage.temporaryBytes,
-            scheme.outline,
+            tint(StorageUsageDefaults.TemporaryAlpha),
             stringResource(R.string.storage_temporary_detail),
         ),
     )

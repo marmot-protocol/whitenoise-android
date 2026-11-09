@@ -72,6 +72,13 @@ class ManageStorageModelsTest {
         assertEquals(StorageOutcome.Removed(2, 0), describe(StorageAction.RemoveChat("a"), 2, before, null))
     }
 
+    /** A removal announces only the attachment space it returned, not temporary copies dropped alongside it. */
+    @Test fun removalFreedBytesIgnoreTemporaryCopies() {
+        val before = StorageUsage(1_000, 4, 200, 0, 50, 300)
+        val after = before.copy(attachmentBytes = 600, temporaryBytes = 0)
+        assertEquals(StorageOutcome.Removed(2, 400), describe(StorageAction.RemoveChat("a"), 2, before, after))
+    }
+
     @Suppress("LongParameterList")
     /** Native usage figures with zero defaults. */
     private fun ffi(

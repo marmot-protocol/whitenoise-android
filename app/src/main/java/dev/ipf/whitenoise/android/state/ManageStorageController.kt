@@ -246,8 +246,11 @@ internal fun describe(
     before: StorageUsage?,
     after: StorageUsage?,
 ): StorageOutcome {
-    // Measured on the total, so bytes that only become free database pages are not announced as freed.
-    val freed = ((before?.totalBytes ?: 0) - (after?.totalBytes ?: Long.MAX_VALUE)).coerceAtLeast(0)
+    // A removal reports the attachment space it returned, matching its "up to" confirmation, even though it also
+    // drops temporary playback copies, while clearing caches reports the cache space.
+    val clearing = action == StorageAction.ClearCaches
+    val measure: (StorageUsage) -> Long = { if (clearing) it.clearableCacheBytes else it.attachmentBytes }
+    val freed = ((before?.let(measure) ?: 0) - (after?.let(measure) ?: Long.MAX_VALUE)).coerceAtLeast(0)
     return when {
         action == StorageAction.ClearCaches -> StorageOutcome.CacheCleared(freed)
         removed > 0 -> StorageOutcome.Removed(removed, freed)
