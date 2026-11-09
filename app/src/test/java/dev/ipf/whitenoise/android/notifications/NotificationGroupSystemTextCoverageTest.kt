@@ -44,11 +44,12 @@ class NotificationGroupSystemTextCoverageTest {
                 .substringAfter("internal class NotificationFirstPostResolver")
                 .substringBefore("internal fun createNotificationContentResolutionServices")
                 .kotlinFunctionBody("resolve")
+        val groupTitle = "conversationTitle.resolve(update, localOnly)"
 
         assertTrue(
             "non-rename system rows should override body text without replacing the conversation title",
             "system?.body" in body &&
-                "system?.title ?: conversationTitle.resolve(update, localOnly)" in body,
+                "system?.title ?: if (isDirectConversation) null else $groupTitle" in body,
         )
     }
 

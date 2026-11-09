@@ -23,6 +23,7 @@ internal data class NotificationFirstPostContent(
     val reactedToPreview: String?,
     val mediaKind: ReplyMediaKind,
     val recipientAccountSubtext: String?,
+    val isDirectConversation: Boolean = false,
 )
 
 /** Exact user-visible text/subtext produced for one notification write. */

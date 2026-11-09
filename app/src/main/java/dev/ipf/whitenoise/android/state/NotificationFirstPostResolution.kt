@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.state
 
 import android.content.Context
 import dev.ipf.marmotkit.MarkdownDocumentFfi
+import dev.ipf.marmotkit.NotificationTriggerFfi
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import dev.ipf.marmotkit.UserProfileMetadataFfi
 import dev.ipf.whitenoise.android.R
@@ -126,6 +127,7 @@ internal fun notificationContentPresentation(
                 previewTextOverride = content?.previewText,
                 reactedToPreviewOverride = content?.reactedToPreview,
                 mediaKind = content?.mediaKind ?: ReplyMediaKind.None,
+                useDirectLayout = content?.isDirectConversation == true,
                 shortNpub = shortNpub,
             ),
         recipientAccountSubtext = content?.recipientAccountSubtext,
@@ -458,8 +460,11 @@ internal class NotificationFirstPostResolver(
         update: NotificationUpdateFfi,
         localOnly: Boolean,
     ): NotificationFirstPostContent {
+        val isDirectConversation =
+            update.isDm || (update.trigger == NotificationTriggerFfi.NEW_MESSAGE && source.isDirectConversation(update))
         val senderName = identity.senderName(update)
         val system = systemText.resolve(update, senderName, localOnly)
+        val title = system?.title ?: if (isDirectConversation) null else conversationTitle.resolve(update, localOnly)
         val preview =
             system?.body ?: if (LocalNotificationFormatter.needsPreviewTextResolution(update)) {
                 identity.previewText(update.previewText, requestMissingProfiles = !localOnly)
@@ -483,12 +488,13 @@ internal class NotificationFirstPostResolver(
                 ReplyMediaKind.None
             }
         return NotificationFirstPostContent(
-            conversationTitle = system?.title ?: conversationTitle.resolve(update, localOnly),
+            conversationTitle = title,
             senderName = senderName,
             previewText = preview,
             reactedToPreview = reactedTo,
             mediaKind = resolvedMediaKind,
             recipientAccountSubtext = recipientAccountSubtext(update, localOnly),
+            isDirectConversation = isDirectConversation,
         )
     }
 }
@@ -518,7 +524,7 @@ internal class NotificationAvatarCoordinator(
     private val senderAvatarUrl: suspend (NotificationUpdateFfi) -> String?,
     private val groupAvatarUrl: suspend (NotificationUpdateFfi) -> String?,
 ) {
-    /** Starts bounded remote work only after the first notification write. */
+    /** Warms the pictures used by the posted card; a reaction needs only its sender's picture. */
     suspend fun preWarm(
         update: NotificationUpdateFfi,
         engineMuted: Boolean,
@@ -543,7 +549,12 @@ internal class NotificationAvatarCoordinator(
                 null
             }
         preWarmIfUnlocked(sender, published)
-        val group = if (target.resolveGroupAvatar) bestEffort { groupAvatarUrl(update) } else null
+        val group =
+            if (target.resolveGroupAvatar) {
+                bestEffort { groupAvatarUrl(update) }
+            } else {
+                null
+            }
         // A group's URL picture has host-chosen bytes, so it decodes single-use, never in the conversation's worker.
         preWarmIfUnlocked(group, dev.ipf.whitenoise.android.media.MediaTrustDomain.Unique)
         return PreWarmedNotificationAvatars(sender, group)

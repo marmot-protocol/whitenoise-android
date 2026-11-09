@@ -29,6 +29,7 @@ import dev.ipf.whitenoise.android.notifications.preferredConversationShortcutTit
 import dev.ipf.whitenoise.android.notifications.shortcutPreviewAllowed
 import dev.ipf.whitenoise.android.notifications.stampShortcutPreview
 import dev.ipf.whitenoise.android.state.ChatListItem
+import dev.ipf.whitenoise.android.state.readyStoredAvatarBitmap
 
 internal const val MAX_SHARE_SHORTCUTS = 8
 private const val SHARE_SHORTCUT_SHORT_LABEL_MAX = 24
@@ -42,6 +43,11 @@ data class ShareShortcutTarget(
     val localContactAvatar: Boolean = false,
 )
 
+/**
+ * The active account's recent chats as ranked Direct Share targets, skipping pending invites. A target's picture is
+ * the one the chat list shows for the row: its first-frame seed, else the decoded pixels of the row's stored selected
+ * avatar (#3635), so a refresh that rebuilds a card's shortcut keeps the picture its card shows.
+ */
 internal fun selectShareShortcutTargets(
     accountRef: String,
     chats: List<ChatListItem>,
@@ -60,7 +66,8 @@ internal fun selectShareShortcutTargets(
                 avatarUrl =
                     ProfileSanitizer.protocolImageUrl(item.group.avatarUrl)
                         ?: ProfileSanitizer.protocolImageUrl(item.projection?.avatarUrl),
-                avatarBitmap = item.firstFrameAvatar?.image?.asAndroidBitmap(),
+                avatarBitmap =
+                    item.firstFrameAvatar?.image?.asAndroidBitmap() ?: item.readyStoredAvatarBitmap(accountRef),
             )
         }
 
@@ -138,7 +145,7 @@ internal fun buildShareShortcut(
 }
 
 /**
- * Rebuild a notification-published shortcut through the public AndroidX API.
+ * Rebuild a notification-published shortcut through the public AndroidX API, drawing [picture] or the monogram.
  * AndroidX's shortcut copy constructor is library-internal, so copying it from
  * application code fails Android Lint's RestrictedApi check.
  */
@@ -146,6 +153,7 @@ private fun rebuildRichShareShortcut(
     context: Context,
     target: ShareShortcutTarget,
     existing: ShortcutInfoCompat,
+    picture: Bitmap?,
     rank: Int,
     previewToken: NotificationPreviewToken,
 ): ShortcutInfoCompat =
@@ -153,7 +161,7 @@ private fun rebuildRichShareShortcut(
         context = context,
         existing = existing,
         title = preferredConversationShortcutTitle(target.title, existing.longLabel?.toString()),
-        avatarBitmap = target.avatarBitmap ?: AvatarImageLoader.peekBitmap(target.avatarUrl),
+        avatarBitmap = picture,
         rank = rank,
         categories = existing.categories.orEmpty() + CONVERSATION_SHARE_TARGET_CATEGORY,
         extras = shareShortcutExtras(target.accountRef, existing.extras, previewToken),
@@ -346,7 +354,10 @@ class ShareShortcutPublisher(
         return dynamicShortcuts().filter { it.id in cards && isConversationShortcutId(it.id) }
     }
 
-    /** Builds the ranked recent-chat shortcuts, upgrading rich notification shortcuts instead of downgrading them. */
+    /**
+     * Builds the ranked recent-chat shortcuts, upgrading rich notification shortcuts instead of downgrading them. A
+     * rich shortcut rebuilt with no picture is marked, so a card whose picture it drops gets it back at its next post.
+     */
     private fun targetShortcuts(
         accountRef: String,
         targets: List<ShareShortcutTarget>,
@@ -359,7 +370,9 @@ class ShareShortcutPublisher(
                     ?: return@mapIndexedNotNull null
             val existing = existingById[shortcutId]
             if (existing != null && conversationShortcutIsRich(existing)) {
-                rebuildRichShareShortcut(context, target, existing, rank, previewToken)
+                val picture = target.avatarBitmap ?: AvatarImageLoader.peekBitmap(target.avatarUrl)
+                if (picture == null) InFlightConversationShortcuts.markIdentityLost(shortcutId, ifPictured = true)
+                rebuildRichShareShortcut(context, target, existing, picture, rank, previewToken)
             } else {
                 buildShareShortcut(
                     context,
