@@ -6932,6 +6932,56 @@ class ConversationDictationControllerTest {
         assertTrue(f.controller.state is ConversationDictationState.Failed)
     }
 
+    /** At the drain deadline a stalled short final tail is released and the recognized text is sent. */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun callerAudioHangOnShortFinalTailSendsRecognizedPrefix() =
+        runTest {
+            for (tailSamples in listOf(8_000L, 32_000L)) {
+                val sent = mutableListOf<String>()
+                val platform = FakePlatform().apply { pendingCallerAudio = true }
+                val f =
+                    fixture(
+                        draft = TextFieldValue(""),
+                        platform = platform,
+                        targetValidationScope = this,
+                        sendTranscriptIfOriginUnchanged = {
+                            it.beginDispatch().also { accepted -> if (accepted) sent += it.payload }
+                        },
+                    )
+                f.controller.requestStart(ACCOUNT, GROUP, f.drafts.getValue(key()))
+                platform.listener.onReady()
+                f.controller.send()
+                f.scheduler.advanceBy(30_000L)
+                platform.listener.onResult("prefix")
+                f.scheduler.runDelay(500L)
+                platform.listener.onReady()
+                platform.listener.onEndOfSpeech()
+                val tail = platform.session
+                tail.callerAudioFinalChunk = true
+                tail.audioRequest =
+                    ConversationDictationAudioRequest(
+                        ConversationDictationAudioChunk(1L, 9L, 0L, tailSamples, hasSpeech = true, pcm = ByteArray(0)),
+                    )
+                platform.pendingCallerAudio = false
+                f.scheduler.advanceBy(59_500L)
+                advanceUntilIdle()
+                if (tailSamples == 8_000L) {
+                    assertEquals(1, tail.acknowledgedCallerAudio)
+                    assertEquals(listOf("prefix"), sent)
+                    assertEquals("", f.drafts.getValue(key()).text)
+                    assertTrue(f.controller.state is ConversationDictationState.Idle)
+                } else {
+                    val failed = f.controller.state as ConversationDictationState.Failed
+                    assertEquals(ConversationDictationFailure.SendBlocked, failed.reason)
+                    assertEquals(ConversationDictationFailure.TimedOut, failed.cause)
+                    assertEquals(0, tail.acknowledgedCallerAudio)
+                    assertTrue(sent.isEmpty())
+                    assertEquals("prefix", f.drafts.getValue(key()).text)
+                }
+            }
+        }
+
     /** A provider-owned recording still has its ordinary bounded final-result wait. */
     @Test
     fun providerOwnedSendStillTimesOutAfterTwentySeconds() {
@@ -9500,7 +9550,7 @@ class ConversationDictationControllerTest {
         private val callerAudioOwned: Boolean = false,
         private val callerAudioChunkId: Long? = null,
         private val onCallerAudioAcknowledged: () -> Unit = {},
-        private val audioRequest: ConversationDictationAudioRequest? = null,
+        var audioRequest: ConversationDictationAudioRequest? = null,
         private val settleAudio: (String) -> ConversationDictationAudioSettlement? = { null },
         private val retryAudioWithContext: () -> Boolean = { false },
     ) : ConversationDictationRecognitionSession {

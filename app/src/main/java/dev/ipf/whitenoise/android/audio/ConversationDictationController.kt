@@ -1061,7 +1061,7 @@ internal class ConversationDictationController internal constructor(
             PROCESSING_TIMEOUT_MILLIS,
             ConversationDictationRecognitionDeadlines.GenerationPhase.Processing,
         ) {
-            failOrRetainTranscript(sessionId, target, ConversationDictationFailure.TimedOut)
+            failGenerationTimeout(sessionId, target)
         }
         runCatching {
             generation.session?.stop {
@@ -1114,7 +1114,7 @@ internal class ConversationDictationController internal constructor(
                 "caller_audio_drain",
                 isCurrent = { finishRequested && state.sessionId == sessionId },
             ) {
-                failOrRetainTranscript(sessionId, target, ConversationDictationFailure.TimedOut)
+                failGenerationTimeout(sessionId, target)
             }
         }
     }
@@ -1148,7 +1148,10 @@ internal class ConversationDictationController internal constructor(
         state = ConversationDictationState.Idle
     }
 
-    /** Involuntary focus loss preserves input; an earlier Send choice is never submitted. */
+    /**
+     * Involuntary focus loss before Send or Paste preserves input as a draft. After either choice,
+     * capture is already sealed, so the chosen action continues under its own drain deadline.
+     */
     fun interruptForAudioFocusLoss() {
         if (!inActiveRecognitionState || deliveryInProgress || completion.intent.committed) return
         if (finishRequested) {

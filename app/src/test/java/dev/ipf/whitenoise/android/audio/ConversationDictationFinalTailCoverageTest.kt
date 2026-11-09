@@ -10,9 +10,12 @@ import org.junit.Test
  * Earlier chunks, long or unknown-length tails with transient faults, and first faults keep the retry path.
  */
 class ConversationDictationFinalTailCoverageTest {
-    /** Only the final chunk after recognized speech may be skipped, and only for weak evidence of speech. */
+    /**
+     * Only the final chunk may be skipped. Silence, a short stall or a repeated fault releases it; a
+     * repeated empty result releases a tail of any length, since the provider already heard it twice.
+     */
     @Test
-    fun finalTailDropPolicyKeepsLongSpeechAndEarlierChunksOnRetryPath() {
+    fun finalTailDropPolicyRetriesFirstFaultsAndKeepsEarlierChunks() {
         val recognition = ConversationDictationRecognitionCoordinator()
         val short = ConversationDictationRecognitionCoordinator.SHORT_FINAL_TAIL_MILLIS
         val long = short + 1L
