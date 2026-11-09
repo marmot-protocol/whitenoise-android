@@ -40,6 +40,14 @@
         "test_ids": [
           "ONB-025"
         ]
+      },
+      {
+        "surface": "Fresh sign-up name prefill",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/onboarding/SignUpScreen.kt",
+        "anchor": "controller.draft?.name ?: randomName(null)",
+        "test_ids": [
+          "ONB-025"
+        ]
       }
     ],
     "settings_controls": [

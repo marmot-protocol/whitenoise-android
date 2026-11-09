@@ -4660,6 +4660,34 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/ChatLinkRoute.kt",
+      "symbol": "ChatLinkAccountChooserDialog",
+      "bindings": [
+        {
+          "case": "presentation-chat-link-choose-cancel",
+          "selector": {
+            "text": "Open chat in"
+          },
+          "scope": "account chooser and Cancel dispatch; no account switch.",
+          "entry_assertion": {
+            "text": "Open chat in"
+          },
+          "visible_on_entry": true
+        },
+        {
+          "case": "presentation-chat-link-choose-select",
+          "selector": {
+            "text": "Open chat in"
+          },
+          "scope": "account chooser and account selection dispatch; no chat opened.",
+          "entry_assertion": {
+            "text": "Open chat in"
+          },
+          "visible_on_entry": true
+        }
+      ]
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
       "symbol": "ChatDepartureSuccessor",
       "bindings": [

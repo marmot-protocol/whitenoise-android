@@ -4950,14 +4950,21 @@ internal fun ConversationScreen(
                                         // Jump-to-mention chip: tap visits the oldest unread
                                         // mention and marks it read, so the count steps down.
                                         val mentionCount = unreadMentionMessageIds.size
-                                        if (!selectionMode && mentionCount > 0) {
+                                        // The chip keeps its last count while it shrinks away instead of showing 0.
+                                        val shownMentionCount = remember { IntArray(1) }
+                                        if (mentionCount > 0) shownMentionCount[0] = mentionCount
+                                        val mentionBadge =
+                                            shownMentionCount[0].let { if (it > 99) "99+" else it.toString() }
+                                        ConversationNavigationControl(
+                                            visible = !selectionMode && mentionCount > 0,
+                                        ) {
                                             // The badge caps at 99+; the spoken label keeps the real count.
                                             val jumpToMentionLabel =
                                                 stringResource(R.string.conversation_jump_to_mention) + ", " +
                                                     pluralStringResource(
                                                         R.plurals.unread_mentions_count,
-                                                        mentionCount,
-                                                        mentionCount,
+                                                        shownMentionCount[0],
+                                                        shownMentionCount[0],
                                                     )
                                             Surface(
                                                 shape = CircleShape,
@@ -4980,13 +4987,15 @@ internal fun ConversationScreen(
                                                 ) {
                                                     Text("@", style = MaterialTheme.typography.titleMedium)
                                                     Text(
-                                                        if (mentionCount > 99) "99+" else mentionCount.toString(),
+                                                        mentionBadge,
                                                         style = MaterialTheme.typography.labelLarge,
                                                     )
                                                 }
                                             }
                                         }
-                                        if (!selectionMode && !nearBottom) {
+                                        ConversationNavigationControl(
+                                            visible = !selectionMode && !nearBottom,
+                                        ) {
                                             ConversationJumpToNewestButton(
                                                 unreadIncomingCount = unreadIncomingCount,
                                                 onClick = {

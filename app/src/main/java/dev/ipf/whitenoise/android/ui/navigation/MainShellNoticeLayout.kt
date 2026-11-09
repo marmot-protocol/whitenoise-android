@@ -24,6 +24,7 @@ import dev.ipf.whitenoise.android.ui.conversation.ShellPlaybackHost
 import dev.ipf.whitenoise.android.ui.conversation.composer.ComposerActionRowHeight
 import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationNotificationNotice
 import dev.ipf.whitenoise.android.ui.conversation.composer.ConversationDictationPersistentControl
+import dev.ipf.whitenoise.android.ui.conversation.composer.controlFacts
 
 /** The shell's single notice layout, using control ownership from this same navigation composition. */
 @Composable
@@ -148,11 +149,21 @@ internal fun MainShellNoticeLayout(
                 }
             },
             control = {
-                if (dictationControlOwner != ConversationDictationControlOwner.Hidden) {
+                DictationControlExit(
+                    owner = dictationControlOwner,
+                    state = dictationController.state,
+                    facts = dictationController.controlFacts,
+                    motionAllowed = dictationMotionAllowed,
+                    morphActive = { dictationMotion.active },
+                ) { renderedState, renderedFacts, exitModifier ->
+                    // Only a floating capsule exits; Hidden here is that capsule's frozen final frame.
+                    val capsuleOwner =
+                        dictationControlOwner.takeUnless { it == ConversationDictationControlOwner.Hidden }
+                            ?: ConversationDictationControlOwner.Persistent
                     ConversationDictationPersistentControl(
-                        state = dictationController.state,
+                        state = renderedState,
                         modifier =
-                            Modifier.graphicsLayer {
+                            exitModifier.graphicsLayer {
                                 alpha =
                                     if (dictationMotion.entranceActive) {
                                         dictationMotion.renderedDecorationAlpha
@@ -161,21 +172,22 @@ internal fun MainShellNoticeLayout(
                                     }
                             },
                         controller = dictationController,
-                        embedded = dictationControlOwner == ConversationDictationControlOwner.Composer,
+                        facts = renderedFacts,
+                        embedded = capsuleOwner == ConversationDictationControlOwner.Composer,
                         movingChromeSize = {
                             dictationMotion.renderedBounds?.size.takeIf { dictationMotion.active }
                         },
                         chromeVisibility = {
                             if (dictationMotion.active) {
                                 dictationMotion.renderedDecorationAlpha
-                            } else if (dictationControlOwner == ConversationDictationControlOwner.Persistent) {
+                            } else if (capsuleOwner == ConversationDictationControlOwner.Persistent) {
                                 1f
                             } else {
                                 0f
                             }
                         },
                         actionColors =
-                            if (dictationControlOwner ==
+                            if (capsuleOwner ==
                                 ConversationDictationControlOwner.Composer
                             ) {
                                 anchor.composerControlColors ?: accountActionColors(null)

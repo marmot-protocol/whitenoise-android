@@ -9,7 +9,17 @@
         "anchor": "fun BoxScope.ConversationNavigationStack(",
         "test_ids": [
           "CON-001",
-          "DIC-002"
+          "DIC-002",
+          "NAV-011"
+        ]
+      },
+      {
+        "surface": "ColumnScope.ConversationNavigationControl",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/ConversationNavigationStack.kt",
+        "anchor": "fun ColumnScope.ConversationNavigationControl(",
+        "test_ids": [
+          "NAV-011",
+          "CON-001"
         ]
       }
     ]
