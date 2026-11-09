@@ -51,8 +51,8 @@ internal fun BlockedLeaveCancelNotice(
 
 /**
  * The conversation's composer slot while this account's leave is blocked: the same explanation and Cancel leave as
- * Chat Info, so a durable block never leaves the chat with an empty bar. A cancel that does not restore membership
- * says so here, since Chat Info's error banner is not on screen.
+ * Chat Info, so a durable block never leaves the chat with an empty bar. Cancel waits while another group change is
+ * running, and the controller itself reports a native failure, so this adds no message of its own.
  */
 @Suppress("FunctionNaming")
 @Composable
@@ -69,13 +69,9 @@ internal fun BlockedLeaveComposerNotice(
             .testTag("conversation.blocked_leave"),
     ) {
         BlockedLeaveCancelNotice(
-            enabled = controller.canCancelBlockedLeave,
+            enabled = controller.canCancelBlockedLeave && !controller.mutationInFlight,
             refreshingMembership = controller.blockedLeaveNeedsReadback,
-            onCancel = {
-                appState.launchMutation {
-                    if (!controller.cancelBlockedLeave()) appState.presentTransient(R.string.toast_couldnt_cancel_leave)
-                }
-            },
+            onCancel = { appState.launchMutation { controller.cancelBlockedLeave() } },
         )
     }
 }

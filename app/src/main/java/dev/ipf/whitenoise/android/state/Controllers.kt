@@ -7794,8 +7794,9 @@ class ConversationController(
         onDurablyAccepted: () -> Unit = {},
     ) {
         if (showsBlockedLeave) {
-            // Shares, dictation and notification replies reach here without the composer gate, so say why.
-            appState.presentTransient(R.string.group_leave_blocked_hint)
+            // Dictation's send action and the in-conversation wave and location shares reach here without the
+            // composer gate, so say why.
+            if (text.isNotBlank()) appState.presentTransient(R.string.group_leave_blocked_hint)
             return
         }
         val trimmed = text.trim()

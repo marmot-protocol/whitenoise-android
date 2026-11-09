@@ -50,14 +50,6 @@
         "test_ids": [
           "GRP-037"
         ]
-      },
-      {
-        "surface": "R.string.toast_couldnt_cancel_leave",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupBlockedLeaveNotice.kt",
-        "anchor": "R.string.toast_couldnt_cancel_leave",
-        "test_ids": [
-          "GRP-037"
-        ]
       }
     ]
   },
