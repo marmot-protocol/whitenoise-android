@@ -5,6 +5,8 @@
     <string name="storage_calculating">Подсчёт…</string>
     <string name="storage_used_by_profile">Занято этим профилем на этом устройстве</string>
     <string name="storage_usage_description">Занято: %1$s. %2$s</string>
+    <string name="storage_usage_category">%1$s, %2$s.</string>
+    <string name="storage_usage_category_detail">%1$s, %2$s, %3$s.</string>
     <string name="storage_attachments">Вложения</string>
     <plurals name="storage_attachment_count">
         <item quantity="one">%d вложение</item>

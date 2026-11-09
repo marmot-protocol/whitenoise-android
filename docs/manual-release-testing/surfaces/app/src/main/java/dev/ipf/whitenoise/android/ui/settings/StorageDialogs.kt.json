@@ -134,6 +134,22 @@
         ]
       },
       {
+        "surface": "string:storage_remove_chat_message",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+        "anchor": "R.string.storage_remove_chat_message",
+        "test_ids": [
+          "SET-049"
+        ]
+      },
+      {
+        "surface": "string:storage_remove_chat_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+        "anchor": "R.string.storage_remove_chat_title",
+        "test_ids": [
+          "SET-049"
+        ]
+      },
+      {
         "surface": "string:storage_remove_older",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
         "anchor": "R.string.storage_remove_older",

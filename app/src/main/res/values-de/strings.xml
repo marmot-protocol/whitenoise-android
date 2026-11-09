@@ -1113,6 +1113,7 @@
     <string name="media_downloading">Wird heruntergeladen</string>
     <string name="media_cancel_download">Download abbrechen</string>
     <string name="media_download_cancelled">Download abgebrochen. Zum erneuten Herunterladen tippen</string>
+    <string name="media_removed_download_again">Von diesem Gerät entfernt. Zum erneuten Herunterladen tippen</string>
     <string name="media_opening">Wird geöffnet</string>
     <string name="media_save">Speichern</string>
     <string name="media_saved">In Galerie gespeichert</string>

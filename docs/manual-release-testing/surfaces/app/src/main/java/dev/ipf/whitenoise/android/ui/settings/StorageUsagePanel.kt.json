@@ -110,6 +110,22 @@
         ]
       },
       {
+        "surface": "string:storage_usage_category",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "R.string.storage_usage_category",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
+        "surface": "string:storage_usage_category_detail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
+        "anchor": "R.string.storage_usage_category_detail",
+        "test_ids": [
+          "SET-047"
+        ]
+      },
+      {
         "surface": "string:storage_usage_description",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageUsagePanel.kt",
         "anchor": "R.string.storage_usage_description",

@@ -35,7 +35,10 @@ class ManageStorageSemanticsTest {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
 
-    /** The usage panel reads as one sentence naming the total and every category with its size. */
+    /**
+     * The usage panel reads as one sentence naming this profile's total and every category with its size, each as its
+     * own sentence. The total leaves out the temporary files every profile shares.
+     */
     @Test fun usagePanelReadsOneSentenceWithEveryCategory() {
         val usage = StorageUsage(2_000_000, 3, 500_000, 0, 100_000, 50_000)
         composeRule.setContent {
@@ -49,10 +52,10 @@ class ManageStorageSemanticsTest {
                 .single()
         val size = { bytes: Long -> formatStorageBytes(context, bytes) }
         listOf(
-            "Storage used: ${size(usage.totalBytes)}",
-            "Attachments ${size(usage.attachmentBytes)}",
-            "Messages and chat data ${size(usage.chatDataBytes)}",
-            "Temporary files ${size(usage.temporaryBytes)}, Shared by all profiles on this device",
+            "Storage used: ${size(usage.profileBytes)}.",
+            "Attachments, ${size(usage.attachmentBytes)}, 3 attachments.",
+            "Messages and chat data, ${size(usage.chatDataBytes)}.",
+            "Temporary files, ${size(usage.temporaryBytes)}, Shared by all profiles on this device.",
         ).forEach { assert(description.contains(it)) { "$it missing from $description" } }
         assert(!description.contains("Unused database space")) { "Empty unused space must be left out" }
     }

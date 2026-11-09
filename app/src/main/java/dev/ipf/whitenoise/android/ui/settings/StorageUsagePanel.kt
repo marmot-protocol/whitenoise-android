@@ -34,6 +34,8 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.state.StorageUsage
@@ -64,12 +66,13 @@ private object StorageUsageDefaults {
     const val BaseBodySp = 16f
 }
 
-/** One measured category: its label, bytes and bar colour. */
+/** One measured category: its label, bytes and bar colour, and whether every profile on the device shares it. */
 internal data class StorageCategory(
     @StringRes val labelRes: Int,
     val bytes: Long,
     val color: Color,
     val detail: String? = null,
+    val shared: Boolean = false,
 )
 
 /** The categories the panel shows, largest meaning first, leaving out unused database space when there is none. */
@@ -94,12 +97,14 @@ internal fun storageCategories(usage: StorageUsage): List<StorageCategory> {
             usage.temporaryBytes,
             tint(StorageUsageDefaults.TemporaryAlpha),
             stringResource(R.string.storage_temporary_detail),
+            shared = true,
         ),
     )
 }
 
 /**
- * The total, a stacked pill bar and a legend that names every category with its size, so nothing relies on colour.
+ * This profile's total, a stacked pill bar of its categories and a legend that names every category with its size, so
+ * nothing relies on colour. Temporary files every profile shares stay in the legend but out of the total and the bar.
  * TalkBack reads the whole panel as one sentence. Before the first figures arrive the bar pulses under
  * "Calculating…" without changing height.
  */
@@ -109,13 +114,9 @@ internal fun StorageUsagePanel(
     modifier: Modifier = Modifier,
 ) {
     val categories = usage?.let { storageCategories(it) }.orEmpty()
-    val total = usage?.let { storageBytes(it.totalBytes) }
-    val parts =
-        categories
-            .map { category ->
-                val sized = "${stringResource(category.labelRes)} ${storageBytes(category.bytes)}"
-                listOfNotNull(sized, category.detail).joinToString(", ")
-            }.joinToString()
+    val total = usage?.let { storageBytes(it.profileBytes) }
+    // Each category is a localized sentence carrying its own punctuation, so TalkBack pauses between categories.
+    val parts = categories.map { storageCategorySentence(it) }.joinToString(" ")
     val described =
         stringResource(
             R.string.storage_usage_description,
@@ -137,10 +138,19 @@ internal fun StorageUsagePanel(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (usage == null) StorageUsagePlaceholderBar() else StorageUsageBar(categories)
+            if (usage == null) StorageUsagePlaceholderBar() else StorageUsageBar(categories.filterNot { it.shared })
             categories.forEach { StorageLegendRow(it) }
         }
     }
+}
+
+/** One category as TalkBack reads it: label, size and any detail, as a sentence in the device language. */
+@Composable
+private fun storageCategorySentence(category: StorageCategory): String {
+    val label = stringResource(category.labelRes)
+    val size = storageBytes(category.bytes)
+    return category.detail?.let { stringResource(R.string.storage_usage_category_detail, label, size, it) }
+        ?: stringResource(R.string.storage_usage_category, label, size)
 }
 
 /** Segments share the bar by bytes, an all-zero account shows an empty track. */
@@ -204,7 +214,7 @@ private fun StorageLegendRow(category: StorageCategory) {
         Column(Modifier.weight(1f)) {
             Text(stringResource(category.labelRes), style = MaterialTheme.typography.bodyLarge)
             category.detail?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(it, style = storageDetailStyle(), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         Text(
@@ -227,8 +237,12 @@ private fun StorageLegendLine(category: StorageCategory) {
         Column(Modifier.weight(1f)) {
             Text(stringResource(category.labelRes), style = MaterialTheme.typography.bodyLarge)
             category.detail?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(it, style = storageDetailStyle(), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
 }
+
+/** Detail text set in its own content's direction, so a size and count keep their order in a right-to-left layout. */
+@Composable
+private fun storageDetailStyle(): TextStyle = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Content)

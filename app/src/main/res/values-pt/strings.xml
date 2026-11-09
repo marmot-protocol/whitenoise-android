@@ -1115,6 +1115,7 @@
     <string name="media_downloading">Baixando</string>
     <string name="media_cancel_download">Cancelar o download</string>
     <string name="media_download_cancelled">Download cancelado. Toque para baixar novamente</string>
+    <string name="media_removed_download_again">Removido deste dispositivo. Toque para baixar novamente</string>
     <string name="media_opening">Abrindo</string>
     <string name="media_save">Salvar</string>
     <string name="media_saved">Salvo na galeria</string>

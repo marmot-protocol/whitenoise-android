@@ -80,9 +80,13 @@ internal data class StorageUsage(
     val migration: StorageMigration? = null,
     val migrationBytes: Long = 0,
 ) {
-    /** Everything White Noise holds for this account on the device. */
+    /** Everything White Noise holds for this account on the device, including temporary files all profiles share. */
     val totalBytes: Long
-        get() = attachmentBytes + chatDataBytes + unusedDatabaseBytes + pictureCacheBytes + temporaryBytes
+        get() = profileBytes + temporaryBytes
+
+    /** What this profile alone holds on the device: every figure except the temporary files all profiles share. */
+    val profileBytes: Long
+        get() = attachmentBytes + chatDataBytes + unusedDatabaseBytes + pictureCacheBytes
 
     /** What Clear pictures and temporary files can return. */
     val clearableCacheBytes: Long get() = pictureCacheBytes + temporaryBytes

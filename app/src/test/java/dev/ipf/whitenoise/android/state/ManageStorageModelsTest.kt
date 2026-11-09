@@ -20,6 +20,7 @@ class ManageStorageModelsTest {
         assertEquals(350, usage.chatDataBytes)
         assertEquals(50, usage.unusedDatabaseBytes)
         assertEquals(30, usage.pictureCacheBytes)
+        assertEquals(1_230, usage.profileBytes)
         assertEquals(1_250, usage.totalBytes)
         assertNull(usage.migration)
     }

@@ -26,6 +26,7 @@ import dev.ipf.whitenoise.android.state.attachmentFilePresentationState
 import dev.ipf.whitenoise.android.state.attachmentNativeProgress
 import dev.ipf.whitenoise.android.state.hasCachedAttachmentInMemory
 import dev.ipf.whitenoise.android.state.refreshAttachmentTransferState
+import dev.ipf.whitenoise.android.ui.conversation.media.LOCALLY_REMOVED_PHASES
 import dev.ipf.whitenoise.android.ui.conversation.media.TileTransfer
 import dev.ipf.whitenoise.android.ui.conversation.media.rememberAttachmentFirstFrameCacheResolution
 import dev.ipf.whitenoise.android.ui.medialibrary.mediaAttachments
@@ -166,6 +167,7 @@ private fun keptTransferLabel(transfer: TileTransfer?): Int =
         transfer?.active == true -> R.string.media_downloading
         transfer?.state == AttachmentTransferState.Resolving -> R.string.floating_attachment_resolving
         transfer?.state == AttachmentTransferState.Available -> R.string.floating_attachment_available
+        transfer?.progress?.phase in LOCALLY_REMOVED_PHASES -> R.string.media_removed_download_again
         transfer?.state == AttachmentTransferState.NotRetained -> R.string.media_attachment_unavailable
         else -> R.string.floating_attachment_remote
     }

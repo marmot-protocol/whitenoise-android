@@ -141,14 +141,15 @@ internal fun StoredAttachmentsContent(
 
 /**
  * The chat's attachment count and bytes: summed from its own list once every page is loaded, else the overview's row,
- * else null. The overview pages its chats and reloads only the first page after an action, so it may not hold one.
+ * else null. The overview pages its chats and reloads only the first page after an action, so it may not hold one, and
+ * a list emptied under an open confirmation answers null rather than zero.
  */
 internal fun chatFigures(
     storage: ManageStorageUiState,
     list: StoredAttachmentsUiState,
     groupIdHex: String,
 ): Pair<Long, Long>? =
-    if (list.complete && !list.failed) {
+    if (list.complete && !list.failed && list.items.isNotEmpty()) {
         list.items.size.toLong() to list.items.sumOf { it.bytes }
     } else {
         storage.chats.firstOrNull { it.groupIdHex == groupIdHex }?.let { it.attachmentCount to it.bytes }

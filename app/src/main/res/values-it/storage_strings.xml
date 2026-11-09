@@ -5,6 +5,8 @@
     <string name="storage_calculating">Calcolo in corso…</string>
     <string name="storage_used_by_profile">Usato da questo profilo su questo dispositivo</string>
     <string name="storage_usage_description">Spazio usato: %1$s. %2$s</string>
+    <string name="storage_usage_category">%1$s, %2$s.</string>
+    <string name="storage_usage_category_detail">%1$s, %2$s, %3$s.</string>
     <string name="storage_attachments">Allegati</string>
     <plurals name="storage_attachment_count">
         <item quantity="one">%d allegato</item>

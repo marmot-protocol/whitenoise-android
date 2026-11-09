@@ -24,6 +24,11 @@ class StoredAttachmentsFiguresTest {
         assertEquals(40L to 40L, chatFigures(storage, list, "g"))
     }
 
+    /** A list emptied under an open confirmation is unknown, never zero. */
+    @Test fun emptiedListIsUnknown() {
+        assertNull(chatFigures(ManageStorageUiState(), StoredAttachmentsUiState(complete = true), "g"))
+    }
+
     /** A chat the overview has not loaded is unknown, never zero. */
     @Test fun chatMissingFromTheOverviewIsUnknown() {
         val list = StoredAttachmentsUiState(items = listOf(attachment("a", 10)), complete = false)

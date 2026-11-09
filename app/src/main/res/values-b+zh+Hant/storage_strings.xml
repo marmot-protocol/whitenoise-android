@@ -5,6 +5,8 @@
     <string name="storage_calculating">正在計算…</string>
     <string name="storage_used_by_profile">此個人檔案在此裝置上占用的空間</string>
     <string name="storage_usage_description">已用儲存空間：%1$s。%2$s</string>
+    <string name="storage_usage_category">%1$s，%2$s。</string>
+    <string name="storage_usage_category_detail">%1$s，%2$s，%3$s。</string>
     <string name="storage_attachments">附件</string>
     <plurals name="storage_attachment_count">
         <item quantity="other">%d 個附件</item>
