@@ -171,6 +171,22 @@ internal fun RemoveAttachmentsDialog(
     )
 }
 
+/** Confirms removing every attachment in a chat whose count and size are not known yet. */
+@Composable
+internal fun RemoveChatAttachmentsDialog(
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    ConfirmDialog(
+        title = stringResource(R.string.storage_remove_chat_title),
+        message = stringResource(R.string.storage_remove_chat_message),
+        confirmLabel = stringResource(R.string.storage_remove),
+        destructive = true,
+        onDismiss = onDismiss,
+        onConfirm = onConfirm,
+    )
+}
+
 /** The cutoff as the long local date the confirmation names. */
 private fun cutoffDate(cutoffSeconds: Long): String =
     DateTimeFormatter

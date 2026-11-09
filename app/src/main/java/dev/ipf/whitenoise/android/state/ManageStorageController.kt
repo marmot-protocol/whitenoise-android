@@ -132,7 +132,8 @@ internal class ManageStorageController(
     /** Runs [action] when nothing else is running, then reports what it did and refreshes everything. */
     fun perform(action: StorageAction) {
         if (!current || state.value.busy) return
-        val before = state.value.usage
+        // A figure kept after a failed or unfinished read is stale, so it never anchors the freed space.
+        val before = state.value.takeUnless { it.usageFailed || it.usageLoading }?.usage
         mutable.value = state.value.copy(action = action, outcome = null)
         scope.launch {
             val outcome = runCatchingAction { requireNotNull(access).execute(action) }

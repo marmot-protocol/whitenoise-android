@@ -71,6 +71,8 @@
         <item quantity="other">Rimuovere %d allegati?</item>
     </plurals>
     <string name="storage_remove_attachments_message">In questo modo si liberano fino a %1$s. I messaggi restano e puoi scaricare di nuovo gli allegati finché la copia del mittente è ancora disponibile.</string>
+    <string name="storage_remove_chat_title">Rimuovere tutti gli allegati di questa chat?</string>
+    <string name="storage_remove_chat_message">Tutti gli allegati di questa chat vengono rimossi da questo dispositivo. I messaggi restano e puoi scaricare di nuovo gli allegati finché la copia del mittente è ancora disponibile.</string>
     <string name="storage_attachment_photo">Foto</string>
     <string name="storage_attachment_video">Filmato</string>
     <string name="storage_attachment_audio">File audio</string>

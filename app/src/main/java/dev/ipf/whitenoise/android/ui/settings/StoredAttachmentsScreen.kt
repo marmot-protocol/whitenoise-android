@@ -121,18 +121,38 @@ internal fun StoredAttachmentsContent(
     }
     RemoveOlderDialogs(dialogs, groupIdHex, actions.onAction)
     confirm?.let { target ->
-        val chat = storage.chats.firstOrNull { it.groupIdHex == target }
         val selection = target == SELECTION
-        val count = if (selection) list.selection.size.toLong() else chat?.attachmentCount ?: 0
-        val bytes = if (selection) list.selectedBytes else chat?.bytes ?: 0
-        RemoveAttachmentsDialog(count, bytes, onDismiss = { confirm = null }) {
+        val figures =
+            if (selection) list.selection.size.toLong() to list.selectedBytes else chatFigures(storage, list, target)
+        val onDismiss = { confirm = null }
+        val onConfirm = {
             confirm = null
             actions.onAction(
                 if (selection) StorageAction.RemoveAttachments(list.selection) else StorageAction.RemoveChat(target),
             )
         }
+        if (figures != null) {
+            RemoveAttachmentsDialog(figures.first, figures.second, onDismiss, onConfirm)
+        } else {
+            RemoveChatAttachmentsDialog(onDismiss, onConfirm)
+        }
     }
 }
+
+/**
+ * The chat's attachment count and bytes: summed from its own list once every page is loaded, else the overview's row,
+ * else null. The overview pages its chats and reloads only the first page after an action, so it may not hold one.
+ */
+internal fun chatFigures(
+    storage: ManageStorageUiState,
+    list: StoredAttachmentsUiState,
+    groupIdHex: String,
+): Pair<Long, Long>? =
+    if (list.complete && !list.failed) {
+        list.items.size.toLong() to list.items.sumOf { it.bytes }
+    } else {
+        storage.chats.firstOrNull { it.groupIdHex == groupIdHex }?.let { it.attachmentCount to it.bytes }
+    }
 
 /** The confirmation key for removing the selection rather than a whole chat. */
 private const val SELECTION = "selection"

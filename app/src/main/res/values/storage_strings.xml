@@ -71,6 +71,8 @@
         <item quantity="other">Remove %d attachments?</item>
     </plurals>
     <string name="storage_remove_attachments_message">This frees up to %1$s. Messages stay, and you can download attachments again while the sender\'s copy is still available.</string>
+    <string name="storage_remove_chat_title">Remove all attachments in this chat?</string>
+    <string name="storage_remove_chat_message">Every attachment in this chat is removed from this device. Messages stay, and you can download attachments again while the sender\'s copy is still available.</string>
     <string name="storage_attachment_photo">Photo</string>
     <string name="storage_attachment_video">Video</string>
     <string name="storage_attachment_audio">Audio</string>

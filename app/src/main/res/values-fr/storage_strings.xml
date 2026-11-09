@@ -71,6 +71,8 @@
         <item quantity="other">Supprimer %d pièces jointes ?</item>
     </plurals>
     <string name="storage_remove_attachments_message">Cela libère jusqu\'à %1$s. Les messages restent, et vous pouvez télécharger à nouveau les pièces jointes tant que la copie de l\'expéditeur est encore disponible.</string>
+    <string name="storage_remove_chat_title">Supprimer toutes les pièces jointes de cette discussion ?</string>
+    <string name="storage_remove_chat_message">Toutes les pièces jointes de cette discussion sont supprimées de cet appareil. Les messages restent, et vous pouvez télécharger à nouveau les pièces jointes tant que la copie de l\'expéditeur est encore disponible.</string>
     <string name="storage_attachment_photo">Image</string>
     <string name="storage_attachment_video">Vidéo</string>
     <string name="storage_attachment_audio">Fichier audio</string>

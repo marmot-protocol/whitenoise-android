@@ -21,6 +21,14 @@
         ]
       },
       {
+        "surface": "RemoveChatAttachmentsDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+        "anchor": "fun RemoveChatAttachmentsDialog(",
+        "test_ids": [
+          "SET-049"
+        ]
+      },
+      {
         "surface": "RemoveOlderDialogs",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
         "anchor": "fun RemoveOlderDialogs(",

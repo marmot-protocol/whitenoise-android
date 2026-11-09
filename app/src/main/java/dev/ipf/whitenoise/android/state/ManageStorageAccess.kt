@@ -150,26 +150,34 @@ internal class NativeManageStorageAccess(
 
     /** Saves the window and drops every decrypted copy when anything was removed. */
     override suspend fun setKeepMedia(period: KeepMediaPeriod): Long =
-        admitted(removal = true) {
+        admitted {
             // A bulk removal that returns only a count names no attachments, so every decrypted copy goes.
             native { setAttachmentKeepMedia(account, period.ffi).toSaturatedLong() }
                 .also { if (it > 0) appState.clearDecryptedAttachmentCopies() }
         }
 
-    /** Removes by age and drops every decrypted copy when anything was removed. */
+    /** Removes by age and, when anything went, drops the decrypted copies in its scope: one chat, or all of them. */
     override suspend fun removeOlderThan(
         receivedBeforeSeconds: Long,
         groupIdHex: String?,
     ): Long =
-        admitted(removal = true) {
+        admitted {
             val before = receivedBeforeSeconds.coerceAtLeast(0).toULong()
-            native { removeAttachmentsOlderThan(account, before, groupIdHex).toSaturatedLong() }
-                .also { if (it > 0) appState.clearDecryptedAttachmentCopies() }
+            native { removeAttachmentsOlderThan(account, before, groupIdHex).toSaturatedLong() }.also {
+                when {
+                    it == 0L -> Unit
+                    groupIdHex == null -> appState.clearDecryptedAttachmentCopies()
+                    else -> {
+                        appState.evictGroupMediaCaches(account, groupIdHex)
+                        appState.clearTemporaryAttachmentFiles()
+                    }
+                }
+            }
         }
 
     /** Removes one chat's attachments and evicts that chat's decrypted copies. */
     override suspend fun removeChat(groupIdHex: String): Long =
-        admitted(removal = true) {
+        admitted {
             native { removeChatAttachments(account, groupIdHex).toSaturatedLong() }.also {
                 if (it > 0) {
                     appState.evictGroupMediaCaches(account, groupIdHex)
@@ -183,38 +191,39 @@ internal class NativeManageStorageAccess(
      * part way still evicts what was already removed, and fails the action only when nothing was.
      */
     override suspend fun removeAttachments(items: List<StoredAttachment>): Long =
-        admitted(removal = true) {
+        admitted {
             val removed = mutableListOf<StoredAttachment>()
             val failure =
-                runCatching {
-                    items.forEach { item -> if (native { removeLocalAttachment(account, item) }) removed += item }
-                }.exceptionOrNull()
-            if (removed.isNotEmpty()) {
-                appState.evictAttachmentCopies(account, removed)
-                appState.clearTemporaryAttachmentFiles()
-            }
+                try {
+                    runCatchingCancellable {
+                        items.forEach { item -> if (native { removeLocalAttachment(account, item) }) removed += item }
+                    }.exceptionOrNull()
+                } finally {
+                    // Runs on every exit, so whatever MarmotKit already removed loses its decrypted copy.
+                    if (removed.isNotEmpty()) {
+                        appState.evictAttachmentCopies(account, removed)
+                        appState.clearTemporaryAttachmentFiles()
+                    }
+                }
             if (failure != null && removed.isEmpty()) throw failure
             removed.size.toLong()
         }
 
     /** Clears the account's picture cache and every decrypted attachment copy. */
     override suspend fun clearCaches() {
-        admitted(removal = true) {
+        admitted {
             native { clearAvatarCache(account) }
             appState.clearDecryptedAttachmentCopies()
         }
     }
 
     /**
-     * Admits [block] once the owner is current. A [removal] then runs its native call and cache eviction as one unit
-     * that leaving the screen or switching accounts cannot interrupt, so no removed attachment keeps a decrypted copy.
+     * Admits [block] once the owner is current, then runs its native call and cache eviction as one unit that leaving
+     * the screen or switching accounts cannot interrupt, so no removed attachment keeps a decrypted copy.
      */
-    private suspend fun <T> admitted(
-        removal: Boolean = false,
-        block: suspend () -> T,
-    ): T {
+    private suspend fun <T> admitted(block: suspend () -> T): T {
         if (!isCurrent()) throw CancellationException("Manage Storage owner retired")
-        return if (removal) withContext(NonCancellable) { block() } else block()
+        return withContext(NonCancellable) { block() }
     }
 }
 

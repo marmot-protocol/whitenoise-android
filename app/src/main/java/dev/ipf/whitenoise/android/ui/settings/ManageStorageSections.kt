@@ -19,6 +19,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.ChatStorageEntry
 import dev.ipf.whitenoise.android.state.ManageStorageUiState
 import dev.ipf.whitenoise.android.state.StorageAction
@@ -256,8 +257,10 @@ private fun StorageChatRow(
 internal fun storageChatItem(
     appState: WhiteNoiseAppState,
     groupIdHex: String,
-) = (appState.chatListItems + appState.archivedChatListItems)
-    .firstOrNull { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+): ChatListItem? {
+    val matches: (ChatListItem) -> Boolean = { it.group.groupIdHex.equals(groupIdHex, ignoreCase = true) }
+    return appState.chatListItems.firstOrNull(matches) ?: appState.archivedChatListItems.firstOrNull(matches)
+}
 
 /** Fixed chat titles for previews and screenshot tests, which have no chat list, null defers to the chat list. */
 internal val LocalStorageChatTitles = staticCompositionLocalOf<(String) -> String?> { { null } }

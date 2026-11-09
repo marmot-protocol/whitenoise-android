@@ -29,14 +29,14 @@
     <string name="storage_clear_cache_subtitle">需要時會重新下載圖片</string>
     <string name="storage_removal_help">已移除的附件仍保留在其訊息中。只要傳送者的副本仍可使用，你就可以重新下載。</string>
     <string name="storage_keep_media">保留媒體</string>
-    <string name="storage_keep_media_help">早於此期限的附件會立即從此裝置移除，之後到期的附件也會隨之移除。重新下載的附件會保留完整期限。</string>
+    <string name="storage_keep_media_help">超過此期限的附件會立即從此裝置移除，之後到期的附件也會隨之移除。重新下載的附件會保留完整期限。</string>
     <string name="storage_keep_media_failed">無法載入</string>
     <string name="storage_keep_forever">永久</string>
     <string name="storage_keep_one_year">1 年</string>
     <string name="storage_keep_six_months">6 個月</string>
     <string name="storage_keep_thirty_days">30 天</string>
     <string name="storage_keep_confirm_title">將媒體保留 %1$s？</string>
-    <string name="storage_keep_confirm_message">早於 %1$s 的附件會立即從此裝置移除，之後到期的附件也會隨之移除。訊息會保留，只要傳送者的副本仍可使用，你就可以重新下載附件。</string>
+    <string name="storage_keep_confirm_message">超過 %1$s 的附件會立即從此裝置移除，之後到期的附件也會隨之移除。訊息會保留，只要傳送者的副本仍可使用，你就可以重新下載附件。</string>
     <string name="storage_older_one_week">早於 1 週</string>
     <string name="storage_older_one_month">早於 1 個月</string>
     <string name="storage_older_three_months">早於 3 個月</string>
@@ -68,6 +68,8 @@
         <item quantity="other">要移除 %d 個附件嗎？</item>
     </plurals>
     <string name="storage_remove_attachments_message">這最多可釋放 %1$s。訊息會保留，只要傳送者的副本仍可使用，你就可以重新下載附件。</string>
+    <string name="storage_remove_chat_title">要移除此聊天中的所有附件嗎？</string>
+    <string name="storage_remove_chat_message">此聊天中的所有附件都會從此裝置移除。訊息會保留，只要傳送者的副本仍可使用，你就可以重新下載附件。</string>
     <string name="storage_attachment_photo">相片</string>
     <string name="storage_attachment_video">影片</string>
     <string name="storage_attachment_audio">音訊</string>

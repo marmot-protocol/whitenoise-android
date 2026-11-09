@@ -71,6 +71,8 @@
         <item quantity="other">%d ek kaldırılsın mı?</item>
     </plurals>
     <string name="storage_remove_attachments_message">Bu işlem en fazla %1$s yer açar. Mesajlar kalır ve gönderenin kopyası hâlâ kullanılabilir olduğu sürece ekleri yeniden indirebilirsiniz.</string>
+    <string name="storage_remove_chat_title">Bu sohbetteki tüm ekler kaldırılsın mı?</string>
+    <string name="storage_remove_chat_message">Bu sohbetteki tüm ekler bu cihazdan kaldırılır. Mesajlar kalır ve gönderenin kopyası hâlâ kullanılabilir olduğu sürece ekleri yeniden indirebilirsiniz.</string>
     <string name="storage_attachment_photo">Fotoğraf</string>
     <string name="storage_attachment_video">Video dosyası</string>
     <string name="storage_attachment_audio">Ses</string>

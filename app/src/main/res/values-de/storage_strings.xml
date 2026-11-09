@@ -71,6 +71,8 @@
         <item quantity="other">%d Anhänge entfernen?</item>
     </plurals>
     <string name="storage_remove_attachments_message">Dadurch werden bis zu %1$s frei. Nachrichten bleiben erhalten, und du kannst Anhänge erneut herunterladen, solange die Kopie des Absenders noch verfügbar ist.</string>
+    <string name="storage_remove_chat_title">Alle Anhänge in diesem Chat entfernen?</string>
+    <string name="storage_remove_chat_message">Alle Anhänge in diesem Chat werden von diesem Gerät entfernt. Nachrichten bleiben erhalten, und du kannst Anhänge erneut herunterladen, solange die Kopie des Absenders noch verfügbar ist.</string>
     <string name="storage_attachment_photo">Foto</string>
     <string name="storage_attachment_video">Videodatei</string>
     <string name="storage_attachment_audio">Audiodatei</string>

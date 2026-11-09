@@ -96,6 +96,23 @@ class ManageStorageControllerTest {
             controller.close()
         }
 
+    /** After a failed read the kept figure is stale, so the next removal measures nothing rather than inflating it. */
+    @Test fun staleUsageNeverAnchorsTheNextRemoval() =
+        runTest {
+            val access = FakeStorageAccess().apply { removed = 1 }
+            val controller = open(access)
+            access.failUsage = true
+            controller.perform(StorageAction.RemoveChat("a"))
+            runCurrent()
+            controller.outcomeShown()
+            access.failUsage = false
+            access.usage = access.usage.copy(attachmentBytes = 850)
+            controller.perform(StorageAction.RemoveChat("b"))
+            runCurrent()
+            assertEquals(StorageOutcome.Removed(count = 1, freedBytes = null), controller.state.value.outcome)
+            controller.close()
+        }
+
     /** Nothing matching is reported as such, while an unchanged Keep media window reports it was saved. */
     @Test fun emptyRemovalsAreDistinguishedFromSavedKeepMedia() =
         runTest {

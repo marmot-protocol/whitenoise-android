@@ -71,6 +71,8 @@
         <item quantity="other">Remover %d anexos?</item>
     </plurals>
     <string name="storage_remove_attachments_message">Isso libera até %1$s. As mensagens continuam, e você pode baixar os anexos de novo enquanto a cópia do remetente ainda estiver disponível.</string>
+    <string name="storage_remove_chat_title">Remover todos os anexos desta conversa?</string>
+    <string name="storage_remove_chat_message">Todos os anexos desta conversa são removidos deste dispositivo. As mensagens continuam, e você pode baixar os anexos de novo enquanto a cópia do remetente ainda estiver disponível.</string>
     <string name="storage_attachment_photo">Foto</string>
     <string name="storage_attachment_video">Vídeo</string>
     <string name="storage_attachment_audio">Áudio</string>

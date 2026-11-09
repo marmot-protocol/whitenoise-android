@@ -39,7 +39,7 @@
     <string name="storage_keep_six_months">6 месяцев</string>
     <string name="storage_keep_thirty_days">30 дней</string>
     <string name="storage_keep_confirm_title">Хранить медиа: %1$s?</string>
-    <string name="storage_keep_confirm_message">Вложения старше %1$s удаляются с этого устройства сейчас и по мере устаревания. Сообщения остаются, и вложения можно скачать снова, пока копия отправителя ещё доступна.</string>
+    <string name="storage_keep_confirm_message">Срок хранения — %1$s. Вложения старше этого срока удаляются с этого устройства сейчас и по мере устаревания. Сообщения остаются, и вложения можно скачать снова, пока копия отправителя ещё доступна.</string>
     <string name="storage_older_one_week">Старше 1 недели</string>
     <string name="storage_older_one_month">Старше 1 месяца</string>
     <string name="storage_older_three_months">Старше 3 месяцев</string>
@@ -77,6 +77,8 @@
         <item quantity="other">Удалить %d вложения?</item>
     </plurals>
     <string name="storage_remove_attachments_message">Освободится до %1$s. Сообщения остаются, и вложения можно скачать снова, пока копия отправителя ещё доступна.</string>
+    <string name="storage_remove_chat_title">Удалить все вложения в этом чате?</string>
+    <string name="storage_remove_chat_message">Все вложения в этом чате будут удалены с этого устройства. Сообщения остаются, и вложения можно скачать снова, пока копия отправителя ещё доступна.</string>
     <string name="storage_attachment_photo">Фото</string>
     <string name="storage_attachment_video">Видео</string>
     <string name="storage_attachment_audio">Аудио</string>
