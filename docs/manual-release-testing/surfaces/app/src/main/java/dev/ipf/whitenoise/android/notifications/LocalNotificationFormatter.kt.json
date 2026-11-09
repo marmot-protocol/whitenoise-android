@@ -31,6 +31,15 @@
       },
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationFormatter.kt",
+        "anchor": "R.string.notification_sender_in_group",
+        "surface": "group message title includes its conversation while a DM shows its peer once",
+        "test_ids": [
+          "NTF-006",
+          "NTF-042"
+        ]
+      },
+      {
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationFormatter.kt",
         "anchor": "R.string.notification_reacted_to_message",
         "surface": "reaction sentence with its quoted target",
         "test_ids": [

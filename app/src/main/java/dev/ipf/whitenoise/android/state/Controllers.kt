@@ -1177,6 +1177,16 @@ class ChatsController private constructor(
             )
     }
 
+    /** Publishes visible and archived rows as a projection would, for state readers of the chat list's rows. */
+    @VisibleForTesting
+    internal fun publishItemsForTest(
+        visible: List<ChatListItem>,
+        archived: List<ChatListItem> = emptyList(),
+    ) {
+        items = visible
+        archivedItems = archived
+    }
+
     /** Publishes the terminal no-snapshot failure used by first-frame screen coverage. */
     @VisibleForTesting
     internal fun publishInitialLoadFailureForTest(failure: ErrorPresentation) {

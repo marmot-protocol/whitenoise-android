@@ -234,7 +234,11 @@ internal class PinnedConversationShortcuts(
         groupIdHex: String,
     ) = synchronized(UserEventNotificationGroup.mutationLock) {
         val baseId = conversationShortcutId(accountRef, groupIdHex) ?: return@synchronized
-        val old = platform.shortcuts().filter { it.id == baseId || it.id.startsWith("$baseId-pin-") }
+        val reactionId = reactionConversationShortcutId(accountRef, groupIdHex)
+        val old =
+            platform.shortcuts().filter {
+                it.id == baseId || it.id == reactionId || it.id.startsWith("$baseId-pin-")
+            }
         val ids = old.map { it.id }
         try {
             if (old.isNotEmpty()) platform.update(old.map { genericNotificationShortcut(context, it) })

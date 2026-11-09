@@ -39,6 +39,12 @@ class NotificationFirstPostAvatarOwnerTest {
         checkOwner("account-b", expectedImage = false, encrypted = true)
     }
 
+    /** A named group's reaction cannot borrow the image from its retained invite row. */
+    @Test
+    fun pendingInviteCannotLendItsAvatarToANamedGroupReaction() {
+        checkOwner("account-a", expectedImage = false, pendingInvite = true)
+    }
+
     /**
      * #3311: a direct chat's first card takes the sender's ready picture as its conversation identity image,
      * while a group snapshot never borrows that face for the group.
@@ -68,9 +74,9 @@ class NotificationFirstPostAvatarOwnerTest {
         }
     }
 
-    /** Hidden sender cache hits are skipped for group messages, while invite imagery keeps its existing source. */
+    /** #3635: a group message's snapshot carries its sender's ready picture for the row, as an invite's does. */
     @Test
-    fun groupMessageSnapshotDropsTheSenderButInviteSnapshotRetainsIt() {
+    fun groupMessageAndInviteSnapshotsBothCarryTheReadySenderPicture() {
         val context = RuntimeEnvironment.getApplication()
         val url = "https://profiles.example/group-member.png"
         val fixture = NotificationBootstrapTestFixture(context = context, senderPictureUrl = url, isDm = false)
@@ -85,7 +91,9 @@ class NotificationFirstPostAvatarOwnerTest {
         val image = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888)
         try {
             AvatarImageLoader.putCached(url, image.asImageBitmap())
-            assertNull(state.readyNotificationAvatars(fixture.update).senderAvatarBitmap)
+            val message = state.readyNotificationAvatars(fixture.update)
+            assertSame(image, message.senderAvatarBitmap)
+            assertNull("a group never borrows the sender's face", message.conversationBitmap(isDm = false))
             val invite = fixture.update.copy(trigger = NotificationTriggerFfi.GROUP_INVITE)
             assertSame(image, state.readyNotificationAvatars(invite).senderAvatarBitmap)
         } finally {
@@ -99,6 +107,7 @@ class NotificationFirstPostAvatarOwnerTest {
         controllerAccount: String,
         expectedImage: Boolean,
         encrypted: Boolean = false,
+        pendingInvite: Boolean = false,
     ) {
         val context = RuntimeEnvironment.getApplication()
         val fixture = NotificationBootstrapTestFixture(context = context)
@@ -123,6 +132,7 @@ class NotificationFirstPostAvatarOwnerTest {
             chats.applyChatListRow(
                 notificationChatListRow().copy(
                     groupIdHex = "group-a",
+                    pendingConfirmation = pendingInvite,
                     avatarUrl = url.takeUnless { encrypted },
                     avatar =
                         if (encrypted) {
@@ -134,7 +144,12 @@ class NotificationFirstPostAvatarOwnerTest {
             )
             chats.setChatListVisible(true)
             state.attachChatsController(chats)
-            val snapshot = state.readyNotificationAvatars(fixture.update)
+            if (pendingInvite) {
+                val invite = fixture.update.copy(trigger = NotificationTriggerFfi.GROUP_INVITE)
+                assertSame(image, state.readyNotificationAvatars(invite).groupAvatarBitmap)
+            }
+            val update = if (pendingInvite) fixture.update.copy(reactionEmoji = "👍") else fixture.update
+            val snapshot = state.readyNotificationAvatars(update)
             if (expectedImage) assertSame(image, snapshot.groupAvatarBitmap) else assertNull(snapshot.groupAvatarBitmap)
         } finally {
             state.attachChatsController(null)

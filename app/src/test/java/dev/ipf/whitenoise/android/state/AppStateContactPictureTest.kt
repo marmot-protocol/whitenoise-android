@@ -1,7 +1,12 @@
 package dev.ipf.whitenoise.android.state
 
+import android.graphics.Bitmap
+import android.graphics.Bitmap.Config.ARGB_8888
 import android.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.app.NotificationCompat
+import androidx.core.graphics.drawable.toBitmap
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AvatarAcquisitionStateFfi
 import dev.ipf.marmotkit.AvatarAssetFfi
@@ -14,8 +19,12 @@ import dev.ipf.marmotkit.SelectedAvatarFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.core.PrivateContactAvatarLoader
 import dev.ipf.whitenoise.android.media.PresentationMemoryTrim
+import dev.ipf.whitenoise.android.notifications.NotificationIdentityImage
 import dev.ipf.whitenoise.android.notifications.PinnedConversationCapability
+import dev.ipf.whitenoise.android.notifications.notificationMonogramBackgroundColor
 import dev.ipf.whitenoise.android.notifications.setAppLockScreenVisibleForTest
+import dev.ipf.whitenoise.android.notifications.setConversationIdentityImage
+import dev.ipf.whitenoise.android.notifications.withCurrentIdentityContact
 import dev.ipf.whitenoise.android.ui.share.group
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -141,34 +150,8 @@ class AppStateContactPictureTest {
         runBlocking {
             val app = app()
             assertTrue(app.saveContactPrivateDetails("a", "contact", "Local", "", picture(Color.RED)) { true })
-            val asset =
-                AvatarAssetFfi(
-                    "peer",
-                    "public-picture",
-                    AvatarAvailabilityFfi.READY,
-                    AvatarAcquisitionStateFfi.IDLE,
-                    1uL,
-                    1_024uL,
-                )
-            val item =
-                ChatListItem(
-                    group("dm"),
-                    null,
-                    "contact",
-                    2,
-                    null,
-                    selectedAvatarAsset = asset,
-                    selectedPresentation =
-                        ConversationPresentationFfi(
-                            title = PresentationTextFfi.Literal("Peer"),
-                            avatar = SelectedAvatarFfi.RemoteImage("https://peer.example/avatar", "peer"),
-                            titleSource = PresentationSourceFfi.PEER_PROFILE,
-                            avatarSource = PresentationSourceFfi.PEER_PROFILE,
-                            peerId = "contact",
-                            resolution = PresentationResolutionFfi.CACHED,
-                        ),
-                )
-            val captured = app.pinnedConversationPresentation("a", item, "Local")
+            val asset = storedAsset("public-picture")
+            val captured = app.pinnedConversationPresentation("a", directItem(asset), "Local")
             assertEquals(Color.RED, checkNotNull(captured.currentPicture?.invoke()?.bitmap).getPixel(0, 0))
             assertTrue(app.saveContactPrivateDetails("a", "contact", "Local", "", ContactPictureChange.Clear) { true })
             AvatarImageLoader.loadStored(checkNotNull(asset.cacheKey("a")), AvatarImageLoader.currentCacheLifetime()) {
@@ -178,6 +161,69 @@ class AppStateContactPictureTest {
             assertEquals("contact", captured.contact)
             app.setAppLockScreenVisibleForTest(true)
             assertNull(captured.currentPicture?.invoke()?.bitmap)
+        }
+
+    /**
+     * #3635: a Clear retires only the contact's private pixels, so the card's final write shows the stored picture
+     * their chat row shows instead of initials. The app lock still shows the monogram.
+     */
+    @Test fun clearedPictureWritesTheStoredPictureTheChatRowShows() =
+        runBlocking {
+            val app = app()
+            val asset = storedAsset("row-picture")
+            val chats = ChatsController(app, initialAccountRef = "a", memberSnapshotLoader = { _, _ -> emptyList() })
+            chats.publishItemsForTest(listOf(directItem(asset)))
+            app.attachChatsController(chats)
+            AvatarImageLoader.putCached(checkNotNull(asset.cacheKey("a")), solid(Color.GREEN))
+            assertTrue(app.saveContactPrivateDetails("a", "contact", "Local", "", picture(Color.RED)) { true })
+            val private = checkNotNull(app.contactPictureStore.reference("a", "contact")).cacheKey
+            assertEquals("the private picture wins", Color.RED, app.writtenCardPixel("contact"))
+
+            assertTrue(app.saveContactPrivateDetails("a", "contact", "Local", "", ContactPictureChange.Clear) { true })
+
+            assertNull("the Clear retired the private pixels", AvatarImageLoader.cachedImage(private))
+            assertEquals("the card shows what the row shows", Color.GREEN, app.writtenCardPixel("contact"))
+            app.setAppLockScreenVisibleForTest(true)
+            assertEquals(notificationMonogramBackgroundColor(SEED), app.writtenCardPixel("contact"))
+        }
+
+    /** #3635: a cleared choice shows an archived direct chat's stored picture as well. */
+    @Test fun clearedPictureWritesAnArchivedRowsStoredPicture() =
+        runBlocking {
+            val app = app()
+            val asset = storedAsset("archived-picture")
+            val chats = ChatsController(app, initialAccountRef = "a", memberSnapshotLoader = { _, _ -> emptyList() })
+            chats.publishItemsForTest(visible = emptyList(), archived = listOf(directItem(asset)))
+            app.attachChatsController(chats)
+            AvatarImageLoader.putCached(checkNotNull(asset.cacheKey("a")), solid(Color.GREEN))
+
+            assertTrue(app.saveContactPrivateDetails("a", "contact", "Local", "", ContactPictureChange.Clear) { true })
+
+            assertEquals(Color.GREEN, app.writtenCardPixel("contact"))
+        }
+
+    /**
+     * #3635: with no chat list holding the row, as for a push into a dead process or another account, a cleared
+     * choice shows the stored picture the notification's late refresh decoded for that row. Behind the app lock the
+     * refresh decodes and records nothing.
+     */
+    @Test fun clearedPictureWritesTheStoredPictureALateRefreshDecoded() =
+        runBlocking {
+            val app = app()
+            val asset = storedAsset("late-picture")
+            AvatarImageLoader.putCached(checkNotNull(asset.cacheKey("a")), solid(Color.GREEN))
+            assertTrue(app.saveContactPrivateDetails("a", "contact", "Local", "", ContactPictureChange.Clear) { true })
+            val refresh = app.lateRowIdentity("a", directItem(asset))
+            val loader = checkNotNull(refresh.storedLoader)
+            assertEquals("contact", refresh.contact)
+
+            app.setAppLockScreenVisibleForTest(true)
+            assertNull(loader())
+            app.setAppLockScreenVisibleForTest(false)
+            assertEquals("nothing recorded", notificationMonogramBackgroundColor(SEED), app.writtenCardPixel("contact"))
+
+            assertEquals(Color.GREEN, checkNotNull(loader()).getPixel(0, 0))
+            assertEquals(Color.GREEN, app.writtenCardPixel("contact"))
         }
 
     /** A narrow approval waits for both broad jobs without invalidating their other pins' pending presentation. */
@@ -232,6 +278,68 @@ class AppStateContactPictureTest {
             .set(this, value)
     }
 
+    /**
+     * Writes a direct chat card naming [contact], drawn with a blue picture, through the final-write identity refresh
+     * every card write takes, and returns the top-left pixel of the picture it ends on.
+     */
+    private fun WhiteNoiseAppState.writtenCardPixel(contact: String): Int {
+        val context = RuntimeEnvironment.getApplication()
+        val card =
+            NotificationCompat
+                .Builder(context, "contact-picture-test")
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setConversationIdentityImage(
+                    NotificationIdentityImage(solid(Color.BLUE).asAndroidBitmap(), "Peer", SEED, contact),
+                ).build()
+        val written = withCurrentIdentityContact(context, card) { contactAvatarChoice("a", it) }
+        return checkNotNull(written.getLargeIcon()?.loadDrawable(context)).toBitmap().getPixel(0, 0)
+    }
+
+    /** The account-scoped choice every notification and shortcut write reads, called as the presenter calls it. */
+    @Suppress("UNCHECKED_CAST")
+    private fun WhiteNoiseAppState.contactAvatarChoice(
+        account: String,
+        contact: String,
+    ): Pair<Boolean, Bitmap?> =
+        WhiteNoiseAppState::class.java
+            .getDeclaredMethod("contactAvatarOverride", String::class.java, String::class.java)
+            .apply { isAccessible = true }
+            .invoke(this, account, contact) as Pair<Boolean, Bitmap?>
+
+    /** MDK's ready stored copy of the peer's picture, under its own [reference]. */
+    private fun storedAsset(reference: String) =
+        AvatarAssetFfi(
+            "peer",
+            reference,
+            AvatarAvailabilityFfi.READY,
+            AvatarAcquisitionStateFfi.IDLE,
+            1uL,
+            1_024uL,
+        )
+
+    /** A direct chat with "contact" whose row shows [asset], the peer's stored picture. */
+    private fun directItem(asset: AvatarAssetFfi) =
+        ChatListItem(
+            group("dm"),
+            null,
+            "contact",
+            2,
+            null,
+            selectedAvatarAsset = asset,
+            selectedPresentation =
+                ConversationPresentationFfi(
+                    title = PresentationTextFfi.Literal("Peer"),
+                    avatar = SelectedAvatarFfi.RemoteImage("https://peer.example/avatar", "peer"),
+                    titleSource = PresentationSourceFfi.PEER_PROFILE,
+                    avatarSource = PresentationSourceFfi.PEER_PROFILE,
+                    peerId = "contact",
+                    resolution = PresentationResolutionFfi.CACHED,
+                ),
+        )
+
+    /** A solid 2x2 image of [color]. */
+    private fun solid(color: Int) = Bitmap.createBitmap(2, 2, ARGB_8888).apply { eraseColor(color) }.asImageBitmap()
+
     /** Creates a small synthetic normalized replacement without relying on external media. */
     private fun picture(color: Int) = ContactPictureChange.Replace(contactPicturePng(color))
 
@@ -268,4 +376,8 @@ class AppStateContactPictureTest {
             running = true,
             unlinked = false,
         )
+
+    private companion object {
+        const val SEED = "contact-seed"
+    }
 }

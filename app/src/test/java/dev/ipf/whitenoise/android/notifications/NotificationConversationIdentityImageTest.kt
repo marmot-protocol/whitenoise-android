@@ -63,73 +63,17 @@ class NotificationConversationIdentityImageTest {
         assertEquals(DEFAULT_SENDER, identityExtras(posts.single())?.getString("contact"))
     }
 
-    /** A group card shows its own picture and the sender name without sender photo or initial pixels. */
+    /** A group card shows its own picture as its identity and the member's own picture on the member's row (#3635). */
     @Test
-    fun groupCardShowsOnlyTheGroupPictureAndKeepsTheSenderName() {
+    fun groupCardShowsTheGroupPictureAndTheSendersOwnPicture() {
         val presenter = presenter()
         show(presenter, group(), conversation = solid(Color.BLUE), sender = solid(Color.GREEN))
 
         val card = liveCard()
         assertEquals(Color.BLUE, identityPixel(card))
-        assertEquals(0, Color.alpha(pixel(lastMessagePerson(card))))
+        assertEquals(Color.GREEN, pixel(lastMessagePerson(card)))
         assertEquals(DEFAULT_SENDER, lastMessagePerson(card).key)
         assertNull("a group identity is never a member's private contact", identityExtras(card)?.getString("contact"))
-    }
-
-    /** Hidden member pictures do not schedule enrichment, consult private overrides or churn a group shortcut. */
-    @Test
-    fun readyGroupPictureIgnoresColdAndChangedSenderPictures() {
-        val posts = mutableListOf<Notification>()
-        val publications = AtomicInteger()
-        val privateReads = AtomicInteger()
-        val resolverCalls = AtomicInteger()
-        val fetched = mutableListOf<String>()
-        val presenter =
-            presenter(
-                posts,
-                resolver = { url ->
-                    resolverCalls.incrementAndGet()
-                    url?.also { fetched += it }?.let { solid(Color.GREEN) }
-                },
-                contactAvatar = { _, _ -> (true to solid(Color.RED)).also { privateReads.incrementAndGet() } },
-                shortcutPublications = publications,
-            )
-        val picture = solid(Color.BLUE)
-        show(presenter, group(), conversation = picture, senderUrl = PICTURE_URL)
-        val next = group().copy(messageIdHex = "next")
-        show(presenter, next, conversation = picture, senderUrl = "https://example.com/changed.png")
-
-        assertTrue(fetched.isEmpty())
-        assertEquals(0, privateReads.get())
-        assertEquals(0, resolverCalls.get())
-        assertEquals(1, publications.get())
-        assertEquals(2, posts.size)
-        assertEquals(Color.BLUE, identityPixel(liveCard()))
-        assertEquals(DEFAULT_SENDER, lastMessagePerson(liveCard()).key)
-        assertEquals(0, Color.alpha(pixel(lastMessagePerson(liveCard()))))
-    }
-
-    /** A missing group URL picture still enriches the same card without fetching its member's image. */
-    @Test
-    fun groupPictureUrlStillLoadsWithoutTheHiddenSenderUrl() {
-        val posts = mutableListOf<Notification>()
-        val fetched = mutableListOf<String>()
-        var enrichment: (suspend () -> Unit)? = null
-        val groupUrl = "https://example.com/group.png"
-        val presenter =
-            presenter(
-                posts,
-                resolver = { url -> solid(Color.BLUE).also { fetched += checkNotNull(url) } },
-                launcher = { enrichment = it },
-            )
-        show(presenter, group(), senderUrl = PICTURE_URL, conversationUrl = groupUrl)
-        runBlocking { checkNotNull(enrichment).invoke() }
-
-        assertEquals(listOf(groupUrl), fetched)
-        assertEquals(2, posts.size)
-        assertEquals(Color.BLUE, identityPixel(liveCard()))
-        assertTrue(liveCard().flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
-        assertEquals(0, Color.alpha(pixel(lastMessagePerson(liveCard()))))
     }
 
     /** Missing pictures fall back to the conversation shortcut's monogram, never the app icon or a member's face. */
@@ -312,7 +256,10 @@ class NotificationConversationIdentityImageTest {
             assertEquals("only this card's own account scope is consulted", setOf(scope(ACCOUNT)), scopes)
         }
 
-    /** Rewriting a live group card for a member's private picture keeps the group's own identity image. */
+    /**
+     * Rewriting a live group card for a member's private picture keeps the group's own identity image and shows the
+     * private picture on the member's row (#3635).
+     */
     @Test
     fun liveGroupRewriteKeepsTheGroupIdentityImage() =
         runBlocking {
@@ -322,7 +269,7 @@ class NotificationConversationIdentityImageTest {
 
             val card = liveCard()
             assertEquals(Color.BLUE, identityPixel(card))
-            assertEquals(0, Color.alpha(pixel(lastMessagePerson(card))))
+            assertEquals(Color.RED, pixel(lastMessagePerson(card)))
             assertEquals("Maya", lastMessagePerson(card).name.toString())
         }
 
@@ -368,9 +315,9 @@ class NotificationConversationIdentityImageTest {
             assertTrue(card.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
         }
 
-    /** An unused late member picture causes no fetch or rewrite and keeps the current sender name. */
+    /** A late member picture draws on the member's row, keeping the group picture and the current sender name. */
     @Test
-    fun lateGroupSenderPictureKeepsTheCurrentNameAndNoSenderPixels() =
+    fun lateGroupSenderPictureDrawsOnTheRowAndKeepsTheCurrentName() =
         runBlocking {
             val posts = mutableListOf<Notification>()
             val fetched = mutableListOf<String>()
@@ -382,14 +329,14 @@ class NotificationConversationIdentityImageTest {
             val before = posts.size
             val sources = NotificationIdentityPictureSources(picture, null, null, PICTURE_URL)
 
-            assertFalse(refreshLateIdentity(presenter, group(), sources))
+            assertTrue(refreshLateIdentity(presenter, group(), sources))
 
-            assertTrue(fetched.isEmpty())
-            assertEquals(before, posts.size)
+            assertEquals(listOf(PICTURE_URL), fetched)
+            assertEquals(before + 1, posts.size)
             val card = liveCard()
             assertEquals(Color.BLUE, identityPixel(card))
             assertEquals("Maya", lastMessagePerson(card).name.toString())
-            assertEquals(0, Color.alpha(pixel(lastMessagePerson(card))))
+            assertEquals(Color.MAGENTA, pixel(lastMessagePerson(card)))
             assertTrue(card.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
         }
 
@@ -407,7 +354,7 @@ class NotificationConversationIdentityImageTest {
             val sources =
                 NotificationIdentityPictureSources(null, null, null, null, conversationLoader = { solid(Color.GREEN) })
 
-            assertTrue(sources.hasMissingPicture)
+            assertTrue(sources.mayUpdatePictures)
             assertTrue(refreshLateIdentity(presenter, group(), sources))
 
             assertEquals(before + 1, posts.size)
@@ -443,15 +390,16 @@ class NotificationConversationIdentityImageTest {
             assertEquals(Color.BLUE, identityPixel(liveCard()))
         }
 
-    /** A failed group-picture load never fetches an unused sender image or rewrites the card. */
+    /** A failed group-picture load keeps the monogram identity and still draws the sender picture that arrived. */
     @Test
-    fun lateIdentityRefreshKeepsSenderPixelsHiddenWhenTheGroupLoaderFails() =
+    fun lateIdentityRefreshStillDrawsTheSenderWhenTheGroupLoaderFails() =
         runBlocking {
             val posts = mutableListOf<Notification>()
             val fetched = mutableListOf<String>()
             val presenter =
                 presenter(posts, resolver = { url -> url?.also { fetched += it }?.let { solid(Color.MAGENTA) } })
             show(presenter, group())
+            val monogram = identityPixel(liveCard())
             val before = posts.size
             val sources =
                 NotificationIdentityPictureSources(
@@ -462,11 +410,12 @@ class NotificationConversationIdentityImageTest {
                     conversationLoader = { error("the group picture download failed") },
                 )
 
-            assertFalse(refreshLateIdentity(presenter, group(), sources))
+            assertTrue(refreshLateIdentity(presenter, group(), sources))
 
-            assertTrue(fetched.isEmpty())
-            assertEquals("no visible picture arrived, so no rewrite is needed", before, posts.size)
-            assertEquals(0, Color.alpha(pixel(lastMessagePerson(liveCard()))))
+            assertEquals(listOf(PICTURE_URL), fetched)
+            assertEquals(before + 1, posts.size)
+            assertEquals(monogram, identityPixel(liveCard()))
+            assertEquals(Color.MAGENTA, pixel(lastMessagePerson(liveCard())))
         }
 
     /** A redacted group card never asks the loader for its encrypted picture, and nothing is written. */
