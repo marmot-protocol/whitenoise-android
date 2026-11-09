@@ -2,6 +2,8 @@ package dev.ipf.whitenoise.android.ui.chats
 
 import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.whitenoise.android.state.ChatFolderQuery
+import dev.ipf.whitenoise.android.state.ChatListSelectAllScope
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -10,31 +12,36 @@ internal const val CHAT_LIST_SELECT_ALL_ATTEMPTS = 5
 internal const val CHAT_LIST_SELECT_ALL_RETRY_MS = 250L
 
 /**
- * The native view whose complete membership Select all may claim (#2925), or null where Android
- * still filters loaded windows: search, unread and folder scopes keep loaded-window semantics.
- * The Archived system folder qualifies only while its rule and membership are untouched.
+ * The native scope whose complete membership Select all may claim (#2925, #3652), or null where Android
+ * still filters loaded windows: search, unread and participant folders keep loaded-window semantics.
+ * The Archived system folder reads its view while its rule and membership are untouched, and any other
+ * folder with a native query reads that query.
  */
-internal fun chatListCompleteSelectAllView(
+internal fun chatListCompleteSelectAllScope(
     folderSelected: Boolean,
     untouchedArchivedFolder: Boolean,
     unreadOnly: Boolean,
     searchOpen: Boolean,
-): ChatListViewFfi? =
+    folderQuery: ChatFolderQuery? = null,
+): ChatListSelectAllScope? =
     when {
         searchOpen || unreadOnly -> null
-        untouchedArchivedFolder -> ChatListViewFfi.ARCHIVED
-        folderSelected -> null
-        else -> ChatListViewFfi.CHATS
+        untouchedArchivedFolder -> ChatListSelectAllScope(ChatListViewFfi.ARCHIVED)
+        folderSelected -> folderQuery?.let(ChatListSelectAllScope::of)
+        else -> ChatListSelectAllScope(ChatListViewFfi.CHATS)
     }
 
 /**
- * Select-all intent bound to one native view. [resolved] stays false until MDK returns the
+ * Select-all intent bound to one native scope. [resolved] stays false until MDK returns the
  * complete set, so the bar never presents a partial count or bulk action as complete.
  */
 internal data class ChatListCompleteSelection(
-    val view: ChatListViewFfi,
+    val scope: ChatListSelectAllScope,
     val resolved: Boolean,
-)
+) {
+    /** The view the selection's bulk actions behave like. */
+    val view: ChatListViewFfi get() = scope.view
+}
 
 /** Reads the complete view, retrying only the not-ready refusal; other failures surface to the caller. */
 internal suspend fun resolveCompleteChatListIds(

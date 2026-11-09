@@ -18,7 +18,7 @@ class ChatFolderLiveSourceTest {
             var retired = false
             val result =
                 async {
-                    source.receiveUntilChanged(false) {
+                    source.receiveUntilChanged(ChatFolderSourceSpec()) {
                         try {
                             entered.complete(Unit)
                             awaitCancellation()
@@ -31,7 +31,7 @@ class ChatFolderLiveSourceTest {
             source.complete.value = true
             assertTrue(withTimeout(1000) { result.await() })
             assertTrue(retired)
-            assertFalse(source.receiveUntilChanged(true) {})
+            assertFalse(source.receiveUntilChanged(ChatFolderSourceSpec(complete = true)) {})
         }
 
     @Test fun cancellationRetiresReceiverBeforeReopening() =
@@ -41,7 +41,7 @@ class ChatFolderLiveSourceTest {
             var retired = false
             val job =
                 async {
-                    source.receiveUntilChanged(false) {
+                    source.receiveUntilChanged(ChatFolderSourceSpec()) {
                         try {
                             entered.complete(Unit)
                             awaitCancellation()
@@ -54,6 +54,6 @@ class ChatFolderLiveSourceTest {
             job.cancel()
             job.join()
             assertTrue(retired)
-            assertFalse(source.receiveUntilChanged(false) {})
+            assertFalse(source.receiveUntilChanged(ChatFolderSourceSpec()) {})
         }
 }

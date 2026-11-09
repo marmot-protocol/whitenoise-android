@@ -3,7 +3,10 @@ package dev.ipf.whitenoise.android.state
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Device-local UI prototype. MDK must eventually own full-account evaluation before paging. */
+/**
+ * A folder's advanced filter, stored on the device. `chatFolderQuery` hands it to MarmotKit, which evaluates it over
+ * every chat before paging; only a filter testing participants is still evaluated over loaded rows.
+ */
 sealed interface SmartFolderFilter {
     data class Group(
         val all: Boolean = true,
@@ -167,7 +170,10 @@ object SmartFolderCodec {
     }
 }
 
-/** Single source selection for every folder consumer. An advanced view uses only already-loaded rows. */
+/**
+ * Single source selection for every folder consumer: the loaded rows a folder can show. An advanced folder spans
+ * active and archived chats, and a selected folder's own native windows add its chats beyond the plain windows.
+ */
 internal fun chatFolderSource(
     rule: ChatFolderRule?,
     active: List<ChatListItem>,

@@ -1819,6 +1819,9 @@ class ChatsController private constructor(
     private var isCleared = false
 
     internal val folderSource = ChatFolderLiveSource()
+
+    /** Folder memberships MarmotKit computes over every chat, refreshed as the list and folders change (#3652). */
+    internal val folderMembership by lazy { ChatFolderMembership(recomputeScope, liveSubscriptions.chatListQueryIds) }
     private val subscriptionOwner = ChatListSubscriptionOwner()
     private val liveSubscriptionLock get() = subscriptionOwner.lock
     internal val chatListWindows: ChatListWindowSet? get() = subscriptionOwner.windows
@@ -1956,7 +1959,7 @@ class ChatsController private constructor(
                 val subscriptionAttempt = ChatListSubscriptionOwner.Attempt()
                 lastFailureNotReady = false
                 var receivedLiveUpdate = false
-                val completeChatList = folderSource.complete.value
+                val source = folderSource.current
                 var folderSourceChanged = false
                 val connectionAttempt =
                     if (initialSubscriptionProjection) {
@@ -1971,7 +1974,7 @@ class ChatsController private constructor(
                     }
                 try {
                     val chatListStream =
-                        liveSubscriptions.openFolderSource(accountRef, completeChatList)
+                        liveSubscriptions.openFolderSource(accountRef, source.complete, source.folder)
                     subscriptionAttempt.windows = chatListStream
                     if (!isActiveBindEpoch(epoch) || !coroutineContext.isActive) break
                     connectionOwner.noteSubscriptionBoundary(
@@ -2035,7 +2038,7 @@ class ChatsController private constructor(
                     readinessCatchUp?.let(connectionOwner::observe)
 
                     folderSourceChanged =
-                        folderSource.receiveUntilChanged(completeChatList) {
+                        folderSource.receiveUntilChanged(source) {
                             coroutineScope {
                                 runUntilFirstLiveSubscriptionEnds(
                                     first = {
@@ -2130,7 +2133,7 @@ class ChatsController private constructor(
                     withContext(NonCancellable + Dispatchers.IO) { subscriptionAttempt.close() }
                 }
                 if (!coroutineContext.isActive || !isActiveBindEpoch(epoch)) break
-                if (folderSourceChanged || folderSource.complete.value != completeChatList) {
+                if (folderSourceChanged || folderSource.current != source) {
                     initialSubscriptionProjection = true
                     continue
                 }
@@ -4649,28 +4652,41 @@ class ChatsController private constructor(
     }
 
     /**
-     * The complete native membership of [view] for select all (#2925), or null when this owner is stale.
+     * The complete native membership of [scope] for select all (#2925, #3652), or null when this owner is stale.
      * MDK throws ChatPresentationNotReady rather than returning a partial list; callers retry.
      */
     internal suspend fun completeChatListIds(
-        view: ChatListViewFfi,
+        scope: ChatListSelectAllScope,
         owner: ChatListActionOwner,
     ): List<String>? {
-        val read = liveSubscriptions.chatListIds?.takeIf { chatListActionIsCurrent(owner) } ?: return null
-        val ids = read(owner.accountRef, view)
+        val folder = scope.folder
+        val readFolder = liveSubscriptions.chatListQueryIds
+        val readView = liveSubscriptions.chatListIds
+        val available = if (folder != null) readFolder != null else readView != null
+        if (!available || !chatListActionIsCurrent(owner)) return null
+        val ids =
+            if (folder != null) {
+                folder.views.flatMap { requireNotNull(readFolder)(owner.accountRef, folder.forView(it)) }.distinct()
+            } else {
+                requireNotNull(readView)(owner.accountRef, scope.view)
+            }
         return ids.takeIf { chatListActionIsCurrent(owner) }
     }
 
     /**
-     * Drops captured IDs that left [view]; keeps caller order and never adds chats (#2925). Departed groups
+     * Drops captured IDs that left [scope]; keeps caller order and never adds chats (#2925). Departed groups
      * render inside Chats and Archived but MDK places them in LEFT, so a loaded departed row that was
-     * selected stays selected while it is still departed.
+     * selected stays selected while it is still departed. A folder rechecks against its own query in every
+     * view it covers.
      */
     internal suspend fun revalidateCompleteChatListIds(
-        view: ChatListViewFfi,
+        scope: ChatListSelectAllScope,
         groupIds: List<String>,
         owner: ChatListActionOwner,
     ): List<String>? {
+        val folder = scope.folder
+        if (folder != null) return revalidateFolderChatListIds(folder, groupIds, owner)
+        val view = scope.view
         val revalidate = liveSubscriptions.revalidateChatListIds?.takeIf { chatListActionSessionIsCurrent(owner) }
         return when {
             groupIds.isEmpty() -> emptyList()
@@ -4681,6 +4697,27 @@ class ChatsController private constructor(
                 if (outside.isNotEmpty()) {
                     revalidate(owner.accountRef, ChatListViewFfi.LEFT, outside)
                         .mapTo(kept) { it.lowercase(Locale.ROOT) }
+                }
+                groupIds.filter { it.lowercase(Locale.ROOT) in kept }.takeIf { chatListActionSessionIsCurrent(owner) }
+            }
+        }
+    }
+
+    /** Drops captured IDs that no longer match [folder] in any view it covers; keeps caller order, never adds. */
+    private suspend fun revalidateFolderChatListIds(
+        folder: ChatFolderQuery,
+        groupIds: List<String>,
+        owner: ChatListActionOwner,
+    ): List<String>? {
+        val revalidate = liveSubscriptions.revalidateChatListQueryIds?.takeIf { chatListActionSessionIsCurrent(owner) }
+        return when {
+            groupIds.isEmpty() -> emptyList()
+            revalidate == null -> null
+            else -> {
+                val kept = hashSetOf<String>()
+                folder.views.forEach { view ->
+                    val matching = revalidate(owner.accountRef, folder.forView(view), groupIds)
+                    matching.mapTo(kept) { it.lowercase(Locale.ROOT) }
                 }
                 groupIds.filter { it.lowercase(Locale.ROOT) in kept }.takeIf { chatListActionSessionIsCurrent(owner) }
             }

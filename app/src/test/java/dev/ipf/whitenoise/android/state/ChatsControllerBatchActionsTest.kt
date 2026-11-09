@@ -741,13 +741,13 @@ class ChatsControllerBatchActionsTest {
         runTest {
             val fixture = Fixture(this, retainedIds = setOf(A))
             val owner = fixture.controller.captureChatListActionOwner()!!
-            val complete = fixture.controller.completeChatListIds(ChatListViewFfi.CHATS, owner)!!
+            val complete = fixture.controller.completeChatListIds(CHATS_SCOPE, owner)!!
             assertEquals(listOf(A, B, C), complete)
             assertEquals(listOf(ChatListViewFfi.CHATS), fixture.viewReads)
             assertEquals(listOf(A), fixture.controller.chatRows.map { it.groupIdHex })
             // C leaves the view (for example, archived elsewhere) before the bulk action starts.
             fixture.completeIds = listOf(A, B)
-            val targets = fixture.controller.revalidateCompleteChatListIds(ChatListViewFfi.CHATS, complete, owner)!!
+            val targets = fixture.controller.revalidateCompleteChatListIds(CHATS_SCOPE, complete, owner)!!
             assertEquals(listOf(A, B), targets)
             fixture.rejectB = false
             val result = fixture.controller.runChatListBatch(targets, ChatListBatchCommand.READ, owner)!!
@@ -755,7 +755,7 @@ class ChatsControllerBatchActionsTest {
             assertEquals(2, result.changed)
             assertEquals(
                 emptyList<String>(),
-                fixture.controller.revalidateCompleteChatListIds(ChatListViewFfi.CHATS, emptyList(), owner),
+                fixture.controller.revalidateCompleteChatListIds(CHATS_SCOPE, emptyList(), owner),
             )
             fixture.controller.onCleared()
         }
@@ -769,13 +769,13 @@ class ChatsControllerBatchActionsTest {
             fixture.departedIds = listOf(B)
             assertEquals(
                 listOf(A, B),
-                fixture.controller.revalidateCompleteChatListIds(ChatListViewFfi.CHATS, listOf(A, B, C), owner),
+                fixture.controller.revalidateCompleteChatListIds(CHATS_SCOPE, listOf(A, B, C), owner),
             )
             assertEquals(listOf(ChatListViewFfi.CHATS, ChatListViewFfi.LEFT), fixture.revalidatedViews)
             fixture.revalidatedViews.clear()
             assertEquals(
                 listOf(A),
-                fixture.controller.revalidateCompleteChatListIds(ChatListViewFfi.CHATS, listOf(A), owner),
+                fixture.controller.revalidateCompleteChatListIds(CHATS_SCOPE, listOf(A), owner),
             )
             assertEquals(
                 "no departed lookup when every ID is in view",
@@ -791,8 +791,8 @@ class ChatsControllerBatchActionsTest {
             val fixture = Fixture(this, retainedIds = setOf(A))
             val owner = fixture.controller.captureChatListActionOwner()!!
             fixture.beforeCompleteRead = { fixture.replaceAccount() }
-            assertNull(fixture.controller.completeChatListIds(ChatListViewFfi.CHATS, owner))
-            assertNull(fixture.controller.revalidateCompleteChatListIds(ChatListViewFfi.CHATS, listOf(A, B), owner))
+            assertNull(fixture.controller.completeChatListIds(CHATS_SCOPE, owner))
+            assertNull(fixture.controller.revalidateCompleteChatListIds(CHATS_SCOPE, listOf(A, B), owner))
             fixture.controller.onCleared()
         }
 
@@ -1023,3 +1023,6 @@ class ChatsControllerBatchActionsTest {
         val C = "33".repeat(16)
     }
 }
+
+/** The whole Chats view as a complete Select all scope. */
+private val CHATS_SCOPE = ChatListSelectAllScope(ChatListViewFfi.CHATS)

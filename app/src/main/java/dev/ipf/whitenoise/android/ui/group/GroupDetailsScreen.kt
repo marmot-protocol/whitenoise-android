@@ -100,6 +100,7 @@ import dev.ipf.whitenoise.android.state.ConversationController
 import dev.ipf.whitenoise.android.state.ErrorPresentation
 import dev.ipf.whitenoise.android.state.GroupRosterLoadState
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.nativeFolderMembership
 import dev.ipf.whitenoise.android.state.offersLocalAbandonment
 import dev.ipf.whitenoise.android.state.presentFailure
 import dev.ipf.whitenoise.android.ui.EmojiLabel
@@ -1882,6 +1883,7 @@ internal fun GroupDetailsScreen(
                         folderAccountRef,
                         chatIdLower,
                         groupTitleCopy,
+                        appState.chatFolderMembership?.folders,
                     ) {
                         val accountRef = folderAccountRef ?: return@remember emptyList()
                         val thisChatRow =
@@ -1896,8 +1898,9 @@ internal fun GroupDetailsScreen(
                             .mapNotNull { folder ->
                                 val manual =
                                     chatIdLower in appState.chatFolderPreferences.membershipFor(accountRef, folder.id)
+                                val native = appState.nativeFolderMembership(accountRef, folder.id)
                                 val effective =
-                                    chatIdLower in
+                                    native?.idSet?.contains(chatIdLower) ?: chatIdLower in
                                         chatFolderChatIds(
                                             items = thisChatRow,
                                             manualChatIds =

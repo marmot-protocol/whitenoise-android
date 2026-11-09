@@ -1,15 +1,14 @@
 package dev.ipf.whitenoise.android.state
 
-import dev.ipf.marmotkit.ChatListViewFfi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-/** Keeps retired wrappers alive until admitted native calls have returned or been cancelled. */
-internal class ChatListWindowLifetime(
-    private val handles: Map<ChatListViewFfi, ChatListWindowHandle>,
+/** Keeps retired wrappers alive until admitted native calls have returned or been cancelled. [K] names a window. */
+internal class ChatListWindowLifetime<K>(
+    private val handles: Map<K, ChatListWindowHandle>,
 ) {
     /** Also guards the owning set's cursors and installed frames, so retirement rejects publication atomically. */
     val lock = Any()
@@ -35,13 +34,13 @@ internal class ChatListWindowLifetime(
 
     /** Must run on IO: admission immediately precedes invocation, with no dispatcher hop between them. */
     suspend fun <T> withHandle(
-        view: ChatListViewFfi,
+        key: K,
         block: suspend (ChatListWindowHandle) -> T,
     ): T? {
         val handle =
             synchronized(lock) {
                 if (retired) return@synchronized null
-                handles[view]?.also { activeCalls++ }
+                handles[key]?.also { activeCalls++ }
             } ?: return null
         return try {
             block(handle)

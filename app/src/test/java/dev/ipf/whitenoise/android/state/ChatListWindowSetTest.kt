@@ -5,6 +5,7 @@ import dev.ipf.marmotkit.ChatListAnchorOutcomeFfi
 import dev.ipf.marmotkit.ChatListPageDirectionFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListViewFfi
+import dev.ipf.marmotkit.ChatListViewQueryFfi
 import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
 import dev.ipf.marmotkit.GroupLifecycleStateFfi
@@ -46,6 +47,45 @@ class ChatListWindowSetTest {
             assertEquals(listOf(ChatListViewFfi.ARCHIVED), replaced)
             handles.values.forEach(FakeWindow::close)
             receiver.join()
+        }
+
+    /** A folder's own window opens with its native query, and its rows follow the plain rows without duplicates. */
+    @Test
+    fun folderWindowRowsFollowPlainRowsAndPageOnTheirOwn() =
+        runBlocking {
+            val handles = CHAT_LIST_WINDOW_VIEWS.associateWith { view -> FakeWindow(view, rows = listOf("$view-a")) }
+            val folderWindow = FakeWindow(ChatListViewFfi.CHATS, listOf("CHATS-a", "folder-1"), hasMoreAfter = true)
+            val query = requireNotNull(chatFolderQuery(ChatFolderRule(pinnedOnly = true), emptySet(), emptySet()))
+            val opened = mutableListOf<ChatListViewQueryFfi>()
+            val folder = ChatFolderWindows(query) { _, native -> folderWindow.also { opened += native } }
+            val windows = ChatListWindowSet.open("acct", folder = folder) { _, view -> handles.getValue(view) }
+            assertEquals(listOf(query.forView(ChatListViewFfi.CHATS)), opened)
+            assertTrue(windows.hasFolderWindows)
+            assertEquals(listOf("CHATS-a", "ARCHIVED-a", "LEFT-a", "folder-1"), windows.rows.map { it.row.groupIdHex })
+            windows.pageForward(ChatListViewFfi.CHATS, folder = true)
+            assertEquals("folder-1", windows.rows[3].row.groupIdHex)
+            assertEquals(
+                "CHATS-page",
+                windows.rows
+                    .last()
+                    .row.groupIdHex,
+            )
+            assertTrue(handles.getValue(ChatListViewFfi.CHATS).pageCalls.isEmpty())
+            windows.close()
+        }
+
+    /** A folder query MarmotKit cannot serve yet leaves the plain windows open and the folder on loaded rows. */
+    @Test
+    fun refusedFolderWindowKeepsThePlainWindows() =
+        runBlocking {
+            val handles = CHAT_LIST_WINDOW_VIEWS.associateWith { view -> FakeWindow(view, rows = listOf("$view-a")) }
+            val query = requireNotNull(chatFolderQuery(ChatFolderRule(keyword = "work"), emptySet(), emptySet()))
+            val folder = ChatFolderWindows(query) { _, _ -> throw MarmotKitException.ChatPresentationNotReady() }
+            val windows = ChatListWindowSet.open("acct", folder = folder) { _, view -> handles.getValue(view) }
+            assertFalse(windows.hasFolderWindows)
+            assertEquals(listOf("CHATS-a", "ARCHIVED-a", "LEFT-a"), windows.rows.map { it.row.groupIdHex })
+            assertTrue(handles.values.none(FakeWindow::closed))
+            windows.close()
         }
 
     /** An equal or older sequence is a duplicate echo and is never installed. */
