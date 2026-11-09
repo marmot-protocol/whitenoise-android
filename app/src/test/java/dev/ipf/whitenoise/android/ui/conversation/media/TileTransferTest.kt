@@ -86,6 +86,29 @@ class TileTransferTest {
             "MDK readmits a parked body without a tap",
             tileObservesNative(false, false, AttachmentTransferState.StorageBlocked),
         )
+        assertTrue(
+            "only the native phase tells a locally removed body from a lost one",
+            tileObservesNative(false, false, AttachmentTransferState.NotRetained),
+        )
+    }
+
+    /**
+     * A body this device removed, from Manage storage or Keep media, offers Download again on the tile itself, and the
+     * tap is a deliberate retry rather than a download that would join the removed state.
+     */
+    @Test
+    fun aLocallyRemovedBodyOffersDownloadAgainThroughRetry() {
+        for (phase in listOf(AttachmentTransferStateFfi.REMOVED, AttachmentTransferStateFfi.CLEANED_BY_SETTING)) {
+            val removed = transfer(AttachmentTransferState.NotRetained, progress(0, 4, phase = phase))
+            assertTrue(phase.name, removed.visible && removed.removed)
+            assertFalse(removed.failed || removed.active)
+        }
+        val unavailable = progress(0, 4, phase = AttachmentTransferStateFfi.UNAVAILABLE)
+        val lost = transfer(AttachmentTransferState.NotRetained, unavailable)
+        assertFalse("a body gone for good keeps the idle tile", lost.visible)
+        val removed =
+            transfer(AttachmentTransferState.NotRetained, progress(0, 4, phase = AttachmentTransferStateFfi.REMOVED))
+        assertOneRetryingTap(removed, R.string.media_removed_download_again)
     }
 
     /** A parked surface loads again as soon as MDK resumes the body, so it shows progress and Cancel, not storage. */

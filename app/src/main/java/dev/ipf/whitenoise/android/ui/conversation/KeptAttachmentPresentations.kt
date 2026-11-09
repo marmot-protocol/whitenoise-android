@@ -167,7 +167,8 @@ private fun keptTransferLabel(transfer: TileTransfer?): Int =
         transfer?.active == true -> R.string.media_downloading
         transfer?.state == AttachmentTransferState.Resolving -> R.string.floating_attachment_resolving
         transfer?.state == AttachmentTransferState.Available -> R.string.floating_attachment_available
-        transfer?.progress?.phase in LOCALLY_REMOVED_PHASES -> R.string.media_removed_download_again
+        // A kept card's tap opens the original message, so the label names that route rather than a tap here.
+        transfer?.progress?.phase in LOCALLY_REMOVED_PHASES -> R.string.floating_attachment_removed
         transfer?.state == AttachmentTransferState.NotRetained -> R.string.media_attachment_unavailable
         else -> R.string.floating_attachment_remote
     }

@@ -245,4 +245,7 @@ private fun StorageLegendLine(category: StorageCategory) {
 
 /** Detail text set in its own content's direction, so a size and count keep their order in a right-to-left layout. */
 @Composable
-private fun storageDetailStyle(): TextStyle = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Content)
+private fun storageDetailStyle(): TextStyle {
+    val base = MaterialTheme.typography.bodySmall
+    return base.copy(textDirection = TextDirection.Content)
+}

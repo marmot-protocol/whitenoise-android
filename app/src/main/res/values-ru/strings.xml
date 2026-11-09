@@ -1162,6 +1162,7 @@
     <string name="media_cancel_download">Отменить скачивание</string>
     <string name="media_download_cancelled">Скачивание отменено. Нажмите, чтобы скачать снова</string>
     <string name="media_removed_download_again">Удалено с этого устройства. Нажмите, чтобы скачать снова</string>
+    <string name="floating_attachment_removed">Удалено с этого устройства. Откройте оригинал, чтобы скачать снова</string>
     <string name="media_opening">Открытие</string>
     <string name="media_save">Сохранить</string>
     <string name="media_saved">Сохранено в галерею</string>

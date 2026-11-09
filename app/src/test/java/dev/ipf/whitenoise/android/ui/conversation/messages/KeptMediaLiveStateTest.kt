@@ -159,7 +159,8 @@ class KeptMediaLiveStateTest {
         composeRule.onNodeWithText("Audio · Download failed. Open the original to retry").assertIsDisplayed()
         native.publish(AttachmentTransferStateFfi.REMOVED)
         awaitPresentation {
-            presentation?.attachments?.singleOrNull()?.statusLabel == "Removed from this device. Tap to download again"
+            presentation?.attachments?.singleOrNull()?.statusLabel ==
+                "Removed from this device. Open the original to download again"
         }
         assertNoAcquisition(native)
     }

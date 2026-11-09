@@ -113,8 +113,14 @@ internal class TileTransfer(
                 storageBlocked ||
                 (unobstructed && state == AttachmentTransferState.Failed)
 
+    /**
+     * This device removed the body itself, from Manage storage or the Keep media window, so the tile offers Download
+     * again, which a deliberate retry performs while the sender's copy is still available.
+     */
+    val removed: Boolean get() = unobstructed && !failed && progress?.phase in LOCALLY_REMOVED_PHASES
+
     /** The tile replaces its spinner or Download action with the transfer control. */
-    val visible: Boolean get() = cancelling || active || cancelled || failed
+    val visible: Boolean get() = cancelling || active || cancelled || failed || removed
 
     /** Determinate only while the engine reports a trustworthy total for the body being received. */
     val fraction: Float? get() = progress?.fraction?.takeIf { unobstructed }
@@ -194,7 +200,9 @@ internal fun tileObservesNative(
             materializing ||
                 host == AttachmentTransferState.Downloading ||
                 // MDK readmits a storage-parked body on its own, so the tile keeps watching for it.
-                host == AttachmentTransferState.StorageBlocked
+                host == AttachmentTransferState.StorageBlocked ||
+                // Only the native phase tells a body this device removed from one that is gone for good.
+                host == AttachmentTransferState.NotRetained
         )
 
 /**
@@ -235,9 +243,9 @@ internal fun tileTransferDescription(transfer: TileTransfer): String =
 /**
  * The tile's single transfer control in a fixed 52 dp slot: a progress ring with a Cancel glyph while a transfer is
  * queued or running, an indeterminate ring while Cancel awaits acknowledgement, Download again after a confirmed
- * Cancel and Retry after a failure. The whole slot is the target, so a tap on it never reaches the tile's own open
- * handler, including while Cancel awaits acknowledgement and the slot takes no action. With [showCaption] the step
- * and byte counts are also drawn for sighted readers, for tiles large enough.
+ * Cancel or a local removal, and Retry after a failure. The whole slot is the target, so a tap on it never reaches
+ * the tile's own open handler, including while Cancel awaits acknowledgement and the slot takes no action. With
+ * [showCaption] the step and byte counts are also drawn for sighted readers, for tiles large enough.
  */
 @Composable
 internal fun TileTransferControl(
@@ -321,7 +329,7 @@ internal fun TileTransferGlyph(
     val icon =
         when {
             transfer.active || transfer.cancelling -> Icons.Default.Close
-            transfer.cancelled -> Icons.Default.ArrowDownward
+            transfer.cancelled || transfer.removed -> Icons.Default.ArrowDownward
             else -> Icons.Default.Refresh
         }
     Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(glyphSize))
