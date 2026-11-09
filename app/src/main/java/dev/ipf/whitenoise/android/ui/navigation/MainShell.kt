@@ -2113,6 +2113,7 @@ internal fun MainShell(
                                     routingAppUpdate ||
                                     pendingTtsDestinationNavigation != null,
                             contentVisible = !appState.appLockScreenVisible,
+                            topLevelBubble = true,
                         ) { animatedSection ->
                             when (animatedSection) {
                                 MainSection.Chats -> {

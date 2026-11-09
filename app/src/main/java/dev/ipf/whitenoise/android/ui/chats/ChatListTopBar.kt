@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,11 +53,15 @@ import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
 import dev.ipf.whitenoise.android.ui.account.AccountSelectorSheet
 import dev.ipf.whitenoise.android.ui.account.OtherAccountAvatarsRow
 import dev.ipf.whitenoise.android.ui.account.rememberQuickAccountSwitchNotice
+import dev.ipf.whitenoise.android.ui.common.LocalSearchCollapse
 import dev.ipf.whitenoise.android.ui.common.LocalWhiteNoiseHeaderScroll
 import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoffHost
 import dev.ipf.whitenoise.android.ui.common.accountActionColors
 import dev.ipf.whitenoise.android.ui.common.controlHandoffEndpoint
 import dev.ipf.whitenoise.android.ui.common.rememberMeasuredControlHandoff
+import dev.ipf.whitenoise.android.ui.common.rememberSearchCollapse
+import dev.ipf.whitenoise.android.ui.common.searchCollapseHost
+import dev.ipf.whitenoise.android.ui.common.searchExpandReveal
 import dev.ipf.whitenoise.android.ui.conversation.ConversationSearchScanStatus
 import dev.ipf.whitenoise.android.ui.conversation.allowsSearchSteps
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -147,50 +152,56 @@ internal fun ChatListTopBar(
             Triple(appState.activeAccountRef, appState.runtimeGeneration, appState.appLockScreenVisible),
             searchOpen,
         )
+    val searchCollapse = rememberSearchCollapse(searchOpen)
     MeasuredControlHandoffHost(
         state = searchHandoff,
         destination = searchOpen,
         allowed = !appState.appLockScreenVisible && !appState.signOutInProgress && !appState.wipeInProgress,
+        // The collapsing field is the closing cue; a travelling outline would draw a second pill.
+        outlineVisible = { searchOpen },
     ) {
-        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth().searchCollapseHost(searchCollapse)) {
             val topBarWidthDp = maxWidth
             TopAppBar(
                 title = {
-                    when {
-                        searchOpen ->
-                            dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField(
-                                value = searchQuery,
-                                clearDescription = stringResource(R.string.chat_list_search_clear),
-                                outlined = true,
-                                onValueChange = onSearchQueryChange,
-                                placeholder = stringResource(R.string.chat_list_search_hint),
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .controlHandoffEndpoint(searchHandoff, true)
-                                        .focusRequester(searchFocusRequester)
-                                        .testTag("chats.searchField"),
-                                keyboardOptions =
-                                    KeyboardOptions(
-                                        capitalization = KeyboardCapitalization.Sentences,
-                                        imeAction = ImeAction.Search,
-                                    ),
-                                emptyTrailingIcon = {
-                                    IconButton(onClick = onMic) {
-                                        Icon(
-                                            painter =
-                                                androidx.compose.ui.res
-                                                    .painterResource(R.drawable.ic_mic),
-                                            contentDescription = stringResource(R.string.chat_list_search_voice),
-                                        )
-                                    }
-                                },
-                            )
-                        else ->
-                            ChatListInlineConnectivityIndicator(
-                                state = connectivityState,
-                                modifier = Modifier.padding(start = 12.dp),
-                            )
+                    CompositionLocalProvider(LocalSearchCollapse provides searchCollapse) {
+                        when {
+                            searchOpen ->
+                                dev.ipf.whitenoise.android.ui.common.WhiteNoiseCompactSearchField(
+                                    value = searchQuery,
+                                    clearDescription = stringResource(R.string.chat_list_search_clear),
+                                    outlined = true,
+                                    onValueChange = onSearchQueryChange,
+                                    placeholder = stringResource(R.string.chat_list_search_hint),
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .searchExpandReveal(searchQuery)
+                                            .controlHandoffEndpoint(searchHandoff, true)
+                                            .focusRequester(searchFocusRequester)
+                                            .testTag("chats.searchField"),
+                                    keyboardOptions =
+                                        KeyboardOptions(
+                                            capitalization = KeyboardCapitalization.Sentences,
+                                            imeAction = ImeAction.Search,
+                                        ),
+                                    emptyTrailingIcon = {
+                                        IconButton(onClick = onMic) {
+                                            Icon(
+                                                painter =
+                                                    androidx.compose.ui.res
+                                                        .painterResource(R.drawable.ic_mic),
+                                                contentDescription = stringResource(R.string.chat_list_search_voice),
+                                            )
+                                        }
+                                    },
+                                )
+                            else ->
+                                ChatListInlineConnectivityIndicator(
+                                    state = connectivityState,
+                                    modifier = Modifier.padding(start = 12.dp),
+                                )
+                        }
                     }
                 },
                 navigationIcon = {
@@ -373,6 +384,7 @@ internal fun ConversationSearchTopBar(
                 modifier =
                     Modifier
                         .fillMaxWidth()
+                        .searchExpandReveal(query)
                         .focusRequester(focusRequester)
                         .testTag("conversation.searchField")
                         .semantics { contentDescription = searchDescription },

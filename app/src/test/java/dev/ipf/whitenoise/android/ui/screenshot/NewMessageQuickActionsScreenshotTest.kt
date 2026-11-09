@@ -1,19 +1,25 @@
 package dev.ipf.whitenoise.android.ui.screenshot
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.ui.chats.newchat.LocalNewMessagePenFlight
+import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessagePenFlight
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessageQuickActions
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Rule
@@ -44,16 +50,36 @@ class NewMessageQuickActionsScreenshotTest {
     @Test
     fun narrowWidth() = capture("new_message_quick_actions_narrow.png", dark = false, width = 240, fontScale = 1f)
 
+    /** Halfway through the pen flight: bubbles stream from the bottom end corner, labels fade in. */
+    @Test
+    fun penFlightMidway() {
+        val flight =
+            NewMessagePenFlight().apply {
+                penCenter = Offset(330f, 750f)
+                launchFromPen(motionAllowed = true)
+            }
+        composeRule.mainClock.autoAdvance = false
+        capture("new_message_quick_actions_pen_flight_mid.png", dark = true, width = 360, fontScale = 1f, flight)
+        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.mainClock.advanceTimeBy(PEN_FLIGHT_MIDWAY_MILLIS)
+        composeRule.onRoot().captureRoboImage("src/test/snapshots/new_message_quick_actions_pen_flight_mid.png")
+    }
+
     private fun capture(
         fileName: String,
         dark: Boolean,
         width: Int,
         fontScale: Float,
+        flight: NewMessagePenFlight? = null,
     ) {
         composeRule.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
+            CompositionLocalProvider(
+                LocalDensity provides Density(1f, fontScale),
+                LocalNewMessagePenFlight provides flight,
+            ) {
+                if (flight != null) LaunchedEffect(flight.origin) { flight.fly() }
                 WhiteNoiseTheme(darkTheme = dark) {
-                    Surface {
+                    Surface(if (flight != null) Modifier.fillMaxSize() else Modifier) {
                         Column(Modifier.width(width.dp).testTag(TAG)) {
                             NewMessageQuickActions(
                                 query = "",
@@ -69,10 +95,11 @@ class NewMessageQuickActionsScreenshotTest {
                 }
             }
         }
-        composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/$fileName")
+        if (flight == null) composeRule.onNodeWithTag(TAG).captureRoboImage("src/test/snapshots/$fileName")
     }
 
     private companion object {
         const val TAG = "new-message-quick-actions"
+        const val PEN_FLIGHT_MIDWAY_MILLIS = 150L
     }
 }

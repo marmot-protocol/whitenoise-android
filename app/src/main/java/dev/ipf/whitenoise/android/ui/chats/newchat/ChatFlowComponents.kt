@@ -471,6 +471,7 @@ internal fun FlowQuickActionRow(
     modifier: Modifier = Modifier,
     iconContentDescription: String? = null,
     enabled: Boolean = true,
+    penFlightIndex: Int? = null,
 ) {
     Row(
         modifier =
@@ -485,6 +486,7 @@ internal fun FlowQuickActionRow(
         Box(
             modifier =
                 Modifier
+                    .then(penFlightIndex?.let { Modifier.penFlightBubble(it) } ?: Modifier)
                     .size(48.dp)
                     .clip(CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh),
@@ -492,7 +494,11 @@ internal fun FlowQuickActionRow(
         ) {
             Icon(icon, contentDescription = iconContentDescription, tint = MaterialTheme.colorScheme.primary)
         }
-        Text(title, style = MaterialTheme.typography.bodyLarge)
+        Text(
+            title,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = penFlightIndex?.let { Modifier.penFlightLabel(it) } ?: Modifier,
+        )
     }
 }
 
@@ -513,21 +519,25 @@ internal fun NewMessageQuickActions(
         title = stringResource(R.string.new_group),
         onClick = onNewGroup,
         modifier = Modifier.performanceTestTag(PerformanceTestTags.NEW_GROUP),
+        penFlightIndex = 0,
     )
     FlowQuickActionRow(
         icon = Icons.Default.Share,
         title = stringResource(R.string.invite_friends),
         onClick = onInviteFriends,
+        penFlightIndex = 1,
     )
     FlowQuickActionRow(
         icon = Icons.Default.QrCodeScanner,
         title = stringResource(R.string.scan_qr_code),
         onClick = onScanQr,
+        penFlightIndex = 2,
     )
     FlowQuickActionRow(
         icon = Icons.Default.QrCode,
         title = showMyQrLabel,
         onClick = onShowMyQr,
         enabled = showMyQrEnabled,
+        penFlightIndex = 3,
     )
 }

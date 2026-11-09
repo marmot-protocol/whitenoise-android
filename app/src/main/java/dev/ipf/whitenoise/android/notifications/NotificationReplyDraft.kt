@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import dev.ipf.whitenoise.android.share.ShareRequest
 import java.security.MessageDigest
 import java.util.Base64
 
@@ -48,6 +49,21 @@ private fun notificationDraftReceiptId(
 class NotificationInboundState : ViewModel() {
     var target by mutableStateOf<NotificationTarget?>(null)
     var requestId by mutableLongStateOf(0L)
+
+    /** Merges a parsed inbound route into the pending routes, keeping the notification half here. */
+    fun route(
+        parsedTarget: NotificationTarget?,
+        parsedShare: ShareRequest?,
+        dataString: String?,
+        profilePayload: String?,
+        shareRequest: ShareRequest?,
+    ): InboundIntentRouting {
+        val current = InboundIntentRouting(target, profilePayload, shareRequest, requestId)
+        return routeInboundIntent(parsedTarget, parsedShare, dataString, current).also { routing ->
+            target = routing.notificationTarget
+            requestId = routing.notificationRequestId
+        }
+    }
 }
 
 private const val MAX_REMOTE_DRAFT_CHARS = 65_536

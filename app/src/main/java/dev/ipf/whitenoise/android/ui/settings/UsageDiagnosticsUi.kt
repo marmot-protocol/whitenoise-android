@@ -124,15 +124,19 @@ internal fun UsageDiagnosticsPrompt(
     onDismissFailedClose: () -> Unit = {},
     onDone: () -> Unit,
 ) {
-    val state = appState.diagnostics
     var loggingBusy by remember { mutableStateOf(false) }
     val close = remember { PromptCloseState() }
-    val closeMode =
+    val closeBusyNow by rememberUpdatedState(closeBusy)
+    val closeFailedNow by rememberUpdatedState(closeFailed)
+
+    /** Reads live state so a close in the same frame as a choice's save still sees that save. */
+    fun currentCloseMode() =
         promptCloseMode(
-            idle = !state.busy && !loggingBusy && !closeBusy,
-            receiptSettled = !state.failed && state.snapshot != null,
-            closeFailed = closeFailed,
+            idle = !appState.diagnostics.busy && !loggingBusy && !closeBusyNow,
+            receiptSettled = !appState.diagnostics.failed && appState.diagnostics.snapshot != null,
+            closeFailed = closeFailedNow,
         )
+    val closeMode = currentCloseMode()
     // `rememberModalBottomSheetState` keys its saved state on `confirmValueChange`, so a lambda that
     // captures `settled` gets a new identity the moment a choice starts writing — and the sheet state
     // is rebuilt underneath it, which the reader sees as the sheet closing and reopening on every tap.
@@ -148,7 +152,7 @@ internal fun UsageDiagnosticsPrompt(
         rememberPromptFinish(
             close,
             hide = sheetState::hide,
-            mode = closeMode,
+            mode = ::currentCloseMode,
             onCloseStarted = onCloseStarted,
             onDone = onDone,
             onDismissFailedClose = onDismissFailedClose,
@@ -270,7 +274,6 @@ private fun IndependentAuditLogChoice(
 ) {
     var failed by remember { mutableStateOf(false) }
     var pendingChoice by remember { mutableStateOf<Boolean?>(null) }
-    var confirmUpload by remember { mutableStateOf(false) }
 
     fun saveChoice(enabled: Boolean) {
         pendingChoice = enabled
@@ -292,24 +295,15 @@ private fun IndependentAuditLogChoice(
         saving = busy,
         onCheckedChange = { enabled ->
             onChoiceStarted()
-            if (enabled) confirmUpload = true else saveChoice(false)
+            saveChoice(enabled)
         },
     )
-    if (confirmUpload) {
-        AuditUploadConsentDialog(
-            onDismiss = { confirmUpload = false },
-            onConfirm = {
-                confirmUpload = false
-                saveChoice(true)
-            },
-        )
-    }
     if (failed) {
         Text(stringResource(R.string.usage_diagnostics_error), color = MaterialTheme.colorScheme.error)
     }
 }
 
-/** Prominent disclosure shared by both audit opt-in entry points. */
+/** Prominent disclosure shown before enabling audit uploads from Diagnostics & Improvements settings. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun AuditUploadConsentDialog(

@@ -42,6 +42,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -128,8 +129,10 @@ import dev.ipf.whitenoise.android.state.returnChatListToTop
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupActingAccountIdentity
 import dev.ipf.whitenoise.android.ui.chats.newchat.GroupReviewDestinationIdentity
+import dev.ipf.whitenoise.android.ui.chats.newchat.LocalNewMessagePenFlight
 import dev.ipf.whitenoise.android.ui.chats.newchat.MemberReviewGroup
 import dev.ipf.whitenoise.android.ui.chats.newchat.NewChatFlowHost
+import dev.ipf.whitenoise.android.ui.chats.newchat.NewMessagePenFlight
 import dev.ipf.whitenoise.android.ui.common.DragSelectionVisibleItem
 import dev.ipf.whitenoise.android.ui.common.ErrorContent
 import dev.ipf.whitenoise.android.ui.common.InlineErrorBanner
@@ -1109,6 +1112,7 @@ internal fun ChatsScreen(
 
     // Taken while the list is still on screen, since it may already include the new chat
     // by the time the flow completes (#3529).
+    val penFlight = remember { NewMessagePenFlight() }
     val openNewMessageFlow = {
         newChatFlowOriginHead = visibleReturnHead()
         showNewChatFlow = true
@@ -1767,22 +1771,25 @@ internal fun ChatsScreen(
                 onGroupCreateFlowSuperseded()
             },
         ) {
-            NewChatFlowHost(
-                appState = appState,
-                onOpenConversation = { item, justCreated ->
-                    showNewChatFlow = false
-                    onOpenGroup(item, null, justCreated, newChatFlowReturnHead())
-                },
-                onClose = {
-                    showNewChatFlow = false
-                    onGroupCreateFlowSuperseded()
-                },
-                onGroupCreateSubmitted = onGroupCreateSubmitted,
-                onGroupCreateCompletedOpen = { item, requestToken ->
-                    showNewChatFlow = false
-                    onGroupCreateCompletedOpen(item, requestToken, newChatFlowReturnHead())
-                },
-            )
+            LaunchedEffect(penFlight.origin) { penFlight.fly() }
+            CompositionLocalProvider(LocalNewMessagePenFlight provides penFlight) {
+                NewChatFlowHost(
+                    appState = appState,
+                    onOpenConversation = { item, justCreated ->
+                        showNewChatFlow = false
+                        onOpenGroup(item, null, justCreated, newChatFlowReturnHead())
+                    },
+                    onClose = {
+                        showNewChatFlow = false
+                        onGroupCreateFlowSuperseded()
+                    },
+                    onGroupCreateSubmitted = onGroupCreateSubmitted,
+                    onGroupCreateCompletedOpen = { item, requestToken ->
+                        showNewChatFlow = false
+                        onGroupCreateCompletedOpen(item, requestToken, newChatFlowReturnHead())
+                    },
+                )
+            }
         }
         return
     }
@@ -2441,7 +2448,9 @@ internal fun ChatsScreen(
         },
         floatingActionButton = {
             if (!searchOpen && !selectionMode) {
-                ChatsNewMessageFab(appState, openNewMessageFlow, minimumTopInWindow = fabMinimumTopInWindow)
+                CompositionLocalProvider(LocalNewMessagePenFlight provides penFlight) {
+                    ChatsNewMessageFab(appState, openNewMessageFlow, minimumTopInWindow = fabMinimumTopInWindow)
+                }
             }
         },
     ) { padding ->

@@ -1,0 +1,49 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/ChatLinkRoute.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "ChatLinkAccountChooserDialog",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/ChatLinkRoute.kt",
+        "anchor": "fun ChatLinkAccountChooserDialog(",
+        "test_ids": [
+          "SYS-015"
+        ]
+      },
+      {
+        "surface": "R.string.chat_link_choose_account_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/ChatLinkRoute.kt",
+        "anchor": "R.string.chat_link_choose_account_title",
+        "test_ids": [
+          "SYS-015"
+        ]
+      },
+      {
+        "surface": "R.string.chat_link_invalid",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/ChatLinkRoute.kt",
+        "anchor": "R.string.chat_link_invalid",
+        "test_ids": [
+          "SYS-015"
+        ]
+      },
+      {
+        "surface": "R.string.chat_link_not_found",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/ChatLinkRoute.kt",
+        "anchor": "R.string.chat_link_not_found",
+        "test_ids": [
+          "SYS-015"
+        ]
+      },
+      {
+        "surface": "R.string.error_try_again",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/ChatLinkRoute.kt",
+        "anchor": "R.string.error_try_again",
+        "test_ids": [
+          "SYS-015"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

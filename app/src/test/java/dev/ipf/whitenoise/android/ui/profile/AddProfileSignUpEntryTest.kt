@@ -11,6 +11,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountRelayListsFfi
@@ -78,7 +79,7 @@ class AddProfileSignUpEntryTest {
         val app = app()
         show(app)
         val controller = openForm(app)
-        composeRule.onNodeWithTag("onboarding.sign_up.name").performTextInput("Bob local draft")
+        composeRule.onNodeWithTag("onboarding.sign_up.name").performTextReplacement("Bob local draft")
         composeRule.runOnIdle { composeRule.activity.onBackPressedDispatcher.onBackPressed() }
         assertNull(app.pendingProfileSignUp)
         assertEquals("alice", app.activeAccountRef)
@@ -95,7 +96,7 @@ class AddProfileSignUpEntryTest {
         val app = app()
         show(app)
         val controller = openForm(app)
-        composeRule.onNodeWithTag("onboarding.sign_up.name").performTextInput("Bob")
+        composeRule.onNodeWithTag("onboarding.sign_up.name").performTextReplacement("Bob")
         composeRule.onNodeWithTag("onboarding.sign_up.about").performTextInput("Local about")
         val click =
             composeRule
@@ -380,6 +381,7 @@ class AddProfileSignUpEntryTest {
                         if (creates.get() > 0 && !failCreate) listOf(alice, carol, bob) else listOf(alice, carol)
                     "attachmentDownloadPolicy" -> AttachmentDownloadPolicyFfi(true, 2_000uL, 300uL, 40uL)
                     "setAttachmentDownloadPolicy" -> Unit
+                    "randomProfilePseudonym" -> "Quiet Otter"
                     "toString" -> "ExistingAccountSignUpNativeFixture"
                     "hashCode" -> System.identityHashCode(proxy)
                     "equals" -> proxy === args?.firstOrNull()

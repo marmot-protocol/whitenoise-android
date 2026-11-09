@@ -39,7 +39,10 @@ internal class PromptCloseState {
 }
 
 /**
- * Returns the close action for the current [mode], or a no-op while the sheet is pinned.
+ * Returns the close action for the [mode] current when the gesture arrives, or a no-op while the sheet is pinned.
+ *
+ * [mode] is read at the gesture rather than captured from the last composition: a choice that starts
+ * writing in the same frame as a close must pin the sheet, not be overwritten by the close's declines.
  *
  * The sheet closes on the gesture and records the declined choices afterwards. Waiting for one or
  * two native writes first made a slow write read as "the X did nothing", and invited a second tap
@@ -49,7 +52,7 @@ internal class PromptCloseState {
 internal fun rememberPromptFinish(
     close: PromptCloseState,
     hide: suspend () -> Unit,
-    mode: PromptCloseMode?,
+    mode: () -> PromptCloseMode?,
     onCloseStarted: () -> Unit,
     onDone: () -> Unit,
     onDismissFailedClose: () -> Unit,
@@ -69,6 +72,7 @@ internal fun rememberPromptFinish(
         }
     }
     return {
+        val mode = mode()
         if (mode != null && !close.closing) {
             close.closing = true
             close.mode = mode
