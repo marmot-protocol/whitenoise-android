@@ -5847,7 +5847,7 @@ class ConversationController(
     },
     private val textPublisher: (suspend (String?, String, String, String) -> SendSummaryFfi)? = null,
     // Test seams: the user's own emoji a text uses, and the send that carries them.
-    private val customEmojiReader: suspend (String) -> List<LocalEmojiArtwork> = { appState.localEmojiArtworkIn(it) },
+    private val customEmojiReader: (suspend (String) -> List<LocalEmojiArtwork>)? = null,
     private val customEmojiSender: CustomEmojiSender? = null,
     private val messageEditPublisher: suspend (String, String, String, String) -> Unit = { account, groupId, target, text ->
         appState.marmotIo(MarmotTraceSection.MESSAGE_EDIT) { editMessage(account, groupId, target, text) }
@@ -8205,11 +8205,13 @@ class ConversationController(
 
     /** The user's own emoji a plain, non-reply text send must carry, or none when this send carries none. */
     private suspend fun emojiArtworkForSend(
+        account: String,
         replyTarget: String?,
         text: String,
     ): List<LocalEmojiArtwork> {
         val applies = emojiSendApplies(replyTarget, textPublisher != null)
-        return if (applies) customEmojiReader(text) else emptyList()
+        if (!applies) return emptyList()
+        return customEmojiReader?.invoke(text) ?: appState.emojiArtworkIn(account, text)
     }
 
     /**
@@ -8288,7 +8290,7 @@ class ConversationController(
     ): dev.ipf.marmotkit.SendSummaryFfi {
         // Replies and injected publishers keep their plain-text path. A message that uses the user's
         // own emoji uploads outside the commit lock, and only an upload-stage failure is retried.
-        val emojiArtwork = emojiArtworkForSend(replyTarget, trimmed)
+        val emojiArtwork = emojiArtworkForSend(account, replyTarget, trimmed)
         return appState.withConversationTextSendOrder(account, group.groupIdHex) {
             retryPendingConversationSend(
                 connectivityRecoveryGeneration = appState.validatedConnectivityRecoveryGeneration,

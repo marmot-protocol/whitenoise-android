@@ -407,6 +407,10 @@
           "represented_by": "CustomEmoji.choose_file"
         },
         {
+          "declaration": "\"emoji_sets\"",
+          "represented_by": "CustomEmoji.emoji_sets"
+        },
+        {
           "declaration": "\"choose_photo\"",
           "represented_by": "CustomEmoji.choose_photo"
         },
@@ -749,6 +753,9 @@
     },
     "CustomEmoji": {
       "catalog_id": "Chats.custom_emoji"
+    },
+    "EmojiSets": {
+      "catalog_id": "CustomEmoji.emoji_sets"
     },
     "Data": {
       "catalog_id": "home.DataUsage"

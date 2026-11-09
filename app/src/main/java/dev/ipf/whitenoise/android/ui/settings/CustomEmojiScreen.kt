@@ -67,6 +67,7 @@ internal class StagedEmoji(
 @Composable
 internal fun CustomEmojiScreen(
     appState: WhiteNoiseAppState,
+    onOpenSets: (() -> Unit)? = null,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -112,6 +113,7 @@ internal fun CustomEmojiScreen(
         onChoosePhoto = pickers.photo,
         onChooseFile = pickers.file,
         onRemove = { removing = it },
+        onOpenSets = onOpenSets,
     )
     StagedEmojiDialog(appState, store, staged?.takeIf { it.owner == selectionIdentity }) {
         staged = null
@@ -139,6 +141,7 @@ internal fun CustomEmojiContent(
     onChoosePhoto: () -> Unit,
     onChooseFile: () -> Unit,
     onRemove: (CustomEmoji) -> Unit,
+    onOpenSets: (() -> Unit)? = null,
 ) {
     SettingsScaffold(title = stringResource(R.string.custom_emoji), onBack = onBack) {
         SettingsList(modifier = Modifier.testTag(CUSTOM_EMOJI_CONTENT_TAG)) {
@@ -152,6 +155,15 @@ internal fun CustomEmojiContent(
                             onClick = onChoosePhoto,
                             leading = { Icon(painterResource(R.drawable.ic_image), contentDescription = null) },
                         )
+                    }
+                    if (onOpenSets != null) {
+                        row("emoji_sets") { context ->
+                            SettingsLink(
+                                context = context,
+                                title = stringResource(R.string.emoji_sets_title),
+                                onClick = onOpenSets,
+                            )
+                        }
                     }
                     row("choose_file") { context ->
                         SettingsAction(

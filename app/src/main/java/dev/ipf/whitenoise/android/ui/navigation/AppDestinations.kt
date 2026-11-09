@@ -17,6 +17,7 @@ internal enum class SettingsDetail {
     ChatBubbleColors,
     Language,
     CustomEmoji,
+    EmojiSets,
     Data,
     Profile,
     AccountKeys,

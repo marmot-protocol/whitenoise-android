@@ -197,6 +197,14 @@
         "test_ids": [
           "SET-030"
         ]
+      },
+      {
+        "surface": "setting:emoji_sets_title",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "R.string.emoji_sets_title",
+        "test_ids": [
+          "SET-048"
+        ]
       }
     ],
     "source_coverage": [
@@ -206,6 +214,14 @@
         "anchor": "var selectedUri by rememberSaveable",
         "test_ids": [
           "STB-001"
+        ]
+      },
+      {
+        "surface": "Emoji set browser entry",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/CustomEmojiScreen.kt",
+        "anchor": "row(\"emoji_sets\")",
+        "test_ids": [
+          "SET-048"
         ]
       }
     ]

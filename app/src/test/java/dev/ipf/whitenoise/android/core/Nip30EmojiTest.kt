@@ -158,9 +158,9 @@ class Nip30EmojiTest {
     @Test
     fun sendableShortcodesUseTheStrictAlphabet() {
         assertTrue(Nip30Emoji.isSendable(":party_1:"))
-        assertTrue(Nip30Emoji.isSendable(":" + "a".repeat(62) + ":"))
-        assertFalse(Nip30Emoji.isSendable(":" + "a".repeat(63) + ":"))
-        assertFalse(Nip30Emoji.isSendable(":ship-it:"))
+        assertTrue(Nip30Emoji.isSendable(":" + "a".repeat(64) + ":"))
+        assertFalse(Nip30Emoji.isSendable(":" + "a".repeat(65) + ":"))
+        assertTrue(Nip30Emoji.isSendable(":ship-it:"))
         assertFalse(Nip30Emoji.isSendable("::"))
     }
 

@@ -62,7 +62,7 @@ internal fun EmojiShortcodeSuggestions(
         val entries = withContext(Dispatchers.IO) { EmojiData.load(context) }
         value =
             withContext(Dispatchers.Default) {
-                val shortcodes = custom.sendable.map { it.shortcode } + EmojiShortcodes.builtins
+                val shortcodes = custom.composerShortcodes + EmojiShortcodes.builtins
                 val named = EmojiData.search(entries, query, MAX_EMOJI_SUGGESTIONS).map { it.emoji }
                 (ShortcodeComposer.matchingShortcodes(shortcodes, query) + named).distinct().take(MAX_EMOJI_SUGGESTIONS)
             }

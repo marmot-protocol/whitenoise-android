@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.state
 
+import dev.ipf.marmotkit.InstalledCustomEmojiFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.MediaAttachmentReferenceFfi
 import dev.ipf.marmotkit.MediaUploadAttachmentRequestFfi
@@ -7,6 +8,7 @@ import dev.ipf.marmotkit.MediaUploadRequestFfi
 import dev.ipf.marmotkit.SendSummaryFfi
 import dev.ipf.whitenoise.android.core.Nip30Emoji
 import dev.ipf.whitenoise.android.ui.CustomEmojiStore
+import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -28,6 +30,9 @@ class LocalEmojiArtwork(
         MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
     }
 }
+
+// Keep the aggregate at the existing per-message artwork bound even with larger installed images.
+private const val EMOJI_SEND_MAX_BYTES = 67_108_864uL
 
 private val EMOJI_MEDIA_TYPES =
     mapOf("png" to "image/png", "gif" to "image/gif", "webp" to "image/webp", "jpg" to "image/jpeg")
@@ -68,13 +73,44 @@ private fun readEmojiFile(
     return if (mediaType == null || bytes == null) null else LocalEmojiArtwork(shortcode, file.name, mediaType, bytes)
 }
 
-/** The user's own emoji that [text] uses, read off the main thread, or empty when it uses none. */
-internal suspend fun WhiteNoiseAppState.localEmojiArtworkIn(text: String): List<LocalEmojiArtwork> {
+/** Resolves device-local files and MDK-installed artwork for the captured sending account. */
+internal suspend fun WhiteNoiseAppState.emojiArtworkIn(
+    account: String,
+    text: String,
+): List<LocalEmojiArtwork> {
     val shortcodes = Nip30Emoji.shortcodesIn(text)
     if (shortcodes.isEmpty()) return emptyList()
-    return withContext(Dispatchers.IO) {
-        readLocalEmojiArtwork(File(appContext.filesDir, CustomEmojiStore.DIRECTORY), shortcodes)
+    val local =
+        withContext(Dispatchers.IO) {
+            readLocalEmojiArtwork(File(appContext.filesDir, CustomEmojiStore.DIRECTORY), shortcodes)
+        }.associateBy { it.shortcode }
+    val missing = shortcodes.filter { it !in local && it !in EmojiShortcodes.builtins }
+    if (missing.isEmpty()) return shortcodes.mapNotNull(local::get)
+    return marmotIo {
+        val installed = installedEmojiByCode(installedCustomEmoji(account))
+        val resolved = shortcodes.filter { it in local || it in installed }
+        val bytes = resolved.sumOf { code -> local[code]?.bytes?.size?.toULong() ?: installed.getValue(code).byteLen }
+        if (resolved.size > Nip30Emoji.MAX_TAGS || bytes > EMOJI_SEND_MAX_BYTES) {
+            throw EmojiSendLimitException("too much custom emoji artwork for one message")
+        }
+        resolved.map { code ->
+            local[code] ?: readInstalledEmojiArtwork(account, code, installed.getValue(code))
+        }
     }
+}
+
+/** Reads the installed bytes and checks that the selected set did not change during resolution. */
+private suspend fun MarmotInterface.readInstalledEmojiArtwork(
+    account: String,
+    code: String,
+    entry: InstalledCustomEmojiFfi,
+): LocalEmojiArtwork {
+    val asset = readInstalledCustomEmoji(account, entry.setCoordinate, entry.shortcode)
+    check(asset.emoji.sha256 == entry.sha256) { "installed emoji changed during send" }
+    val extension =
+        EMOJI_MEDIA_TYPES.entries.firstOrNull { it.value == entry.mime }?.key
+            ?: if (entry.mime == "image/apng") "png" else error("unsupported installed emoji media type")
+    return LocalEmojiArtwork(code, "${entry.shortcode}.$extension", entry.mime, asset.bytes)
 }
 
 /**
