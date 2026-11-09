@@ -132,8 +132,7 @@ internal fun Notification.recordedIdentityInputs(): Pair<String, String>? =
  * native conversation template draws it in the conversation circle. Android owns the remaining small app
  * attribution and exact geometry; the app adds no separate trailing image view.
  */
-internal fun NotificationCompat.Builder.setConversationIdentityImage(image: NotificationIdentityImage) =
-    setLargeIcon(image.bitmap).recordIdentityImage(image)
+internal fun NotificationCompat.Builder.setConversationIdentityImage(image: NotificationIdentityImage) = setLargeIcon(image.bitmap).recordIdentityImage(image)
 
 /** Retains refresh inputs for a native reaction, whose avatar pixels live in the sender Person. */
 internal fun NotificationCompat.Builder.recordIdentityImage(image: NotificationIdentityImage) =
