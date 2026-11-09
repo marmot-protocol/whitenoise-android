@@ -124,15 +124,19 @@ internal fun UsageDiagnosticsPrompt(
     onDismissFailedClose: () -> Unit = {},
     onDone: () -> Unit,
 ) {
-    val state = appState.diagnostics
     var loggingBusy by remember { mutableStateOf(false) }
     val close = remember { PromptCloseState() }
-    val closeMode =
+    val closeBusyNow by rememberUpdatedState(closeBusy)
+    val closeFailedNow by rememberUpdatedState(closeFailed)
+
+    /** Reads live state so a close in the same frame as a choice's save still sees that save. */
+    fun currentCloseMode() =
         promptCloseMode(
-            idle = !state.busy && !loggingBusy && !closeBusy,
-            receiptSettled = !state.failed && state.snapshot != null,
-            closeFailed = closeFailed,
+            idle = !appState.diagnostics.busy && !loggingBusy && !closeBusyNow,
+            receiptSettled = !appState.diagnostics.failed && appState.diagnostics.snapshot != null,
+            closeFailed = closeFailedNow,
         )
+    val closeMode = currentCloseMode()
     // `rememberModalBottomSheetState` keys its saved state on `confirmValueChange`, so a lambda that
     // captures `settled` gets a new identity the moment a choice starts writing — and the sheet state
     // is rebuilt underneath it, which the reader sees as the sheet closing and reopening on every tap.
@@ -148,7 +152,7 @@ internal fun UsageDiagnosticsPrompt(
         rememberPromptFinish(
             close,
             hide = sheetState::hide,
-            mode = closeMode,
+            mode = ::currentCloseMode,
             onCloseStarted = onCloseStarted,
             onDone = onDone,
             onDismissFailedClose = onDismissFailedClose,

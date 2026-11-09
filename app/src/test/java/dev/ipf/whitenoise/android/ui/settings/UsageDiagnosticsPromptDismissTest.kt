@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.ui.settings
 import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.isToggleable
@@ -107,6 +108,36 @@ class UsageDiagnosticsPromptDismissTest {
             "the onboarding logs toggle must not open the upload confirmation",
             composeRule.onAllNodesWithText(AUDIT_CONFIRMATION_TITLE).fetchSemanticsNodes().isEmpty(),
         )
+    }
+
+    /**
+     * A close that arrives before the sheet recomposes reads the current pins, so a logs save started in
+     * the same frame keeps the sheet open instead of letting the close queue a decline over it.
+     */
+    @Test
+    fun closeInTheSameFrameAsAChoiceSeesItsSave() {
+        var mode: PromptCloseMode? = PromptCloseMode.RECORD
+        var closeStarted = 0
+        lateinit var finish: () -> Unit
+        composeRule.setContent {
+            finish =
+                rememberPromptFinish(
+                    remember { PromptCloseState() },
+                    hide = {},
+                    mode = { mode },
+                    onCloseStarted = { closeStarted++ },
+                    onDone = {},
+                    onDismissFailedClose = {},
+                )
+        }
+        composeRule.waitForIdle()
+
+        composeRule.runOnUiThread {
+            mode = null
+            finish()
+        }
+
+        assertEquals("a close must not record declines while a choice is still saving", 0, closeStarted)
     }
 
     /** Exercises the production startup owner rather than an always-mounted callback-only sheet. */
