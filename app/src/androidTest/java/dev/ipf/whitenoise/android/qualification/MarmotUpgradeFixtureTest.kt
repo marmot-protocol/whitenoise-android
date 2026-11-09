@@ -71,12 +71,7 @@ class MarmotUpgradeFixtureTest {
             )
             val receipt = File(context.filesDir, "upgrade-fixture.json")
             val root = File(context.filesDir, "Marmot")
-            if (phase == "seed") {
-                check(!root.exists() && !receipt.exists())
-            } else {
-                check(root.isDirectory && receipt.isFile)
-            }
-            if (phase in setOf("corrupt", "lost")) damageUpgradeMedia(root, receipt, phase)
+            prepareUpgradeFixture(root, receipt, phase)
             val runtime = upgradeFixtureRuntime(context, root, relay)
             try {
                 withTimeout(360_000L) {
@@ -127,6 +122,20 @@ class MarmotUpgradeFixtureTest {
             }
             recordClosedStorage(root, receipt, phase)
         }
+
+    /** Validates the fixture layout and applies media damage only for the two recovery phases. */
+    private fun prepareUpgradeFixture(
+        root: File,
+        receipt: File,
+        phase: String,
+    ) {
+        if (phase == "seed") {
+            check(!root.exists() && !receipt.exists())
+        } else {
+            check(root.isDirectory && receipt.isFile)
+        }
+        if (phase in setOf("corrupt", "lost")) damageUpgradeMedia(root, receipt, phase)
+    }
 
     /** Records database and baseline salt evidence only after the native runtime has fully closed. */
     private fun recordClosedStorage(
@@ -417,7 +426,8 @@ class MarmotUpgradeFixtureTest {
             Bundle().apply {
                 putString(
                     "stale_upload_retry",
-                    "refused epoch ${original.sourceEpoch}, retried at epoch $epoch, peer attachment count 1, bytes matched",
+                    "refused epoch ${original.sourceEpoch}, retried at epoch $epoch, " +
+                        "peer attachment count 1, bytes matched",
                 )
             },
         )
@@ -439,7 +449,9 @@ class MarmotUpgradeFixtureTest {
             delay(100L)
             asset = runtime.attachmentLocalAssets(peer, group, listOf(target)).single().reference
         }
-        assertArrayEquals(plaintext, runtime.readAttachmentAsset(peer, asset, 0uL, plaintext.size.toUInt()).bytes)
+        val read = runtime.readAttachmentAsset(peer, asset, 0uL, plaintext.size.toUInt() + 1u)
+        assertTrue(read.available)
+        assertArrayEquals(plaintext, read.bytes)
         delay(2_000L) // Let duplicate relay deliveries settle before checking the complete fixture conversation.
         val query = TimelineMessageQueryFfi(group, null, null, null, null, null, 100u)
         val messages = runtime.timelineMessages(peer, query).messages

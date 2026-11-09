@@ -295,6 +295,14 @@
         "test_ids": [
           "CON-038"
         ]
+      },
+      {
+        "surface": "R.string.toast_couldnt_cancel_leave",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.toast_couldnt_cancel_leave",
+        "test_ids": [
+          "GRP-032"
+        ]
       }
     ],
     "settings_controls": [

@@ -4,12 +4,15 @@ import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.GroupConversationSnapshotFfi
+import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.SelfMembershipFfi
+import java.lang.reflect.Proxy
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -37,6 +40,106 @@ class GroupConversationSnapshotApplicationTest {
                 assertEquals(emptyList<String>(), controller.group.admins)
                 assertEquals(expected.managementState, controller.managementState)
                 assertTrue(controller.membersVerified)
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    /** A committed cancellation retries only the roster read after a transient refresh failure. */
+    @Test
+    fun blockedLeaveCancellationRestoresMembershipOnlyAfterReadback() =
+        runTest {
+            val joined = snapshot("Stayed", admin = true)
+            val blocked = joined.withBlockedLeave()
+            var reads = 0
+            val controller =
+                controller(initialGroup = blocked.details.group) {
+                    when (reads++) {
+                        0 -> blocked
+                        1 -> error("Roster temporarily unavailable")
+                        else -> joined
+                    }
+                }
+            val nativeCalls = mutableListOf<Pair<Any?, Any?>>()
+            controller.installCancelLeaveStub { account, group -> nativeCalls += account to group }
+            try {
+                assertTrue(controller.refreshManagementState())
+                assertTrue(controller.canCancelBlockedLeave)
+                assertFalse(controller.canSendMessages)
+
+                assertFalse(controller.cancelBlockedLeave())
+                assertTrue(controller.canCancelBlockedLeave)
+                assertFalse(controller.canSendMessages)
+
+                assertTrue(controller.cancelBlockedLeave())
+                assertEquals(listOf(ACCOUNT to ConversationTimelineTestIds.GROUP_ID), nativeCalls)
+                assertEquals(SelfMembershipFfi.MEMBER, controller.group.selfMembership)
+                assertTrue(controller.isSelfMember)
+                assertTrue(controller.canSendMessages)
+                assertFalse(controller.showsBlockedLeave)
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    /** A cancellation can commit even when MDK fails to write its membership projection. */
+    @Test
+    fun blockedLeaveReadsMembershipAfterNativeCancellationError() =
+        runTest {
+            val joined = snapshot("Stayed", admin = true)
+            val blocked = joined.withBlockedLeave()
+            var current = blocked
+            val controller = controller(initialGroup = blocked.details.group) { current }
+            controller.installCancelLeaveStub { _, _ ->
+                current = joined
+                error("Native response lost after cancellation")
+            }
+            try {
+                assertTrue(controller.refreshManagementState())
+                assertTrue(controller.cancelBlockedLeave())
+                assertEquals(SelfMembershipFfi.MEMBER, controller.group.selfMembership)
+                assertTrue(controller.canSendMessages)
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    /** A reopened controller can reconcile a cancellation submitted from the old conversation. */
+    @Test
+    fun reopenedBlockedLeaveResolvesAfterJoinedStateUpdate() =
+        runTest {
+            val joined = snapshot("Stayed", admin = true)
+            val controller = controller(initialGroup = joined.withBlockedLeave().details.group) { joined }
+            try {
+                controller.applyGroupStateForTest(joined.details.group)
+                assertFalse(controller.canSendMessages)
+                controller.refreshMembersAfterGroupState()
+                assertEquals(SelfMembershipFfi.MEMBER, controller.group.selfMembership)
+                assertTrue(controller.canSendMessages)
+            } finally {
+                controller.onCleared()
+            }
+        }
+
+    /** An observer can retry a failed readback even after MDK clears the blocked flag. */
+    @Test
+    fun clearedBlockKeepsReadbackAvailableAfterTransientFailure() =
+        runTest {
+            val joined = snapshot("Stayed", admin = true)
+            var reads = 0
+            val controller =
+                controller(initialGroup = joined.withBlockedLeave().details.group) {
+                    if (reads++ == 0) error("Roster temporarily unavailable")
+                    joined
+                }
+            try {
+                controller.applyGroupStateForTest(joined.details.group)
+                assertFalse(controller.refreshManagementState())
+                assertTrue(controller.showsBlockedLeave)
+                assertTrue(controller.blockedLeaveNeedsReadback)
+                assertTrue(controller.canCancelBlockedLeave)
+                assertTrue(controller.cancelBlockedLeave())
+                assertTrue(controller.canSendMessages)
             } finally {
                 controller.onCleared()
             }
@@ -331,6 +434,45 @@ class GroupConversationSnapshotApplicationTest {
                 controller.onCleared()
             }
         }
+
+    /** Models a native leave request whose projected LEFT is still provisional. */
+    private fun GroupConversationSnapshotFfi.withBlockedLeave() =
+        copy(
+            details =
+                details.copy(
+                    group =
+                        details.group.copy(
+                            selfMembership = SelfMembershipFfi.LEFT,
+                            leaveRequestPending = true,
+                            leaveRequestedAtMs = 1uL,
+                            leaveBlocked = true,
+                        ),
+                ),
+            managementState =
+                managementState.copy(
+                    leaveRequestPending = true,
+                    leaveRequestedAtMs = 1uL,
+                    leaveBlocked = true,
+                    canCancelLeave = true,
+                ),
+        )
+
+    /** Installs the native cancellation stub alongside the injected snapshot reader. */
+    private fun ConversationController.installCancelLeaveStub(cancel: (Any?, Any?) -> Unit) {
+        val marmot =
+            Proxy.newProxyInstance(
+                MarmotInterface::class.java.classLoader,
+                arrayOf(MarmotInterface::class.java),
+            ) { _, method, args ->
+                check(method.name == "cancelLeave")
+                val arguments = checkNotNull(args)
+                cancel(arguments[0], arguments[1])
+            } as MarmotInterface
+        WhiteNoiseAppState::class.java
+            .getDeclaredField("marmotRuntime")
+            .apply { isAccessible = true }
+            .set(appState, AppMarmotRuntime(rootPath = "test", marmot = marmot))
+    }
 
     /** Builds a conversation controller whose group snapshot reads come from the given reader. */
     private fun controller(

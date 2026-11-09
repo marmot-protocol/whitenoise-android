@@ -827,6 +827,35 @@ class ComposerExpansionDestructiveLifecycleTest {
             }
         }
 
+    /** Native LEFT is provisional while the blocked leave can still be cancelled. */
+    @Test
+    fun blockedLeaveCannotAdmitHistoryDeletion() =
+        runBlocking {
+            val fixture =
+                fixture(
+                    groupRecord =
+                        group().copy(
+                            selfMembership = SelfMembershipFfi.LEFT,
+                            leaveRequestPending = true,
+                            leaveRequestedAtMs = 1uL,
+                            leaveBlocked = true,
+                        ),
+                )
+            val retained = retainExpansion(fixture.appState)
+            val controller = fixture.seededChatsController()
+            try {
+                assertTrue(runCatching { controller.prepareChatListDeparture(GROUP_ID) }.isFailure)
+                assertFalse(controller.leaveAndDeleteFromChatList(GROUP_ID))
+                assertTrue(fixture.calls.order.isEmpty())
+                assertEquals(
+                    retained,
+                    fixture.appState.composerExpansionStateRetention.preferenceFor(ACCOUNT_REF, GROUP_ID),
+                )
+            } finally {
+                controller.onCleared()
+            }
+        }
+
     /** The last member resets native state rather than retaining a joined group behind local deletion. */
     @Test
     fun soleMemberDepartureForgetsProtocolState() =
@@ -1217,7 +1246,14 @@ class ComposerExpansionDestructiveLifecycleTest {
         return if (projection.missing != MissingProjection.NONE && !left) {
             null
         } else {
-            lifecycleChatRows(present, left).firstOrNull { it.groupIdHex == arguments?.get(1) }
+            lifecycleChatRows(present, left)
+                .firstOrNull { it.groupIdHex == arguments?.get(1) }
+                ?.copy(
+                    selfMembership = if (left) SelfMembershipFfi.LEFT else projection.group.selfMembership,
+                    leaveRequestPending = projection.group.leaveRequestPending,
+                    leaveRequestedAtMs = projection.group.leaveRequestedAtMs,
+                    leaveBlocked = projection.group.leaveBlocked,
+                )
         }
     }
 

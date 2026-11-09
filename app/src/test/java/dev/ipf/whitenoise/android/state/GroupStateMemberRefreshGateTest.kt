@@ -368,6 +368,10 @@ class GroupStateMemberRefreshGateTest {
 
         assertTrue(groupStateUpdateRemovesSelf(previous, removed))
         assertTrue(groupStateUpdateRemovesSelf(previous, left))
+        val pendingLeave = left.copy(leaveRequestPending = true, leaveRequestedAtMs = 1uL, leaveBlocked = true)
+        assertFalse(groupStateUpdateRemovesSelf(previous, pendingLeave))
+        assertTrue(groupStateUpdateRemovesSelf(pendingLeave, left))
+        assertTrue(groupStateUpdateRemovesSelf(pendingLeave, removed))
         assertFalse(groupStateUpdateRemovesSelf(removed, removed.copy()))
         assertFalse(groupStateUpdateRemovesSelf(previous, previous.copy(name = "Renamed")))
     }

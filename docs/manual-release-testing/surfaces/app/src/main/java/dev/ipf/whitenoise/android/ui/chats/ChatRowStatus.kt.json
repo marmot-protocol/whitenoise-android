@@ -58,6 +58,14 @@
         "test_ids": [
           "CON-039"
         ]
+      },
+      {
+        "surface": "R.string.group_leave_blocked",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatRowStatus.kt",
+        "anchor": "R.string.group_leave_blocked",
+        "test_ids": [
+          "GRP-032"
+        ]
       }
     ]
   },

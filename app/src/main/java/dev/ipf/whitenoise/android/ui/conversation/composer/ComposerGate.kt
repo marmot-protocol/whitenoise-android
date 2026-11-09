@@ -78,6 +78,7 @@ internal fun conversationComposerGate(
     unrecoverable: Boolean = false,
     disbanding: Boolean = false,
     disbanded: Boolean = false,
+    leaveBlocked: Boolean = false,
 ): ComposerGate =
     when {
         // The most specific terminal state wins: a disbanded group is done by
@@ -85,7 +86,7 @@ internal fun conversationComposerGate(
         disbanded || disbanding -> ComposerGate.DISBANDED
         unrecoverable -> ComposerGate.FROZEN
         pendingInvite -> ComposerGate.INVITE
-        inviteAcceptanceResolutionPending -> ComposerGate.PENDING
+        inviteAcceptanceResolutionPending || leaveBlocked -> ComposerGate.PENDING
         isSelfMember -> ComposerGate.COMPOSER
         // Removed-member notice only once refreshMembers() has VERIFIED the
         // roster. An unverified roster that merely omits self — e.g. a stale or

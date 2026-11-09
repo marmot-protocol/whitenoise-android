@@ -360,6 +360,31 @@ internal fun GroupLeaveBlockedNotice(
     }
 }
 
+/** Shows the durable last-admin block or offers to verify membership after it clears. */
+@Suppress("FunctionNaming")
+@Composable
+internal fun BlockedLeaveCancelNotice(
+    enabled: Boolean,
+    refreshingMembership: Boolean = false,
+    onCancel: () -> Unit,
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = RoundedCornerShape(12.dp),
+        border = amoledSurfaceBorderStroke(),
+        modifier = Modifier.fillMaxWidth().testTag("chat_info.cancel_blocked_leave"),
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            val hint =
+                if (refreshingMembership) R.string.group_leave_refresh_hint else R.string.group_leave_blocked_hint
+            Text(stringResource(hint), style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = onCancel, enabled = enabled, modifier = Modifier.align(Alignment.End)) {
+                Text(stringResource(if (refreshingMembership) R.string.refresh else R.string.group_cancel_leave))
+            }
+        }
+    }
+}
+
 /**
  * The You're the only admin gate when no member can receive admin, the fallback of the transfer-then-leave route.
  * Cancel only dismisses, and the error-coloured action opens the reviewed abandonment, which the body names as the
