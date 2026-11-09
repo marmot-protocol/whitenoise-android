@@ -952,6 +952,8 @@
     <string name="scan_to_connect">Bağlanmak için tarayın.</string>
     <string name="not_copied">Kopyalanmadı</string>
     <string name="copy_public_key">Genel anahtarı kopyala</string>
+    <string name="copy_chat_link">Sohbet bağlantısını kopyala</string>
+    <string name="copy_chat_link_subtitle">Bu sohbeti zaten içinde olanlar için açar</string>
     <string name="public_key_copy_action_with_value">Genel anahtarı kopyala: %1$s</string>
     <string name="button_in_progress">Devam ediyor</string>
     <string name="private_key">Özel anahtar</string>
@@ -1087,6 +1089,9 @@
     <string name="toast_reply_draft_restore_failed">Yanıt geri yüklenemedi.</string>
     <string name="toast_draft_save_failed">Taslak kaydedilemedi.</string>
     <string name="toast_notification_conversation_unavailable">Bu sohbet artık kullanılamıyor</string>
+    <string name="chat_link_not_found">Sohbet bulunamadı</string>
+    <string name="chat_link_invalid">Bu sohbet bağlantısı geçersiz</string>
+    <string name="chat_link_choose_account_title">Sohbeti şurada aç</string>
     <string name="toast_couldnt_decode_image">Resim çözülemedi</string>
     <string name="toast_couldnt_prepare_image">Görsel indirilemedi veya hazırlanamadı.</string>
     <string name="toast_reattach_to_retry_media">Tekrar denemek için yeniden ekleyin</string>

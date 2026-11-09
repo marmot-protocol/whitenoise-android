@@ -19,6 +19,7 @@ import dev.ipf.whitenoise.android.state.DraftPersistence
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.navigation.SettingsDetail
+import dev.ipf.whitenoise.android.ui.settings.SETTINGS_CARD_MORPH_MILLIS
 import dev.ipf.whitenoise.android.ui.settings.SettingsHomeViewport
 import dev.ipf.whitenoise.android.ui.settings.SettingsScreen
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -30,7 +31,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** Actual Settings destination at the start, middle and end of its draw-layer motion. */
+/** Actual Settings destination at the start, middle and end of its card morph. */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [36], qualifiers = "en-w360dp-h780dp-mdpi")
@@ -86,6 +87,8 @@ class SettingsRouteMotionScreenshotTest {
                             { detail.value = it },
                             SettingsHomeViewport.Top,
                             {},
+                            // Pin the flavor-dependent update card so Play and Zapstore share one baseline.
+                            selfUpdateEnabled = true,
                         )
                     }
                 }
@@ -93,17 +96,20 @@ class SettingsRouteMotionScreenshotTest {
         }
         rule.runOnIdle { detail.value = SettingsDetail.Gestures }
         rule.mainClock.advanceTimeByFrame()
-        captureFrame(name, "first")
-        rule.mainClock.advanceTimeBy(96)
+        // The card morph moves the bubbles first and fades the text in after, so the first frame is
+        // shapes only; the row must already be composed and must show ink from the midpoint on.
+        captureFrame(name, "first", inked = false)
+        rule.mainClock.advanceTimeBy(SETTINGS_CARD_MORPH_MILLIS / 2L)
         captureFrame(name, "middle")
-        rule.mainClock.advanceTimeBy(200)
+        rule.mainClock.advanceTimeBy(SETTINGS_CARD_MORPH_MILLIS.toLong())
         captureFrame(name, "settled")
     }
 
-    /** Every recorded frame must contain actual gesture-row ink, not merely its top bar or semantics. */
+    /** Inked frames must contain actual gesture-row ink, not merely its top bar or semantics. */
     private fun captureFrame(
         name: String,
         frame: String,
+        inked: Boolean = true,
     ) {
         val row = rule.onNodeWithTag("gestures.MessageLeft", useUnmergedTree = true).assertIsDisplayed()
         val bounds = row.fetchSemanticsNode().boundsInRoot
@@ -112,7 +118,7 @@ class SettingsRouteMotionScreenshotTest {
         val right = bounds.right.toInt().coerceIn(left + 1, bitmap.width)
         val top = bounds.top.toInt().coerceIn(0, bitmap.height - 1)
         val bottom = bounds.bottom.toInt().coerceIn(top + 1, bitmap.height)
-        assertGestureRowInk(bitmap, left, top, right, bottom)
+        if (inked) assertGestureRowInk(bitmap, left, top, right, bottom)
         bitmap.captureRoboImage("src/test/snapshots/settings_motion_${name}_$frame.png")
     }
 
@@ -129,6 +135,6 @@ class SettingsRouteMotionScreenshotTest {
             for (x in left until right) colors += bitmap.getPixel(x, y)
             if (colors.size > 8) return
         }
-        assertTrue("Gesture row body must render at every motion frame", colors.size > 8)
+        assertTrue("Gesture row body must render once the page fades in", colors.size > 8)
     }
 }

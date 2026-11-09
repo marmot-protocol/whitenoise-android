@@ -937,6 +937,8 @@
     <string name="scan_to_connect">扫码即可连接。</string>
     <string name="not_copied">未复制</string>
     <string name="copy_public_key">复制公钥</string>
+    <string name="copy_chat_link">复制聊天链接</string>
+    <string name="copy_chat_link_subtitle">为已在此聊天中的人打开此聊天</string>
     <string name="public_key_copy_action_with_value">复制公钥 %1$s</string>
     <string name="button_in_progress">进行中</string>
     <string name="private_key">私钥</string>
@@ -1068,6 +1070,9 @@
     <string name="toast_reply_draft_restore_failed">无法恢复回复。</string>
     <string name="toast_draft_save_failed">无法保存草稿。</string>
     <string name="toast_notification_conversation_unavailable">该对话已不可用</string>
+    <string name="chat_link_not_found">未找到聊天</string>
+    <string name="chat_link_invalid">此聊天链接无效</string>
+    <string name="chat_link_choose_account_title">在以下账户中打开聊天</string>
     <string name="toast_couldnt_decode_image">无法解码该图片</string>
     <string name="toast_couldnt_prepare_image">无法下载或处理该图片。</string>
     <string name="toast_reattach_to_retry_media">重新附加以重试</string>

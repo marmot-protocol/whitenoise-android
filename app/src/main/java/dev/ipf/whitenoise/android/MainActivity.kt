@@ -35,7 +35,6 @@ import dev.ipf.whitenoise.android.amber.AmberActivityCoordinator
 import dev.ipf.whitenoise.android.core.DateTimeFormatState
 import dev.ipf.whitenoise.android.diagnostics.AndroidFramePerformanceReporter
 import dev.ipf.whitenoise.android.diagnostics.FramePerformanceCallbackGuard
-import dev.ipf.whitenoise.android.notifications.InboundIntentRouting
 import dev.ipf.whitenoise.android.notifications.NotificationInboundState
 import dev.ipf.whitenoise.android.notifications.NotificationNavigation
 import dev.ipf.whitenoise.android.notifications.NotificationTapTokens
@@ -257,14 +256,18 @@ class MainActivity : AppCompatActivity() {
                     warmResumeTraceToken = warmResumeTraceToken,
                     warmResumeEpoch = warmResumeEpoch,
                     inboundProfilePayload = inboundProfilePayload,
-                    onProfilePayloadHandled = { handled ->
-                        if (inboundProfilePayload == handled) inboundProfilePayload = null
-                    },
+                    onProfilePayloadHandled = { if (inboundProfilePayload == it) inboundProfilePayload = null },
                     inboundNotificationTarget = inboundNotificationTarget,
                     inboundNotificationRequestId = inboundNotificationRequestId,
                     onNotificationTargetHandled = ::handleNotificationTarget,
                     inboundShareRequest = inboundShareRequest,
                     onShareRequestHandled = ::handleShareRequest,
+                    onChatLinkResolved = { handled, target ->
+                        if (handled != null && intent?.dataString == handled) {
+                            setIntent(Intent(this@MainActivity, MainActivity::class.java))
+                        }
+                        if (target != null) applyInboundRouting(target, null, null, warmResumeLifecycleClass)
+                    },
                     inboundAppUpdateTap = inboundAppUpdateTap,
                     onAppUpdateTapHandled = { handled ->
                         if (inboundAppUpdateTap == handled) inboundAppUpdateTap = 0
@@ -425,34 +428,32 @@ class MainActivity : AppCompatActivity() {
                 parseShareRequest(intent)
             }
         val profileData = intent?.dataString.takeUnless { retainNotification }
-        val routing =
-            routeInboundIntent(
-                parsedTarget = parsedTarget,
-                shareRequest = parsedShare,
-                dataString = profileData,
-                current =
-                    InboundIntentRouting(
-                        notificationTarget = inboundNotificationTarget,
-                        profilePayload = inboundProfilePayload,
-                        shareRequest = inboundShareRequest,
-                        notificationRequestId = inboundNotificationRequestId,
-                    ),
-            )
         pinTapGate.supersedeForRoute(parsedTarget != null, parsedShare != null, profileData)
-        if (parsedTarget != null) {
-            foregroundConversationDismissal.onNotificationRouteObserved()
-            appState.startNotificationRouteTrace(routing.notificationRequestId, lifecycleClass, parsedTarget)
-        }
-        inboundNotificationTarget = routing.notificationTarget
-        inboundNotificationRequestId = routing.notificationRequestId
-        inboundProfilePayload = routing.profilePayload
-        inboundShareRequest = routing.shareRequest
+        applyInboundRouting(parsedTarget, parsedShare, profileData, lifecycleClass)
         if (parsedTarget != null || parsedShare != null) {
             // Notification taps and share intents are one-shot navigation requests.
             // Replace the stored intent after parsing so activity recreation cannot
             // replay the same target after the UI has already consumed it.
             setIntent(Intent(this, MainActivity::class.java))
         }
+    }
+
+    // Merges a parsed inbound route into the pending routes; a notification target also starts its route trace. A chat
+    // link (#3658) opens through here as a notification target, sharing account switching, app lock and cold/warm
+    // handling; its stored intent is replaced first so activity recreation cannot resolve the link again.
+    private fun applyInboundRouting(
+        target: NotificationTarget?,
+        share: ShareRequest?,
+        data: String?,
+        lifecycleClass: WarmResumeLifecycleClass,
+    ) {
+        val routing = notificationInboundState.route(target, share, data, inboundProfilePayload, inboundShareRequest)
+        if (target != null) {
+            foregroundConversationDismissal.onNotificationRouteObserved()
+            appState.startNotificationRouteTrace(routing.notificationRequestId, lifecycleClass, target)
+        }
+        inboundProfilePayload = routing.profilePayload
+        inboundShareRequest = routing.shareRequest
     }
 
     /** Acknowledges the Activity-delivered intent without clearing a promoted picker route. */

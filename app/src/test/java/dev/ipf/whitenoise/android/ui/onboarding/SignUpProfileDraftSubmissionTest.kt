@@ -7,6 +7,9 @@ import android.net.NetworkInfo
 import android.os.Looper
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -14,6 +17,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.text.AnnotatedString
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
 import dev.ipf.marmotkit.MarmotInterface
@@ -25,7 +30,6 @@ import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
@@ -43,9 +47,19 @@ class SignUpProfileDraftSubmissionTest {
     @get:Rule val composeRule = createComposeRule()
     private val context = ApplicationProvider.getApplicationContext<Context>()
 
-    /** Welcome opens the real form; edits and Back leave no native runtime access or account receipt. */
+    /** Welcome opens the real form with a generated name; edits and Back create no account. */
     @Test fun welcomeToFormAndBackCreatesNothing() {
-        var nativeAccess = 0
+        val nativeCalls = mutableListOf<String>()
+        val native =
+            java.lang.reflect.Proxy
+                .newProxyInstance(
+                    MarmotInterface::class.java.classLoader,
+                    arrayOf(MarmotInterface::class.java),
+                ) { _, method, _ ->
+                    nativeCalls += method.name
+                    check(method.name == "randomProfilePseudonym") { "Unexpected native call: ${method.name}" }
+                    "Quiet Otter"
+                } as MarmotInterface
         val app =
             WhiteNoiseAppState(
                 context = context,
@@ -53,20 +67,25 @@ class SignUpProfileDraftSubmissionTest {
                 accountIdHexResolver = { null },
                 accounts = emptyList(),
                 activeAccountRef = "",
-                marmotAccessObserver = { nativeAccess++ },
+                initialMarmotRuntime = AppMarmotRuntime(context.cacheDir.resolve("signup-welcome-test").path, native),
             )
         composeRule.setContent { WhiteNoiseTheme { OnboardingScreen(app, hasActiveNetwork = { true }) } }
         composeRule.onNodeWithTag("onboarding.welcome.sign_up").performClick()
-        composeRule.runOnIdle { assertNotNull(app.pendingProfileSignUp) }
-        composeRule.onNodeWithTag("onboarding.sign_up.name").performTextInput("Local name")
+        composeRule.onNodeWithTag("onboarding.sign_up.name").assertTextContains("Quiet Otter")
+        composeRule.runOnIdle { assertEquals("Quiet Otter", app.pendingProfileSignUp?.draft?.name) }
+        composeRule.onNodeWithTag("onboarding.sign_up.name").performTextReplacement("Local name")
         composeRule.onNodeWithTag("onboarding.sign_up.about").performTextInput("Local description")
         composeRule.onNodeWithContentDescription(context.getString(R.string.back)).performClick()
         composeRule.onNodeWithTag("onboarding.welcome.sign_up").assertExists()
         composeRule.runOnIdle {
             assertNull(app.pendingProfileSignUp)
             assertEquals("", app.activeAccountRef)
-            assertEquals(0, nativeAccess)
+            assertEquals(listOf("randomProfilePseudonym"), nativeCalls)
         }
+        // Back discarded the draft, so reopening generates a fresh name.
+        composeRule.onNodeWithTag("onboarding.welcome.sign_up").performClick()
+        composeRule.runOnIdle { assertEquals(listOf("randomProfilePseudonym", "randomProfilePseudonym"), nativeCalls) }
+        composeRule.onNodeWithTag("onboarding.sign_up.name").assertTextContains("Quiet Otter")
     }
 
     /** The real Welcome/form wiring reaches native creation once after an offline retry. */
@@ -98,6 +117,7 @@ class SignUpProfileDraftSubmissionTest {
                     MarmotInterface::class.java.classLoader,
                     arrayOf(MarmotInterface::class.java),
                 ) { _, method, args ->
+                    if (method.name == "randomProfilePseudonym") return@newProxyInstance "Quiet Otter"
                     check(method.name == "createIdentityWithInitialProfile") {
                         "Unexpected native call: ${method.name}"
                     }
@@ -119,7 +139,7 @@ class SignUpProfileDraftSubmissionTest {
             WhiteNoiseTheme { OnboardingScreen(app, hasActiveNetwork = { availability.hasActiveNetwork() }) }
         }
         composeRule.onNodeWithTag("onboarding.welcome.sign_up").performClick()
-        composeRule.onNodeWithTag("onboarding.sign_up.name").performTextInput("Retained name")
+        composeRule.onNodeWithTag("onboarding.sign_up.name").performTextReplacement("Retained name")
         composeRule.onNodeWithTag("onboarding.sign_up.action").performClick()
         if (!hasDefaultRoute) {
             composeRule.onNodeWithTag(ONBOARDING_OFFLINE_NOTICE_TAG).assertExists()
@@ -177,7 +197,7 @@ class SignUpProfileDraftSubmissionTest {
                 }
             WhiteNoiseTheme { SignUpScreen(controller, availability::hasActiveNetwork, { "Quiet Otter" }, {}) }
         }
-        composeRule.onNodeWithTag("onboarding.sign_up.name").performTextInput("Alice")
+        composeRule.onNodeWithTag("onboarding.sign_up.name").performTextReplacement("Alice")
         composeRule.onNodeWithTag("onboarding.sign_up.about").performTextInput("Current text")
         composeRule.onNodeWithContentDescription("Suggest name").assertExists()
         composeRule.onNodeWithTag("onboarding.sign_up.suggest_name").performClick()
@@ -201,7 +221,7 @@ class SignUpProfileDraftSubmissionTest {
     @Test fun blankNameSubmitPublishesPseudonym() {
         var owner = SignUpOwner(1, null)
         val publications = mutableListOf<UserProfileMetadataFfi>()
-        val pseudonyms = ArrayDeque(listOf("Quiet Otter", "Brave Fox"))
+        val pseudonyms = ArrayDeque(listOf("Prefilled Name", "Quiet Otter", "Brave Fox"))
         composeRule.setContent {
             val scope = rememberCoroutineScope()
             val controller =
@@ -227,7 +247,7 @@ class SignUpProfileDraftSubmissionTest {
                 }
             WhiteNoiseTheme { SignUpScreen(controller, { true }, { pseudonyms.removeFirst() }, {}) }
         }
-        composeRule.onNodeWithTag("onboarding.sign_up.name").performTextInput("   ")
+        composeRule.onNodeWithTag("onboarding.sign_up.name").performTextReplacement("   ")
         composeRule.onNodeWithTag("onboarding.sign_up.action").performClick()
         composeRule.onNodeWithTag("onboarding.sign_up.action").performClick()
         composeRule.runOnIdle {
@@ -236,6 +256,68 @@ class SignUpProfileDraftSubmissionTest {
         }
         composeRule.onNodeWithTag("onboarding.sign_up.name").assertTextContains("Quiet Otter")
     }
+
+    /** A fresh form starts with one generated name and stages it as the draft (#3662). */
+    @Test fun freshFormPrefillsGeneratedName() {
+        val requests = mutableListOf<String?>()
+        lateinit var controller: SignUpController
+        composeRule.setContent {
+            val scope = rememberCoroutineScope()
+            controller = remember { idleSignUpController(scope) }
+            WhiteNoiseTheme {
+                SignUpScreen(controller, { true }, { excluding -> "Quiet Otter".also { requests += excluding } }, {})
+            }
+        }
+        composeRule.onNodeWithTag("onboarding.sign_up.name").assertTextContains("Quiet Otter")
+        composeRule.runOnIdle {
+            assertEquals(listOf<String?>(null), requests)
+            assertEquals("Quiet Otter", controller.draft?.name)
+        }
+    }
+
+    /** A kept draft name is shown as-is without generating another one. */
+    @Test fun existingDraftKeepsItsNameWithoutGenerating() {
+        assertDraftNameKept("Kept name")
+    }
+
+    /** A name the user cleared stays cleared until submit falls back to a generated one. */
+    @Test fun clearedDraftNameStaysClearedWithoutGenerating() {
+        assertDraftNameKept("")
+    }
+
+    private fun assertDraftNameKept(kept: String) {
+        var generated = 0
+        lateinit var controller: SignUpController
+        composeRule.setContent {
+            val scope = rememberCoroutineScope()
+            controller =
+                remember {
+                    idleSignUpController(scope).apply { stageDraft(SignUpProfileDraft(kept, "About")) }
+                }
+            WhiteNoiseTheme { SignUpScreen(controller, { true }, { "Quiet Otter".also { generated++ } }, {}) }
+        }
+        composeRule.runOnIdle {
+            assertEquals(0, generated)
+            assertEquals(SignUpProfileDraft(kept, "About"), controller.draft)
+        }
+        composeRule
+            .onNodeWithTag("onboarding.sign_up.name")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.EditableText, AnnotatedString(kept)))
+    }
+
+    private fun idleSignUpController(scope: kotlinx.coroutines.CoroutineScope) =
+        SignUpController(
+            scope,
+            { SignUpOwner(1, null) },
+            { true },
+            create = { _, _ -> error("Not submitted") },
+            hasPendingIdentityReceipt = { false },
+            qualify = {},
+            accept = { _, _ -> false },
+            upload = { _, _ -> error("Not submitted") },
+            publish = { _, _ -> false },
+            finish = { _, _ -> false },
+        )
 
     /** The new form remains editable offline; neither its primary action nor Retry creates an identity. */
     @Test fun missingActiveRouteRetainsDraftAndStartsNoNativeOperation() {
@@ -263,7 +345,7 @@ class SignUpProfileDraftSubmissionTest {
                 }
             WhiteNoiseTheme { SignUpScreen(controller, availability::hasActiveNetwork, { "Quiet Otter" }, {}) }
         }
-        composeRule.onNodeWithTag("onboarding.sign_up.name").performTextInput("Saved locally")
+        composeRule.onNodeWithTag("onboarding.sign_up.name").performTextReplacement("Saved locally")
         composeRule.onNodeWithTag("onboarding.sign_up.action").performClick()
         composeRule.onNodeWithTag(ONBOARDING_OFFLINE_NOTICE_TAG).assertExists()
         composeRule.onNodeWithText(context.getString(R.string.retry)).performClick()

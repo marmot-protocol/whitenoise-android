@@ -58,7 +58,7 @@ class GroupAdvancedSettingsIconsTest {
 
     private val context: Context = ApplicationProvider.getApplicationContext()
 
-    /** All five rows show their glyph in the light theme, aligned across switch and chevron rows. */
+    /** All six rows show their glyph in the light theme, aligned across switch and chevron rows. */
     @Test
     fun advancedGroupLight() {
         render()
@@ -274,7 +274,10 @@ class GroupAdvancedSettingsIconsTest {
         const val GROUP_HEX = "group-a"
         const val ADVANCED_GROUP_TAG = "chat_info.actions"
 
-        /** Read aloud, notification settings, bubble colors and Add to Home screen expose distinct actions. */
-        const val EXPECTED_BUTTON_ROWS = 5
+        /**
+         * Read aloud, notification settings, bubble colors, Add to Home screen and Copy chat link
+         * expose distinct actions.
+         */
+        const val EXPECTED_BUTTON_ROWS = 6
     }
 }

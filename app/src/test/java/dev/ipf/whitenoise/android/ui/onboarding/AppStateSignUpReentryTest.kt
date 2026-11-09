@@ -95,6 +95,7 @@ class AppStateSignUpReentryTest {
                     "listAccounts" -> listOf(created)
                     "attachmentDownloadPolicy" -> AttachmentDownloadPolicyFfi(true, 2_000uL, 300uL, 40uL)
                     "setAttachmentDownloadPolicy" -> Unit
+                    "randomProfilePseudonym" -> "Quiet Otter"
                     "toString" -> "SignUpNativeTestDouble"
                     "hashCode" -> System.identityHashCode(proxy)
                     "equals" -> proxy === args?.firstOrNull()
