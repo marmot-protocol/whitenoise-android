@@ -16,14 +16,17 @@ import dev.ipf.whitenoise.android.state.ChatFolderQuery
 import dev.ipf.whitenoise.android.state.ChatFolderRule
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.chatFolderQuery
+import dev.ipf.whitenoise.android.state.chatFolderSource
+import dev.ipf.whitenoise.android.state.departedFolderMatches
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.util.Locale
 
 /**
- * Characterizes each legacy rule field: the old loaded-rows evaluator and the native query select the same chats from
- * one fixture. The native side is read with MarmotKit's documented view scopes and condition meanings, so a
- * translation that drifts from the old rule shows up here before it reaches a device.
+ * Characterizes each legacy rule field: the chats a folder showed under the old loaded-rows evaluator are exactly the
+ * chats its native membership names now. The native side is the query read with MarmotKit's documented view scopes
+ * and condition meanings, merged with [departedFolderMatches] for departed groups, so a translation that drifts from
+ * what the folder shows surfaces here before it reaches a device.
  */
 class ChatFolderQueryCharacterizationTest {
     private val chats =
@@ -38,7 +41,8 @@ class ChatFolderQueryCharacterizationTest {
             chat("archived", archived = true, unread = true),
             chat("archived-direct", archived = true, kind = ChatConversationKindFfi.DIRECT),
             chat("work", description = "Work chat"),
-            chat("departed", departed = true),
+            chat("departed", departed = true, unread = true),
+            chat("archived-departed", departed = true, archived = true),
         )
 
     /** Every legacy field, alone and combined, selects the same chats either way. */
@@ -61,22 +65,13 @@ class ChatFolderQueryCharacterizationTest {
         rules.forEach { rule -> assertSame(rule, manual = emptySet(), excluded = emptySet()) }
     }
 
-    /**
-     * The one documented difference: MarmotKit hides a departed group's badges, so an unread departed group no longer
-     * counts as unread, while every other folder keeps it among active chats.
-     */
-    @Test fun departedGroupLosesOnlyItsUnreadBadge() {
-        val departed = listOf(chat("left", departed = true, unread = true))
-        val unread = requireNotNull(chatFolderQuery(ChatFolderRule(unreadOnly = true), emptySet(), emptySet()))
-        val everyChat = requireNotNull(chatFolderQuery(ChatFolderRule(includeAll = true), emptySet(), emptySet()))
-        assertEquals(emptySet<String>(), native(unread, departed))
-        assertEquals(setOf("left"), native(everyChat, departed))
-    }
-
-    /** Manual members join from either side of the archive split, and exclusions win over both. */
+    /** Manual members count on the folder's own side of the archive split, and exclusions win over both. */
     @Test fun manualMembersAndExclusionsMatchTheOldEvaluator() {
         assertSame(ChatFolderRule(groupsOnly = true), manual = setOf("archived-direct"), excluded = setOf("plain"))
         assertSame(ChatFolderRule(archivedOnly = true), manual = setOf("pinned"), excluded = setOf("archived"))
+        val departed = setOf("departed", "archived-departed")
+        assertSame(ChatFolderRule(pinnedOnly = true), manual = departed, excluded = emptySet())
+        assertSame(ChatFolderRule(archivedOnly = true), manual = departed, excluded = emptySet())
         assertSame(null, manual = setOf("archived", "direct"), excluded = setOf("direct"))
     }
 
@@ -87,9 +82,12 @@ class ChatFolderQueryCharacterizationTest {
         excluded: Set<String>,
     ) {
         val query = requireNotNull(chatFolderQuery(rule, manual, excluded))
+        val active = chats.filterNot { it.group.archived }
+        val archived = chats.filter { it.group.archived }
+        val source = chatFolderSource(rule, active, archived)
         val legacy =
             chatFolderChatIds(
-                items = chats,
+                items = source,
                 manualChatIds = manual,
                 rule = rule,
                 activeAccountIdHex = null,
@@ -97,16 +95,15 @@ class ChatFolderQueryCharacterizationTest {
                 displayTitle = { it.projection?.title.orEmpty() },
                 excludedChatIds = excluded,
             )
-        assertEquals("rule $rule", legacy, native(query))
+        val shown = source.mapTo(HashSet()) { it.id }.filterTo(HashSet()) { it in legacy }
+        val departed = departedFolderMatches(rule, manual, excluded, active, archived, activeAccountIdHex = null)
+        assertEquals("rule $rule", shown, native(query) + departed)
     }
 
-    /** The chats [query] selects from [from] across its views. */
-    private fun native(
-        query: ChatFolderQuery,
-        from: List<ChatListItem> = chats,
-    ): Set<String> =
+    /** The chats [query] selects across its views. */
+    private fun native(query: ChatFolderQuery): Set<String> =
         query.views.flatMapTo(HashSet()) { view ->
-            from.filter { it.inView(view) && query.matches(0, it) }.map { it.id }
+            chats.filter { it.inView(view) && query.matches(0, it) }.map { it.id }
         }
 
     /** Whether node [index] of this query holds for [chat]. */

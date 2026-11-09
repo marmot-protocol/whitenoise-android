@@ -14,10 +14,10 @@ import org.junit.Test
 
 /** How each folder rule field becomes a native chat-list query, and when a folder stays on the old evaluator. */
 class ChatFolderQueryTest {
-    /** The default Chats folder is every active chat, departed groups and muted chats included. */
+    /** The default Chats folder is every active chat, muted ones included. */
     @Test fun chatsDefaultMatchesEveryActiveChat() {
         val query = query(ChatFolderPreferences.defaultRuleFor(SystemFolderKind.CHATS))
-        assertEquals(listOf(ChatListViewFfi.CHATS, ChatListViewFfi.LEFT), query.views)
+        assertEquals(listOf(ChatListViewFfi.CHATS), query.views)
         assertEquals("All[Any[All[]]]", query.render())
         assertTrue(query.wholeView)
     }
@@ -60,22 +60,19 @@ class ChatFolderQueryTest {
     }
 
     /**
-     * Manual members are added and exclusions removed around the rule, with IDs lowercased. Manual members count in
-     * every view, archived ones included, so the rule keeps to its own side of the archive split.
+     * Manual members are added and exclusions removed around the rule, with IDs lowercased. They count only on the
+     * folder's side of the archive split, the rows the chat list draws the folder from.
      */
     @Test fun manualMembersAndExclusionsWrapTheRule() {
         val rule = ChatFolderRule(groupsOnly = true, includeMuted = true)
         val query = chatFolderQuery(rule, setOf("BB", "aa"), setOf("CC"))!!
-        assertEquals(CHAT_LIST_WINDOW_VIEWS, query.views)
-        assertEquals("All[Not[Ids(cc)], Any[Ids(aa,bb), All[Not[ARCHIVED], All[Not[DIRECT]]]]]", query.render())
-        val archived = chatFolderQuery(ChatFolderRule(archivedOnly = true), setOf("aa"), emptySet())!!
-        assertEquals("All[Any[Ids(aa), All[ARCHIVED, All[Not[MUTED]]]]]", archived.render())
+        assertEquals(listOf(ChatListViewFfi.CHATS), query.views)
+        assertEquals("All[Not[Ids(cc)], Any[Ids(aa,bb), All[Not[DIRECT]]]]", query.render())
     }
 
-    /** Without manual members a rule reads only its side: Chats and departed groups, or Archived. */
-    @Test fun ruleWithoutManualMembersReadsItsSideOnly() {
-        val active = query(ChatFolderRule(pinnedOnly = true))
-        assertEquals(listOf(ChatListViewFfi.CHATS, ChatListViewFfi.LEFT), active.views)
+    /** A rule reads its side only: Chats, or Archived for an archived rule. Departed groups are left to loaded rows. */
+    @Test fun ruleReadsItsSideOnly() {
+        assertEquals(listOf(ChatListViewFfi.CHATS), query(ChatFolderRule(pinnedOnly = true)).views)
         assertEquals(listOf(ChatListViewFfi.ARCHIVED), query(ChatFolderRule(archivedOnly = true)).views)
     }
 
@@ -126,7 +123,7 @@ class ChatFolderQueryTest {
             )
         fields.forEach { (field, node) ->
             val query = smart(SmartFolderFilter.Condition(field))
-            assertEquals(CHAT_LIST_WINDOW_VIEWS, query.views)
+            assertEquals(listOf(ChatListViewFfi.CHATS, ChatListViewFfi.ARCHIVED), query.views)
             assertEquals("All[Any[All[$node]]]", query.render())
         }
         val noneUnread = smart(SmartFolderFilter.Condition(FolderField.UNREAD, FolderMode.NONE))
@@ -159,7 +156,7 @@ class ChatFolderQueryTest {
     /** The unread narrowing wraps the whole folder, manual members and exclusions included. */
     @Test fun unreadNarrowsTheWholeFolder() {
         val query = chatFolderQuery(ChatFolderRule(pinnedOnly = true, includeMuted = true), setOf("aa"), emptySet())!!
-        assertEquals("All[All[Any[Ids(aa), All[Not[ARCHIVED], All[PINNED]]]], UNREAD]", query.unread().render())
+        assertEquals("All[All[Any[Ids(aa), All[PINNED]]], UNREAD]", query.unread().render())
     }
 
     /** Every flattened child follows its parent, as MarmotKit requires. */

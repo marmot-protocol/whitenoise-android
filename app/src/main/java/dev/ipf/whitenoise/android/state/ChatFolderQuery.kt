@@ -14,9 +14,8 @@ private const val QUERY_MAX_TEXT_BYTES = 1024
 
 /**
  * One folder as a native chat-list query: the same filter over each view the folder covers. MarmotKit matches it in
- * SQL over every chat in a view before paging, so the folder's list, count and select-all agree. The chat list shows
- * departed groups among active chats, so a legacy rule covers Chats and Left, or Archived for an archived rule, and
- * an advanced rule or any folder with manual members covers every view.
+ * SQL over every chat in a view before paging, so the folder's list, count and select-all agree. A legacy rule covers
+ * active or archived chats, and an advanced rule covers both.
  */
 internal data class ChatFolderQuery(
     val views: List<ChatListViewFfi>,
@@ -80,13 +79,9 @@ internal fun chatFolderQuery(
     val decoded = advanced?.let { SmartFolderCodec.decode(it)?.takeIf(SmartFolderCodec::valid) }
     if (rule.testsParticipants(decoded)) return null
     val match = if (advanced != null) decoded?.let(::smartFolderNode) else rule?.let(::legacyRuleNode)
-    val manual = manualChatIds.toIdNode()
-    val archivedRule = advanced == null && rule?.archivedOnly == true
-    // Manual members count in every view, as before, so a legacy rule then keeps to its own side of the archive split.
-    val sided = match?.let { if (manual != null && advanced == null) it.onArchiveSide(archivedRule) else it }
-    val included = listOfNotNull(manual, sided)
+    val included = listOfNotNull(manualChatIds.toIdNode(), match)
     val root = FolderNode.All(listOfNotNull(excludedChatIds.toIdNode()?.let(FolderNode::Not), FolderNode.Any(included)))
-    val views = folderViews(everyView = advanced != null || manual != null, archived = archivedRule)
+    val views = folderViews(advanced = advanced != null, archived = rule?.archivedOnly == true)
     // The chip's unread count wraps the root one level deeper, so it must fit as well.
     val fits = FolderNode.All(listOf(root, FolderNode.Is(ChatListConditionFfi.UNREAD))).withinLimits()
     return root.takeIf { fits }?.let { ChatFolderQuery(views, flatten(it)) }
@@ -99,22 +94,19 @@ private fun ChatFolderRule?.testsParticipants(decoded: SmartFolderFilter?): Bool
 }
 
 /**
- * The views a folder reads. The chat list shows departed groups among active chats, so an active rule reads Chats and
- * Left, an archived one reads Archived, and [everyView] (an advanced rule or manual members) reads all three.
+ * The views whose rows a folder shows, the same side of the archive split the chat list draws it from: Chats, or
+ * Archived for an archived rule, and both for an advanced rule. Departed groups sit in MarmotKit's Left scope, which
+ * carries no archive side, so their loaded rows keep the loaded-rows evaluator (see [departedFolderMatches]).
  */
 private fun folderViews(
-    everyView: Boolean,
+    advanced: Boolean,
     archived: Boolean,
 ): List<ChatListViewFfi> =
     when {
-        everyView -> CHAT_LIST_WINDOW_VIEWS
+        advanced -> listOf(ChatListViewFfi.CHATS, ChatListViewFfi.ARCHIVED)
         archived -> listOf(ChatListViewFfi.ARCHIVED)
-        else -> listOf(ChatListViewFfi.CHATS, ChatListViewFfi.LEFT)
+        else -> listOf(ChatListViewFfi.CHATS)
     }
-
-/** This rule limited to archived chats, or to active ones. A departed group is never Archived, so it is active. */
-private fun FolderNode.onArchiveSide(archived: Boolean): FolderNode =
-    FolderNode.All(listOf(FolderNode.Is(ChatListConditionFfi.ARCHIVED).negatedIf(!archived), this))
 
 /**
  * A legacy rule: its keyword, or every chat when it is a pure category rule, narrowed by each selected category. A

@@ -5,7 +5,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.ipf.marmotkit.ChatListViewQueryFfi
+import dev.ipf.marmotkit.GroupLifecycleStateFfi
 import dev.ipf.marmotkit.MarmotKitException
+import dev.ipf.marmotkit.SelfMembershipFfi
+import dev.ipf.whitenoise.android.core.chatFolderChatIds
+import dev.ipf.whitenoise.android.core.chatListItemDisplayTitle
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -31,6 +35,12 @@ internal data class NativeFolderMembership(
 ) {
     /** The matched chats as lowercase group IDs, the key folder membership sets use. */
     val idSet: Set<String> by lazy(LazyThreadSafetyMode.PUBLICATION) { ids.toSet() }
+
+    /** These members plus the loaded departed groups the folder matches, which show no unread badge. */
+    fun withDeparted(departed: Set<String>): NativeFolderMembership {
+        val extra = departed.filterNot(idSet::contains)
+        return if (extra.isEmpty()) this else copy(ids = ids + extra)
+    }
 }
 
 /**
@@ -198,6 +208,71 @@ internal fun WhiteNoiseAppState.nativeFolderMembership(
     accountRef: String,
     folderId: String,
 ): NativeFolderMembership? {
-    val query = chatFolderPreferences.folderQuery(accountRef, folderId)
-    return chatFolderMembership?.current(accountRef, folderId, query)
+    val preferences = chatFolderPreferences
+    val query = preferences.folderQuery(accountRef, folderId)
+    val native = chatFolderMembership?.current(accountRef, folderId, query) ?: return null
+    val departed =
+        departedFolderMatches(
+            rule = preferences.folderRule(accountRef, folderId),
+            manualChatIds = preferences.membershipFor(accountRef, folderId),
+            excludedChatIds = preferences.excludedChats(accountRef, folderId),
+            active = chatListItems,
+            archived = archivedChatListItems,
+            activeAccountIdHex = accounts.firstOrNull { it.label == accountRef }?.accountIdHex,
+            displayTitle = { chatListItemDisplayTitle(it, this, notificationGroupTitleCopy(appContext)) },
+        )
+    return native.withDeparted(departed)
+}
+
+/**
+ * Whether MarmotKit files this chat in its Left scope: departed or removed, disbanded, or with a leave or disband
+ * outstanding. That scope carries no archive side, so the folder queries leave it out and [departedFolderMatches]
+ * answers for these rows instead.
+ */
+internal fun ChatListItem.inLeftScope(): Boolean {
+    val row = projection
+    val groupLeft =
+        group.selfMembership != SelfMembershipFfi.MEMBER ||
+            group.disbanded ||
+            group.disbanding ||
+            group.leaveRequestPending
+    val rowLeft =
+        row != null &&
+            (
+                row.selfMembership != SelfMembershipFfi.MEMBER ||
+                    row.leaveRequestPending ||
+                    row.disbanding ||
+                    row.lifecycleState == GroupLifecycleStateFfi.DISBANDED
+            )
+    return groupLeft || rowLeft
+}
+
+/**
+ * A folder's matches among loaded departed groups, by the loaded-rows evaluator over the same side of the archive
+ * split the chat list draws the folder from. The chat list shows these rows among active or archived chats by their
+ * own archive flag, which MarmotKit's Left scope does not carry, so this keeps them exactly where they were.
+ */
+internal fun departedFolderMatches(
+    rule: ChatFolderRule?,
+    manualChatIds: Set<String>,
+    excludedChatIds: Set<String>,
+    active: List<ChatListItem>,
+    archived: List<ChatListItem>,
+    activeAccountIdHex: String?,
+    displayTitle: (ChatListItem) -> String = { it.projection?.title.orEmpty() },
+): Set<String> {
+    val departed = chatFolderSource(rule, active, archived).filter(ChatListItem::inLeftScope)
+    if (departed.isEmpty()) return emptySet()
+    val departedIds = departed.mapTo(HashSet()) { it.foldedId }
+    val matched =
+        chatFolderChatIds(
+            items = departed,
+            manualChatIds = manualChatIds,
+            rule = rule,
+            activeAccountIdHex = activeAccountIdHex,
+            isMuted = { id -> departed.any { it.group.groupIdHex == id && it.engineMuted() } },
+            displayTitle = displayTitle,
+            excludedChatIds = excludedChatIds,
+        )
+    return matched.filterTo(HashSet()) { it in departedIds }
 }

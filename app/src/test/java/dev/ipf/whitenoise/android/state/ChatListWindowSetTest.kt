@@ -62,9 +62,11 @@ class ChatListWindowSetTest {
                 mapOf(
                     ChatListViewFfi.CHATS to
                         FakeWindow(ChatListViewFfi.CHATS, listOf("CHATS-a", "f-1"), hasMoreAfter = true),
-                    ChatListViewFfi.LEFT to FakeWindow(ChatListViewFfi.LEFT, listOf("f-left")),
+                    ChatListViewFfi.ARCHIVED to FakeWindow(ChatListViewFfi.ARCHIVED, listOf("f-archived")),
                 )
-            val query = requireNotNull(chatFolderQuery(ChatFolderRule(pinnedOnly = true), emptySet(), emptySet()))
+            val advanced = SmartFolderFilter.Group(children = listOf(SmartFolderFilter.Condition(FolderField.PINNED)))
+            val rule = ChatFolderRule(smartFilter = SmartFolderCodec.encode(advanced))
+            val query = requireNotNull(chatFolderQuery(rule, emptySet(), emptySet()))
             val opened = mutableListOf<ChatListViewQueryFfi>()
             val folder =
                 ChatFolderWindows(query) { _, native -> folderWindows.getValue(native.view).also { opened += native } }
@@ -72,7 +74,7 @@ class ChatListWindowSetTest {
             val folderSet = ChatListWindowSet.openFolder("acct", folder)
             assertEquals(query.views.map(query::forView), opened)
             val merged = plain.frame().withFolder(folderSet)
-            val expected = listOf("CHATS-a", "ARCHIVED-a", "LEFT-a", "f-1", "f-left")
+            val expected = listOf("CHATS-a", "ARCHIVED-a", "LEFT-a", "f-1", "f-archived")
             assertEquals(expected, merged.rows.map { it.row.groupIdHex })
             assertEquals(plain.frame().revision, merged.revision)
             folderSet.pageForward(ChatListViewFfi.CHATS, folder = true)
@@ -97,7 +99,10 @@ class ChatListWindowSetTest {
         runBlocking {
             val handles = CHAT_LIST_WINDOW_VIEWS.associateWith { view -> FakeWindow(view, rows = listOf("$view-a")) }
             val chatsFolder = FakeWindow(ChatListViewFfi.CHATS, listOf("f-1"))
-            val query = requireNotNull(chatFolderQuery(ChatFolderRule(keyword = "work"), emptySet(), emptySet()))
+            val title = SmartFolderFilter.Condition(FolderField.TITLE, FolderMode.CONTAINS, setOf("work"))
+            val filter = SmartFolderFilter.Group(children = listOf(title))
+            val rule = ChatFolderRule(smartFilter = SmartFolderCodec.encode(filter))
+            val query = requireNotNull(chatFolderQuery(rule, emptySet(), emptySet()))
             val folder =
                 ChatFolderWindows(query) { _, native ->
                     if (native.view != ChatListViewFfi.CHATS) throw MarmotKitException.ChatPresentationNotReady()

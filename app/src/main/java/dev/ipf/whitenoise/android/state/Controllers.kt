@@ -28,6 +28,7 @@ import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.ChatListSubscriptionUpdateFfi
 import dev.ipf.marmotkit.ChatListUpdateTriggerFfi
 import dev.ipf.marmotkit.ChatListViewFfi
+import dev.ipf.marmotkit.ChatListViewQueryFfi
 import dev.ipf.marmotkit.ChatListWindowSnapshotFfi
 import dev.ipf.marmotkit.ChatPinStateFfi
 import dev.ipf.marmotkit.ConversationPresentationFfi
@@ -3214,14 +3215,19 @@ class ChatsController private constructor(
         accountRef: String,
         windows: ChatListWindowSet,
     ): Boolean {
-        val frame = windows.frame().withFolder(folderWindows)
+        val folder = folderWindows
+        val folderRevision = folder?.currentRevision
+        val frame = windows.frame().withFolder(folder)
         val valid = validateChatListWindowRows(accountRef, windows, frame.rows)
+        // The plain revision guards only the plain rows; a folder swap or install since capture makes this frame
+        // stale too, and the change that superseded it publishes its own frame.
+        val folderCurrent = folderWindows === folder && folder?.currentRevision == folderRevision
         return when {
             windows.closed || chatListWindows !== windows -> {
                 windows.close()
                 false
             }
-            !windows.isCurrent(frame) -> true
+            !windows.isCurrent(frame) || !folderCurrent -> true
             !valid -> {
                 windows.close()
                 false
@@ -4732,7 +4738,10 @@ class ChatsController private constructor(
         }
     }
 
-    /** Drops captured IDs that no longer match [folder] in any view it covers; keeps caller order, never adds. */
+    /**
+     * Drops captured IDs that no longer match [folder] in any view it covers; keeps caller order, never adds. A
+     * departed group the folder showed from loaded rows stays selected while MarmotKit still files it under Left.
+     */
     private suspend fun revalidateFolderChatListIds(
         folder: ChatFolderQuery,
         groupIds: List<String>,
@@ -4747,6 +4756,11 @@ class ChatsController private constructor(
                 folder.views.forEach { view ->
                     val matching = revalidate(owner.accountRef, folder.forView(view), groupIds)
                     matching.mapTo(kept) { it.lowercase(Locale.ROOT) }
+                }
+                val outside = groupIds.filter { it.lowercase(Locale.ROOT) !in kept }
+                if (outside.isNotEmpty()) {
+                    revalidate(owner.accountRef, ChatListViewQueryFfi(ChatListViewFfi.LEFT, emptyList()), outside)
+                        .mapTo(kept) { it.lowercase(Locale.ROOT) }
                 }
                 groupIds.filter { it.lowercase(Locale.ROOT) in kept }.takeIf { chatListActionSessionIsCurrent(owner) }
             }

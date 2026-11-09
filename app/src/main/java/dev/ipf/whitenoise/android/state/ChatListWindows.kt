@@ -99,6 +99,9 @@ internal class ChatListWindowSet private constructor(
     val rows: List<PresentedChatRowFfi>
         get() = frame().rows
 
+    /** Advances whenever this set installs a newer replacement, so a captured frame can tell it is stale. */
+    val currentRevision: Long get() = synchronized(frameLock) { revision }
+
     /** Every installed window's rows in view order, the plain views' or, for a folder set, the folder's. */
     fun frame(): ChatListFrame =
         synchronized(frameLock) {

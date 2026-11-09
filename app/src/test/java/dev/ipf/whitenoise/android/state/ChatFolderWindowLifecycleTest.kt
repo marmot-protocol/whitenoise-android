@@ -53,7 +53,7 @@ class ChatFolderWindowLifecycleTest {
             fixture.controller.folderSource.folder.value = groups
             awaitFolderCondition { fixture.folderOpens.lastOrNull() == groups.forView(groups.views.last()) }
             awaitFolderCondition { first.all { it.closes.get() == 1 } }
-            assertTrue(fixture.controller.hasFolderWindows())
+            awaitFolderCondition { fixture.controller.hasFolderWindows() }
 
             fixture.controller.folderSource.folder.value = null
             awaitFolderCondition { !fixture.controller.hasFolderWindows() }
