@@ -456,6 +456,7 @@ internal fun ComposerBar(
     onShareUser: (() -> Unit)? = null,
     onShareContact: (() -> Unit)? = null,
     onCreatePoll: (() -> Unit)? = null,
+    onOpenStickers: (() -> Unit)? = null,
     onPasteImageUris: ((List<Uri>) -> Unit)? = null,
     voiceRecordingController: dev.ipf.whitenoise.android.audio.VoiceRecordingController? = null,
     voiceReview: VoiceRecordingReview? = null,
@@ -1515,6 +1516,7 @@ internal fun ComposerBar(
                         onShareUser?.let { put(ComposerShortcut.Person, it) }
                         onShareContact?.let { put(ComposerShortcut.Contact, it) }
                         onCreatePoll?.let { put(ComposerShortcut.Poll, it) }
+                        onOpenStickers?.let { put(ComposerShortcut.Sticker, it) }
                     }
                 val transactionActive =
                     isRecordingVoice ||
@@ -1792,6 +1794,10 @@ internal fun ComposerBar(
                                 onPoll =
                                     onCreatePoll
                                         ?.takeIf { ComposerShortcut.Poll in hiddenAttachments }
+                                        ?.let(::guardedAttachmentAction),
+                                onSticker =
+                                    onOpenStickers
+                                        ?.takeIf { ComposerShortcut.Sticker in hiddenAttachments }
                                         ?.let(::guardedAttachmentAction),
                             )
                         },

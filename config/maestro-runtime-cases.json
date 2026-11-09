@@ -259,6 +259,14 @@
       "assertions": "Emoji picker opens and dismisses without sending or removing history.",
       "postcondition": "none"
     },
+    "conversation-stickers-empty-cancel": {
+      "suite": "conversation",
+      "manual_ids": [
+        "MSG-045"
+      ],
+      "assertions": "Stickers opens from the attachment menu with no installed packs, shows the empty picker and dismisses without sending.",
+      "postcondition": "none"
+    },
     "conversation-attachment-cancel": {
       "suite": "conversation",
       "manual_ids": [

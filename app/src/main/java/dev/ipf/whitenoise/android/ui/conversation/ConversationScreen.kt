@@ -153,6 +153,7 @@ import dev.ipf.whitenoise.android.state.recordProductObservation
 import dev.ipf.whitenoise.android.state.reduceChatCreateOpenConversationTiming
 import dev.ipf.whitenoise.android.state.returnToLatestWindow
 import dev.ipf.whitenoise.android.state.runCatchingCancellable
+import dev.ipf.whitenoise.android.state.sendSticker
 import dev.ipf.whitenoise.android.state.setUserBlocked
 import dev.ipf.whitenoise.android.state.tracedPagingSection
 import dev.ipf.whitenoise.android.state.transcriptPresentationNeedsRetry
@@ -243,6 +244,7 @@ import dev.ipf.whitenoise.android.ui.conversation.share.formatLocationShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.formatUserShareText
 import dev.ipf.whitenoise.android.ui.conversation.share.locationGrantAllowsSharing
 import dev.ipf.whitenoise.android.ui.conversation.share.readSharedContact
+import dev.ipf.whitenoise.android.ui.conversation.stickers.StickerSheet
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.group.GroupDetailsScreen
 import dev.ipf.whitenoise.android.ui.group.isCurrentGroupMutationOwner
@@ -2049,6 +2051,7 @@ internal fun ConversationScreen(
     // the recipient can tap to open that profile.
     var shareUserPickerOpen by remember(chat.id) { mutableStateOf(false) }
     var pollCreateOpen by remember(chat.id) { mutableStateOf(false) }
+    var stickerSheetOpen by remember(chat.id) { mutableStateOf(false) }
     val shareUserSelection = remember(chat.id) { mutableStateListOf<RecipientSearch.Candidate>() }
     val contactPickerLauncher =
         rememberOriginGuardedResultLauncher(
@@ -4318,6 +4321,7 @@ internal fun ConversationScreen(
                         } else {
                             null
                         },
+                    onOpenStickers = { stickerSheetOpen = true },
                     onPasteImageUris = { uris ->
                         val admission =
                             admitComposerAttachments(
@@ -5193,6 +5197,18 @@ internal fun ConversationScreen(
                         }
                     }
                 },
+            )
+        }
+
+        if (stickerSheetOpen) {
+            StickerSheet(
+                controller = controller,
+                appState = appState,
+                onSend = { sticker ->
+                    stickerSheetOpen = false
+                    appState.launchMutation { controller.sendSticker(sticker) }
+                },
+                onDismiss = { stickerSheetOpen = false },
             )
         }
 

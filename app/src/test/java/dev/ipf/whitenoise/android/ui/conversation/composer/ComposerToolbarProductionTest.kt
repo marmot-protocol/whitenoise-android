@@ -430,7 +430,7 @@ class ComposerToolbarProductionTest {
     }
 
     @Test
-    fun locationPeopleContactAndPollShortcutsInvokeTheirProductionCallbacksOnce() {
+    fun locationPeopleContactPollAndStickerShortcutsInvokeTheirProductionCallbacksOnce() {
         extraInventory = true
         render(
             ComposerToolbarSettings(
@@ -440,13 +440,14 @@ class ComposerToolbarProductionTest {
                     ComposerShortcut.Person,
                     ComposerShortcut.Contact,
                     ComposerShortcut.Poll,
+                    ComposerShortcut.Sticker,
                 ),
             ),
         )
-        listOf("location", "person", "contact", "poll").forEach { id ->
+        listOf("location", "person", "contact", "poll", "sticker").forEach { id ->
             composeRule.onNodeWithTag("composer.shortcut.$id").performTouchInput { click() }
         }
-        assertEquals(mapOf("location" to 1, "person" to 1, "contact" to 1, "poll" to 1), extraCalls)
+        assertEquals(mapOf("location" to 1, "person" to 1, "contact" to 1, "poll" to 1, "sticker" to 1), extraCalls)
     }
 
     @Test
@@ -618,6 +619,7 @@ class ComposerToolbarProductionTest {
                                 onShareUser = if (extraInventory) ({ recordExtra("person") }) else null,
                                 onShareContact = if (extraInventory) ({ recordExtra("contact") }) else null,
                                 onCreatePoll = if (extraInventory || pollOnly) ({ recordExtra("poll") }) else null,
+                                onOpenStickers = if (extraInventory) ({ recordExtra("sticker") }) else null,
                                 textState = text,
                                 voiceRecordingController = voiceController,
                                 modifier = Modifier.testTag("composer.toolbar.production"),

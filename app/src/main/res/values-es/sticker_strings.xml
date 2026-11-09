@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sticker">Sticker</string>
+    <string name="sticker_alt">Sticker: %1$s</string>
+    <string name="sticker_with_emoji">Sticker %1$s</string>
+    <string name="stickers_title">Stickers</string>
+    <string name="sticker_load_hint">Cargar sticker</string>
+    <string name="sticker_tap_to_load">Toca para cargar</string>
+    <string name="sticker_tap_to_retry">Toca para reintentar</string>
+    <string name="stickers_empty_title">No hay stickers</string>
+    <string name="stickers_empty_detail">Añade un paquete de stickers para enviar stickers.</string>
+    <string name="stickers_browse">Explorar paquetes de stickers</string>
+    <string name="sticker_server_disclosure">Los stickers se cargan desde servidores elegidos por el autor de cada paquete. Esos servidores pueden ver tu dirección IP.</string>
+    <string name="sticker_packs_title">Paquetes de stickers</string>
+    <string name="sticker_pack">Paquete de stickers</string>
+    <string name="sticker_packs_add_by_link">Añadir con enlace</string>
+    <string name="sticker_pack_link">Enlace del paquete de stickers</string>
+    <string name="sticker_pack_open_link">Abrir enlace</string>
+    <string name="sticker_pack_opening">Abriendo…</string>
+    <string name="sticker_pack_link_footer">Pega un enlace de paquete de stickers de Sonar o un naddr.</string>
+    <string name="sticker_packs_installed">Instalados</string>
+    <string name="sticker_packs_discover">Descubrir</string>
+    <string name="sticker_packs_search">Buscar paquetes de stickers</string>
+    <string name="sticker_packs_none_on_relays">Tus relays aún no tienen paquetes de stickers. Pega arriba un enlace de paquete para añadir uno.</string>
+    <string name="sticker_packs_no_matches">Ningún paquete de stickers coincide con tu búsqueda.</string>
+    <string name="sticker_packs_unreachable">No se pudieron consultar tus relays para buscar paquetes de stickers.</string>
+    <string name="sticker_packs_try_again">Reintentar</string>
+    <string name="sticker_packs_public_footer">Los paquetes de stickers son públicos y White Noise no los revisa. Tus paquetes instalados aparecen públicamente en tus relays.</string>
+    <string name="sticker_pack_add">Añadir</string>
+    <string name="sticker_pack_by">De %1$s</string>
+    <string name="sticker_pack_add_failed">No se pudo añadir el paquete de stickers</string>
+    <string name="sticker_pack_remove_failed">No se pudo quitar el paquete de stickers</string>
+    <string name="sticker_pack_open_failed">No se pudo abrir el paquete de stickers</string>
+    <string name="sticker_send_failed">No se pudo enviar el sticker</string>
+    <string name="sticker_error_invalid">Este paquete de stickers no es válido.</string>
+    <string name="sticker_error_not_found">No se encontró este paquete de stickers.</string>
+    <string name="sticker_error_network">No se pudo conectar con los relays del paquete de stickers. Revisa tu conexión e inténtalo de nuevo.</string>
+    <string name="sticker_error_import">Este paquete de stickers no se puede importar.</string>
+    <plurals name="sticker_pack_count">
+        <item quantity="one">%1$d sticker</item>
+        <item quantity="other">%1$d stickers</item>
+    </plurals>
+</resources>

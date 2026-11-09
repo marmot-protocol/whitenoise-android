@@ -1241,6 +1241,10 @@ class LocalizationResourceTest {
             mapOf(
                 "values-de" to
                     setOf(
+                        // "Sticker" is the standard German word.
+                        "sticker",
+                        "sticker_alt",
+                        "sticker_with_emoji",
                         // "Version" is the German word for the About version label.
                         "about_version",
                         // "Details" is also the standard German label for additional information.
@@ -1272,6 +1276,11 @@ class LocalizationResourceTest {
                     setOf(
                         // "emoji" is the loan word used for emoji counts in this locale.
                         "emoji_sets_item_count",
+                        // "sticker" is the established Spanish term in messaging apps.
+                        "sticker",
+                        "sticker_alt",
+                        "stickers_title",
+                        "sticker_pack_count",
                         // "chat"/"chats" are common loan words in Spanish.
                         "archived_chats_count",
                         "chat_folder_chat_count",
@@ -1288,6 +1297,10 @@ class LocalizationResourceTest {
                     setOf(
                         // "emoji" is the loan word used for emoji counts in this locale.
                         "emoji_sets_item_count",
+                        // "sticker" is the established French term in messaging apps.
+                        "sticker",
+                        "stickers_title",
+                        "sticker_pack_count",
                         // "Date" is also the French word for the date-format group label.
                         "date_time_format_date",
                         // "minute"/"minutes" is the French word for the spoken read-aloud unit.
@@ -1330,6 +1343,10 @@ class LocalizationResourceTest {
                     setOf(
                         // "emoji" is the loan word used for emoji counts in this locale.
                         "emoji_sets_item_count",
+                        // "sticker" is the established Italian term in messaging apps.
+                        "sticker",
+                        "sticker_alt",
+                        "sticker_pack_count",
                         // "File" is the standard Italian computing term, as in attachment_type_file.
                         "text_attachment_reader_title",
                         // "Password" is the standard Italian loan word.

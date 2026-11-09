@@ -72,6 +72,7 @@ data class MessageTextCopy(
     val message: String,
     val poll: String = "Poll",
     val pollCopyHeadingFormat: String = "Poll: %1\$s",
+    val sticker: String = "Sticker",
     val giphyMedia: String = "GIF via GIPHY",
     val groupSystem: GroupSystemCopy = GroupSystemCopy.Default,
 ) {
@@ -191,8 +192,12 @@ object MessageProjector {
             isGroupSystem(message) -> GroupSystemEvents.previewText(message.plaintext, copy.groupSystem)
             isChatKind(message.kind) && RemoteGiphyMedia.isEnvelopeText(message.plaintext) -> copy.giphyMedia
             isMedia(message) -> mediaBodyText(message, copy)
+            isBareSticker(message) -> copy.sticker
             else -> message.plaintext
         }
+
+    /** A sticker with no caption, which reads as "Sticker" wherever text stands in for it. */
+    fun isBareSticker(message: AppMessageRecordFfi): Boolean = message.sticker != null && message.plaintext.isBlank()
 
     /** Builds chat-list copy without exposing raw poll, system-event, or media envelope payloads. */
     fun previewText(
@@ -210,6 +215,7 @@ object MessageProjector {
             isStreamFinal(message) -> message.plaintext.ifBlank { copy.streamFinished }
             isChatKind(message.kind) && RemoteGiphyMedia.isEnvelopeText(message.plaintext) -> copy.giphyMedia
             isMedia(message) -> mediaBodyText(message, copy)
+            isBareSticker(message) -> copy.sticker
             else -> message.plaintext.ifBlank { copy.message }
         }
     }
@@ -498,7 +504,9 @@ object MessageProjector {
         nowSeconds: ULong,
     ): ForwardBlockedReason? =
         when {
-            message.kind != KindChat || streamId(message) != null -> ForwardBlockedReason.Unsupported
+            // A sticker forwards only as its caption, so it would lose the sticker itself.
+            message.kind != KindChat || streamId(message) != null || message.sticker != null ->
+                ForwardBlockedReason.Unsupported
             isPendingMedia(message) -> ForwardBlockedReason.PendingAttachment
             message.retentionExpiresAt
                 ?.takeIf { it > 0uL }

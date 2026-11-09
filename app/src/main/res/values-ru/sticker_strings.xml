@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sticker">Стикер</string>
+    <string name="sticker_alt">Стикер: %1$s</string>
+    <string name="sticker_with_emoji">Стикер %1$s</string>
+    <string name="stickers_title">Стикеры</string>
+    <string name="sticker_load_hint">Загрузить стикер</string>
+    <string name="sticker_tap_to_load">Нажмите, чтобы загрузить</string>
+    <string name="sticker_tap_to_retry">Нажмите, чтобы повторить</string>
+    <string name="stickers_empty_title">Нет стикеров</string>
+    <string name="stickers_empty_detail">Добавьте набор стикеров, чтобы отправлять стикеры.</string>
+    <string name="stickers_browse">Найти наборы стикеров</string>
+    <string name="sticker_server_disclosure">Стикеры загружаются с серверов, выбранных автором каждого набора. Эти серверы видят ваш IP-адрес.</string>
+    <string name="sticker_packs_title">Наборы стикеров</string>
+    <string name="sticker_pack">Набор стикеров</string>
+    <string name="sticker_packs_add_by_link">Добавить по ссылке</string>
+    <string name="sticker_pack_link">Ссылка на набор стикеров</string>
+    <string name="sticker_pack_open_link">Открыть ссылку</string>
+    <string name="sticker_pack_opening">Открытие…</string>
+    <string name="sticker_pack_link_footer">Вставьте ссылку на набор стикеров Sonar или naddr.</string>
+    <string name="sticker_packs_installed">Установленные</string>
+    <string name="sticker_packs_discover">Обзор</string>
+    <string name="sticker_packs_search">Поиск наборов стикеров</string>
+    <string name="sticker_packs_none_on_relays">На ваших релеях пока нет наборов стикеров. Вставьте ссылку на набор выше, чтобы добавить его.</string>
+    <string name="sticker_packs_no_matches">Нет наборов стикеров по вашему запросу.</string>
+    <string name="sticker_packs_unreachable">Не удалось проверить ваши релеи на наличие наборов стикеров.</string>
+    <string name="sticker_packs_try_again">Повторить</string>
+    <string name="sticker_packs_public_footer">Наборы стикеров публичны и не проверяются White Noise. Ваши установленные наборы публично видны на ваших релеях.</string>
+    <string name="sticker_pack_add">Добавить</string>
+    <string name="sticker_pack_by">Автор: %1$s</string>
+    <string name="sticker_pack_add_failed">Не удалось добавить набор стикеров</string>
+    <string name="sticker_pack_remove_failed">Не удалось удалить набор стикеров</string>
+    <string name="sticker_pack_open_failed">Не удалось открыть набор стикеров</string>
+    <string name="sticker_send_failed">Не удалось отправить стикер</string>
+    <string name="sticker_error_invalid">Этот набор стикеров недействителен.</string>
+    <string name="sticker_error_not_found">Набор стикеров не найден.</string>
+    <string name="sticker_error_network">Не удалось связаться с релеями набора стикеров. Проверьте подключение и повторите попытку.</string>
+    <string name="sticker_error_import">Этот набор стикеров нельзя импортировать.</string>
+    <plurals name="sticker_pack_count">
+        <item quantity="one">%1$d стикер</item>
+        <item quantity="few">%1$d стикера</item>
+        <item quantity="many">%1$d стикеров</item>
+        <item quantity="other">%1$d стикера</item>
+    </plurals>
+</resources>

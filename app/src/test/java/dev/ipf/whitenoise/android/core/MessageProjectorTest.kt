@@ -9,6 +9,7 @@ import dev.ipf.marmotkit.MessageTagFfi
 import dev.ipf.marmotkit.PollOptionResultFfi
 import dev.ipf.marmotkit.PollProjectionFfi
 import dev.ipf.marmotkit.PollTypeFfi
+import dev.ipf.marmotkit.StickerRefFfi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -807,6 +808,25 @@ class MessageProjectorTest {
         open = true,
     )
 
+    @Test
+    fun captionlessStickerReadsAsStickerAndBlocksForwarding() {
+        val ref = StickerRefFfi("30031:author:pack", "wave", "ab".repeat(32))
+        val bare = message("bare", plaintext = "", sticker = ref)
+        val captioned = message("captioned", plaintext = "see you", sticker = ref)
+
+        assertTrue(MessageProjector.isBareSticker(bare))
+        assertFalse(MessageProjector.isBareSticker(captioned))
+        assertFalse(MessageProjector.isBareSticker(message("plain", plaintext = "")))
+        assertEquals("Sticker", MessageProjector.displayBody(bare, MessageTextCopy.Default))
+        assertEquals("Sticker", MessageProjector.previewText(bare, MessageTextCopy.Default))
+        assertEquals("see you", MessageProjector.displayBody(captioned, MessageTextCopy.Default))
+        assertEquals("see you", MessageProjector.previewText(captioned, MessageTextCopy.Default))
+        assertEquals(
+            ForwardEligibility.Blocked(ForwardBlockedReason.Unsupported),
+            MessageProjector.forwardEligibility(captioned, emptyList(), nowSeconds = 1uL),
+        )
+    }
+
     /** Builds a message record with overridable direction, sender, text, kind, tags, time and expiry. */
     private fun message(
         id: String,
@@ -817,6 +837,7 @@ class MessageProjectorTest {
         tags: List<MessageTagFfi> = emptyList(),
         at: UInt = 1u,
         retentionExpiresAt: ULong? = null,
+        sticker: StickerRefFfi? = null,
     ) = AppMessageRecordFfi(
         messageIdHex = id,
         direction = direction,
@@ -831,7 +852,7 @@ class MessageProjectorTest {
         retentionExpiresAt = retentionExpiresAt,
         recordedAt = at.toULong(),
         receivedAt = at.toULong(),
-        sticker = null,
+        sticker = sticker,
     )
 
     @Test

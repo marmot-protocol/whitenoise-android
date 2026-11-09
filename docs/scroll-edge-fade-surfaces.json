@@ -29,7 +29,8 @@
     "TtsSentenceAccessibility.kt": "Read-aloud sentence chooser, active sentence and overflowing labels.",
     "conversation/ConversationTopBar.kt": "Timer explanation popup, compact windows and large text overflow.",
     "navigation": "Persistent shell chrome: dictation capsule and registered fixed action footers, including wrapped actions, constrained height and real IME insets.",
-    "conversation/AttachmentCollectionProgress.kt": "Collection send progress: the expanded per-item state list under the composer accessory."
+    "conversation/AttachmentCollectionProgress.kt": "Collection send progress: the expanded per-item state list under the composer accessory.",
+    "conversation/stickers": "Sticker sheet installed-pack grid with loading, failed and empty tiles; pack browser with loading, none, no-match, unreachable, search and link lookup states."
   },
   "exclusions": [
     {
@@ -798,6 +799,37 @@
       "family": "conversation/reactions",
       "policy": "ordinary",
       "test_ids": [
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPackPages.kt",
+      "calls": {
+        "WhiteNoiseLazyColumn": 1
+      },
+      "family": "conversation/stickers",
+      "policy": "ordinary",
+      "test_ids": [
+        "MSG-046",
+        "SCR-001",
+        "SCR-002",
+        "SCR-003",
+        "SCR-004"
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/stickers/StickerPicker.kt",
+      "calls": {
+        "WhiteNoiseLazyVerticalGrid": 1
+      },
+      "family": "conversation/stickers",
+      "policy": "ordinary",
+      "test_ids": [
+        "MSG-045",
+        "MSG-046",
         "SCR-001",
         "SCR-002",
         "SCR-003",

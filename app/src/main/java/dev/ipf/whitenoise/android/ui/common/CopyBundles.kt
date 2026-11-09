@@ -58,6 +58,7 @@ internal fun rememberMessageTextCopy(): MessageTextCopy =
         message = stringResource(R.string.generic_message),
         poll = stringResource(R.string.poll_preview),
         pollCopyHeadingFormat = stringResource(R.string.poll_copy_heading),
+        sticker = stringResource(R.string.sticker),
         giphyMedia = stringResource(R.string.giphy_media_preview),
         groupSystem = rememberGroupSystemCopy(),
     )

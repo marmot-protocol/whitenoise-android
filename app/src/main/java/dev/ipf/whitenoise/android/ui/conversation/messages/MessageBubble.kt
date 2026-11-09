@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -39,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -177,6 +179,8 @@ import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedContactFromTe
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedLocationFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.parseSharedUserFromText
 import dev.ipf.whitenoise.android.ui.conversation.share.rememberLocalVCardContact
+import dev.ipf.whitenoise.android.ui.conversation.stickers.StickerMessageContent
+import dev.ipf.whitenoise.android.ui.conversation.stickers.StickerPresentation
 import dev.ipf.whitenoise.android.ui.conversation.traceConversationUiSection
 import dev.ipf.whitenoise.android.ui.documentMentionsAccount
 import dev.ipf.whitenoise.android.ui.group.BlockedLeaveComposerNotice
@@ -191,6 +195,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+
+private const val PENDING_STICKER_ALPHA = 0.7f
 
 /** Draws semantic, saved-colour, or directional AMOLED borders in that precedence order. */
 @Composable
@@ -1490,7 +1496,12 @@ internal fun MessageBubble(
     // already activated the link, so that pair must not also open the editor.
     val recentPressesOnLink = remember { BooleanArray(2) }
     val canEditMessage =
-        !actionsReadOnly && mine && record.kind == 9uL && record.messageIdHex.isNotBlank() && !deleted
+        !actionsReadOnly &&
+            mine &&
+            record.kind == 9uL &&
+            record.messageIdHex.isNotBlank() &&
+            !deleted &&
+            record.sticker == null
 
     /** Opens this message in the edit composer; reply and edit modes are mutually exclusive in the composer banner. */
     fun beginEdit() {
@@ -2180,6 +2191,14 @@ internal fun MessageBubble(
                                 sharedUser != null ||
                                 remoteGiphyMedia != null
                         )
+                val stickerRef = record.sticker?.takeIf { !deleted && !persistedFailure && !isPollRecord }
+                val stickerAlone =
+                    stickerRef != null &&
+                        StickerPresentation.standsAlone(
+                            plaintext = editState?.latestText ?: record.plaintext,
+                            hasReply = replyPreview != null,
+                            hasMedia = hasMedia,
+                        )
                 // Detached media keeps its own rounded Surface. When a caption
                 // is attached, each child delegates its corners and border to
                 // the shared frame so the result is one continuous message card.
@@ -2536,6 +2555,35 @@ internal fun MessageBubble(
                             },
                         )
                     }
+                } else if (stickerAlone && stickerRef != null) {
+                    // A sticker with nothing beside it replaces the bubble.
+                    Column(
+                        actionAnchorBoundsModifier,
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalAlignment = if (mine) Alignment.End else Alignment.Start,
+                    ) {
+                        senderNameLabel(false)
+                        StickerMessageContent(
+                            ref = stickerRef,
+                            mine = mine,
+                            controller = controller,
+                            appState = appState,
+                            modifier =
+                                Modifier.alpha(
+                                    if (item.status == MessageStatus.Pending) PENDING_STICKER_ALPHA else 1f,
+                                ),
+                        )
+                        MessageInlineFooter(
+                            timeText = rememberedMessageBubbleTime(record.recordedAt),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            showStatus = showOutgoingStatus,
+                            status = item.status,
+                            editedLabel = footerLabel,
+                            onEditedClick = null,
+                            modifier = Modifier.testTag("sticker-message-footer"),
+                            statusContainerColor = MaterialTheme.colorScheme.background,
+                        )
+                    }
                 } else if (hasMedia) {
                     // Media plus caption renders as one message surface. The
                     // media owns no internal corners or border when
@@ -2811,6 +2859,16 @@ internal fun MessageBubble(
                             onExpand = { if (!deleted) surfaces.openExpandedFullView() },
                         )
                     }
+                }
+                if (stickerRef != null && !stickerAlone) {
+                    // A caption, quote or attachment keeps its bubble; the sticker follows it.
+                    StickerMessageContent(
+                        ref = stickerRef,
+                        mine = mine,
+                        controller = controller,
+                        appState = appState,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
                 }
                 MessageActionMenu(
                     // A tombstone gets a focused delete-only menu. Batch or partial

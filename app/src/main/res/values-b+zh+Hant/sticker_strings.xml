@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="sticker">貼圖</string>
+    <string name="sticker_alt">貼圖：%1$s</string>
+    <string name="sticker_with_emoji">%1$s 貼圖</string>
+    <string name="stickers_title">貼圖</string>
+    <string name="sticker_load_hint">載入貼圖</string>
+    <string name="sticker_tap_to_load">輕觸載入</string>
+    <string name="sticker_tap_to_retry">輕觸重試</string>
+    <string name="stickers_empty_title">沒有貼圖</string>
+    <string name="stickers_empty_detail">新增貼圖包即可傳送貼圖。</string>
+    <string name="stickers_browse">瀏覽貼圖包</string>
+    <string name="sticker_server_disclosure">貼圖會從各貼圖包作者選擇的伺服器載入。這些伺服器可以看到你的 IP 位址。</string>
+    <string name="sticker_packs_title">貼圖包</string>
+    <string name="sticker_pack">貼圖包</string>
+    <string name="sticker_packs_add_by_link">透過連結新增</string>
+    <string name="sticker_pack_link">貼圖包連結</string>
+    <string name="sticker_pack_open_link">開啟連結</string>
+    <string name="sticker_pack_opening">正在開啟…</string>
+    <string name="sticker_pack_link_footer">貼上 Sonar 貼圖包連結或 naddr。</string>
+    <string name="sticker_packs_installed">已安裝</string>
+    <string name="sticker_packs_discover">探索</string>
+    <string name="sticker_packs_search">搜尋貼圖包</string>
+    <string name="sticker_packs_none_on_relays">你的中繼站還沒有任何貼圖包。在上方貼上貼圖包連結即可新增。</string>
+    <string name="sticker_packs_no_matches">沒有符合搜尋條件的貼圖包。</string>
+    <string name="sticker_packs_unreachable">無法在你的中繼站上查詢貼圖包。</string>
+    <string name="sticker_packs_try_again">重試</string>
+    <string name="sticker_packs_public_footer">貼圖包是公開的，未經 White Noise 審核。你安裝的貼圖包會公開列在你的中繼站上。</string>
+    <string name="sticker_pack_add">新增</string>
+    <string name="sticker_pack_by">作者：%1$s</string>
+    <string name="sticker_pack_add_failed">無法新增貼圖包</string>
+    <string name="sticker_pack_remove_failed">無法移除貼圖包</string>
+    <string name="sticker_pack_open_failed">無法開啟貼圖包</string>
+    <string name="sticker_send_failed">無法傳送貼圖</string>
+    <string name="sticker_error_invalid">此貼圖包無效。</string>
+    <string name="sticker_error_not_found">找不到此貼圖包。</string>
+    <string name="sticker_error_network">無法連線到貼圖包的中繼站。請檢查網路連線後再試一次。</string>
+    <string name="sticker_error_import">此貼圖包無法匯入。</string>
+    <plurals name="sticker_pack_count">
+        <item quantity="other">%1$d 張貼圖</item>
+    </plurals>
+</resources>
