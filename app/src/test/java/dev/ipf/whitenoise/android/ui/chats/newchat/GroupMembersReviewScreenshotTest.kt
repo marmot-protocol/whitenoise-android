@@ -504,7 +504,7 @@ class GroupMembersReviewScreenshotTest {
         assertEquals(1, dismisses)
     }
 
-    /** An unresolved public name shows exactly one shortened npub, with person before destination. */
+    /** An unresolved public name shows exactly one shortened npub, below its destinations. */
     @Test
     fun unnamedMemberHasOneAbbreviatedIdentity() {
         val state =
@@ -542,7 +542,7 @@ class GroupMembersReviewScreenshotTest {
         rule.onAllNodesWithText(short).assertCountEquals(1)
         val person = rule.onNodeWithTag("group.members.review.member").fetchSemanticsNode().boundsInRoot
         val group = rule.onNodeWithTag("group.members.review.destination").fetchSemanticsNode().boundsInRoot
-        assertTrue(person.right <= group.left)
+        assertTrue(group.bottom <= person.top)
         rule
             .onNodeWithTag("group.members.review.dialog")
             .captureRoboImage("src/test/snapshots/group_member_review_unnamed.png")
@@ -553,7 +553,7 @@ class GroupMembersReviewScreenshotTest {
     @Config(qualifiers = "en-w360dp-h1280dp-mdpi")
     fun multipleMembersLarge() = captureMultipleMembers(false)
 
-    /** Mirrors the paired identity columns without losing per-member control grouping. */
+    /** Mirrors the member rows without losing per-member control grouping. */
     @Test
     @Config(qualifiers = "ar-rEG-ldrtl-w360dp-h1280dp-mdpi")
     fun multipleMembersLargeRtl() = captureMultipleMembers(true)

@@ -1,0 +1,52 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMemberReviewRow.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "GroupMemberReviewRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMemberReviewRow.kt",
+        "anchor": "fun GroupMemberReviewRow(",
+        "test_ids": [
+          "GRP-030",
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "GroupReviewAdminSwitch",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMemberReviewRow.kt",
+        "anchor": "fun GroupReviewAdminSwitch(",
+        "test_ids": [
+          "GRP-030"
+        ]
+      }
+    ],
+    "source_coverage": [
+      {
+        "surface": "R.string.admin",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMemberReviewRow.kt",
+        "anchor": "R.string.admin",
+        "test_ids": [
+          "GRP-030"
+        ]
+      },
+      {
+        "surface": "R.string.member",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMemberReviewRow.kt",
+        "anchor": "R.string.member",
+        "test_ids": [
+          "GRP-030"
+        ]
+      },
+      {
+        "surface": "R.string.unknown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMemberReviewRow.kt",
+        "anchor": "R.string.unknown",
+        "test_ids": [
+          "GRP-034"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -7,11 +7,11 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -19,26 +19,29 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.RecipientSearch
+import dev.ipf.whitenoise.android.media.MediaTrustDomain
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.EmojiLabel
+import dev.ipf.whitenoise.android.ui.account.AccountAvatarButton
+import dev.ipf.whitenoise.android.ui.common.Avatar
 import dev.ipf.whitenoise.android.ui.common.WhiteNoiseAlertDialog
 import dev.ipf.whitenoise.android.ui.common.fadingVerticalScroll
 import dev.ipf.whitenoise.android.ui.icons.Icons
@@ -53,7 +56,7 @@ internal data class MemberReviewGroup(
     val groupAnimation: dev.ipf.whitenoise.android.ui.common.GroupAvatarAnimation? = null,
 )
 
-/** Shows the destination opposite each public member identity; actions stay outside the scrolling body. */
+/** Destination and acting account head one compact row per member; actions stay outside the scrolling body. */
 @Composable
 @Suppress("FunctionNaming", "LongMethod", "LongParameterList")
 internal fun GroupMembersReviewDialog(
@@ -67,7 +70,7 @@ internal fun GroupMembersReviewDialog(
     initialAdminIds: Set<String> = emptySet(),
     onInitialAdminChange: ((RecipientSearch.Candidate, Boolean) -> Unit)? = null,
     title: String = stringResource(groupReviewAddMembersLabel(members.size)),
-    description: String? = stringResource(R.string.group_review_invitation_visibility),
+    description: String? = null,
     invitation: Boolean = true,
     dismissEnabled: Boolean = !busy,
     showProgress: Boolean = busy,
@@ -100,7 +103,7 @@ internal fun GroupMembersReviewDialog(
                 onDismiss()
             }
         },
-        title = { GroupMembersReviewTitle(appState, title, actingAccount) },
+        title = { GroupMembersReviewTitle(appState, title, groups, invitation, actingAccount) },
         confirmButton = {
             TextButton(
                 onClick = {
@@ -143,22 +146,18 @@ internal fun GroupMembersReviewDialog(
         text = {
             Column(
                 Modifier.fillMaxWidth().fadingVerticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                description?.let { EmojiLabel(it) }
-                groups.firstOrNull()?.let { firstGroup ->
-                    members.forEachIndexed { index, member ->
+                description?.let { EmojiLabel(it, Modifier.padding(bottom = 8.dp)) }
+                if (groups.isNotEmpty()) {
+                    members.forEach { member ->
                         key(member.accountIdHex) {
-                            if (index > 0) HorizontalDivider()
-                            GroupMemberReviewPair(
+                            GroupMemberReviewRow(
                                 appState = appState,
-                                group = firstGroup,
                                 member = member,
                                 busy = busy,
                                 initialAdminIds = initialAdminIds,
                                 onInitialAdminChange = onInitialAdminChange,
-                                otherGroups = groups.drop(1),
-                                showDirection = invitation,
                             )
                         }
                     }
@@ -174,36 +173,97 @@ internal fun groupReviewAddMembersLabel(memberCount: Int): Int {
     return R.string.group_action_add_members
 }
 
-/** Keep the captured actor at the top end and reflow a title that cannot share its line. */
+/** Destination at the start, captured acting account at the top end, as in the app bar. */
 @Composable
 @Suppress("FunctionNaming")
 private fun GroupMembersReviewTitle(
     appState: WhiteNoiseAppState,
     title: String,
+    groups: List<MemberReviewGroup>,
+    invitation: Boolean,
     actingAccount: String?,
 ) {
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val fontScale = LocalDensity.current.fontScale
-        var titleNeedsLine by remember(title, actingAccount, fontScale, maxWidth) { mutableStateOf(false) }
-        val largeText =
-            fontScale > GROUP_REVIEW_LARGE_FONT_SCALE || MaterialTheme.typography.bodyMedium.fontSize >= 20.sp
-        if (largeText || maxWidth < GroupReviewPairedMinWidth || titleNeedsLine) {
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                GroupActingAccountIdentity(appState, actingAccount)
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(
+            Modifier.weight(1f).testTag("group.members.review.destination"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            val single = groups.singleOrNull()
+            single?.let { GroupReviewAvatar(it, 40.dp) }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(title)
-            }
-        } else {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    title,
-                    Modifier.weight(1f),
-                    maxLines = 1,
-                    onTextLayout = { if (it.hasVisualOverflow) titleNeedsLine = true },
-                )
-                GroupActingAccountIdentity(appState, actingAccount, Modifier)
+                val secondary = MaterialTheme.typography.bodySmall
+                val secondaryColor = MaterialTheme.colorScheme.onSurfaceVariant
+                if (single != null) {
+                    EmojiLabel(
+                        if (invitation) stringResource(R.string.group_review_destination, single.name) else single.name,
+                        style = secondary,
+                        color = secondaryColor,
+                    )
+                } else {
+                    // Several destinations keep their frozen order, each with its own picture.
+                    groups.forEach { destination ->
+                        key(destination.id) {
+                            Row(
+                                Modifier.padding(top = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                GroupReviewAvatar(destination, 24.dp)
+                                EmojiLabel(destination.name, style = secondary, color = secondaryColor)
+                            }
+                        }
+                    }
+                }
             }
         }
+        GroupReviewActingAvatar(appState, actingAccount)
     }
+}
+
+@Composable
+@Suppress("FunctionNaming")
+private fun GroupReviewAvatar(
+    group: MemberReviewGroup,
+    size: Dp,
+) {
+    Avatar(
+        group.name,
+        group.id,
+        size,
+        pictureUrl = group.pictureUrl,
+        picture = group.image,
+        groupAnimation = group.groupAnimation,
+        // A group's picture never decodes in the public-profile worker; without its account, single-use.
+        pictureDomain = MediaTrustDomain.Unique,
+    )
+}
+
+/** The captured actor's own picture; tapping copies its full npub. */
+@Composable
+@Suppress("FunctionNaming")
+private fun GroupReviewActingAvatar(
+    appState: WhiteNoiseAppState,
+    actingAccount: String?,
+) {
+    val account = appState.accounts.firstOrNull { it.label == actingAccount } ?: return
+    val clipboard = LocalClipboardManager.current
+    val npub = appState.npubForDisplay(account.accountIdHex)
+    AccountAvatarButton(
+        title = appState.accountDisplayNameCached(account.accountIdHex),
+        seed = account.accountIdHex,
+        pictureUrl = appState.avatarUrl(account.accountIdHex),
+        size = 32.dp,
+        touchTargetSize = 48.dp,
+        actionDescription = stringResource(R.string.group_action_acting_account),
+        onClick = { if (npub.isNotBlank()) clipboard.setText(AnnotatedString(npub)) },
+        modifier = Modifier.testTag("group.action.acting_account"),
+    )
 }
 
 /** Shows one public identity beside its destinations; arrows are reserved for invitations. */
@@ -294,8 +354,8 @@ private fun GroupReviewDestinations(groups: List<MemberReviewGroup>) {
     }
 }
 
-private const val GROUP_REVIEW_LARGE_FONT_SCALE = 1.3f
-private val GroupReviewPairedMinWidth = 250.dp
+internal const val GROUP_REVIEW_LARGE_FONT_SCALE = 1.3f
+internal val GroupReviewPairedMinWidth = 250.dp
 
 /** Rejects identity placeholders as names so an unnamed person has one abbreviated identifier. */
 internal fun reviewMemberPublicName(value: String?): String? {

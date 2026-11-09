@@ -2506,7 +2506,7 @@
         <item quantity="other">%1$d groupes</item>
     </plurals>
     <string name="group_review_add_member">Ajouter un membre</string>
-    <string name="group_review_invitation_visibility">Visible par tous les membres.</string>
+    <string name="group_review_destination">à %1$s</string>
     <string name="search_scope_this_chat">Cette discussion · %1$s</string>
     <string name="search_scope_all_chats">Toutes les discussions</string>
     <string name="search_scope_other_chats">Rechercher dans d’autres discussions</string>

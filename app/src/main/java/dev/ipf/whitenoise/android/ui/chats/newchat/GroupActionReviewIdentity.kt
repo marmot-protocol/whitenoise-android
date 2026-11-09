@@ -40,6 +40,32 @@ internal fun GroupReviewPersonIdentity(
     role: String,
     modifier: Modifier = Modifier,
 ) {
+    val person = rememberGroupReviewPerson(appState, member)
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Avatar(
+            person.publicName ?: person.identifier,
+            member.accountIdHex,
+            48.dp,
+            pictureUrl = person.picture,
+            pictureDomain = AvatarImageLoader.publicProfiles(),
+        )
+        GroupReviewPersonText(person, role)
+    }
+}
+
+/** Public facts shown for one reviewed person; a local nickname never replaces the public name. */
+internal data class GroupReviewPerson(
+    val identifier: String,
+    val publicName: String?,
+    val nickname: String?,
+    val picture: String?,
+)
+
+@Composable
+internal fun rememberGroupReviewPerson(
+    appState: WhiteNoiseAppState,
+    member: RecipientSearch.Candidate,
+): GroupReviewPerson {
     val revision = appState.profileRevisionForCompose
     val profile = remember(appState, member.accountIdHex, revision) { appState.userProfile(member.accountIdHex) }
     val identifier = groupReviewPublicIdentifier(appState, member)
@@ -54,21 +80,22 @@ internal fun GroupReviewPersonIdentity(
             ?.takeIf { it != publicName }
             ?.let(::reviewMemberPublicName)
     val picture = ProfileSanitizer.protocolImageUrl(profile?.picture ?: member.searchProfile?.picture)
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Avatar(
-            publicName ?: identifier,
-            member.accountIdHex,
-            48.dp,
-            pictureUrl = picture,
-            pictureDomain = AvatarImageLoader.publicProfiles(),
-        )
-        publicName?.let { Text(it, style = MaterialTheme.typography.titleSmall) }
-        nickname?.let { Text(stringResource(R.string.group_action_local_nickname, it)) }
-        if (identifier.isNotBlank()) {
-            GroupReviewNpub(identifier, role)
-        } else if (publicName == null) {
-            Text(stringResource(R.string.unknown), style = MaterialTheme.typography.bodySmall)
-        }
+    return GroupReviewPerson(identifier, publicName, nickname, picture)
+}
+
+/** Name, local nickname and copyable npub, or one unknown label when nothing public exists. */
+@Composable
+@Suppress("FunctionNaming")
+internal fun GroupReviewPersonText(
+    person: GroupReviewPerson,
+    role: String,
+) {
+    person.publicName?.let { Text(it, style = MaterialTheme.typography.titleSmall) }
+    person.nickname?.let { Text(stringResource(R.string.group_action_local_nickname, it)) }
+    if (person.identifier.isNotBlank()) {
+        GroupReviewNpub(person.identifier, role)
+    } else if (person.publicName == null) {
+        Text(stringResource(R.string.unknown), style = MaterialTheme.typography.bodySmall)
     }
 }
 
@@ -97,7 +124,7 @@ internal fun GroupActingAccountIdentity(
 /** A small visible label with a full-size copy target and complete spoken identity. */
 @Composable
 @Suppress("FunctionNaming")
-private fun GroupReviewNpub(
+internal fun GroupReviewNpub(
     npub: String,
     role: String,
     compact: Boolean = false,

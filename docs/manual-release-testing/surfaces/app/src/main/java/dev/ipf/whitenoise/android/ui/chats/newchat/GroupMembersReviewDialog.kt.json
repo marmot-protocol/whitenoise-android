@@ -37,6 +37,23 @@
         "test_ids": [
           "GRP-034"
         ]
+      },
+      {
+        "surface": "GroupReviewAvatar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+        "anchor": "fun GroupReviewAvatar(",
+        "test_ids": [
+          "GRP-030",
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "GroupReviewActingAvatar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+        "anchor": "fun GroupReviewActingAvatar(",
+        "test_ids": [
+          "GRP-034"
+        ]
       }
     ],
     "source_coverage": [
@@ -77,9 +94,9 @@
         ]
       },
       {
-        "surface": "R.string.group_review_invitation_visibility",
+        "surface": "R.string.group_review_destination",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
-        "anchor": "R.string.group_review_invitation_visibility",
+        "anchor": "R.string.group_review_destination",
         "test_ids": [
           "GRP-030",
           "GRP-034"
@@ -91,6 +108,14 @@
         "anchor": "R.string.group_action_add_members",
         "test_ids": [
           "GRP-030",
+          "GRP-034"
+        ]
+      },
+      {
+        "surface": "R.string.group_action_acting_account",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/newchat/GroupMembersReviewDialog.kt",
+        "anchor": "R.string.group_action_acting_account",
+        "test_ids": [
           "GRP-034"
         ]
       }
