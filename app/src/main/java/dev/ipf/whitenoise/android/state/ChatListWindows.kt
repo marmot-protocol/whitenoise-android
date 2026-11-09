@@ -32,12 +32,6 @@ internal data class ChatListWindowKey(
     val folder: Boolean = false,
 )
 
-/** The folder windows a set opened, with their first replacements. */
-private class FolderWindows(
-    val keys: OpenedWindows,
-    val values: InitialReplacements,
-)
-
 /** The selected folder's native query and the opener for its windows, one per view the folder covers. */
 internal class ChatFolderWindows(
     val query: ChatFolderQuery,
@@ -64,7 +58,18 @@ internal data class ChatListFrameMark(
 internal data class ChatListFrame(
     val rows: List<PresentedChatRowFfi>,
     val revision: Long,
-)
+) {
+    /**
+     * These rows, then any row of the selected folder's [folder] windows they do not already hold, so a folder chat
+     * beyond the plain windows still reaches every screen that reads the merged list. The revision stays this
+     * frame's, since the plain set's guard decides what may publish.
+     */
+    fun withFolder(folder: ChatListWindowSet?): ChatListFrame {
+        val extra = folder?.takeUnless { it.closed }?.frame()?.rows ?: return this
+        val held = rows.mapTo(HashSet()) { it.row.groupIdHex }
+        return copy(rows = rows + extra.filter { held.add(it.row.groupIdHex) })
+    }
+}
 
 /**
  * One account's bounded live chat-list windows, merged into the single row set [ChatsController] renders.
@@ -94,22 +99,11 @@ internal class ChatListWindowSet private constructor(
     val rows: List<PresentedChatRowFfi>
         get() = frame().rows
 
-    /** Whether the selected folder's own windows are open, so its rows load beyond the plain windows. */
-    val hasFolderWindows: Boolean get() = handles.keys.any { it.folder }
-
-    /**
-     * The plain views' rows in view order, then any folder row they do not already hold, so a folder chat beyond the
-     * plain windows still reaches every screen that reads the merged list.
-     */
+    /** Every installed window's rows in view order, the plain views' or, for a folder set, the folder's. */
     fun frame(): ChatListFrame =
         synchronized(frameLock) {
-            val plain = CHAT_LIST_WINDOW_VIEWS.flatMap { installed[ChatListWindowKey(it)]?.rows.orEmpty() }
-            val held = plain.mapTo(HashSet()) { it.row.groupIdHex }
-            val folder =
-                CHAT_LIST_WINDOW_VIEWS
-                    .flatMap { installed[ChatListWindowKey(it, folder = true)]?.rows.orEmpty() }
-                    .filter { held.add(it.row.groupIdHex) }
-            ChatListFrame(plain + folder, revision)
+            val keys = CHAT_LIST_WINDOW_VIEWS.flatMap { listOf(ChatListWindowKey(it), ChatListWindowKey(it, true)) }
+            ChatListFrame(keys.flatMap { installed[it]?.rows.orEmpty() }, revision)
         }
 
     /** Prevents a callback suspended during validation from publishing over a newer view's frame. */
@@ -346,18 +340,12 @@ internal class ChatListWindowSet private constructor(
         suspend fun open(
             account: String,
             openFallback: (suspend (account: String) -> ChatListWindowHandle)? = null,
-            folder: ChatFolderWindows? = null,
             openWindow: suspend (account: String, view: ChatListViewFfi) -> ChatListWindowHandle,
         ): ChatListWindowSet {
             val handles = LinkedHashMap<ChatListWindowKey, ChatListWindowHandle>()
             try {
                 for (view in CHAT_LIST_WINDOW_VIEWS) handles[ChatListWindowKey(view)] = openWindow(account, view)
-                val initial = initialReplacements(handles)
-                val folderWindows = folder?.let { openFolderWindows(account, it) }
-                return ChatListWindowSet(
-                    handles + folderWindows?.keys.orEmpty(),
-                    initial + folderWindows?.values.orEmpty(),
-                )
+                return ChatListWindowSet(handles, initialReplacements(handles))
             } catch (refused: MarmotKitException) {
                 handles.values.forEach { handle -> runCatching { handle.close() } }
                 val fallback = openFallback ?: throw refused
@@ -368,6 +356,24 @@ internal class ChatListWindowSet private constructor(
             } catch (throwable: Throwable) {
                 handles.values.forEach { handle -> runCatching { handle.close() } }
                 throw throwable
+            }
+        }
+
+        /**
+         * Opens the selected folder's own windows, one per view it covers, with their first replacements. The set
+         * lives beside the plain one, so opening, failing or closing it never touches the plain windows. Any failure
+         * closes the handles opened so far and propagates, the caller decides whether to retry.
+         */
+        suspend fun openFolder(
+            account: String,
+            folder: ChatFolderWindows,
+        ): ChatListWindowSet {
+            val handles = LinkedHashMap<ChatListWindowKey, ChatListWindowHandle>()
+            return openOrClose(handles) {
+                for (view in folder.query.views) {
+                    handles[ChatListWindowKey(view, folder = true)] = folder.open(account, folder.query.forView(view))
+                }
+                ChatListWindowSet(handles, initialReplacements(handles))
             }
         }
 
@@ -399,32 +405,6 @@ internal class ChatListWindowSet private constructor(
                     snapshot.logWindowFrame(key.view, if (key.folder) "folder initial" else "initial")
                 }
             }
-
-        /**
-         * Opens the folder's window over each view it covers, with their first replacements. A refused or not-yet-ready
-         * folder query must not take the plain windows down with it, so a failure closes only the folder's handles and
-         * the folder keeps showing the loaded rows its members match until the set next reopens.
-         */
-        @Suppress("TooGenericExceptionCaught") // Any failure must release the folder handles opened so far.
-        private suspend fun openFolderWindows(
-            account: String,
-            folder: ChatFolderWindows,
-        ): FolderWindows? {
-            val handles = LinkedHashMap<ChatListWindowKey, ChatListWindowHandle>()
-            return try {
-                for (view in folder.query.views) {
-                    handles[ChatListWindowKey(view, folder = true)] = folder.open(account, folder.query.forView(view))
-                }
-                FolderWindows(handles, initialReplacements(handles))
-            } catch (refused: MarmotKitException) {
-                handles.values.forEach { handle -> runCatching { handle.close() } }
-                Log.w("DMChats", "${releaseFailureMarker("CHAT_FOLDER_WINDOW_OPEN", refused)} fallback=loaded_rows")
-                null
-            } catch (throwable: Throwable) {
-                handles.values.forEach { handle -> runCatching { handle.close() } }
-                throw throwable
-            }
-        }
     }
 }
 

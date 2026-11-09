@@ -600,7 +600,8 @@ internal fun ChatsScreen(
             untouchedArchivedFolder = untouchedArchivedFolder,
             unreadOnly = unreadOnly,
             searchOpen = searchOpen,
-            folderQuery = selectedFolderQuery,
+            // A folder whose own windows are not open shows only its loaded matches, so it selects only those too.
+            folderQuery = selectedFolderQuery?.takeIf { it.wholeView || controller.hasFolderWindows() },
         )
     // A scope change ends any complete selection; pending reads see the cleared holder and are discarded.
     LaunchedEffect(completeSelectAllScope) { completeSelection = null }
@@ -1562,8 +1563,7 @@ internal fun ChatsScreen(
             chatRowKey = { key -> (key as? String)?.takeIf(currentVisibleChatIds::contains) },
         ) { rowId ->
             currentVisibleItems.firstOrNull { it.id == rowId }?.group?.let { group ->
-                val view = if (group.archived) ChatListViewFfi.ARCHIVED else ChatListViewFfi.CHATS
-                controller.reportVisibleFolderChat(group.groupIdHex, view)
+                controller.reportVisibleFolderChat(group.groupIdHex)
             }
         }
     }

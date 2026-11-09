@@ -49,6 +49,8 @@ internal class ChatFolderMembership(
     var folders: Map<String, NativeFolderMembership> by mutableStateOf(emptyMap())
         private set
     private var job: Job? = null
+    private var pending: Map<String, ChatFolderQuery> = emptyMap()
+    private var dirty = false
 
     /** The native membership of [folderId] for [account], when it answers [query] and is current. */
     fun current(
@@ -61,45 +63,65 @@ internal class ChatFolderMembership(
     }
 
     /**
-     * Reads every folder in [queries] again for [account], replacing any read still running. Switching accounts drops
-     * the previous account's answers at once, and a superseded read can no longer publish.
+     * Reads every folder in [queries] again for [account]. Requests that arrive while a round is waiting or reading
+     * fold into one more round with the newest queries, so a steady stream of list changes cannot postpone the reads.
+     * Switching accounts drops the previous account's answers at once, and a superseded read can no longer publish.
      */
     fun refresh(
         account: String?,
         queries: Map<String, ChatFolderQuery>,
     ) {
-        job?.cancel()
         if (account != this.account) {
+            job?.cancel()
+            job = null
             this.account = account
             folders = emptyMap()
         }
+        pending = queries
         val read = queryIds
         if (account == null || read == null) return
         folders = folders.filterKeys(queries::containsKey)
+        if (job?.isActive == true) {
+            dirty = true
+            return
+        }
         job =
             scope.launch {
-                delay(MEMBERSHIP_REFRESH_DELAY_MS)
-                var pending = queries
-                var backoff = MEMBERSHIP_RETRY_INITIAL_MS
-                while (pending.isNotEmpty()) {
-                    val next = folders.toMutableMap()
-                    val retry = mutableMapOf<String, ChatFolderQuery>()
-                    for ((id, query) in pending) {
-                        when (val answer = readFolder(read, account, query)) {
-                            is Answer.Read -> next[id] = answer.membership
-                            Answer.Refused -> next.remove(id)
-                            Answer.NotReady -> retry[id] = query
-                        }
-                    }
-                    if (this@ChatFolderMembership.account != account) return@launch
-                    folders = next
-                    pending = retry
-                    if (pending.isNotEmpty()) {
-                        delay(backoff)
-                        backoff = (backoff * 2).coerceAtMost(MEMBERSHIP_RETRY_MAX_MS)
-                    }
+                do {
+                    dirty = false
+                    delay(MEMBERSHIP_REFRESH_DELAY_MS)
+                    readAll(read, account)
+                } while (dirty && this@ChatFolderMembership.account == account)
+            }
+    }
+
+    /** One round: reads every pending folder, retrying those MarmotKit is not ready for, with backoff. */
+    private suspend fun readAll(
+        read: suspend (String, ChatListViewQueryFfi) -> List<String>,
+        account: String,
+    ) {
+        var queries = pending
+        var backoff = MEMBERSHIP_RETRY_INITIAL_MS
+        while (queries.isNotEmpty()) {
+            val next = folders.toMutableMap()
+            val retry = mutableMapOf<String, ChatFolderQuery>()
+            for ((id, query) in queries) {
+                when (val answer = readFolder(read, account, query)) {
+                    is Answer.Read -> next[id] = answer.membership
+                    Answer.Refused -> next.remove(id)
+                    Answer.NotReady -> retry[id] = query
                 }
             }
+            if (this.account != account) return
+            folders = next.filterKeys(pending::containsKey)
+            queries = retry.filterKeys(pending::containsKey)
+            if (queries.isNotEmpty() && !dirty) {
+                delay(backoff)
+                backoff = (backoff * 2).coerceAtMost(MEMBERSHIP_RETRY_MAX_MS)
+            } else {
+                return
+            }
+        }
     }
 
     /** Forgets every answer, for sign-out and teardown. */
@@ -118,7 +140,11 @@ internal class ChatFolderMembership(
         data object Refused : Answer
     }
 
-    /** Reads every view of [query] and its unread narrowing, in display order. */
+    /**
+     * Reads every view of [query], then its unread narrowing. An unread count MarmotKit cannot answer leaves the
+     * members standing with no unread badge, and any failure other than not-ready leaves the folder on loaded rows.
+     */
+    @Suppress("TooGenericExceptionCaught") // A count is advisory: any failure must degrade, never crash the scope.
     private suspend fun readFolder(
         read: suspend (String, ChatListViewQueryFfi) -> List<String>,
         account: String,
@@ -127,14 +153,51 @@ internal class ChatFolderMembership(
         try {
             val ids = query.views.flatMap { read(account, query.forView(it)) }
             val unread = query.unread()
-            val unreadCount = unread.views.sumOf { read(account, unread.forView(it)).size }
+            val unreadCount =
+                try {
+                    unread.views.sumOf { read(account, unread.forView(it)).size }
+                } catch (_: MarmotKitException.InvalidChatListQuery) {
+                    0
+                }
             Answer.Read(NativeFolderMembership(query, ids.map { it.lowercase(Locale.ROOT) }.distinct(), unreadCount))
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: MarmotKitException.ChatPresentationNotReady) {
             Answer.NotReady
-        } catch (refused: MarmotKitException) {
+        } catch (refused: Exception) {
             Log.w("DMChats", "CHAT_FOLDER_QUERY_REFUSED reason=${refused.javaClass.simpleName}")
             Answer.Refused
         }
+}
+
+/** [folderId]'s native query for [accountRef], from its stored rule, manual members and exclusions. */
+internal fun ChatFolderPreferences.folderQuery(
+    accountRef: String,
+    folderId: String,
+): ChatFolderQuery? {
+    val rule = folderRule(accountRef, folderId)
+    return chatFolderQuery(rule, membershipFor(accountRef, folderId), excludedChats(accountRef, folderId))
+}
+
+/** Every folder of [accountRef] that has a native query, keyed by folder ID. */
+internal fun ChatFolderPreferences.folderQueries(accountRef: String): Map<String, ChatFolderQuery> =
+    foldersFor(accountRef).mapNotNull { folder -> folderQuery(accountRef, folder.id)?.let { folder.id to it } }.toMap()
+
+/**
+ * [folderId]'s member IDs for [accountRef]: MarmotKit's answer over every chat once it is current, otherwise [loaded],
+ * the evaluation over loaded rows that participant folders and not-yet-read folders keep using.
+ */
+internal fun WhiteNoiseAppState.folderMemberIds(
+    accountRef: String,
+    folderId: String,
+    loaded: () -> Set<String>,
+): Set<String> = nativeFolderMembership(accountRef, folderId)?.idSet ?: loaded()
+
+/** [folderId]'s current native membership for [accountRef], or null when its readers must evaluate loaded rows. */
+internal fun WhiteNoiseAppState.nativeFolderMembership(
+    accountRef: String,
+    folderId: String,
+): NativeFolderMembership? {
+    val query = chatFolderPreferences.folderQuery(accountRef, folderId)
+    return chatFolderMembership?.current(accountRef, folderId, query)
 }

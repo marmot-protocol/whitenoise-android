@@ -3,6 +3,7 @@ package dev.ipf.whitenoise.android.state
 import dev.ipf.marmotkit.ChatListConditionFfi
 import dev.ipf.marmotkit.ChatListFilterNodeFfi
 import dev.ipf.marmotkit.ChatListQueryErrorFfi
+import dev.ipf.marmotkit.ChatListViewFfi
 import dev.ipf.marmotkit.ChatListViewQueryFfi
 import dev.ipf.marmotkit.MarmotKitException
 import kotlinx.coroutines.CompletableDeferred
@@ -26,7 +27,14 @@ class ChatFolderMembershipTest {
     /** A read publishes every matching chat, lowercased, with the folder's unread count. */
     @Test fun readPublishesIdsAndUnreadCount() =
         runTest {
-            val membership = membership { query -> if (query.unreadNarrowed()) listOf("BB") else listOf("AA", "BB") }
+            val membership =
+                membership { query ->
+                    when {
+                        query.view != ChatListViewFfi.CHATS -> emptyList()
+                        query.unreadNarrowed() -> listOf("BB")
+                        else -> listOf("AA", "BB")
+                    }
+                }
             membership.refresh("acct", mapOf("f" to pinned))
             advanceUntilIdle()
             val read = requireNotNull(membership.current("acct", "f", pinned))

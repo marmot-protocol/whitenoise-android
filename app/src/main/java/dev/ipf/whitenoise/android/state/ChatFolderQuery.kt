@@ -14,15 +14,16 @@ private const val QUERY_MAX_TEXT_BYTES = 1024
 
 /**
  * One folder as a native chat-list query: the same filter over each view the folder covers. MarmotKit matches it in
- * SQL over every chat in a view before paging, so the folder's list, count and select-all agree. A legacy rule covers
- * active or archived chats, and an advanced rule covers both.
+ * SQL over every chat in a view before paging, so the folder's list, count and select-all agree. The chat list shows
+ * departed groups among active chats, so a legacy rule covers Chats and Left, or Archived for an archived rule, and
+ * an advanced rule or any folder with manual members covers every view.
  */
 internal data class ChatFolderQuery(
     val views: List<ChatListViewFfi>,
     val filter: List<ChatListFilterNodeFfi>,
 ) {
-    /** Whether the folder is every chat in its one view, so the plain window already holds it and needs no other. */
-    val wholeView: Boolean get() = views.size == 1 && filter == WHOLE_VIEW
+    /** Whether the folder is every chat in the views it covers, so the plain windows already hold it. */
+    val wholeView: Boolean get() = filter == WHOLE_VIEW
 
     /** The query for one of [views]. */
     fun forView(view: ChatListViewFfi): ChatListViewQueryFfi = ChatListViewQueryFfi(view, filter)
@@ -77,24 +78,43 @@ internal fun chatFolderQuery(
 ): ChatFolderQuery? {
     val advanced = rule?.smartFilter
     val decoded = advanced?.let { SmartFolderCodec.decode(it)?.takeIf(SmartFolderCodec::valid) }
-    val legacyParticipants = advanced == null && rule?.includeMemberPubkeys?.isNotEmpty() == true
-    if (legacyParticipants || decoded?.references(FolderField.PARTICIPANTS) == true) return null
-    val match =
-        when {
-            rule == null -> null
-            advanced != null -> decoded?.let(::smartFolderNode)
-            else -> legacyRuleNode(rule)
-        }
-    val included = listOfNotNull(manualChatIds.toIdNode(), match)
+    if (rule.testsParticipants(decoded)) return null
+    val match = if (advanced != null) decoded?.let(::smartFolderNode) else rule?.let(::legacyRuleNode)
+    val manual = manualChatIds.toIdNode()
+    val archivedRule = advanced == null && rule?.archivedOnly == true
+    // Manual members count in every view, as before, so a legacy rule then keeps to its own side of the archive split.
+    val sided = match?.let { if (manual != null && advanced == null) it.onArchiveSide(archivedRule) else it }
+    val included = listOfNotNull(manual, sided)
     val root = FolderNode.All(listOfNotNull(excludedChatIds.toIdNode()?.let(FolderNode::Not), FolderNode.Any(included)))
-    val views =
-        when {
-            advanced != null -> listOf(ChatListViewFfi.CHATS, ChatListViewFfi.ARCHIVED)
-            rule?.archivedOnly == true -> listOf(ChatListViewFfi.ARCHIVED)
-            else -> listOf(ChatListViewFfi.CHATS)
-        }
-    return root.takeIf(FolderNode::withinLimits)?.let { ChatFolderQuery(views, flatten(it)) }
+    val views = folderViews(everyView = advanced != null || manual != null, archived = archivedRule)
+    // The chip's unread count wraps the root one level deeper, so it must fit as well.
+    val fits = FolderNode.All(listOf(root, FolderNode.Is(ChatListConditionFfi.UNREAD))).withinLimits()
+    return root.takeIf { fits }?.let { ChatFolderQuery(views, flatten(it)) }
 }
+
+/** Whether this rule tests participants, which MarmotKit cannot match yet, in its legacy or [decoded] advanced form. */
+private fun ChatFolderRule?.testsParticipants(decoded: SmartFolderFilter?): Boolean {
+    val legacy = this?.smartFilter == null && this?.includeMemberPubkeys?.isNotEmpty() == true
+    return legacy || decoded?.references(FolderField.PARTICIPANTS) == true
+}
+
+/**
+ * The views a folder reads. The chat list shows departed groups among active chats, so an active rule reads Chats and
+ * Left, an archived one reads Archived, and [everyView] (an advanced rule or manual members) reads all three.
+ */
+private fun folderViews(
+    everyView: Boolean,
+    archived: Boolean,
+): List<ChatListViewFfi> =
+    when {
+        everyView -> CHAT_LIST_WINDOW_VIEWS
+        archived -> listOf(ChatListViewFfi.ARCHIVED)
+        else -> listOf(ChatListViewFfi.CHATS, ChatListViewFfi.LEFT)
+    }
+
+/** This rule limited to archived chats, or to active ones. A departed group is never Archived, so it is active. */
+private fun FolderNode.onArchiveSide(archived: Boolean): FolderNode =
+    FolderNode.All(listOf(FolderNode.Is(ChatListConditionFfi.ARCHIVED).negatedIf(!archived), this))
 
 /**
  * A legacy rule: its keyword, or every chat when it is a pure category rule, narrowed by each selected category. A
@@ -104,12 +124,13 @@ private fun legacyRuleNode(rule: ChatFolderRule): FolderNode? {
     val keyword = rule.keyword?.trim()?.takeIf { it.isNotEmpty() }
     val categories =
         listOfNotNull(
-            ChatListConditionFfi.UNREAD.takeIf { rule.unreadOnly },
-            ChatListConditionFfi.MENTION.takeIf { rule.unreadMentionsOnly },
-            ChatListConditionFfi.PINNED.takeIf { rule.pinnedOnly },
-            ChatListConditionFfi.GROUP.takeIf { rule.groupsOnly },
-            ChatListConditionFfi.DIRECT.takeIf { rule.directChatsOnly },
-        ).map(FolderNode::Is)
+            FolderNode.Is(ChatListConditionFfi.UNREAD).takeIf { rule.unreadOnly },
+            FolderNode.Is(ChatListConditionFfi.MENTION).takeIf { rule.unreadMentionsOnly },
+            FolderNode.Is(ChatListConditionFfi.PINNED).takeIf { rule.pinnedOnly },
+            // Not Direct rather than Group, so a chat whose kind is still unknown stays a group chat, as before.
+            FolderNode.Not(FolderNode.Is(ChatListConditionFfi.DIRECT)).takeIf { rule.groupsOnly },
+            FolderNode.Is(ChatListConditionFfi.DIRECT).takeIf { rule.directChatsOnly },
+        )
     val selects = keyword != null || rule.includeAll || categories.isNotEmpty() || rule.archivedOnly
     if (!selects) return null
     val muted = FolderNode.Not(FolderNode.Is(ChatListConditionFfi.MUTED)).takeUnless { rule.includeMuted }
@@ -146,11 +167,12 @@ private fun smartConditionNode(condition: SmartFolderFilter.Condition): FolderNo
                 if (condition.mode == FolderMode.DIRECT) ChatListConditionFfi.DIRECT else ChatListConditionFfi.GROUP,
             )
         FolderField.TITLE -> FolderNode.Text(condition.values.single())
-        // A joined, settled membership: no invitation awaiting an answer and no leave or disband outstanding.
+        // A joined, settled membership: no pending invitation, not departed, no leave or disband outstanding.
         FolderField.ACCEPTED ->
             FolderNode.All(
                 listOf(
                     ChatListConditionFfi.PENDING_INVITE,
+                    ChatListConditionFfi.LEFT,
                     ChatListConditionFfi.PENDING_LEAVE,
                     ChatListConditionFfi.DISBANDING,
                 ).map { FolderNode.Not(FolderNode.Is(it)) },
@@ -248,36 +270,4 @@ private fun flatten(root: FolderNode): List<ChatListFilterNodeFfi> {
     }
     emit(root)
     return out.map(::requireNotNull)
-}
-
-/** [folderId]'s native query for [accountRef], from its stored rule, manual members and exclusions. */
-internal fun ChatFolderPreferences.folderQuery(
-    accountRef: String,
-    folderId: String,
-): ChatFolderQuery? {
-    val rule = folderRule(accountRef, folderId)
-    return chatFolderQuery(rule, membershipFor(accountRef, folderId), excludedChats(accountRef, folderId))
-}
-
-/** Every folder of [accountRef] that has a native query, keyed by folder ID. */
-internal fun ChatFolderPreferences.folderQueries(accountRef: String): Map<String, ChatFolderQuery> =
-    foldersFor(accountRef).mapNotNull { folder -> folderQuery(accountRef, folder.id)?.let { folder.id to it } }.toMap()
-
-/**
- * [folderId]'s member IDs for [accountRef]: MarmotKit's answer over every chat once it is current, otherwise [loaded],
- * the evaluation over loaded rows that participant folders and not-yet-read folders keep using.
- */
-internal fun WhiteNoiseAppState.folderMemberIds(
-    accountRef: String,
-    folderId: String,
-    loaded: () -> Set<String>,
-): Set<String> = nativeFolderMembership(accountRef, folderId)?.idSet ?: loaded()
-
-/** [folderId]'s current native membership for [accountRef], or null when its readers must evaluate loaded rows. */
-internal fun WhiteNoiseAppState.nativeFolderMembership(
-    accountRef: String,
-    folderId: String,
-): NativeFolderMembership? {
-    val query = chatFolderPreferences.folderQuery(accountRef, folderId)
-    return chatFolderMembership?.current(accountRef, folderId, query)
 }

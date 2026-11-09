@@ -1822,6 +1822,24 @@ class ChatsController private constructor(
 
     /** Folder memberships MarmotKit computes over every chat, refreshed as the list and folders change (#3652). */
     internal val folderMembership by lazy { ChatFolderMembership(recomputeScope, liveSubscriptions.chatListQueryIds) }
+
+    /** The selected folder's own windows, open beside [chatListWindows] while a folder is selected (#3652). */
+    @Volatile
+    internal var folderWindows: ChatListWindowSet? = null
+        private set
+
+    /** Whether [folderWindows] is open, as snapshot state so the chat list switches its paging when it changes. */
+    internal var folderWindowsOpen by mutableStateOf(false)
+        private set
+
+    /** Installs or clears the selected folder's windows, closing any set it replaces. */
+    internal fun replaceFolderWindows(windows: ChatListWindowSet?) {
+        val previous = folderWindows
+        folderWindows = windows
+        folderWindowsOpen = windows != null
+        if (previous !== windows) previous?.close()
+    }
+
     private val subscriptionOwner = ChatListSubscriptionOwner()
     private val liveSubscriptionLock get() = subscriptionOwner.lock
     internal val chatListWindows: ChatListWindowSet? get() = subscriptionOwner.windows
@@ -1959,7 +1977,7 @@ class ChatsController private constructor(
                 val subscriptionAttempt = ChatListSubscriptionOwner.Attempt()
                 lastFailureNotReady = false
                 var receivedLiveUpdate = false
-                val source = folderSource.current
+                val completeChatList = folderSource.complete.value
                 var folderSourceChanged = false
                 val connectionAttempt =
                     if (initialSubscriptionProjection) {
@@ -1974,7 +1992,7 @@ class ChatsController private constructor(
                     }
                 try {
                     val chatListStream =
-                        liveSubscriptions.openFolderSource(accountRef, source.complete, source.folder)
+                        liveSubscriptions.openFolderSource(accountRef, completeChatList)
                     subscriptionAttempt.windows = chatListStream
                     if (!isActiveBindEpoch(epoch) || !coroutineContext.isActive) break
                     connectionOwner.noteSubscriptionBoundary(
@@ -1990,7 +2008,7 @@ class ChatsController private constructor(
                             subscriptionOwner.install(subscriptionAttempt)
                         }
                     }
-                    val initialFrame = chatListStream.frame()
+                    val initialFrame = chatListStream.frame().withFolder(folderWindows)
                     requireCompleteChatListWindowRows(
                         validateChatListWindowRows(accountRef, chatListStream, initialFrame.rows) &&
                             !chatListStream.closed &&
@@ -2038,53 +2056,64 @@ class ChatsController private constructor(
                     readinessCatchUp?.let(connectionOwner::observe)
 
                     folderSourceChanged =
-                        folderSource.receiveUntilChanged(source) {
+                        folderSource.receiveUntilChanged(completeChatList) {
                             coroutineScope {
-                                runUntilFirstLiveSubscriptionEnds(
-                                    first = {
-                                        chatListStream.receive { view, replacement ->
-                                            appState.recoveryDiagnostics
-                                                .recordChatListSubscriptionReceived()
-                                                ?.let { generation ->
-                                                    pendingRecoveryProjectionGeneration.publish(generation)
+                                // Bounded windows only, the complete stream already holds every folder chat.
+                                val folderJob =
+                                    if (completeChatList) {
+                                        null
+                                    } else {
+                                        launch { runFolderWindows(accountRef, chatListStream) }
+                                    }
+                                try {
+                                    runUntilFirstLiveSubscriptionEnds(
+                                        first = {
+                                            chatListStream.receive { view, replacement ->
+                                                appState.recoveryDiagnostics
+                                                    .recordChatListSubscriptionReceived()
+                                                    ?.let { generation ->
+                                                        pendingRecoveryProjectionGeneration.publish(generation)
+                                                    }
+                                                chatsDebug {
+                                                    "chat list window view=$view sequence=${replacement.sequence} " +
+                                                        "rows=${replacement.rows.size} merged=${chatListStream.rows.size}"
                                                 }
-                                            chatsDebug {
-                                                "chat list window view=$view sequence=${replacement.sequence} " +
-                                                    "rows=${replacement.rows.size} merged=${chatListStream.rows.size}"
+                                                requireCompleteChatListWindowRows(
+                                                    applyChatListWindowRows(accountRef, chatListStream),
+                                                )
+                                                receivedLiveUpdate = true
+                                                connectionOwner.noteLiveUpdate(connectionAttempt)
+                                                appState.schedulePendingLocalGroupDeleteCleanup()
                                             }
-                                            requireCompleteChatListWindowRows(
-                                                applyChatListWindowRows(accountRef, chatListStream),
+                                            connectionOwner.noteSubscriptionBoundary(
+                                                connectionAttempt,
+                                                PerformancePhase.CONNECTION_CHAT_LIST_COMPLETED,
                                             )
-                                            receivedLiveUpdate = true
-                                            connectionOwner.noteLiveUpdate(connectionAttempt)
-                                            appState.schedulePendingLocalGroupDeleteCleanup()
-                                        }
-                                        connectionOwner.noteSubscriptionBoundary(
-                                            connectionAttempt,
-                                            PerformancePhase.CONNECTION_CHAT_LIST_COMPLETED,
-                                        )
-                                    },
-                                    second = {
-                                        while (isActive) {
-                                            val update =
-                                                withContext(Dispatchers.IO) {
-                                                    chatStream.next()
-                                                } ?: break
-                                            if (!isActiveBindEpoch(epoch) || !isActive) break
-                                            receivedLiveUpdate = true
-                                            connectionOwner.noteLiveUpdate(connectionAttempt)
-                                            requestGroupProfiles(update)
-                                            chatsDebug {
-                                                "chat update account=${accountRef.take(8)} ${update.debugSummary()}"
+                                        },
+                                        second = {
+                                            while (isActive) {
+                                                val update =
+                                                    withContext(Dispatchers.IO) {
+                                                        chatStream.next()
+                                                    } ?: break
+                                                if (!isActiveBindEpoch(epoch) || !isActive) break
+                                                receivedLiveUpdate = true
+                                                connectionOwner.noteLiveUpdate(connectionAttempt)
+                                                requestGroupProfiles(update)
+                                                chatsDebug {
+                                                    "chat update account=${accountRef.take(8)} ${update.debugSummary()}"
+                                                }
+                                                foldGroup(update)
                                             }
-                                            foldGroup(update)
-                                        }
-                                        connectionOwner.noteSubscriptionBoundary(
-                                            connectionAttempt,
-                                            PerformancePhase.CONNECTION_CHATS_COMPLETED,
-                                        )
-                                    },
-                                )
+                                            connectionOwner.noteSubscriptionBoundary(
+                                                connectionAttempt,
+                                                PerformancePhase.CONNECTION_CHATS_COMPLETED,
+                                            )
+                                        },
+                                    )
+                                } finally {
+                                    folderJob?.cancel()
+                                }
                             }
                         }
                     if (folderSourceChanged) {
@@ -2133,7 +2162,7 @@ class ChatsController private constructor(
                     withContext(NonCancellable + Dispatchers.IO) { subscriptionAttempt.close() }
                 }
                 if (!coroutineContext.isActive || !isActiveBindEpoch(epoch)) break
-                if (folderSourceChanged || folderSource.current != source) {
+                if (folderSourceChanged || folderSource.complete.value != completeChatList) {
                     initialSubscriptionProjection = true
                     continue
                 }
@@ -3185,7 +3214,7 @@ class ChatsController private constructor(
         accountRef: String,
         windows: ChatListWindowSet,
     ): Boolean {
-        val frame = windows.frame()
+        val frame = windows.frame().withFolder(folderWindows)
         val valid = validateChatListWindowRows(accountRef, windows, frame.rows)
         return when {
             windows.closed || chatListWindows !== windows -> {
