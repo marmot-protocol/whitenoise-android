@@ -134,8 +134,6 @@ class DevicePrivacyScreenScreenshotTest {
         composeRule.waitUntil(5_000L) { !chats.isLoading && chats.error != null }
         composeRule.waitForIdle()
         composeRule.onRoot().captureRoboImage("src/test/snapshots/audit_upload_renewal_prompt.png")
-        composeRule.onAllNodes(isToggleable())[1].performClick()
-        composeRule.onNodeWithText("Cancel").performClick()
         composeRule.onAllNodes(isToggleable())[1].assertIsOff()
         assertTrue(state.auditUploadConsentRequired)
         composeRule.onNodeWithContentDescription("Close").performClick()
@@ -383,7 +381,6 @@ class DevicePrivacyScreenScreenshotTest {
             try {
                 val title = if (index == 0) "Share usage" else "Share diagnostic logs"
                 composeRule.onNodeWithText(title).performClick()
-                if (index == 1 && enabled) composeRule.onNodeWithText("Enable automatic sharing").performClick()
                 waitForMutation { entered.count == 0L }
                 val toggle = composeRule.onAllNodes(isToggleable())[index]
                 if (enabled) toggle.assertIsOn() else toggle.assertIsOff()

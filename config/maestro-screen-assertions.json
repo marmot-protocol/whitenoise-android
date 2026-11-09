@@ -4364,16 +4364,16 @@
       "symbol": "AuditUploadConsentDialog",
       "bindings": [
         {
-          "case": "consent-log-confirm-cancel",
+          "case": "nested-diagnostics-log-confirm-cancel",
           "selector": {
             "text": "Share group diagnostic logs with White Noise[?]"
           },
-          "scope": "diagnostics consent confirmation dismisses without enabling log upload.",
+          "scope": "Diagnostics & Improvements log-sharing confirmation dismisses without enabling log upload.",
           "entry_assertion": {
             "text": "Share group diagnostic logs with White Noise[?]"
           },
           "opened_by": {
-            "text": "Share diagnostic logs"
+            "text": "Share group diagnostic logs"
           }
         }
       ]
