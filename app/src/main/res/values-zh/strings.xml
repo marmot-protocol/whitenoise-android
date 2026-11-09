@@ -348,6 +348,11 @@
     <string name="restoring_chat">正在恢复聊天...</string>
     <string name="leave_chat">退出对话</string>
     <string name="leaving_chat">正在离开聊天...</string>
+    <string name="group_leave_blocked">退出受阻</string>
+    <string name="group_leave_blocked_hint">你是唯一的管理员。取消退出即可留在此群组。</string>
+    <string name="group_cancel_leave">取消退出</string>
+    <string name="group_leave_refresh_hint">刷新以确认你是否仍在此群组中。</string>
+    <string name="toast_couldnt_cancel_leave">无法取消退出</string>
     <string name="export_conversation_transcript">导出会话记录</string>
     <string name="toast_couldnt_export_transcript">无法导出记录</string>
     <string name="no_share_target_available">没有可用的分享目标</string>

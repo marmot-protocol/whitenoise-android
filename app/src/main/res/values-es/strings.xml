@@ -363,6 +363,11 @@
     <string name="restoring_chat">Restaurando chat...</string>
     <string name="leave_chat">Salir del chat</string>
     <string name="leaving_chat">Saliendo del chat...</string>
+    <string name="group_leave_blocked">Salida bloqueada</string>
+    <string name="group_leave_blocked_hint">Eres el único administrador. Cancela la salida para quedarte en este grupo.</string>
+    <string name="group_cancel_leave">Cancelar salida</string>
+    <string name="group_leave_refresh_hint">Actualiza para comprobar si sigues en este grupo.</string>
+    <string name="toast_couldnt_cancel_leave">No se pudo cancelar la salida</string>
     <string name="export_conversation_transcript">Exportar transcripción de la conversación</string>
     <string name="toast_couldnt_export_transcript">No se pudo exportar la transcripción</string>
     <string name="no_share_target_available">No hay destino para compartir disponible</string>

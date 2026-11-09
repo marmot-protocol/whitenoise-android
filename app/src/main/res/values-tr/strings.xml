@@ -361,6 +361,11 @@
     <string name="restoring_chat">Sohbet geri yükleniyor...</string>
     <string name="leave_chat">Sohbetten ayrıl</string>
     <string name="leaving_chat">Sohbetten ayrılınıyor...</string>
+    <string name="group_leave_blocked">Ayrılma engellendi</string>
+    <string name="group_leave_blocked_hint">Tek yönetici sizsiniz. Bu grupta kalmak için ayrılmayı iptal edin.</string>
+    <string name="group_cancel_leave">Ayrılmayı iptal et</string>
+    <string name="group_leave_refresh_hint">Hâlâ bu grupta olup olmadığınızı görmek için yenileyin.</string>
+    <string name="toast_couldnt_cancel_leave">Ayrılma iptal edilemedi</string>
     <string name="export_conversation_transcript">Konuşma dökümünü dışa aktar</string>
     <string name="toast_couldnt_export_transcript">Döküm dışa aktarılamadı</string>
     <string name="no_share_target_available">Kullanılabilir paylaşım hedefi yok</string>

@@ -19,8 +19,9 @@ internal fun chatRowMembershipStatus(
     accountIdHex: String?,
 ): Int? {
     val leaveBlocked = item.projection?.leaveBlocked ?: item.group.leaveBlocked
-    val groupEnding = item.group.disbanded || item.group.disbanding || item.group.leaveRequestPending || leaveBlocked
-    if (accountIdHex.isNullOrBlank() || (!item.removedFromGroup(accountIdHex) && !groupEnding)) return null
+    if (accountIdHex.isNullOrBlank() || (!item.removedFromGroup(accountIdHex) && !item.groupEnding(leaveBlocked))) {
+        return null
+    }
     return chatRowTerminalGroupStatus(item) ?: when {
         chatListItemEvicted(item) -> R.string.chat_row_removed_description
         item.hasSelfMembership(SelfMembershipFfi.DEVICE_REMOVED) -> R.string.chat_row_device_removed_description
@@ -30,6 +31,9 @@ internal fun chatRowMembershipStatus(
         else -> R.string.you_are_no_longer_a_member
     }
 }
+
+/** Whether the group is disbanding or gone, or this account's leave is pending or blocked. */
+private fun ChatListItem.groupEnding(leaveBlocked: Boolean): Boolean = group.disbanded || group.disbanding || group.leaveRequestPending || leaveBlocked
 
 /** Whether the group record or its native projection reports this self-membership state. */
 private fun ChatListItem.hasSelfMembership(state: SelfMembershipFfi): Boolean =

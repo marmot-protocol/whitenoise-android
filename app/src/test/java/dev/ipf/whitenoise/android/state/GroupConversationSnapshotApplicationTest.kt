@@ -6,7 +6,6 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.GroupConversationSnapshotFfi
 import dev.ipf.marmotkit.MarmotInterface
 import dev.ipf.marmotkit.SelfMembershipFfi
-import java.lang.reflect.Proxy
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
@@ -19,6 +18,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.lang.reflect.Proxy
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])

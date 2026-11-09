@@ -361,6 +361,11 @@
     <string name="restoring_chat">Chat wird wiederhergestellt...</string>
     <string name="leave_chat">Chat verlassen</string>
     <string name="leaving_chat">Chat wird verlassen...</string>
+    <string name="group_leave_blocked">Verlassen blockiert</string>
+    <string name="group_leave_blocked_hint">Du bist der einzige Admin. Brich das Verlassen ab, um in dieser Gruppe zu bleiben.</string>
+    <string name="group_cancel_leave">Verlassen abbrechen</string>
+    <string name="group_leave_refresh_hint">Aktualisiere, um zu prüfen, ob du noch in dieser Gruppe bist.</string>
+    <string name="toast_couldnt_cancel_leave">Verlassen konnte nicht abgebrochen werden</string>
     <string name="export_conversation_transcript">Konversationstranskript exportieren</string>
     <string name="toast_couldnt_export_transcript">Transkript konnte nicht exportiert werden</string>
     <string name="no_share_target_available">Kein Freigabeziel verfügbar</string>

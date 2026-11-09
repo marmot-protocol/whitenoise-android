@@ -4,14 +4,6 @@
   "categories": {
     "composable_surfaces": [
       {
-        "surface": "BlockedLeaveCancelNotice",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
-        "anchor": "fun BlockedLeaveCancelNotice(",
-        "test_ids": [
-          "GRP-032"
-        ]
-      },
-      {
         "surface": "group reset action",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
         "anchor": "R.string.group_reset_action",
@@ -294,38 +286,6 @@
         "test_ids": [
           "GRP-010",
           "GRP-033"
-        ]
-      },
-      {
-        "surface": "R.string.group_cancel_leave",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
-        "anchor": "R.string.group_cancel_leave",
-        "test_ids": [
-          "GRP-032"
-        ]
-      },
-      {
-        "surface": "R.string.group_leave_blocked_hint",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
-        "anchor": "R.string.group_leave_blocked_hint",
-        "test_ids": [
-          "GRP-032"
-        ]
-      },
-      {
-        "surface": "R.string.group_leave_refresh_hint",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
-        "anchor": "R.string.group_leave_refresh_hint",
-        "test_ids": [
-          "GRP-032"
-        ]
-      },
-      {
-        "surface": "R.string.refresh",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupDetailsResetControl.kt",
-        "anchor": "R.string.refresh",
-        "test_ids": [
-          "GRP-032"
         ]
       }
     ]

@@ -904,13 +904,16 @@ private fun AppGroupRecordFfi.hasSettledDeparture(): Boolean =
     selfMembership.isNonMember() && !(selfMembership == SelfMembershipFfi.LEFT && leaveRequestPending)
 
 /** Distinguishes an actual eviction from a provisional voluntary departure. */
-private fun SelfMembershipFfi.isGroupEviction(): Boolean =
-    this == SelfMembershipFfi.REMOVED || this == SelfMembershipFfi.DEVICE_REMOVED
+private fun SelfMembershipFfi.isGroupEviction(): Boolean = this == SelfMembershipFfi.REMOVED || this == SelfMembershipFfi.DEVICE_REMOVED
 
 /** A readback can rejoin only an active, confirmed group with no outstanding leave request. */
 private fun AppGroupRecordFfi.isJoinedAfterLeave(): Boolean =
-    selfMembership == SelfMembershipFfi.MEMBER && !leaveRequestPending && !leaveBlocked &&
-        !pendingConfirmation && !disbanded && !disbanding
+    selfMembership == SelfMembershipFfi.MEMBER &&
+        !leaveRequestPending &&
+        !leaveBlocked &&
+        !pendingConfirmation &&
+        !disbanded &&
+        !disbanding
 
 internal fun cacheAppliedGroupMembers(
     appState: WhiteNoiseAppState,
@@ -3896,6 +3899,18 @@ class ChatsController private constructor(
         check(details.group.groupIdHex.equals(attempt.groupId, ignoreCase = true) && resolution.invariant == null) {
             "Authoritative group roster unavailable"
         }
+        return departResolvedChat(attempt, deleteAfterLeave, resolution)
+    }
+
+    /**
+     * Leaves a chat whose authoritative roster [resolution] has been read. A durable leave request already pending
+     * stays provisional, so it keeps the history and reports that the leave is not confirmed yet.
+     */
+    private suspend fun departResolvedChat(
+        attempt: ChatListDepartureAttempt,
+        deleteAfterLeave: Boolean,
+        resolution: GroupRosterResolution,
+    ): Boolean {
         val group = resolution.applied.group
         if (group.leaveRequestPending) {
             appState.presentTransient(R.string.toast_leave_not_confirmed_history_kept)
@@ -9160,16 +9175,16 @@ class ConversationController(
         val accountRef = conversationAccountRef
         if (
             showsBlockedLeave ||
-                !canAcceptReaction(
-                    accountRef = accountRef,
-                    membersVerified = membersVerified,
-                    isSelfMember = isSelfMember,
-                    seededSelfMember = seededSelfMember,
-                    selfLeft = selfMembership.selfLeft,
-                    unrecoverable = group.unrecoverable,
-                    disbanding = group.disbanding,
-                    disbanded = group.disbanded,
-                )
+            !canAcceptReaction(
+                accountRef = accountRef,
+                membersVerified = membersVerified,
+                isSelfMember = isSelfMember,
+                seededSelfMember = seededSelfMember,
+                selfLeft = selfMembership.selfLeft,
+                unrecoverable = group.unrecoverable,
+                disbanding = group.disbanding,
+                disbanded = group.disbanded,
+            )
         ) {
             appState.present(R.string.toast_reaction_failed)
             return null
@@ -14409,10 +14424,14 @@ class ConversationController(
         val incoming = resolution.applied.group
         if (incoming.leaveBlocked) observedBlockedLeave = true
         val restored =
-            freshLeaveReadback && observedBlockedLeave && resolution.containsLocalMember &&
-                incoming.isJoinedAfterLeave() && !group.selfMembership.isGroupEviction()
+            freshLeaveReadback &&
+                observedBlockedLeave &&
+                resolution.containsLocalMember &&
+                incoming.isJoinedAfterLeave() &&
+                !group.selfMembership.isGroupEviction()
         val settled =
-            incoming.selfMembership.isGroupEviction() || incoming.disbanded ||
+            incoming.selfMembership.isGroupEviction() ||
+                incoming.disbanded ||
                 (freshLeaveReadback && incoming.hasSettledDeparture() && !resolution.containsLocalMember)
         if (restored || settled) {
             observedBlockedLeave = false

@@ -395,7 +395,12 @@ class MarmotUpgradeFixtureTest {
                 false,
                 "http://127.0.0.1:$blobPort",
             )
-        val original = runtime.uploadMedia(sender.label, group, request).attachments.single().reference
+        val original =
+            runtime
+                .uploadMedia(sender.label, group, request)
+                .attachments
+                .single()
+                .reference
         requireNotNull(original.sourceEpochIdentity)
         runtime.updateGroupProfile(sender.label, group, "Stale upload retry advanced", null)
         var epoch = runtime.groupDetails(sender.label, group).mlsState.epoch
@@ -414,7 +419,12 @@ class MarmotUpgradeFixtureTest {
         assertEquals(original.sourceEpoch, refusal.sourceEpoch)
         assertEquals(epoch, refusal.currentEpoch)
 
-        val fresh = runtime.uploadMedia(sender.label, group, request).attachments.single().reference
+        val fresh =
+            runtime
+                .uploadMedia(sender.label, group, request)
+                .attachments
+                .single()
+                .reference
         assertEquals(epoch, fresh.sourceEpoch)
         assertNotEquals(original.ciphertextSha256, fresh.ciphertextSha256)
         assertEquals(original.plaintextSha256, fresh.plaintextSha256)
