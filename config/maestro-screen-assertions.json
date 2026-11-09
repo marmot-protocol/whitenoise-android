@@ -5961,6 +5961,12 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/ComposerTranslation.kt",
+      "symbol": "ComposerTranslationPreview",
+      "bindings": [],
+      "remaining": "No Maestro flow opens composer Translate mode yet. The target-language dialog, the read-only translated line, Send gating while pending or failed, and the missing-engine action are covered by ComposerTranslationBarScreenshotTest, ComposerTranslationStateTest and manual case CON-045; a real-engine device flow remains separate qualification."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/translation/MessageTranslationForm.kt",
       "symbol": "TranslationLanguageRow",
       "bindings": [
