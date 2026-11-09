@@ -28,6 +28,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.ipf.marmotkit.EmojiSetFfi
 import dev.ipf.whitenoise.android.R
@@ -56,8 +57,11 @@ internal fun EmojiSetsScreen(
     appState: WhiteNoiseAppState,
     onBack: () -> Unit,
     initialAddress: String? = null,
+    targetAccount: String? = null,
 ) {
-    val account = appState.activeAccountRef
+    val activeOwner = appState.activeAccountRef
+    val selected = targetAccount?.let { ref -> appState.accounts.firstOrNull { it.label == ref } }
+    val account = if (targetAccount == null) activeOwner else selected?.label
     if (account == null) {
         SettingsScaffold(title = stringResource(R.string.emoji_sets_title), onBack = onBack) {
             SettingsExplainer(stringResource(R.string.emoji_sets_account_required))
@@ -65,10 +69,13 @@ internal fun EmojiSetsScreen(
         return
     }
     val generation = appState.runtimeGeneration
-    key(appState, account, generation, initialAddress) {
+    key(appState, activeOwner, account, generation, initialAddress) {
         val controller =
             remember {
-                EmojiSetsController(appState.emojiSetsBackend(account, generation), appState.emojiSetLibrary::invalidate)
+                EmojiSetsController(
+                    appState.emojiSetsBackend(account, generation, activeOwner),
+                    appState.emojiSetLibrary::invalidate,
+                )
             }
         val scope = rememberCoroutineScope()
         val back = {
@@ -97,6 +104,7 @@ internal fun EmojiSetsScreen(
             onInstall = { appState.launchMutation { controller.install() } },
             onCancel = controller::cancelInstall,
             onRemove = { appState.launchMutation { controller.remove() } },
+            profileName = selected?.let { appState.accountDisplayNameCached(it.accountIdHex) },
         )
     }
 }
@@ -113,8 +121,16 @@ internal fun EmojiSetsContent(
     onInstall: () -> Unit,
     onCancel: () -> Unit,
     onRemove: () -> Unit,
+    profileName: String? = null,
 ) {
-    SettingsScaffold(title = stringResource(R.string.emoji_sets_title), onBack = onBack) {
+    val title = stringResource(R.string.emoji_sets_title)
+    val accountTitle: (@Composable () -> Unit)? =
+        if (profileName == null) {
+            null
+        } else {
+            { EmojiSetsAccountTitle(title, profileName) }
+        }
+    SettingsScaffold(title = title, onBack = onBack, titleContent = accountTitle) {
         val set = state.preview
         if (set == null) {
             EmojiSetBrowser(state, onSearch, onShow)
@@ -124,7 +140,19 @@ internal fun EmojiSetsContent(
     }
 }
 
-/** Searches the local results as the query is edited, and explicitly asks MDK to discover more. */
+/** Identifies the profile that will own the set opened from the share picker. */
+@Composable
+private fun EmojiSetsAccountTitle(
+    title: String,
+    profileName: String,
+) {
+    Column {
+        Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(profileName, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** Renders MDK search results and lets the user explicitly search or paste an address. */
 @Composable
 private fun EmojiSetBrowser(
     state: EmojiSetsState,
@@ -132,18 +160,6 @@ private fun EmojiSetBrowser(
     onShow: (EmojiSetFfi) -> Unit,
 ) {
     val field = rememberTextFieldState()
-    val query = field.text.toString().trim()
-    val sets =
-        remember(state.sets, query) {
-            state.sets
-                .filter { set ->
-                    set.installed != null ||
-                        query.isBlank() ||
-                        set.displayTitle().contains(query, ignoreCase = true) ||
-                        set.description.orEmpty().contains(query, ignoreCase = true) ||
-                        set.emoji.any { it.shortcode.contains(query, ignoreCase = true) }
-                }.sortedBy { it.installed == null }
-        }
     SettingsList {
         item {
             Column(
@@ -156,16 +172,16 @@ private fun EmojiSetBrowser(
                     label = { Text(stringResource(R.string.emoji_sets_query)) },
                     lineLimits = TextFieldLineLimits.SingleLine,
                 )
-                Button(onClick = { onSearch(query) }, enabled = !state.busy) {
+                Button(onClick = { onSearch(field.text.toString().trim()) }, enabled = !state.busy) {
                     Text(stringResource(R.string.emoji_sets_find))
                 }
             }
         }
         item { EmojiSetStatus(state) }
-        if (sets.isEmpty() && !state.busy) {
+        if (state.sets.isEmpty() && !state.busy) {
             item { SettingsExplainer(stringResource(R.string.emoji_sets_empty)) }
         }
-        items(sets, key = { it.coordinate }) { set ->
+        items(state.sets, key = { it.coordinate }) { set ->
             SettingsGroup {
                 row("set") { context ->
                     SettingsAction(
@@ -173,7 +189,8 @@ private fun EmojiSetBrowser(
                         title = set.displayTitle(),
                         subtitle =
                             when {
-                                set.installed?.updateAvailable == true -> stringResource(R.string.emoji_sets_update_available)
+                                set.installed?.updateAvailable == true ->
+                                    stringResource(R.string.emoji_sets_update_available)
                                 set.installed != null -> stringResource(R.string.emoji_sets_installed)
                                 else -> stringResource(R.string.emoji_sets_item_count, set.emoji.size)
                             },

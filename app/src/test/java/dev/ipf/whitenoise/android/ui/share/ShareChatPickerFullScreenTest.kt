@@ -68,6 +68,37 @@ class ShareChatPickerFullScreenTest {
             intentMimeType = "text/plain",
         )
 
+    /** A set shared to another profile opens for the chooser's profile, even with the active profile unchanged. */
+    @Test
+    fun sharedEmojiSetUsesTheSelectedSendingProfile() {
+        val otherRef = "Second profile"
+        val otherHex = "b3".repeat(32)
+        val state =
+            appStateWithDirectChats(
+                GROUP_A to PEER_A,
+                accounts = listOf(testAccount(ACCOUNT_REF, ACCOUNT_HEX), testAccount(otherRef, otherHex)),
+            )
+        val opened = mutableListOf<String>()
+        val otherTitle = state.networkDisplayName(otherHex)
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                ShareChatPickerFullScreenContent(
+                    appState = state,
+                    payload = payload,
+                    onDismiss = {},
+                    onStage = { _, _ -> false },
+                    controllerBinder = { _, _ -> },
+                    onOpenEmojiSet = opened::add,
+                )
+            }
+        }
+        composeRule.onNodeWithContentDescription(app.getString(R.string.share_choose_sending_account)).performClick()
+        composeRule.onNodeWithText(otherTitle).performClick()
+        composeRule.onNodeWithText(app.getString(R.string.emoji_sets_open)).performClick()
+        assertEquals(listOf(otherRef), opened)
+        assertEquals(ACCOUNT_REF, state.activeAccountRef)
+    }
+
     @Test
     fun fullScreenPickerUsesAvailableHeightForAUsefulRecipientList() {
         val chats =

@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 
 /** Reads and mutates sets for the account and runtime that opened the screen. */
 internal interface EmojiSetsBackend {
-    suspend fun sets(): List<EmojiSetFfi>
+    suspend fun sets(search: String?): List<EmojiSetFfi>
 
     suspend fun discover(search: String?): Boolean
 
@@ -44,17 +44,25 @@ internal interface EmojiSetInstall : AutoCloseable {
 internal fun WhiteNoiseAppState.emojiSetsBackend(
     account: String,
     generation: Int,
+    activeOwner: String?,
 ): EmojiSetsBackend {
     suspend fun <T> scoped(block: suspend dev.ipf.marmotkit.MarmotInterface.() -> T): T =
         marmotIo {
-            if (runtimeGeneration != generation || activeAccountRef != account) {
+            val targetExists = account == activeOwner || accounts.any { it.label == account }
+            if (runtimeGeneration != generation || activeAccountRef != activeOwner || !targetExists) {
                 throw CancellationException("emoji set owner changed")
             }
             block()
         }
 
     return object : EmojiSetsBackend {
-        override suspend fun sets(): List<EmojiSetFfi> = scoped { emojiSets(account, false, null, null) }
+        override suspend fun sets(search: String?): List<EmojiSetFfi> =
+            scoped {
+                // Discovery is capped and ordered by date. Always include the full installed projection.
+                val installed = emojiSets(account, true, null, null)
+                val discovered = emojiSets(account, false, search, null)
+                (installed + discovered).distinctBy { it.coordinate }
+            }
 
         override suspend fun discover(search: String?): Boolean = scoped { syncEmojiSets(account, search).complete }
 
@@ -114,6 +122,7 @@ internal class EmojiSetsController(
         private set
     private var activeInstall: EmojiSetInstall? = null
     private var closed = false
+    private var search: String? = null
 
     /** Loads the existing projection without contacting relays or image hosts. */
     suspend fun load() = operate { refresh() }
@@ -121,7 +130,9 @@ internal class EmojiSetsController(
     /** Contacts only the account's discovery relays, then rereads the local projection. */
     suspend fun discover(search: String) =
         operate {
-            val complete = backend.discover(search.trim().ifBlank { null })
+            val query = search.trim().ifBlank { null }
+            val complete = backend.discover(query)
+            this.search = query
             refresh()
             if (!complete) state = state.copy(notice = EmojiSetNotice.DiscoveryIncomplete)
         }
@@ -187,7 +198,7 @@ internal class EmojiSetsController(
     }
 
     private suspend fun refresh() {
-        state = state.copy(sets = backend.sets())
+        state = state.copy(sets = backend.sets(search))
     }
 
     private suspend fun installWithProgress(set: EmojiSetFfi): EmojiSetInstallResultFfi =

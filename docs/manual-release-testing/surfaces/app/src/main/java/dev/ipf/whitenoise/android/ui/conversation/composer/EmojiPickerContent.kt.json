@@ -6,7 +6,7 @@
       {
         "surface": "Emoji picker source isolation",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/conversation/composer/EmojiPickerContent.kt",
-        "anchor": "EmojiShortcodes.art(emoji, LocalCustomEmoji.current, emptyMap())",
+        "anchor": "EmojiShortcodes.art(emoji, customEmoji, emptyMap())",
         "test_ids": [
           "MSG-037"
         ]

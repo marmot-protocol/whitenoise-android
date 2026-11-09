@@ -91,7 +91,7 @@ internal fun ShareChatPickerFullScreenContent(
     controllerBinder: suspend (ChatsController, String) -> Unit = { controller, accountRef ->
         controller.bind(accountRef)
     },
-    onOpenEmojiSet: (() -> Unit)? = null,
+    onOpenEmojiSet: ((String) -> Unit)? = null,
 ) {
     val pickerState =
         rememberShareChatPickerState(
@@ -140,7 +140,7 @@ private fun ShareChatPickerScaffold(
     actions: ShareChatPickerScaffoldActions,
     snackbarHostState: SnackbarHostState,
     overlayBackRegistrar: ShareChatPickerOverlayBackRegistrar?,
-    onOpenEmojiSet: (() -> Unit)?,
+    onOpenEmojiSet: ((String) -> Unit)?,
 ) {
     val shareToTitle = stringResource(R.string.share_to)
     ShareChatPickerBackAwareScreen(
@@ -172,8 +172,9 @@ private fun ShareChatPickerScaffold(
                         title = { Text(shareToTitle) },
                         navigationIcon = { ShareChatPickerCloseButton(actions.dismiss) },
                         actions = {
-                            if (onOpenEmojiSet != null) {
-                                TextButton(onClick = onOpenEmojiSet) {
+                            val selected = pickerState.selectedAccountRef
+                            if (onOpenEmojiSet != null && selected != null) {
+                                TextButton(onClick = { onOpenEmojiSet(selected) }) {
                                     Text(stringResource(R.string.emoji_sets_open))
                                 }
                             }

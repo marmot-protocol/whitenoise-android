@@ -52,6 +52,9 @@ internal class CustomEmojiSet(
     val composerShortcodes: List<String> =
         (sendable.map { it.shortcode } + installed?.entries?.keys.orEmpty()).distinct()
 
+    /** True when the composer sends installed artwork instead of a sendable device-local file. */
+    fun usesInstalledArtwork(shortcode: String): Boolean = installed?.entries?.containsKey(shortcode) == true && byShortcode[shortcode]?.sendable != true
+
     /** Any emoji with this code, sendable or not, so existing artwork keeps rendering. */
     operator fun get(shortcode: String): CustomEmoji? = byShortcode[shortcode]
 

@@ -67,7 +67,11 @@ internal fun EmojiShortcodeSuggestions(
                 (ShortcodeComposer.matchingShortcodes(shortcodes, query) + named).distinct().take(MAX_EMOJI_SUGGESTIONS)
             }
     }
-    if (active == null || suggestions.isEmpty()) {
+    val visibleSuggestions =
+        suggestions.filter {
+            !EmojiShortcodes.isShortcode(it) || it in custom.composerShortcodes || it in EmojiShortcodes.builtins
+        }
+    if (active == null || visibleSuggestions.isEmpty()) {
         return
     }
     Surface(
@@ -82,7 +86,7 @@ internal fun EmojiShortcodeSuggestions(
         border = amoledOutlineBorder(),
     ) {
         LazyRow(contentPadding = PaddingValues(horizontal = 4.dp)) {
-            itemsIndexed(suggestions, key = { _, emoji -> emoji }) { index, emoji ->
+            itemsIndexed(visibleSuggestions, key = { _, emoji -> emoji }) { index, emoji ->
                 EmojiTapTarget(
                     emoji = emoji,
                     onClick = {

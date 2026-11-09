@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.window.DialogProperties
 import dev.ipf.whitenoise.android.core.emojiSetAddress
@@ -45,7 +46,8 @@ internal fun ShareChatPickerFullScreen(
         remember(payload.text, hasStreams) {
             payload.text?.takeUnless { hasStreams }?.let(::emojiSetAddress)
         }
-    var setOpen by rememberSaveable(requestId, appState.activeAccountRef) { mutableStateOf(false) }
+    var setAccount by rememberSaveable(requestId, appState.activeAccountRef) { mutableStateOf<String?>(null) }
+    val pickerState = rememberSaveableStateHolder()
     PlaybackDialog(
         onDismissRequest = {},
         onSourceDismiss = onDismiss,
@@ -57,20 +59,28 @@ internal fun ShareChatPickerFullScreen(
                 decorFitsSystemWindows = false,
             ),
     ) {
-        if (setOpen && setAddress != null) {
-            EmojiSetsScreen(appState, onBack = { setOpen = false }, initialAddress = setAddress)
-        } else {
-            ShareChatPickerFullScreenContent(
-                appState = appState,
-                requestId = requestId,
-                payload = payload,
-                onDismiss = onDismiss,
-                onStage = onStage,
-                overlayBackRegistrar = overlayBackRegistrar,
-                controllerFactory = controllerFactory,
-                controllerBinder = controllerBinder,
-                onOpenEmojiSet = if (setAddress == null) null else ({ setOpen = true }),
+        val targetAccount = setAccount
+        if (targetAccount != null && setAddress != null) {
+            EmojiSetsScreen(
+                appState,
+                onBack = { setAccount = null },
+                initialAddress = setAddress,
+                targetAccount = targetAccount,
             )
+        } else {
+            pickerState.SaveableStateProvider(requestId) {
+                ShareChatPickerFullScreenContent(
+                    appState = appState,
+                    requestId = requestId,
+                    payload = payload,
+                    onDismiss = onDismiss,
+                    onStage = onStage,
+                    overlayBackRegistrar = overlayBackRegistrar,
+                    controllerFactory = controllerFactory,
+                    controllerBinder = controllerBinder,
+                    onOpenEmojiSet = if (setAddress == null) null else ({ setAccount = it }),
+                )
+            }
         }
     }
 }

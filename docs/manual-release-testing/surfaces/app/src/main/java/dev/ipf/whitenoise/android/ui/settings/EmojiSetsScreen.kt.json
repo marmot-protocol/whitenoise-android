@@ -58,6 +58,14 @@
         "test_ids": [
           "SET-048"
         ]
+      },
+      {
+        "surface": "EmojiSetsAccountTitle",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/EmojiSetsScreen.kt",
+        "anchor": "fun EmojiSetsAccountTitle(",
+        "test_ids": [
+          "SET-048"
+        ]
       }
     ],
     "settings_controls": [

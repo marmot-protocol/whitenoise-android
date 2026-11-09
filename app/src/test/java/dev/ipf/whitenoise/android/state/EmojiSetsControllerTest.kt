@@ -110,7 +110,7 @@ private class FakeEmojiSetsBackend : EmojiSetsBackend {
     var set = emojiSetFixture()
     val install = FakeEmojiSetInstall()
 
-    override suspend fun sets() = listOf(set)
+    override suspend fun sets(search: String?) = listOf(set)
 
     override suspend fun discover(search: String?) = true
 
