@@ -252,21 +252,24 @@ object LocalNotificationFormatter {
         // (the caption is shown verbatim via the preview overrides).
         mediaKind: ReplyMediaKind = ReplyMediaKind.None,
         conversationTitleOverride: String? = null,
+        // The stored chat row can identify a DM whose notification payload reports it as a group.
+        useDirectLayout: Boolean = false,
         // AppState owns hex→npub conversion through Marmot; requiring its
         // shortener here keeps this pure formatter from duplicating bech32.
         shortNpub: (String) -> String,
     ): LocalNotificationContent? {
         val kind = contentKind(update) ?: return null
+        val isGroupConversation = !update.isDm && !useDirectLayout
         val senderName = senderName(update.sender, senderNameOverride, shortNpub)
         val conversationTitle =
-            if (!update.isDm) {
+            if (isGroupConversation) {
                 clean(conversationTitleOverride) ?: clean(update.groupName)
             } else {
                 null
             }
         val title =
             when (kind) {
-                ContentKind.MESSAGE -> messageTitle(update, context, senderName)
+                ContentKind.MESSAGE -> messageTitle(update, context, senderName, isGroupConversation)
                 ContentKind.INVITE -> inviteTitle(context)
                 ContentKind.REMOVED_FROM_GROUP -> removedFromGroupTitle(context, conversationTitle)
                 ContentKind.MADE_ADMIN -> adminRoleTitle(context, conversationTitle, madeAdmin = true)
@@ -304,7 +307,7 @@ object LocalNotificationFormatter {
             senderKey = update.sender.accountIdHex,
             selfName = displayName(update.receiver, shortNpub),
             selfKey = update.receiver.accountIdHex,
-            isGroupConversation = !update.isDm,
+            isGroupConversation = isGroupConversation,
             conversationTitle = conversationTitle,
             isReactionPreview = isReaction(update),
             reactionArtworkBody = reactionArtworkBody,
@@ -422,10 +425,12 @@ object LocalNotificationFormatter {
         update: NotificationUpdateFfi,
         context: Context?,
         sender: String,
+        isGroupConversation: Boolean,
     ): String {
         val group = clean(update.groupName)
         return when {
-            group != null && !update.isDm -> text(context, R.string.notification_sender_in_group, "%1\$s in %2\$s", sender, group)
+            group != null && isGroupConversation ->
+                text(context, R.string.notification_sender_in_group, "%1\$s in %2\$s", sender, group)
             else -> sender
         }
     }
