@@ -156,6 +156,22 @@
         ]
       },
       {
+        "surface": "R.string.conversation_disbanded_notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.conversation_disbanded_notice",
+        "test_ids": [
+          "GRP-037"
+        ]
+      },
+      {
+        "surface": "R.string.conversation_disbanding_notice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.conversation_disbanding_notice",
+        "test_ids": [
+          "GRP-037"
+        ]
+      },
+      {
         "surface": "R.string.group_leave_blocked_hint",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "R.string.group_leave_blocked_hint",

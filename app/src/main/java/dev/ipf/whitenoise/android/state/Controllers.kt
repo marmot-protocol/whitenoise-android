@@ -10403,9 +10403,9 @@ class ConversationController(
      */
     @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
     suspend fun retryFailedSend(item: TimelineMessage) {
-        // A send that failed before the leave was blocked stays failed until the block is resolved.
-        if (showsBlockedLeave) {
-            appState.presentTransient(blockedLeaveHint())
+        // A send that failed before the leave was blocked, or before a disband, stays failed while that state holds.
+        outboundRefusal()?.let {
+            appState.presentTransient(it)
             return
         }
         val key = item.id
@@ -11965,6 +11965,20 @@ class ConversationController(
                 }
             }
             stayed
+        }
+
+    /**
+     * Why ordinary outbound work is refused right now, or null when it may proceed: a blocked leave, or a group that is
+     * disbanding or disbanded, the terminal states [canSendMessages] also refuses. Shared by every send path that does
+     * not pass through the composer gate.
+     */
+    @StringRes
+    private fun outboundRefusal(): Int? =
+        when {
+            showsBlockedLeave -> blockedLeaveHint()
+            group.disbanded -> R.string.conversation_disbanded_notice
+            group.disbanding -> R.string.conversation_disbanding_notice
+            else -> null
         }
 
     /** Matches the blocked-leave notice: a cancelled or cleared block that only awaits readback asks for Refresh. */
