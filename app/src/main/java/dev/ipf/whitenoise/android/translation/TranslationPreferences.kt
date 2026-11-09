@@ -17,6 +17,7 @@ internal data class TranslationChoice(
 )
 
 /** Platform choices only: no source text, rendition, error, revision or request identity is persisted. */
+@Suppress("TooManyFunctions")
 internal class TranslationPreferences(
     context: Context,
 ) {
@@ -126,6 +127,26 @@ internal class TranslationPreferences(
         val edit = preferences.edit()
         if (target == null) edit.remove(key) else edit.putString(key, target)
         edit.apply()
+    }
+
+    /**
+     * The language this chat's composer last translated outgoing text into, or null until chosen. It is kept
+     * apart from the incoming target: people usually read in their own language and write in the chat's.
+     */
+    fun outgoingTarget(
+        account: String,
+        group: String,
+    ): String? =
+        savedTarget(key(account, group) + ":outgoing")
+            ?.takeIf(OfflineTranslatorLanguageCatalog::supportsTarget)
+
+    fun setOutgoingTarget(
+        account: String,
+        group: String,
+        target: String,
+    ) {
+        require(OfflineTranslatorLanguageCatalog.supportsTarget(target))
+        preferences.edit().putString(key(account, group) + ":outgoing", target).apply()
     }
 
     /** The raw saved code, `""` for a value of the wrong type, or null when nothing is saved. */

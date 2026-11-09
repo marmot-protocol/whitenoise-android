@@ -95,13 +95,14 @@ internal class ComposerAttachmentMenuPositionProvider(
 
 /** Text actions the Plus menu offers whenever they are not pinned to the toolbar. */
 internal val composerMenuTextShortcuts =
-    setOf(ComposerShortcut.Emoji, ComposerShortcut.Paste, ComposerShortcut.Dictation)
+    setOf(ComposerShortcut.Emoji, ComposerShortcut.Paste, ComposerShortcut.Dictation, ComposerShortcut.Translate)
 
 /** Callbacks for unpinned text actions; Paste reports false when the system denies clipboard access. */
 internal data class ComposerMenuTextShortcuts(
     val onEmoji: (() -> Unit)? = null,
     val onPaste: (() -> Boolean)? = null,
     val onDictation: (() -> Unit)? = null,
+    val onTranslate: (() -> Unit)? = null,
     val pasteAccepted: () -> Boolean = { true },
 ) {
     /** Drops actions already pinned to the toolbar or unavailable in this composer. */
@@ -110,6 +111,7 @@ internal data class ComposerMenuTextShortcuts(
             onEmoji = onEmoji?.takeIf { ComposerShortcut.Emoji in hidden },
             onPaste = onPaste?.takeIf { ComposerShortcut.Paste in hidden },
             onDictation = onDictation?.takeIf { ComposerShortcut.Dictation in hidden },
+            onTranslate = onTranslate?.takeIf { ComposerShortcut.Translate in hidden },
             pasteAccepted = pasteAccepted,
         )
 }
@@ -237,6 +239,7 @@ private fun composerMenuTextItems(
                 dictate()
             }
         },
+        textShortcuts.onTranslate?.let { composerMenuShortcutItem(ComposerShortcut.Translate, onClick = it) },
     )
 }
 
