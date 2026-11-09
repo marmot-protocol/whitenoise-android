@@ -1063,6 +1063,9 @@
     <string name="toast_reply_draft_restore_failed">無法還原回覆。</string>
     <string name="toast_draft_save_failed">無法儲存草稿。</string>
     <string name="toast_notification_conversation_unavailable">該對話已無法使用</string>
+    <string name="chat_link_not_found">找不到聊天</string>
+    <string name="chat_link_invalid">此聊天連結無效</string>
+    <string name="chat_link_choose_account_title">在以下帳號中開啟聊天</string>
     <string name="toast_couldnt_decode_image">無法解碼該圖片</string>
     <string name="toast_couldnt_prepare_image">無法下載或處理該圖片。</string>
     <string name="toast_reattach_to_retry_media">重新附加以重試</string>

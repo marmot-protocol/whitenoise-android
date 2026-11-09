@@ -12242,6 +12242,14 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
+    /** Signed-in accounts whose local chat list holds [groupIdHex], in account order (#3658). */
+    internal suspend fun accountsHoldingChat(groupIdHex: String): List<String> =
+        accounts.filterNot { it.signedOut }.map { it.label }.filter { account ->
+            runCatchingCancellable {
+                marmotIo(MarmotTraceSection.CHAT_ROW_READ) { chatListRow(account, groupIdHex) }
+            }.getOrNull()?.groupIdHex.equals(groupIdHex, ignoreCase = true)
+        }
+
     fun presentProfilePayload(raw: String): Boolean {
         val link = ProfileLink.parse(raw) ?: return false
         pendingProfileGroupsInCommon = false

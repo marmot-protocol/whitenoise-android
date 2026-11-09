@@ -1082,6 +1082,9 @@
     <string name="toast_reply_draft_restore_failed">Yanıt geri yüklenemedi.</string>
     <string name="toast_draft_save_failed">Taslak kaydedilemedi.</string>
     <string name="toast_notification_conversation_unavailable">Bu sohbet artık kullanılamıyor</string>
+    <string name="chat_link_not_found">Sohbet bulunamadı</string>
+    <string name="chat_link_invalid">Bu sohbet bağlantısı geçersiz</string>
+    <string name="chat_link_choose_account_title">Sohbeti şurada aç</string>
     <string name="toast_couldnt_decode_image">Resim çözülemedi</string>
     <string name="toast_couldnt_prepare_image">Görsel indirilemedi veya hazırlanamadı.</string>
     <string name="toast_reattach_to_retry_media">Tekrar denemek için yeniden ekleyin</string>

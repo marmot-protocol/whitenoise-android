@@ -1084,6 +1084,9 @@
     <string name="toast_reply_draft_restore_failed">Impossible de restaurer la réponse.</string>
     <string name="toast_draft_save_failed">Impossible d’enregistrer le brouillon.</string>
     <string name="toast_notification_conversation_unavailable">Cette conversation n\'est plus disponible</string>
+    <string name="chat_link_not_found">Discussion introuvable</string>
+    <string name="chat_link_invalid">Ce lien de discussion n’est pas valide</string>
+    <string name="chat_link_choose_account_title">Ouvrir la discussion dans</string>
     <string name="toast_couldnt_decode_image">Impossible de décoder l\'image</string>
     <string name="toast_couldnt_prepare_image">Impossible de télécharger ou de préparer cette image.</string>
     <string name="toast_reattach_to_retry_media">Joindre à nouveau pour réessayer</string>

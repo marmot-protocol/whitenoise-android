@@ -1084,6 +1084,9 @@
     <string name="toast_reply_draft_restore_failed">Impossibile ripristinare la risposta.</string>
     <string name="toast_draft_save_failed">Impossibile salvare la bozza.</string>
     <string name="toast_notification_conversation_unavailable">Quella conversazione non è più disponibile</string>
+    <string name="chat_link_not_found">Chat non trovata</string>
+    <string name="chat_link_invalid">Questo link alla chat non è valido</string>
+    <string name="chat_link_choose_account_title">Apri la chat in</string>
     <string name="toast_couldnt_decode_image">Impossibile decodificare l\'immagine</string>
     <string name="toast_couldnt_prepare_image">Impossibile scaricare o preparare l’immagine.</string>
     <string name="toast_reattach_to_retry_media">Riallega per riprovare</string>
