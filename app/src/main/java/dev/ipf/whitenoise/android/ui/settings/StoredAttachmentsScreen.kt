@@ -120,7 +120,11 @@ internal fun StoredAttachmentsContent(
         }
     }
     RemoveOlderDialogs(dialogs, groupIdHex, actions.onAction)
-    confirm?.let { target ->
+    // The confirmation survives recreation but the selection does not, so an emptied selection closes it rather than
+    // offering to remove nothing.
+    val selectionGone = confirm == SELECTION && list.selection.isEmpty()
+    LaunchedEffect(selectionGone) { if (selectionGone) confirm = null }
+    confirm?.takeUnless { selectionGone }?.let { target ->
         val selection = target == SELECTION
         val figures =
             if (selection) list.selection.size.toLong() to list.selectedBytes else chatFigures(storage, list, target)

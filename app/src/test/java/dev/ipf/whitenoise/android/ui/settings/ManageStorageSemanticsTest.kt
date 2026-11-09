@@ -1,14 +1,20 @@
 package dev.ipf.whitenoise.android.ui.settings
 
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
@@ -75,6 +81,32 @@ class ManageStorageSemanticsTest {
         val rows = listOf(attachment("a", 9_000_000), attachment("b", 4_000_000))
         renderList(StoredAttachmentsUiState(items = rows, complete = false, selected = setOf(rows.first().key)))
         composeRule.onNodeWithContentDescription("Select all shown").assertExists()
+    }
+
+    /** A selection confirmation whose selection empties, as after recreation, closes instead of removing nothing. */
+    @Test fun emptiedSelectionClosesItsConfirmation() {
+        val rows = listOf(attachment("a", 9_000_000))
+        val selected = StoredAttachmentsUiState(items = rows, complete = true, selected = setOf(rows.first().key))
+        var list by mutableStateOf(selected)
+        val appState = appState()
+        composeRule.setContent {
+            WhiteNoiseTheme {
+                StoredAttachmentsContent(
+                    appState = appState,
+                    storage = ManageStorageUiState(),
+                    list = list,
+                    groupIdHex = null,
+                    onBack = {},
+                    actions = StoredAttachmentsActions({}, {}, {}, {}, {}),
+                )
+            }
+        }
+        composeRule.onNodeWithTag("storage.selection.remove").performClick()
+        composeRule.onNodeWithText("Remove 1 attachment?").assertExists()
+        list = list.copy(selected = emptySet())
+        composeRule.waitForIdle()
+        composeRule.onAllNodesWithText("Remove 1 attachment?").assertCountEquals(0)
+        composeRule.onAllNodesWithText("Remove 0 attachments?").assertCountEquals(0)
     }
 
     /** A failed page offers Try again, which resumes the list. */
