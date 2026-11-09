@@ -95,7 +95,7 @@ class TileTransferTest {
 
     /**
      * In a conversation opened after the removal the host only knows the cache missed, so an idle received tile reads
-     * its native phase once, and a removed phase then presents as a locally removed body.
+     * its native state once, read-only, and a removed state then presents as a locally removed body.
      */
     @Test
     fun aFreshlyOpenedRemovedBodyIsProbedAndPresentsAsRemoved() {
@@ -104,7 +104,10 @@ class TileTransferTest {
         assertFalse("a watched tile already has its phase", tileProbesNative(true, false, remote))
         assertFalse("own sends have nothing to download", tileProbesNative(false, true, remote))
         assertFalse(tileProbesNative(false, false, AttachmentTransferState.Available))
-        val removedPhase = progress(0, 4, phase = AttachmentTransferStateFfi.CLEANED_BY_SETTING)
+        // The one-shot read yields only a phase; a removed one becomes the sample the tile presents from.
+        assertNull(locallyRemovedProgress(AttachmentTransferStateFfi.NOT_REQUESTED))
+        assertNull(locallyRemovedProgress(null))
+        val removedPhase = requireNotNull(locallyRemovedProgress(AttachmentTransferStateFfi.CLEANED_BY_SETTING))
         val state = attachmentFilePresentationState(remote, removedPhase, AttachmentCancellationState.None)
         val tile = transfer(state, removedPhase)
         assertTrue(tile.removed && tile.visible && tile.needsDeliberateRetry)
