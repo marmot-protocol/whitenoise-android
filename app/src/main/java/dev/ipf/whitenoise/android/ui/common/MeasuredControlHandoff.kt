@@ -326,11 +326,16 @@ internal fun rememberMeasuredControlHandoff(
         MeasuredControlHandoff(destination, morphSurface, followMovingTarget)
     }
 
-/** Measures the actual endpoint without changing its size, focus, hit target or semantics. */
+/**
+ * Measures the actual endpoint without changing its size, focus, hit target or semantics. A clipped
+ * endpoint normally cannot admit a handoff; with [clipToVisible] a tall section scrolled partly out of
+ * its viewport reports only its on-screen part, so the morph lands on what the user can see.
+ */
 @Composable
 internal fun Modifier.controlHandoffEndpoint(
     state: MeasuredControlHandoff?,
     key: Any,
+    clipToVisible: Boolean = false,
 ): Modifier {
     val token = remember(state, key) { Any() }
     DisposableEffect(state, key, token) { onDispose { state?.remove(key, token) } }
@@ -344,7 +349,7 @@ internal fun Modifier.controlHandoffEndpoint(
             kotlin.math.abs(raw.right - visible.right) < 0.5f &&
                 kotlin.math.abs(raw.bottom - visible.bottom) < 0.5f
         val whole = unclippedStart && unclippedEnd
-        state?.report(key, token, if (whole) raw else Rect.Zero)
+        state?.report(key, token, if (whole) raw else if (clipToVisible) visible else Rect.Zero)
     }
 }
 
@@ -417,6 +422,7 @@ internal fun Modifier.controlMorphSurface(
     key: Any,
     artwork: ControlMorphSurface,
     nativeChromeSettled: Boolean,
+    clipToVisible: Boolean = false,
 ): Modifier {
     val fill = artwork.fill
     val retirementToken = state?.retirementToken
@@ -426,7 +432,7 @@ internal fun Modifier.controlMorphSurface(
         if (nativeChromeSettled) state?.acknowledgeRetirement(retirementToken, key)
     }
     var bounds by remember(state, key) { mutableStateOf(Rect.Zero) }
-    return controlHandoffEndpoint(state, key)
+    return controlHandoffEndpoint(state, key, clipToVisible)
         .onPlaced {
             bounds = it.boundsInWindow()
             state?.reportSurface(key, artwork)

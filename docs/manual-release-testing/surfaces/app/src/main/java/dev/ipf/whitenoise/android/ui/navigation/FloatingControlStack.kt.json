@@ -1,0 +1,28 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/FloatingControlStack.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "FloatingControlVisibility",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/FloatingControlStack.kt",
+        "anchor": "fun FloatingControlVisibility(",
+        "test_ids": [
+          "CHL-035",
+          "NAV-012"
+        ]
+      },
+      {
+        "surface": "Modifier.floatingDictationCapsuleClearance",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/navigation/FloatingControlStack.kt",
+        "anchor": "fun Modifier.floatingDictationCapsuleClearance(",
+        "test_ids": [
+          "DIC-002",
+          "CHL-035",
+          "NAV-012"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

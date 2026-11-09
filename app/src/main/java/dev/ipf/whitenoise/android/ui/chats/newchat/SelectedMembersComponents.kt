@@ -55,6 +55,7 @@ import dev.ipf.whitenoise.android.ui.icons.Icons
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.ArrowBack
 import dev.ipf.whitenoise.android.ui.icons.automirrored.filled.KeyboardArrowRight
 import dev.ipf.whitenoise.android.ui.icons.filled.Close
+import dev.ipf.whitenoise.android.ui.navigation.floatingDictationAnchor
 import dev.ipf.whitenoise.android.ui.theme.Dimens
 import dev.ipf.whitenoise.android.ui.theme.Radii
 
@@ -222,6 +223,8 @@ internal fun SelectedMembersReviewScreen(
                 onClick = { if (!busy) onConfirm() },
                 modifier =
                     Modifier
+                        // Registered so the floating dictation capsule stacks above Confirm instead of covering it.
+                        .floatingDictationAnchor()
                         .testTag(SELECTED_MEMBERS_CONFIRM_TAG)
                         .then(if (busy) Modifier.semantics { disabled() } else Modifier),
                 containerColor = MaterialTheme.colorScheme.primaryContainer,

@@ -32,8 +32,11 @@ import dev.ipf.whitenoise.android.ui.common.LocalControlHandoffEndpointCurrent
 import dev.ipf.whitenoise.android.ui.common.MeasuredControlHandoff
 import dev.ipf.whitenoise.android.ui.common.controlMorphSurface
 
-/** The shell connects only these two real controls; no composer or draft state is shared. */
-internal enum class ComposerFabEndpoint { Composer, NewMessage }
+/**
+ * The real controls the shell connects; no composer, draft or roster state is shared. Opening chat
+ * details carries the composer's container into the group's Members section and Back carries it home.
+ */
+internal enum class ComposerFabEndpoint { Composer, NewMessage, GroupMembers }
 
 internal val LocalComposerFabHandoff = staticCompositionLocalOf<MeasuredControlHandoff?> { null }
 
@@ -48,8 +51,12 @@ internal fun Modifier.composerFabSurface(
     border: Color?,
     radiusDp: Float,
     morphing: Boolean,
+    clipToVisible: Boolean = false,
 ): Modifier {
-    if (!LocalControlHandoffEndpointCurrent.current) return clearAndSetSemantics { }.drawWithContent { }
+    if (!LocalControlHandoffEndpointCurrent.current) {
+        // Outgoing route pixels keep the Members section as content; only the composer and pen go blank.
+        return if (endpoint == ComposerFabEndpoint.GroupMembers) this else clearAndSetSemantics { }.drawWithContent { }
+    }
     val density = LocalDensity.current
     val composerHeight = LocalComposerFabHeight.current
     return onPlaced { coordinates ->
@@ -67,6 +74,7 @@ internal fun Modifier.composerFabSurface(
             decorationAlpha = if (endpoint == ComposerFabEndpoint.NewMessage) 1f else 0f,
         ),
         nativeChromeSettled = !morphing,
+        clipToVisible = clipToVisible,
     )
 }
 

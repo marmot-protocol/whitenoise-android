@@ -22,6 +22,14 @@
         ]
       },
       {
+        "surface": "ChatListJumpToTopButton",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
+        "anchor": "fun ChatListJumpToTopButton(",
+        "test_ids": [
+          "CHL-035"
+        ]
+      },
+      {
         "surface": "ChatListSearchSectionHeader",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatsScreen.kt",
         "anchor": "fun ChatListSearchSectionHeader(",
@@ -54,7 +62,8 @@
           "GRP-034",
           "CHL-031",
           "CHL-006",
-          "CHL-034"
+          "CHL-034",
+          "CHL-035"
         ]
       },
       {

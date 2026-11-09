@@ -148,6 +148,9 @@ import dev.ipf.whitenoise.android.ui.medialibrary.MediaLibraryRoute
 import dev.ipf.whitenoise.android.ui.medialibrary.SharedContentCategory
 import dev.ipf.whitenoise.android.ui.medialibrary.SharedMediaSection
 import dev.ipf.whitenoise.android.ui.medialibrary.rememberSharedMediaTiles
+import dev.ipf.whitenoise.android.ui.navigation.ComposerFabEndpoint
+import dev.ipf.whitenoise.android.ui.navigation.LocalComposerFabHandoff
+import dev.ipf.whitenoise.android.ui.navigation.composerFabSurface
 import dev.ipf.whitenoise.android.ui.profile.AvatarFullScreenViewer
 import dev.ipf.whitenoise.android.ui.profile.ProfileAddToGroupsScreen
 import dev.ipf.whitenoise.android.ui.profile.rememberAvatarImageAvailable
@@ -1372,7 +1375,18 @@ internal fun GroupDetailsScreen(
                 // Keep the member header, identities, pending invitations and the
                 // full-roster action in one contiguous primary section. ContactRow
                 // already provides Material touch heights and internal padding.
-                Column(Modifier.testTag("chat_info.members")) {
+                // The composer's container opens into this section and closes back out of it on Back.
+                Column(
+                    Modifier
+                        .composerFabSurface(
+                            ComposerFabEndpoint.GroupMembers,
+                            fill = MaterialTheme.colorScheme.surfaceContainerLow,
+                            border = MaterialTheme.colorScheme.outlineVariant,
+                            radiusDp = 16f,
+                            morphing = LocalComposerFabHandoff.current?.active == true,
+                            clipToVisible = true,
+                        ).testTag("chat_info.members"),
+                ) {
                     if (!rosterReady) {
                         GroupRosterLoadStatus(
                             state = controller.memberRosterState,

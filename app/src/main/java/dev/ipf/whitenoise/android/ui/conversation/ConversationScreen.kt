@@ -4937,7 +4937,9 @@ internal fun ConversationScreen(
                                 if (transcriptReadyToReveal) {
                                     ConversationNavigationStack(composerOverlap = overlayPadding) {
                                         // Selection hides these controls; paging progress never covers message rows.
-                                        if (!selectionMode && ttsFollowHandle.showResumeAction) {
+                                        ConversationNavigationControl(
+                                            visible = !selectionMode && ttsFollowHandle.showResumeAction,
+                                        ) {
                                             TtsResumeFollowButton(
                                                 onClick = {
                                                     ttsFollowHandle.revealCurrentPassage(

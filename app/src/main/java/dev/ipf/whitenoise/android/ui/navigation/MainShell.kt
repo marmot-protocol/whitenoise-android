@@ -1775,6 +1775,8 @@ internal fun MainShell(
                     routingShare ||
                     routingAppUpdate ||
                     pendingTtsDestinationNavigation != null -> null
+                selectedChat != null && selectedConversationSurfaceState.showDetails.value ->
+                    ComposerFabEndpoint.GroupMembers
                 selectedChat != null -> ComposerFabEndpoint.Composer
                 section == MainSection.Chats -> ComposerFabEndpoint.NewMessage
                 else -> null
