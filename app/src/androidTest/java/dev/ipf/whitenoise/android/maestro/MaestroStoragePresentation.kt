@@ -8,6 +8,7 @@ import dev.ipf.whitenoise.android.state.ManageStorageUiState
 import dev.ipf.whitenoise.android.state.StorageAction
 import dev.ipf.whitenoise.android.state.StorageUsage
 import dev.ipf.whitenoise.android.ui.settings.RemoveAttachmentsDialog
+import dev.ipf.whitenoise.android.ui.settings.RemoveChatAttachmentsDialog
 import dev.ipf.whitenoise.android.ui.settings.RemoveOlderDialogs
 import dev.ipf.whitenoise.android.ui.settings.StorageDialogs
 import dev.ipf.whitenoise.android.ui.settings.StorageOverviewDialogs
@@ -43,6 +44,11 @@ internal fun MaestroStoragePresentation(fixture: MaestroPresentationFixture) {
             RemoveAttachmentsDialog(
                 count = 3,
                 bytes = 14_000_000,
+                onDismiss = { fixture.finish("dismiss") },
+                onConfirm = { error("Cancel fixture must not remove attachments") },
+            )
+        "storage-remove-chat-cancel" ->
+            RemoveChatAttachmentsDialog(
                 onDismiss = { fixture.finish("dismiss") },
                 onConfirm = { error("Cancel fixture must not remove attachments") },
             )

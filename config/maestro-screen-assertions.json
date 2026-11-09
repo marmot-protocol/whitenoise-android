@@ -3751,6 +3751,24 @@
     },
     {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
+      "symbol": "RemoveChatAttachmentsDialog",
+      "bindings": [
+        {
+          "case": "presentation-storage-remove-chat-cancel",
+          "selector": {
+            "id": "confirmation.confirm",
+            "enabled": true
+          },
+          "scope": "Production remove-all-in-chat confirmation without known figures shows an enabled Remove; Cancel dispatches dismissal and no removal.",
+          "entry_assertion": {
+            "text": "Remove all attachments in this chat\\?"
+          },
+          "visible_on_entry": true
+        }
+      ]
+    },
+    {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageDialogs.kt",
       "symbol": "RemoveOlderDialogs",
       "bindings": [
         {
