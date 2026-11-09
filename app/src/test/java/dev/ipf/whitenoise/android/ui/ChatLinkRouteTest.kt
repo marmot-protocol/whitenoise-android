@@ -1,5 +1,7 @@
 package dev.ipf.whitenoise.android.ui
 
+import androidx.compose.runtime.saveable.SaverScope
+import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.notifications.InboundIntentRouting
 import dev.ipf.whitenoise.android.notifications.NotificationNavStep
 import dev.ipf.whitenoise.android.notifications.NotificationTarget
@@ -80,5 +82,42 @@ class ChatLinkRouteTest {
                 availableGroupIds = emptySet(),
             ),
         )
+    }
+
+    @Test
+    fun outcome_failedLookupAsksToRetryInsteadOfSayingNotFound() {
+        assertEquals(ChatLinkOutcome.Notice(R.string.error_try_again), chatLinkOutcome(groupId, null, "acct-a"))
+    }
+
+    @Test
+    fun outcome_noHolderSaysChatNotFound() {
+        assertEquals(
+            ChatLinkOutcome.Notice(R.string.chat_link_not_found),
+            chatLinkOutcome(groupId, emptyList(), "acct-a"),
+        )
+    }
+
+    @Test
+    fun outcome_activeHolderOpensDirectly() {
+        assertEquals(
+            ChatLinkOutcome.Open(chatLinkTarget("acct-b", groupId)),
+            chatLinkOutcome(groupId, listOf("acct-a", "acct-b"), "acct-b"),
+        )
+    }
+
+    @Test
+    fun outcome_severalInactiveHoldersAskWhichAccount() {
+        assertEquals(
+            ChatLinkOutcome.Choose(ChatLinkAccountChoice(groupId, listOf("acct-a", "acct-b"))),
+            chatLinkOutcome(groupId, listOf("acct-a", "acct-b"), "acct-c"),
+        )
+    }
+
+    @Test
+    fun chooserSaver_roundTripsThePendingChoice() {
+        val choice = ChatLinkAccountChoice(groupId, listOf("acct-a", "acct-b"))
+        val saved = with(ChatLinkAccountChoiceSaver) { SaverScope { true }.save(choice) }!!
+        assertEquals(choice, ChatLinkAccountChoiceSaver.restore(saved))
+        assertNull(with(ChatLinkAccountChoiceSaver) { SaverScope { true }.save(null) })
     }
 }

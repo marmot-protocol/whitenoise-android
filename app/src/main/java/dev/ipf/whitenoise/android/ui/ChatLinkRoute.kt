@@ -1,9 +1,9 @@
 package dev.ipf.whitenoise.android.ui
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
-import dev.ipf.whitenoise.android.core.ChatLink
 import dev.ipf.whitenoise.android.core.ChatLinkDestination
 import dev.ipf.whitenoise.android.core.ChatLinkParse
 import dev.ipf.whitenoise.android.core.resolveChatLinkDestination
@@ -46,28 +46,41 @@ internal fun chatLinkTarget(
     )
 
 /**
- * Resolves an inbound link payload as a chat link (#3658). Returns null when the payload is not a chat link, so the
+ * Resolves a parsed inbound link as a chat link (#3658). Returns null when the payload is not a chat link, so the
  * caller keeps its profile-link handling. A malformed or unknown id never produces an [ChatLinkOutcome.Open].
  */
 internal suspend fun resolveChatLinkOutcome(
-    payload: String,
+    link: ChatLinkParse,
     appState: WhiteNoiseAppState,
 ): ChatLinkOutcome? =
-    when (val link = ChatLink.parse(payload)) {
+    when (link) {
         ChatLinkParse.NotChatLink -> null
         ChatLinkParse.Malformed -> ChatLinkOutcome.Notice(R.string.chat_link_invalid)
         is ChatLinkParse.Valid ->
-            when (
-                val destination =
-                    resolveChatLinkDestination(appState.accountsHoldingChat(link.groupIdHex), appState.activeAccountRef)
-            ) {
-                ChatLinkDestination.NotFound -> ChatLinkOutcome.Notice(R.string.chat_link_not_found)
-                is ChatLinkDestination.Open ->
-                    ChatLinkOutcome.Open(chatLinkTarget(destination.accountRef, link.groupIdHex))
-                is ChatLinkDestination.Choose ->
-                    ChatLinkOutcome.Choose(ChatLinkAccountChoice(link.groupIdHex, destination.accountRefs))
-            }
+            chatLinkOutcome(link.groupIdHex, appState.accountsHoldingChat(link.groupIdHex), appState.activeAccountRef)
     }
+
+/** Maps the accounts holding a linked chat to what the root shows; null holders means the lookup failed. */
+internal fun chatLinkOutcome(
+    groupIdHex: String,
+    holders: List<String>?,
+    activeAccountRef: String?,
+): ChatLinkOutcome {
+    holders ?: return ChatLinkOutcome.Notice(R.string.error_try_again)
+    return when (val destination = resolveChatLinkDestination(holders, activeAccountRef)) {
+        ChatLinkDestination.NotFound -> ChatLinkOutcome.Notice(R.string.chat_link_not_found)
+        is ChatLinkDestination.Open -> ChatLinkOutcome.Open(chatLinkTarget(destination.accountRef, groupIdHex))
+        is ChatLinkDestination.Choose ->
+            ChatLinkOutcome.Choose(ChatLinkAccountChoice(groupIdHex, destination.accountRefs))
+    }
+}
+
+/** Keeps a pending account choice across activity recreation, after the link intent itself has been consumed. */
+internal val ChatLinkAccountChoiceSaver: Saver<ChatLinkAccountChoice?, ArrayList<String>> =
+    Saver(
+        save = { choice -> choice?.let { arrayListOf(it.groupIdHex).apply { addAll(it.accountRefs) } } },
+        restore = { saved -> ChatLinkAccountChoice(saved.first(), saved.drop(1)) },
+    )
 
 /** Asks which account should open a chat that several signed-in accounts hold. */
 @Suppress("FunctionNaming")

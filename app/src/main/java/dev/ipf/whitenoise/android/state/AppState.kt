@@ -12242,13 +12242,18 @@ class WhiteNoiseAppState private constructor(
         }
     }
 
-    /** Signed-in accounts whose local chat list holds [groupIdHex], in account order (#3658). */
-    internal suspend fun accountsHoldingChat(groupIdHex: String): List<String> =
-        accounts.filterNot { it.signedOut }.map { it.label }.filter { account ->
-            runCatchingCancellable {
+    /**
+     * Signed-in accounts whose local chat list holds [groupIdHex], in account order (#3658). Null when any read
+     * fails, so a storage error is never reported as a missing chat or skips an account the user could pick.
+     */
+    internal suspend fun accountsHoldingChat(groupIdHex: String): List<String>? =
+        runCatchingCancellable {
+            accounts.filterNot { it.signedOut }.map { it.label }.filter { account ->
                 marmotIo(MarmotTraceSection.CHAT_ROW_READ) { chatListRow(account, groupIdHex) }
-            }.getOrNull()?.groupIdHex.equals(groupIdHex, ignoreCase = true)
-        }
+                    ?.groupIdHex
+                    .equals(groupIdHex, ignoreCase = true)
+            }
+        }.getOrNull()
 
     fun presentProfilePayload(raw: String): Boolean {
         val link = ProfileLink.parse(raw) ?: return false

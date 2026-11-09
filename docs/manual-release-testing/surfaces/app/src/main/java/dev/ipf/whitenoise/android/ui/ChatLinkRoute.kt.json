@@ -34,6 +34,14 @@
         "test_ids": [
           "SYS-015"
         ]
+      },
+      {
+        "surface": "R.string.error_try_again",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/ChatLinkRoute.kt",
+        "anchor": "R.string.error_try_again",
+        "test_ids": [
+          "SYS-015"
+        ]
       }
     ]
   },

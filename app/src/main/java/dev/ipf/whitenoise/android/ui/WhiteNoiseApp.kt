@@ -31,6 +31,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -467,7 +468,7 @@ internal fun WhiteNoiseApp(
     // Snackbars time out here, at the root, so a slot that is hidden by app lock or replaced by a modal
     // cannot pause the clock and show a confirmation for its full length a second time.
     TopNoticeSnackbarTimeoutEffect(snackbarHostState)
-    var chatLinkChoice by remember { mutableStateOf<ChatLinkAccountChoice?>(null) }
+    var chatLinkChoice by rememberSaveable(stateSaver = ChatLinkAccountChoiceSaver) { mutableStateOf(null) }
     LaunchedEffect(
         inboundProfilePayload,
         appState.phase,
@@ -476,21 +477,19 @@ internal fun WhiteNoiseApp(
     ) {
         val payload = inboundProfilePayload ?: return@LaunchedEffect
         if (appState.phase != AppPhase.Ready) return@LaunchedEffect
-        // A chat link reads which accounts hold the chat and may say so; neither happens under app lock (#3658).
-        val chatLinkMayResolve = !appState.appLockScreenVisible && !appState.appUnlockEvaluationPending
-        if (chatLinkMayResolve) {
-            val outcome = resolveChatLinkOutcome(payload, appState)
-            if (outcome != null) {
-                when (outcome) {
-                    is ChatLinkOutcome.Open -> Unit
-                    is ChatLinkOutcome.Choose -> chatLinkChoice = outcome.choice
-                    is ChatLinkOutcome.Notice -> appState.present(outcome.messageRes)
-                }
-                onProfilePayloadHandled(payload)
-                return@LaunchedEffect onChatLinkResolved(payload, (outcome as? ChatLinkOutcome.Open)?.target)
+        val chatLink = ChatLink.parse(payload)
+        if (chatLink != ChatLinkParse.NotChatLink) {
+            // A chat link reads which accounts hold the chat and may say so; neither happens under app lock (#3658).
+            // A key change cancels this read, so a late result cannot act on a newer link or a locked app.
+            if (appState.appLockScreenVisible || appState.appUnlockEvaluationPending) return@LaunchedEffect
+            val outcome = resolveChatLinkOutcome(chatLink, appState) ?: return@LaunchedEffect
+            when (outcome) {
+                is ChatLinkOutcome.Open -> Unit
+                is ChatLinkOutcome.Choose -> chatLinkChoice = outcome.choice
+                is ChatLinkOutcome.Notice -> appState.present(outcome.messageRes)
             }
-        } else if (ChatLink.parse(payload) != ChatLinkParse.NotChatLink) {
-            return@LaunchedEffect
+            onProfilePayloadHandled(payload)
+            return@LaunchedEffect onChatLinkResolved(payload, (outcome as? ChatLinkOutcome.Open)?.target)
         }
         if (appState.presentProfilePayload(payload)) {
             appState.recordProductObservation(ProductObservation.PROFILE_ENTRY, profileEntryTicket)

@@ -4660,6 +4660,12 @@
       ]
     },
     {
+      "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/ChatLinkRoute.kt",
+      "symbol": "ChatLinkAccountChooserDialog",
+      "bindings": [],
+      "remaining": "Needs a fixture where two signed-in accounts other than the active one hold the same chat, then a marmot://chat link to it; screenshot and route tests cover the dialog and the chosen target until then."
+    },
+    {
       "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
       "symbol": "ChatDepartureSuccessor",
       "bindings": [
