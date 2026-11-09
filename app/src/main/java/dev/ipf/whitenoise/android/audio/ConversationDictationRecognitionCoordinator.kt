@@ -154,6 +154,45 @@ internal class ConversationDictationRecognitionCoordinator {
         }
     }
 
+    /** The kind of provider failure on the final caller-audio chunk after an explicit finish. */
+    internal enum class TailFault {
+        /** NoSpeech, NoMatch or a blank final result. */
+        Empty,
+
+        /** A retryable provider fault such as a disconnect, busy recognizer or network error. */
+        Transient,
+
+        /** The provider stopped answering within the generation deadline. */
+        TimedOut,
+    }
+
+    /** The final chunk of a finished capture whose recognition failed. */
+    internal data class TailInput(
+        val chunkId: Long?,
+        val finalChunk: Boolean,
+        val chunkHasSpeech: Boolean?,
+        val tailMillis: Long?,
+        val fault: TailFault,
+    )
+
+    /**
+     * Decides whether a failing final chunk may be skipped so recognized text can still be delivered.
+     *
+     * The audio after the last recognized sentence is usually breath, room noise or the Send tap.
+     * Holding the whole message for it turns a successful dictation into a draft. Earlier chunks,
+     * long tails with real speech and first transient faults still take the bounded retry path.
+     */
+    fun shouldDropFinalTail(input: TailInput): Boolean {
+        if (!input.finalChunk) return false
+        val priorFailures = retry?.takeIf { it.chunkId == input.chunkId }?.attempts ?: 0
+        val shortTail = input.tailMillis != null && input.tailMillis <= SHORT_FINAL_TAIL_MILLIS
+        return when (input.fault) {
+            TailFault.Empty -> input.chunkHasSpeech == false || priorFailures >= 1
+            TailFault.Transient -> shortTail && priorFailures >= 1
+            TailFault.TimedOut -> shortTail
+        }
+    }
+
     fun resetFailure() {
         retry = null
     }
@@ -171,5 +210,10 @@ internal class ConversationDictationRecognitionCoordinator {
         spans.clear()
         nextProviderSpanId = -1L
         retry = null
+    }
+
+    internal companion object {
+        /** Final chunks up to this length hold at most a short trailing phrase. */
+        const val SHORT_FINAL_TAIL_MILLIS = 1_500L
     }
 }

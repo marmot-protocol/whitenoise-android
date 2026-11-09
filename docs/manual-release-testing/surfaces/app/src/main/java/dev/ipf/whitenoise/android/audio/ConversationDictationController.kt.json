@@ -246,6 +246,22 @@
         "test_ids": [
           "DIC-002"
         ]
+      },
+      {
+        "surface": "Send and Paste deliver recognized text past an empty, transient or stalled final caller-audio tail",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "private fun dropFinalTailIfSafe(",
+        "test_ids": [
+          "DIC-012"
+        ]
+      },
+      {
+        "surface": "Audio focus loss after Send or Paste continues the chosen completion",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/audio/ConversationDictationController.kt",
+        "anchor": "event=audio_focus_lost_after_finish",
+        "test_ids": [
+          "DIC-012"
+        ]
       }
     ]
   },
