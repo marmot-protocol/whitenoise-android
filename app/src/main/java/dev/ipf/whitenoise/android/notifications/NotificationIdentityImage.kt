@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.os.Bundle
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationCompat.Builder
 
 /** Bundle holding the identity snapshot's monogram inputs and, for a direct chat, the contact that owns it. */
 internal const val EXTRA_IDENTITY_IMAGE = "dev.ipf.whitenoise.android.notify.identity_image"
@@ -132,7 +133,10 @@ internal fun Notification.recordedIdentityInputs(): Pair<String, String>? =
  * native conversation template draws it in the conversation circle. Android owns the remaining small app
  * attribution and exact geometry; the app adds no separate trailing image view.
  */
-internal fun NotificationCompat.Builder.setConversationIdentityImage(image: NotificationIdentityImage) = setLargeIcon(image.bitmap).recordIdentityImage(image)
+internal fun Builder.setConversationIdentityImage(image: NotificationIdentityImage): Builder {
+    val builder = setLargeIcon(image.bitmap)
+    return builder.recordIdentityImage(image)
+}
 
 /** Retains refresh inputs for a native reaction, whose avatar pixels live in the sender Person. */
 internal fun NotificationCompat.Builder.recordIdentityImage(image: NotificationIdentityImage) =
