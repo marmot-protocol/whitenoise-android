@@ -63,8 +63,10 @@ class NotificationReactorPictureTest {
             assertEquals(update.sender.accountIdHex, line.person?.key)
             val avatar = line.person?.icon?.loadDrawable(context)
             assertEquals(Color.RED, avatar?.toBitmap()?.getPixel(0, 0))
-            assertEquals(content(update).conversationTitle, style.conversationTitle)
-            assertTrue(style.isGroupConversation)
+            assertEquals(content(update).title, line.person?.name)
+            assertEquals(content(update).title, shortcut.longLabel)
+            assertNull(style.conversationTitle)
+            assertFalse(style.isGroupConversation)
             assertEquals(shortcut.id, card.shortcutId)
             assertEquals(reactionConversationShortcutId(update.accountRef, update.groupIdHex), shortcut.id)
             assertTrue(shortcut.categories.isNullOrEmpty())
@@ -161,21 +163,19 @@ class NotificationReactorPictureTest {
             assertEquals(NotificationChannelSpec.REACTIONS.id, card.channelId)
         }
 
-    /** A group photo arriving on its own refreshes the header without replacing the reactor row or card. */
+    /** A group photo never rewrites a reaction card, whose only picture belongs to the actor. */
     @Test
-    fun lateGroupPhotoRefreshesTheNativeReactionHeader() =
+    fun lateGroupPhotoLeavesTheReactionCardAlone() =
         runBlocking {
             val posts = mutableListOf<Notification>()
             val shortcuts = mutableListOf<ShortcutInfoCompat>()
             val presenter = presenter(posts, shortcutPublisher = { shortcuts.add(it) })
             val update = reaction("👍")
             val actorPicture = solid(Color.RED)
+            var groupPictureRequested = false
             assertTrue(show(presenter, update, picture = actorPicture))
-            val before = liveCard()
-            val header = content(update).conversationTitle
-            val groupPicture = solid(Color.BLUE)
 
-            assertTrue(
+            assertFalse(
                 presenter.refreshLateIdentityImage(
                     update,
                     content(update),
@@ -184,33 +184,19 @@ class NotificationReactorPictureTest {
                         null,
                         actorPicture,
                         null,
-                        conversationLoader = { groupPicture },
+                        conversationLoader = {
+                            groupPictureRequested = true
+                            solid(Color.BLUE)
+                        },
                     ),
                     directShareEligible = true,
                     isRefreshCurrent = { true },
                 ),
             )
 
-            assertEquals(2, posts.size)
-            assertEquals(2, shortcuts.size)
-            val shortcut = shortcuts.last()
-            assertEquals(before.shortcutId, shortcut.id)
-            assertEquals(header, shortcut.longLabel)
-            assertTrue(shortcut.categories.isNullOrEmpty())
-            val icon = checkNotNull(shortcut.icon?.loadDrawable(context)).toBitmap(PICTURE_PX, PICTURE_PX)
-            assertEquals(Color.BLUE, icon.getPixel(PICTURE_PX / 2, PICTURE_PX / 2))
-            val after = liveCard()
-            val style = checkNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(after))
-            val line = style.messages.single()
-            val actor = line.person?.icon?.loadDrawable(context)
-            assertEquals(Color.RED, actor?.toBitmap()?.getPixel(0, 0))
-            assertEquals(header, style.conversationTitle)
-            assertEquals(content(update).body, line.text.toString())
-            assertEquals(before.shortcutId, after.shortcutId)
-            assertEquals(before.channelId, after.channelId)
-            assertEquals(before.group, after.group)
-            assertEquals(before.`when`, after.`when`)
-            assertTrue(after.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
+            assertFalse(groupPictureRequested)
+            assertEquals(1, posts.size)
+            assertEquals(1, shortcuts.size)
         }
 
     /** A late picture never reaches a reaction card that was dismissed meanwhile. */

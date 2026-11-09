@@ -91,4 +91,10 @@ internal fun notificationSenderPerson(
             if (!redacted) avatarBitmap?.let { setIcon(IconCompat.createWithBitmap(it)) }
         }.build()
 
+/** Uses the existing reaction title, including group context, as the actor's single header label. */
+internal fun reactionSenderPerson(
+    content: LocalNotificationContent,
+    avatarBitmap: Bitmap?,
+): Person = notificationSenderPerson(content.copy(senderName = content.title), avatarBitmap)
+
 private const val NOTIFICATION_MONOGRAM_SIZE_PX = 128

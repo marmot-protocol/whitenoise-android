@@ -358,29 +358,23 @@ internal class NotificationConversationShortcuts(
         }.getOrDefault(emptySet())
 }
 
-/** Holds a notification-only shortcut with the chat's header and a separate reactor row. */
+/** Holds a notification-only shortcut with the same title as the reaction card. */
 internal fun NotificationConversationShortcuts.publishReactionShortcut(
     update: NotificationUpdateFfi,
     content: LocalNotificationContent,
     shortcutId: String,
-    groupTitle: String?,
-    groupAvatar: Bitmap?,
     isPublishAllowed: () -> Boolean,
 ): Boolean =
     publishConversationShortcut(
         update,
-        content.copy(
-            title = groupTitle ?: content.senderName,
-            conversationTitle = groupTitle,
-            isGroupConversation = groupTitle != null,
-        ),
+        content.copy(conversationTitle = null, isGroupConversation = false),
         shortcutId,
         LocusIdCompat(shortcutId),
         conversationAvatarUrl = null,
-        conversationAvatarBitmap = groupAvatar,
+        conversationAvatarBitmap = null,
         senderAvatarUrl = null,
         senderAvatarBitmap = null,
-        sender = notificationSenderPerson(content, null),
+        sender = reactionSenderPerson(content, null),
         directShareEligible = false,
         isPublishAllowed = isPublishAllowed,
         holdForPost = true,

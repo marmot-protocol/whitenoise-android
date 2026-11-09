@@ -68,7 +68,7 @@ internal class NotificationCardContent(
      */
     fun reactorPictureNotification(
         active: Notification,
-        reactor: NotificationIdentityImage?,
+        reactor: NotificationIdentityImage,
     ): Notification {
         val builder =
             NotificationCompat
@@ -76,13 +76,11 @@ internal class NotificationCardContent(
                 .setGroupAlertBehavior(active.groupAlertBehavior)
                 .setOnlyAlertOnce(true)
                 .keepingCustomViews(active)
-        if (reactor != null) {
-            val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(active)
-            if (style == null) builder.setConversationIdentityImage(reactor)
-            style?.messages?.singleOrNull()?.person?.let { person ->
-                val sender = contactAvatarPerson(person, reactor.bitmap)
-                builder.setStyle(copiedMessagingStyle(style, sender, repaint = true))
-            }
+        val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(active)
+        if (style == null) builder.setConversationIdentityImage(reactor)
+        style?.messages?.singleOrNull()?.person?.let { person ->
+            val sender = contactAvatarPerson(person, reactor.bitmap)
+            builder.setStyle(copiedMessagingStyle(style, sender, repaint = true))
         }
         return builder.build()
     }
@@ -101,13 +99,18 @@ internal class NotificationCardContent(
         return copiedMessagingStyle(existing, enrichedSender, repaint = true)
     }
 
-    /** Rebuilds an active card only when a stable sender key can be relabeled safely. */
+    /**
+     * Relabels active message senders by stable key. Reaction cards keep their event title and matching shortcut label.
+     */
     fun renamedSenderNotification(
         notification: Notification,
         senderAccountIdHex: String,
         senderName: String,
     ): Notification? =
-        if (notification.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true) {
+        if (
+            notification.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true ||
+            notification.shortcutId?.let(::isReactionShortcutId) == true
+        ) {
             null
         } else {
             NotificationCompat.MessagingStyle
@@ -316,11 +319,10 @@ internal class NotificationCardContent(
         }
 }
 
-/** A reaction uses the native message layout for a single actor and owns its own card and channel. */
+/** Uses the single-sender template so the actor's picture sits next to the existing reaction title. */
 internal fun reactionStyle(
     content: LocalNotificationContent,
     reactor: NotificationIdentityImage,
-    groupTitle: String?,
     timestampMs: Long,
 ): NotificationCompat.MessagingStyle {
     val self =
@@ -329,10 +331,9 @@ internal fun reactionStyle(
             .setName(content.selfName)
             .setKey(content.selfKey)
             .build()
-    val sender = notificationSenderPerson(content, reactor.bitmap)
+    val sender = reactionSenderPerson(content, reactor.bitmap)
     return NotificationCompat
         .MessagingStyle(self)
-        .setConversationTitle(groupTitle)
-        .setGroupConversation(groupTitle != null)
+        .setGroupConversation(false)
         .addMessage(content.body, timestampMs, sender)
 }

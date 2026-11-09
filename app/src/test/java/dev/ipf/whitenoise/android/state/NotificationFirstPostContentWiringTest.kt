@@ -91,7 +91,6 @@ class NotificationFirstPostContentWiringTest {
             "firstPost.content ?:" !in enrichment &&
                 "notificationContentResolution.firstPost.resolve(candidate, localOnly = false)" in enrichment,
         )
-        assertNativeGroupDecisionBeforePreWarm(source)
         val pictureRefresh = source.functionBody("refreshLateNotificationIdentity")
         assertTrue(
             "the late-picture refresh keeps the late-correction fences",
@@ -105,18 +104,6 @@ class NotificationFirstPostContentWiringTest {
             "the late-picture refresh runs after the enrichment permit is released",
             "refreshLateNotificationIdentity(" !in permit &&
                 schedule.indexOf("refreshLateNotificationIdentity(") > permitStart + permit.length,
-        )
-    }
-
-    /** Keeps the group photo lookup behind the live native reaction check. */
-    private fun assertNativeGroupDecisionBeforePreWarm(source: String) {
-        val lateIdentity = source.functionBody("prepareLateNotificationIdentity")
-        val nativeGroupCheck = lateIdentity.indexOf("localNotificationPresenter.hasNativeGroupReaction(")
-        val avatarPreWarm = lateIdentity.indexOf("notificationAvatarCoordinator.preWarm(")
-        assertTrue(
-            "post-write prewarm must resolve the group header only after it knows the native reaction is live",
-            nativeGroupCheck in 0 until avatarPreWarm &&
-                "nativeGroupReaction" in lateIdentity.substring(avatarPreWarm),
         )
     }
 

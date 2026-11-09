@@ -671,7 +671,6 @@ class LocalNotificationPresenter(
                     builder.addExtras(contactPictureAccountExtras(update.accountRef))
                     var messagingPost: MessagingPostContext? = null
                     var reactorIdentity: NotificationIdentityImage? = null
-                    val reactionGroupTitle = notificationContent.conversationTitle.takeIf { identityContact == null }
                     when (val style = decision.style) {
                         // Reactions get their own self-contained card (own tag/id on the
                         // reactions channel, see LocalNotificationFormatter) so they're muted
@@ -821,12 +820,7 @@ class LocalNotificationPresenter(
                                 profileAllowsPost() && showGenerationAllowsPost()
                             }
                         } ?: reactorIdentity?.let {
-                            publishReactionShortcutBeforePost(
-                                update,
-                                notificationContent,
-                                reactionGroupTitle,
-                                conversationAvatarBitmap.takeIf { reactionGroupTitle != null },
-                            ) {
+                            publishReactionShortcutBeforePost(update, notificationContent) {
                                 profileAllowsPost() && showGenerationAllowsPost()
                             }?.also(builder::setShortcutId)
                         }
@@ -1052,7 +1046,6 @@ class LocalNotificationPresenter(
                                                 reactionStyle(
                                                     notificationContent,
                                                     reactor,
-                                                    reactionGroupTitle,
                                                     presentationTimestampMs,
                                                 ),
                                             )
@@ -1225,8 +1218,6 @@ class LocalNotificationPresenter(
     private suspend fun publishReactionShortcutBeforePost(
         update: NotificationUpdateFfi,
         content: LocalNotificationContent,
-        groupTitle: String?,
-        groupAvatar: Bitmap?,
         isPublishAllowed: () -> Boolean,
     ): String? {
         val id =
@@ -1238,8 +1229,6 @@ class LocalNotificationPresenter(
                     update,
                     content,
                     id,
-                    groupTitle,
-                    groupAvatar,
                     isPublishAllowed,
                 )
             }
@@ -1511,7 +1500,7 @@ class LocalNotificationPresenter(
             val refreshable = { isRefreshCurrent() && refreshableIdentityCard(update, content) != null }
             val card = refreshableIdentityCard(update, content)?.notification?.takeIf { isRefreshCurrent() }
             val sources =
-                if (content.isReactionPreview && card?.reactionGroupHeaderTitle() == null) {
+                if (content.isReactionPreview) {
                     pictures.copy(
                         conversationBitmap = null,
                         conversationUrl = null,
@@ -1621,22 +1610,6 @@ class LocalNotificationPresenter(
         }
     }
 
-    /** Only a live native group reaction can use the conversation picture sources. */
-    internal fun hasNativeGroupReaction(
-        update: NotificationUpdateFfi,
-        content: LocalNotificationContent,
-    ): Boolean = refreshableIdentityCard(update, content)?.notification?.reactionGroupHeaderTitle() != null
-
-    /** Reads the posted group title; a legacy or direct reaction has no group picture slot. */
-    private fun Notification.reactionGroupHeaderTitle(): String? {
-        if (shortcutId?.let(::isReactionShortcutId) != true) return null
-        return NotificationCompat.MessagingStyle
-            .extractMessagingStyleFromNotification(this)
-            ?.takeIf { it.isGroupConversation }
-            ?.conversationTitle
-            ?.toString()
-    }
-
     /**
      * Republishes the conversation shortcut with the late pictures and rewrites [live] through the enrichment rewrite.
      * The card keeps its own sender Person, so a sender renamed since the post keeps the new name, and its recorded
@@ -1686,52 +1659,17 @@ class LocalNotificationPresenter(
         } == true
     }
 
-    /**
-     * Refreshes the native reaction's group shortcut and/or reactor row. A legacy reaction can refresh only the
-     * reactor, and retains its artwork. Neither path changes the live card's text, channel or grouping.
-     */
+    /** Refreshes only the reactor's picture, retaining the live card's layout, artwork and grouping. */
     private fun rewriteWithLateReactorPicture(
         refresh: LateIdentityRefresh,
         live: StatusBarNotification,
         sources: NotificationIdentityPictureSources,
     ): Boolean {
-        val card = live.notification
-        val (groupPicture, reactorPicture) = refresh.pictures
-        val reactor = reactorPicture?.takeUnless { it === sources.senderBitmap }?.let(refresh.content::reactorImage)
-        val heldShortcutId =
-            groupPicture
-                ?.takeUnless { it.sameAs(sources.conversationBitmap) }
-                ?.let { holdLateReactionGroupShortcut(refresh, card, it) }
-        return try {
-            (heldShortcutId != null || reactor != null) &&
-                postLateIdentityRewrite(refresh, live, cardContent.reactorPictureNotification(card, reactor))
-        } finally {
-            heldShortcutId?.let(InFlightConversationShortcuts::release)
-        }
-    }
-
-    /** Updates only the live reaction shortcut and holds it until the card has picked up its new icon. */
-    private fun holdLateReactionGroupShortcut(
-        refresh: LateIdentityRefresh,
-        card: Notification,
-        groupPicture: Bitmap,
-    ): String? {
-        val title = card.reactionGroupHeaderTitle()
-        val shortcutId = card.shortcutId
-        if (title == null || shortcutId == null) return null
-        val held =
-            conversationShortcuts.publishReactionShortcut(
-                refresh.update,
-                refresh.content,
-                shortcutId,
-                title,
-                groupPicture,
-            ) {
-                refresh.isCurrent() &&
-                    refreshableIdentityCard(refresh.update, refresh.content) != null &&
-                    publisher.canPublishPreviewShortcut(refresh.content, card)
-            }
-        return shortcutId.takeIf { held }
+        val reactor =
+            refresh.pictures.second
+                ?.takeUnless { it === sources.senderBitmap }
+                ?.let(refresh.content::reactorImage) ?: return false
+        return postLateIdentityRewrite(refresh, live, cardContent.reactorPictureNotification(live.notification, reactor))
     }
 
     /** Writes one late picture rewrite over the same live card, under the refresh's fences up to the platform write. */

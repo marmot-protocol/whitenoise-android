@@ -524,11 +524,10 @@ internal class NotificationAvatarCoordinator(
     private val senderAvatarUrl: suspend (NotificationUpdateFfi) -> String?,
     private val groupAvatarUrl: suspend (NotificationUpdateFfi) -> String?,
 ) {
-    /** Warms pictures after the first write; only a native group reaction has a group header to warm. */
+    /** Warms the pictures used by the posted card; a reaction needs only its sender's picture. */
     suspend fun preWarm(
         update: NotificationUpdateFfi,
         engineMuted: Boolean,
-        nativeGroupReaction: Boolean = false,
     ): PreWarmedNotificationAvatars {
         val eligible =
             shouldPreWarmNotificationAvatars(
@@ -551,7 +550,7 @@ internal class NotificationAvatarCoordinator(
             }
         preWarmIfUnlocked(sender, published)
         val group =
-            if (target.resolveGroupAvatar || (nativeGroupReaction && !appLocked())) {
+            if (target.resolveGroupAvatar) {
                 bestEffort { groupAvatarUrl(update) }
             } else {
                 null

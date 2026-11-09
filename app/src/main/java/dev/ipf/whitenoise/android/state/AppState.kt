@@ -13392,8 +13392,7 @@ class WhiteNoiseAppState private constructor(
      * sender picture on an account whose chat list was not loaded. The row's
      * peer, whose private picture the row shows instead, is carried along so
      * the rewrite records them. A missing sender picture gets a loader with
-     * the late refresh's longer bound. Reactions also draw the group image
-     * when Android rendered the reaction with a native group header.
+     * the late refresh's longer bound. Reaction cards show only the reactor's picture.
      */
     private suspend fun prepareLateNotificationIdentity(
         update: NotificationUpdateFfi,
@@ -13403,10 +13402,7 @@ class WhiteNoiseAppState private constructor(
         if (content == null) return null
         val reaction = LocalNotificationFormatter.isReaction(update)
         val isDm = !content.isGroupConversation
-        val nativeGroupReaction =
-            reaction && !isDm && localNotificationPresenter.hasNativeGroupReaction(update, content)
-        val reactorOnly = reaction && !nativeGroupReaction
-        val warmed = notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted, nativeGroupReaction)
+        val warmed = notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted)
         val pictures =
             firstPost.avatars
                 .lateIdentitySources(
@@ -13416,10 +13412,10 @@ class WhiteNoiseAppState private constructor(
                         .notificationConversationDomain(update),
                     dev.ipf.whitenoise.android.notifications
                         .notificationSenderDomain(update),
-                    reactorOnly = reactorOnly,
+                    reactorOnly = reaction,
                 ).withLateLoaders(
                     isDm = isDm,
-                    reactorOnly = reactorOnly,
+                    reactorOnly = reaction,
                     storedShown = firstPost.avatars.storedConversationBitmap != null,
                     row = {
                         storedConversationIdentity(update)?.takeUnless { reaction && it.contact != null }
