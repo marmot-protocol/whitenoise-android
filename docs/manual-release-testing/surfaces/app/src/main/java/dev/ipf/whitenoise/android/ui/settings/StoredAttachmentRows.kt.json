@@ -1,0 +1,55 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentRows.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "StoredAttachmentPreview",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentRows.kt",
+        "anchor": "fun StoredAttachmentPreview(",
+        "test_ids": [
+          "SET-048",
+          "SET-049"
+        ]
+      },
+      {
+        "surface": "StoredAttachmentRow",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentRows.kt",
+        "anchor": "fun StoredAttachmentRow(",
+        "test_ids": [
+          "SET-048",
+          "SET-049"
+        ]
+      }
+    ],
+    "settings_controls": [
+      {
+        "surface": "string:storage_attachments_failed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentRows.kt",
+        "anchor": "R.string.storage_attachments_failed",
+        "test_ids": [
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_largest_first",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentRows.kt",
+        "anchor": "R.string.storage_largest_first",
+        "test_ids": [
+          "SET-048",
+          "SET-049"
+        ]
+      },
+      {
+        "surface": "string:storage_no_attachments",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentRows.kt",
+        "anchor": "R.string.storage_no_attachments",
+        "test_ids": [
+          "SET-048",
+          "SET-049"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

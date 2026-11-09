@@ -1,0 +1,13 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-storage-remove-attachments-cancel
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible:
+    text: Remove 3 attachments\?
+- assertVisible:
+    id: confirmation.confirm
+    enabled: true
+- tapOn:
+    id: confirmation.cancel
+- assertVisible:
+    id: presentation.complete
