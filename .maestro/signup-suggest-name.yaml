@@ -20,8 +20,12 @@ name: signup-suggest-name
     element:
       id: "onboarding.sign_up.name"
     direction: DOWN
+- copyTextFrom:
+    id: "onboarding.sign_up.name"
+- assertTrue: ${maestro.copiedText.length > 0}
 - tapOn:
     id: "onboarding.sign_up.name"
+- eraseText
 - inputText: "Maestro custom name"
 - hideKeyboard
 - tapOn:
