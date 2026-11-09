@@ -38,6 +38,15 @@ import dev.ipf.whitenoise.android.ui.common.controlMorphSurface
  */
 internal enum class ComposerFabEndpoint { Composer, NewMessage, GroupMembers }
 
+/**
+ * Where the composer/pen container lands for an open chat. Only group details have a members section
+ * to open into; direct-message details and the transcript keep the composer.
+ */
+internal fun openChatComposerFabEndpoint(
+    isDm: Boolean,
+    showDetails: Boolean,
+): ComposerFabEndpoint = if (showDetails && !isDm) ComposerFabEndpoint.GroupMembers else ComposerFabEndpoint.Composer
+
 internal val LocalComposerFabHandoff = staticCompositionLocalOf<MeasuredControlHandoff?> { null }
 
 /** Retains only the last measured composer height across the account-owned route handoff. */

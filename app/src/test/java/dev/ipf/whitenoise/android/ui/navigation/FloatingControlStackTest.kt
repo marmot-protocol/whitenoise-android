@@ -35,7 +35,10 @@ class FloatingControlStackTest {
     @Test
     fun liftNeverCarriesTheControlAboveItsParent() {
         val capsule = Rect(200f, 100f, 360f, 760f)
-        assertEquals(50, floatingControlStackClearancePx(jump, capsule, obstacleTop = null, gapPx = GAP, topLimit = 650f))
+        assertEquals(
+            50,
+            floatingControlStackClearancePx(jump, capsule, obstacleTop = null, gapPx = GAP, topLimit = 650f),
+        )
     }
 
     @Test
@@ -57,5 +60,12 @@ class FloatingControlStackTest {
 
     private companion object {
         const val GAP = 8f
+    }
+
+    @Test
+    fun onlyGroupDetailsReceiveTheComposerAsTheMembersSection() {
+        assertEquals(ComposerFabEndpoint.GroupMembers, openChatComposerFabEndpoint(isDm = false, showDetails = true))
+        assertEquals(ComposerFabEndpoint.Composer, openChatComposerFabEndpoint(isDm = true, showDetails = true))
+        assertEquals(ComposerFabEndpoint.Composer, openChatComposerFabEndpoint(isDm = false, showDetails = false))
     }
 }

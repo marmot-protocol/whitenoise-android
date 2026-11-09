@@ -3063,7 +3063,11 @@ internal fun ChatListJumpToTopButton(
             modifier = Modifier.size(34.dp),
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(painterResource(R.drawable.ic_jump_to_edge), contentDescription = null, modifier = Modifier.size(16.dp))
+                Icon(
+                    painterResource(R.drawable.ic_jump_to_edge),
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                )
             }
         }
     }

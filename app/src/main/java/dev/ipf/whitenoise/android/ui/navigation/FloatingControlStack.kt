@@ -109,9 +109,10 @@ private val InertControl =
  *
  * The read is one-way — the overlay never registers as an obstacle, so the capsule cannot chase the
  * overlay it just moved. Rising to clear new chrome happens in the same frame; settling back down glides
- * on the floating control clock, and reduced motion settles at once. It never carries the overlay above its parent's top edge: when a tall capsule
- * leaves too little room — recovery text with the keyboard open, a short landscape window — the overlay
- * rises only as far as its parent allows rather than leaving the screen.
+ * on the floating control clock, and reduced motion settles at once. It never carries the overlay above
+ * its parent's top edge: when a tall capsule leaves too little room — recovery text with the keyboard
+ * open, a short landscape window — the overlay rises only as far as its parent allows rather than
+ * leaving the screen.
  */
 @Composable
 internal fun Modifier.floatingDictationCapsuleClearance(
@@ -135,7 +136,8 @@ internal fun Modifier.floatingDictationCapsuleClearance(
                     floatingControlStackClearancePx(
                         overlay = overlay,
                         capsule = anchor.floatingCapsuleBounds,
-                        obstacleTop = if (clearColumnObstacles) anchor.topInColumn(overlay.left, overlay.right) else null,
+                        obstacleTop =
+                            if (clearColumnObstacles) anchor.topInColumn(overlay.left, overlay.right) else null,
                         gapPx = gap.toPx(),
                         topLimit = coordinates?.parentLayoutCoordinates?.positionInWindow()?.y ?: origin.y,
                     )
@@ -184,9 +186,9 @@ internal fun floatingControlStackClearancePx(
     gapPx: Float,
     topLimit: Float = Float.NEGATIVE_INFINITY,
 ): Int {
-    if (overlay.width <= 0f) return 0
     val capsuleTop = capsule?.takeIf { overlay.left < it.right && overlay.right > it.left }?.top
-    val ceiling = listOfNotNull(capsuleTop, obstacleTop).minOrNull() ?: return 0
+    val ceiling = listOfNotNull(capsuleTop, obstacleTop).minOrNull()
+    if (overlay.width <= 0f || ceiling == null) return 0
     val wanted = ceil(overlay.bottom + gapPx - ceiling).toInt().coerceAtLeast(0)
     val room = (overlay.top - topLimit).toInt().coerceAtLeast(0)
     return minOf(wanted, room)

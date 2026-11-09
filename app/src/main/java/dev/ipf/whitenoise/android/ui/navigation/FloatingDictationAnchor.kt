@@ -137,15 +137,26 @@ internal class FloatingDictationAnchor {
         bounds
             .filter { (_, rect) -> rect.left < right && rect.right > left }
             .minOfOrNull { (token, rect) ->
-                if (composerFabObstacles[token] == true && movingComposerFab != null) movingComposerFab.top else rect.top
+                if (composerFabObstacles[token] == true && movingComposerFab != null) {
+                    movingComposerFab.top
+                } else {
+                    rect.top
+                }
             }
 
     /**
-     * Changes whenever an obstacle registers or leaves, but not when one merely moves. The capsule
-     * glides on the floating control clock only for these appear/leave steps; a moving obstacle such
-     * as the keyboard or a scrolling footer keeps carrying it frame by frame.
+     * Changes whenever an in-route obstacle such as a notice or footer registers or leaves, but not when
+     * one merely moves. The capsule glides on the floating control clock only for these appear/leave
+     * steps; a moving obstacle such as the keyboard or a scrolling footer keeps carrying it frame by frame.
      */
     var obstacleGeneration: Int = 0
+        private set
+
+    /**
+     * Changes whenever a pen or composer registers or leaves. Those swap with the route, where the
+     * navigation handoff owns the capsule's path, so the capsule follows them without its own glide.
+     */
+    var routeChromeGeneration: Int = 0
         private set
 
     /** Registers a visible obstacle and whether its painted edge follows the composer/FAB bridge. */
@@ -155,7 +166,7 @@ internal class FloatingDictationAnchor {
         followsComposerFab: Boolean = false,
     ) {
         if (visibleBounds.width > 0f && visibleBounds.height > 0f) {
-            if (token !in bounds) obstacleGeneration++
+            if (token !in bounds) bumpGeneration(followsComposerFab)
             bounds[token] = visibleBounds
             composerFabObstacles[token] = followsComposerFab
         } else {
@@ -178,11 +189,15 @@ internal class FloatingDictationAnchor {
     }
 
     fun remove(token: Any) {
-        if (bounds.remove(token) != null) obstacleGeneration++
-        composerFabObstacles.remove(token)
+        val followedComposerFab = composerFabObstacles.remove(token) == true
+        if (bounds.remove(token) != null) bumpGeneration(followedComposerFab)
         footerViewports.remove(token)
         capsuleSlots.remove(token)
         footerScrolls.remove(token)
+    }
+
+    private fun bumpGeneration(routeChrome: Boolean) {
+        if (routeChrome) routeChromeGeneration++ else obstacleGeneration++
     }
 }
 
@@ -443,6 +458,7 @@ internal fun FloatingDictationLayout(
                     settle.offsetFor(
                         y = y,
                         generation = anchor.obstacleGeneration,
+                        routeGeneration = anchor.routeChromeGeneration,
                         follow = inlineControl || scrolling != null || controlMotion?.active == true,
                     )
                 val owner =
@@ -500,29 +516,41 @@ private class CapsuleSettle(
     private val offset = Animatable(0f)
     private var lastY: Int? = null
     private var lastGeneration = 0
+    private var lastRouteGeneration = 0
 
-    /** Layer offset to paint at for a capsule placed at [y]; reading it subscribes the layer only. */
+    /**
+     * Layer offset to paint at for a capsule placed at [y]. A route chrome change or [follow] drops any
+     * glide at once, so navigation and its handoff alone own the capsule's path.
+     */
     fun offsetFor(
         y: Int,
         generation: Int,
+        routeGeneration: Int,
         follow: Boolean,
     ): Float {
         val previous = lastY
         val chromeChanged = generation != lastGeneration
+        val routeChanged = routeGeneration != lastRouteGeneration
         lastY = y
         lastGeneration = generation
-        if (previous != null && previous != y) {
-            if (chromeChanged && !follow && motionEnabled) {
+        lastRouteGeneration = routeGeneration
+        val glide = chromeChanged && !routeChanged && !follow && motionEnabled
+        return when {
+            // Rising clears new chrome in the same frame; only settling down glides.
+            glide && previous != null && y > previous -> {
                 val from = offset.value + (previous - y)
                 scope.launch(start = CoroutineStart.UNDISPATCHED) {
                     offset.snapTo(from)
                     offset.animateTo(0f, floatingControlMotionSpec())
                 }
-            } else if (offset.value != 0f) {
-                scope.launch(start = CoroutineStart.UNDISPATCHED) { offset.snapTo(0f) }
+                from
             }
+            (routeChanged || follow || previous != y) && offset.value != 0f -> {
+                scope.launch(start = CoroutineStart.UNDISPATCHED) { offset.snapTo(0f) }
+                0f
+            }
+            else -> offset.value
         }
-        return offset.value
     }
 }
 

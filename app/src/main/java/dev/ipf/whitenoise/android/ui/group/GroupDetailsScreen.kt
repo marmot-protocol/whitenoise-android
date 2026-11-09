@@ -1380,8 +1380,9 @@ internal fun GroupDetailsScreen(
                     Modifier
                         .composerFabSurface(
                             ComposerFabEndpoint.GroupMembers,
+                            // The page's own fill and no outline, so landing leaves nothing to vanish.
                             fill = MaterialTheme.colorScheme.surfaceContainerLow,
-                            border = MaterialTheme.colorScheme.outlineVariant,
+                            border = null,
                             radiusDp = 16f,
                             morphing = LocalComposerFabHandoff.current?.active == true,
                             clipToVisible = true,

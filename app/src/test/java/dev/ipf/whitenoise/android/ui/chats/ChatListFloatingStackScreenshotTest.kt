@@ -130,15 +130,22 @@ class ChatListFloatingStackScreenshotTest {
         lower: Rect,
     ) {
         val gap = lower.top - upper.bottom
-        assertTrue("$upper must sit ${FloatingControlGap.value}px above $lower, gap was $gap", gap >= FloatingControlGap.value - 0.5f)
+        assertTrue(
+            "$upper must sit ${FloatingControlGap.value}px above $lower, gap was $gap",
+            gap >= FloatingControlGap.value - 0.5f,
+        )
         assertTrue("$upper should not float far above $lower, gap was $gap", gap <= FloatingControlGap.value + 6f)
     }
 
-    private fun bounds(tag: String): Rect = composeRule.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInWindow
+    private fun bounds(tag: String): Rect =
+        composeRule.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInWindow
 
     /** The pen's painted button; its slot wrapper sits higher because the pen aligns with the composer row. */
     private fun penBounds(): Rect =
-        composeRule.onNodeWithContentDescription(context.getString(R.string.new_message)).fetchSemanticsNode().boundsInWindow
+        composeRule
+            .onNodeWithContentDescription(context.getString(R.string.new_message))
+            .fetchSemanticsNode()
+            .boundsInWindow
 
     private fun render(
         dark: Boolean,
