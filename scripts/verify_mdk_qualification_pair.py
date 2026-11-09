@@ -52,7 +52,7 @@ def main():
         pin = lock(reports / f'{role}-MARMOT_VERSION')
         artifact = Path(os.environ['WHITENOISE_MARMOTKIT_CACHE_DIR']) / pin['artifact-sha256'] / pin['archive-root']
         elf = json.loads((artifact / 'android-elf.json').read_text())
-        expected_native = elf['libraries']['jniLibs/x86_64/libmarmot_uniffi.so']['sha256']
+        expected_native = elf['libraries']['jniLibs/arm64-v8a/libmarmot_uniffi.so']['sha256']
         for kind in ('app', 'test'):
             apk = Path('build/mdk-pair') / role / f'{kind}.apk'
             certificate = subprocess.check_output([str(build_tools / 'apksigner'), 'verify', '--print-certs', str(apk)], text=True)
@@ -63,10 +63,10 @@ def main():
                    'apk_sha256': hashlib.sha256(apk.read_bytes()).hexdigest(), 'signer_sha256': digest}
             if kind == 'app':
                 with zipfile.ZipFile(apk) as archive:
-                    native = hashlib.sha256(archive.read('lib/x86_64/libmarmot_uniffi.so')).hexdigest()
+                    native = hashlib.sha256(archive.read('lib/arm64-v8a/libmarmot_uniffi.so')).hexdigest()
                 if native != expected_native:
                     raise ValueError('Packaged native bytes differ from the verified published artifact')
-                row.update(mdk_source=pin['mdk-sha'], native_sha256=native, abi='x86_64')
+                row.update(mdk_source=pin['mdk-sha'], native_sha256=native, abi='arm64-v8a')
             rows.append(row)
     if len({row['signer_sha256'] for row in rows}) != 1:
         raise ValueError('All app and instrumentation generations must share the disposable signer')

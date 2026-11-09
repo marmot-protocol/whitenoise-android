@@ -21,13 +21,13 @@ for role in baseline candidate; do
   (
     cd "$checkout"
     ./gradlew --init-script "$root/scripts/mdk-qualification.init.gradle" \
-      -Pandroid.injected.build.abi=x86_64 -Pandroid.injected.testOnly=true \
+      -Pandroid.injected.build.abi=arm64-v8a -Pandroid.injected.testOnly=true \
       :app:assembleDevZapstoreDebug :app:assembleDevZapstoreDebugAndroidTest --no-daemon --stacktrace
     # Single-ABI (IDE-style) assembly uses intermediates for app and test APKs.
     mapfile -t app_apks < <(
       for base in app/build/outputs/apk app/build/intermediates/apk; do
         [[ -d "$base/devZapstore/debug" ]] || continue
-        find "$base/devZapstore/debug" -maxdepth 1 -type f -name '*x86_64*.apk'
+        find "$base/devZapstore/debug" -maxdepth 1 -type f -name '*arm64-v8a*.apk'
       done
     )
     mapfile -t test_apks < <(
