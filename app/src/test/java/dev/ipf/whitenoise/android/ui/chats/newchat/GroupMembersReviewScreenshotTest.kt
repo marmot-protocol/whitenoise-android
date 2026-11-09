@@ -175,9 +175,9 @@ class GroupMembersReviewScreenshotTest {
         }
     }
 
-    /** An unavailable formatter never leaks raw keys or operational group identifiers. */
+    /** An unavailable formatter never leaks raw keys or operational group identifiers; the actor stays an avatar. */
     @Test
-    fun unavailableFormatterHidesRawKeysAndKeepsLocalActorLabel() {
+    fun unavailableFormatterHidesRawKeysAndShowsActorAvatar() {
         val actor = "a".repeat(64)
         val member = "b".repeat(64)
         val state = emptyAppState(accounts = listOf(testAccount("Owner", actor)), activeAccountRef = "Owner")
@@ -194,7 +194,7 @@ class GroupMembersReviewScreenshotTest {
                 )
             }
         }
-        rule.onNodeWithText("Local account label: Owner").assertExists()
+        rule.onNodeWithTag("group.action.acting_account").assertIsDisplayed()
         rule.onAllNodesWithText(actor, substring = true).assertCountEquals(0)
         rule.onAllNodesWithText(member, substring = true).assertCountEquals(0)
         rule.onAllNodesWithText("Public key", substring = true).assertCountEquals(0)
