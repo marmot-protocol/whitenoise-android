@@ -126,7 +126,7 @@ class NotificationGroupPictureSourcesTest {
                     storedConversationLoader = { solid(Color.GREEN) },
                 )
 
-            assertTrue(sources.hasMissingPicture)
+            assertTrue(sources.mayUpdatePictures)
             assertTrue(refreshLateIdentity(presenter, group(), sources))
 
             assertTrue("the group URL is never fetched", fetched.isEmpty())

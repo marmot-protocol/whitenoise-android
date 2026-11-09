@@ -569,6 +569,12 @@ internal class NotificationBootstrapTestFixture(
                         onPresentedChatList?.invoke(accountRef) ?: onChatList?.invoke(accountRef) ?: chatListRows,
                     )
                 }
+                "presentedChatListRow" -> {
+                    val accountRef = arguments?.get(0) as String
+                    val groupId = arguments[1] as String
+                    val rows = onPresentedRows?.invoke(accountRef) ?: presentedChatListSnapshot(chatListRows).rows
+                    rows.firstOrNull { it.row.groupIdHex == groupId }
+                }
                 "readAvatarAssets" -> {
                     @Suppress("UNCHECKED_CAST")
                     val references = arguments?.get(1) as List<String>

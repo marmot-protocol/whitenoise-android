@@ -354,7 +354,7 @@ class NotificationConversationIdentityImageTest {
             val sources =
                 NotificationIdentityPictureSources(null, null, null, null, conversationLoader = { solid(Color.GREEN) })
 
-            assertTrue(sources.hasMissingPicture)
+            assertTrue(sources.mayUpdatePictures)
             assertTrue(refreshLateIdentity(presenter, group(), sources))
 
             assertEquals(before + 1, posts.size)

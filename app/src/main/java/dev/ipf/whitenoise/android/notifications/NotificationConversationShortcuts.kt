@@ -92,7 +92,7 @@ internal class NotificationConversationShortcuts(
         }
     }
 
-    /** The conversation's current private contact choice. A group shows no member's picture, so it reads none. */
+    /** Reads the private contact picture for a peer's shortcut; member and reactor pictures belong to card rows. */
     private fun directContactAvatar(
         update: NotificationUpdateFfi,
         identityContact: String?,
@@ -104,8 +104,8 @@ internal class NotificationConversationShortcuts(
 
     /**
      * Cached private pixels replace a direct chat's protocol-sourced bitmaps; when none are cached, the public ones
-     * stay. A group keeps only its own picture and drops its member's. A direct chat MDK reports as a group keeps
-     * that shape, but its picture follows its peer's current choice, read here under the publication lock (#3635).
+     * stay. A group shortcut keeps its own picture. A direct chat MDK reports as a group follows its peer's
+     * current choice under the publication lock (#3635).
      */
     private fun ownedShortcutAvatars(
         update: NotificationUpdateFfi,
@@ -184,6 +184,7 @@ internal class NotificationConversationShortcuts(
                     notificationTag = content.notificationTag,
                     senderName = content.senderName,
                     senderKey = content.senderKey,
+                    isGroupConversation = content.isGroupConversation,
                     avatarUrl = conversationAvatarUrl,
                     avatarGenerationId = ownedConversationAvatar?.generationId,
                     senderAvatarUrl = senderAvatarUrl.takeIf { update.isDm },
@@ -415,7 +416,7 @@ private fun ShortcutInfoCompat.withPictureContact(
     }
 }
 
-/** Pixel generations invalidate image-only changes without retaining another copy of bitmap memory. */
+/** Tracks the posted layout and pixel generations without retaining another copy of bitmap memory. */
 private data class ConversationShortcutSnapshot(
     val shortcutId: String,
     val accountScope: String,
@@ -424,6 +425,7 @@ private data class ConversationShortcutSnapshot(
     val notificationTag: String,
     val senderName: String,
     val senderKey: String,
+    val isGroupConversation: Boolean,
     val avatarUrl: String?,
     val avatarGenerationId: Int?,
     val senderAvatarUrl: String?,

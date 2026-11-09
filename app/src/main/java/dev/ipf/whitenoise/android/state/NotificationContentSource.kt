@@ -45,6 +45,9 @@ internal interface NotificationContentSource {
     /** Reads authoritative group membership for this account and conversation. */
     suspend fun groupMembers(update: NotificationUpdateFfi): List<AppGroupMemberRecordFfi>
 
+    /** Reads whether the stored chat row identifies this conversation as direct. */
+    suspend fun isDirectConversation(update: NotificationUpdateFfi): Boolean = false
+
     /** Classifies media from the exact stored message. */
     suspend fun mediaKind(update: NotificationUpdateFfi): ReplyMediaKind
 

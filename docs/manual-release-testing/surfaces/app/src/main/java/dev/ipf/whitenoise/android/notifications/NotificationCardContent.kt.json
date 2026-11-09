@@ -40,7 +40,7 @@
         ]
       },
       {
-        "surface": "private contact picture on a direct message's identity",
+        "surface": "single direct message identity with its private contact picture",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationCardContent.kt",
         "anchor": "fun withCurrentContactPictures(",
         "test_ids": [

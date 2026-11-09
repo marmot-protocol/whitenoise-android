@@ -31,6 +31,7 @@ import dev.ipf.marmotkit.AppGroupRecordFfi
 import dev.ipf.marmotkit.AppMessageRecordFfi
 import dev.ipf.marmotkit.AttachmentTransferStateFfi
 import dev.ipf.marmotkit.AuditLogSettingsFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.marmotkit.ChatListMessagePreviewFfi
 import dev.ipf.marmotkit.ChatListRowFfi
 import dev.ipf.marmotkit.EventsSubscription
@@ -2886,6 +2887,15 @@ class WhiteNoiseAppState private constructor(
             runCatchingCancellable { marmotIo { groupMembers(update.accountRef, update.groupIdHex) } }
                 .getOrNull()
                 .orEmpty()
+
+        /** Uses the receiver's chat row, including when its chat list is cold or another account is active. */
+        override suspend fun isDirectConversation(update: NotificationUpdateFfi): Boolean {
+            val cachedKind = notificationChatListItem(update)?.projection?.conversationKind
+            val kind =
+                cachedKind?.takeUnless { it == ChatConversationKindFfi.UNKNOWN }
+                    ?: presentedNotificationChatRow(update)?.row?.conversationKind
+            return kind == ChatConversationKindFfi.DIRECT
+        }
 
         override suspend fun mediaKind(update: NotificationUpdateFfi): ReplyMediaKind =
             resolveNotificationMediaKind(
@@ -13250,6 +13260,8 @@ class WhiteNoiseAppState private constructor(
                     if (!isNotDismissed() || !isNotificationEnrichmentAllowed(candidate, firstPost)) {
                         return@withVerifiedReactionQuote false
                     }
+                    val useDirectLayout = candidate.isDm || content.isDirectConversation
+                    val peer = candidate.sender.accountIdHex.takeIf { useDirectLayout }
                     localNotificationPresenter.show(
                         update = candidate,
                         conversationTitleOverride = content.conversationTitle,
@@ -13259,9 +13271,10 @@ class WhiteNoiseAppState private constructor(
                         mediaKind = content.mediaKind,
                         recipientAccountSubtext = content.recipientAccountSubtext,
                         directShareEligible = candidate.accountRef == activeAccountRef,
-                        conversationAvatarBitmap = firstPost.avatars.conversationBitmap(candidate.isDm),
+                        conversationAvatarBitmap = firstPost.avatars.conversationBitmap(useDirectLayout),
                         senderAvatarBitmap = firstPost.avatars.senderAvatarBitmap,
-                        identityContact = firstPost.avatars.identityContact,
+                        identityContact = firstPost.avatars.identityContact ?: peer,
+                        useDirectLayout = useDirectLayout,
                         silentUpdate = true,
                         replaceCurrentMessage = true,
                         shortNpub = ::shortNpub,
@@ -13319,9 +13332,16 @@ class WhiteNoiseAppState private constructor(
     private suspend fun enrichResolvedNotificationUpdate(
         update: NotificationUpdateFfi,
         firstPost: NotificationFirstPost,
-        content: NotificationFirstPostContent,
+        resolvedContent: NotificationFirstPostContent,
         deferPicture: (LateNotificationIdentity) -> Unit,
     ): NotificationLateCorrectionOutcome {
+        val content =
+            if (firstPost.content?.isDirectConversation == true && !resolvedContent.isDirectConversation) {
+                // A late local read can fail. Keep the direct layout already established for this post.
+                resolvedContent.copy(conversationTitle = null, isDirectConversation = true)
+            } else {
+                resolvedContent
+            }
         val resolvedPresentation =
             notificationContentPresentation(
                 context = appContext,
@@ -13382,22 +13402,23 @@ class WhiteNoiseAppState private constructor(
     ): LateNotificationIdentity? {
         if (content == null) return null
         val reaction = LocalNotificationFormatter.isReaction(update)
+        val isDm = !content.isGroupConversation
         val nativeGroupReaction =
-            reaction && !update.isDm && localNotificationPresenter.hasNativeGroupReaction(update, content)
+            reaction && !isDm && localNotificationPresenter.hasNativeGroupReaction(update, content)
         val reactorOnly = reaction && !nativeGroupReaction
         val warmed = notificationAvatarCoordinator.preWarm(update, firstPost.engineMuted, nativeGroupReaction)
         val pictures =
             firstPost.avatars
                 .lateIdentitySources(
                     warmed,
-                    update.isDm,
+                    isDm,
                     dev.ipf.whitenoise.android.notifications
                         .notificationConversationDomain(update),
                     dev.ipf.whitenoise.android.notifications
                         .notificationSenderDomain(update),
                     reactorOnly = reactorOnly,
                 ).withLateLoaders(
-                    isDm = update.isDm,
+                    isDm = isDm,
                     reactorOnly = reactorOnly,
                     storedShown = firstPost.avatars.storedConversationBitmap != null,
                     row = {
@@ -13435,14 +13456,15 @@ class WhiteNoiseAppState private constructor(
      * when the row cannot be read.
      */
     private suspend fun storedConversationIdentity(update: NotificationUpdateFfi): LateRowIdentity? {
+        val row = presentedNotificationChatRow(update) ?: return null
         val account = update.accountRef
-        val item =
-            runCatchingCancellable { marmotIo { presentedChatListRow(account, update.groupIdHex) } }
-                .getOrNull()
-                ?.let { chatListItemFromProjection(it.row, it.presentation, it.avatarAsset) }
-                ?: return null
+        val item = chatListItemFromProjection(row.row, row.presentation, row.avatarAsset)
         return lateRowIdentity(account, item)
     }
+
+    /** Reads the exact receiver-owned presentation without waiting for a chat list to bind. */
+    private suspend fun presentedNotificationChatRow(update: NotificationUpdateFfi) =
+        runCatchingCancellable { marmotIo { presentedChatListRow(update.accountRef, update.groupIdHex) } }.getOrNull()
 
     /**
      * #3635: [storedConversationIdentity] for a row already read. Once the loader decodes the row's stored picture, it
@@ -13611,6 +13633,8 @@ class WhiteNoiseAppState private constructor(
         onNotificationWritten: () -> Unit,
     ): Boolean =
         withVerifiedReactionQuote(update, firstPost) { candidate, isNotDismissed ->
+            val useDirectLayout = candidate.isDm || firstPost.content?.isDirectConversation == true
+            val peer = candidate.sender.accountIdHex.takeIf { useDirectLayout }
             localNotificationPresenter.show(
                 update = candidate,
                 conversationTitleOverride = firstPost.content?.conversationTitle,
@@ -13619,9 +13643,10 @@ class WhiteNoiseAppState private constructor(
                 reactedToPreviewOverride = verifiedReactionPreview(candidate, firstPost.content?.reactedToPreview),
                 mediaKind = firstPost.content?.mediaKind ?: ReplyMediaKind.None,
                 recipientAccountSubtext = firstPost.content?.recipientAccountSubtext,
-                conversationAvatarBitmap = firstPost.avatars.conversationBitmap(candidate.isDm),
+                conversationAvatarBitmap = firstPost.avatars.conversationBitmap(useDirectLayout),
                 senderAvatarBitmap = firstPost.avatars.senderAvatarBitmap,
-                identityContact = firstPost.avatars.identityContact,
+                identityContact = firstPost.avatars.identityContact ?: peer,
+                useDirectLayout = useDirectLayout,
                 redactContent = redactContent,
                 directShareEligible = !redactContent && candidate.accountRef == activeAccountRef,
                 shortNpub = ::cachedShortNpubOrUnknown,
@@ -14108,11 +14133,7 @@ class WhiteNoiseAppState private constructor(
             synchronized(profilePresentationLock) {
                 profilePresentations[update.sender.accountIdHex]?.avatarUrl
             } ?: update.sender.pictureUrl
-        val item =
-            chatsController
-                ?.takeIf { it.boundAccountRef == update.accountRef && update.accountRef == activeAccountRef }
-                ?.items
-                ?.firstOrNull { it.id.equals(update.groupIdHex, ignoreCase = true) }
+        val item = notificationChatListItem(update)
         val group = item?.group
         val ready = readyNotificationAvatarSnapshot(senderUrl, group?.avatarUrl)
         val encryptedKey = group?.let { encryptedGroupAvatarCacheKey(update.accountRef, it) }
@@ -14122,6 +14143,13 @@ class WhiteNoiseAppState private constructor(
                     ready.groupAvatarBitmap ?: GroupAvatarImageLoader.peek(encryptedKey)?.asAndroidBitmap(),
             ).withChatRow(item, update.accountRef)
     }
+
+    /** Reuses an already-bound row only for the update's receiving account and conversation. */
+    private fun notificationChatListItem(update: NotificationUpdateFfi): ChatListItem? =
+        chatsController
+            ?.takeIf { it.boundAccountRef == update.accountRef && update.accountRef == activeAccountRef }
+            ?.items
+            ?.firstOrNull { it.id.equals(update.groupIdHex, ignoreCase = true) }
 
     /** Publishes one fixed-label timing event without notification identity or content. */
     private fun recordNotificationFirstPostTiming(

@@ -176,7 +176,7 @@ class NotificationFirstPostContentWiringTest {
                 .substringBefore("private suspend fun showRedactedNotificationUpdate")
         val latePost = source.functionBody("postNotificationLateCorrection")
         for (post in listOf(firstPost, latePost)) {
-            assertTrue("conversationAvatarBitmap = firstPost.avatars.conversationBitmap(candidate.isDm)" in post)
+            assertTrue("conversationAvatarBitmap = firstPost.avatars.conversationBitmap(useDirectLayout)" in post)
             assertTrue("senderAvatarBitmap = firstPost.avatars.senderAvatarBitmap" in post)
         }
         assertTrue("postNotificationAvatarCorrection" !in source)

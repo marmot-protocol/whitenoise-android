@@ -17,6 +17,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.toBitmap
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
 import dev.ipf.whitenoise.android.notifications.ConversationCardBarrier
 import dev.ipf.whitenoise.android.notifications.ConversationCardOp
@@ -90,9 +91,11 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
     @Test
     fun cachedGroupAvatarRendersOnTheFirstPlatformCard() = captureFirstPost(cachedAvatar = true, isDm = false)
 
-    /** Pins the long first message to the same native template and identity slot as short messages. */
+    /** A stored DM still uses the existing single-peer template when the notification reports a group. */
     @Test
-    fun longFirstMessageRendersInTheConversationTemplate() = captureFirstPost(cachedAvatar = true, longBody = true)
+    fun longFirstMessageRendersInTheConversationTemplate() {
+        captureFirstPost(cachedAvatar = true, longBody = true, reportedAsGroup = true)
+    }
 
     /** Pins the group picture rather than a member picture for the long first group message. */
     @Test
@@ -130,6 +133,7 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
         isDm: Boolean = true,
         longBody: Boolean = false,
         snapshotPath: String = snapshotPath(cachedAvatar, isDm, longBody),
+        reportedAsGroup: Boolean = false,
     ) = runBlocking {
         val writes = AtomicInteger(0)
         val events = CopyOnWriteArrayList<NotificationFirstPostTimingEvent>()
@@ -144,7 +148,14 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
             NotificationBootstrapTestFixture(
                 context = context,
                 previewText = preview,
-                isDm = isDm,
+                isDm = isDm && !reportedAsGroup,
+                chatListRows =
+                    if (reportedAsGroup) {
+                        val row = notificationChatListRow()
+                        listOf(row.copy(groupIdHex = "group-a", conversationKind = ChatConversationKindFfi.DIRECT))
+                    } else {
+                        emptyList()
+                    },
                 accounts = listOf(AccountSummaryFfi("account-a", "self", true, false, false, true, false)),
                 notificationUsersHaveDisplayNames = false,
                 localDisplayName = null,
@@ -210,16 +221,15 @@ class NotificationFirstPostRemoteViewsScreenshotTest {
         preview: String,
         isDm: Boolean,
     ): View {
+        val style = checkNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(notification))
+        assertEquals(!isDm, style.isGroupConversation)
         if (!isDm) {
             assertTrue("Group image must be in the first payload", notification.getLargeIcon() != null)
             assertEquals("the group's own picture", Color.BLUE, pixel(notification.getLargeIcon()))
-            val member =
-                NotificationCompat.MessagingStyle
-                    .extractMessagingStyleFromNotification(notification)
-                    ?.messages
-                    ?.last()
-                    ?.person
+            val member = style.messages.last().person
             assertEquals("the member's own picture on their row", Color.RED, pixel(member?.icon?.toIcon(context)))
+        } else {
+            assertEquals(null, style.conversationTitle)
         }
         val body = notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString()
         assertEquals(preview.replace("**", ""), body)

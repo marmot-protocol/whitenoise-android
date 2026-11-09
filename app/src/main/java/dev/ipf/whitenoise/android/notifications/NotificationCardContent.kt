@@ -283,8 +283,8 @@ internal class NotificationCardContent(
         style.isGroupConversation = content.isGroupConversation
         // Prefer the caller-resolved title (chat-list parity, e.g. "Group of N
         // people" for unnamed groups) over the often-empty payload group name.
-        (conversationTitleOverride?.takeIf { it.isNotBlank() } ?: content.conversationTitle)?.let {
-            style.conversationTitle = it
+        if (content.isGroupConversation) {
+            style.conversationTitle = conversationTitleOverride?.takeIf { it.isNotBlank() } ?: content.conversationTitle
         }
         newMessages.forEach(style::addMessage)
         return style

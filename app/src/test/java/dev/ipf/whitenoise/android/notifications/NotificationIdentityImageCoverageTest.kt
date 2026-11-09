@@ -248,7 +248,7 @@ class NotificationIdentityImageCoverageTest {
         assertTrue("the stored copy is carried", "storedConversationLoader = stored?.storedLoader" in late)
         assertTrue("with the row's peer", "identityContact = stored?.contact" in late)
         val read = appState.functionBody("storedConversationIdentity")
-        assertTrue("from the chat list's own row", "presentedChatListRow(" in read)
+        assertTrue("from the chat list's own row", "presentedNotificationChatRow(update)" in read)
         assertTrue("as the chat list projects it", "chatListItemFromProjection(" in read)
         assertTrue("read for the row", "lateRowIdentity(account, item)" in read)
         val stored = appState.functionBody("lateRowIdentity")

@@ -129,7 +129,7 @@ class NotificationLateLoadersTest {
 
             assertSame(stored, withStored.storedConversationLoader)
             assertEquals(PEER, withStored.identityContact)
-            assertFalse("nothing is missing", peerOnly.hasMissingPicture)
+            assertFalse("no picture can change", peerOnly.mayUpdatePictures)
             assertTrue("but the peer may still need recording", peerOnly.mayRefresh)
         }
 

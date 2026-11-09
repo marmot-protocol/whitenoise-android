@@ -338,6 +338,7 @@ class LocalNotificationPresenter(
      * [identityContact] is the chat row's peer for a direct chat MDK reports as a
      * group (#3635). The card and its shortcut record them, and each write applies
      * their private picture as chosen at that moment, as for any direct chat.
+     * [useDirectLayout] selects Android's single-peer presentation without changing alert routing.
      */
     @SuppressLint("MissingPermission")
     suspend fun show(
@@ -355,6 +356,7 @@ class LocalNotificationPresenter(
         senderAvatarUrl: String? = null,
         senderAvatarBitmap: Bitmap? = null,
         identityContact: String? = null,
+        useDirectLayout: Boolean = false,
         silentUpdate: Boolean = false,
         replaceCurrentMessage: Boolean = false,
         onNotificationWritten: (() -> Unit)? = null,
@@ -373,6 +375,7 @@ class LocalNotificationPresenter(
                 reactedToPreviewOverride = reactedToPreviewOverride,
                 mediaKind = mediaKind,
                 conversationTitleOverride = conversationTitleOverride,
+                useDirectLayout = useDirectLayout,
                 shortNpub = shortNpub,
             )
         val formatterReturnedContent = formattedContent != null
@@ -1563,7 +1566,7 @@ class LocalNotificationPresenter(
      * conversation picture with the same pixels as the one the card shows changes nothing.
      */
     private suspend fun arrivedPictures(sources: NotificationIdentityPictureSources): Pair<Bitmap?, Bitmap?>? =
-        if (!sources.hasMissingPicture || !NotificationPreviewPreferences.capture(context).allowed) {
+        if (!sources.mayUpdatePictures || !NotificationPreviewPreferences.capture(context).allowed) {
             null
         } else {
             resolveAvatars(sources).takeIf { (conversation, sender) ->

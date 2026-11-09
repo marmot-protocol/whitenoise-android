@@ -95,10 +95,10 @@ internal data class NotificationIdentityPictureSources(
     val identityContact: String? = null,
 ) {
     /**
-     * True when the card was drawn without a picture that a URL or a loader may still supply, or without the stored
-     * picture the chat list shows.
+     * True when a source can supply a missing picture or replace the current conversation picture with its stored
+     * copy. The refresh compares pixels before rewriting a card.
      */
-    val hasMissingPicture: Boolean
+    val mayUpdatePictures: Boolean
         get() =
             storedConversationLoader != null ||
                 (conversationBitmap == null && (!conversationUrl.isNullOrBlank() || conversationLoader != null)) ||
@@ -108,9 +108,9 @@ internal data class NotificationIdentityPictureSources(
     val hasConversationLoader: Boolean
         get() = storedConversationLoader != null || conversationLoader != null
 
-    /** True when a late refresh may still change the card: a missing picture, or a contact it may not record yet. */
+    /** True when a late refresh may change the pictures or record a contact. */
     val mayRefresh: Boolean
-        get() = hasMissingPicture || identityContact != null
+        get() = mayUpdatePictures || identityContact != null
 }
 
 /** The contact whose private picture a live card's identity follows at the final write, or null for none. */
