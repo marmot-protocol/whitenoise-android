@@ -1,0 +1,9 @@
+appId: dev.ipf.whitenoise.android.maestrolab
+name: presentation-chat-link-choose-select
+---
+- runFlow: ../fixtures/emulator-interruption.yaml
+- assertVisible: Open chat in
+- assertVisible: Work
+- tapOn: Personal
+- assertVisible:
+    id: presentation.complete

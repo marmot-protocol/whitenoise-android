@@ -949,6 +949,8 @@
     <string name="scan_to_connect">Digitalize para conectar.</string>
     <string name="not_copied">Não copiado</string>
     <string name="copy_public_key">Copiar chave pública</string>
+    <string name="copy_chat_link">Copiar link do chat</string>
+    <string name="copy_chat_link_subtitle">Abre este chat para quem já está nele</string>
     <string name="public_key_copy_action_with_value">Copiar chave pública %1$s</string>
     <string name="button_in_progress">Em andamento</string>
     <string name="private_key">Chave privada</string>
@@ -1084,6 +1086,9 @@
     <string name="toast_reply_draft_restore_failed">Não foi possível recuperar a resposta.</string>
     <string name="toast_draft_save_failed">Não foi possível guardar o rascunho.</string>
     <string name="toast_notification_conversation_unavailable">Essa conversa não está mais disponível</string>
+    <string name="chat_link_not_found">Conversa não encontrada</string>
+    <string name="chat_link_invalid">Este link de conversa não é válido</string>
+    <string name="chat_link_choose_account_title">Abrir conversa em</string>
     <string name="toast_couldnt_decode_image">Não foi possível decodificar a imagem</string>
     <string name="toast_couldnt_prepare_image">Não foi possível transferir ou preparar a imagem.</string>
     <string name="toast_reattach_to_retry_media">Anexe novamente para tentar de novo</string>
