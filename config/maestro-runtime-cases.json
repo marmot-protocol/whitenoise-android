@@ -647,6 +647,14 @@
       "assertions": "Sharing choices open and dismiss without granting usage or diagnostic sharing.",
       "postcondition": "none"
     },
+    "nested-diagnostics-log-confirm-cancel": {
+      "suite": "nested",
+      "manual_ids": [
+        "SEC-008"
+      ],
+      "assertions": "Enabling group diagnostic logs in Diagnostics & Improvements requires the explicit upload disclosure; Cancel leaves log sharing off.",
+      "postcondition": "none"
+    },
     "nested-default-retention": {
       "suite": "nested",
       "manual_ids": [
