@@ -4,9 +4,9 @@
   "categories": {
     "source_coverage": [
       {
-        "surface": "Testing-only MarmotKit November 8 nightly from 580082a5 with recovery and account migrations over the November 6 baseline, Odin Markdown parsing, and admin invitation decline. Verify retained data, the original pending upload, cold restart and recovery.",
+        "surface": "Testing-only MarmotKit November 9 nightly from b3e48468 over the November 8 baseline. Verify retained data, the original pending upload, cold restart, both recovery relay modes and group departure with experimental device groups disabled.",
         "source": "app/src/main/marmotkit/MARMOT_VERSION",
-        "anchor": "artifact-id=0.15.0-nightly.20261108",
+        "anchor": "artifact-id=0.15.0-nightly.20261109",
         "test_ids": [
           "INT-010",
           "INT-003",

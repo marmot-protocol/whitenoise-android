@@ -41,6 +41,7 @@ internal fun emptyGroupRecord(row: ChatListRowFfi): AppGroupRecordFfi =
         disappearingMessageSecs = 0uL,
         leaveRequestPending = false,
         leaveRequestedAtMs = null,
+        leaveBlocked = false,
         // The row projects the authoritative lifecycle; a cold open of a
         // disbanding/disbanded chat must not flash an active composer while
         // the full group record is still loading.
