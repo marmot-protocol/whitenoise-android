@@ -5,12 +5,11 @@
     "notification_content_contracts": [
       {
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationReactionPresentation.kt",
-        "anchor": "internal fun applyReactionNotificationPresentation(",
-        "surface": "leading reactor avatar, inline reaction artwork, accessible fallback and no custom hidden payload",
+        "anchor": "internal fun applyReactionNotificationArtwork(",
+        "surface": "emoji-sized inline received reaction artwork, accessible fallback and no custom hidden payload",
         "test_ids": [
           "NTF-034",
-          "NTF-030",
-          "NTF-042"
+          "NTF-030"
         ]
       },
       {

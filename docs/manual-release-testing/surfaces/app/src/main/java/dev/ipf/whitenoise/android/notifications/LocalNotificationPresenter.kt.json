@@ -42,7 +42,7 @@
       {
         "surface": "decorated inline reaction artwork and privacy fallback",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/LocalNotificationPresenter.kt",
-        "anchor": "applyReactionNotificationPresentation(",
+        "anchor": "applyReactionNotificationArtwork(",
         "test_ids": [
           "NTF-034",
           "NTF-030"

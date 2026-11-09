@@ -1,6 +1,5 @@
 package dev.ipf.whitenoise.android.notifications
 
-import android.app.Notification
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Bitmap
@@ -24,61 +23,54 @@ import dev.ipf.whitenoise.android.ui.EmojiShortcodes
 import kotlin.math.roundToInt
 
 /**
- * Places the reactor at the leading edge of the reaction content. Plain text uses a TextView; only text
- * containing bundled artwork needs a bitmap. Android still supplies the notification header and controls.
+ * Android decorates the card; the body renders inline artwork while retaining complete accessible text. With
+ * [reservesPicture] the card also shows who reacted (#3635), so the body is drawn narrower to keep its text size.
  */
-internal fun applyReactionNotificationPresentation(
+internal fun applyReactionNotificationArtwork(
     context: Context,
     builder: NotificationCompat.Builder,
     content: LocalNotificationContent,
-    reactor: NotificationIdentityImage,
+    reservesPicture: Boolean = false,
 ): Boolean {
-    val text = ReactionNotificationText(content.title, content.body, content.reactionArtworkBody)
-    return builder.renderReactionNotification(context, text, reactor)
-}
-
-/** The text already carried by the notification and its optional authored shortcodes for inline artwork. */
-private data class ReactionNotificationText(
-    val title: String,
-    val body: String,
-    val artworkBody: String?,
-)
-
-/** Builds each view from text and the current reactor picture without carrying any previous picture actions. */
-private fun NotificationCompat.Builder.renderReactionNotification(
-    context: Context,
-    text: ReactionNotificationText,
-    reactor: NotificationIdentityImage,
-): Boolean {
+    if (!content.isReactionPreview) return false
     var images = emptyMap<String, Bitmap>()
     return try {
-        images = reactionBodyArtwork(context, text.artworkBody ?: text.body)
-        val compact = reactionInlineView(context, text, images, reactor.bitmap, expanded = false)
-        val expanded = reactionInlineView(context, text, images, reactor.bitmap, expanded = true)
-        setStyle(NotificationCompat.DecoratedCustomViewStyle())
-            .setCustomContentView(compact)
-            .setCustomBigContentView(expanded)
-            .setCustomHeadsUpContentView(compact)
-            .recordLeadingReactionIdentity(reactor, text.artworkBody)
-        true
+        images = reactionBodyArtwork(context, content.artworkSource)
+        if (images.isEmpty()) {
+            false
+        } else {
+            val compact = reactionInlineView(context, content, images, expanded = false, reservesPicture)
+            val expanded = reactionInlineView(context, content, images, expanded = true, reservesPicture)
+            builder
+                .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+                .setCustomContentView(compact)
+                .setCustomBigContentView(expanded)
+                .setCustomHeadsUpContentView(compact)
+            true
+        }
     } catch (
         @Suppress("TooGenericExceptionCaught")
         _: RuntimeException,
     ) {
-        clearReactionNotificationPresentation(text.body)
+        clearReactionArtwork(builder, content.body)
         false
     } catch (_: OutOfMemoryError) {
-        clearReactionNotificationPresentation(text.body)
+        clearReactionArtwork(builder, content.body)
         false
     } finally {
         images.values.forEach { it.recycle() }
     }
 }
 
-/** Restores a readable text-only card if building or posting the custom presentation fails. */
-internal fun NotificationCompat.Builder.clearReactionNotificationPresentation(body: String) {
-    extras.remove(EXTRA_IDENTITY_IMAGE)
-    this
+/** The authored sentence the inline body draws from; the readable [LocalNotificationContent.body] stays the text. */
+private val LocalNotificationContent.artworkSource: String get() = reactionArtworkBody ?: body
+
+/** Failed optional drawing leaves a plain text card with no partially configured custom views. */
+private fun clearReactionArtwork(
+    builder: NotificationCompat.Builder,
+    body: String,
+) {
+    builder
         .setCustomContentView(null)
         .setCustomBigContentView(null)
         .setCustomHeadsUpContentView(null)
@@ -101,52 +93,23 @@ internal fun reactionBodyArtwork(
 /** Resource-selected full-color images follow SystemUI's night mode when the same card re-inflates. */
 private fun reactionInlineView(
     context: Context,
-    text: ReactionNotificationText,
+    content: LocalNotificationContent,
     artwork: Map<String, Bitmap>,
-    avatar: Bitmap,
     expanded: Boolean,
+    reservesPicture: Boolean,
 ): RemoteViews =
     RemoteViews(context.packageName, R.layout.notification_reaction_inline).apply {
-        setImageViewBitmap(R.id.reaction_notification_avatar, avatar)
-        setTextViewText(R.id.reaction_notification_title, text.title)
-        setInt(R.id.reaction_notification_title, "setMaxLines", if (expanded) 2 else 1)
-        if (artwork.isEmpty()) {
-            setViewVisibility(R.id.reaction_notification_artwork, View.GONE)
-            setTextViewText(R.id.reaction_notification_body, text.body)
-            setInt(R.id.reaction_notification_body, "setMaxLines", if (expanded) REACTION_EXPANDED_PREVIEW_LINES else 1)
-        } else {
-            setViewVisibility(R.id.reaction_notification_body, View.GONE)
-            setImageViewBitmap(
-                R.id.reaction_notification_body_light,
-                reactionBodyBitmap(context, text.artworkBody ?: text.body, artwork, expanded, dark = false),
-            )
-            setImageViewBitmap(
-                R.id.reaction_notification_body_dark,
-                reactionBodyBitmap(context, text.artworkBody ?: text.body, artwork, expanded, dark = true),
-            )
-        }
-        setContentDescription(R.id.reaction_notification, "${text.title}, ${text.body}")
-    }
-
-/** Builds fresh views on Save, Clear and late refresh so prior private pixels are absent even from the parcel. */
-internal fun NotificationCompat.Builder.withUpdatedReactionAvatar(
-    context: Context,
-    source: Notification,
-    reactor: NotificationIdentityImage,
-    artworkBody: String?,
-): NotificationCompat.Builder {
-    val extras = source.extras
-    val title = extras?.getCharSequence(Notification.EXTRA_TITLE)
-    val body = extras?.getCharSequence(Notification.EXTRA_TEXT)
-    val text =
-        ReactionNotificationText(
-            title?.toString().orEmpty(),
-            body?.toString().orEmpty(),
-            artworkBody,
+        setTextViewText(R.id.reaction_notification_title, content.title)
+        setImageViewBitmap(
+            R.id.reaction_notification_body_light,
+            reactionBodyBitmap(context, content.artworkSource, artwork, expanded, dark = false, reservesPicture),
         )
-    renderReactionNotification(context, text, reactor)
-    return this
-}
+        setImageViewBitmap(
+            R.id.reaction_notification_body_dark,
+            reactionBodyBitmap(context, content.artworkSource, artwork, expanded, dark = true, reservesPicture),
+        )
+        setContentDescription(R.id.reaction_notification, "${content.title}, ${content.body}")
+    }
 
 /** Draw the same shortcode annotations as the message UI, with bounded wrapping and system text colors. */
 private fun reactionBodyBitmap(
@@ -155,6 +118,7 @@ private fun reactionBodyBitmap(
     artwork: Map<String, Bitmap>,
     expanded: Boolean,
     dark: Boolean,
+    reservesPicture: Boolean,
 ): Bitmap {
     val metrics = context.resources.displayMetrics
     val paint = reactionTextPaint(context, dark)
@@ -167,9 +131,11 @@ private fun reactionBodyBitmap(
             text.setSpan(span, token.start, token.end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
     }
-    // Leave room for the system icon, margins and leading picture.
+    // Leave room for the system icon/margins and the reactor's picture; narrow OEM templates can scale down without
+    // clipping.
+    val pictureInsetDp = if (reservesPicture) REACTION_BODY_PICTURE_INSET_DP else 0
     val widthDp =
-        (context.resources.configuration.screenWidthDp - REACTION_BODY_INSET_DP - REACTION_AVATAR_INSET_DP)
+        (context.resources.configuration.screenWidthDp - REACTION_BODY_INSET_DP - pictureInsetDp)
             .coerceIn(REACTION_BODY_MIN_WIDTH_DP, REACTION_BODY_MAX_WIDTH_DP)
     val width = (widthDp * metrics.density).toInt().coerceAtLeast(1)
     val direction =
@@ -223,8 +189,8 @@ private const val REACTION_BODY_ARTWORK_LIMIT = 4
 private const val REACTION_TEXT_SP = 14f
 private const val REACTION_BODY_INSET_DP = 96
 
-/** The 36 dp picture and 8 dp gap beside the content column. */
-private const val REACTION_AVATAR_INSET_DP = 44
+/** The template's 48 dp picture slot and its 16 dp gap beside the content column. */
+private const val REACTION_BODY_PICTURE_INSET_DP = 64
 private const val REACTION_BODY_MIN_WIDTH_DP = 96
 private const val REACTION_BODY_MAX_WIDTH_DP = 280
 

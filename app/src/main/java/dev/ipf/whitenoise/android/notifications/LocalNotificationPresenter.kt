@@ -443,7 +443,7 @@ class LocalNotificationPresenter(
         var written = false
         var rewriteLease: NotificationCardGeneration? = null
         var emojiArtifact: NotificationEmojiArtifact? = null
-        var reactionInlinePresentation = false
+        var reactionInlineArtwork = false
         var carriedArtworkLease: AutoCloseable? = null
         var emojiPreparationAttempted = false
         try {
@@ -670,14 +670,23 @@ class LocalNotificationPresenter(
                     when (val style = decision.style) {
                         // Reactions get their own self-contained card (own tag/id on the
                         // reactions channel, see LocalNotificationFormatter) so they're muted
-                        // independently of messages. The decorated row places the reactor beside the text and
-                        // keeps any inline artwork.
+                        // independently of messages. Artwork replaces its shortcode in a decorated inline row;
+                        // the card keeps its existing actions and never becomes a conversation.
                         NotificationStyleChoice.Plain -> {
                             builder.setContentTitle(notificationContent.title)
                             if (notificationContent.body.isNotBlank()) {
                                 builder
                                     .setContentText(notificationContent.body)
                                     .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
+                                reactionInlineArtwork =
+                                    previewToken.allowed &&
+                                    applyReactionNotificationArtwork(
+                                        context,
+                                        builder,
+                                        notificationContent,
+                                        // The reactor's picture below shares this card's row (#3635).
+                                        reservesPicture = !redactContent,
+                                    )
                             } else {
                                 // Expand the same sentence for long group names without repeating its title.
                                 builder.setStyle(
@@ -687,18 +696,14 @@ class LocalNotificationPresenter(
                                         .bigText(notificationContent.title),
                                 )
                             }
+                            // #3635: a reaction card shows who reacted. A missing picture arrives through the late
+                            // identity refresh, and redacted or hidden-preview cards get none.
                             if (notificationContent.isReactionPreview && !redactContent && previewToken.allowed) {
-                                val reactor =
+                                builder.setConversationIdentityImage(
                                     notificationContent.reactorImage(
                                         senderAvatarBitmap ?: cachedAvatarBitmap(senderAvatarUrl),
-                                    )
-                                reactionInlinePresentation =
-                                    applyReactionNotificationPresentation(
-                                        context,
-                                        builder,
-                                        notificationContent,
-                                        reactor,
-                                    )
+                                    ),
+                                )
                             }
                         }
 
@@ -1053,10 +1058,7 @@ class LocalNotificationPresenter(
                                                         rewriteLease?.dismissed?.get() != true
                                                 },
                                             )
-                                        if (
-                                            postResult == NotificationCardWriteResult.FAILED &&
-                                            reactionInlinePresentation
-                                        ) {
+                                        if (postResult == NotificationCardWriteResult.FAILED && reactionInlineArtwork) {
                                             publisher.cancelNotification(
                                                 notificationManager,
                                                 notificationContent.notificationTag,
@@ -1065,7 +1067,13 @@ class LocalNotificationPresenter(
                                             if (!profileAllowsPost() || !showGenerationAllowsPost()) {
                                                 return@withLock false
                                             }
-                                            builder.clearReactionNotificationPresentation(notificationContent.body)
+                                            builder
+                                                .setCustomContentView(null)
+                                                .setCustomBigContentView(null)
+                                                .setCustomHeadsUpContentView(null)
+                                                .setStyle(
+                                                    NotificationCompat.BigTextStyle().bigText(notificationContent.body),
+                                                )
                                             postResult =
                                                 publisher.postNotificationSafely(
                                                     notificationManager,
@@ -1606,10 +1614,8 @@ class LocalNotificationPresenter(
         refresh: LateIdentityRefresh,
         live: StatusBarNotification,
     ): Boolean {
-        val card = live.notification
-        val picture = refresh.pictures.second
-        if (picture == null || card.recordedIdentityInputs() == null) return false
-        val rewritten = cardContent.reactorPictureNotification(card, refresh.content.reactorImage(picture))
+        val picture = refresh.pictures.second ?: return false
+        val rewritten = cardContent.reactorPictureNotification(live.notification, refresh.content.reactorImage(picture))
         return postLateIdentityRewrite(refresh, live, rewritten)
     }
 

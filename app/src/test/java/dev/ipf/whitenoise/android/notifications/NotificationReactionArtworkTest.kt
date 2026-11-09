@@ -113,10 +113,10 @@ class NotificationReactionArtworkTest {
 
     /** Unicode reactions stay ordinary text and never look for custom image files. */
     @Test
-    fun unicodeKeepsNativeTextBesideTheReactorAvatar() =
+    fun unicodeKeepsNativeTextWithoutCustomViews() =
         runBlocking {
             val card = post("👍")
-            assertTextReaction(card, "👍")
+            assertNoArtwork(card)
             assertTrue(
                 card.extras
                     .getCharSequence(Notification.EXTRA_TEXT)
@@ -143,7 +143,7 @@ class NotificationReactionArtworkTest {
                 val marmot = requireNotNull(notificationBuiltinEmojiBitmap(context, ":marmot:"))
                 assertFalse(marmot.getPixel(64, 64) == Color.GREEN)
                 val card = post(":party:")
-                assertTextReaction(card, ":party:")
+                assertNoArtwork(card)
                 assertTrue(
                     card.extras
                         .getCharSequence(Notification.EXTRA_TEXT)
@@ -393,12 +393,11 @@ class NotificationReactionArtworkTest {
             "android.app.Notification\$DecoratedCustomViewStyle",
             card.extras.getString(Notification.EXTRA_TEMPLATE),
         )
-        // The leading picture shows who reacted and leaves the system's trailing slot empty.
-        assertNull(card.getLargeIcon())
+        // The card's own picture shows who reacted (#3635); the artwork stays inline, never a big picture.
+        assertNotNull(card.getLargeIcon())
         assertNotNull(card.extras.getBundle(EXTRA_IDENTITY_IMAGE))
         assertFalse(card.extras.containsKey(Notification.EXTRA_PICTURE))
         val root = requireNotNull(card.contentView).apply(context, null)
-        assertNotNull(root.findViewById<ImageView>(R.id.reaction_notification_avatar).drawable)
         val icon = root.findViewById<ImageView>(R.id.reaction_notification_body_light)
         assertNotNull(icon.drawable)
         assertFalse((icon.drawable as BitmapDrawable).bitmap.isRecycled)
@@ -414,28 +413,14 @@ class NotificationReactionArtworkTest {
         }
     }
 
-    /** Text-only reactions still render a leading picture, with the authored text in the normal text view. */
-    private fun assertTextReaction(
-        card: Notification,
-        token: String,
-    ) {
-        assertNull(card.getLargeIcon())
-        val root = requireNotNull(card.contentView).apply(context, null)
-        assertNotNull(root.findViewById<ImageView>(R.id.reaction_notification_avatar).drawable)
-        assertEquals(View.GONE, root.findViewById<View>(R.id.reaction_notification_artwork).visibility)
-        assertTrue(root.findViewById<android.widget.TextView>(R.id.reaction_notification_body).text.contains(token))
-    }
-
     /** A redacted, hidden or public payload carries neither artwork nor anyone's picture. */
     private fun assertGeneric(card: Notification) {
         assertNull(card.getLargeIcon())
         assertNoArtwork(card)
     }
 
-    /** A platform fallback or redacted card keeps its text without custom views or identity pixels. */
+    /** No reaction artwork remains; a readable card may still show who reacted (#3635). */
     private fun assertNoArtwork(card: Notification) {
-        assertNull(card.getLargeIcon())
-        assertNull(card.recordedIdentityInputs())
         assertNull(card.contentView)
         assertNull(card.bigContentView)
         assertNull(card.headsUpContentView)

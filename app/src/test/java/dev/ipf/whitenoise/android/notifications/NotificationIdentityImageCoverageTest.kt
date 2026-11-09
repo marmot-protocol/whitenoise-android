@@ -367,14 +367,11 @@ class NotificationIdentityImageCoverageTest {
         assertTrue("the reaction card draws who reacted", reactor >= 0)
         val guard = plain.substring(plain.lastIndexOf("if (", reactor), reactor)
         assertTrue("never on a redacted or hidden-preview card", "!redactContent && previewToken.allowed" in guard)
-        assertTrue("through the leading reaction presentation", "applyReactionNotificationPresentation(" in plain)
+        assertTrue("through the shared snapshot", "setConversationIdentityImage(" in plain)
         val route = presenter.functionBody("refreshLateIdentityImage")
         assertTrue("a late picture takes the reaction path", "rewriteWithLateReactorPicture(" in route)
         val rewrite = source("NotificationCardContent.kt").declaration("fun reactorPictureNotification(")
-        assertTrue(
-            "the artwork views survive the rewrite",
-            "withRepaintedIdentityImage(context, active, reactor)" in rewrite,
-        )
+        assertTrue("the artwork views survive the rewrite", "keepingCustomViews(active)" in rewrite)
         assertTrue("one silent rewrite", "setOnlyAlertOnce(true)" in rewrite)
         val identity = source("NotificationIdentityImage.kt")
         val keep = identity.extensionBody("keepingCustomViews")
@@ -384,16 +381,7 @@ class NotificationIdentityImageCoverageTest {
         val image = identity.extensionBody("reactorImage")
         assertTrue("the reactor's private picture applies", "contactKey = senderKey.takeIf(" in image)
         val refresh = identity.functionBody("withCurrentIdentityContact")
-        assertTrue(
-            "and the final write keeps the artwork",
-            "withRepaintedIdentityImage(context, notification, image)" in refresh,
-        )
-        val reaction = source("NotificationReactionPresentation.kt").extensionBody("withUpdatedReactionAvatar")
-        assertTrue(
-            "each updated picture rebuilds the view from text",
-            "renderReactionNotification(context, text, reactor)" in reaction,
-        )
-        assertFalse("never carry a view with stale private pixels", "source.contentView" in reaction)
+        assertTrue("and the final write keeps the artwork", "keepingCustomViews(notification)" in refresh)
         val warm = stateSource("AppStatePresentation.kt").declaration("internal fun shouldPreWarmNotificationAvatars(")
         assertFalse("a reaction's picture is warmed", "isReaction" in warm)
     }

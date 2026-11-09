@@ -6,12 +6,8 @@ import android.app.NotificationManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
-import android.os.Parcel
-import android.widget.ImageView
-import android.widget.RemoteViews
 import androidx.core.graphics.drawable.toBitmap
 import dev.ipf.marmotkit.NotificationUpdateFfi
-import dev.ipf.whitenoise.android.R
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -56,7 +52,7 @@ class NotificationReactorPictureTest {
             assertTrue(show(presenter, reaction("👍"), picture = solid(Color.RED)))
 
             val card = liveCard()
-            assertEquals(Color.RED, leadingAvatarPixel(card))
+            assertEquals(Color.RED, largeIconPixel(card))
             assertNotNull("a late picture can still redraw it", card.recordedIdentityInputs())
         }
 
@@ -73,34 +69,10 @@ class NotificationReactorPictureTest {
             assertTrue(show(presenter, update, picture = solid(Color.RED)))
 
             val card = liveCard()
-            assertEquals("the private picture", Color.GREEN, leadingAvatarPixel(card))
+            assertEquals("the private picture", Color.GREEN, largeIconPixel(card))
             assertNotNull("the artwork survives", card.contentView)
             assertNotNull(card.bigContentView)
             assertEquals(NotificationChannelSpec.REACTIONS.id, card.channelId)
-        }
-
-    /** Clearing a private picture replaces the view payload instead of appending another bitmap action. */
-    @Test
-    @Suppress("DEPRECATION")
-    fun clearingThePrivatePictureRebuildsThePostedView() =
-        runBlocking {
-            val update = reaction("👍")
-            val reactor = update.sender.accountIdHex
-            val publicPicture = solid(Color.RED)
-            val privatePicture = solid(Color.GREEN)
-            val presenter = presenter(contactAvatar = { _, contact -> (contact == reactor) to privatePicture })
-            assertTrue(show(presenter, update, picture = publicPicture))
-
-            val withPrivate = liveCard()
-            val cleared =
-                NotificationCardContent(context) { _, contact -> (contact == reactor) to publicPicture }
-                    .withCurrentContactPictures(withPrivate)
-            assertEquals(Color.GREEN, leadingAvatarPixel(withPrivate))
-            assertEquals(Color.RED, leadingAvatarPixel(cleared))
-            assertEquals(
-                parcelSize(checkNotNull(withPrivate.contentView)),
-                parcelSize(checkNotNull(cleared.contentView)),
-            )
         }
 
     /** Without a picture in hand, the reaction card shows the reactor's monogram. */
@@ -113,7 +85,7 @@ class NotificationReactorPictureTest {
 
             val content = content(update)
             val monogram = notificationMonogramBitmap(content.senderName, content.senderKey).getPixel(0, 0)
-            assertEquals(monogram, leadingAvatarPixel(liveCard()))
+            assertEquals(monogram, largeIconPixel(liveCard()))
         }
 
     /** A redacted reaction card shows no picture of anyone. */
@@ -154,7 +126,7 @@ class NotificationReactorPictureTest {
             assertEquals(listOf(PICTURE_URL), fetched)
             assertEquals(before + 1, posts.size)
             val card = liveCard()
-            assertEquals(Color.MAGENTA, leadingAvatarPixel(card))
+            assertEquals(Color.MAGENTA, largeIconPixel(card))
             assertNotNull("the artwork survives the rewrite", card.contentView)
             assertNotNull(card.bigContentView)
             assertTrue(card.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
@@ -231,31 +203,11 @@ class NotificationReactorPictureTest {
             .single { it.notification.flags and Notification.FLAG_GROUP_SUMMARY == 0 }
             .notification
 
-    /** Every rendered form uses the leading avatar view and leaves the system's trailing slot empty. */
-    @Suppress("DEPRECATION")
-    private fun leadingAvatarPixel(card: Notification): Int {
-        assertNull(card.getLargeIcon())
-        val pixels =
-            listOf(card.contentView, card.bigContentView, card.headsUpContentView).map { remote ->
-                val root = checkNotNull(remote).apply(context, null)
-                checkNotNull(root.findViewById<ImageView>(R.id.reaction_notification_avatar).drawable)
-                    .toBitmap()
-                    .getPixel(0, 0)
-            }
-        assertEquals(1, pixels.distinct().size)
-        return pixels.first()
-    }
-
-    /** Measures the serialized view including the bitmap cache and every action. */
-    private fun parcelSize(view: RemoteViews): Int {
-        val parcel = Parcel.obtain()
-        return try {
-            view.writeToParcel(parcel, 0)
-            parcel.dataSize()
-        } finally {
-            parcel.recycle()
-        }
-    }
+    /** The top-left pixel of the card's picture. */
+    private fun largeIconPixel(card: Notification): Int =
+        checkNotNull(card.getLargeIcon()?.loadDrawable(context)) { "the card has no picture" }
+            .toBitmap()
+            .getPixel(0, 0)
 
     /** A small single-color bitmap whose pixels identify which picture reached the card. */
     private fun solid(color: Int): Bitmap =

@@ -1693,7 +1693,6 @@ class LocalNotificationPresenterConversationTest {
         assertEquals(listOf("safe new line"), messages)
     }
 
-    /** A rejected redacted reaction has no custom view to remove, so it needs no retry. */
     @Test
     fun failedPlainPostIsContainedAndReportedAsNotPosted() {
         presenter.ensureChannels()
@@ -1713,7 +1712,6 @@ class LocalNotificationPresenterConversationTest {
                 failingPresenter.show(
                     update(isMention = false, reactionEmoji = "thumbs-up"),
                     shortNpub = { "npub1test" },
-                    redactContent = true,
                 )
             }
 
