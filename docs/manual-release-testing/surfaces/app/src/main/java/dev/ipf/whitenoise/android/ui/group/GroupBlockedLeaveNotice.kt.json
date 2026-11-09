@@ -8,7 +8,15 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupBlockedLeaveNotice.kt",
         "anchor": "fun BlockedLeaveCancelNotice(",
         "test_ids": [
-          "GRP-032"
+          "GRP-037"
+        ]
+      },
+      {
+        "surface": "BlockedLeaveComposerNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupBlockedLeaveNotice.kt",
+        "anchor": "fun BlockedLeaveComposerNotice(",
+        "test_ids": [
+          "GRP-037"
         ]
       },
       {
@@ -16,7 +24,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupBlockedLeaveNotice.kt",
         "anchor": "R.string.group_cancel_leave",
         "test_ids": [
-          "GRP-032"
+          "GRP-037"
         ]
       },
       {
@@ -24,15 +32,7 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupBlockedLeaveNotice.kt",
         "anchor": "R.string.group_leave_blocked_hint",
         "test_ids": [
-          "GRP-032"
-        ]
-      },
-      {
-        "surface": "R.string.group_leave_refresh_hint",
-        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupBlockedLeaveNotice.kt",
-        "anchor": "R.string.group_leave_refresh_hint",
-        "test_ids": [
-          "GRP-032"
+          "GRP-037"
         ]
       },
       {
@@ -40,7 +40,23 @@
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupBlockedLeaveNotice.kt",
         "anchor": "R.string.group_leave_refresh_action",
         "test_ids": [
-          "GRP-032"
+          "GRP-037"
+        ]
+      },
+      {
+        "surface": "R.string.group_leave_refresh_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupBlockedLeaveNotice.kt",
+        "anchor": "R.string.group_leave_refresh_hint",
+        "test_ids": [
+          "GRP-037"
+        ]
+      },
+      {
+        "surface": "R.string.toast_couldnt_cancel_leave",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupBlockedLeaveNotice.kt",
+        "anchor": "R.string.toast_couldnt_cancel_leave",
+        "test_ids": [
+          "GRP-037"
         ]
       }
     ]

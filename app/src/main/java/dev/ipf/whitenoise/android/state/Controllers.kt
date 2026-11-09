@@ -908,7 +908,7 @@ private fun AppGroupRecordFfi.hasSettledDeparture(): Boolean =
 private fun SelfMembershipFfi.isGroupEviction(): Boolean =
     when (this) {
         SelfMembershipFfi.REMOVED, SelfMembershipFfi.DEVICE_REMOVED -> true
-        else -> false
+        SelfMembershipFfi.MEMBER, SelfMembershipFfi.LEFT -> false
     }
 
 /** A readback can rejoin only an active, confirmed group with no outstanding leave request. */
@@ -7793,7 +7793,11 @@ class ConversationController(
         onPresentationAccepted: (String) -> Unit = {},
         onDurablyAccepted: () -> Unit = {},
     ) {
-        if (showsBlockedLeave) return
+        if (showsBlockedLeave) {
+            // Shares, dictation and notification replies reach here without the composer gate, so say why.
+            appState.presentTransient(R.string.group_leave_blocked_hint)
+            return
+        }
         val trimmed = text.trim()
         val accountRef = conversationAccountRef
         if (

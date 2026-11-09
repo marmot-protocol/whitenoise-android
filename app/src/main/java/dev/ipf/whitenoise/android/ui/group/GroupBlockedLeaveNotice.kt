@@ -1,8 +1,11 @@
 package dev.ipf.whitenoise.android.ui.group
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -16,6 +19,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.state.ConversationController
+import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.theme.amoledSurfaceBorderStroke
 
 /** Shows the durable last-admin block or offers to verify membership after it clears. */
@@ -41,5 +46,36 @@ internal fun BlockedLeaveCancelNotice(
                 Text(stringResource(action))
             }
         }
+    }
+}
+
+/**
+ * The conversation's composer slot while this account's leave is blocked: the same explanation and Cancel leave as
+ * Chat Info, so a durable block never leaves the chat with an empty bar. A cancel that does not restore membership
+ * says so here, since Chat Info's error banner is not on screen.
+ */
+@Suppress("FunctionNaming")
+@Composable
+internal fun BlockedLeaveComposerNotice(
+    controller: ConversationController,
+    appState: WhiteNoiseAppState,
+) {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .imePadding()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .testTag("conversation.blocked_leave"),
+    ) {
+        BlockedLeaveCancelNotice(
+            enabled = controller.canCancelBlockedLeave,
+            refreshingMembership = controller.blockedLeaveNeedsReadback,
+            onCancel = {
+                appState.launchMutation {
+                    if (!controller.cancelBlockedLeave()) appState.presentTransient(R.string.toast_couldnt_cancel_leave)
+                }
+            },
+        )
     }
 }
