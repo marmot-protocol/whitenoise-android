@@ -164,6 +164,14 @@
         ]
       },
       {
+        "surface": "R.string.group_leave_refresh_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "R.string.group_leave_refresh_hint",
+        "test_ids": [
+          "GRP-037"
+        ]
+      },
+      {
         "surface": "R.string.toast_couldnt_cancel_leave",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
         "anchor": "R.string.toast_couldnt_cancel_leave",

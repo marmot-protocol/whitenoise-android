@@ -7796,13 +7796,7 @@ class ConversationController(
         if (showsBlockedLeave) {
             // Dictation's send action and the in-conversation wave and location shares reach here without the
             // composer gate, so say why.
-            // Matches the notice: a cancelled or cleared block that only awaits readback asks for Refresh.
-            val hint =
-                when {
-                    blockedLeaveNeedsReadback -> R.string.group_leave_refresh_hint
-                    else -> R.string.group_leave_blocked_hint
-                }
-            if (text.isNotBlank()) appState.presentTransient(hint)
+            if (text.isNotBlank()) appState.presentTransient(blockedLeaveHint())
             return
         }
         val trimmed = text.trim()
@@ -10409,6 +10403,11 @@ class ConversationController(
      */
     @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
     suspend fun retryFailedSend(item: TimelineMessage) {
+        // A send that failed before the leave was blocked stays failed until the block is resolved.
+        if (showsBlockedLeave) {
+            appState.presentTransient(blockedLeaveHint())
+            return
+        }
         val key = item.id
         // A failed edit's bubble is the target's projected row (no
         // optimisticMessages entry); its retry re-runs the edit publish rather
@@ -11966,6 +11965,14 @@ class ConversationController(
                 }
             }
             stayed
+        }
+
+    /** Matches the blocked-leave notice: a cancelled or cleared block that only awaits readback asks for Refresh. */
+    @StringRes
+    private fun blockedLeaveHint(): Int =
+        when {
+            blockedLeaveNeedsReadback -> R.string.group_leave_refresh_hint
+            else -> R.string.group_leave_blocked_hint
         }
 
     /** Check the action owner again under the native group lock before canceling or retrying readback. */
