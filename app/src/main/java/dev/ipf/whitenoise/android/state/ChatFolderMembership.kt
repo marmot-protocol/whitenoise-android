@@ -235,6 +235,7 @@ internal fun WhiteNoiseAppState.nativeFolderMembership(
             excludedChatIds = preferences.excludedChats(accountRef, folderId),
             active = chatListItems,
             archived = archivedChatListItems,
+            presentation = profileRevisionForCompose,
         )
     val departed =
         chatFolderMembership
@@ -263,20 +264,25 @@ internal class DepartedInputs(
     val excludedChatIds: Set<String>,
     val active: List<ChatListItem>,
     val archived: List<ChatListItem>,
+    val presentation: ProfilePresentationRevision,
 ) {
-    /** Equal when the folder's settings are equal and both row lists are the very same instances. */
+    /**
+     * Equal when the folder's settings and the profile and nickname revision are equal, since a keyword can match a
+     * departed chat's display title, and both row lists are the very same instances.
+     */
     override fun equals(other: Any?): Boolean =
         other is DepartedInputs &&
             accountRef == other.accountRef &&
             rule == other.rule &&
             manualChatIds == other.manualChatIds &&
             excludedChatIds == other.excludedChatIds &&
+            presentation == other.presentation &&
             active === other.active &&
             archived === other.archived
 
     /** Hashes the folder's settings and the row lists' identities, consistent with [equals]. */
     override fun hashCode(): Int =
-        listOf(accountRef, rule, manualChatIds, excludedChatIds).hashCode() * 31 +
+        listOf(accountRef, rule, manualChatIds, excludedChatIds, presentation).hashCode() * 31 +
             System.identityHashCode(active) * 17 + System.identityHashCode(archived)
 }
 
