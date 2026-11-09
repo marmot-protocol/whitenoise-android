@@ -956,6 +956,23 @@
         "test_ids": [
           "MSG-019"
         ]
+      },
+      {
+        "surface": "Mark all read, mark unread and pin run through one admission check, account recheck and failure path",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private suspend fun <T> runAdmittedChatListAction(",
+        "test_ids": [
+          "CHL-006",
+          "CHL-008"
+        ]
+      },
+      {
+        "surface": "Read anchors, send retention and pending edits drop together when their message leaves the loaded window",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/state/Controllers.kt",
+        "anchor": "private fun MutableMap<String, *>.retainTimelineWindow()",
+        "test_ids": [
+          "CON-003"
+        ]
       }
     ]
   },
