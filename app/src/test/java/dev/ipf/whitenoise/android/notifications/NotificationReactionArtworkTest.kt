@@ -326,6 +326,7 @@ class NotificationReactionArtworkTest {
     ): LocalNotificationPresenter =
         LocalNotificationPresenter(
             context,
+            shortcutPublisher = { error("reaction shortcut unavailable") },
             groupReconciliation = {},
             enrichmentLauncher = {},
             emojiArtworkTimeoutMs = 5_000L,

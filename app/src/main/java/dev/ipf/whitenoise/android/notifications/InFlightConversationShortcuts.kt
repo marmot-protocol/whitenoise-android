@@ -78,13 +78,14 @@ internal object InFlightConversationShortcuts {
         }
 
     /**
-     * What a Direct Share refresh keeps for a held [shortcutId] it does not target: the presenter's publication with
-     * its picture and Person, but without share eligibility, so a pending card for another account, or for a chat
-     * outside the active account's recent targets, never becomes a share suggestion. Null when it is not held.
+     * The presenter's share-ineligible shortcut for a pending post or a live reaction. Reactions never have a
+     * share target of their own, so a refresh must keep their group picture after the first post as well.
      */
     fun retainedShortcut(shortcutId: String): ShortcutInfoCompat? =
         synchronized(UserEventNotificationGroup.mutationLock) {
-            published[shortcutId]?.retained?.takeIf { shortcutId in holds }
+            published[shortcutId]
+                ?.retained
+                ?.takeIf { shortcutId in holds || isReactionShortcutId(shortcutId) }
         }
 
     /**

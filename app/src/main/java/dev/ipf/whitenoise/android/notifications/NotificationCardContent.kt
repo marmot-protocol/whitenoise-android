@@ -64,21 +64,25 @@ internal class NotificationCardContent(
     }
 
     /**
-     * Rewrites a live reaction card with the reactor's late picture (#3635) as one silent write. The recovery builder
-     * drops custom views, so the card's reaction artwork views are copied across, and its text, extras and grouping
-     * are kept.
+     * Updates the reactor's Person in the native template, or keeps the fallback's artwork views, in one silent write.
      */
     fun reactorPictureNotification(
         active: Notification,
         reactor: NotificationIdentityImage,
-    ): Notification =
-        NotificationCompat
-            .Builder(context, active)
-            .setGroupAlertBehavior(active.groupAlertBehavior)
-            .setOnlyAlertOnce(true)
-            .keepingCustomViews(active)
-            .setConversationIdentityImage(reactor)
-            .build()
+    ): Notification {
+        val builder =
+            NotificationCompat
+                .Builder(context, active)
+                .setGroupAlertBehavior(active.groupAlertBehavior)
+                .setOnlyAlertOnce(true)
+                .keepingCustomViews(active)
+        val style = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(active)
+        if (style == null) builder.setConversationIdentityImage(reactor)
+        style?.messages?.singleOrNull()?.person?.let { person ->
+            builder.setStyle(copiedMessagingStyle(style, contactAvatarPerson(person, reactor.bitmap), repaint = true))
+        }
+        return builder.build()
+    }
 
     /**
      * Copies an active MessagingStyle while replacing the matching sender's rich Person metadata, repainting that
@@ -181,11 +185,20 @@ internal class NotificationCardContent(
                 val (changed, bitmap) = person.key?.let { contactAvatarOverride(account, it) } ?: (false to null)
                 if (changed) {
                     changedAny = true
-                    style = copiedMessagingStyle(checkNotNull(style), contactAvatarPerson(person, bitmap))
+                    style =
+                        copiedMessagingStyle(
+                            checkNotNull(style),
+                            contactAvatarPerson(person, bitmap),
+                            repaint = notification.shortcutId?.let(::isReactionShortcutId) == true,
+                        )
                 }
             }
             return if (changedAny) {
-                NotificationCompat.Builder(context, notification).setStyle(style).build()
+                NotificationCompat
+                    .Builder(context, notification)
+                    .setGroupAlertBehavior(notification.groupAlertBehavior)
+                    .setStyle(style)
+                    .build()
             } else {
                 notification
             }
@@ -207,7 +220,11 @@ internal class NotificationCardContent(
     fun withCurrentContactPictures(notification: Notification): Notification {
         val people = withCurrentContactAvatars(notification)
         val account = people.extras?.getString(CONTACT_PICTURE_ACCOUNT_SCOPE_EXTRA)
-        return if (account == null || people.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true) {
+        return if (
+            account == null ||
+            people.extras?.getBoolean(EXTRA_CONTENT_REDACTED) == true ||
+            people.shortcutId?.let(::isReactionShortcutId) == true
+        ) {
             people
         } else {
             withCurrentIdentityContact(context, people) { contact -> contactAvatarOverride(account, contact) }
@@ -294,4 +311,25 @@ internal class NotificationCardContent(
                 )
             }
         }
+}
+
+/** A reaction uses the native message layout for a single actor and owns its own card and channel. */
+internal fun reactionStyle(
+    content: LocalNotificationContent,
+    reactor: NotificationIdentityImage,
+    groupTitle: String?,
+    timestampMs: Long,
+): NotificationCompat.MessagingStyle {
+    val self =
+        Person
+            .Builder()
+            .setName(content.selfName)
+            .setKey(content.selfKey)
+            .build()
+    val sender = notificationSenderPerson(content, reactor.bitmap)
+    return NotificationCompat
+        .MessagingStyle(self)
+        .setConversationTitle(groupTitle)
+        .setGroupConversation(groupTitle != null)
+        .addMessage(content.body, timestampMs, sender)
 }

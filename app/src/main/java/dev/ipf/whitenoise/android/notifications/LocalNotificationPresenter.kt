@@ -5,6 +5,7 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import android.graphics.Bitmap
+import android.os.Build
 import android.os.Bundle
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationCompat
@@ -52,7 +53,7 @@ private fun postLocalNotification(
 class LocalNotificationPresenter(
     private val context: Context,
     private val shortcutPublisher: (ShortcutInfoCompat) -> Unit = { shortcut ->
-        ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+        check(ShortcutManagerCompat.pushDynamicShortcut(context, shortcut))
     },
     private val nowMillis: () -> Long = System::currentTimeMillis,
     private val notificationPoster: (NotificationManagerCompat, String, Int, Notification) -> Unit =
@@ -443,7 +444,6 @@ class LocalNotificationPresenter(
         var written = false
         var rewriteLease: NotificationCardGeneration? = null
         var emojiArtifact: NotificationEmojiArtifact? = null
-        var reactionInlineArtwork = false
         var carriedArtworkLease: AutoCloseable? = null
         var emojiPreparationAttempted = false
         try {
@@ -667,26 +667,18 @@ class LocalNotificationPresenter(
 
                     builder.addExtras(contactPictureAccountExtras(update.accountRef))
                     var messagingPost: MessagingPostContext? = null
+                    var reactorIdentity: NotificationIdentityImage? = null
+                    val reactionGroupTitle = notificationContent.conversationTitle.takeIf { identityContact == null }
                     when (val style = decision.style) {
                         // Reactions get their own self-contained card (own tag/id on the
                         // reactions channel, see LocalNotificationFormatter) so they're muted
-                        // independently of messages. Artwork replaces its shortcode in a decorated inline row;
-                        // the card keeps its existing actions and never becomes a conversation.
+                        // independently of messages. Android can use the message template for that separate card.
                         NotificationStyleChoice.Plain -> {
                             builder.setContentTitle(notificationContent.title)
                             if (notificationContent.body.isNotBlank()) {
                                 builder
                                     .setContentText(notificationContent.body)
                                     .setStyle(NotificationCompat.BigTextStyle().bigText(notificationContent.body))
-                                reactionInlineArtwork =
-                                    previewToken.allowed &&
-                                    applyReactionNotificationArtwork(
-                                        context,
-                                        builder,
-                                        notificationContent,
-                                        // The reactor's picture below shares this card's row (#3635).
-                                        reservesPicture = !redactContent,
-                                    )
                             } else {
                                 // Expand the same sentence for long group names without repeating its title.
                                 builder.setStyle(
@@ -699,11 +691,12 @@ class LocalNotificationPresenter(
                             // #3635: a reaction card shows who reacted. A missing picture arrives through the late
                             // identity refresh, and redacted or hidden-preview cards get none.
                             if (notificationContent.isReactionPreview && !redactContent && previewToken.allowed) {
-                                builder.setConversationIdentityImage(
+                                val reactor =
                                     notificationContent.reactorImage(
                                         senderAvatarBitmap ?: cachedAvatarBitmap(senderAvatarUrl),
-                                    ),
-                                )
+                                    )
+                                reactorIdentity = reactor
+                                builder.setConversationIdentityImage(reactor)
                             }
                         }
 
@@ -826,7 +819,25 @@ class LocalNotificationPresenter(
                             publishShortcutBeforePost(update, notificationContent, messaging, directShareEligible) {
                                 profileAllowsPost() && showGenerationAllowsPost()
                             }
+                        } ?: reactorIdentity?.let {
+                            publishReactionShortcutBeforePost(
+                                update,
+                                notificationContent,
+                                reactionGroupTitle,
+                                conversationAvatarBitmap.takeIf { reactionGroupTitle != null },
+                            ) {
+                                profileAllowsPost() && showGenerationAllowsPost()
+                            }?.also(builder::setShortcutId)
                         }
+                    val reactionInlineArtwork =
+                        reactorIdentity != null &&
+                            heldShortcutId == null &&
+                            applyReactionNotificationArtwork(
+                                context,
+                                builder,
+                                notificationContent,
+                                reservesPicture = true,
+                            )
 
                     // Builds under the card lock, so the quiet flags see the card the platform will update.
                     val buildSettled = { afterOwnCancel: Boolean ->
@@ -1029,6 +1040,18 @@ class LocalNotificationPresenter(
                                         }
                                         val presentationTimestampMs = nowMillis()
                                         stampPresentationTime(builder, decision.channelId, decision.category, presentationTimestampMs)
+                                        reactorIdentity?.takeIf { heldShortcutId != null }?.let { reactor ->
+                                            builder
+                                                .setLargeIcon(null as Bitmap?)
+                                                .setStyle(
+                                                    reactionStyle(
+                                                        notificationContent,
+                                                        reactor,
+                                                        reactionGroupTitle,
+                                                        presentationTimestampMs,
+                                                    ),
+                                                )
+                                        }
                                         val notification = buildSettled(false)
                                         ConversationCardPostSynchronizer.awaitTestBarrier(
                                             ConversationCardOp.SHOW_NOTIFY,
@@ -1191,6 +1214,31 @@ class LocalNotificationPresenter(
                 identityContact = messaging.identityContact,
             )
         }.takeIf { it }?.let { shortcutId }
+    }
+
+    /** Publishes the separate reaction shortcut before Android classifies the card for its template. */
+    private suspend fun publishReactionShortcutBeforePost(
+        update: NotificationUpdateFfi,
+        content: LocalNotificationContent,
+        groupTitle: String?,
+        groupAvatar: Bitmap?,
+        isPublishAllowed: () -> Boolean,
+    ): String? {
+        val id =
+            reactionConversationShortcutId(update.accountRef, update.groupIdHex)
+                ?.takeIf { Build.VERSION.SDK_INT >= Build.VERSION_CODES.R } ?: return null
+        val published =
+            withContext(Dispatchers.Default) {
+                conversationShortcuts.publishReactionShortcut(
+                    update,
+                    content,
+                    id,
+                    groupTitle,
+                    groupAvatar,
+                    isPublishAllowed,
+                )
+            }
+        return id.takeIf { published }
     }
 
     /** Hands optional picture work to its execution owner while keeping content and write checks here. */

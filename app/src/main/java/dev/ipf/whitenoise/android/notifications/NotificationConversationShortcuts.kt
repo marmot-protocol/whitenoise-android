@@ -79,10 +79,16 @@ internal class NotificationConversationShortcuts(
         accountRef: String,
         groupIdHex: String,
     ) {
-        val shortcutId = conversationShortcutId(accountRef, groupIdHex) ?: return
+        val ids =
+            listOfNotNull(
+                conversationShortcutId(accountRef, groupIdHex),
+                reactionConversationShortcutId(accountRef, groupIdHex),
+            )
         synchronized(UserEventNotificationGroup.mutationLock) {
-            forgetShortcutSnapshot(shortcutId)
-            shortcutLastUsed.remove(shortcutId)
+            ids.forEach { shortcutId ->
+                forgetShortcutSnapshot(shortcutId)
+                shortcutLastUsed.remove(shortcutId)
+            }
         }
     }
 
@@ -90,8 +96,9 @@ internal class NotificationConversationShortcuts(
     private fun directContactAvatar(
         update: NotificationUpdateFfi,
         identityContact: String?,
+        reaction: Boolean = false,
     ): Pair<Boolean, Bitmap?> {
-        val contact = pictureContact(update, identityContact) ?: return false to null
+        val contact = pictureContact(update, identityContact).takeUnless { reaction } ?: return false to null
         return currentContactAvatar(update.accountRef, contact)
     }
 
@@ -106,9 +113,10 @@ internal class NotificationConversationShortcuts(
         conversationAvatarBitmap: Bitmap?,
         senderAvatarBitmap: Bitmap?,
         sender: Person,
+        reaction: Boolean,
     ): Triple<Bitmap?, Bitmap?, Person> {
-        if (!update.isDm) {
-            val (chosen, private) = directContactAvatar(update, identityContact)
+        if (reaction || !update.isDm) {
+            val (chosen, private) = directContactAvatar(update, identityContact, reaction)
             return Triple(private.takeIf { chosen } ?: conversationAvatarBitmap, null, sender)
         }
         val (override, currentAvatar) = currentContactAvatar(update.accountRef, update.sender.accountIdHex)
@@ -147,8 +155,16 @@ internal class NotificationConversationShortcuts(
         identityContact: String? = null,
     ): Boolean =
         runCatching {
+            val reaction = content.isReactionPreview
             val (ownedConversationAvatar, ownedSenderAvatar, ownedSender) =
-                ownedShortcutAvatars(update, identityContact, conversationAvatarBitmap, senderAvatarBitmap, sender)
+                ownedShortcutAvatars(
+                    update,
+                    identityContact,
+                    conversationAvatarBitmap,
+                    senderAvatarBitmap,
+                    sender,
+                    reaction,
+                )
             val candidateTitle = content.conversationTitle ?: content.title
             val existingTitle =
                 shortcutSnapshots[shortcutId]?.longLabel
@@ -189,6 +205,7 @@ internal class NotificationConversationShortcuts(
                     sender = notificationShortcutSender(content, ownedSender),
                     conversationAvatarBitmap = ownedConversationAvatar,
                     directShareEligible = shareEligible,
+                    content = content,
                 )
             }
             val shortcut = build(directShareEligible)
@@ -198,11 +215,11 @@ internal class NotificationConversationShortcuts(
                 // A cap filled by protected shortcuts skips the publication, and the card keeps the existing fallback.
                 if (isPublishAllowed() && pruneConversationShortcutsBeforePublish(shortcutId)) {
                     val contact = pictureContact(update, identityContact)
-                    val choice = directContactAvatar(update, identityContact)
+                    val choice = directContactAvatar(update, identityContact, reaction)
                     val preview = NotificationPreviewPreferences.capture(context)
                     val finish = { built: ShortcutInfoCompat ->
                         built.extras?.let { stampShortcutPreview(preview, it) }
-                        built.withPictureContact(context, contact, update.sender.accountIdHex, choice)
+                        built.withPictureContact(context, contact, update.sender.accountIdHex, choice, reaction)
                     }
                     val currentShortcut = finish(shortcut)
                     val retainedShortcut = if (retainable === shortcut) currentShortcut else finish(retainable)
@@ -273,23 +290,23 @@ internal class NotificationConversationShortcuts(
         sender: Person,
         conversationAvatarBitmap: android.graphics.Bitmap?,
         directShareEligible: Boolean,
+        content: LocalNotificationContent,
     ): ShortcutInfoCompat {
         val builder =
             ShortcutInfoCompat
                 .Builder(context, shortcutId)
                 .setShortLabel(snapshot.shortLabel)
                 .setLongLabel(snapshot.longLabel)
-                .setIcon(
-                    notificationConversationIcon(
-                        title = snapshot.longLabel,
-                        seed = snapshot.shortcutId,
-                        avatarBitmap = conversationAvatarBitmap,
-                    ),
-                ).setIntent(intent)
+                .setIntent(intent)
                 .setLocusId(locusId)
                 .setPerson(sender)
                 .setLongLived(true)
                 .setExtras(conversationShortcutAccountScopeExtras(snapshot.accountScope))
+        if (!content.isReactionPreview || content.isGroupConversation) {
+            builder.setIcon(
+                notificationConversationIcon(snapshot.longLabel, snapshot.shortcutId, conversationAvatarBitmap),
+            )
+        }
         if (directShareEligible) {
             builder.setCategories(setOf(CONVERSATION_SHARE_TARGET_CATEGORY))
         }
@@ -340,6 +357,34 @@ internal class NotificationConversationShortcuts(
         }.getOrDefault(emptySet())
 }
 
+/** Holds a notification-only shortcut with the chat's header and a separate reactor row. */
+internal fun NotificationConversationShortcuts.publishReactionShortcut(
+    update: NotificationUpdateFfi,
+    content: LocalNotificationContent,
+    shortcutId: String,
+    groupTitle: String?,
+    groupAvatar: Bitmap?,
+    isPublishAllowed: () -> Boolean,
+): Boolean =
+    publishConversationShortcut(
+        update,
+        content.copy(
+            title = groupTitle ?: content.senderName,
+            conversationTitle = groupTitle,
+            isGroupConversation = groupTitle != null,
+        ),
+        shortcutId,
+        LocusIdCompat(shortcutId),
+        conversationAvatarUrl = null,
+        conversationAvatarBitmap = groupAvatar,
+        senderAvatarUrl = null,
+        senderAvatarBitmap = null,
+        sender = notificationSenderPerson(content, null),
+        directShareEligible = false,
+        isPublishAllowed = isPublishAllowed,
+        holdForPost = true,
+    )
+
 /**
  * The contact whose private picture is this conversation's own picture: a direct chat's sender, or the chat row's
  * peer, [identityContact], for a direct chat MDK reports as a group (#3635). A group names none.
@@ -359,8 +404,9 @@ private fun ShortcutInfoCompat.withPictureContact(
     contact: String?,
     sender: String,
     choice: Pair<Boolean, Bitmap?>,
+    reaction: Boolean,
 ): ShortcutInfoCompat {
-    stampContactPictureShortcut(this, contact ?: sender, conversationIcon = contact != null)
+    if (!reaction) stampContactPictureShortcut(this, contact ?: sender, conversationIcon = contact != null)
     val (chosen, pixels) = choice
     return when {
         !shortcutPreviewAllowed(context, this) -> genericNotificationShortcut(context, this)

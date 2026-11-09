@@ -6,6 +6,8 @@ import android.app.NotificationManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
+import androidx.core.app.NotificationCompat
+import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.graphics.drawable.toBitmap
 import dev.ipf.marmotkit.NotificationUpdateFfi
 import kotlinx.coroutines.runBlocking
@@ -44,15 +46,31 @@ class NotificationReactorPictureTest {
         shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
     }
 
-    /** A reactor's ready picture is the reaction card's picture. */
+    /** The native row carries one reaction with the reactor's picture and its own shortcut and channel. */
     @Test
     fun reactionCardShowsTheReactorsReadyPicture() =
         runBlocking {
-            val presenter = presenter()
-            assertTrue(show(presenter, reaction("👍"), picture = solid(Color.RED)))
+            val shortcuts = mutableListOf<ShortcutInfoCompat>()
+            val presenter = presenter(shortcutPublisher = { shortcuts.add(it) })
+            val update = reaction("👍")
+            assertTrue(show(presenter, update, picture = solid(Color.RED)))
 
             val card = liveCard()
-            assertEquals(Color.RED, largeIconPixel(card))
+            val style = checkNotNull(NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(card))
+            val line = style.messages.single()
+            val shortcut = shortcuts.single()
+            assertEquals(content(update).body, line.text.toString())
+            assertEquals(update.sender.accountIdHex, line.person?.key)
+            val avatar = line.person?.icon?.loadDrawable(context)
+            assertEquals(Color.RED, avatar?.toBitmap()?.getPixel(0, 0))
+            assertEquals(content(update).conversationTitle, style.conversationTitle)
+            assertTrue(style.isGroupConversation)
+            assertEquals(shortcut.id, card.shortcutId)
+            assertEquals(reactionConversationShortcutId(update.accountRef, update.groupIdHex), shortcut.id)
+            assertTrue(shortcut.categories.isNullOrEmpty())
+            assertEquals(NotificationChannelSpec.REACTIONS.id, card.channelId)
+            assertTrue(card.actions.isNullOrEmpty())
+            assertNull(card.getLargeIcon())
             assertNotNull("a late picture can still redraw it", card.recordedIdentityInputs())
         }
 
@@ -160,10 +178,12 @@ class NotificationReactorPictureTest {
     private fun presenter(
         posts: MutableList<Notification> = mutableListOf(),
         contactAvatar: (String, String) -> Pair<Boolean, Bitmap?> = { _, _ -> false to null },
+        shortcutPublisher: (ShortcutInfoCompat) -> Unit = { error("reaction shortcut unavailable") },
         resolver: suspend (String?) -> Bitmap? = { null },
     ): LocalNotificationPresenter =
         LocalNotificationPresenter(
             context,
+            shortcutPublisher = shortcutPublisher,
             groupReconciliation = {},
             enrichmentLauncher = {},
             emojiArtworkTimeoutMs = 5_000L,

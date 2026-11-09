@@ -73,6 +73,15 @@
         "test_ids": [
           "NTF-025"
         ]
+      },
+      {
+        "surface": "separate native reaction row with a reactor avatar",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/notifications/NotificationCardContent.kt",
+        "anchor": "fun reactionStyle(",
+        "test_ids": [
+          "NTF-034",
+          "NTF-042"
+        ]
       }
     ]
   }
