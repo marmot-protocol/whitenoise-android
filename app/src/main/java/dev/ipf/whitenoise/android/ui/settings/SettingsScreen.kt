@@ -381,6 +381,7 @@ internal fun SettingsScreen(
     homeViewport: SettingsHomeViewport,
     onHomeViewportChange: (SettingsHomeViewport) -> Unit,
     suppressMotion: Boolean = false,
+    selfUpdateEnabled: Boolean = BuildConfig.SELF_UPDATE_ENABLED,
 ) {
     // Issue #121: the prior shape only handled back from a detail
     // subscreen; when on the Settings home (detail == null) the system
@@ -472,6 +473,7 @@ internal fun SettingsScreen(
                     searchEligibility = eligibility,
                     searchDocuments = searchDocuments,
                     suppressSearchMotion = suppressMotion,
+                    selfUpdateEnabled = selfUpdateEnabled,
                     onSearchOpenChange = {
                         if (it) searchOriginId = null
                         searchOpen = it
@@ -680,6 +682,7 @@ private fun SettingsHomeScreen(
     onOpenProfilePictureActions: () -> Unit,
     viewport: SettingsHomeViewport,
     onViewportChange: (SettingsHomeViewport) -> Unit,
+    selfUpdateEnabled: Boolean,
 ) {
     var showAccountSelector by remember { mutableStateOf(false) }
     var showAddIdentity by remember { mutableStateOf(false) }
@@ -737,7 +740,7 @@ private fun SettingsHomeScreen(
         state =
             settingsHomeState(
                 hasActiveAccount = activeAccount != null,
-                selfUpdateEnabled = BuildConfig.SELF_UPDATE_ENABLED,
+                selfUpdateEnabled = selfUpdateEnabled,
                 updateAvailable = appState.appUpdateInfo.isUpdateAvailable,
             ),
         account = homeAccount,

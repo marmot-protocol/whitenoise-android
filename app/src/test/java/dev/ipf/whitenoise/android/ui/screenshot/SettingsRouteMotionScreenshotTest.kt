@@ -87,6 +87,8 @@ class SettingsRouteMotionScreenshotTest {
                             { detail.value = it },
                             SettingsHomeViewport.Top,
                             {},
+                            // Pin the flavor-dependent update card so Play and Zapstore share one baseline.
+                            selfUpdateEnabled = true,
                         )
                     }
                 }
