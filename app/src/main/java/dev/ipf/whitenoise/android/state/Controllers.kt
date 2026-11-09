@@ -7796,7 +7796,9 @@ class ConversationController(
         if (showsBlockedLeave) {
             // Dictation's send action and the in-conversation wave and location shares reach here without the
             // composer gate, so say why.
-            if (text.isNotBlank()) appState.presentTransient(R.string.group_leave_blocked_hint)
+            // Matches the notice: a cancelled or cleared block that only awaits readback asks for Refresh.
+            val hint = if (blockedLeaveNeedsReadback) R.string.group_leave_refresh_hint else R.string.group_leave_blocked_hint
+            if (text.isNotBlank()) appState.presentTransient(hint)
             return
         }
         val trimmed = text.trim()
