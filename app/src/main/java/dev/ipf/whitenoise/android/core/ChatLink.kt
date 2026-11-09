@@ -27,6 +27,9 @@ object ChatLink {
     private const val MAX_GROUP_ID_BYTES = 255
     private val HEX = Regex("^[0-9a-f]+$")
 
+    /** The canonical link for a chat, in the form [parse] reads back; shared from chat details (#3658). */
+    fun uri(groupIdHex: String): String = "${ProfileLink.MARMOT_SCHEME}://$CHAT_HOST/${groupIdHex.lowercase()}"
+
     fun parse(raw: String): ChatLinkParse {
         val trimmed = raw.trim()
         val uri = runCatching { URI(trimmed) }.getOrNull()

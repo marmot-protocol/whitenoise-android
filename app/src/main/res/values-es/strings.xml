@@ -949,6 +949,8 @@
     <string name="scan_to_connect">Escanea para conectar.</string>
     <string name="not_copied">No copiado</string>
     <string name="copy_public_key">Copiar clave pública</string>
+    <string name="copy_chat_link">Copiar enlace del chat</string>
+    <string name="copy_chat_link_subtitle">Abre este chat para quienes ya están en él</string>
     <string name="public_key_copy_action_with_value">Copiar clave pública %1$s</string>
     <string name="button_in_progress">En curso</string>
     <string name="private_key">Clave privada</string>

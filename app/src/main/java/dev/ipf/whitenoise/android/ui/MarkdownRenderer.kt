@@ -91,6 +91,9 @@ import dev.ipf.marmotkit.MarkdownListKindFfi
 import dev.ipf.marmotkit.MarkdownNostrEntityFfi
 import dev.ipf.marmotkit.MarkdownTableCellFfi
 import dev.ipf.whitenoise.android.R
+import dev.ipf.whitenoise.android.core.ChatLink
+import dev.ipf.whitenoise.android.core.ChatLinkParse
+import dev.ipf.whitenoise.android.core.ProfileLink
 import dev.ipf.whitenoise.android.core.ProfileSanitizer
 import dev.ipf.whitenoise.android.core.onlyRepeatsRepresentedEvents
 import dev.ipf.whitenoise.android.core.withoutRepeatsOf
@@ -166,6 +169,7 @@ internal fun MarkdownMessageBody(
     hiddenEventIds: Set<String> = emptySet(),
 ) {
     val context = LocalContext.current
+    val inAppLinks = LocalInAppLinkHandler.current
     // A tapped spoofable `[label](url)` link parks its destination here until
     // the user confirms it in the dialog below (#273).
     var pendingLinkUrl by remember { mutableStateOf<String?>(null) }
@@ -173,9 +177,9 @@ internal fun MarkdownMessageBody(
     // in on the annotation. Autolink URL annotations open directly because their
     // visible text is the supplied destination; confirm-link Clickable annotations
     // surface destinations hidden behind author-controlled labels first;
-    // nostr-profile Clickable annotations stay in-app.
+    // nostr-profile and app-link Clickable annotations stay in-app.
     val linkListener =
-        remember(context, onNostrProfileTap, deferLinkActivation, onWebLinkActivated) {
+        remember(context, onNostrProfileTap, deferLinkActivation, onWebLinkActivated, inAppLinks) {
             LinkInteractionListener { annotation ->
                 val activate: () -> Unit = {
                     when (annotation) {
@@ -188,6 +192,8 @@ internal fun MarkdownMessageBody(
                                     onNostrProfileTap?.invoke(
                                         annotation.tag.removePrefix(NOSTR_PROFILE_LINK_TAG_PREFIX),
                                     )
+                                annotation.tag.startsWith(APP_LINK_TAG_PREFIX) ->
+                                    inAppLinks?.open?.invoke(annotation.tag.removePrefix(APP_LINK_TAG_PREFIX))
                                 else -> Unit
                             }
                         else -> Unit
@@ -201,12 +207,13 @@ internal fun MarkdownMessageBody(
             }
         }
     val bodyContext =
-        remember(linkListener, mentionDisplayName, useDecorativeBackgrounds, hiddenEventIds) {
+        remember(linkListener, mentionDisplayName, useDecorativeBackgrounds, hiddenEventIds, inAppLinks) {
             MarkdownBodyContext(
                 linkListener,
                 mentionDisplayName,
                 useDecorativeBackgrounds,
                 hiddenEventIds,
+                inAppLinks?.chatTitle,
             )
         }
     CompositionLocalProvider(
@@ -291,6 +298,7 @@ private data class MarkdownBodyContext(
     val mentionDisplayName: ((String) -> String?)?,
     val useDecorativeBackgrounds: Boolean,
     val hiddenEventIds: Set<String> = emptySet(),
+    val chatLinkTitle: ((String) -> String?)? = null,
 )
 
 internal typealias SelectableTextLayoutReporter =
@@ -565,11 +573,13 @@ internal fun markdownLinkDestination(annotation: LinkAnnotation): String? =
     when (annotation) {
         is LinkAnnotation.Url -> parsedOpenableMarkdownLink(annotation.url)?.destination
         is LinkAnnotation.Clickable ->
-            annotation.tag
-                .takeIf { it.startsWith(CONFIRM_LINK_TAG_PREFIX) }
-                ?.removePrefix(CONFIRM_LINK_TAG_PREFIX)
-                ?.let(::parsedOpenableMarkdownLink)
-                ?.destination
+            when {
+                annotation.tag.startsWith(CONFIRM_LINK_TAG_PREFIX) ->
+                    parsedOpenableMarkdownLink(annotation.tag.removePrefix(CONFIRM_LINK_TAG_PREFIX))?.destination
+                annotation.tag.startsWith(APP_LINK_TAG_PREFIX) ->
+                    inAppMarkdownLink(annotation.tag.removePrefix(APP_LINK_TAG_PREFIX))
+                else -> null
+            }
         else -> null
     }
 
@@ -1434,6 +1444,8 @@ private fun rememberMarkdownInlineText(
     // string when a profile arrives.
     val profileReferences = remember(inlines) { markdownInlineProfileReferenceBech32s(inlines) }
     val profileNames = resolveProfileReferenceNames(profileReferences, ctx.mentionDisplayName)
+    val chatLinkIds = remember(inlines) { markdownInlineChatLinkGroupIds(inlines) }
+    val chatLinkTitles = ctx.chatLinkTitle?.let { resolve -> chatLinkIds.associateWith(resolve) }.orEmpty()
     val timestampRevision = rememberTimestampRevision(remember(inlines) { markdownInlineTimestamps(inlines) })
     // A leaf that would be left empty keeps its references: only a top-level
     // paragraph may disappear, a heading, list item or cell stays readable.
@@ -1444,7 +1456,7 @@ private fun rememberMarkdownInlineText(
     // Links must derive from the content color like every other accent:
     // colorScheme.primary disappears on the outgoing bubble, whose container
     // IS primary. Underline alone carries the affordance on both surfaces.
-    return remember(inlines, contentColor, ctx, profileNames, timestampRevision) {
+    return remember(inlines, contentColor, ctx, profileNames, chatLinkTitles, timestampRevision) {
         markdownInlinesToAnnotatedString(
             inlines = inlines,
             codeStyle =
@@ -1466,6 +1478,7 @@ private fun rememberMarkdownInlineText(
             mentionDisplayName = profileNames::get,
             useDecorativeBackgrounds = ctx.useDecorativeBackgrounds,
             hiddenEventIds = hiddenEventIds,
+            chatLinkTitle = chatLinkTitles::get,
         )
     }
 }
@@ -1518,6 +1531,11 @@ internal const val NOSTR_PROFILE_LINK_TAG_PREFIX = "nostr-profile:"
 // and open directly.
 internal const val CONFIRM_LINK_TAG_PREFIX = "confirm-link:"
 
+// `marmot://chat/…` and `marmot://profile/…` links (and their flavor schemes) open
+// in-app through [LocalInAppLinkHandler], never through another app that claims
+// the scheme. The tag carries the canonical link (#3658).
+internal const val APP_LINK_TAG_PREFIX = "app-link:"
+
 /**
  * Pure inline-tree → [AnnotatedString] mapping (kept free of composition so
  * it's unit-testable). Only allowlisted destinations (see
@@ -1538,6 +1556,7 @@ internal fun markdownInlinesToAnnotatedString(
     mentionDisplayName: ((String) -> String?)? = null,
     useDecorativeBackgrounds: Boolean = true,
     hiddenEventIds: Set<String> = emptySet(),
+    chatLinkTitle: ((String) -> String?)? = null,
 ): AnnotatedString =
     buildAnnotatedString {
         appendMarkdownInlines(
@@ -1549,6 +1568,7 @@ internal fun markdownInlinesToAnnotatedString(
                 mentionDisplayName,
                 useDecorativeBackgrounds,
                 hiddenEventIds,
+                chatLinkTitle,
             ),
             depth = 0,
         )
@@ -1565,6 +1585,7 @@ private class MarkdownInlineRenderContext(
     val mentionDisplayName: ((String) -> String?)?,
     val useDecorativeBackgrounds: Boolean,
     val hiddenEventIds: Set<String>,
+    val chatLinkTitle: ((String) -> String?)?,
 ) {
     /**
      * This context with no reference hidden, for a link or image label. A link that only repeats a card is removed
@@ -1581,6 +1602,7 @@ private class MarkdownInlineRenderContext(
                 mentionDisplayName,
                 useDecorativeBackgrounds,
                 hiddenEventIds = emptySet(),
+                chatLinkTitle,
             )
         }
 }
@@ -1628,8 +1650,12 @@ private fun AnnotatedString.Builder.appendMarkdownInlines(
             is MarkdownInlineFfi.Image ->
                 appendMarkdownLink(inline.dest, inline.alt, ctx, depth + 1)
             is MarkdownInlineFfi.Autolink -> {
-                val parsedLink = parsedOpenableMarkdownLink(markdownAutolinkDestination(inline.url, inline.kind))
-                if (parsedLink != null) {
+                val destination = markdownAutolinkDestination(inline.url, inline.kind)
+                val appLink = inAppMarkdownLink(destination)
+                val parsedLink = parsedOpenableMarkdownLink(destination)
+                if (appLink != null) {
+                    appendInAppAutolink(appLink, inline.url, ctx)
+                } else if (parsedLink != null) {
                     withLink(LinkAnnotation.Url(parsedLink.destination, TextLinkStyles(style = ctx.linkStyle), ctx.linkListener)) {
                         append(markdownSafeDisplayText(inline.url, Int.MAX_VALUE))
                     }
@@ -1807,22 +1833,24 @@ private fun AnnotatedString.Builder.appendMarkdownLink(
     // produce a zero-length, untappable annotation — show the URL itself.
     val visible = children.ifEmpty { listOf(MarkdownInlineFfi.Text(normalizedDest)) }
     val parsedLink = parsedOpenableMarkdownLink(normalizedDest)
-    if (parsedLink != null) {
-        // The label is attacker-chosen, but only a URL-shaped label can
-        // misrepresent where the tap goes (issue #273's example). Plain-word
-        // labels open directly like autolinks; a label carrying host-shaped
-        // text that doesn't match the destination routes through the
-        // confirmation dialog that shows the real URL.
-        val annotation =
-            if (shouldConfirmMarkdownLink(markdownInlinePlainText(visible), parsedLink.destination)) {
-                LinkAnnotation.Clickable(
-                    CONFIRM_LINK_TAG_PREFIX + parsedLink.destination,
-                    TextLinkStyles(style = ctx.linkStyle),
-                    ctx.linkListener,
-                )
-            } else {
-                LinkAnnotation.Url(parsedLink.destination, TextLinkStyles(style = ctx.linkStyle), ctx.linkListener)
-            }
+    val appLink = inAppMarkdownLink(normalizedDest)
+    // The label is attacker-chosen, but only a URL-shaped label can
+    // misrepresent where the tap goes (issue #273's example). Plain-word
+    // labels open directly like autolinks; a label carrying host-shaped
+    // text that doesn't match the destination routes through the
+    // confirmation dialog that shows the real URL. An app link never
+    // leaves the app and only reaches the viewer's own chats or a profile,
+    // so it opens without the dialog.
+    val linkStyles = TextLinkStyles(style = ctx.linkStyle)
+    val annotation =
+        when {
+            appLink != null -> LinkAnnotation.Clickable(APP_LINK_TAG_PREFIX + appLink, linkStyles, ctx.linkListener)
+            parsedLink == null -> null
+            shouldConfirmMarkdownLink(markdownInlinePlainText(visible), parsedLink.destination) ->
+                LinkAnnotation.Clickable(CONFIRM_LINK_TAG_PREFIX + parsedLink.destination, linkStyles, ctx.linkListener)
+            else -> LinkAnnotation.Url(parsedLink.destination, linkStyles, ctx.linkListener)
+        }
+    if (annotation != null) {
         val label = buildAnnotatedString { appendMarkdownInlines(visible, ctx, depth) }
         val start = length
         append(label)
@@ -2075,6 +2103,74 @@ internal fun markdownAutolinkDestination(
         else -> trimmed
     }
 }
+
+/**
+ * The canonical form of a chat or profile link the app opens itself (#3658), or null for any other
+ * destination. A chat link with an unusable id stays inert rather than tappable.
+ */
+internal fun inAppMarkdownLink(dest: String): String? {
+    val trimmed = dest.trim()
+    if (trimmed.substringBefore(':', "").lowercase(Locale.ROOT) !in ProfileLink.PROFILE_SCHEMES) return null
+    return when (val chat = ChatLink.parse(trimmed)) {
+        is ChatLinkParse.Valid -> ChatLink.uri(chat.groupIdHex)
+        ChatLinkParse.Malformed -> null
+        ChatLinkParse.NotChatLink -> ProfileLink.parse(trimmed)?.uri
+    }
+}
+
+/** Group ids of the chat links written out in [inlines], so the renderer can name chats the viewer is in. */
+internal fun markdownInlineChatLinkGroupIds(inlines: List<MarkdownInlineFfi>): Set<String> =
+    mutableSetOf<String>().also { collectChatLinkGroupIds(inlines, it, depth = 0) }
+
+private fun collectChatLinkGroupIds(
+    inlines: List<MarkdownInlineFfi>,
+    out: MutableSet<String>,
+    depth: Int,
+) {
+    if (markdownInlineDepthExceeded(depth)) return
+    markdownVisibleSiblings(inlines).forEach { inline ->
+        when (inline) {
+            is MarkdownInlineFfi.Autolink ->
+                (ChatLink.parse(inline.url) as? ChatLinkParse.Valid)?.let { out += it.groupIdHex }
+            is MarkdownInlineFfi.Emph -> collectChatLinkGroupIds(inline.children, out, depth + 1)
+            is MarkdownInlineFfi.Strong -> collectChatLinkGroupIds(inline.children, out, depth + 1)
+            is MarkdownInlineFfi.Strikethrough -> collectChatLinkGroupIds(inline.children, out, depth + 1)
+            else -> Unit
+        }
+    }
+}
+
+/**
+ * A written-out app link. A chat the viewer is in shows its local name with the mention highlight, since a
+ * raw group id means nothing to a reader; other links show the text that was sent.
+ */
+private fun AnnotatedString.Builder.appendInAppAutolink(
+    link: String,
+    sentText: String,
+    ctx: MarkdownInlineRenderContext,
+) {
+    val chatTitle =
+        (ChatLink.parse(link) as? ChatLinkParse.Valid)
+            ?.let { ctx.chatLinkTitle?.invoke(it.groupIdHex) }
+            ?.let { markdownSafeDisplayText(it.trim(), CHAT_LINK_TITLE_MAX_LENGTH) }
+            ?.takeIf(String::isNotBlank)
+    val style =
+        if (chatTitle != null) {
+            SpanStyle(
+                color = ctx.linkStyle.color,
+                fontWeight = FontWeight.Bold,
+                background =
+                    if (ctx.useDecorativeBackgrounds) ctx.linkStyle.color.copy(alpha = 0.12f) else Color.Unspecified,
+            )
+        } else {
+            ctx.linkStyle
+        }
+    withLink(LinkAnnotation.Clickable(APP_LINK_TAG_PREFIX + link, TextLinkStyles(style = style), ctx.linkListener)) {
+        withStyle(style) { append(chatTitle ?: markdownSafeDisplayText(sentText, Int.MAX_VALUE)) }
+    }
+}
+
+private const val CHAT_LINK_TITLE_MAX_LENGTH = 80
 
 /** Parses an allowed link and canonicalizes Unicode HTTP hosts to their ASCII form. */
 internal fun parsedOpenableMarkdownLink(dest: String): ParsedOpenableMarkdownLink? {

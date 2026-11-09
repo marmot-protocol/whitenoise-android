@@ -2,6 +2,7 @@ package dev.ipf.whitenoise.android.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.res.stringResource
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.ChatLinkDestination
@@ -11,6 +12,19 @@ import dev.ipf.whitenoise.android.notifications.NotificationTarget
 import dev.ipf.whitenoise.android.notifications.NotificationTargetKind
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
 import dev.ipf.whitenoise.android.ui.common.ChoiceDialog
+
+/**
+ * Opens a `marmot://` link tapped inside the app, and names the chats such links point at (#3658).
+ *
+ * Message text reaches this instead of the system so no other app can claim the tap, and it opens without
+ * the external-link dialog because it only ever reaches the viewer's own chats or a profile sheet.
+ */
+internal class InAppLinkHandler(
+    val open: (link: String) -> Unit,
+    val chatTitle: (groupIdHex: String) -> String?,
+)
+
+internal val LocalInAppLinkHandler = staticCompositionLocalOf<InAppLinkHandler?> { null }
 
 /** A chat link held by more than one signed-in account, none of them active, waiting for the user to pick one. */
 internal data class ChatLinkAccountChoice(

@@ -88,6 +88,7 @@ import dev.ipf.marmotkit.GroupPushDebugInfoFfi
 import dev.ipf.marmotkit.GroupPushTokenDebugEntryFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.AvatarImageLoader
+import dev.ipf.whitenoise.android.core.ChatLink
 import dev.ipf.whitenoise.android.core.GroupProjector
 import dev.ipf.whitenoise.android.core.IdentityFormatter
 import dev.ipf.whitenoise.android.core.LeaveAction
@@ -1926,6 +1927,22 @@ internal fun GroupDetailsScreen(
                             controller,
                             conversationTitle,
                         )
+                    }
+                    // A chat link only opens for people already in the chat;
+                    // a DM shares its profile link instead (#3658).
+                    if (!isDm && !readOnlyInvite) {
+                        row("copy_chat_link") { rowContext ->
+                            SettingsLink(
+                                context = rowContext,
+                                title = stringResource(R.string.copy_chat_link),
+                                subtitle = stringResource(R.string.copy_chat_link_subtitle),
+                                onClick = {
+                                    clipboard.setText(AnnotatedString(ChatLink.uri(controller.group.groupIdHex)))
+                                    appState.present(R.string.copied)
+                                },
+                                leading = { Icon(painterResource(R.drawable.ic_link), contentDescription = null) },
+                            )
+                        }
                     }
                     row("collapse_long_messages") { rowContext ->
                         SettingsSwitch(

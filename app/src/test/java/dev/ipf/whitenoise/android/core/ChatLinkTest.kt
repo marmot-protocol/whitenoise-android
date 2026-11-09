@@ -117,4 +117,11 @@ class ChatLinkTest {
             resolveChatLinkDestination(listOf("acct-a", "acct-c"), "acct-b"),
         )
     }
+
+    @Test
+    fun uri_isCanonicalAndParsesBack() {
+        val link = ChatLink.uri("00112233AABBCCDD")
+        assertEquals("marmot://chat/00112233aabbccdd", link)
+        assertEquals(ChatLinkParse.Valid("00112233aabbccdd"), ChatLink.parse(link))
+    }
 }
