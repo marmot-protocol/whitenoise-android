@@ -22,14 +22,15 @@ import dev.ipf.whitenoise.android.ui.group.GroupAbandonmentTarget
 /**
  * Whether the chat list offers MDK's forget for this row (#3310), by the same rule as Group Details: not for a
  * read-only invite, and not once MDK confirms the account left, was removed or the group is disbanded, read from the
- * group or its row. A queued leave or a converging disband still offers it, since either can stay unfinished. The
- * native row policy must also allow a local removal at all.
+ * group or its row. A queued leave or a converging disband still offers it, since either can stay unfinished. MDK's
+ * `canDeleteLocal` is not read: it allows only the history delete of a chat already left, while the forget is for a
+ * chat still receiving.
  */
 internal fun ChatListItem.offersLocalAbandonment(): Boolean {
     val row = projection
     val rowConfirmsNonMember =
         row?.selfMembership?.isNonMember() == true || row?.lifecycleState == GroupLifecycleStateFfi.DISBANDED
-    return group.offersLocalAbandonment() && !rowConfirmsNonMember && actions?.canDeleteLocal != false
+    return group.offersLocalAbandonment() && !rowConfirmsNonMember
 }
 
 /** A selection offers bulk abandonment only when it is not empty and every selected chat offers it. */

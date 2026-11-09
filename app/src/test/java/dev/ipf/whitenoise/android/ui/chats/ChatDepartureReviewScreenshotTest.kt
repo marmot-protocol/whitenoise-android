@@ -15,11 +15,13 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.test.core.app.ApplicationProvider
 import com.github.takahirom.roborazzi.captureRoboImage
 import dev.ipf.marmotkit.AppGroupMemberRecordFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi
 import dev.ipf.whitenoise.android.R
 import dev.ipf.whitenoise.android.core.GroupTitleCopy
 import dev.ipf.whitenoise.android.state.ChatsController
 import dev.ipf.whitenoise.android.state.chatListItemFromProjection
 import dev.ipf.whitenoise.android.state.chatRow
+import dev.ipf.whitenoise.android.state.noChatRowActions
 import dev.ipf.whitenoise.android.ui.share.ACCOUNT_REF
 import dev.ipf.whitenoise.android.ui.share.emptyAppState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
@@ -57,6 +59,32 @@ class ChatDepartureReviewScreenshotTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         rule.onNodeWithText(context.getString(R.string.cancel)).assertIsDisplayed()
         rule.onRoot().captureRoboImage("src/test/snapshots/group_departure_bulk_review_light.png")
+    }
+
+    /** A selection with a direct chat still received says that chat is forgotten on this device, not only left. */
+    @Test
+    fun bulkDepartureWithReceivingDirectChatNamesTheForget() {
+        val state = emptyAppState()
+        val controller = ChatsController(state, ACCOUNT_REF) { _, _ -> emptyList() }
+        val dm =
+            chatListItemFromProjection(
+                chatRow("dm-one").copy(
+                    title = "Alice",
+                    groupName = "Alice",
+                    conversationKind = ChatConversationKindFfi.DIRECT,
+                ),
+            ).copy(actions = noChatRowActions())
+        val group =
+            chatListItemFromProjection(chatRow("garden-one").copy(title = "Garden club", groupName = "Garden club"))
+        val request = PendingChatDeparture(listOf(dm, group), controller, state, GroupTitleCopy.Default)
+        rule.setContent {
+            WhiteNoiseTheme {
+                ChatDepartureBatchDialog(request, state, controller, ChatDepartureActions(onDismiss = {}))
+            }
+        }
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        rule.onNodeWithText(context.getString(R.string.chat_departure_forget_dm), substring = true).assertExists()
+        rule.onRoot().captureRoboImage("src/test/snapshots/group_departure_bulk_forget_dm_light.png")
     }
 
     /** The actual final successor review keeps its actions reachable in large RTL AMOLED. */

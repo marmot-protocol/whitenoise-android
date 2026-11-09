@@ -329,7 +329,8 @@
         "anchor": "chatListSelectionActions(",
         "test_ids": [
           "CHL-011",
-          "CHL-012"
+          "CHL-012",
+          "CHL-035"
         ]
       },
       {

@@ -3,10 +3,12 @@ package dev.ipf.whitenoise.android.ui.chats
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import dev.ipf.marmotkit.AccountSummaryFfi
+import dev.ipf.marmotkit.ChatConversationKindFfi.DIRECT
 import dev.ipf.marmotkit.SelfMembershipFfi
 import dev.ipf.whitenoise.android.state.ChatListItem
 import dev.ipf.whitenoise.android.state.DraftStore
 import dev.ipf.whitenoise.android.state.WhiteNoiseAppState
+import dev.ipf.whitenoise.android.state.noChatRowActions
 import dev.ipf.whitenoise.android.state.offersLocalAbandonment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -83,6 +85,29 @@ class ChatAbandonmentEligibilityTest {
         assertEquals(app.accountDisplayNameCached("c".repeat(64)), captured)
         assertNotEquals(app.accountDisplayNameCached("a".repeat(64)), captured)
         assertEquals("an unknown reference names itself", "gone-ref", abandonmentAccountName(app, "gone-ref"))
+    }
+
+    /**
+     * MDK allows `canDeleteLocal` only once a chat is left, so a member row still receiving carries false. The forget
+     * is still offered there, alone or in a selection, and not for a left row that keeps the history delete.
+     */
+    @Test
+    fun receivingMemberRowOffersTheForgetDespiteNativeDeleteLocal() {
+        val receiving = noChatRowActions()
+        val dm =
+            leftScopeRow("dm").let {
+                it.copy(projection = it.projection?.copy(conversationKind = DIRECT), actions = receiving)
+            }
+        val group = leftScopeRow("group").copy(actions = receiving)
+        assertTrue("fixture is a direct chat", dm.isDm())
+        listOf(listOf(dm), listOf(group), listOf(dm, group)).forEach { selection ->
+            assertTrue("the forget is offered", selection.offerLocalAbandonment())
+        }
+        val left =
+            leftScopeRow("left", membership = SelfMembershipFfi.LEFT)
+                .copy(actions = receiving.copy(canDeleteLocal = true))
+        assertFalse(listOf(left).offerLocalAbandonment())
+        assertFalse("a mixed selection keeps Leave and delete", listOf(dm, left).offerLocalAbandonment())
     }
 
     /** A read-only invite declines instead, on both surfaces, and an empty selection offers nothing. */

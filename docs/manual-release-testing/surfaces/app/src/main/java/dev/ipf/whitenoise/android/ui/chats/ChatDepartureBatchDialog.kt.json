@@ -11,7 +11,8 @@
           "CHL-026",
           "CHL-027",
           "CHL-028",
-          "GRP-034"
+          "GRP-034",
+          "CHL-035"
         ]
       },
       {
@@ -76,6 +77,15 @@
           "CHL-026",
           "CHL-027",
           "CHL-028"
+        ]
+      },
+      {
+        "surface": "R.string.chat_departure_forget_dm",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/chats/ChatDepartureBatchDialog.kt",
+        "anchor": "R.string.chat_departure_forget_dm",
+        "test_ids": [
+          "CHL-026",
+          "CHL-035"
         ]
       },
       {

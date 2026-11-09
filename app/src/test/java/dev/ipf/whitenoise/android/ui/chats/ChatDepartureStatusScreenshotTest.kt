@@ -49,7 +49,7 @@ class ChatDepartureStatusScreenshotTest {
         composeRule.setContent {
             WhiteNoiseTheme { ChatDepartureResultContent(result, targets, emptyMap(), abandon = true) }
         }
-        composeRule.onNodeWithText("Alice: ${app.getString(R.string.toast_couldnt_abandon_chat)}").assertExists()
+        composeRule.onNodeWithText("Alice: ${app.getString(R.string.toast_couldnt_delete_chat)}").assertExists()
         composeRule.onNodeWithText("Hiking club: ${app.getString(R.string.toast_couldnt_reset_group)}").assertExists()
     }
 

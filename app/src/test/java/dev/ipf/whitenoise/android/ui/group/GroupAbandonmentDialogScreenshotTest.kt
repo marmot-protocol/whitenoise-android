@@ -98,7 +98,7 @@ class GroupAbandonmentDialogScreenshotTest {
         assertEquals(1, dismissals)
         composeRule
             .onNodeWithTag("chat_info.sole_admin_leave.abandon")
-            .assertTextEquals(app.getString(R.string.chat_abandon_action))
+            .assertTextEquals(app.getString(R.string.delete_from_device))
             .performClick()
         assertEquals(1, abandons)
     }
@@ -137,7 +137,7 @@ class GroupAbandonmentDialogScreenshotTest {
         assertEquals(R.string.chats_abandon_action, groupAbandonmentBatchLabel(listOf(true, true)))
         assertEquals(R.string.chats_abandon_action, groupAbandonmentBatchLabel(listOf(true, false)))
         assertEquals(R.string.group_reset_action, groupAbandonmentBatchLabel(listOf(false)))
-        assertEquals(R.string.chat_abandon_action, groupAbandonmentBatchLabel(listOf(true)))
+        assertEquals(R.string.delete_from_device, groupAbandonmentBatchLabel(listOf(true)))
         val groups = listOf(GROUP, GROUP.copy(groupIdHex = "group-books", conversationTitle = "Book club"))
         composeRule.setContent {
             WhiteNoiseTheme(darkTheme = false) { GroupAbandonmentDialog(groups, onConfirm = {}, onDismiss = {}) }
@@ -159,6 +159,9 @@ class GroupAbandonmentDialogScreenshotTest {
         val account = app.getString(R.string.abandon_identity_account, DM.accountName)
         composeRule.onNodeWithText(chat).assertIsDisplayed()
         composeRule.onNodeWithText(account).assertIsDisplayed()
+        composeRule
+            .onNodeWithTag("group.abandon.confirm")
+            .assertTextEquals(app.getString(R.string.delete_group_confirm))
         composeRule.onNodeWithTag("group.abandon.cancel").performClick()
         assertEquals(0, confirms)
         assertEquals(1, dismissals)

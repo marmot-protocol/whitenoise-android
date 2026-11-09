@@ -15,6 +15,8 @@ internal data class ChatDepartureTarget(
     val groupId: String,
     val title: String,
     val isDm: Boolean,
+    /** A direct chat this account still receives is forgotten, so a later message cannot bring it back. */
+    val forgetsDm: Boolean = false,
 )
 
 internal enum class ChatDepartureOutcome { COMPLETED, FAILED, SKIPPED, NOT_STARTED }

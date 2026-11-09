@@ -11263,7 +11263,7 @@ class ConversationController(
      */
     suspend fun forgetGroupLocal(): Boolean {
         val dm = isDm
-        val failure = if (dm) R.string.toast_couldnt_abandon_chat else R.string.toast_couldnt_reset_group
+        val failure = if (dm) R.string.toast_couldnt_delete_chat else R.string.toast_couldnt_reset_group
         return runLocalGroupRemoval(failure, "GROUP_LOCAL_RESET") { account ->
             val runtime = appState.runtimeGeneration
             val reset =
@@ -11276,7 +11276,7 @@ class ConversationController(
             when {
                 !reset && dm -> R.string.toast_chat_already_abandoned
                 !reset -> R.string.toast_group_reset_already_waiting
-                dm -> R.string.toast_chat_abandoned
+                dm -> R.string.toast_chat_deleted_local
                 else -> R.string.toast_group_reset_done
             }
         }
