@@ -1,0 +1,57 @@
+{
+  "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupBlockedLeaveNotice.kt",
+  "legacy_sha256": "355dccf5b36f7d464c28d3527e85afd135ca2b82c1bfe550f8e3716587d06bb8",
+  "categories": {
+    "composable_surfaces": [
+      {
+        "surface": "BlockedLeaveCancelNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupBlockedLeaveNotice.kt",
+        "anchor": "fun BlockedLeaveCancelNotice(",
+        "test_ids": [
+          "GRP-037"
+        ]
+      },
+      {
+        "surface": "BlockedLeaveComposerNotice",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupBlockedLeaveNotice.kt",
+        "anchor": "fun BlockedLeaveComposerNotice(",
+        "test_ids": [
+          "GRP-037"
+        ]
+      },
+      {
+        "surface": "R.string.group_cancel_leave",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupBlockedLeaveNotice.kt",
+        "anchor": "R.string.group_cancel_leave",
+        "test_ids": [
+          "GRP-037"
+        ]
+      },
+      {
+        "surface": "R.string.group_leave_blocked_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupBlockedLeaveNotice.kt",
+        "anchor": "R.string.group_leave_blocked_hint",
+        "test_ids": [
+          "GRP-037"
+        ]
+      },
+      {
+        "surface": "R.string.group_leave_refresh_action",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupBlockedLeaveNotice.kt",
+        "anchor": "R.string.group_leave_refresh_action",
+        "test_ids": [
+          "GRP-037"
+        ]
+      },
+      {
+        "surface": "R.string.group_leave_refresh_hint",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/group/GroupBlockedLeaveNotice.kt",
+        "anchor": "R.string.group_leave_refresh_hint",
+        "test_ids": [
+          "GRP-037"
+        ]
+      }
+    ]
+  },
+  "discovery_exceptions": []
+}

@@ -439,6 +439,12 @@
     <string name="restoring_chat">Restoring chat...</string>
     <string name="leave_chat">Leave chat</string>
     <string name="leaving_chat">Leaving chat...</string>
+    <string name="group_leave_blocked">Leave blocked</string>
+    <string name="group_leave_blocked_hint">You’re the only admin. Cancel the leave to stay in this group.</string>
+    <string name="group_cancel_leave">Cancel leave</string>
+    <string name="group_leave_refresh_hint">Refresh to check whether you’re still in this group.</string>
+    <string name="group_leave_refresh_action">Refresh</string>
+    <string name="toast_couldnt_cancel_leave">Couldn’t cancel the leave</string>
     <string name="export_conversation_transcript">Export Conversation Transcript</string>
     <string name="toast_couldnt_export_transcript">Couldn\'t export transcript</string>
     <string name="no_share_target_available">No share target available</string>

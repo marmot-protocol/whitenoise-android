@@ -167,6 +167,7 @@ class MarkReadChatListReturnLifecycleTest {
         updatedAt = TAIL_AT,
         leaveRequestPending = false,
         leaveRequestedAtMs = null,
+        leaveBlocked = false,
         manuallyMarkedUnread = false,
         conversationKind = ChatConversationKindFfi.UNKNOWN,
         muted = false,

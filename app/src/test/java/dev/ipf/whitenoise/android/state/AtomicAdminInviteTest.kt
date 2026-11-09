@@ -338,6 +338,8 @@ class AtomicAdminInviteTest {
                     requiresSelfDemoteBeforeLeave = SELF in admins,
                     leaveRequestPending = false,
                     leaveRequestedAtMs = null,
+                    leaveBlocked = false,
+                    canCancelLeave = false,
                     lifecycleState = GroupLifecycleStateFfi.STABLE,
                     disbandingEnabled = false,
                     disbanding = false,

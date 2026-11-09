@@ -474,6 +474,7 @@ class NotificationMessageRouteExactReadNavigationTest {
             updatedAt = 2uL,
             leaveRequestPending = false,
             leaveRequestedAtMs = null,
+            leaveBlocked = false,
             manuallyMarkedUnread = false,
             conversationKind = ChatConversationKindFfi.GROUP,
             muted = false,
