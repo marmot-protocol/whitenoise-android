@@ -468,7 +468,8 @@ class ConversationDictationDraftPresentationTest {
 
                                 override fun callerAudioFullyFed(): Boolean = true
 
-                                override fun callerAudioIsFinalChunk(): Boolean = true
+                                // Non-final, so a failing chunk stays retained instead of being dropped as a tail.
+                                override fun callerAudioIsFinalChunk(): Boolean = false
 
                                 override fun callerAudioContainsSpeech(): Boolean = true
                             }
