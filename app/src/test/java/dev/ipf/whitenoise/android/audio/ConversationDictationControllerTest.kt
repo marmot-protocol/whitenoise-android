@@ -1153,7 +1153,7 @@ class ConversationDictationControllerTest {
             validation.complete(ConversationDictationTargetValidation.Available)
             advanceUntilIdle()
             assertEquals(1, sends)
-            assertEquals("Draft", f.drafts.getValue(key()).text)
+            assertEquals("", f.drafts.getValue(key()).text)
         }
 
     /** An unavailable original target cannot receive interruption text through another owner. */
@@ -6963,7 +6963,8 @@ class ConversationDictationControllerTest {
                     ConversationDictationAudioRequest(
                         ConversationDictationAudioChunk(1L, 9L, 0L, tailSamples, hasSpeech = true, pcm = ByteArray(0)),
                     )
-                platform.pendingCallerAudio = false
+                // The fake does not clear pending audio on acknowledgment; a stalled long tail stays retained.
+                platform.pendingCallerAudio = tailSamples > 8_000L
                 f.scheduler.advanceBy(59_500L)
                 advanceUntilIdle()
                 if (tailSamples == 8_000L) {

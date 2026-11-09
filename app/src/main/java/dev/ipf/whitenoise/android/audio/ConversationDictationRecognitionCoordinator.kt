@@ -87,6 +87,9 @@ internal class ConversationDictationRecognitionCoordinator {
     val capacityAttempts: Int get() = retry?.capacityAttempts ?: 0
     val failureAttempts: Int get() = retry?.attempts ?: 0
 
+    /** The caller-audio chunk that [failureAttempts] counts, or null without a pending retry. */
+    val failureChunkId: Long? get() = retry?.chunkId
+
     fun tryContextOnce(
         chunkId: Long,
         action: () -> Boolean,
@@ -174,24 +177,6 @@ internal class ConversationDictationRecognitionCoordinator {
         val tailMillis: Long?,
         val fault: TailFault,
     )
-
-    /**
-     * Decides whether a failing final chunk may be skipped so recognized text can still be delivered.
-     *
-     * The audio after the last recognized sentence is usually breath, room noise or the Send tap.
-     * Holding the whole message for it turns a successful dictation into a draft. Earlier chunks,
-     * long tails with real speech and first transient faults still take the bounded retry path.
-     */
-    fun shouldDropFinalTail(input: TailInput): Boolean {
-        if (!input.finalChunk) return false
-        val priorFailures = retry?.takeIf { it.chunkId == input.chunkId }?.attempts ?: 0
-        val shortTail = input.tailMillis != null && input.tailMillis <= SHORT_FINAL_TAIL_MILLIS
-        return when (input.fault) {
-            TailFault.Empty -> input.chunkHasSpeech == false || priorFailures >= 1
-            TailFault.Transient -> shortTail && priorFailures >= 1
-            TailFault.TimedOut -> shortTail
-        }
-    }
 
     fun resetFailure() {
         retry = null
