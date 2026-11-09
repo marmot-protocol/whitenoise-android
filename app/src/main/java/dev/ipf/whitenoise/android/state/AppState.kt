@@ -14144,12 +14144,20 @@ class WhiteNoiseAppState private constructor(
             ).withChatRow(item, update.accountRef)
     }
 
-    /** Reuses an already-bound row only for the update's receiving account and conversation. */
+    /**
+     * Reuses the receiver's bound row. A named group's message or reaction can arrive before the chat list
+     * replaces its pending invite, which still shows the inviter instead of the group.
+     */
     private fun notificationChatListItem(update: NotificationUpdateFfi): ChatListItem? =
         chatsController
             ?.takeIf { it.boundAccountRef == update.accountRef && update.accountRef == activeAccountRef }
             ?.items
             ?.firstOrNull { it.id.equals(update.groupIdHex, ignoreCase = true) }
+            ?.takeUnless {
+                it.group.pendingConfirmation &&
+                    update.trigger == NotificationTriggerFfi.NEW_MESSAGE &&
+                    !update.groupName.isNullOrBlank()
+            }
 
     /** Publishes one fixed-label timing event without notification identity or content. */
     private fun recordNotificationFirstPostTiming(

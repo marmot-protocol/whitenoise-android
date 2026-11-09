@@ -39,6 +39,12 @@ class NotificationFirstPostAvatarOwnerTest {
         checkOwner("account-b", expectedImage = false, encrypted = true)
     }
 
+    /** A named group's reaction cannot borrow the image from its retained invite row. */
+    @Test
+    fun pendingInviteCannotLendItsAvatarToANamedGroupReaction() {
+        checkOwner("account-a", expectedImage = false, pendingInvite = true)
+    }
+
     /**
      * #3311: a direct chat's first card takes the sender's ready picture as its conversation identity image,
      * while a group snapshot never borrows that face for the group.
@@ -101,6 +107,7 @@ class NotificationFirstPostAvatarOwnerTest {
         controllerAccount: String,
         expectedImage: Boolean,
         encrypted: Boolean = false,
+        pendingInvite: Boolean = false,
     ) {
         val context = RuntimeEnvironment.getApplication()
         val fixture = NotificationBootstrapTestFixture(context = context)
@@ -125,6 +132,7 @@ class NotificationFirstPostAvatarOwnerTest {
             chats.applyChatListRow(
                 notificationChatListRow().copy(
                     groupIdHex = "group-a",
+                    pendingConfirmation = pendingInvite,
                     avatarUrl = url.takeUnless { encrypted },
                     avatar =
                         if (encrypted) {
@@ -136,7 +144,12 @@ class NotificationFirstPostAvatarOwnerTest {
             )
             chats.setChatListVisible(true)
             state.attachChatsController(chats)
-            val snapshot = state.readyNotificationAvatars(fixture.update)
+            if (pendingInvite) {
+                val invite = fixture.update.copy(trigger = NotificationTriggerFfi.GROUP_INVITE)
+                assertSame(image, state.readyNotificationAvatars(invite).groupAvatarBitmap)
+            }
+            val update = if (pendingInvite) fixture.update.copy(reactionEmoji = "👍") else fixture.update
+            val snapshot = state.readyNotificationAvatars(update)
             if (expectedImage) assertSame(image, snapshot.groupAvatarBitmap) else assertNull(snapshot.groupAvatarBitmap)
         } finally {
             state.attachChatsController(null)
