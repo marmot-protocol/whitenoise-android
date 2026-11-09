@@ -1669,7 +1669,8 @@ class LocalNotificationPresenter(
             refresh.pictures.second
                 ?.takeUnless { it === sources.senderBitmap }
                 ?.let(refresh.content::reactorImage) ?: return false
-        return postLateIdentityRewrite(refresh, live, cardContent.reactorPictureNotification(live.notification, reactor))
+        val rewritten = cardContent.reactorPictureNotification(live.notification, reactor)
+        return postLateIdentityRewrite(refresh, live, rewritten)
     }
 
     /** Writes one late picture rewrite over the same live card, under the refresh's fences up to the platform write. */
