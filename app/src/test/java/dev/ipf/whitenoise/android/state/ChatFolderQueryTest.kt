@@ -134,10 +134,10 @@ class ChatFolderQueryTest {
             "All[Any[All[DIRECT]]]",
             smart(SmartFolderFilter.Condition(FolderField.TYPE, FolderMode.DIRECT)).render(),
         )
-        assertEquals(
-            "All[Any[All[Text(work)]]]",
-            smart(SmartFolderFilter.Condition(FolderField.TITLE, FolderMode.CONTAINS, setOf("work"))).render(),
-        )
+        val title = SmartFolderFilter.Condition(FolderField.TITLE, FolderMode.CONTAINS, setOf("work"))
+        val titled = SmartFolderFilter.Group(children = listOf(title))
+        val titleRule = ChatFolderRule(smartFilter = SmartFolderCodec.encode(titled))
+        assertNull("a title-only match stays on loaded rows", local(titleRule))
     }
 
     /** Nested any/negated groups keep their shape, and an incomplete filter with an empty group stays manual-only. */

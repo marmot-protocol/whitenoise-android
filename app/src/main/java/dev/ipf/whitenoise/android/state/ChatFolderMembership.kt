@@ -226,8 +226,9 @@ internal fun WhiteNoiseAppState.nativeFolderMembership(
 
 /**
  * Whether MarmotKit files this chat in its Left scope: departed or removed, disbanded, or with a leave or disband
- * outstanding. That scope carries no archive side, so the folder queries leave it out and [departedFolderMatches]
- * answers for these rows instead.
+ * outstanding, mirroring MDK's `list_scope` predicate (storage migration 0147). It errs toward including a chat, since
+ * a missed one would drop out of every folder. That scope carries no archive side, so the folder queries leave it out
+ * and [departedFolderMatches] answers for these rows instead.
  */
 internal fun ChatListItem.inLeftScope(): Boolean {
     val row = projection
@@ -235,6 +236,7 @@ internal fun ChatListItem.inLeftScope(): Boolean {
         group.selfMembership != SelfMembershipFfi.MEMBER ||
             group.disbanded ||
             group.disbanding ||
+            group.disbandRequest != null ||
             group.leaveRequestPending
     val rowLeft =
         row != null &&
@@ -261,8 +263,9 @@ internal fun departedFolderMatches(
     activeAccountIdHex: String?,
     displayTitle: (ChatListItem) -> String = { it.projection?.title.orEmpty() },
 ): Set<String> {
+    // Departed rows are usually none, so test for them before building the folder's source list.
+    if (active.none(ChatListItem::inLeftScope) && archived.none(ChatListItem::inLeftScope)) return emptySet()
     val departed = chatFolderSource(rule, active, archived).filter(ChatListItem::inLeftScope)
-    if (departed.isEmpty()) return emptySet()
     val departedIds = departed.mapTo(HashSet()) { it.foldedId }
     val matched =
         chatFolderChatIds(

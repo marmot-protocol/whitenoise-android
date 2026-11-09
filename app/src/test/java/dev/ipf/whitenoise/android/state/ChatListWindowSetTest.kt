@@ -99,8 +99,8 @@ class ChatListWindowSetTest {
         runBlocking {
             val handles = CHAT_LIST_WINDOW_VIEWS.associateWith { view -> FakeWindow(view, rows = listOf("$view-a")) }
             val chatsFolder = FakeWindow(ChatListViewFfi.CHATS, listOf("f-1"))
-            val title = SmartFolderFilter.Condition(FolderField.TITLE, FolderMode.CONTAINS, setOf("work"))
-            val filter = SmartFolderFilter.Group(children = listOf(title))
+            val muted = SmartFolderFilter.Condition(FolderField.MUTED)
+            val filter = SmartFolderFilter.Group(children = listOf(muted))
             val rule = ChatFolderRule(smartFilter = SmartFolderCodec.encode(filter))
             val query = requireNotNull(chatFolderQuery(rule, emptySet(), emptySet()))
             val folder =

@@ -68,7 +68,8 @@ internal data class ChatListSelectAllScope(
 /**
  * Translates a folder into its native query: manual members are added and exclusions removed around the rule, as
  * `All[Not(excluded), Any[included, rule]]`. Returns null when the folder must stay on the loaded-rows evaluator —
- * its rule tests participants, which MarmotKit cannot match yet, or it exceeds MarmotKit's query limits.
+ * its rule tests participants or an advanced title, which MarmotKit cannot match exactly yet, or it exceeds
+ * MarmotKit's query limits.
  */
 internal fun chatFolderQuery(
     rule: ChatFolderRule?,
@@ -77,7 +78,7 @@ internal fun chatFolderQuery(
 ): ChatFolderQuery? {
     val advanced = rule?.smartFilter
     val decoded = advanced?.let { SmartFolderCodec.decode(it)?.takeIf(SmartFolderCodec::valid) }
-    if (rule.testsParticipants(decoded)) return null
+    if (rule.needsLoadedRows(decoded)) return null
     val match = if (advanced != null) decoded?.let(::smartFolderNode) else rule?.let(::legacyRuleNode)
     val included = listOfNotNull(manualChatIds.toIdNode(), match)
     val root = FolderNode.All(listOfNotNull(excludedChatIds.toIdNode()?.let(FolderNode::Not), FolderNode.Any(included)))
@@ -87,10 +88,15 @@ internal fun chatFolderQuery(
     return root.takeIf { fits }?.let { ChatFolderQuery(views, flatten(it)) }
 }
 
-/** Whether this rule tests participants, which MarmotKit cannot match yet, in its legacy or [decoded] advanced form. */
-private fun ChatFolderRule?.testsParticipants(decoded: SmartFolderFilter?): Boolean {
+/**
+ * Whether this rule needs a test MarmotKit cannot express yet, so the folder stays on loaded rows: participants, in
+ * the legacy or [decoded] advanced form, or an advanced title match, which MarmotKit's text node would widen to the
+ * description, group name and peer name.
+ */
+private fun ChatFolderRule?.needsLoadedRows(decoded: SmartFolderFilter?): Boolean {
     val legacy = this?.smartFilter == null && this?.includeMemberPubkeys?.isNotEmpty() == true
-    return legacy || decoded?.references(FolderField.PARTICIPANTS) == true
+    val advanced = decoded?.let { it.references(FolderField.PARTICIPANTS) || it.references(FolderField.TITLE) }
+    return legacy || advanced == true
 }
 
 /**
@@ -129,7 +135,7 @@ private fun legacyRuleNode(rule: ChatFolderRule): FolderNode? {
     return FolderNode.All(listOfNotNull(keyword?.let(FolderNode::Text)) + categories + listOfNotNull(muted))
 }
 
-/** An advanced filter tree, or null when it tests participants. An empty group matches nothing, even negated. */
+/** An advanced filter tree, or null for participants or a title. An empty group matches nothing, even negated. */
 private fun smartFolderNode(filter: SmartFolderFilter): FolderNode? =
     when (filter) {
         is SmartFolderFilter.Group -> {
@@ -144,7 +150,7 @@ private fun smartFolderNode(filter: SmartFolderFilter): FolderNode? =
             smartConditionNode(filter)?.negatedIf(filter.mode == FolderMode.NONE)?.negatedIf(filter.not)
     }
 
-/** One advanced condition in its present sense, or null for participants. */
+/** One advanced condition in its present sense, or null for participants and titles. */
 private fun smartConditionNode(condition: SmartFolderFilter.Condition): FolderNode? =
     when (condition.field) {
         FolderField.UNREAD -> FolderNode.Is(ChatListConditionFfi.UNREAD)
@@ -158,7 +164,8 @@ private fun smartConditionNode(condition: SmartFolderFilter.Condition): FolderNo
             FolderNode.Is(
                 if (condition.mode == FolderMode.DIRECT) ChatListConditionFfi.DIRECT else ChatListConditionFfi.GROUP,
             )
-        FolderField.TITLE -> FolderNode.Text(condition.values.single())
+        // Kept on loaded rows by needsLoadedRows, so it never reaches the native tree.
+        FolderField.TITLE -> null
         // A joined, settled membership: no pending invitation, not departed, no leave or disband outstanding.
         FolderField.ACCEPTED ->
             FolderNode.All(
