@@ -1,5 +1,6 @@
 package dev.ipf.whitenoise.android.qualification
 
+import android.os.Bundle
 import android.os.Process
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -77,6 +78,7 @@ class MarmotUpgradeFixtureTest {
                     } else if (phase in setOf("corrupt", "lost")) {
                         recoverDamagedMedia(runtime, root, receipt)
                     } else {
+                        reportPendingEpoch(runtime, JSONObject(receipt.readText()), "$phase-start")
                         verify(runtime, receipt, phase)
                         verifyUpgradeStorage(
                             runtime,
@@ -183,6 +185,7 @@ class MarmotUpgradeFixtureTest {
             JSONObject(receipt.readText())
                 .put("pendingReference", reference.upgradeReceipt())
         receipt.writeText(value.toString())
+        reportPendingEpoch(runtime, value, "seed-upload")
         verifyHistory(runtime, value)
         verifyRetained(runtime, value)
     }
@@ -312,6 +315,25 @@ class MarmotUpgradeFixtureTest {
         return reference
     }
 
+    /** Track numeric group epochs around each phase of the disposable fixture. */
+    private suspend fun reportPendingEpoch(runtime: Marmot, receipt: JSONObject, phase: String) {
+        val report = JSONObject().put("phase", phase)
+        runCatching {
+            val group = receipt.getString("group")
+            val reference = receipt.getJSONObject("pendingReference").upgradeMediaReference()
+            report.put("sourceEpoch", reference.sourceEpoch.toLong())
+                .put("identityPresent", reference.sourceEpochIdentity != null)
+            for (role in listOf("sender", "receiver")) {
+                val mls = runtime.groupDetails(receipt.getString(role), group).mlsState
+                report.put("${role}Epoch", mls.epoch.toLong())
+            }
+        }.onFailure { report.put("observationError", it.javaClass.simpleName) }
+        InstrumentationRegistry.getInstrumentation().sendStatus(
+            0,
+            Bundle().apply { putString("pending_epoch", report.toString()) },
+        )
+    }
+
     /** Sends the baseline's original pending upload unchanged, then verifies its plaintext after another restart. */
     private suspend fun verifyPendingUpload(
         runtime: Marmot,
@@ -322,7 +344,9 @@ class MarmotUpgradeFixtureTest {
         val account = value.getString("sender")
         val group = value.getString("group")
         if (phase == "promote") {
+            reportPendingEpoch(runtime, value, "before-stripped-reference")
             val reference = retainedPendingReference(runtime, account, group, value)
+            reportPendingEpoch(runtime, value, "before-complete-reference")
             val sent = runtime.sendMediaReference(account, group, reference, "Promoted baseline pending upload")
             value.put("pendingMessage", sent.messageIds.single())
             receipt.writeText(value.toString())

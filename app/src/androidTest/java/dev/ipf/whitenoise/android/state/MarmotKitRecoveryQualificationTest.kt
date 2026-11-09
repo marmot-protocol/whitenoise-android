@@ -1,6 +1,7 @@
 package dev.ipf.whitenoise.android.state
 
 import android.content.Context
+import android.os.Bundle
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -56,7 +57,8 @@ class MarmotKitRecoveryQualificationTest {
                 requestLimitClamp = RELAY_CLAMP
                 refuseComparison = InstrumentationRegistry.getArguments().getString("comparison") != "ignore"
             }
-        relays = listOf(relay.url)
+        val externalPort = argument("receiveDiagnosticRelay")
+        relays = listOf(if (externalPort == null) relay.url else "ws://127.0.0.1:$externalPort")
     }
 
     /** Closes every runtime this case opened, then the relay, then deletes the generated roots. */
@@ -298,23 +300,75 @@ class MarmotKitRecoveryQualificationTest {
         runBlocking<Unit> {
             val group = establishedGroup()
             val receiver = group.receiver
-            val deleted = receiver.runtime.createGroup(receiver.account.label, "Deleted fixture", emptyList(), null)
-            check(receiver.runtime.deleteGroupLocal(receiver.account.label, deleted))
+            val mode = argument("receiveDiagnosticMode") ?: "delete"
+            val other = if (mode == "control") null else receiver.runtime.createGroup(
+                receiver.account.label,
+                "Deleted fixture",
+                emptyList(),
+                null,
+            )
+            if (mode == "delete") check(receiver.runtime.deleteGroupLocal(receiver.account.label, requireNotNull(other)))
             repeat(2) { pass ->
                 val active = if (pass == 0) receiver else reopen(receiver)
                 val incoming = "healthy-incoming-$pass"
-                group.sender.runtime.sendText(group.sender.account.label, group.id, incoming)
-                assertEquals(setOf(incoming), awaitTexts(active, group.id, setOf(incoming), INVITE_TIMEOUT_MILLIS))
+                val sent = group.sender.runtime.sendText(group.sender.account.label, group.id, incoming)
+                val received = awaitTexts(active, group.id, setOf(incoming), INVITE_TIMEOUT_MILLIS)
+                if (argument("receiveDiagnosticMode") != null) {
+                    reportReceiveDiagnostic(group, active, incoming, pass, sent, received.isNotEmpty())
+                }
+                assertEquals(setOf(incoming), received)
                 val outgoing = "healthy-outgoing-$pass"
                 active.runtime.sendText(active.account.label, group.id, outgoing)
                 assertEquals(
                     setOf(outgoing),
                     awaitTexts(group.sender, group.id, setOf(outgoing), INVITE_TIMEOUT_MILLIS),
                 )
-                assertTrue(active.runtime.chatList(active.account.label, true).none { it.groupIdHex == deleted })
+                if (mode == "delete") {
+                    assertTrue(active.runtime.chatList(active.account.label, true).none { it.groupIdHex == other })
+                }
                 close(active)
             }
         }
+
+    /** Correlate the exact published envelope with the test relay and native receive state. */
+    private suspend fun reportReceiveDiagnostic(
+        group: EstablishedGroup,
+        active: Participant,
+        incoming: String,
+        pass: Int,
+        sent: dev.ipf.marmotkit.SendSummaryFfi,
+        received: Boolean,
+    ) {
+        val query = TimelineMessageQueryFfi(group.id, null, null, null, null, null, PAGE)
+        val timeline = group.sender.runtime.timelineMessages(group.sender.account.label, query).messages
+        val source = timeline.firstOrNull { it.plaintext == incoming }?.sourceMessageIdHex
+        val warmup = timeline.firstOrNull { it.plaintext == FIRST_MESSAGE }?.sourceMessageIdHex
+        val report = JSONObject()
+            .put("pass", pass)
+            .put("received", received)
+            .put("published", sent.published.toInt())
+            .put("accept", sent.acceptDisposition.name)
+            .put("maintenance", sent.maintenanceDisposition.name)
+            .put("source", source)
+            .put("warmupLivePorts", org.json.JSONArray(relay.diagnosticDelivery(warmup)))
+            .put("livePorts", org.json.JSONArray(relay.diagnosticDelivery(source)))
+            .put("inRelay", relay.recordedEvents(GROUP_MESSAGE_KIND).any { it.optString("id") == source })
+            .put("replayQueries", source?.let { relay.queriesThatReturned(it).size })
+        runCatching {
+            val sender = group.sender
+            val senderMls = sender.runtime.groupDetails(sender.account.label, group.id).mlsState
+            val receiverMls = active.runtime.groupDetails(active.account.label, group.id).mlsState
+            val recovery = active.runtime.accountRecoveryStatus(active.account.label)
+            report.put("senderEpoch", senderMls.epoch.toLong())
+                .put("receiverEpoch", receiverMls.epoch.toLong())
+                .put("convergenceParked", receiverMls.convergenceParked)
+                .put("catchingUp", group.id in recovery.catchingUpGroupIdsHex)
+        }.onFailure { report.put("nativeReadError", it.javaClass.simpleName) }
+        InstrumentationRegistry.getInstrumentation().sendStatus(
+            0,
+            Bundle().apply { putString("receive_diagnostic", report.toString()) },
+        )
+    }
 
     /** An optional instrumentation argument, so a debugging run can use smaller counts and waits. */
     private fun argument(name: String): String? = InstrumentationRegistry.getArguments().getString(name)

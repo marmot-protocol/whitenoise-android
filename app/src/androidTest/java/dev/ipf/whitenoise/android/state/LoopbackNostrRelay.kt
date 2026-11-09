@@ -33,6 +33,12 @@ internal class LoopbackNostrRelay(
     private val publications = mutableListOf<JSONObject>()
     private val requests = mutableListOf<JSONObject>()
     private val clients = ConcurrentHashMap.newKeySet<Client>()
+    private val diagnosticLive = mutableMapOf<String, MutableSet<Int>>()
+
+    /** Report only synthetic connection ports and counts for the exact envelope. */
+    fun diagnosticDelivery(eventId: String?): List<Int> =
+        synchronized(lock) { diagnosticLive[eventId]?.sorted().orEmpty() }
+
 
     /** Test-controlled visibility models an advertised outbox without a discovery-only package. */
     @Volatile var hiddenKinds: Set<Int> = emptySet()
@@ -376,6 +382,7 @@ internal class LoopbackNostrRelay(
                 if (filters.any { matches(event, it) }) {
                     liveDeliveries.computeIfAbsent(event.optInt("kind")) { AtomicInteger() }.incrementAndGet()
                     sendJson(JSONArray().put("EVENT").put(id).put(event))
+                    diagnosticLive.getOrPut(event.getString("id")) { mutableSetOf() }.add(socket.port)
                 }
             }
         }

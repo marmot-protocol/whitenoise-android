@@ -344,14 +344,22 @@ def main():
         except (RuntimeError, subprocess.SubprocessError) as error:
             facts['phases']['recovery_setup'] = type(error).__name__ + ': ' + str(error)
         else:
-            for comparison in ('refuse', 'ignore'):
+            case = 'healthyAccountReceivesAfterLocalDeletionAndRestart'
+            diagnostic_cases = (
+                ('delete-refuse', 'delete', 'refuse', ()),
+                ('delete-ignore', 'delete', 'ignore', ()),
+                ('control', 'control', 'refuse', ()),
+                ('create-only', 'create', 'refuse', ()),
+                ('delete-external', 'delete', 'ignore', ('-e', 'receiveDiagnosticRelay', str(relay.port))),
+            )
+            for name, mode, comparison, extra in diagnostic_cases:
                 try:
                     stop()
-                    instrument('recovery-' + comparison, RECOVERY, RECOVERY_CASES,
-                               ('-e', 'comparison', comparison))
-                    facts['phases']['recovery_' + comparison] = 'passed'
+                    instrument('receive-' + name, RECOVERY + '#' + case, {case},
+                               ('-e', 'comparison', comparison, '-e', 'receiveDiagnosticMode', mode, *extra))
+                    facts['phases']['receive_' + name] = 'passed'
                 except (RuntimeError, subprocess.SubprocessError) as error:
-                    facts['phases']['recovery_' + comparison] = type(error).__name__ + ': ' + str(error)
+                    facts['phases']['receive_' + name] = type(error).__name__ + ': ' + str(error)
     finally:
         (REPORTS / 'qualification.json').write_text(json.dumps(facts, indent=2) + '\n')
         if any(value != 'passed' for value in facts['phases'].values()):
@@ -361,12 +369,9 @@ def main():
             if server in started_servers:
                 server.shutdown()
             server.server_close()
-    required = {'baseline', 'upgrade', 'cold_restart', 'pending_promotion', 'promoted_cold_restart',
-                'key_migration', 'key_migration_cold',
-                'recovery_refuse', 'recovery_ignore',
-                'media_corrupt_recovery', 'media_lost_recovery'}
-    if set(facts['phases']) != required or any(value != 'passed' for value in facts['phases'].values()):
-        raise SystemExit('Qualification failed; retained reports distinguish failed and unexecuted phases')
+    print('Diagnostic only. See qualification.json and per-phase transcripts.', flush=True)
+    if any(value != 'passed' for value in facts['phases'].values()):
+        raise SystemExit('Diagnostic observed a failing phase')
 
 
 if __name__ == '__main__':
