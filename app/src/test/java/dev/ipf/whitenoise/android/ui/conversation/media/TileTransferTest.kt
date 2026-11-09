@@ -21,6 +21,7 @@ import dev.ipf.whitenoise.android.state.AttachmentCancellationState
 import dev.ipf.whitenoise.android.state.AttachmentTransferState
 import dev.ipf.whitenoise.android.state.NativeAttachmentProgress
 import dev.ipf.whitenoise.android.state.NativeAttachmentTerminalException
+import dev.ipf.whitenoise.android.state.attachmentFilePresentationState
 import dev.ipf.whitenoise.android.ui.theme.WhiteNoiseTheme
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -90,6 +91,23 @@ class TileTransferTest {
             "only the native phase tells a locally removed body from a lost one",
             tileObservesNative(false, false, AttachmentTransferState.NotRetained),
         )
+    }
+
+    /**
+     * In a conversation opened after the removal the host only knows the cache missed, so an idle received tile reads
+     * its native phase once, and a removed phase then presents as a locally removed body.
+     */
+    @Test
+    fun aFreshlyOpenedRemovedBodyIsProbedAndPresentsAsRemoved() {
+        val remote = AttachmentTransferState.Remote
+        assertTrue(tileProbesNative(observing = false, mine = false, host = remote))
+        assertFalse("a watched tile already has its phase", tileProbesNative(true, false, remote))
+        assertFalse("own sends have nothing to download", tileProbesNative(false, true, remote))
+        assertFalse(tileProbesNative(false, false, AttachmentTransferState.Available))
+        val removedPhase = progress(0, 4, phase = AttachmentTransferStateFfi.CLEANED_BY_SETTING)
+        val state = attachmentFilePresentationState(remote, removedPhase, AttachmentCancellationState.None)
+        val tile = transfer(state, removedPhase)
+        assertTrue(tile.removed && tile.visible && tile.needsDeliberateRetry)
     }
 
     /**

@@ -53,6 +53,7 @@ import dev.ipf.whitenoise.android.ui.icons.filled.Close
 import dev.ipf.whitenoise.android.ui.icons.filled.Refresh
 import dev.ipf.whitenoise.android.ui.theme.ScrimAlpha
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.take
 
 /** A tile's transfer control stays at least this large so Cancel and Retry are reachable by touch and TalkBack. */
 internal val TILE_TRANSFER_CONTROL_SIZE: Dp = 52.dp
@@ -119,6 +120,9 @@ internal class TileTransfer(
      */
     val removed: Boolean get() = unobstructed && !failed && progress?.phase in LOCALLY_REMOVED_PHASES
 
+    /** Only a deliberate retry recovers the body: it failed, the reader cancelled it, or this device removed it. */
+    val needsDeliberateRetry: Boolean get() = failed || cancelled || removed
+
     /** The tile replaces its spinner or Download action with the transfer control. */
     val visible: Boolean get() = cancelling || active || cancelled || failed || removed
 
@@ -164,8 +168,14 @@ internal fun rememberTileTransfer(
     val observed by remember(controller, key, reference.ciphertextSha256, reference.sourceEpoch, observing) {
         if (observing) controller.attachmentNativeProgress(messageIdHex, attachmentIndex) else emptyFlow()
     }.collectAsStateWithLifecycle(initialValue = null)
+    // An idle tile the cache cannot fill reads its native phase once, so a body this device removed offers Download
+    // again even in a conversation opened after the removal, without every idle tile holding a subscription.
+    val probing = tileProbesNative(observing, mine, host)
+    val probed by remember(controller, key, reference.ciphertextSha256, reference.sourceEpoch, probing) {
+        if (probing) controller.attachmentNativeProgress(messageIdHex, attachmentIndex).take(1) else emptyFlow()
+    }.collectAsStateWithLifecycle(initialValue = null)
     // A sample outlives its flow, so once observation stops the last one would describe a transfer that is over.
-    val native = if (observing) observed else null
+    val native = if (observing) observed else probed?.takeIf { probing && it.phase in LOCALLY_REMOVED_PHASES }
     val state = attachmentFilePresentationState(tileHostState(host, native, materializing), native, cancellation)
     return remember(state, native, cancellation, suppressed, failedLocally, storageBlockedLocally, controller, key) {
         TileTransfer(state, native, cancellation, suppressed, failedLocally, storageBlockedLocally) {
@@ -204,6 +214,16 @@ internal fun tileObservesNative(
                 // Only the native phase tells a body this device removed from one that is gone for good.
                 host == AttachmentTransferState.NotRetained
         )
+
+/**
+ * Whether an idle tile reads its native phase once: received media the cache cannot fill and that no feed already
+ * watches, so a body this device removed is told apart from one never downloaded.
+ */
+internal fun tileProbesNative(
+    observing: Boolean,
+    mine: Boolean,
+    host: AttachmentTransferState,
+): Boolean = !observing && !mine && host == AttachmentTransferState.Remote
 
 /**
  * A tile restarts its download without the coordinator that publishes Downloading for a file card, so a Cancelled left
