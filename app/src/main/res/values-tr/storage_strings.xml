@@ -60,6 +60,7 @@
     <string name="storage_remove">Kaldır</string>
     <string name="storage_removing">Kaldırılıyor</string>
     <string name="storage_select_all">Tümünü seç</string>
+    <string name="storage_select_shown">Gösterilenlerin tümünü seç</string>
     <string name="storage_clear_selection">Seçimi temizle</string>
     <plurals name="storage_selected">
         <item quantity="one">%1$d seçildi · %2$s</item>
@@ -78,8 +79,13 @@
         <item quantity="one">%1$d ek kaldırıldı · %2$s yer açıldı</item>
         <item quantity="other">%1$d ek kaldırıldı · %2$s yer açıldı</item>
     </plurals>
+    <plurals name="storage_removed">
+        <item quantity="one">%d ek kaldırıldı</item>
+        <item quantity="other">%d ek kaldırıldı</item>
+    </plurals>
     <string name="storage_nothing_removed">Eşleşen ek olmadığından hiçbir şey kaldırılmadı</string>
     <string name="storage_keep_media_saved">Medya saklama ayarı kaydedildi</string>
     <string name="storage_cache_cleared">%1$s yer açıldı</string>
+    <string name="storage_caches_cleared">Fotoğraflar ve geçici dosyalar temizlendi</string>
     <string name="storage_action_failed">Yer açılamadı. Tekrar deneyin.</string>
 </resources>

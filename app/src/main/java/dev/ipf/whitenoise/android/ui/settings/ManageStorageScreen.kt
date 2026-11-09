@@ -51,7 +51,10 @@ internal fun ManageStorageScreen(
 ) {
     val controller = rememberManageStorageController(appState)
     val state by controller.state.collectAsStateWithLifecycle()
-    var list by rememberSaveable(appState.activeAccountRef) { mutableStateOf<String?>(null) }
+    // A new runtime retires the controller, so an open list closes with it instead of reading a retired access.
+    var list by rememberSaveable(appState.activeAccountRef, appState.runtimeGeneration) {
+        mutableStateOf<String?>(null)
+    }
     val context = LocalContext.current
     LaunchedEffect(state.outcome) {
         state.outcome?.let {

@@ -59,6 +59,7 @@
     <string name="storage_remove">移除</string>
     <string name="storage_removing">正在移除</string>
     <string name="storage_select_all">全选</string>
+    <string name="storage_select_shown">全选已显示的项</string>
     <string name="storage_clear_selection">清除选择</string>
     <plurals name="storage_selected">
         <item quantity="other">已选择 %1$d 项 · %2$s</item>
@@ -74,8 +75,12 @@
     <plurals name="storage_removed_freed">
         <item quantity="other">已移除 %1$d 个附件 · 已释放 %2$s</item>
     </plurals>
+    <plurals name="storage_removed">
+        <item quantity="other">已移除 %d 个附件</item>
+    </plurals>
     <string name="storage_nothing_removed">没有匹配的附件，因此未移除任何内容</string>
     <string name="storage_keep_media_saved">已保存“保留媒体”设置</string>
     <string name="storage_cache_cleared">已释放 %1$s</string>
+    <string name="storage_caches_cleared">已清除图片和临时文件</string>
     <string name="storage_action_failed">无法释放空间。请重试。</string>
 </resources>

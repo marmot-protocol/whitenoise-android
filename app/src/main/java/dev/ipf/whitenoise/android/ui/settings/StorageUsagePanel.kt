@@ -110,7 +110,12 @@ internal fun StorageUsagePanel(
 ) {
     val categories = usage?.let { storageCategories(it) }.orEmpty()
     val total = usage?.let { storageBytes(it.totalBytes) }
-    val parts = categories.map { "${stringResource(it.labelRes)} ${storageBytes(it.bytes)}" }.joinToString()
+    val parts =
+        categories
+            .map { category ->
+                val sized = "${stringResource(category.labelRes)} ${storageBytes(category.bytes)}"
+                listOfNotNull(sized, category.detail).joinToString(", ")
+            }.joinToString()
     val described =
         stringResource(
             R.string.storage_usage_description,

@@ -62,6 +62,7 @@
     <string name="storage_remove">Удалить</string>
     <string name="storage_removing">Удаление</string>
     <string name="storage_select_all">Выбрать все</string>
+    <string name="storage_select_shown">Выбрать все показанные</string>
     <string name="storage_clear_selection">Снять выбор</string>
     <plurals name="storage_selected">
         <item quantity="one">Выбрано %1$d · %2$s</item>
@@ -86,8 +87,15 @@
         <item quantity="many">Удалено %1$d вложений · освобождено %2$s</item>
         <item quantity="other">Удалено %1$d вложения · освобождено %2$s</item>
     </plurals>
+    <plurals name="storage_removed">
+        <item quantity="one">Удалено %d вложение</item>
+        <item quantity="few">Удалено %d вложения</item>
+        <item quantity="many">Удалено %d вложений</item>
+        <item quantity="other">Удалено %d вложения</item>
+    </plurals>
     <string name="storage_nothing_removed">Подходящих вложений нет, ничего не удалено</string>
     <string name="storage_keep_media_saved">Срок хранения медиа сохранён</string>
     <string name="storage_cache_cleared">Освобождено %1$s</string>
+    <string name="storage_caches_cleared">Фото и временные файлы очищены</string>
     <string name="storage_action_failed">Не удалось освободить место. Повторите попытку.</string>
 </resources>

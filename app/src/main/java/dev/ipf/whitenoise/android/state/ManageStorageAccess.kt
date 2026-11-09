@@ -178,14 +178,22 @@ internal class NativeManageStorageAccess(
             }
         }
 
-    /** Removes every selected attachment that is still held, then evicts exactly those decrypted copies. */
+    /**
+     * Removes every selected attachment that is still held, then evicts exactly those decrypted copies. A failure
+     * part way still evicts what was already removed, and fails the action only when nothing was.
+     */
     override suspend fun removeAttachments(items: List<StoredAttachment>): Long =
         admitted(removal = true) {
-            val removed = items.filter { item -> native { removeLocalAttachment(account, item) } }
+            val removed = mutableListOf<StoredAttachment>()
+            val failure =
+                runCatching {
+                    items.forEach { item -> if (native { removeLocalAttachment(account, item) }) removed += item }
+                }.exceptionOrNull()
             if (removed.isNotEmpty()) {
                 appState.evictAttachmentCopies(account, removed)
                 appState.clearTemporaryAttachmentFiles()
             }
+            if (failure != null && removed.isEmpty()) throw failure
             removed.size.toLong()
         }
 

@@ -60,6 +60,7 @@
     <string name="storage_remove">Remover</string>
     <string name="storage_removing">Removendo</string>
     <string name="storage_select_all">Selecionar tudo</string>
+    <string name="storage_select_shown">Selecionar todos os exibidos</string>
     <string name="storage_clear_selection">Limpar seleção</string>
     <plurals name="storage_selected">
         <item quantity="one">%1$d selecionado · %2$s</item>
@@ -78,8 +79,13 @@
         <item quantity="one">%1$d anexo removido · %2$s liberados</item>
         <item quantity="other">%1$d anexos removidos · %2$s liberados</item>
     </plurals>
+    <plurals name="storage_removed">
+        <item quantity="one">%d anexo removido</item>
+        <item quantity="other">%d anexos removidos</item>
+    </plurals>
     <string name="storage_nothing_removed">Nenhum anexo correspondeu, então nada foi removido</string>
-    <string name="storage_keep_media_saved">Manter mídia salvo</string>
+    <string name="storage_keep_media_saved">Configuração «Manter mídia» salva</string>
     <string name="storage_cache_cleared">%1$s liberados</string>
+    <string name="storage_caches_cleared">Fotos e arquivos temporários limpos</string>
     <string name="storage_action_failed">Não foi possível liberar espaço. Tente novamente.</string>
 </resources>

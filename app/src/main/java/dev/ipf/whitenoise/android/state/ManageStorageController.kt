@@ -42,12 +42,15 @@ internal sealed interface StorageAction {
     data object ClearCaches : StorageAction
 }
 
-/** What the last action did, announced once. [freedBytes] is measured from usage before and after. */
+/**
+ * What the last action did, announced once. [freedBytes] is measured from usage before and after, and is null when
+ * either reading failed, so a stale figure is never announced as freed space.
+ */
 internal sealed interface StorageOutcome {
     /** [count] attachments were removed. */
     data class Removed(
         val count: Long,
-        val freedBytes: Long,
+        val freedBytes: Long?,
     ) : StorageOutcome
 
     /** The action ran but nothing matched it. */
@@ -58,7 +61,7 @@ internal sealed interface StorageOutcome {
 
     /** Caches were cleared. */
     data class CacheCleared(
-        val freedBytes: Long,
+        val freedBytes: Long?,
     ) : StorageOutcome
 
     /** The action could not finish. */
@@ -134,11 +137,11 @@ internal class ManageStorageController(
         scope.launch {
             val outcome = runCatchingAction { requireNotNull(access).execute(action) }
             if (!current) return@launch retire()
-            reloadUsage()
+            val after = reloadUsage()
             mutable.value =
                 state.value.copy(
                     action = null,
-                    outcome = outcome?.let { describe(action, it, before, state.value.usage) } ?: StorageOutcome.Failed,
+                    outcome = outcome?.let { describe(action, it, before, after) } ?: StorageOutcome.Failed,
                     revision = state.value.revision + 1,
                 )
             refresh(readUsage = false)
@@ -150,19 +153,24 @@ internal class ManageStorageController(
         mutable.value = state.value.copy(outcome = null)
     }
 
-    /** Reads usage again, keeping the last figures on failure, and schedules a poll while a migration runs. */
-    private suspend fun reloadUsage() {
-        if (!current) return
+    /**
+     * Reads usage again, keeping the last figures on failure, and schedules a poll while a migration runs. Returns
+     * the fresh reading, or null when it failed.
+     */
+    private suspend fun reloadUsage(): StorageUsage? {
+        if (!current) return null
         mutable.value = state.value.copy(usageLoading = true)
-        val usage = runCatchingAction { requireNotNull(access).usage() }
-        if (!current) return
-        mutable.value =
-            state.value.copy(
-                usage = usage ?: state.value.usage,
-                usageLoading = false,
-                usageFailed = usage == null,
-            )
-        schedulePoll(usage?.migration)
+        val usage = runCatchingAction { requireNotNull(access).usage() }?.takeIf { current }
+        if (current) {
+            mutable.value =
+                state.value.copy(
+                    usage = usage ?: state.value.usage,
+                    usageLoading = false,
+                    usageFailed = usage == null,
+                )
+            schedulePoll(usage?.migration)
+        }
+        return usage
     }
 
     /** Reads the account's Keep media window. */
@@ -250,7 +258,7 @@ internal fun describe(
     // drops temporary playback copies, while clearing caches reports the cache space.
     val clearing = action == StorageAction.ClearCaches
     val measure: (StorageUsage) -> Long = { if (clearing) it.clearableCacheBytes else it.attachmentBytes }
-    val freed = ((before?.let(measure) ?: 0) - (after?.let(measure) ?: Long.MAX_VALUE)).coerceAtLeast(0)
+    val freed = if (before == null || after == null) null else (measure(before) - measure(after)).coerceAtLeast(0)
     return when {
         action == StorageAction.ClearCaches -> StorageOutcome.CacheCleared(freed)
         removed > 0 -> StorageOutcome.Removed(removed, freed)

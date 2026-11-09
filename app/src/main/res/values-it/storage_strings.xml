@@ -60,6 +60,7 @@
     <string name="storage_remove">Rimuovi</string>
     <string name="storage_removing">Rimozione</string>
     <string name="storage_select_all">Seleziona tutto</string>
+    <string name="storage_select_shown">Seleziona tutti quelli visualizzati</string>
     <string name="storage_clear_selection">Deseleziona</string>
     <plurals name="storage_selected">
         <item quantity="one">%1$d selezionato · %2$s</item>
@@ -78,8 +79,13 @@
         <item quantity="one">%1$d allegato rimosso · %2$s liberati</item>
         <item quantity="other">%1$d allegati rimossi · %2$s liberati</item>
     </plurals>
+    <plurals name="storage_removed">
+        <item quantity="one">%d allegato rimosso</item>
+        <item quantity="other">%d allegati rimossi</item>
+    </plurals>
     <string name="storage_nothing_removed">Nessun allegato corrispondente, quindi non è stato rimosso nulla</string>
-    <string name="storage_keep_media_saved">Conserva contenuti multimediali salvato</string>
+    <string name="storage_keep_media_saved">Impostazione «Conserva contenuti multimediali» salvata</string>
     <string name="storage_cache_cleared">%1$s liberati</string>
+    <string name="storage_caches_cleared">Immagini e file temporanei cancellati</string>
     <string name="storage_action_failed">Impossibile liberare spazio. Riprova.</string>
 </resources>

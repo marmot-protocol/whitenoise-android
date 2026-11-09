@@ -52,7 +52,7 @@ class ManageStorageSemanticsTest {
             "Storage used: ${size(usage.totalBytes)}",
             "Attachments ${size(usage.attachmentBytes)}",
             "Messages and chat data ${size(usage.chatDataBytes)}",
-            "Temporary files ${size(usage.temporaryBytes)}",
+            "Temporary files ${size(usage.temporaryBytes)}, Shared by all profiles on this device",
         ).forEach { assert(description.contains(it)) { "$it missing from $description" } }
         assert(!description.contains("Unused database space")) { "Empty unused space must be left out" }
     }
@@ -65,6 +65,13 @@ class ManageStorageSemanticsTest {
         nodes[0].assertIsSelected()
         nodes[1].assert(SemanticsMatcher.expectValue(SemanticsProperties.Selected, false))
         composeRule.onNodeWithContentDescription("Select all").assertExists()
+    }
+
+    /** Before the last page loads, select-all says it selects only the rows shown. */
+    @Test fun selectAllNamesItsScopeWhileMoreRowsRemain() {
+        val rows = listOf(attachment("a", 9_000_000), attachment("b", 4_000_000))
+        renderList(StoredAttachmentsUiState(items = rows, complete = false, selected = setOf(rows.first().key)))
+        composeRule.onNodeWithContentDescription("Select all shown").assertExists()
     }
 
     /** A failed page offers Try again, which resumes the list. */

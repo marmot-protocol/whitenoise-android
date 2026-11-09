@@ -60,6 +60,7 @@
     <string name="storage_remove">Remove</string>
     <string name="storage_removing">Removing</string>
     <string name="storage_select_all">Select all</string>
+    <string name="storage_select_shown">Select all shown</string>
     <string name="storage_clear_selection">Clear selection</string>
     <plurals name="storage_selected">
         <item quantity="one">%1$d selected · %2$s</item>
@@ -78,8 +79,13 @@
         <item quantity="one">Removed %1$d attachment · %2$s freed</item>
         <item quantity="other">Removed %1$d attachments · %2$s freed</item>
     </plurals>
+    <plurals name="storage_removed">
+        <item quantity="one">Removed %d attachment</item>
+        <item quantity="other">Removed %d attachments</item>
+    </plurals>
     <string name="storage_nothing_removed">No attachments matched, so nothing was removed</string>
-    <string name="storage_keep_media_saved">Keep media saved</string>
+    <string name="storage_keep_media_saved">Keep media setting saved</string>
     <string name="storage_cache_cleared">%1$s freed</string>
+    <string name="storage_caches_cleared">Pictures and temporary files cleared</string>
     <string name="storage_action_failed">Couldn\'t free up space. Try again.</string>
 </resources>

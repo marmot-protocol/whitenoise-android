@@ -61,6 +61,14 @@
           "SET-048",
           "SET-049"
         ]
+      },
+      {
+        "surface": "string:storage_select_shown",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StoredAttachmentsScreen.kt",
+        "anchor": "R.string.storage_select_shown",
+        "test_ids": [
+          "SET-049"
+        ]
       }
     ],
     "settings_controls": [

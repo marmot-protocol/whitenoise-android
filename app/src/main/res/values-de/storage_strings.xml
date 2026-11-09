@@ -60,6 +60,7 @@
     <string name="storage_remove">Entfernen</string>
     <string name="storage_removing">Wird entfernt</string>
     <string name="storage_select_all">Alle auswählen</string>
+    <string name="storage_select_shown">Alle angezeigten auswählen</string>
     <string name="storage_clear_selection">Auswahl aufheben</string>
     <plurals name="storage_selected">
         <item quantity="one">%1$d ausgewählt · %2$s</item>
@@ -78,8 +79,13 @@
         <item quantity="one">%1$d Anhang entfernt · %2$s frei</item>
         <item quantity="other">%1$d Anhänge entfernt · %2$s frei</item>
     </plurals>
+    <plurals name="storage_removed">
+        <item quantity="one">%d Anhang entfernt</item>
+        <item quantity="other">%d Anhänge entfernt</item>
+    </plurals>
     <string name="storage_nothing_removed">Keine passenden Anhänge, daher wurde nichts entfernt</string>
-    <string name="storage_keep_media_saved">„Medien behalten“ gespeichert</string>
+    <string name="storage_keep_media_saved">Einstellung „Medien behalten“ gespeichert</string>
     <string name="storage_cache_cleared">%1$s freigegeben</string>
+    <string name="storage_caches_cleared">Bilder und temporäre Dateien gelöscht</string>
     <string name="storage_action_failed">Speicherplatz konnte nicht freigegeben werden. Versuche es erneut.</string>
 </resources>

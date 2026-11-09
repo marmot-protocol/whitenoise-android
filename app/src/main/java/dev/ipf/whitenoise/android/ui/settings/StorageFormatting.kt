@@ -78,16 +78,27 @@ internal fun storageOutcomeText(
     outcome: StorageOutcome,
 ): String =
     when (outcome) {
-        is StorageOutcome.Removed ->
-            context.resources.getQuantityString(
-                R.plurals.storage_removed_freed,
-                outcome.count.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
-                outcome.count,
-                formatStorageBytes(context, outcome.freedBytes),
-            )
+        is StorageOutcome.Removed -> removedText(context, outcome.count, outcome.freedBytes)
         StorageOutcome.NothingRemoved -> context.getString(R.string.storage_nothing_removed)
         StorageOutcome.KeepMediaSaved -> context.getString(R.string.storage_keep_media_saved)
         is StorageOutcome.CacheCleared ->
-            context.getString(R.string.storage_cache_cleared, formatStorageBytes(context, outcome.freedBytes))
+            outcome.freedBytes
+                ?.let { context.getString(R.string.storage_cache_cleared, formatStorageBytes(context, it)) }
+                ?: context.getString(R.string.storage_caches_cleared)
         StorageOutcome.Failed -> context.getString(R.string.storage_action_failed)
     }
+
+/** "Removed N attachments", with the space freed when it could be measured. */
+private fun removedText(
+    context: Context,
+    count: Long,
+    freedBytes: Long?,
+): String {
+    val quantity = count.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+    return if (freedBytes == null) {
+        context.resources.getQuantityString(R.plurals.storage_removed, quantity, count)
+    } else {
+        val freed = formatStorageBytes(context, freedBytes)
+        context.resources.getQuantityString(R.plurals.storage_removed_freed, quantity, count, freed)
+    }
+}

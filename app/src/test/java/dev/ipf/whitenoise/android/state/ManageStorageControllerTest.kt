@@ -84,6 +84,18 @@ class ManageStorageControllerTest {
             controller.close()
         }
 
+    /** A removal whose follow-up usage read fails still reports its count, but no freed space it could not measure. */
+    @Test fun removalWithFailedUsageReadOmitsFreedBytes() =
+        runTest {
+            val access = FakeStorageAccess().apply { removed = 2 }
+            val controller = open(access)
+            access.failUsage = true
+            controller.perform(StorageAction.RemoveChat("a"))
+            runCurrent()
+            assertEquals(StorageOutcome.Removed(count = 2, freedBytes = null), controller.state.value.outcome)
+            controller.close()
+        }
+
     /** Nothing matching is reported as such, while an unchanged Keep media window reports it was saved. */
     @Test fun emptyRemovalsAreDistinguishedFromSavedKeepMedia() =
         runTest {

@@ -64,12 +64,13 @@ class ManageStorageModelsTest {
         assertEquals(5L, 5uL.toSaturatedLong())
     }
 
-    /** Clearing caches announces freed bytes from the change in removable usage. */
+    /** Clearing caches announces freed bytes from the change in removable usage, and none when a reading is missing. */
     @Test fun describeMeasuresFreedBytes() {
         val before = StorageUsage(1_000, 4, 200, 0, 50, 10)
         val after = before.copy(pictureCacheBytes = 0, temporaryBytes = 0)
         assertEquals(StorageOutcome.CacheCleared(60), describe(StorageAction.ClearCaches, 0, before, after))
-        assertEquals(StorageOutcome.Removed(2, 0), describe(StorageAction.RemoveChat("a"), 2, before, null))
+        assertEquals(StorageOutcome.CacheCleared(null), describe(StorageAction.ClearCaches, 0, null, after))
+        assertEquals(StorageOutcome.Removed(2, null), describe(StorageAction.RemoveChat("a"), 2, before, null))
     }
 
     /** A removal announces only the attachment space it returned, not temporary copies dropped alongside it. */

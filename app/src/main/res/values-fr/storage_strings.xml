@@ -60,6 +60,7 @@
     <string name="storage_remove">Supprimer</string>
     <string name="storage_removing">Suppression</string>
     <string name="storage_select_all">Tout sélectionner</string>
+    <string name="storage_select_shown">Tout sélectionner à l\'écran</string>
     <string name="storage_clear_selection">Effacer la sélection</string>
     <plurals name="storage_selected">
         <item quantity="one">%1$d sélectionnée · %2$s</item>
@@ -78,8 +79,13 @@
         <item quantity="one">%1$d pièce jointe supprimée · %2$s libérés</item>
         <item quantity="other">%1$d pièces jointes supprimées · %2$s libérés</item>
     </plurals>
+    <plurals name="storage_removed">
+        <item quantity="one">%d pièce jointe supprimée</item>
+        <item quantity="other">%d pièces jointes supprimées</item>
+    </plurals>
     <string name="storage_nothing_removed">Aucune pièce jointe ne correspondait, rien n\'a été supprimé</string>
-    <string name="storage_keep_media_saved">Conserver les médias enregistré</string>
+    <string name="storage_keep_media_saved">Réglage « Conserver les médias » enregistré</string>
     <string name="storage_cache_cleared">%1$s libérés</string>
+    <string name="storage_caches_cleared">Photos et fichiers temporaires effacés</string>
     <string name="storage_action_failed">Impossible de libérer de l\'espace. Réessayez.</string>
 </resources>

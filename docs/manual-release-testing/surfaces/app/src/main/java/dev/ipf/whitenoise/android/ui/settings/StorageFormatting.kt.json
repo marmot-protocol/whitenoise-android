@@ -4,6 +4,16 @@
   "categories": {
     "settings_controls": [
       {
+        "surface": "plurals:storage_removed",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.plurals.storage_removed",
+        "test_ids": [
+          "SET-048",
+          "SET-049",
+          "SET-050"
+        ]
+      },
+      {
         "surface": "plurals:storage_removed_freed",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
         "anchor": "R.plurals.storage_removed_freed",
@@ -57,6 +67,14 @@
         "surface": "string:storage_cache_cleared",
         "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
         "anchor": "R.string.storage_cache_cleared",
+        "test_ids": [
+          "SET-050"
+        ]
+      },
+      {
+        "surface": "string:storage_caches_cleared",
+        "source": "app/src/main/java/dev/ipf/whitenoise/android/ui/settings/StorageFormatting.kt",
+        "anchor": "R.string.storage_caches_cleared",
         "test_ids": [
           "SET-050"
         ]

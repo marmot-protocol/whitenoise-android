@@ -173,7 +173,10 @@ private fun LazyListScope.storageChatActionItems(
     }
 }
 
-/** Select all, or clear the selection once everything loaded is selected. */
+/**
+ * Select all, or clear the selection once everything loaded is selected. Before the last page loads it selects only
+ * the rows shown, and says so.
+ */
 @Composable
 private fun SelectAllAction(
     list: StoredAttachmentsUiState,
@@ -183,16 +186,20 @@ private fun SelectAllAction(
     IconButton(onClick = { onSelectAll(!all) }, modifier = Modifier.testTag("storage.select_all")) {
         Icon(
             painterResource(if (all) R.drawable.ic_deselect_all else R.drawable.ic_select_all),
-            contentDescription = stringResource(selectAllLabel(all)),
+            contentDescription = stringResource(selectAllLabel(all, list.complete)),
         )
     }
 }
 
-/** Names the select-all action for its current effect. */
-private fun selectAllLabel(allSelected: Boolean): Int =
-    when (allSelected) {
-        true -> R.string.storage_clear_selection
-        false -> R.string.storage_select_all
+/** Names the select-all action for its current effect and scope. */
+private fun selectAllLabel(
+    allSelected: Boolean,
+    complete: Boolean,
+): Int =
+    when {
+        allSelected -> R.string.storage_clear_selection
+        complete -> R.string.storage_select_all
+        else -> R.string.storage_select_shown
     }
 
 /** The pinned bar while selecting: the live count and size, and Remove. */
