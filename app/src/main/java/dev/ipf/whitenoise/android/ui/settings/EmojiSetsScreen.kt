@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
@@ -124,6 +125,7 @@ internal fun EmojiSetsContent(
     profileName: String? = null,
 ) {
     val title = stringResource(R.string.emoji_sets_title)
+    val query = rememberTextFieldState()
     val accountTitle: (@Composable () -> Unit)? =
         if (profileName == null) {
             null
@@ -133,7 +135,7 @@ internal fun EmojiSetsContent(
     SettingsScaffold(title = title, onBack = onBack, titleContent = accountTitle) {
         val set = state.preview
         if (set == null) {
-            EmojiSetBrowser(state, onSearch, onShow)
+            EmojiSetBrowser(state, query, onSearch, onShow)
         } else {
             EmojiSetPreview(state, set, onLoadArtwork, onInstall, onCancel, onRemove) { onSearch(set.coordinate) }
         }
@@ -156,10 +158,10 @@ private fun EmojiSetsAccountTitle(
 @Composable
 private fun EmojiSetBrowser(
     state: EmojiSetsState,
+    field: TextFieldState,
     onSearch: (String) -> Unit,
     onShow: (EmojiSetFfi) -> Unit,
 ) {
-    val field = rememberTextFieldState()
     SettingsList {
         item {
             Column(
